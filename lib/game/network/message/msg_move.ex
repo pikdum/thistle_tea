@@ -33,15 +33,22 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   ]
 
   @impl ClientMessage
-  def handle(%__MODULE__{}, %{character: %Character{internal: %{taxi_flight: %Flight{}}}} = state), do: state
+  def handle(%__MODULE__{} = message, %{character: %Character{} = character} = state) do
+    if PlayerMovement.accepts_input?(character), do: handle_movement(message, state), else: state
+  end
 
-  def handle(%__MODULE__{}, %{server_movement: server_movement} = state) when not is_nil(server_movement), do: state
+  def handle(%__MODULE__{} = message, state), do: handle_movement(message, state)
 
-  def handle(
-        %__MODULE__{payload: payload, opcode: opcode},
-        %{ready: true, guid: player_guid, active_mover_guid: mover_guid, character: %Character{} = character} = state
-      )
-      when is_integer(mover_guid) and mover_guid > 0 and mover_guid != player_guid do
+  defp handle_movement(%__MODULE__{}, %{character: %Character{internal: %{taxi_flight: %Flight{}}}} = state), do: state
+
+  defp handle_movement(%__MODULE__{}, %{server_movement: server_movement} = state) when not is_nil(server_movement),
+    do: state
+
+  defp handle_movement(
+         %__MODULE__{payload: payload, opcode: opcode},
+         %{ready: true, guid: player_guid, active_mover_guid: mover_guid, character: %Character{} = character} = state
+       )
+       when is_integer(mover_guid) and mover_guid > 0 and mover_guid != player_guid do
     if Companion.control_guid(character) == mover_guid do
       case Entity.pid(mover_guid) do
         pid when is_pid(pid) -> send(pid, {:controlled_move, payload, opcode})
@@ -52,16 +59,16 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     state
   end
 
-  def handle(
-        %__MODULE__{payload: payload} = message,
-        %{
-          ready: true,
-          guid: player_guid,
-          active_mover_guid: mover_guid,
-          character: %Character{movement_block: %MovementBlock{} = movement_block, unit: %Unit{}} = character
-        } = state
-      )
-      when mover_guid in [nil, player_guid] do
+  defp handle_movement(
+         %__MODULE__{payload: payload} = message,
+         %{
+           ready: true,
+           guid: player_guid,
+           active_mover_guid: mover_guid,
+           character: %Character{movement_block: %MovementBlock{} = movement_block, unit: %Unit{}} = character
+         } = state
+       )
+       when mover_guid in [nil, player_guid] do
     movement_block = MovementBlock.from_binary(payload, movement_block)
 
     case Transports.reconcile(character, movement_block) do
@@ -74,7 +81,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     end
   end
 
-  def handle(_message, state), do: state
+  defp handle_movement(_message, state), do: state
 
   @impl ClientMessage
   def from_binary(payload) do

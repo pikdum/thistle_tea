@@ -1,21 +1,23 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Fear do
   @moduledoc """
-  Runs frightened creatures using navigation observations supplied by their
+  Runs frightened entities using navigation observations supplied by their
   owner. Each completed run is followed by a pause before choosing a new run.
   """
 
-  alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Fear, as: FearMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
+  alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Logic.Movement
 
-  def tick(%Mob{} = mob, %Blackboard{} = blackboard, %Context{} = context) do
-    if Fear.active?(mob) do
+  def tick(%{unit: %Unit{}, internal: %Internal{}} = mob, %Blackboard{} = blackboard, %Context{} = context) do
+    if ControlMovement.mode(mob) == :fear do
       memory = blackboard.fear || %FearMemory{previous_running: mob.internal.running}
       run(mob, %{blackboard | fear: memory}, context)
     else

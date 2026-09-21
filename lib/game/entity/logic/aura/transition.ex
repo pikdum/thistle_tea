@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Aura.ViewpointSync
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.DiminishingReturns
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -82,7 +83,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     script_events = Script.after_remove(entity, removed, cause)
     {entity, control_events} = ControlSync.sync(entity, now)
     {entity, movement_events} = MovementSync.sync_movement_state(entity, now)
-    {entity, fear_events} = Fear.reconcile(entity, previous, holders, now)
+    {entity, control_movement_events} = ControlMovement.reconcile(entity, previous, holders, now)
     {entity, feign_events} = Hunter.reconcile_feign_death(entity, previous, holders, now)
     entity = maybe_interrupt_fear_casting(entity)
     viewpoint_events = ViewpointSync.events(previous, holders, entity_guid(entity))
@@ -98,7 +99,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
         script_events ++
         control_events ++
         feign_events ++
-        viewpoint_events ++ release_events ++ movement_events ++ fear_events ++ forced_reaction_events ++ threat_events
+        viewpoint_events ++
+        release_events ++ movement_events ++ control_movement_events ++ forced_reaction_events ++ threat_events
 
     {Core.mark_broadcast_update(entity), events}
   end

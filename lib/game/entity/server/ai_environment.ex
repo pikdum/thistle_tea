@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Navigation, as: NavigationMemory
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Confusion
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
@@ -27,7 +28,6 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
   alias ThistleTea.Game.Entity.Logic.AI.Script
-  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Condition.Requirements
   alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Server.NavigationResolver
@@ -458,13 +458,11 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     end
   end
 
-  defp random_point_requests(%Mob{} = entity, now) do
-    [wander_request(entity, now), confused_request(entity, now)]
+  defp random_point_requests(entity, now) do
+    [wander_request(entity, now), Confusion.request(entity, now)]
     |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
   end
-
-  defp random_point_requests(_entity, _now), do: []
 
   defp wander_request(
          %Mob{
@@ -485,26 +483,5 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     end
   end
 
-  defp wander_request(%Mob{}, _now), do: nil
-
-  defp confused_request(%Mob{} = entity, now) when is_integer(now) do
-    blackboard = Blackboard.ensure(entity.internal.blackboard)
-
-    if confused_wander_ready?(entity, blackboard, now) do
-      anchor = confused_anchor(blackboard, entity.movement_block)
-      {entity.internal.world.map_id, anchor, MobBT.confused_wander_radius()}
-    end
-  end
-
-  defp confused_wander_ready?(%Mob{} = entity, %Blackboard{} = blackboard, now) do
-    Aura.has_aura?(entity, :mod_confuse) and
-      is_nil(blackboard.navigation.target) and
-      Blackboard.ready_for?(blackboard, :next_confused_at, now)
-  end
-
-  defp confused_anchor(%Blackboard{navigation: %NavigationMemory{confused_anchor: {_key, anchor}}}, %MovementBlock{}) do
-    anchor
-  end
-
-  defp confused_anchor(%Blackboard{}, %MovementBlock{position: {x, y, z, _orientation}}), do: {x, y, z}
+  defp wander_request(_entity, _now), do: nil
 end

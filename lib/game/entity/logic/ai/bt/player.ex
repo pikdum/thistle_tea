@@ -7,8 +7,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Confusion
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Fear
   alias ThistleTea.Game.Entity.Logic.AI.BT.Ranged, as: RangedBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Breathing
@@ -24,6 +26,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
       BT.action(&sync_combat/2),
       BT.action(&pvp_tick/3),
       BT.action(&reactive_tick/3),
+      BT.action(&Confusion.tick/3),
+      BT.action(&Fear.tick/3),
       SpellBT.casting_sequence(),
       RangedBT.sequence(),
       CombatBT.melee_sequence(),

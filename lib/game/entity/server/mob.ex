@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
@@ -786,26 +787,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_info(
         {:controlled_move, payload, opcode},
-        %Mob{
-          internal: %Internal{pet: %Pet{possessed?: true, owner_guid: owner_guid}},
-          movement_block: %MovementBlock{} = movement_block
-        } = state
+        %Mob{internal: %Internal{pet: %Pet{possessed?: true}}, movement_block: %MovementBlock{}} = state
       ) do
-    movement_block = MovementBlock.from_binary(payload, movement_block)
-    {x, y, z, _orientation} = movement_block.position
-    state = %{state | movement_block: movement_block, unit: %{state.unit | stand_state: 0}}
-
-    World.update_position(state)
-    sync_orientation_metadata(state)
-    state = Visibility.refresh_entity(state)
-
-    BinaryUtils.pack_guid(state.object.guid)
-    |> Kernel.<>(payload)
-    |> Packet.build(opcode)
-    |> World.broadcast_packet(state, recipients: Enum.uniq([owner_guid | World.tracking_players(state)]))
-
-    ChaseWatch.notify_moved(state.object.guid, {x, y, z})
-    {:noreply, state}
+    if ControlMovement.active?(state),
+      do: {:noreply, state},
+      else: {:noreply, apply_controlled_move(state, payload, opcode)}
+  rescue
+    error ->
+      Logger.error("Controlled movement failed: #{inspect(error)}")
+      {:noreply, state}
   end
 
   def handle_info({:controlled_move, _payload, _opcode}, state), do: {:noreply, state}
@@ -1058,6 +1048,24 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_info({:event_start, _event}, state) do
     {:noreply, state}
+  end
+
+  defp apply_controlled_move(%Mob{internal: %{pet: %Pet{owner_guid: owner_guid}}} = state, payload, opcode) do
+    movement_block = MovementBlock.from_binary(payload, state.movement_block)
+    {x, y, z, _orientation} = movement_block.position
+    state = %{state | movement_block: movement_block, unit: %{state.unit | stand_state: 0}}
+
+    World.update_position(state)
+    sync_orientation_metadata(state)
+    state = Visibility.refresh_entity(state)
+
+    BinaryUtils.pack_guid(state.object.guid)
+    |> Kernel.<>(payload)
+    |> Packet.build(opcode)
+    |> World.broadcast_packet(state, recipients: Enum.uniq([owner_guid | World.tracking_players(state)]))
+
+    ChaseWatch.notify_moved(state.object.guid, {x, y, z})
+    state
   end
 
   defp stop_after_event(state) do

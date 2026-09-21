@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.ItemOpening do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
@@ -18,7 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.ItemOpening do
       Core.dead?(character) ->
         {:error, :you_are_dead}
 
-      not is_nil(character.internal.taxi_flight) ->
+      movement_restricted?(character) ->
         {:error, :cant_do_right_now}
 
       item.item.owner != character.object.guid ->
@@ -36,6 +37,9 @@ defmodule ThistleTea.Game.Entity.Logic.ItemOpening do
   end
 
   def validate(_character, _item), do: {:error, :item_not_found}
+
+  defp movement_restricted?(%Character{} = character),
+    do: not is_nil(character.internal.taxi_flight) or ControlMovement.active?(character)
 
   def validate_unlock(%Item{} = item) do
     if locked?(item), do: :ok, else: {:error, :already_open}

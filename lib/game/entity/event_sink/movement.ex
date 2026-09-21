@@ -4,9 +4,9 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   alias ThistleTea.Game.Entity.Commands
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Data.Taxi.Flight
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Network.Message
@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.Visibility
 
   def emit(%Mob{} = entity, %Effects.MovementStopped{}, _context) do
@@ -62,8 +63,33 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   def emit(%Character{} = entity, %Effects.MovementStopped{}, _context) do
     entity = World.snapshot_position(entity)
     World.update_position(entity)
+    entity |> Message.SmsgMonsterMove.build_stop() |> World.broadcast_packet(entity)
     entity
   end
+
+  def emit(
+        %Character{object: %{guid: guid}} = entity,
+        %Effects.ClientControlChanged{allow_movement?: allowed?},
+        context
+      ) do
+    Presence.relocate(entity, %{movement_velocity: {0.0, 0.0, 0.0}, moving_until: nil, airborne?: false})
+    Context.send_packet(context, %Message.SmsgClientControlUpdate{guid: guid, allow_movement?: allowed?})
+    entity
+  end
+
+  def emit(
+        %Mob{object: %{guid: guid}, internal: %{pet: %Pet{possessed?: true, owner_guid: owner}}} = entity,
+        %Effects.ClientControlChanged{allow_movement?: allowed?},
+        _context
+      ) do
+    World.broadcast_packet(%Message.SmsgClientControlUpdate{guid: guid, allow_movement?: allowed?}, entity,
+      recipients: [owner]
+    )
+
+    entity
+  end
+
+  def emit(entity, %Effects.ClientControlChanged{}, _context), do: entity
 
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.MovementRootChanged{rooted?: true}, context) do
     Context.send_packet(context, %Message.SmsgForceMoveRoot{guid: guid})
@@ -136,7 +162,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
     entity
   end
 
-  def emit(%Character{internal: %{taxi_flight: %Flight{}}} = entity, %Effects.MonsterMove{move_opts: opts}, _context) do
+  def emit(%Character{} = entity, %Effects.MonsterMove{move_opts: opts}, _context) do
     World.update_position(entity)
 
     Message.SmsgMonsterMove.build(entity, opts || [])

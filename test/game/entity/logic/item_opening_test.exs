@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.ItemOpeningTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -14,10 +16,23 @@ defmodule ThistleTea.Game.Entity.Logic.ItemOpeningTest do
   alias ThistleTea.Game.Entity.Logic.ItemOpening
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.Trade
+  alias ThistleTea.Game.Spell
 
   setup [:container]
 
   describe "validate/2" do
+    test "rejects opening a container during fear or confusion", %{character: character, source: source} do
+      for type <- [:mod_fear, :mod_confuse] do
+        holder = %Holder{
+          spell: %Spell{id: 1},
+          auras: [%Aura{type: type}]
+        }
+
+        character = %{character | unit: %{character.unit | auras: [holder]}}
+        assert {:error, :cant_do_right_now} = ItemOpening.validate(character, source)
+      end
+    end
+
     test "template loot flags do not unlock new lockboxes", %{character: character} do
       item = Item.build(%ItemTemplate{entry: 4632, flags: 4, lockid: 5}, 101, owner: 1)
       refute Item.unlocked?(item)

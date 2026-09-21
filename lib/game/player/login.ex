@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.ChatStatus
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
+  alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.DispelResistance
@@ -121,6 +122,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> evaluate_login_rest()
       |> Honor.sync()
       |> BT.init(PlayerBT.tree())
+      |> ControlMovement.restore(Time.now())
 
     c = PlayerFlags.set_group_leader(c, party_leader?(character_guid))
 

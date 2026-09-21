@@ -8,11 +8,15 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Breathing
+  alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Falling
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.World.Loader.ModelGeometry
   alias ThistleTea.Game.World.Pathfinding
+
+  def accepts_input?(%Character{} = character), do: not ControlMovement.active?(character)
+  def accepts_input?(_character), do: true
 
   def apply_environment(%Character{} = character, opcode, now) do
     character

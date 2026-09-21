@@ -1244,8 +1244,10 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   @impl GenServer
-  def handle_info(:player_tick, %{character: %Character{} = character} = state) do
+  def handle_info(:player_tick, %{character: %Character{}} = state) do
     now = Time.now()
+    state = ServerMovement.advance(state, now)
+    character = state.character
     {status, character} = tick_player(character, now)
     character = NavigationResolver.resolve(character, now)
     character = EventSink.emit_pending(character)
@@ -1289,6 +1291,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def maybe_broadcast_update(%{character: %Character{}} = state) do
     state
+    |> ServerMovement.reconcile()
     |> cancel_cast_if_dead()
     |> finalize_death()
     |> Looting.close_unavailable()

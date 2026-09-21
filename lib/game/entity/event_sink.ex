@@ -82,6 +82,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   @movement_effects [
     Effects.BindHome,
     Effects.ChargeResolved,
+    Effects.ClientControlChanged,
     Effects.CreatureTeleported,
     Effects.FeatherFallChanged,
     Effects.HoverChanged,

@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Player.Looting do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Hostility
@@ -48,7 +49,7 @@ defmodule ThistleTea.Game.Player.Looting do
       |> Map.put(:guid, guid)
       |> Map.put(:friendly?, Hostility.friendly?(character, Map.put(metadata, :guid, guid)))
 
-    with false <- Core.dead?(character),
+    with false <- Core.dead?(character) or ControlMovement.active?(character),
          :ok <- Pickpocket.validate_target(character, target) do
       state = release(state)
 
@@ -73,21 +74,34 @@ defmodule ThistleTea.Game.Player.Looting do
 
   def open(state, guid, opts \\ [])
 
-  def open(%{character: %Character{internal: %{item_loot: %PendingItemLoot{guid: guid}}}} = state, guid, _opts) do
-    state |> release() |> ItemLoot.open()
-  end
-
   def open(%{character: %Character{} = character} = state, guid, opts) do
-    if Guid.entity_type(guid) == :item do
-      Containers.open_guid(state, guid)
+    if ControlMovement.active?(character) do
+      Network.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
+      release(state)
     else
-      open_entity(state, character, guid, opts)
+      open_available(state, guid, opts)
     end
   end
 
   def open(state, guid, _opts) do
     Network.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
     state
+  end
+
+  defp open_available(
+         %{character: %Character{internal: %{item_loot: %PendingItemLoot{guid: guid}}}} = state,
+         guid,
+         _opts
+       ) do
+    state |> release() |> ItemLoot.open()
+  end
+
+  defp open_available(%{character: %Character{} = character} = state, guid, opts) do
+    if Guid.entity_type(guid) == :item do
+      Containers.open_guid(state, guid)
+    else
+      open_entity(state, character, guid, opts)
+    end
   end
 
   defp open_entity(state, character, guid, opts) do
@@ -148,9 +162,10 @@ defmodule ThistleTea.Game.Player.Looting do
   def release(state), do: state
 
   def close_unavailable(%{character: %Character{} = character, loot_guid: guid} = state) when is_integer(guid) do
-    if Core.dead?(character) or chest_out_of_range?(character, guid) or container_unavailable?(state),
-      do: release(state),
-      else: state
+    if Core.dead?(character) or ControlMovement.active?(character) or chest_out_of_range?(character, guid) or
+         container_unavailable?(state),
+       do: release(state),
+       else: state
   end
 
   def close_unavailable(state), do: state

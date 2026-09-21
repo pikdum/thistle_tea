@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Player.LootingTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
@@ -13,9 +15,21 @@ defmodule ThistleTea.Game.Player.LootingTest do
   alias ThistleTea.Game.Entity.Logic.Loot.Reservation
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Network.Message.SmsgLootReleaseResponse
   alias ThistleTea.Game.Player.Looting
+  alias ThistleTea.Game.Spell
 
   describe "open/3" do
+    test "fear and confusion prevent new loot sessions" do
+      for type <- [:mod_fear, :mod_confuse] do
+        holder = %Holder{spell: %Spell{id: 1}, auras: [%Aura{type: type}]}
+        character = %Character{unit: %Unit{health: 100, auras: [holder]}}
+        state = %State{guid: 42, character: character}
+        assert Looting.open(state, 123) == state
+        assert_receive {:"$gen_cast", {:send_packet, %SmsgLootReleaseResponse{guid: 123}}}
+      end
+    end
+
     test "closes pocket viewing before opening a corpse window" do
       parent = self()
       guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive, :monotonic]))
@@ -53,6 +67,12 @@ defmodule ThistleTea.Game.Player.LootingTest do
       assert opened.loot_guid == guid
       assert_receive :pockets_released
       assert_receive :corpse_opened
+
+      holder = %Holder{spell: %Spell{id: 1}, auras: [%Aura{type: :mod_fear}]}
+      character = %{opened.character | unit: %{opened.character.unit | auras: [holder]}}
+      closed = Looting.close_unavailable(%{opened | character: character})
+      assert closed.loot_guid == nil
+      assert closed.loot_type == nil
     end
   end
 

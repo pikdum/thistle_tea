@@ -108,6 +108,10 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.MovementStopped{}
   end
 
+  def client_control_changed(allow_movement?) when is_boolean(allow_movement?) do
+    %Effects.ClientControlChanged{allow_movement?: allow_movement?}
+  end
+
   def movement_speed_changed(speed, movement_type \\ :run_speed)
       when is_number(speed) and movement_type in [:run_speed, :run_back_speed, :swim_speed, :swim_back_speed] do
     %Effects.MovementSpeedChanged{speed: speed, movement_type: movement_type}

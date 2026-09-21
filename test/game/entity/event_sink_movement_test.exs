@@ -2,15 +2,20 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.MsgMoveTeleport
+  alias ThistleTea.Game.Network.Message.SmsgClientControlUpdate
+  alias ThistleTea.Game.Network.Message.SmsgMonsterMove
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Metadata
@@ -164,6 +169,63 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
       World.remove_position(updated)
       Visibility.leave_entity(updated)
       Metadata.delete(guid)
+    end
+  end
+
+  describe "emit/3" do
+    test "player control uses its explicit owner and movement reaches owner and observers" do
+      world = WorldRef.instance(0, unique_low())
+      guid = Guid.from_low_guid(:player, unique_low())
+      observers = start_observers(owner: {world, {0.0, 0.0, 0.0}}, nearby: {world, {1.0, 0.0, 0.0}})
+      [{:owner, _owner_guid, owner_pid} | _] = observers
+      {:ok, _} = Entity.register(guid)
+
+      character = %Character{
+        object: %Object{guid: guid},
+        unit: %Unit{health: 100},
+        movement_block: stationary_block({0.0, 0.0, 0.0, 0.0}, 0),
+        internal: %Internal{world: world, spline_id: 1}
+      }
+
+      on_exit(fn ->
+        World.remove_position(character)
+        Metadata.delete(guid)
+        stop_observers(observers)
+      end)
+
+      EventSink.emit(character, Effects.client_control_changed(false), Context.new(owner_pid))
+
+      assert_receive {:observer, :owner,
+                      {:"$gen_cast", {:send_packet, %SmsgClientControlUpdate{guid: ^guid, allow_movement?: false}}}}
+
+      refute_received {:"$gen_cast", {:send_packet, %SmsgClientControlUpdate{}}}
+
+      character = %{
+        character
+        | movement_block: %{character.movement_block | spline_nodes: [{7.0, 0.0, 0.0}], duration: 1_000}
+      }
+
+      EventSink.emit(character, Effects.monster_move(), Context.new(owner_pid))
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgMonsterMove{guid: ^guid, move_type: 0}}}
+
+      assert_receive {:observer, :nearby,
+                      {:"$gen_cast", {:send_packet, %SmsgMonsterMove{guid: ^guid, move_type: 0}, _}}}
+
+      EventSink.emit(character, Effects.movement_stopped(), Context.new(owner_pid))
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgMonsterMove{guid: ^guid, move_type: 1}}}
+
+      assert_receive {:observer, :nearby,
+                      {:"$gen_cast", {:send_packet, %SmsgMonsterMove{guid: ^guid, move_type: 1}, _}}}
+    end
+
+    test "possessed mob control is delivered to its controller" do
+      owner = Guid.from_low_guid(:player, unique_low())
+      {:ok, _} = Entity.register(owner)
+      mob = mob(Guid.from_low_guid(:mob, 1, unique_low()), WorldRef.open(0), {0.0, 0.0, 0.0, 0.0})
+      mob = %{mob | internal: %{mob.internal | pet: %Pet{possessed?: true, owner_guid: owner}}}
+      guid = mob.object.guid
+      EventSink.emit(mob, Effects.client_control_changed(false))
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgClientControlUpdate{guid: ^guid, allow_movement?: false}, _}}
     end
   end
 

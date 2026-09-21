@@ -69,7 +69,7 @@ defmodule ThistleTea.Game.Entity.Logic.FearTest do
         {status, mob} = BehaviorRunner.tick(tree, mob, context(0))
         assert status == {:running, 0, :navigation}
         assert mob.internal.running
-        assert mob.internal.blackboard.navigation.confused_anchor == nil
+        assert mob.internal.blackboard.confusion == nil
         assert mob.internal.blackboard.fear.moving?
 
         mob = resolve(mob, 0)

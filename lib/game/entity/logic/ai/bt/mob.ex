@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat, as: CombatMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Navigation, as: NavigationMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Confusion
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
@@ -88,14 +89,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         BT.condition(&stunned?/2),
         BT.action(&idle_stunned/3)
       ]),
-      BT.sequence([
-        BT.condition(&confused?/2),
-        BT.action(&wait_until_confused_wander_ready/3),
-        BT.action(&pick_confused_point/3),
-        BT.action(&move_to_target_with_context/3),
-        BT.action(&wait_for_arrival_with_context/3),
-        BT.action(&set_next_confused_wait/3)
-      ]),
+      BT.action(&Confusion.tick/3),
       BT.action(&FearBT.tick/3),
       BT.sequence([
         BT.condition(&not_in_combat?/2),
@@ -226,16 +220,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  @confused_wander_radius 4.0
-
-  def confused_wander_radius, do: @confused_wander_radius
-
-  defp confused?(%Mob{} = state, _blackboard) do
-    AuraLogic.has_aura?(state, :mod_confuse)
-  end
-
-  defp confused?(_state, _blackboard), do: false
-
   defp stunned?(%Mob{} = state, _blackboard) do
     AuraLogic.has_aura?(state, :mod_stun)
   end
@@ -250,62 +234,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     state = set_running(state, false)
     blackboard = Blackboard.clear_move_target(blackboard)
     {BT.running(@dead_idle_delay, :stunned), state, blackboard}
-  end
-
-  defp wait_until_confused_wander_ready(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
-    if Blackboard.ready_for?(blackboard, :next_confused_at, now) do
-      {:success, state, blackboard}
-    else
-      delay_ms = Blackboard.delay_until(blackboard, :next_confused_at, now)
-      {BT.running(delay_ms, :confused_wander), state, blackboard}
-    end
-  end
-
-  defp pick_confused_point(
-         %Mob{movement_block: %MovementBlock{position: {x, y, z, _o}}} = state,
-         %Blackboard{} = blackboard,
-         %Context{now: now} = context
-       ) do
-    state = set_running(state, false)
-    blackboard = ensure_confused_anchor(state, blackboard, {x, y, z})
-
-    if blackboard.navigation.target do
-      {:success, state, blackboard}
-    else
-      {_key, anchor} = blackboard.navigation.confused_anchor
-
-      case Navigation.wander_point(state, anchor, @confused_wander_radius, context) do
-        nil ->
-          blackboard = Blackboard.put_next_at(blackboard, :next_confused_at, confused_wait_delay(context), now)
-          {:running, state, Blackboard.clear_move_target(blackboard)}
-
-        {wx, wy, wz} ->
-          navigation = %{blackboard.navigation | target: {wx, wy, wz}}
-          {:success, state, %{blackboard | navigation: navigation}}
-      end
-    end
-  end
-
-  defp ensure_confused_anchor(%Mob{} = state, %Blackboard{} = blackboard, current_position) do
-    key = AuraLogic.confuse_anchor_key(state)
-
-    case blackboard.navigation.confused_anchor do
-      {^key, _anchor} ->
-        blackboard
-
-      _ ->
-        blackboard = Blackboard.clear_move_target(blackboard)
-        %{blackboard | navigation: %{blackboard.navigation | confused_anchor: {key, current_position}}}
-    end
-  end
-
-  defp set_next_confused_wait(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
-    blackboard = Blackboard.put_next_at(blackboard, :next_confused_at, confused_wait_delay(context), now)
-    {:success, state, Blackboard.clear_move_target(blackboard)}
-  end
-
-  defp confused_wait_delay(%Context{random: random}) do
-    Random.integer(random, 1_000) + 500
   end
 
   defp eventai_step(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do

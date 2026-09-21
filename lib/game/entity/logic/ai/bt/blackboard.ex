@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
 
   defstruct navigation: %Navigation{},
             fear: nil,
+            confusion: nil,
             combat: %Combat{},
             spells: %Spells{},
             event_ai: %EventAI{},
@@ -230,7 +231,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   defp deadline(%__MODULE__{navigation: %Navigation{next_chase_at: at}}, :next_chase_at), do: at
   defp deadline(%__MODULE__{navigation: %Navigation{next_wander_at: at}}, :next_wander_at), do: at
   defp deadline(%__MODULE__{navigation: %Navigation{next_waypoint_at: at}}, :next_waypoint_at), do: at
-  defp deadline(%__MODULE__{navigation: %Navigation{next_confused_at: at}}, :next_confused_at), do: at
   defp deadline(%__MODULE__{combat: %Combat{next_attack_at: at}}, :next_attack_at), do: at
   defp deadline(%__MODULE__{combat: %Combat{next_offhand_attack_at: at}}, :next_offhand_attack_at), do: at
   defp deadline(%__MODULE__{combat: %Combat{next_aggro_at: at}}, :next_aggro_at), do: at
@@ -254,10 +254,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
 
   defp put_deadline(%__MODULE__{navigation: navigation} = blackboard, :next_waypoint_at, at) do
     %{blackboard | navigation: %{navigation | next_waypoint_at: at}}
-  end
-
-  defp put_deadline(%__MODULE__{navigation: navigation} = blackboard, :next_confused_at, at) do
-    %{blackboard | navigation: %{navigation | next_confused_at: at}}
   end
 
   defp put_deadline(%__MODULE__{combat: combat} = blackboard, :next_attack_at, at) do
