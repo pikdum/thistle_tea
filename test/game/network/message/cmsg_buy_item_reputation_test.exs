@@ -115,7 +115,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
   end
 
   defp publish_vendor(guid) do
-    Metadata.put(guid, %{alive?: true, npc_flags: 128})
+    Metadata.put(guid, %{alive?: true, npc_flags: 4})
     SpatialHash.update(:mobs, guid, WorldRef.open(0), 2.0, 0.0, 0.0)
 
     on_exit(fn ->

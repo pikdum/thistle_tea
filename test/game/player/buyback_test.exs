@@ -141,13 +141,15 @@ defmodule ThistleTea.Game.Player.BuybackTest do
       %{state: state, item: item, vendor: vendor} = context
       assert Vendor.valid_vendor?(state.character, vendor)
 
-      for metadata <- [%{alive?: false, npc_flags: 128}, %{alive?: true, npc_flags: 0}] do
+      invalid = [%{alive?: false, npc_flags: 4}, %{alive?: true, npc_flags: 0}, %{alive?: true, npc_flags: 128}]
+
+      for metadata <- invalid do
         Metadata.put(vendor, metadata)
         refute Vendor.valid_vendor?(state.character, vendor)
         assert Buyback.sell(state, vendor, item.object.guid, 0) == state
       end
 
-      Metadata.put(vendor, %{alive?: true, npc_flags: 128})
+      Metadata.put(vendor, %{alive?: true, npc_flags: 4})
       SpatialHash.update(:mobs, vendor, WorldRef.open(0), 6.0, 0.0, 0.0)
       refute Vendor.valid_vendor?(state.character, vendor)
       assert Vendor.buy(state, vendor, @entry, 1) == state
@@ -193,7 +195,7 @@ defmodule ThistleTea.Game.Player.BuybackTest do
 
     :ets.insert(ItemLoader, {@entry, template})
     item = ItemStore.create(template, owner: owner)
-    Metadata.put(vendor, %{alive?: true, npc_flags: 128})
+    Metadata.put(vendor, %{alive?: true, npc_flags: 4})
     SpatialHash.update(:mobs, vendor, WorldRef.open(0), 2.0, 0.0, 0.0)
 
     character = %Character{

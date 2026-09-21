@@ -50,7 +50,7 @@ defmodule ThistleTea.Game.Player.Vendor do
     with true <- Death.alive?(character),
          :mob <- Guid.entity_type(vendor_guid),
          %{alive?: true, npc_flags: flags} when is_integer(flags) <- Metadata.query(vendor_guid, [:alive?, :npc_flags]),
-         true <- (flags &&& 0x80) != 0,
+         true <- (flags &&& 0x4) != 0,
          true <- Reputation.can_interact?(character, vendor_guid),
          world = character.internal.world,
          {^world, _x, _y, _z} <- World.position(vendor_guid),

@@ -156,7 +156,7 @@ defmodule ThistleTea.Game.Player.VendorTest do
   end
 
   defp publish_vendor(guid) do
-    Metadata.put(guid, %{alive?: true, npc_flags: 128})
+    Metadata.put(guid, %{alive?: true, npc_flags: 4})
     SpatialHash.update(:mobs, guid, WorldRef.open(1), 2.0, 0.0, 0.0)
 
     on_exit(fn ->
