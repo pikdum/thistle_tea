@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
     next_quest_in_chain: 0,
     src_item_id: 0,
     src_item_count: 0,
+    start_item_template: nil,
     title: "",
     details: "",
     objectives_text: "",

@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet.Placement
   alias ThistleTea.Game.Entity.Logic.QuestDialogStatus
+  alias ThistleTea.Game.Entity.Logic.QuestItems
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Logic.QuestLog.Entry
   alias ThistleTea.Game.Entity.Logic.QuestRequirements
@@ -243,13 +244,31 @@ defmodule ThistleTea.Game.Player.Quests do
     end
   end
 
-  def abandon(%{character: %Character{player: player} = character} = state, slot) do
+  def abandon(%{character: %Character{player: player}} = state, slot) do
     case Map.get(player.quest_log, slot) do
       %Entry{quest_id: quest_id} ->
-        {:ok, quest_log} = QuestLog.remove(player.quest_log, quest_id)
-        put_character(state, %{character | player: %{player | quest_log: quest_log}})
+        abandon_quest(state, quest_id)
 
       _entry ->
+        state
+    end
+  end
+
+  defp abandon_quest(%{character: character} = state, quest_id) do
+    quest = QuestLoader.get(quest_id) || %Quest{id: quest_id}
+    {batch, replacements} = QuestItems.abandon(character.player, quest, &ItemStore.get/1)
+
+    with {:ok, rewards} <- prepare_rewards(replacements, state.guid),
+         batch = Enum.reduce(rewards, batch, fn {item, _count}, acc -> Batch.add(acc, item) end),
+         {:ok, changes} <- Inventory.plan(batch, &ItemStore.get/1) do
+      state = InventoryUpdate.apply(state, {:ok, changes})
+      send_reward_pushes(state, changes, rewards)
+      character = state.character
+      {:ok, quest_log} = QuestLog.remove(character.player.quest_log, quest_id)
+      put_character(state, %{character | player: %{character.player | quest_log: quest_log}})
+    else
+      {:error, reason} ->
+        InventoryUpdate.send_failure(reason, 0, 0)
         state
     end
   end
@@ -876,27 +895,23 @@ defmodule ThistleTea.Game.Player.Quests do
     fn item_id -> Inventory.count_entry(player, item_id, &ItemStore.get/1) end
   end
 
-  defp grant_source_item(state, %Quest{src_item_id: src_item_id}) when src_item_id <= 0, do: {:ok, state}
+  defp grant_source_item(state, %Quest{} = quest) do
+    case QuestItems.missing_source_count(state.character.player, quest, &ItemStore.get/1) do
+      0 -> {:ok, state}
+      count -> grant_source_items(state, quest.src_item_id, count)
+    end
+  end
 
-  defp grant_source_item(%{guid: guid} = state, %Quest{src_item_id: src_item_id} = quest) do
-    count = max(quest.src_item_count, 1)
-
-    case ItemStore.create(src_item_id, owner: guid, stack_count: count) do
-      %DataItem{} = item ->
-        case Inventory.store(state.character.player, guid, item, &ItemStore.get/1) do
-          {:ok, result, placement} ->
-            placed_at = InventoryUpdate.commit_placement(item, placement)
-            state = InventoryUpdate.apply(state, {:ok, result}, placement)
-            send_item_push(state, item, placed_at, count)
-            {:ok, state}
-
-          _error ->
-            ItemStore.delete(item.object.guid)
-            {:error, :inventory_full}
-        end
-
-      _error ->
-        {:ok, state}
+  defp grant_source_items(state, entry, count) do
+    with {:ok, rewards} <- prepare_rewards([{entry, count}], state.guid),
+         batch =
+           Enum.reduce(rewards, Batch.new(state.character.player), fn {item, _count}, acc -> Batch.add(acc, item) end),
+         {:ok, changes} <- Inventory.plan(batch, &ItemStore.get/1) do
+      state = InventoryUpdate.apply(state, {:ok, changes})
+      send_reward_pushes(state, changes, rewards)
+      {:ok, state}
+    else
+      {:error, _reason} -> {:error, :inventory_full}
     end
   end
 

@@ -3,6 +3,9 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory.Batch do
   A pure inventory transaction request. Removals are planned before additions
   so consumed items can free capacity for the items granted by the same
   gameplay transition.
+
+  Exact item consumption includes bank storage and bypasses manual destruction
+  restrictions, while still protecting nonempty bags.
   """
 
   alias ThistleTea.Game.Entity.Data.Component.Player
@@ -17,7 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory.Batch do
   defmodule ItemRemoval do
     @moduledoc false
     @enforce_keys [:guid, :count]
-    defstruct [:guid, :count]
+    defstruct [:guid, :count, mode: :destroy]
   end
 
   defmodule Relocation do
@@ -47,6 +50,11 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory.Batch do
   def remove_item(%__MODULE__{removals: removals} = batch, guid, count)
       when is_integer(guid) and guid > 0 and is_integer(count) and count > 0 do
     %{batch | removals: [%ItemRemoval{guid: guid, count: count} | removals]}
+  end
+
+  def consume_item(%__MODULE__{removals: removals} = batch, guid, count)
+      when is_integer(guid) and guid > 0 and is_integer(count) and count > 0 do
+    %{batch | removals: [%ItemRemoval{guid: guid, count: count, mode: :consume} | removals]}
   end
 
   def removals(%__MODULE__{removals: removals}), do: Enum.reverse(removals)

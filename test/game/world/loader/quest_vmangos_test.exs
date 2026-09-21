@@ -22,6 +22,14 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
   end
 
   describe "load_all/0" do
+    test "preloads original quest-starting items for abandonment exchanges" do
+      assert %Quest{src_item_id: 2223, start_item_template: %ItemTemplate{entry: 1307, start_quest: 123}} =
+               QuestLoader.get(123)
+
+      assert %Quest{src_item_id: 2794, start_item_template: %ItemTemplate{entry: 2794}} = QuestLoader.get(337)
+      assert %Quest{src_item_id: 21_921, start_item_template: nil} = QuestLoader.get(8897)
+    end
+
     test "preloads every required condition tree" do
       conditioned_quests =
         QuestLoader

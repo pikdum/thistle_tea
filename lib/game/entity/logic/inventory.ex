@@ -254,7 +254,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   defp plan_removals(%ChangeSet{} = change_set, [%Batch.ItemRemoval{} = removal | rest], get_item) do
     lookup = &ChangeSet.get_item(change_set, &1, get_item)
 
-    case remove_item(change_set.player, removal.guid, removal.count, lookup) do
+    case remove_item(change_set.player, removal.guid, removal.count, removal.mode, lookup) do
       {:ok, result} -> plan_removals(ChangeSet.absorb(change_set, result), rest, get_item)
       {:error, error, _item1_guid, _item2_guid} -> {:error, error}
     end
@@ -288,21 +288,30 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     remove_count(player, entry, count, get_item, %{items: [], destroyed: []})
   end
 
-  defp remove_item(player, guid, count, get_item) do
+  defp remove_item(player, guid, count, mode, get_item) do
+    scope = if mode == :consume, do: :all_owned, else: :carried
+
     with %Item{} = item <- get_item.(guid),
-         pos when not is_nil(pos) <- find_position(player, guid, get_item),
+         pos when not is_nil(pos) <- find_position(player, guid, scope, get_item),
          true <- count <= stack_count(item) do
       if count < stack_count(item) do
         reduce_stack(player, pos, count, get_item)
       else
-        destroy_for_batch(player, pos, get_item)
+        destroy_for_batch(player, pos, mode, get_item)
       end
     else
       _ -> {:error, :item_not_found, guid, 0}
     end
   end
 
-  defp destroy_for_batch(player, pos, get_item) do
+  defp destroy_for_batch(player, pos, :consume, get_item) do
+    case detach(player, pos, get_item) do
+      {:ok, result, destroyed} -> {:ok, %{result | destroyed: [destroyed | result.destroyed]}}
+      error -> error
+    end
+  end
+
+  defp destroy_for_batch(player, pos, :destroy, get_item) do
     case destroy(player, pos, get_item) do
       {:ok, result, destroyed} -> {:ok, %{result | destroyed: [destroyed | result.destroyed]}}
       error -> error

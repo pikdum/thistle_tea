@@ -121,6 +121,69 @@ defmodule ThistleTea.Game.Player.QuestSharingTest do
       assert_result(2)
       assert Quests.accept(accepted, source.guid, quest.id) == accepted
       refute_receive {:"$gen_cast", {:send_packet, %Message.MsgQuestPushResult{result: 2}}}
+
+      abandoned = Quests.abandon(accepted, 0)
+      refute QuestLog.active?(abandoned.character.player.quest_log, quest.id)
+      assert Inventory.count_entry_with_bank(abandoned.character.player, context.item.entry, &ItemStore.get/1) == 0
+      assert CharacterStore.get(abandoned.guid).player == abandoned.character.player
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{}}}
+    end
+
+    test "accepts with full bags when the source item is already in the bank", context do
+      quest = put_quest(%{context.quest | src_item_id: context.item.entry})
+      banked = ItemStore.create(context.item, owner: context.target.guid)
+
+      fields =
+        Map.new(1..16, fn index ->
+          filler =
+            ItemStore.create(%{context.item | entry: context.item.entry + 1},
+              owner: context.target.guid,
+              stack_count: 20
+            )
+
+          {String.to_atom("inv#{index}"), filler.object.guid}
+        end)
+
+      player = struct!(context.target.character.player, Map.put(fields, :bank1, banked.object.guid))
+      target = %{context.target | character: %{context.target.character | player: player}}
+      accepted = Quests.accept(offer(%{context | target: target}), context.source.guid, quest.id)
+      assert QuestLog.active?(accepted.character.player.quest_log, quest.id)
+      assert Inventory.count_entry_with_bank(accepted.character.player, context.item.entry, &ItemStore.get/1) == 1
+      assert_result(2)
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgItemPushResult{}}}
+
+      abandoned = Quests.abandon(accepted, 0)
+      assert abandoned.character.player.bank1 == 0
+      assert ItemStore.get(banked.object.guid) == nil
+    end
+
+    test "restores the original starting item and rejects abandonment if it cannot fit", context do
+      starter = %{context.item | entry: context.item.entry + 1, start_quest: context.quest.id}
+      quest = put_quest(%{context.quest | src_item_id: context.item.entry, start_item_template: starter})
+      accepted = Quests.accept(offer(context), context.source.guid, quest.id)
+      abandoned = Quests.abandon(accepted, 0)
+      refute QuestLog.active?(abandoned.character.player.quest_log, quest.id)
+      assert Inventory.count_entry(abandoned.character.player, starter.entry, &ItemStore.get/1) == 1
+      assert Inventory.count_entry(abandoned.character.player, context.item.entry, &ItemStore.get/1) == 0
+
+      banked = ItemStore.create(context.item, owner: context.target.guid)
+
+      fields =
+        Map.new(1..16, fn index ->
+          filler =
+            ItemStore.create(%{context.item | entry: context.item.entry + 2},
+              owner: context.target.guid,
+              stack_count: 20
+            )
+
+          {String.to_atom("inv#{index}"), filler.object.guid}
+        end)
+
+      player = struct!(accepted.character.player, Map.put(fields, :bank1, banked.object.guid))
+      full = %{accepted | character: %{accepted.character | player: player}}
+      assert Quests.abandon(full, 0) == full
+      assert ItemStore.get(banked.object.guid) == banked
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgInventoryChangeFailure{}}}
     end
 
     test "does not add a quest or acknowledge acceptance when source items cannot fit", context do
@@ -128,7 +191,12 @@ defmodule ThistleTea.Game.Player.QuestSharingTest do
 
       fields =
         Map.new(1..16, fn index ->
-          filler = ItemStore.create(context.item, owner: context.target.guid, stack_count: 20)
+          filler =
+            ItemStore.create(%{context.item | entry: context.item.entry + 1},
+              owner: context.target.guid,
+              stack_count: 20
+            )
+
           {String.to_atom("inv#{index}"), filler.object.guid}
         end)
 

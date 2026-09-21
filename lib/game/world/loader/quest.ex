@@ -3,8 +3,11 @@ defmodule ThistleTea.Game.World.Loader.Quest do
   ETS cache of quest templates and questgiver/quest-ender relations from
   Mangos.
   """
+  import Ecto.Query, only: [from: 2]
+
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Condition
+  alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.Script
@@ -23,6 +26,7 @@ defmodule ThistleTea.Game.World.Loader.Quest do
     start_scripts = load_scripts(rows, :start_script, Mangos.QuestStartScript)
     complete_scripts = load_scripts(rows, :complete_script, Mangos.QuestEndScript)
     required_conditions = rows |> Enum.map(& &1.required_condition) |> ConditionLoader.load_by_ids()
+    start_items = load_start_items()
 
     rows
     |> Enum.each(fn row ->
@@ -30,7 +34,8 @@ defmodule ThistleTea.Game.World.Loader.Quest do
 
       quest = %{
         quest
-        | start_script_steps: Map.get(start_scripts, quest.start_script_id, []),
+        | start_item_template: Map.get(start_items, quest.id),
+          start_script_steps: Map.get(start_scripts, quest.start_script_id, []),
           complete_script_steps: Map.get(complete_scripts, quest.complete_script_id, [])
       }
 
@@ -56,6 +61,12 @@ defmodule ThistleTea.Game.World.Loader.Quest do
     |> Enum.map(&Map.get(&1, field))
     |> Enum.filter(&(&1 > 0))
     |> then(&Script.load_by_ids(schema, &1))
+  end
+
+  defp load_start_items do
+    from(item in Mangos.ItemTemplate, where: item.start_quest > 0, order_by: [desc: item.entry])
+    |> Mangos.Repo.all()
+    |> Map.new(&{&1.start_quest, ItemTemplate.build(&1)})
   end
 
   def get(quest_id) do
