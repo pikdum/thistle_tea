@@ -1494,7 +1494,10 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     }
 
     state = if possession?, do: Visibility.reset_viewpoint(state), else: state
-    CompanionVisibility.clear(state)
+
+    if Companion.active_guid(state.character) == entity_ref.guid,
+      do: Login.refresh_companion(state),
+      else: CompanionVisibility.clear(state)
   end
 
   defp trigger_kill_procs(state, victim) do

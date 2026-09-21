@@ -921,6 +921,49 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
     end
 
+    test "releases pet possession without dropping the pet or its monitor" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      pet_guid = Guid.from_low_guid(:pet, 1, System.unique_integer([:positive]))
+      Entity.register(pet_guid)
+
+      state = %State{
+        connection_pid: self(),
+        guid: guid,
+        active_mover_guid: guid,
+        character: %{character(guid, health: 100, max_health: 100) | player: %Player{}}
+      }
+
+      attachment = %Attachment{
+        kind: :hunter_pet,
+        entity_ref: %EntityRef{guid: pet_guid, entry: 1, spell_id: 1515},
+        pid: self(),
+        spells: []
+      }
+
+      {:noreply, attached, _continue} = PlayerServer.handle_info(attachment, state)
+      companion = attached.character.internal.companion
+      possession = %{attachment | kind: :possession, entity_ref: %{attachment.entity_ref | spell_id: 1002}}
+      {:noreply, possessed, _continue} = PlayerServer.handle_info(possession, attached)
+      assert possessed.active_mover_guid == pet_guid
+      assert possessed.character.player.farsight == pet_guid
+      assert possessed.character.internal.companion == %{companion | possession_spell_id: 1002}
+
+      assert {:noreply, released, {:continue, :maybe_broadcast_update}} =
+               PlayerServer.handle_info({:control_released, pet_guid}, possessed)
+
+      assert released.character.internal.companion == companion
+      assert released.character.player.farsight == 0
+      assert released.character.unit.summon == pet_guid
+      assert released.character.unit.charm == 0
+      assert released.active_mover_guid == guid
+      assert released.companion_monitor.token == possessed.companion_monitor.token
+      assert released.companion_monitor.entity_ref == attachment.entity_ref
+      assert_receive {:attach_pet, owner_pid, 1515, nil}
+      assert owner_pid == self()
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
+      assert {:noreply, ^released} = PlayerServer.handle_info({:control_released, pet_guid}, released)
+    end
+
     test "uses the monitored relationship for charm release" do
       guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
       controlled_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))

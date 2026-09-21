@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Data.Companion do
     :health,
     :happiness,
     :progress,
+    :possession_spell_id,
     dead?: false,
     reaction_state: :defensive,
     autocast: MapSet.new()
@@ -45,6 +46,7 @@ defmodule ThistleTea.Game.Entity.Data.Companion do
           health: non_neg_integer() | nil,
           happiness: non_neg_integer() | nil,
           progress: PetProgress.t() | nil,
+          possession_spell_id: pos_integer() | nil,
           dead?: boolean(),
           reaction_state: :passive | :defensive | :aggressive,
           autocast: MapSet.t(non_neg_integer())

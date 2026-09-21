@@ -61,12 +61,25 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner do
     %{state | character: character, companion_monitor: monitor}
   end
 
-  def detach(%State{} = state, guid, reason) when is_integer(guid) do
+  def detach(%State{} = state, guid, :released) when is_integer(guid) do
+    if CompanionLogic.control_guid(state.character) == guid, do: detach_current(state, guid, :released), else: :stale
+  end
+
+  def detach(%State{} = state, guid, reason) when is_integer(guid), do: detach_current(state, guid, reason)
+
+  defp detach_current(%State{} = state, guid, reason) do
     case state.companion_monitor do
-      %Monitor{entity_ref: %EntityRef{guid: ^guid} = entity_ref} ->
-        state = clear_monitor(state)
+      %Monitor{entity_ref: %EntityRef{guid: ^guid} = entity_ref} = monitor ->
         character = CompanionLogic.removed(state.character, reason)
-        {:ok, entity_ref, %{state | character: character}}
+        state = %{state | character: character}
+
+        state =
+          case CompanionLogic.active_ref(character) do
+            %EntityRef{guid: ^guid} = retained -> %{state | companion_monitor: %{monitor | entity_ref: retained}}
+            _ -> clear_monitor(state)
+          end
+
+        {:ok, entity_ref, state}
 
       _ ->
         :stale

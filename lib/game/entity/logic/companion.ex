@@ -19,6 +19,17 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
   @act_enabled 0xC1
   @act_disabled 0x81
 
+  def activate(
+        %Character{
+          internal: %Internal{companion: %Companion{kind: kind, status: {:active, %EntityRef{guid: guid}}} = companion}
+        } = character,
+        :possession,
+        %EntityRef{guid: guid, spell_id: spell_id}
+      )
+      when kind in @summon_kinds do
+    put_relationship(character, %{companion | possession_spell_id: spell_id})
+  end
+
   def activate(%Character{} = character, kind, %EntityRef{} = entity_ref)
       when kind in @summon_kinds or kind in @control_kinds do
     autocast = activation_autocast(relationship(character), kind, entity_ref.entry)
@@ -104,7 +115,8 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
       %Companion{kind: kind, status: {:active, %EntityRef{} = entity_ref}} when kind in @summon_kinds ->
         put_relationship(character, %{
           companion
-          | status: {:suspended, entity_ref.entry, entity_ref.spell_id}
+          | status: {:suspended, entity_ref.entry, entity_ref.spell_id},
+            possession_spell_id: nil
         })
 
       %Companion{status: {:active, %EntityRef{}}} ->
@@ -119,6 +131,9 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
 
   def removed(%Character{} = character, reason \\ nil) do
     case relationship(character) do
+      %Companion{possession_spell_id: spell_id} = companion when is_integer(spell_id) and reason == :released ->
+        put_relationship(character, %{companion | possession_spell_id: nil})
+
       %Companion{kind: :hunter_pet, status: {:active, %EntityRef{}}} when reason in [:owner_died, :process_down] ->
         suspend(character)
 
@@ -218,8 +233,15 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
 
   def control_guid(%Character{} = character) do
     case relationship(character) do
-      %Companion{kind: kind, status: {:active, %EntityRef{guid: guid}}} when kind in @control_kinds -> guid
-      _ -> nil
+      %Companion{possession_spell_id: spell_id, status: {:active, %EntityRef{guid: guid}}}
+      when is_integer(spell_id) ->
+        guid
+
+      %Companion{kind: kind, status: {:active, %EntityRef{guid: guid}}} when kind in @control_kinds ->
+        guid
+
+      _ ->
+        nil
     end
   end
 
@@ -244,9 +266,18 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
   def project(%Character{unit: %Unit{} = unit} = character) do
     {summon, charm} =
       case relationship(character) do
-        %Companion{kind: kind, status: {:active, %EntityRef{guid: guid}}} when kind in @summon_kinds -> {guid, 0}
-        %Companion{kind: kind, status: {:active, %EntityRef{guid: guid}}} when kind in @control_kinds -> {0, guid}
-        _ -> {0, 0}
+        %Companion{kind: kind, possession_spell_id: spell_id, status: {:active, %EntityRef{guid: guid}}}
+        when kind in @summon_kinds and is_integer(spell_id) ->
+          {guid, guid}
+
+        %Companion{kind: kind, status: {:active, %EntityRef{guid: guid}}} when kind in @summon_kinds ->
+          {guid, 0}
+
+        %Companion{kind: kind, status: {:active, %EntityRef{guid: guid}}} when kind in @control_kinds ->
+          {0, guid}
+
+        _ ->
+          {0, 0}
       end
 
     %{character | unit: %{unit | summon: summon, charm: charm}}

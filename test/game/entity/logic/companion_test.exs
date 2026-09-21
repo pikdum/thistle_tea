@@ -10,6 +10,48 @@ defmodule ThistleTea.Game.Entity.Logic.CompanionTest do
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
 
+  describe "activate/3" do
+    test "possessing the current pet retains its identity and progression through release" do
+      character =
+        character_with_pet()
+        |> Companion.capture_progress(%PetProgress{level: 49, xp: 123, spells: [2649]})
+        |> Companion.capture_health(77)
+        |> Companion.capture_happiness(750_000)
+        |> Companion.remember_reaction(44, :passive)
+        |> Companion.set_autocast([%{action: 14_920, action_type: 0xC1}])
+
+      original = Companion.relationship(character)
+      ref = %EntityRef{guid: 44, entry: 416, spell_id: 1002}
+      possessed = Companion.activate(character, :possession, ref)
+      assert Companion.relationship(possessed) == %{original | possession_spell_id: 1002}
+      assert Companion.activate(possessed, :possession, ref) == possessed
+      assert Companion.summon_guid(possessed) == 44
+      assert Companion.control_guid(possessed) == 44
+      assert possessed.unit.summon == 44
+      assert possessed.unit.charm == 44
+
+      released = Companion.removed(possessed, :released)
+      assert Companion.relationship(released) == original
+      assert Companion.control_guid(released) == nil
+      assert released.unit.summon == 44
+      assert released.unit.charm == 0
+    end
+
+    test "suspension and process loss clear possession while retaining the hunter pet" do
+      possessed =
+        Companion.activate(character_with_pet(), :possession, %EntityRef{guid: 44, entry: 416, spell_id: 1002})
+
+      for transition <- [&Companion.suspend/1, &Companion.removed(&1, :process_down)] do
+        suspended = transition.(possessed)
+        assert Companion.suspended(suspended) == {:hunter_pet, 416, 688}
+        assert Companion.relationship(suspended).possession_spell_id == nil
+        assert Companion.control_guid(suspended) == nil
+        assert suspended.unit.summon == 0
+        assert suspended.unit.charm == 0
+      end
+    end
+  end
+
   describe "dismiss/2" do
     test "suspends a hunter pet and clears the summon projection for a normal dismissal" do
       character = character_with_pet()
