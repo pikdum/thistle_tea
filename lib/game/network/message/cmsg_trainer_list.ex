@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgTrainerList do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_TRAINER_LIST
 
+  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.Trainer
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.SmsgTrainerList
@@ -40,6 +41,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgTrainerList do
       %SmsgTrainerList.Spell{
         spell_id: spell.teach_spell_id,
         state: Trainer.state(spell, known_ids, unit.level, skills),
+        profession_slots:
+          if(Trainer.first_primary_rank?(spell) and Skills.free_profession_slots(skills) > 0, do: 1, else: 0),
+        profession_slots_required: if(Trainer.first_primary_rank?(spell), do: 1, else: 0),
         cost: Reputation.price(character, trainer_guid, spell.cost),
         req_level: spell.req_level,
         req_skill: spell.req_skill,

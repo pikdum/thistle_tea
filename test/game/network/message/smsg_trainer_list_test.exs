@@ -4,6 +4,22 @@ defmodule ThistleTea.Game.Network.Message.SmsgTrainerListTest do
   alias ThistleTea.Game.Network.Message.SmsgTrainerList
 
   describe "to_binary/1" do
+    test "requests profession confirmation and disables training when slots are full" do
+      for {state, available} <- [green: 1, green_disabled: 0] do
+        spell = %SmsgTrainerList.Spell{
+          spell_id: 2581,
+          state: state,
+          profession_slots: available,
+          profession_slots_required: 1
+        }
+
+        binary = SmsgTrainerList.to_binary(%SmsgTrainerList{guid: 1, spells: [spell]})
+
+        assert <<_header::binary-size(16), 2581::little-size(32), 0, 0::little-size(32), ^available::little-size(32),
+                 1::little-size(32), _rest::binary>> = binary
+      end
+    end
+
     test "encodes an empty list with the title" do
       binary =
         SmsgTrainerList.to_binary(%SmsgTrainerList{

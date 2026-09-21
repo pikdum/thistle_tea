@@ -16,6 +16,15 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
   @defense_skill 95
   @unarmed_skill 162
   @fishing_skill 356
+  @primary_professions [164, 165, 171, 182, 186, 197, 202, 333, 393]
+
+  def primary_profession?(skill_id), do: skill_id in @primary_professions
+
+  def free_profession_slots(skills) when is_map(skills) do
+    max(2 - Enum.count(@primary_professions, &known?(skills, &1)), 0)
+  end
+
+  def free_profession_slots(_skills), do: 2
 
   @weapon_subclass_skills %{
     0 => 44,

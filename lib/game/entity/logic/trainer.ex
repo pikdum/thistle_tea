@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trainer do
   import Bitwise, only: [&&&: 2, <<<: 2]
 
   alias ThistleTea.Game.Entity.Data.TrainerSpell
+  alias ThistleTea.Game.Entity.Logic.Skills
 
   def fits_class_race?(%TrainerSpell{class_race_masks: []}, _class, _race), do: true
 
@@ -24,12 +25,33 @@ defmodule ThistleTea.Game.Entity.Logic.Trainer do
     known_ids = known_ids || []
 
     cond do
-      spell.learned_spell_id in known_ids -> :gray
-      spell.req_level > level -> :red
-      missing_prerequisite?(spell, known_ids) -> :red
-      spell.req_skill > 0 and skill_value(skills, spell.req_skill) < spell.req_skill_value -> :red
-      true -> :green
+      spell.learned_spell_id in known_ids ->
+        :gray
+
+      spell.req_level > level ->
+        :red
+
+      missing_prerequisite?(spell, known_ids) ->
+        :red
+
+      spell.req_skill > 0 and skill_value(skills, spell.req_skill) < spell.req_skill_value ->
+        :red
+
+      profession_limit?(spell, skills) ->
+        :green_disabled
+
+      true ->
+        :green
     end
+  end
+
+  def first_primary_rank?(%TrainerSpell{skill_id: id, skill_max: cap}) do
+    Skills.primary_profession?(id) and cap == 75
+  end
+
+  defp profession_limit?(spell, skills) do
+    first_primary_rank?(spell) and not Skills.known?(skills, spell.skill_id) and
+      Skills.free_profession_slots(skills) == 0
   end
 
   defp skill_value(skills, skill_id) when is_map(skills) do

@@ -234,7 +234,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Player do
     skills: {:virtual, %{}},
     skill_bonuses: {:virtual, %{}},
     character_points1: {0x044E, 1, :int, :private},
-    character_points2: {0x044F, 1, :int, :private},
+    character_points2: {0x044F, 1, {:fn, [:skills], &__MODULE__.profession_points/1}, :private},
     track_creatures: {0x0450, 1, :int, :private},
     track_resources: {0x0451, 1, :int, :private},
     block_percentage: {0x0452, 1, :float, :private},
@@ -333,6 +333,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Player do
   end
 
   def skill_info(%{skills: skills, skill_bonuses: bonuses}), do: Skills.encode(skills, bonuses)
+
+  def profession_points(%{skills: skills}), do: <<Skills.free_profession_slots(skills)::little-size(32)>>
 
   def bytes_3(%{
         gender: gender,

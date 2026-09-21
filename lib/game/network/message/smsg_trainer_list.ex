@@ -11,6 +11,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgTrainerList do
       :state,
       :prev_spell_id,
       :req_spell_id,
+      profession_slots: 0,
+      profession_slots_required: 0,
       cost: 0,
       req_level: 0,
       req_skill: 0,
@@ -18,7 +20,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgTrainerList do
     ]
   end
 
-  @states %{green: 0, red: 1, gray: 2}
+  @states %{green: 0, green_disabled: 0, red: 1, gray: 2}
 
   @impl ServerMessage
   def to_binary(%__MODULE__{guid: guid, trainer_type: trainer_type, spells: spells, title: title}) do
@@ -39,8 +41,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgTrainerList do
       spell.spell_id::little-size(32),
       Map.fetch!(@states, spell.state),
       spell.cost::little-size(32),
-      0::little-size(32),
-      0::little-size(32),
+      spell.profession_slots::little-size(32),
+      spell.profession_slots_required::little-size(32),
       spell.req_level,
       spell.req_skill::little-size(32),
       spell.req_skill_value::little-size(32),

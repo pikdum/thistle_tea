@@ -11,8 +11,13 @@ defmodule ThistleTea.Game.Player.SpellsDbcTest do
   alias ThistleTea.Game.Entity.Logic.Breathing
   alias ThistleTea.Game.Player.Spells
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Loader.Skill
 
   @moduletag :dbc_db
+
+  setup_all do
+    Skill.load_all()
+  end
 
   describe "learn/2" do
     setup [:character]

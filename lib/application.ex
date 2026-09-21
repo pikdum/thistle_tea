@@ -49,6 +49,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.PetTraining, as: PetTrainingLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
+  alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride, as: SpellEffectOverrideLoader
@@ -192,6 +193,7 @@ defmodule ThistleTea.Application do
     SpellThreatLoader.init()
     TalentLoader.init()
     TrainerLoader.init()
+    SkillLoader.init()
     ClassSpellLoader.init()
     LootLoader.init()
     MailLoader.init()
@@ -276,6 +278,7 @@ defmodule ThistleTea.Application do
         DurabilityLoader.load_all()
         AuctionHouseLoader.load_all()
         EmoteLoader.load_all()
+        SkillLoader.load_all()
         PetLevelLoader.load_all()
         BattlegroundLoader.load_all()
 

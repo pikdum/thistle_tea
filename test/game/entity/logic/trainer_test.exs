@@ -1,7 +1,9 @@
 defmodule ThistleTea.Game.Entity.Logic.TrainerTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.TrainerSpell
+  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.Trainer
 
   @fireball_rank_2 %TrainerSpell{
@@ -13,6 +15,22 @@ defmodule ThistleTea.Game.Entity.Logic.TrainerTest do
   }
 
   describe "state/3" do
+    test "disables a third primary profession but permits upgrades and secondary skills" do
+      skills = %{} |> Skills.learn_rank(186, 75) |> Skills.learn_rank(182, 75)
+      first_rank = %TrainerSpell{skill_id: 171, skill_max: 75, learned_spell_id: 2259}
+      assert Trainer.state(first_rank, [], 60, skills) == :green_disabled
+      assert Trainer.state(%{first_rank | skill_id: 185}, [], 60, skills) == :green
+      assert Trainer.state(%{first_rank | skill_id: 186, skill_max: 150}, [], 60, skills) == :green
+      assert Trainer.state(first_rank, [2259], 60, skills) == :gray
+      assert Trainer.state(first_rank, [], 60, Map.delete(skills, 186)) == :green
+    end
+
+    test "projects free slots from known primary skills" do
+      skills = %{} |> Skills.learn_rank(186, 75) |> Skills.learn_rank(185, 75)
+      assert Player.profession_points(%{skills: skills}) == <<1::little-size(32)>>
+      assert Player.profession_points(%{skills: %{}}) == <<2::little-size(32)>>
+    end
+
     test "gray when the spell is already known" do
       assert Trainer.state(@fireball_rank_2, [143], 60) == :gray
     end

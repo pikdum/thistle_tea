@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Player.TalentsDbcTest do
   alias ThistleTea.Game.Entity.Logic.Aura.ModifierSync
   alias ThistleTea.Game.Player.Spells
   alias ThistleTea.Game.Player.Talents
+  alias ThistleTea.Game.World.Loader.Skill
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
   alias ThistleTea.Game.WorldRef
@@ -17,6 +18,7 @@ defmodule ThistleTea.Game.Player.TalentsDbcTest do
   @moduletag :dbc_db
 
   setup_all do
+    :ok = Skill.load_all()
     :ok = TalentLoader.load_all()
   end
 
