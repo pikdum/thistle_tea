@@ -177,11 +177,23 @@ defmodule ThistleTea.Game.Entity.Logic.SkillsTest do
   describe "learn_rank/3" do
     test "learns apprentice fishing and raises later rank caps without resetting progress" do
       skills = Skills.learn_rank(%{}, Skills.fishing_skill(), 75)
-      assert skills[356] == %{value: 1, max: 75, range: :tier, always_max?: false}
+      assert skills[356] == %{value: 1, max: 75, range: :tier, always_max?: false, step: 1}
 
       skills = Map.update!(skills, 356, &%{&1 | value: 50})
       assert Skills.learn_rank(skills, 356, 150)[356].value == 50
       assert Skills.learn_rank(skills, 356, 150)[356].max == 150
+      assert Skills.learn_rank(skills, 356, 150)[356].step == 2
+    end
+
+    test "encodes trained tiers separately from skill value and maximum" do
+      skills = %{} |> Skills.learn_rank(186, 150) |> Skills.max_professions()
+
+      assert <<186::little-size(16), 2::little-size(16), 300::little-size(16), 300::little-size(16), _rest::binary>> =
+               Skills.encode(skills)
+
+      assert Skills.rank_known?(skills, 186, 75)
+      assert Skills.rank_known?(skills, 186, 150)
+      refute Skills.rank_known?(skills, 186, 225)
     end
   end
 

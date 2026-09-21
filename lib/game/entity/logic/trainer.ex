@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trainer do
     known_ids = known_ids || []
 
     cond do
-      spell.learned_spell_id in known_ids ->
+      known?(spell, known_ids, skills) ->
         :gray
 
       spell.req_level > level ->
@@ -47,6 +47,10 @@ defmodule ThistleTea.Game.Entity.Logic.Trainer do
 
   def first_primary_rank?(%TrainerSpell{skill_id: id, skill_max: cap}) do
     Skills.primary_profession?(id) and cap == 75
+  end
+
+  defp known?(spell, known_ids, skills) do
+    spell.learned_spell_id in known_ids or Skills.rank_known?(skills, spell.skill_id, spell.skill_max)
   end
 
   defp profession_limit?(spell, skills) do

@@ -15,6 +15,12 @@ defmodule ThistleTea.Game.Entity.Logic.TrainerTest do
   }
 
   describe "state/3" do
+    test "treats a superseded profession rank as known without downgrading or charging again" do
+      skills = %{} |> Skills.learn_rank(186, 150) |> Skills.learn_rank(182, 75)
+      apprentice = %TrainerSpell{learned_spell_id: 2575, skill_id: 186, skill_max: 75}
+      assert Trainer.state(apprentice, [2576], 60, skills) == :gray
+    end
+
     test "disables a third primary profession but permits upgrades and secondary skills" do
       skills = %{} |> Skills.learn_rank(186, 75) |> Skills.learn_rank(182, 75)
       first_rank = %TrainerSpell{skill_id: 171, skill_max: 75, learned_spell_id: 2259}

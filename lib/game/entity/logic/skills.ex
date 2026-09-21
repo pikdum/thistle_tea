@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.Skills do
   @moduledoc """
-  Player skill lines as data: a map of skill id to `%{value, max, range,
-  always_max?}` entries, encoded into the PLAYER_SKILL_INFO update field.
+  Player skill lines as data: a map of skill id to value, maximum, range,
+  always-max flag, and trained tier step, encoded into PLAYER_SKILL_INFO.
   Ranges follow vmangos: `:level` skills cap at 5 x level and gain points
   from combat use, `:tier` skills use their trained profession cap, `:mono`
   skills stay 1/1, and `:language` skills stay 300/300.
@@ -183,10 +183,20 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
 
   def learn_rank(skills, skill_id, skill_max) when is_map(skills) and is_integer(skill_id) and skill_id > 0 do
     entry = Map.get(skills, skill_id, %{value: 1, max: skill_max, range: :tier, always_max?: false})
+    entry = Map.put(entry, :step, max(Map.get(entry, :step, 0), div(skill_max, 75)))
     Map.put(skills, skill_id, %{entry | max: max(entry.max, skill_max), range: :tier})
   end
 
   def learn_rank(skills, _skill_id, _skill_max), do: skills
+
+  def rank_known?(skills, skill_id, skill_max) when is_map(skills) and is_integer(skill_max) and skill_max > 0 do
+    case Map.get(skills, skill_id) do
+      %{step: step} -> step >= div(skill_max, 75)
+      _unknown -> false
+    end
+  end
+
+  def rank_known?(_skills, _skill_id, _skill_max), do: false
 
   def encode(skills, bonuses \\ %{})
 
@@ -197,8 +207,9 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
       |> Enum.take(@max_skill_entries)
       |> Enum.map(fn {id, entry} ->
         {temporary, permanent} = Map.get(bonuses, id, {0, 0})
+        step = Map.get(entry, :step, 0)
 
-        <<id::little-size(32), entry.value::little-size(16), entry.max::little-size(16),
+        <<id::little-size(16), step::little-size(16), entry.value::little-size(16), entry.max::little-size(16),
           temporary::little-signed-size(16), permanent::little-signed-size(16)>>
       end)
       |> IO.iodata_to_binary()
