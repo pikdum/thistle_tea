@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Player.StatsTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Rest
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Player.Stats
 
@@ -55,6 +56,11 @@ defmodule ThistleTea.Game.Player.StatsTest do
 
       character = Stats.apply(character, %{stats | level: 12})
       assert character.player.character_points1 == 3
+
+      capped = character |> Rest.set_bonus(50.0) |> Stats.apply(%{stats | level: 60, next_level_xp: 0})
+      assert capped.internal.rest_bonus == 0.0
+      assert capped.player.rest_state_experience == 0
+      assert capped.player.rest_state == 2
     end
   end
 

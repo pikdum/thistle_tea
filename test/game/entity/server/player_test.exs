@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateBatcher
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.Effect
@@ -103,6 +104,58 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   end
 
   describe "logout" do
+    test "settles rest on disconnect and consumes offline time before login publication" do
+      {:ok, account} = Account.get_user("test")
+      id = System.unique_integer([:positive])
+      guid = Guid.from_low_guid(:player, id)
+      character = login_character(id, guid, account.id)
+      next_level_xp = Stats.next_level_xp(character.unit.level)
+      now = Time.now()
+
+      character = %{
+        character
+        | player: %{character.player | next_level_xp: next_level_xp},
+          internal: %{character.internal | rest_type: :city, rest_logout_at: now - 28_800_000}
+      }
+
+      CharacterStore.put(character)
+      assert {:ok, pid} = PlayerServer.login(account, self(), guid)
+      restored = :sys.get_state(pid).character
+      assert_in_delta restored.internal.rest_bonus, next_level_xp / 40, 0.01
+      assert restored.internal.rest_logout_at == nil
+      assert CharacterStore.get(id).internal.rest_logout_at == nil
+      assert CharacterStore.get(id).player.rest_state_experience == trunc(next_level_xp / 40)
+
+      before_logout = Time.now()
+      assert :ok = PlayerServer.disconnect(pid)
+      saved = CharacterStore.get(id)
+      assert saved.internal.rest_logout_at >= before_logout
+      assert saved.internal.rest_started_at == nil
+
+      assert {:ok, next_pid} = PlayerServer.login(account, self(), guid)
+      assert_in_delta :sys.get_state(next_pid).character.internal.rest_bonus, restored.internal.rest_bonus, 0.01
+      assert :ok = PlayerServer.disconnect(next_pid)
+    end
+
+    test "connection loss begins wilderness rest at actual world departure" do
+      {:ok, account} = Account.get_user("test")
+      id = System.unique_integer([:positive])
+      guid = Guid.from_low_guid(:player, id)
+      CharacterStore.put(login_character(id, guid, account.id))
+      connection = spawn(fn -> receive do: (:stop -> :ok) end)
+      assert {:ok, pid} = PlayerServer.login(account, connection, guid)
+      monitor = Process.monitor(pid)
+      before_logout = Time.now()
+      send(connection, :stop)
+      assert_receive {:DOWN, ^monitor, :process, ^pid, :normal}
+      saved = CharacterStore.get(id)
+      assert saved.internal.rest_logout_at >= before_logout
+      assert saved.internal.rest_type == nil
+
+      assert RestLogic.restore(saved, saved.internal.rest_logout_at + 28_800_000).internal.rest_bonus ==
+               saved.player.next_level_xp / 160
+    end
+
     test "stops the owner before the connection completes logout" do
       {:ok, account} = Account.get_user("test")
       id = System.unique_integer([:positive])

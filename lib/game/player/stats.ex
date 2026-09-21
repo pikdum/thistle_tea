@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Player.Stats do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Experience
+  alias ThistleTea.Game.Entity.Logic.Rest
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.Stats, as: LogicStats
   alias ThistleTea.Game.Entity.Logic.Talents
@@ -105,6 +106,7 @@ defmodule ThistleTea.Game.Player.Stats do
     %{character | unit: unit, player: player}
     |> CombatRatings.sync()
     |> Talents.sync_points()
+    |> Rest.set_bonus(character.internal.rest_bonus)
   end
 
   def level_delta(%__MODULE__{} = old, %__MODULE__{} = new) do

@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.Talents, as: LogicTalents
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
+  alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
@@ -119,6 +120,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> PlayerSpells.apply_default_auras(Time.now())
       |> LogicTalents.sync_points()
       |> Enchantments.restore()
+      |> PlayerRest.restore()
       |> evaluate_login_rest()
       |> Honor.sync()
       |> BT.init(PlayerBT.tree())
@@ -198,7 +200,7 @@ defmodule ThistleTea.Game.Player.Login do
     |> VendorPurchase.finish_recovery()
     |> Quests.on_inventory_changed(old_item_counts)
     |> ItemDurations.start()
-    |> schedule_aura_tick()
+    |> TickScheduler.ensure_scheduled()
     |> Mail.schedule_delivery()
     |> Quests.restore_timers()
   end
@@ -420,13 +422,6 @@ defmodule ThistleTea.Game.Player.Login do
   end
 
   defp align_to_transport(%Character{} = character, %UpdateObject{}), do: character
-
-  defp schedule_aura_tick(%{character: %{unit: %Unit{auras: [_ | _]}}} = state) do
-    ref = Process.send_after(self(), :player_tick, 0)
-    %{state | player_tick_ref: ref}
-  end
-
-  defp schedule_aura_tick(state), do: state
 
   defp build_spellbook(%Character{internal: internal} = character) do
     spellbook = SpellLoader.build_spellbook(internal.spells || [])

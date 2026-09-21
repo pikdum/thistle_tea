@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Player.Rest do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Rest, as: RestLogic
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
+  alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
@@ -21,6 +22,14 @@ defmodule ThistleTea.Game.Player.Rest do
   @area_team_horde 4
   @alliance_races [1, 3, 4, 7]
   @horde_races [2, 5, 6, 8]
+
+  def restore(%Character{} = character, now \\ Time.now()) do
+    character |> RestLogic.restore(now) |> CharacterStore.put()
+  end
+
+  def logout(%{character: %Character{} = character} = state, now \\ Time.now()) do
+    %{state | character: RestLogic.logout(character, now)}
+  end
 
   def enter_tavern(%{character: %Character{} = character} = state, trigger_id) do
     case RestLogic.rest_type(character) do
@@ -97,6 +106,9 @@ defmodule ThistleTea.Game.Player.Rest do
 
   defp apply_transition(state, %Character{} = character) do
     CharacterStore.put(character)
-    PlayerServer.maybe_broadcast_update(%{state | character: Core.mark_broadcast_update(character)})
+
+    %{state | character: Core.mark_broadcast_update(character)}
+    |> PlayerServer.maybe_broadcast_update()
+    |> TickScheduler.ensure_scheduled()
   end
 end

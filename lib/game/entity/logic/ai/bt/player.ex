@@ -18,10 +18,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Logic.Reactive
+  alias ThistleTea.Game.Entity.Logic.Rest
 
   def tree do
     BT.selector([
       BT.action(&sobering_tick/3),
+      BT.action(&rest_tick/3),
       BT.action(&breathing_tick/3),
       BT.action(&sync_combat/2),
       BT.action(&pvp_tick/3),
@@ -33,6 +35,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
       CombatBT.melee_sequence(),
       BT.action(&idle/2)
     ])
+  end
+
+  defp rest_tick(state, blackboard, %Context{now: now}) do
+    {:failure, Rest.tick(state, now), blackboard}
   end
 
   defp sobering_tick(state, blackboard, %Context{now: now}) do

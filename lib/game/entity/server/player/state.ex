@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Player.ItemDurations
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.QuestSharing
+  alias ThistleTea.Game.Player.Rest
   alias ThistleTea.Game.Player.Taxi
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.AggroProbe
@@ -132,7 +133,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
       BattlegroundSystem.disconnect(state.guid, state.character.movement_block.position)
     end
 
-    if state.character, do: CharacterStore.put(state.character)
+    if state.character, do: state |> Rest.logout() |> Map.fetch!(:character) |> CharacterStore.put()
 
     if state.guid do
       leave_world_presence(state)

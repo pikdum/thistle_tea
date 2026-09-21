@@ -7,6 +7,10 @@ defmodule ThistleTea.Game.Entity.Logic.RestTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
+  alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.Rest
 
   @next_level_xp 1_152_000
@@ -54,6 +58,88 @@ defmodule ThistleTea.Game.Entity.Logic.RestTest do
       c = character() |> Rest.start(:city, 0) |> Rest.flush(2_000_000_000_000)
 
       assert c.internal.rest_bonus == @next_level_xp * 0.75
+    end
+
+    test "a backward timestamp cannot credit the same time twice" do
+      c = character() |> Rest.start(:city, -100_000) |> Rest.flush(-50_000)
+      c = c |> Rest.flush(-80_000) |> Rest.flush(-50_000)
+      assert c.internal.rest_bonus == 50.0
+      assert c.internal.rest_started_at == -50_000
+    end
+  end
+
+  describe "logout/2 and restore/2" do
+    test "settles online time and credits an offline rest-area interval once" do
+      for location <- [:city, {:tavern, 71}] do
+        offline = character() |> Rest.start(location, -200_000) |> Rest.logout(-100_000)
+        assert offline.internal.rest_bonus == 100.0
+        assert offline.internal.rest_started_at == nil
+        assert offline.internal.rest_logout_at == -100_000
+        assert Rest.logout(offline, 0) == offline
+        assert Rest.flush(offline, 0) == offline
+
+        restored = Rest.restore(offline, 0)
+        assert restored.internal.rest_bonus == 200.0
+        assert restored.player.rest_state_experience == 200
+        assert restored.player.rest_state == 1
+        assert restored.internal.rest_logout_at == nil
+        assert restored.internal.rest_started_at == 0
+        assert Rest.restore(restored, 100_000) == restored
+        assert Rest.flush(restored, 100_000).internal.rest_bonus == 300.0
+      end
+    end
+
+    test "wilderness time earns one quarter of the rest-area rate" do
+      offline = Rest.logout(character(), 0)
+      restored = Rest.restore(offline, 100_000)
+      assert restored.internal.rest_bonus == 25.0
+      assert restored.internal.rest_started_at == nil
+      assert Rest.flush(restored, 200_000) == restored
+      refute Rest.resting?(restored)
+    end
+
+    test "offline growth preserves fractions and obeys the pool cap" do
+      offline = character() |> Rest.set_bonus(0.25) |> Rest.logout(0)
+      assert Rest.restore(offline, 1_000).internal.rest_bonus == 0.5
+      assert Rest.restore(offline, 10_000_000_000).internal.rest_bonus == @next_level_xp * 0.75
+    end
+
+    test "fresh characters and backward offline timestamps receive no bonus" do
+      assert Rest.restore(character(), 100_000) == character()
+      restored = character() |> Rest.logout(1_000) |> Rest.restore(0)
+      assert restored.internal.rest_bonus == 0.0
+      assert restored.internal.rest_logout_at == nil
+    end
+
+    test "a character with no next level cannot accumulate a bonus" do
+      capped = %{character() | player: %{character().player | next_level_xp: 0}}
+      restored = capped |> Rest.start(:city, 0) |> Rest.logout(10_000) |> Rest.restore(100_000)
+      assert restored.internal.rest_bonus == 0.0
+      assert restored.player.rest_state_experience == 0
+      assert Rest.next_tick_at(restored) == nil
+    end
+  end
+
+  describe "tick/2" do
+    test "publishes rest growth through the player tree on a ten-second deadline" do
+      c = character() |> Rest.start(:city, 0)
+      assert Tick.needs_tick?(c)
+      assert Tick.player_delay(c, :running, 2_000) == 8_000
+      assert Rest.tick(c, 9_999) == c
+
+      {_, updated} = BT.tick(PlayerBT.tree(), c, Context.new(10_000))
+      assert updated.internal.rest_bonus == 10.0
+      assert updated.player.rest_state_experience == 10
+      assert updated.internal.broadcast_update?
+      assert Rest.next_tick_at(updated) == 20_000
+    end
+
+    test "stops rest scheduling at the cap, outside rest areas, and while offline" do
+      c = character() |> Rest.start(:city, 0)
+      assert Rest.next_tick_at(Rest.set_bonus(c, @next_level_xp)) == nil
+      assert Rest.next_tick_at(Rest.stop(c, 1_000)) == nil
+      assert Rest.next_tick_at(Rest.logout(c, 1_000)) == nil
+      assert Rest.tick(Rest.logout(c, 1_000), 100_000).internal.rest_bonus == 1.0
     end
   end
 
