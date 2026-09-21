@@ -62,6 +62,14 @@ defmodule ThistleTea.Game.Entity.Logic.ItemLifetime do
 
   def suspend(%Item{} = item, now) do
     if duration(item) && not realtime?(item) do
+      pause(item, now)
+    else
+      item
+    end
+  end
+
+  def pause(%Item{} = item, now) do
+    if duration(item) || (item.item.duration || 0) > 0 do
       item
       |> put_duration(%ItemDuration{remaining_ms: remaining_ms(item, now)})
       |> project(now)

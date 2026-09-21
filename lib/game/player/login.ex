@@ -48,6 +48,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.Player.Auction
+  alias ThistleTea.Game.Player.Buyback
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.HomeBind
@@ -99,6 +100,7 @@ defmodule ThistleTea.Game.Player.Login do
 
     c =
       c
+      |> Buyback.reset()
       |> ItemDurations.restore()
       |> ChatStatus.reset()
       |> Emote.reset()

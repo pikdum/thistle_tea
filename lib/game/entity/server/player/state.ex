@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Party.Notifier
+  alias ThistleTea.Game.Player.Buyback
   alias ThistleTea.Game.Player.ItemDurations
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.QuestSharing
@@ -124,6 +125,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     state = leave_transport(state)
 
     state = close_mailbox(state)
+    state = Buyback.logout(state)
     state = ItemDurations.logout(state)
 
     if state.guid && state.character do

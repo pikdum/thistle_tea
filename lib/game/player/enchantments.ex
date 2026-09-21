@@ -258,15 +258,19 @@ defmodule ThistleTea.Game.Player.Enchantments do
     ItemStore.put(item)
     position = Inventory.find_position(character.player, item.object.guid, &ItemStore.get/1)
 
-    case enchantment do
-      %{expires_at: expires_at, token: token} ->
-        Process.send_after(self(), {:expire_item_enchantment, item.object.guid, token}, expires_at - now)
-
-      nil ->
-        :ok
-    end
+    if enchantment, do: schedule_item_expiry(item, now)
 
     sync_visible_item(character, position, item)
+  end
+
+  def schedule_item_expiry(%Item{} = item, now \\ Time.now()) do
+    case Item.temporary_enchantment(item) do
+      %{expires_at: expires_at, token: token} when expires_at > now ->
+        Process.send_after(self(), {:expire_item_enchantment, item.object.guid, token}, expires_at - now)
+
+      _ ->
+        :ok
+    end
   end
 
   defp sync_visible_item(%Character{} = character, {bag, slot}, item) when bag in [0, 255] do

@@ -163,6 +163,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_LIST_INVENTORY: Message.CmsgListInventory,
               CMSG_BUY_ITEM: Message.CmsgBuyItem,
               CMSG_SELL_ITEM: Message.CmsgSellItem,
+              CMSG_BUYBACK_ITEM: Message.CmsgBuybackItem,
               CMSG_LOOT: Message.CmsgLoot,
               CMSG_AUTOSTORE_LOOT_ITEM: Message.CmsgAutostoreLootItem,
               CMSG_LOOT_MONEY: Message.CmsgLootMoney,
