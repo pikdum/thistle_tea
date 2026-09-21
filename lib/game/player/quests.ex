@@ -1019,8 +1019,12 @@ defmodule ThistleTea.Game.Player.Quests do
 
   defp put_character(state, %Character{} = character) do
     CharacterStore.put(character)
-    QuestSharing.quest_log_changed(state.character, character)
-    sync_needed_items(character)
+    sync_character_change(state.character, character)
     PlayerServer.maybe_broadcast_update(%{state | character: Core.mark_broadcast_update(character)})
+  end
+
+  def sync_character_change(%Character{} = previous, %Character{} = character) do
+    QuestSharing.quest_log_changed(previous, character)
+    sync_needed_items(character)
   end
 end

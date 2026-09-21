@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Player.Spells do
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.SpellBook
+  alias ThistleTea.Game.Entity.Logic.SpellRemoval
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
@@ -82,39 +83,15 @@ defmodule ThistleTea.Game.Player.Spells do
   end
 
   def unlearn(%Character{} = character, spell_ids, now) when is_list(spell_ids) and is_integer(now) do
-    previous_skills = character |> Proficiency.from_character() |> Proficiency.weapon_skills()
-    {character, aura_events} = AuraLogic.remove_spells(character, spell_ids, now)
-    character = Effects.enqueue(character, aura_events)
-    internal = character.internal
-
-    character = %{
-      character
-      | internal: %{
-          internal
-          | spells: (internal.spells || []) -- spell_ids,
-            spellbook: Map.drop(internal.spellbook || %{}, spell_ids)
-        }
-    }
-
-    current_skills = character |> Proficiency.from_character() |> Proficiency.weapon_skills()
-
-    {skills, forgotten} =
-      Skills.forget(
-        character.player.skills || %{},
-        previous_skills -- current_skills,
-        character.internal.forgotten_skills
-      )
-
-    character = %{
-      character
-      | player: %{character.player | skills: skills},
-        internal: %{character.internal | forgotten_skills: forgotten}
-    }
-
+    character = SpellRemoval.remove(character, spell_ids, now)
     CharacterStore.put(character)
+    notify_unlearned(character, spell_ids)
+    character
+  end
+
+  def notify_unlearned(%Character{} = character, spell_ids) do
     Enum.each(spell_ids, &Network.send_packet(%Message.SmsgRemovedSpell{spell_id: &1}))
     send_proficiencies(character)
-    character
   end
 
   def apply_passives(%Character{internal: %{spellbook: spellbook}} = character, now)

@@ -69,6 +69,40 @@ defmodule ThistleTea.Game.Entity.Logic.QuestItems do
     {batch, replacements}
   end
 
+  def remove_sources(%Player{} = player, quests, get_item) do
+    items = Inventory.all_owned_items(player, get_item)
+
+    available =
+      Enum.reduce(
+        items,
+        %{},
+        &Map.update(&2, &1.object.entry, &1.item.stack_count || 1, fn count -> count + (&1.item.stack_count || 1) end)
+      )
+
+    {counts, _available} = Enum.reduce(quests, {%{}, available}, &reserve_source/2)
+
+    {batch, _remaining} =
+      Enum.reduce(items, {Batch.new(player), counts}, fn item, {batch, counts} ->
+        entry = item.object.entry
+        count = min(item.item.stack_count || 1, Map.get(counts, entry, 0))
+        batch = if count > 0, do: Batch.consume_item(batch, item.object.guid, count), else: batch
+        {batch, Map.update(counts, entry, 0, &(&1 - count))}
+      end)
+
+    batch
+  end
+
+  defp reserve_source(%Quest{src_item_id: id, src_item_count: count}, {counts, available}) do
+    count = max(count, 1)
+    remaining = Map.get(available, id, 0)
+
+    if id > 0 and remaining >= count do
+      {Map.update(counts, id, count, &(&1 + count)), Map.put(available, id, remaining - count)}
+    else
+      {counts, available}
+    end
+  end
+
   defp source_removals(items, %Quest{} = quest) do
     source_items = Enum.filter(items, &(&1.object.entry == quest.src_item_id))
     count = max(quest.src_item_count, 1)

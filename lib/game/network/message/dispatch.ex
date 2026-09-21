@@ -180,6 +180,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_QUESTGIVER_REQUEST_REWARD: Message.CmsgQuestgiverRequestReward,
               CMSG_QUESTGIVER_CHOOSE_REWARD: Message.CmsgQuestgiverChooseReward,
               CMSG_TRAINER_LIST: Message.CmsgTrainerList,
+              CMSG_UNLEARN_SKILL: Message.CmsgUnlearnSkill,
               CMSG_TRAINER_BUY_SPELL: Message.CmsgTrainerBuySpell,
               CMSG_TAXINODE_STATUS_QUERY: Message.CmsgTaxinodeStatusQuery,
               CMSG_TAXIQUERYAVAILABLENODES: Message.CmsgTaxiqueryavailablenodes,

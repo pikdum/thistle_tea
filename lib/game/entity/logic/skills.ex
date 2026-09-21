@@ -190,7 +190,7 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
 
   def encode(skills, bonuses \\ %{})
 
-  def encode(skills, bonuses) when is_map(skills) and map_size(skills) > 0 do
+  def encode(skills, bonuses) when is_map(skills) do
     entries =
       skills
       |> Enum.sort_by(fn {id, _entry} -> id end)
