@@ -110,6 +110,25 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def query_quest(state, npc_guid, quest_id) do
+    if Guid.type_id(npc_guid) == :item do
+      query_item_quest(state, npc_guid, quest_id)
+    else
+      query_world_quest(state, npc_guid, quest_id)
+    end
+  end
+
+  defp query_item_quest(state, guid, quest_id) do
+    with %DataItem{} <- QuestItems.starter(state.character, guid, quest_id, &ItemStore.get/1),
+         %Quest{} = quest <- QuestLoader.get(quest_id) do
+      send_details(guid, quest)
+    else
+      _invalid -> Network.send_packet(%Message.SmsgGossipComplete{})
+    end
+
+    state
+  end
+
+  defp query_world_quest(state, npc_guid, quest_id) do
     entry = Guid.entry(npc_guid)
 
     with true <- PlayerReputation.can_interact?(state.character, npc_guid),
@@ -123,11 +142,54 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def accept(state, npc_guid, quest_id) do
-    if Guid.type_id(npc_guid) == :player do
-      QuestSharing.accept(state, npc_guid, quest_id)
-    else
-      accept_from_questgiver(state, npc_guid, quest_id)
+    case Guid.type_id(npc_guid) do
+      :player -> QuestSharing.accept(state, npc_guid, quest_id)
+      :item -> accept_from_item(state, npc_guid, quest_id)
+      _type -> accept_from_questgiver(state, npc_guid, quest_id)
     end
+  end
+
+  def cancel_dialog(state) do
+    Network.send_packet(%Message.SmsgGossipComplete{})
+    state
+  end
+
+  defp accept_from_item(state, guid, quest_id) do
+    state = QuestSharing.clear(state)
+
+    state =
+      with true <- Death.alive?(state.character),
+           %DataItem{} = item <- QuestItems.starter(state.character, guid, quest_id, &ItemStore.get/1),
+           %Quest{} = quest <- QuestLoader.get(quest_id),
+           :ok <- takeability(state.character, quest) do
+        accepted = force_accept(state, quest_id, nil, starter_item: item)
+
+        if QuestLog.active?(accepted.character.player.quest_log, quest_id),
+          do: QuestSharing.party_accept(accepted, quest),
+          else: accepted
+      else
+        {:error, reason} ->
+          send_item_quest_invalid(reason)
+          state
+
+        _invalid ->
+          state
+      end
+
+    cancel_dialog(state)
+  end
+
+  defp send_item_quest_invalid(reason) do
+    code =
+      case reason do
+        :wrong_race -> 6
+        :timed_quest_active -> 12
+        :already_active -> 13
+        :already_rewarded -> 13
+        _requirement -> 0
+      end
+
+    Network.send_packet(%Message.SmsgQuestgiverQuestInvalid{reason: code})
   end
 
   defp accept_from_questgiver(state, npc_guid, quest_id) do
@@ -165,7 +227,10 @@ defmodule ThistleTea.Game.Player.Quests do
          {:ok, quest_log} <-
            QuestLog.add(player.quest_log, quest, Time.now(), System.system_time(:second)),
          {:ok, quest_log} <- Sharing.inherit_timer(quest_log, quest.id, Keyword.get(opts, :shared_entry)),
-         {:ok, state} <- grant_source_item(state, quest) do
+         {:ok, state} <- accept_quest_inventory(state, quest, Keyword.get(opts, :starter_item)) do
+      {slot, entry} = QuestLog.find(quest_log, quest.id)
+      quest_log = Map.put(state.character.player.quest_log, slot, entry)
+
       {quest_log, event} =
         QuestLog.evaluate(
           quest_log,
@@ -197,8 +262,8 @@ defmodule ThistleTea.Game.Player.Quests do
         Network.send_packet(%Message.SmsgQuestlogFull{})
         state
 
-      {:error, :inventory_full} ->
-        InventoryUpdate.send_failure(:inventory_full, 0, 0)
+      {:error, {:inventory, reason}} ->
+        InventoryUpdate.send_failure(reason, 0, 0)
         state
 
       _other ->
@@ -895,23 +960,39 @@ defmodule ThistleTea.Game.Player.Quests do
     fn item_id -> Inventory.count_entry(player, item_id, &ItemStore.get/1) end
   end
 
-  defp grant_source_item(state, %Quest{} = quest) do
-    case QuestItems.missing_source_count(state.character.player, quest, &ItemStore.get/1) do
-      0 -> {:ok, state}
-      count -> grant_source_items(state, quest.src_item_id, count)
+  defp accept_quest_inventory(state, %Quest{} = quest, starter) do
+    player = state.character.player
+    count = QuestItems.missing_source_count(player, quest, &ItemStore.get/1)
+    grants = if count > 0, do: [{quest.src_item_id, count}], else: []
+
+    with {:ok, rewards} <- prepare_rewards(grants, state.guid),
+         :ok <- source_capacity(player, rewards, starter),
+         batch =
+           Enum.reduce(rewards, QuestItems.acceptance(player, quest, starter), fn {item, _count}, acc ->
+             Batch.add(acc, item)
+           end),
+         {:ok, changes} <- Inventory.plan(batch, &ItemStore.get/1) do
+      if Batch.removals(batch) == [] and rewards == [] do
+        {:ok, state}
+      else
+        state = InventoryUpdate.apply(state, {:ok, changes})
+        send_reward_pushes(state, changes, rewards)
+        {:ok, state}
+      end
+    else
+      {:error, :invalid_reward} -> {:error, {:inventory, :item_not_found}}
+      {:error, reason} -> {:error, {:inventory, reason}}
     end
   end
 
-  defp grant_source_items(state, entry, count) do
-    with {:ok, rewards} <- prepare_rewards([{entry, count}], state.guid),
-         batch =
-           Enum.reduce(rewards, Batch.new(state.character.player), fn {item, _count}, acc -> Batch.add(acc, item) end),
-         {:ok, changes} <- Inventory.plan(batch, &ItemStore.get/1) do
-      state = InventoryUpdate.apply(state, {:ok, changes})
-      send_reward_pushes(state, changes, rewards)
-      {:ok, state}
-    else
-      {:error, _reason} -> {:error, :inventory_full}
+  defp source_capacity(_player, _rewards, nil), do: :ok
+
+  defp source_capacity(player, rewards, %DataItem{}) do
+    batch = Enum.reduce(rewards, Batch.new(player), fn {item, _count}, acc -> Batch.add(acc, item) end)
+
+    case Inventory.plan(batch, &ItemStore.get/1) do
+      {:ok, _changes} -> :ok
+      {:error, reason} -> {:error, reason}
     end
   end
 

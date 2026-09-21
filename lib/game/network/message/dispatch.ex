@@ -171,6 +171,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_QUESTGIVER_HELLO: Message.CmsgQuestgiverHello,
               CMSG_QUESTGIVER_QUERY_QUEST: Message.CmsgQuestgiverQueryQuest,
               CMSG_QUESTGIVER_ACCEPT_QUEST: Message.CmsgQuestgiverAcceptQuest,
+              CMSG_QUESTGIVER_CANCEL: Message.CmsgQuestgiverCancel,
               CMSG_QUESTLOG_REMOVE_QUEST: Message.CmsgQuestlogRemoveQuest,
               CMSG_PUSHQUESTTOPARTY: Message.CmsgPushquesttoparty,
               CMSG_QUEST_CONFIRM_ACCEPT: Message.CmsgQuestConfirmAccept,
