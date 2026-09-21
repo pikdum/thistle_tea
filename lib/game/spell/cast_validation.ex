@@ -582,8 +582,9 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   defp combat_reach(reach) when is_number(reach) and reach > 0, do: reach
   defp combat_reach(_reach), do: 0.0
 
-  defp check_distance(distance, %Spell{range_yards: range, min_range_yards: min_range}) do
+  defp check_distance(distance, %Spell{range_yards: range, min_range_yards: min_range} = spell) do
     cond do
+      spell.melee_range? and Spell.attribute?(spell, :on_next_swing) -> :ok
       distance > range + @range_leeway_yards -> {:error, :out_of_range}
       is_number(min_range) and min_range > 0 and distance < min_range -> {:error, :too_close}
       true -> :ok

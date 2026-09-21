@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.Spell do
     mechanic: 0,
     stances_not: 0,
     min_range_yards: 0.0,
+    melee_range?: false,
     prevention_type: 0,
     proc_chance: 0,
     proc_charges: 0,

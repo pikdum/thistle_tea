@@ -128,7 +128,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
 
     test "offhand accuracy follows the live queued attack lifecycle" do
       target_guid = Guid.from_low_guid(:unit, 1, 99_875)
-      SpatialHash.update(:mobs, target_guid, 0, 1.0, 0.0, 0.0)
+      SpatialHash.update(:mobs, target_guid, 0, 50.0, 0.0, 0.0)
       on_exit(fn -> SpatialHash.remove(:mobs, target_guid) end)
 
       character = %Character{
@@ -156,12 +156,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       }
 
       blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 2_000}}
-      assert {:success, queued, blackboard} = Combat.melee_attack(character, blackboard, 1_000)
+      assert {:success, distant, blackboard} = Combat.melee_attack(character, blackboard, 2_500)
+      assert distant.internal.next_swing_spell.id == 78
+      assert distant.unit.power2 == 1_000
+      refute Enum.any?(distant.internal.events, &match?(%Effects.DeliverSpell{}, &1))
+      refute Enum.any?(distant.internal.events, &match?(%Effects.DeliverAttack{}, &1))
+
+      SpatialHash.update(:mobs, target_guid, 0, 1.0, 0.0, 0.0)
+      distant = %{distant | internal: %{distant.internal | events: []}}
+      assert {:success, queued, blackboard} = Combat.melee_attack(distant, blackboard, 2_550)
       assert queued.internal.next_swing_spell.id == 78
       assert [%Effects.DeliverAttack{attack: %{offhand?: true, dual_wield_penalty?: false}}] = queued.internal.events
 
       queued = %{queued | internal: %{queued.internal | events: []}}
-      assert {:success, consumed, _blackboard} = Combat.melee_attack(queued, blackboard, 2_500)
+      assert {:success, consumed, _blackboard} = Combat.melee_attack(queued, blackboard, 4_100)
       assert consumed.internal.next_swing_spell == nil
       assert consumed.unit.power2 == 850
       assert Enum.any?(consumed.internal.events, &match?(%Effects.DeliverSpell{spell: %Spell{id: 78}}, &1))

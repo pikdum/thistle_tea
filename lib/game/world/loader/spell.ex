@@ -179,6 +179,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       max_duration_ms: max_duration_ms(row.spell_duration),
       range_yards: range_yards(row.spell_range),
       min_range_yards: min_range_yards(row.spell_range),
+      melee_range?: row.range == 2,
       prevention_type: row.prevention_type || 0,
       mana_cost: row.mana_cost || 0,
       mana_cost_per_second: row.mana_cost_per_second || 0,

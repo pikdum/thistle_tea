@@ -282,6 +282,26 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
   end
 
   describe "validate/6" do
+    test "queues next-swing melee attacks beyond combat range" do
+      spell = harmful_spell(range_yards: 5.0, melee_range?: true, attributes: MapSet.new([:on_next_swing]))
+      target = hostile_target(position: {WorldRef.open(0), 100.0, 0.0, 0.0})
+      assert :ok = CastValidation.validate(caster(), spell, Target.unit(7), target, @now)
+
+      assert {:error, :out_of_range} =
+               CastValidation.validate(caster(), %{spell | melee_range?: false}, Target.unit(7), target, @now)
+
+      assert {:error, :out_of_range} =
+               CastValidation.validate(caster(), %{spell | attributes: MapSet.new()}, Target.unit(7), target, @now)
+
+      other_world = %{target | position: {WorldRef.instance(0, 1), 1.0, 0.0, 0.0}}
+      assert {:error, :out_of_range} = CastValidation.validate(caster(), spell, Target.unit(7), other_world, @now)
+
+      assert {:error, :targets_dead} =
+               CastValidation.validate(caster(), spell, Target.unit(7), %{target | alive?: false}, @now)
+
+      assert {:error, :no_power} = CastValidation.validate(caster(power1: 0), spell, Target.unit(7), target, @now)
+    end
+
     test "passes a valid hostile cast" do
       assert :ok =
                CastValidation.validate(caster(), harmful_spell(), Target.unit(7), hostile_target(), @now)
