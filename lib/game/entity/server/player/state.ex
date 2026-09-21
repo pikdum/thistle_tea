@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.Player.Buyback
   alias ThistleTea.Game.Player.ItemDurations
+  alias ThistleTea.Game.Player.Logout
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.QuestSharing
   alias ThistleTea.Game.Player.Rest
@@ -104,6 +105,8 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   def complete_worldport(%__MODULE__{} = state), do: %{state | pending_worldport?: false}
 
   def leave_world(%__MODULE__{} = state) do
+    state = Logout.clear(state)
+
     case state.player_tick_ref do
       ref when is_reference(ref) -> Process.cancel_timer(ref)
       _ -> :ok
@@ -133,7 +136,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
       BattlegroundSystem.disconnect(state.guid, state.character.movement_block.position)
     end
 
-    if state.character, do: state |> Rest.logout() |> Map.fetch!(:character) |> CharacterStore.put()
+    if state.character, do: CharacterStore.put(Rest.logout(state).character)
 
     if state.guid do
       leave_world_presence(state)

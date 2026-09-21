@@ -70,6 +70,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :rest_type,
     :rest_started_at,
     :rest_logout_at,
+    :logout,
     :defense_state_until,
     :defense_target_guid,
     :defense_outcome,

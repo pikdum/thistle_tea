@@ -8,8 +8,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
   import Bitwise, only: [&&&: 2, |||: 2, bnot: 1]
 
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.MovementStats
@@ -36,7 +39,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
   defp sync_movement_flags(%{movement_block: %MovementBlock{} = mb, unit: %Unit{auras: holders}} = entity, now) do
     flags = mb.movement_flags || 0
     was_rooted? = rooted?(entity)
-    has_root? = Enum.any?(holders, &(Holder.has_aura_type?(&1, :mod_root) or Holder.has_aura_type?(&1, :mod_stun)))
+
+    has_root? =
+      logout_rooted?(entity) or corpse_rooted?(entity) or
+        Enum.any?(holders, &(Holder.has_aura_type?(&1, :mod_root) or Holder.has_aura_type?(&1, :mod_stun)))
 
     new_flags =
       if has_root?,
@@ -98,7 +104,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
 
   defp sync_stunned_flag(%{unit: %Unit{auras: holders} = unit} = entity) when is_list(holders) do
     flags = unit.flags || 0
-    stunned? = Enum.any?(holders, &Holder.has_aura_type?(&1, :mod_stun))
+    stunned? = logout_rooted?(entity) or Enum.any?(holders, &Holder.has_aura_type?(&1, :mod_stun))
 
     new_flags =
       if stunned?,
@@ -109,6 +115,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
   end
 
   defp sync_stunned_flag(entity), do: entity
+
+  defp logout_rooted?(%Character{internal: %Internal{logout: :rooted}}), do: true
+  defp logout_rooted?(_entity), do: false
+
+  defp corpse_rooted?(%Character{} = character), do: Core.dead?(character)
+  defp corpse_rooted?(_entity), do: false
 
   defp speed_change_events(%{movement_block: %MovementBlock{} = previous}, %{movement_block: %MovementBlock{} = current}) do
     [

@@ -160,7 +160,8 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       {:ok, account} = Account.get_user("test")
       id = System.unique_integer([:positive])
       guid = Guid.from_low_guid(:player, id)
-      CharacterStore.put(login_character(id, guid, account.id))
+      character = login_character(id, guid, account.id)
+      CharacterStore.put(%{character | internal: %{character.internal | rest_type: {:tavern, 71}}})
 
       assert {:ok, player_pid} = PlayerServer.login(account, self(), guid)
       monitor = Process.monitor(player_pid)

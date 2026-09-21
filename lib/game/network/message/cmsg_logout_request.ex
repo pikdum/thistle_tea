@@ -2,8 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LOGOUT_REQUEST
 
-  alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.World.System.Trade
+  alias ThistleTea.Game.Player.Logout
 
   require Logger
 
@@ -11,11 +10,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
 
   @impl ClientMessage
   def handle(%__MODULE__{}, state) do
-    Trade.cancel(state.guid)
     Logger.info("CMSG_LOGOUT_REQUEST")
-    Network.send_packet(%Message.SmsgLogoutResponse{result: 0, speed: 0})
-    logout_timer = Process.send_after(self(), :logout_complete, 1_000)
-    %{state | logout_timer: logout_timer}
+    Logout.request(state)
   end
 
   @impl ClientMessage

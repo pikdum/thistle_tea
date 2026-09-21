@@ -819,12 +819,12 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   @impl GenServer
-  def handle_info(:logout_complete, %{logout_timer: timer} = state) when is_reference(timer) do
+  def handle_info({:logout_complete, token}, %{logout_timer: %{token: token}} = state) do
     state = State.leave_world(state)
     {:stop, {:shutdown, :logout}, state}
   end
 
-  def handle_info(:logout_complete, state) do
+  def handle_info({:logout_complete, _token}, state) do
     {:noreply, state}
   end
 

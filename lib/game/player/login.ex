@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Emote
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.Logout
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerFlags
   alias ThistleTea.Game.Entity.Logic.Pvp
@@ -106,6 +107,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> Buyback.reset()
       |> ItemDurations.restore()
       |> ChatStatus.reset()
+      |> Logout.cancel(Time.now())
       |> Emote.reset()
       |> restore_instance_world(character_guid)
       |> normalize_movement_state()

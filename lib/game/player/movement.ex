@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.World.Pathfinding
 
   def accepts_input?(%Character{internal: %Internal{movement_start_time: started}}) when is_integer(started), do: false
+  def accepts_input?(%Character{internal: %Internal{logout: :rooted}}), do: false
   def accepts_input?(%Character{} = character), do: not Core.dead?(character) and not ControlMovement.active?(character)
   def accepts_input?(_character), do: true
 
