@@ -128,6 +128,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Charged weapon coatings](docs/weapon-coatings-playtest.md), with finite poison charges, proc chance talents, atomic application, and depletion cleanup
 - [Creature-specific flat damage](docs/creature-damage-playtest.md), including Beastslayer and Elemental Slayer enchants across weapon attacks, spells, and periodic damage
 - quests
+- [Quest sharing](docs/quest-sharing-playtest.md), with party confirmations, eligibility feedback, inherited timers, source-item lifecycle, and stale-offer cleanup
 - xp, leveling, and exploration
 - isolated dungeon instances (Ragefire Chasm)
 - Deadmines boss doors and gunpowder cannon breach, with Smite's alarms and pirate response
