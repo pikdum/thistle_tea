@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatSkills
+  alias ThistleTea.Game.Entity.Logic.CombatWeapon
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.Daze
@@ -19,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Logic.ParryHaste
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.Reactive
+  alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
 
@@ -57,7 +59,10 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   def offhand_damage_range(%{unit: %Unit{min_offhand_damage: min, max_offhand_damage: max}} = entity)
       when is_number(min) and is_number(max) and max > 0 do
     factor = 0.5 * max(100 + Aura.flat_amount(entity, :mod_offhand_damage_pct), 0) / 100
-    outgoing_damage_range(entity, {min * factor, max * factor})
+
+    entity
+    |> outgoing_damage_range({min, max}, :offhand)
+    |> scale_damage_range(factor)
   end
 
   def offhand_damage_range(_entity), do: nil
@@ -98,28 +103,23 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   def damage_range(_entity), do: {@default_damage, @default_damage}
 
-  @physical_school_mask 0x1
-
   defp scale_damage_range(range, 1.0), do: range
   defp scale_damage_range({min_damage, max_damage}, multiplier), do: {min_damage * multiplier, max_damage * multiplier}
 
   defp mainhand_damage_range(entity, range) do
     entity
-    |> outgoing_damage_range(range)
+    |> outgoing_damage_range(range, :mainhand)
     |> scale_damage_range(Disarm.damage_multiplier(entity))
   end
 
-  defp outgoing_damage_range(entity, {min_damage, max_damage}) do
-    flat = Aura.flat_modifier(entity, :mod_damage_done, @physical_school_mask)
+  defp outgoing_damage_range(entity, {min_damage, max_damage}, hand) do
+    weapon = CombatWeapon.usable(entity, hand)
+    flat = WeaponDamage.flat_bonus(entity, :physical, weapon)
     happiness = PetHappiness.damage_multiplier(entity)
     flat = if happiness == 1.0, do: flat, else: flat * happiness
 
     {max(min_damage + flat, 0), max(max_damage + flat, 0)}
-    |> scale_damage_range(outgoing_damage_multiplier(entity))
-  end
-
-  defp outgoing_damage_multiplier(entity) do
-    Aura.percent_multiplier(entity, :mod_damage_percent_done, @physical_school_mask)
+    |> scale_damage_range(WeaponDamage.multiplier(entity, :physical, weapon))
   end
 
   def attack_damage(%{damage: damage}) when is_number(damage), do: trunc(damage)

@@ -9,9 +9,12 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.CombatWeapon
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Entity.Logic.Skills
+  alias ThistleTea.Game.Entity.Logic.WeaponDamage
+  alias ThistleTea.Game.Spell
 
   @warrior 1
   @paladin 2
@@ -70,6 +73,63 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
   def melee_crit_chance(class, level, agility) do
     class_base_bonus(class) + agility_chance(@crit_agility_rates, class, level, agility)
   end
+
+  def crit_chance(entity, :offhand), do: crit_chance(entity, :mainhand)
+
+  def crit_chance(%{unit: %Unit{} = unit, player: %Player{}} = character, hand) do
+    level = unit.level || 1
+    skill = CombatWeapon.skill_snapshot(character, hand).caster_attack_skill
+    base = melee_crit_chance(unit.class, level, unit.agility || 0)
+    bonus = weapon_bonus(character, :mod_crit_percent, hand)
+    max(base + bonus + (skill - Skills.max_for_level(level)) * 0.04, 0.0)
+  end
+
+  def crit_chance(entity, _hand), do: max(5.0 + Aura.flat_amount(entity, :mod_crit_percent), 0.0)
+
+  def hit_chance(%{player: %Player{}} = character, hand), do: weapon_bonus(character, :mod_hit_chance, hand)
+  def hit_chance(entity, _hand), do: Aura.flat_amount(entity, :mod_hit_chance)
+
+  defp weapon_bonus(%{unit: %Unit{auras: holders}} = character, type, hand) when is_list(holders) do
+    for %Holder{} = holder <- holders,
+        applies?(holder, character, type, hand),
+        %AuraData{type: ^type, amount: amount} <- holder.auras,
+        is_integer(amount),
+        reduce: 0 do
+      bonus -> bonus + amount * max(holder.stacks || 1, 1)
+    end
+  end
+
+  defp weapon_bonus(_character, _type, _hand), do: 0
+
+  defp applies?(%Holder{spell: %Spell{equipped_item_class: class}}, _character, _type, _hand) when class in [-1, nil],
+    do: true
+
+  defp applies?(%Holder{spell: %Spell{} = spell} = holder, character, :mod_crit_percent, hand) do
+    case source_item(holder.item_source) do
+      nil -> WeaponDamage.fits?(CombatWeapon.usable(character, hand), spell)
+      guid -> Enum.any?(crit_hands(hand), &source_matches?(character, &1, guid, spell))
+    end
+  end
+
+  defp applies?(%Holder{spell: %Spell{} = spell}, character, _type, hand),
+    do: WeaponDamage.fits?(CombatWeapon.equipped(character, hand), spell)
+
+  defp applies?(_holder, _character, _type, _hand), do: true
+
+  defp source_item({guid, _slot, _spell_id}) when is_integer(guid), do: guid
+  defp source_item({:item_equip, guid, _spell_id}), do: guid
+  defp source_item(_source), do: nil
+
+  defp crit_hands(:mainhand), do: [:mainhand, :offhand]
+  defp crit_hands(:ranged), do: [:ranged]
+
+  defp source_matches?(character, hand, guid, spell) do
+    equipped_guid(character.player, hand) == guid and WeaponDamage.fits?(CombatWeapon.usable(character, hand), spell)
+  end
+
+  defp equipped_guid(%Player{mainhand: guid}, :mainhand), do: guid
+  defp equipped_guid(%Player{offhand: guid}, :offhand), do: guid
+  defp equipped_guid(%Player{ranged: guid}, :ranged), do: guid
 
   def dodge_chance(class, level, agility) do
     class_base_bonus(class) + agility_chance(@dodge_agility_rates, class, level, agility)
@@ -156,16 +216,13 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
 
   defp block_value_multiplier(_holders), do: 1.0
 
-  def sync(%{unit: %Unit{} = unit, player: %Player{} = player} = character) do
-    level = unit.level || 1
-    agility = unit.agility || 0
-    crit = max(melee_crit_chance(unit.class, level, agility) + Aura.flat_amount(character, :mod_crit_percent), 0.0)
+  def sync(%{unit: %Unit{}, player: %Player{} = player} = character) do
     defenses = defensive_chances(character)
 
     player = %{
       player
-      | crit_percentage: crit,
-        ranged_crit_percentage: crit,
+      | crit_percentage: crit_chance(character, :mainhand),
+        ranged_crit_percentage: crit_chance(character, :ranged),
         dodge_percentage: defenses.dodge,
         parry_percentage: defenses.parry,
         block_percentage: defenses.block

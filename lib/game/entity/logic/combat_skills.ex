@@ -6,49 +6,16 @@ defmodule ThistleTea.Game.Entity.Logic.CombatSkills do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.CombatRatings
+  alias ThistleTea.Game.Entity.Logic.CombatWeapon
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Spell
 
   @training_outcomes [:normal, :crit, :glancing, :crushing, :miss, :dodge, :parry, :block, :resist]
 
-  def snapshot(%Character{unit: unit, player: player} = character, hand, get_template) when is_struct(player) do
-    skill_id = weapon_skill(character, hand, get_template)
-    {temporary, permanent} = Map.get(Skills.bonuses(character), skill_id, {0, 0})
-    maximum = Skills.max_for_level(unit.level || 1)
-
-    value =
-      cond do
-        is_nil(skill_id) -> 0
-        unit.shapeshift_form in [1, 2, 3, 4, 5, 8] -> maximum
-        true -> max(Skills.value(player.skills, skill_id, maximum) + temporary + permanent, 0)
-      end
-
-    %{
-      caster_attack_skill: value,
-      weapon_skill_id: if(trainable_form?(unit.shapeshift_form) and skill_id != Skills.fishing_skill(), do: skill_id)
-    }
-  end
-
-  def snapshot(_entity, _hand, _get_template), do: %{caster_attack_skill: nil, weapon_skill_id: nil}
-
-  defp weapon_skill(character, :mainhand, get_template) do
-    if Disarm.unarmed?(character),
-      do: Skills.unarmed_skill(),
-      else: Skills.main_hand_weapon_skill(character.player, get_template)
-  end
-
-  defp weapon_skill(character, :offhand, get_template), do: Skills.off_hand_weapon_skill(character.player, get_template)
-
-  defp weapon_skill(%{unit: %{ranged_weapon: %{class: 2, subclass: subclass}}}, :ranged, _get_template),
-    do: Skills.weapon_skill_for_subclass(subclass)
-
-  defp weapon_skill(character, :ranged, get_template), do: Skills.ranged_weapon_skill(character.player, get_template)
-
-  defp trainable_form?(form), do: form in [nil, 0] or form in Spell.stance_like_forms()
+  defdelegate snapshot(entity, hand), to: CombatWeapon, as: :skill_snapshot
+  defdelegate snapshot(entity, hand, get_template), to: CombatWeapon, as: :skill_snapshot
 
   def resolve(defender, attack, outcome, opts \\ []) do
     if not Core.dead?(defender) and outcome in @training_outcomes and Map.get(attack, :skill_training?, true) do

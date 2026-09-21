@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Player.DurabilityTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
@@ -48,6 +50,34 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
   setup [:equipped_character]
 
   describe "lose/5 and repair/3" do
+    test "weapon talents stop at breakage and return with repaired equipment", %{
+      state: state,
+      item: item,
+      vendor: vendor
+    } do
+      talent = %Holder{
+        spell: %Spell{id: 900_003, equipped_item_class: 2, equipped_item_subclass_mask: Bitwise.bsl(1, 7)},
+        auras: [%Aura{type: :mod_crit_percent, amount: 5}, %Aura{type: :mod_hit_chance, amount: 3}]
+      }
+
+      character = %{state.character | unit: %{state.character.unit | auras: [talent]}}
+      character = Character.sync_equipment_stats(character)
+      assert character.unit.mainhand_weapon.entry == @entry
+      assert character.player.crit_percentage == 5.0
+      assert AttackTable.attacker_context(character).hit_chance_bonus == 3
+
+      broken = Durability.lose(%{state | character: character}, :percent, 100, :equipped)
+      assert broken.character.unit.mainhand_weapon.entry == @entry
+      assert broken.character.player.crit_percentage == 0.0
+      assert AttackTable.attacker_context(broken.character).hit_chance_bonus == 3
+      assert talent in broken.character.unit.auras
+
+      repaired = Durability.repair(broken, vendor, item.object.guid)
+      assert repaired.character.unit.mainhand_weapon.entry == @entry
+      assert repaired.character.player.crit_percentage == 5.0
+      assert AttackTable.attacker_context(repaired.character).hit_chance_bonus == 3
+    end
+
     test "debug wear parses whitespace and rejects invalid percentages", %{state: state, item: item} do
       assert {:handled, worn} = DevCommands.run(state, ".debug durability  10  ")
       assert ItemStore.get(item.object.guid).item.durability == 45

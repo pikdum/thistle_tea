@@ -83,6 +83,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
         unit: %Unit{
           target: target_guid,
           level: 50,
+          mainhand_weapon: sword,
+          offhand_weapon: dagger,
           min_damage: 10.0,
           max_damage: 10.0,
           min_offhand_damage: 10.0,
@@ -213,7 +215,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
           min_offhand_damage: 30.0,
           max_offhand_damage: 40.0,
           offhand_attack_time: 1_500,
-          auras: [%Holder{spell: %Spell{id: 676}, caster_guid: 2, auras: [%Aura{type: :mod_disarm}]}]
+          auras: [%Holder{spell: %Spell{id: 676}, caster_guid: 2, auras: [%Aura{type: :mod_disarm}]}],
+          offhand_weapon: template
         },
         player: %Player{visible_item_17_0: template.entry, skills: %{162 => %{value: 37}, 173 => %{value: 120}}},
         internal: %Internal{

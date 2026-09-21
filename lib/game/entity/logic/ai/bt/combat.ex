@@ -31,7 +31,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Metadata
 
   @attack_retry_delay_ms 100
@@ -287,8 +286,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
     attack =
       state
-      |> melee_attack_payload()
-      |> Map.merge(CombatSkills.snapshot(state, :offhand, &ItemLoader.get_template/1))
+      |> melee_attack_payload(:offhand)
       |> Map.merge(%{min_damage: min_damage, max_damage: max_damage, offhand?: true})
       |> CombatLogic.finalize_attack()
 
@@ -348,7 +346,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     end)
   end
 
-  defp melee_attack_payload(%{object: %{guid: guid}} = state) do
+  defp melee_attack_payload(%{object: %{guid: guid}} = state, hand \\ :mainhand) do
     {min_damage, max_damage} = CombatLogic.damage_range(state)
 
     %{
@@ -358,8 +356,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
       max_damage: max_damage,
       threat_multiplier: Aura.percent_multiplier(state, :mod_threat, Spell.school_mask(:physical))
     }
-    |> Map.merge(AttackTable.attacker_context(state))
-    |> Map.merge(CombatSkills.snapshot(state, :mainhand, &ItemLoader.get_template/1))
+    |> Map.merge(AttackTable.attacker_context(state, hand))
+    |> Map.merge(CombatSkills.snapshot(state, hand))
   end
 
   defp caster_owner_guid(%{internal: %{pet: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid

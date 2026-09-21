@@ -173,8 +173,8 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   def visible_entry_field(slot) when is_atom(slot), do: visible_entry_field(slot_index(slot))
   def visible_entry_field(slot) when is_integer(slot), do: :"visible_item_#{slot + 1}_0"
 
-  def equipment_entry(%{} = player, slot) do
-    if slot in (Map.get(player, :broken_equipment) || []),
+  def equipment_entry(%{} = player, slot, opts \\ []) do
+    if slot in (Map.get(player, :broken_equipment) || []) and not Keyword.get(opts, :include_broken, false),
       do: 0,
       else: player |> Map.get(visible_entry_field(slot)) |> Item.visible_entry()
   end

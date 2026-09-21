@@ -160,7 +160,7 @@ defmodule ThistleTea.Game.Entity.Logic.DisarmTest do
 
       buffed = %{mob | unit: %{unit | auras: [holder(), bonus]}}
       assert Combat.damage_range(buffed) == {50.0, 70.0}
-      assert Combat.offhand_damage_range(buffed) == {40.0, 45.0}
+      assert Combat.offhand_damage_range(buffed) == {27.5, 32.5}
     end
   end
 

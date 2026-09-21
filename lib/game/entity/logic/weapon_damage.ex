@@ -43,6 +43,18 @@ defmodule ThistleTea.Game.Entity.Logic.WeaponDamage do
 
   def multiplier(_entity, _school, _weapon), do: 1.0
 
+  def flat_bonus(%{unit: %Unit{auras: holders}}, school, weapon) when is_list(holders) do
+    for %Holder{} = holder <- holders,
+        applies?(holder.spell, weapon),
+        %Aura{type: :mod_damage_done, amount: amount, misc_value: mask} <- holder.auras,
+        is_integer(amount) and is_integer(mask) and (mask &&& Spell.school_mask(school)) != 0,
+        reduce: 0 do
+      bonus -> bonus + amount * max(holder.stacks || 1, 1)
+    end
+  end
+
+  def flat_bonus(_entity, _school, _weapon), do: 0
+
   defp applies?(%Spell{equipped_item_class: class}, _weapon) when class in [-1, nil], do: true
   defp applies?(%Spell{} = spell, weapon), do: fits?(weapon, spell)
   defp applies?(_spell, _weapon), do: true

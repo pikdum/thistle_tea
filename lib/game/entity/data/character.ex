@@ -71,8 +71,10 @@ defmodule ThistleTea.Game.Entity.Data.Character do
   def controls?(%__MODULE__{} = character, guid), do: Companion.controls?(character, guid)
 
   defp sync_mainhand_inputs(%__MODULE__{unit: %Unit{} = unit} = character) do
+    weapon = weapon_template(character, :mainhand)
+
     {delay, weapon_min, weapon_max} =
-      case mainhand_weapon(character) do
+      case usable_weapon(character, :mainhand, weapon) do
         %ItemTemplate{} = weapon ->
           {positive_or(weapon.delay, @base_attack_time), positive_or(weapon.dmg_min1, @base_min_damage),
            positive_or(weapon.dmg_max1, @base_max_damage)}
@@ -84,7 +86,8 @@ defmodule ThistleTea.Game.Entity.Data.Character do
     unit =
       %{
         unit
-        | base_melee_attack_time: delay,
+        | mainhand_weapon: weapon,
+          base_melee_attack_time: delay,
           base_attack_time: delay,
           base_min_damage: weapon_min,
           base_max_damage: weapon_max
@@ -97,17 +100,19 @@ defmodule ThistleTea.Game.Entity.Data.Character do
     weapon = weapon_template(character, :offhand)
 
     unit =
-      if weapon do
+      if usable_weapon(character, :offhand, weapon) do
         %{
           unit
-          | offhand_attack_time: positive_or(weapon.delay, @base_attack_time),
+          | offhand_weapon: weapon,
+            offhand_attack_time: positive_or(weapon.delay, @base_attack_time),
             base_offhand_min_damage: positive_or(weapon.dmg_min1, 0.0),
             base_offhand_max_damage: positive_or(weapon.dmg_max1, 0.0)
         }
       else
         %{
           unit
-          | offhand_attack_time: @base_attack_time,
+          | offhand_weapon: weapon,
+            offhand_attack_time: @base_attack_time,
             base_offhand_min_damage: nil,
             base_offhand_max_damage: nil,
             min_offhand_damage: 0.0,
@@ -118,13 +123,15 @@ defmodule ThistleTea.Game.Entity.Data.Character do
     %{character | unit: unit}
   end
 
-  defp mainhand_weapon(character), do: weapon_template(character, :mainhand)
-
   defp weapon_template(%__MODULE__{player: %Player{} = player}, slot) do
-    case ItemLoader.get_template(Inventory.equipment_entry(player, slot)) do
+    case ItemLoader.get_template(Inventory.equipment_entry(player, slot, include_broken: true)) do
       %ItemTemplate{class: @item_class_weapon} = template -> template
       _ -> nil
     end
+  end
+
+  defp usable_weapon(%__MODULE__{player: %Player{broken_equipment: broken}}, slot, weapon) do
+    if slot not in (broken || []), do: weapon
   end
 
   defp sync_ranged_inputs(%__MODULE__{unit: %Unit{} = unit, player: %Player{ammo_id: ammo_id}} = character) do
@@ -133,7 +140,7 @@ defmodule ThistleTea.Game.Entity.Data.Character do
     ammo_dps = ammo_dps(ammo_id, weapon)
 
     unit =
-      if weapon do
+      if usable_weapon(character, :ranged, weapon) do
         speed = positive_or(weapon.delay, @base_attack_time) / 1_000
 
         %{
@@ -147,7 +154,7 @@ defmodule ThistleTea.Game.Entity.Data.Character do
       else
         %{
           unit
-          | ranged_weapon: nil,
+          | ranged_weapon: weapon,
             base_ranged_attack_time: nil,
             ranged_attack_time: @base_attack_time,
             base_ranged_min_damage: nil,

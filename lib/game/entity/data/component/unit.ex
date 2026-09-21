@@ -139,6 +139,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Unit do
     base_ranged_min_damage: :virtual,
     base_ranged_max_damage: :virtual,
     base_ranged_attack_time: :virtual,
+    mainhand_weapon: :virtual,
+    offhand_weapon: :virtual,
     ranged_weapon: :virtual,
     base_melee_attack_time: :virtual
 

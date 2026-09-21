@@ -248,6 +248,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentSpellsTest do
         base_health: 100,
         base_strength: 100,
         base_agility: 100,
+        ranged_weapon: %ItemTemplate{class: 2, subclass: 2, inventory_type: 15},
         auras: []
       }
     }

@@ -5,7 +5,6 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
 
   @allowed_logic_boundaries MapSet.new([
                               {"lib/game/entity/logic/ai/bt/combat.ex", "ThistleTea.Game.World"},
-                              {"lib/game/entity/logic/ai/bt/combat.ex", "ThistleTea.Game.World.Loader.Item"},
                               {"lib/game/entity/logic/ai/bt/combat.ex", "ThistleTea.Game.World.Metadata"},
                               {"lib/game/entity/logic/ai/bt/mob.ex", "ThistleTea.Game.World"},
                               {"lib/game/entity/logic/ai/bt/mob.ex", "ThistleTea.Game.World.Metadata"},

@@ -11,8 +11,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.CombatSkills
+  alias ThistleTea.Game.Entity.Logic.CombatWeapon
   alias ThistleTea.Game.Entity.Logic.Disarm
-  alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.ResistancePenetration
@@ -24,7 +24,6 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Spell.Critical
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Semantics
-  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
 
   @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
@@ -127,7 +126,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       spell_crit_chance: spell_crit_chance(caster, spell),
       reflect_chance_bonus: Mage.ward_reflect_chance(caster, spell),
       caster_max_health: caster.unit.max_health,
-      hit_chance_bonus: Aura.flat_amount(caster, :mod_hit_chance)
+      hit_chance_bonus: CombatRatings.hit_chance(caster, attack_hand(spell))
     }
     |> put_melee_snapshot(caster, spell)
     |> put_combo_points(caster)
@@ -146,7 +145,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       spell: spell,
       conditional_crit_modifiers: Critical.snapshot(caster, spell),
       reflect_chance_bonus: Mage.ward_reflect_chance(caster, spell),
-      hit_chance_bonus: Aura.flat_amount(caster, :mod_hit_chance)
+      hit_chance_bonus: CombatRatings.hit_chance(caster, attack_hand(spell))
     }
     |> put_melee_snapshot(caster, spell)
     |> put_combo_points(caster)
@@ -188,7 +187,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     cond do
       Spell.ranged_attack?(spell) ->
         {min_damage, max_damage} = AttackPower.weapon_range(caster.unit, :ranged)
-        skill = CombatSkills.snapshot(caster, :ranged, &ItemLoader.get_template/1)
+        skill = CombatSkills.snapshot(caster, :ranged)
 
         %{
           context
@@ -206,7 +205,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
       melee_snapshot?(spell) ->
         {min_damage, max_damage} = weapon_range(caster)
-        skill = CombatSkills.snapshot(caster, :mainhand, &ItemLoader.get_template/1)
+        skill = CombatSkills.snapshot(caster, :mainhand)
 
         %{
           context
@@ -255,7 +254,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   end
 
   defp normalized_speed(%Character{} = caster) do
-    weapon = if !Disarm.unarmed?(caster), do: main_hand_template(caster)
+    weapon = CombatWeapon.usable(caster, :mainhand)
 
     case weapon do
       %{inventory_type: @two_hand_inventory_type} -> @normalized_two_hand
@@ -267,12 +266,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defp normalized_speed(_caster), do: @normalized_unarmed
 
-  defp melee_crit_chance(%Character{unit: unit} = caster, %Spell{} = spell) do
-    base =
-      CombatRatings.melee_crit_chance(unit.class, unit.level || 1, unit.agility || 0) +
-        Aura.flat_amount(caster, :mod_crit_percent)
-
-    Modifiers.value(caster, spell, :critical_chance, base)
+  defp melee_crit_chance(%Character{} = caster, %Spell{} = spell) do
+    Modifiers.value(caster, spell, :critical_chance, CombatRatings.crit_chance(caster, :mainhand))
   end
 
   defp melee_crit_chance(_caster, _spell), do: nil
@@ -281,28 +276,19 @@ defmodule ThistleTea.Game.Spell.CastContext do
   defp caster_power(%{unit: %{power_type: 3, power4: energy}}) when is_integer(energy), do: energy
   defp caster_power(_caster), do: nil
 
-  defp main_hand_template(%Character{player: player}) when is_struct(player) do
-    case Inventory.equipment_entry(player, :mainhand) do
-      entry when is_integer(entry) and entry > 0 -> ItemLoader.get_template(entry)
-      _ -> nil
-    end
-  end
-
-  defp main_hand_template(_caster), do: nil
-
   defp attack_weapon(caster, %Spell{} = spell) do
     cond do
-      Spell.ranged_attack?(spell) -> caster.unit.ranged_weapon
-      melee_snapshot?(spell) -> main_hand_template(caster)
+      Spell.ranged_attack?(spell) -> CombatWeapon.usable(caster, :ranged)
+      melee_snapshot?(spell) -> CombatWeapon.usable(caster, :mainhand)
       true -> nil
     end
   end
 
-  defp ranged_crit_chance(%Character{player: player, unit: unit} = caster, %Spell{} = spell) when is_struct(player) do
-    base =
-      player.ranged_crit_percentage || CombatRatings.melee_crit_chance(unit.class, unit.level || 1, unit.agility || 0)
+  defp attack_hand(%Spell{} = spell), do: if(Spell.ranged_attack?(spell), do: :ranged, else: :mainhand)
+  defp attack_hand(_spell), do: :mainhand
 
-    Modifiers.value(caster, spell, :critical_chance, base)
+  defp ranged_crit_chance(%Character{} = caster, %Spell{} = spell) do
+    Modifiers.value(caster, spell, :critical_chance, CombatRatings.crit_chance(caster, :ranged))
   end
 
   defp ranged_crit_chance(_caster, _spell), do: nil

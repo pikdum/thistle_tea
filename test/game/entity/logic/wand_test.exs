@@ -38,8 +38,8 @@ defmodule ThistleTea.Game.Entity.Logic.WandTest do
       assert context.weapon_base_max == 100
       assert context.attack_power == 0
       assert context.attack_time_ms == 1_500
-      assert context.melee_crit_chance == 0
-      assert context.spell_crit_chance == 0
+      assert context.melee_crit_chance == 3.2
+      assert context.spell_crit_chance == 3.2
       assert context.attack_skill == 300
       assert spell.school == :physical
     end

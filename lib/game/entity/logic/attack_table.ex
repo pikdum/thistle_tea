@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Logic.AttackDamageTaken
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
+  alias ThistleTea.Game.Entity.Logic.CombatWeapon
   alias ThistleTea.Game.Entity.Logic.CreatureType
   alias ThistleTea.Game.Entity.Logic.Daze
   alias ThistleTea.Game.Entity.Logic.Disarm
@@ -26,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
   alias ThistleTea.Game.Entity.Logic.TargetDamage
+  alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
 
@@ -53,7 +55,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   @crushing_multiplier 1.5
   @armor_reduction_cap 0.75
 
-  def attacker_context(%{unit: %Unit{} = unit} = attacker) do
+  def attacker_context(attacker, hand \\ :mainhand)
+
+  def attacker_context(%{unit: %Unit{} = unit} = attacker, hand) do
     multipliers = attack_damage_multipliers(attacker)
 
     %{
@@ -63,8 +67,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       caster_class: unit.class,
       dual_wield_penalty?: offhand_weapon?(attacker) and not physical_spell_active?(attacker),
       caster_can_daze?: Daze.attacker?(attacker),
-      crit_chance: attacker_crit_chance(attacker) + Aura.flat_amount(attacker, :mod_crit_percent),
-      hit_chance_bonus: Aura.flat_amount(attacker, :mod_hit_chance),
+      crit_chance: CombatRatings.crit_chance(attacker, hand),
+      hit_chance_bonus: CombatRatings.hit_chance(attacker, hand),
       always_crush?: always_crush?(attacker),
       caster_position: attacker_position(attacker),
       damage_done_versus: Aura.misc_amounts(attacker, :mod_damage_done_versus),
@@ -77,7 +81,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     }
   end
 
-  def attacker_context(_attacker), do: %{}
+  def attacker_context(_attacker, _hand), do: %{}
 
   defp offhand_weapon?(%Character{unit: %Unit{shapeshift_form: form}}) when form in [1, 2, 3, 4, 5, 8], do: false
 
@@ -99,15 +103,17 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   defp caster_owner_guid(_attacker), do: nil
 
   defp attack_damage_multipliers(attacker) do
-    multiplier =
-      Aura.percent_multiplier(attacker, :mod_damage_percent_done, 1) * PetHappiness.damage_multiplier(attacker)
-
+    happiness = PetHappiness.damage_multiplier(attacker)
     offhand = 0.5 * max(100 + Aura.flat_amount(attacker, :mod_offhand_damage_pct), 0) / 100
 
     %{
-      mainhand: multiplier * Disarm.damage_multiplier(attacker),
-      offhand: multiplier * offhand
+      mainhand: weapon_multiplier(attacker, :mainhand) * happiness * Disarm.damage_multiplier(attacker),
+      offhand: weapon_multiplier(attacker, :offhand) * happiness * offhand
     }
+  end
+
+  defp weapon_multiplier(attacker, hand) do
+    WeaponDamage.multiplier(attacker, :physical, CombatWeapon.usable(attacker, hand))
   end
 
   defp attack_power_damage(unit, multipliers) do
@@ -551,14 +557,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   end
 
   defp low_level_scale(chance, _ctx), do: chance
-
-  defp attacker_crit_chance(%{unit: %Unit{} = unit} = attacker) do
-    if player?(attacker) do
-      CombatRatings.melee_crit_chance(unit.class, unit.level || 1, unit.agility || 0)
-    else
-      @default_crit_chance
-    end
-  end
 
   defp always_crush?(entity) do
     (extra_flags(entity) &&& @extra_flag_always_crush) != 0
