@@ -127,6 +127,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Inventory containers and lockboxes](docs/item-containers-playtest.md), with retained private loot, Pick Lock, consumable keys, atomic claims, and full-bag recovery
 - [Trade-slot unlocking](docs/trade-opening-playtest.md), with paid lockpicking, consumable keys, final requirement checks, and retry without closing the trade
 - [Wrapped gifts](docs/gift-wrapping-playtest.md), with atomic paper consumption, creator labels, and retained item identity, charges, and enchants through trade and opening
+- [Timed items](docs/item-duration-playtest.md), with client countdowns, offline lifetime rules, conjured-item cleanup, and expiration across equipment, bags, and bank storage
 - Disenchanting, with exact-item consumption, private material loot, Enchanting skill gains, and recovery when bags are full
 - Permanent equipment enchants, with atomic material costs, profession skill gains, independent equipment bonuses, and weapon procs
 - [Charged weapon coatings](docs/weapon-coatings-playtest.md), with finite poison charges, proc chance talents, atomic application, and depletion cleanup
