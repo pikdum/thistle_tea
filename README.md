@@ -120,6 +120,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - items, bags, equipment, and vendors
 - [Vendor buyback](docs/vendor-buyback-playtest.md), with 12 session slots, partial-stack sales, preserved item state, charge and durability pricing, paused timers, and logout cleanup
 - [Limited vendor stock](docs/vendor-stock-playtest.md), shared between buyers at each merchant, with timed restocking, template inventories, sold-out feedback, and recoverable purchases
+- [Ammunition](docs/ammunition-playtest.md), with client selection, compatible projectile costs, Auto Shot depletion, and thrown-stack or durability consumption
 - equipment durability, combat and death wear, broken-gear penalties, and vendor repairs with reputation discounts
 - alcohol intoxication, client drunkenness effects, gradual sobering, and death cleanup
 - looting + group loot
