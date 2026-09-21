@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTableTest do
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.Effect
 
   @warrior 1
   @mage 8
@@ -29,14 +30,25 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTableTest do
   end
 
   defp character(overrides) do
-    unit = %Unit{health: 100, level: 20, class: @warrior, agility: 20, strength: 40, auras: []}
+    unit = %Unit{health: 100, level: 20, class: @warrior, agility: 20, strength: 40, auras: [], sheath_state: 1}
+    unit = struct(unit, Keyword.get(overrides, :unit, []))
+
+    spellbook =
+      if unit.class == @warrior do
+        %{
+          107 => %Spell{id: 107, effects: [%Effect{type: :block}]},
+          3127 => %Spell{id: 3127, effects: [%Effect{type: :parry}]}
+        }
+      else
+        %{}
+      end
 
     %Character{
       object: %Object{guid: 200},
-      unit: struct(unit, Keyword.get(overrides, :unit, [])),
-      player: struct(%Player{}, Keyword.get(overrides, :player, [])),
+      unit: unit,
+      player: struct(%Player{visible_item_16_0: 1}, Keyword.get(overrides, :player, [])),
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-      internal: struct(%Internal{}, Keyword.get(overrides, :internal, []))
+      internal: struct(%Internal{spellbook: spellbook}, Keyword.get(overrides, :internal, []))
     }
   end
 

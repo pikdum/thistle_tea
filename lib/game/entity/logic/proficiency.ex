@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Proficiency do
   alias ThistleTea.Game.Spell, as: SpellData
   alias ThistleTea.Game.Spell.Effect
 
-  defstruct weapon_mask: 0, armor_mask: 0, skill_values: %{}, dual_wield?: false
+  defstruct weapon_mask: 0, armor_mask: 0, skill_values: %{}, dual_wield?: false, parry?: false, block?: false
 
   @item_class_weapon 2
   @item_class_armor 4
@@ -35,7 +35,8 @@ defmodule ThistleTea.Game.Entity.Logic.Proficiency do
         do: skill
   end
 
-  def all, do: %__MODULE__{weapon_mask: -1, armor_mask: -1, skill_values: :all, dual_wield?: true}
+  def all,
+    do: %__MODULE__{weapon_mask: -1, armor_mask: -1, skill_values: :all, dual_wield?: true, parry?: true, block?: true}
 
   def from_character(%Character{player: player, internal: internal}) do
     skills = player.skills || %{}
@@ -66,6 +67,9 @@ defmodule ThistleTea.Game.Entity.Logic.Proficiency do
   defp apply_effect(%__MODULE__{} = prof, %Effect{type: :dual_wield}, _spell) do
     %{prof | dual_wield?: true}
   end
+
+  defp apply_effect(%__MODULE__{} = prof, %Effect{type: :parry}, _spell), do: %{prof | parry?: true}
+  defp apply_effect(%__MODULE__{} = prof, %Effect{type: :block}, _spell), do: %{prof | block?: true}
 
   defp apply_effect(%__MODULE__{} = prof, _effect, _spell), do: prof
 

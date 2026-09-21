@@ -115,13 +115,20 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentSpellsTest do
     end
 
     test "skill and parry bonuses coexist with ordinary auras", %{character: character} do
+      character = %{
+        character
+        | player: %{character.player | visible_item_16_0: 1},
+          internal: %{character.internal | spellbook: %{3127 => %Spell{id: 3127, effects: [%Effect{type: :parry}]}}}
+      }
+
       skill = %{effect(:mod_skill, 5) | misc_value: 95}
       spell = %Spell{id: 1, effects: [skill, effect(:mod_parry_percent, 2)]}
       ordinary = %Spell{id: 2, effects: [effect(:mod_crit_percent, 3)]}
       {character, _} = Aura.apply_spell(character, 1, 60, ordinary, 0)
       equipped = sync(character, [item(10)], [spell])
       assert equipped.player.skill_bonuses == %{95 => {5, 0}}
-      assert equipped.player.parry_percentage == 7.0
+      assert equipped.player.parry_percentage == 7.2
+      assert equipped.player.dodge_percentage == 5.2
       assert equipped.player.crit_percentage == 8.0
       assert sync(equipped, [item(10)], [spell]) == equipped
       removed = sync(%{equipped | player: %{equipped.player | chest: 0}}, [item(10)], [spell])

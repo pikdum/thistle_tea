@@ -1,10 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
   @moduledoc """
-  Player melee avoidance and crit chances following vmangos: crit and dodge
-  from per-class agility rates interpolated between level 1 and 60 plus a
-  per-class base bonus, parry for classes that learn it, and block/block value
-  from an equipped shield. `sync/1` writes the derived percentages to the
-  player component fields shown on the character sheet.
+  Player melee avoidance and crit chances from canonical stats, defense skill,
+  learned combat capabilities, equipment, and auras. The same defensive chances
+  feed attack resolution and the player fields shown on the character sheet.
   """
   alias ThistleTea.Game.Aura, as: AuraData
   alias ThistleTea.Game.Aura.Holder
@@ -12,6 +10,8 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Disarm
+  alias ThistleTea.Game.Entity.Logic.Proficiency
+  alias ThistleTea.Game.Entity.Logic.Skills
 
   @warrior 1
   @paladin 2
@@ -22,8 +22,6 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
   @mage 8
   @warlock 9
   @druid 11
-
-  @parry_classes [@warrior, @paladin, @hunter, @rogue, @shaman]
 
   @crit_agility_rates %{
     @warrior => {3.9, 20.0},
@@ -84,23 +82,48 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
     end
   end
 
-  def parry_chance(class) when class in @parry_classes, do: @base_avoidance_chance
-  def parry_chance(_class), do: 0.0
+  def parry_chance(%{unit: %Unit{}} = entity), do: defensive_chances(entity).parry
 
-  def block_chance(%{unit: %Unit{} = unit, player: %Player{}} = character) do
-    if block_chance(unit.equipment_bonuses || %{}) > 0 do
-      bonus = Map.get(unit.equipment_bonuses || %{}, :block_chance, 0)
-      max(@base_avoidance_chance + bonus + Aura.flat_amount(character, :mod_block_percent), 0.0)
-    else
-      0.0
-    end
-  end
+  def block_chance(%{unit: %Unit{}, player: %Player{}} = character), do: defensive_chances(character).block
 
   def block_chance(%{} = equipment_bonuses) do
     if Map.get(equipment_bonuses, :shields, 0) > 0, do: @base_avoidance_chance, else: 0.0
   end
 
   def block_chance(_equipment_bonuses), do: 0.0
+
+  def defensive_chances(%{unit: %Unit{} = unit, player: %Player{}} = character) do
+    proficiency = proficiency(character)
+    level = unit.level || 1
+    equipment = unit.equipment_bonuses || %{}
+    defense_bonus = (Skills.defense_value(character) - Skills.max_for_level(level)) * 0.04
+    dodge = dodge_chance(unit.class, level, unit.agility || 0) + Aura.flat_amount(character, :mod_dodge)
+    parry = @base_avoidance_chance + Aura.flat_amount(character, :mod_parry_percent)
+
+    block =
+      @base_avoidance_chance + Map.get(equipment, :block_chance, 0) +
+        Aura.flat_amount(character, :mod_block_percent)
+
+    can_parry? = proficiency.parry? and not Disarm.parry_disabled?(character)
+    can_block? = proficiency.block? and block_chance(equipment) > 0
+
+    %{
+      dodge: max(dodge + defense_bonus, 0.0),
+      parry: if(can_parry?, do: max(parry + defense_bonus, 0.0), else: 0.0),
+      block: if(can_block?, do: max(block + defense_bonus, 0.0), else: 0.0)
+    }
+  end
+
+  def defensive_chances(entity) do
+    %{
+      dodge: max(@base_avoidance_chance + Aura.flat_amount(entity, :mod_dodge), 0.0),
+      parry: max(@base_avoidance_chance + Aura.flat_amount(entity, :mod_parry_percent), 0.0),
+      block: max(@base_avoidance_chance + Aura.flat_amount(entity, :mod_block_percent), 0.0)
+    }
+  end
+
+  defp proficiency(%{internal: %{spellbook: spellbook}}), do: Proficiency.from_spellbook(spellbook)
+  defp proficiency(_character), do: %Proficiency{}
 
   def block_value(%{unit: %Unit{} = unit, player: %Player{}} = character) do
     flat =
@@ -137,16 +160,15 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
     level = unit.level || 1
     agility = unit.agility || 0
     crit = max(melee_crit_chance(unit.class, level, agility) + Aura.flat_amount(character, :mod_crit_percent), 0.0)
-    dodge = max(dodge_chance(unit.class, level, agility) + Aura.flat_amount(character, :mod_dodge), 0.0)
-    parry = max(parry_chance(unit.class) + Aura.flat_amount(character, :mod_parry_percent), 0.0)
+    defenses = defensive_chances(character)
 
     player = %{
       player
       | crit_percentage: crit,
         ranged_crit_percentage: crit,
-        dodge_percentage: dodge,
-        parry_percentage: if(Disarm.parry_disabled?(character), do: 0.0, else: parry),
-        block_percentage: block_chance(character)
+        dodge_percentage: defenses.dodge,
+        parry_percentage: defenses.parry,
+        block_percentage: defenses.block
     }
 
     %{character | player: player}

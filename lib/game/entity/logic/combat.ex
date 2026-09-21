@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.Daze
@@ -209,7 +210,9 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
     with false <- Map.get(attack, :caster_player?, false),
          {:gained, skills} <- Skills.combat_skill_up(player.skills, Skills.defense_skill(), skill_up_opts) do
-      Core.mark_broadcast_update(%{entity | player: %{player | skills: skills}})
+      %{entity | player: %{player | skills: skills}}
+      |> CombatRatings.sync()
+      |> Core.mark_broadcast_update()
     else
       _no_gain -> entity
     end

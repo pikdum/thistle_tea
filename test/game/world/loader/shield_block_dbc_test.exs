@@ -7,11 +7,23 @@ defmodule ThistleTea.Game.World.Loader.ShieldBlockDbcTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
+  alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db
 
   describe "load/1" do
+    test "Block and Parry grant combat capabilities while the Shaman talent teaches Parry" do
+      block = SpellLoader.load(107)
+      parry = SpellLoader.load(3127)
+      talent = SpellLoader.load(16_268)
+      talent_parry = SpellLoader.load(18_848)
+      assert Proficiency.from_spellbook(%{107 => block}).block?
+      assert Proficiency.from_spellbook(%{3127 => parry}).parry?
+      assert Enum.any?(talent.effects, &(&1.type == :learn_spell and &1.trigger_spell_id == 18_848))
+      assert Proficiency.from_spellbook(%{18_848 => talent_parry}).parry?
+    end
+
     test "Shield Specialization ranks scale block value by percentages" do
       for {id, percent} <- [
             {16_253, 5},

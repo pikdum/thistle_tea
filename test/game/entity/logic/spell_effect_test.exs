@@ -92,11 +92,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
         level: 1,
         class: class,
         agility: 0,
+        sheath_state: 1,
         equipment_bonuses: equipment_bonuses,
         auras: [avoidance_holder, proc_holder]
       },
-      player: %Player{},
-      internal: %Internal{world: %WorldRef{map_id: 0}},
+      player: %Player{visible_item_16_0: 1},
+      internal: %Internal{
+        world: %WorldRef{map_id: 0},
+        spellbook: %{
+          107 => %Spell{id: 107, effects: [%Effect{type: :block}]},
+          3127 => %Spell{id: 3127, effects: [%Effect{type: :parry}]}
+        }
+      },
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
   end

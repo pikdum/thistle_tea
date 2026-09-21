@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
@@ -555,8 +556,12 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       character = %{
         character
         | unit: %{character.unit | auras: [holder]},
-          player: %Player{},
-          internal: %{character.internal | blackboard: blackboard}
+          player: %Player{visible_item_16_0: 1},
+          internal: %{
+            character.internal
+            | blackboard: blackboard,
+              spellbook: %{3127 => %Spell{id: 3127, effects: [%Effect{type: :parry}]}}
+          }
       }
 
       old_ref = Process.send_after(self(), :old_attack_tick, 60_000)

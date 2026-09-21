@@ -31,8 +31,12 @@ defmodule ThistleTea.Game.Entity.Logic.Disarm do
 
   def damage_multiplier(_entity), do: 1.0
 
-  def parry_disabled?(%Character{unit: %Unit{base_offhand_max_damage: offhand}} = entity) do
-    (unarmed?(entity) or broken_mainhand?(entity)) and not (is_number(offhand) and offhand > 0)
+  def parry_disabled?(%Character{unit: %Unit{class: 11, shapeshift_form: form}}) when form in [1, 5, 8], do: true
+
+  def parry_disabled?(%Character{unit: %Unit{base_offhand_max_damage: offhand}, player: player} = entity) do
+    mainhand = Inventory.equipment_entry(player, :mainhand)
+    mainhand? = is_integer(mainhand) and mainhand > 0 and not unarmed?(entity)
+    not mainhand? and not (is_number(offhand) and offhand > 0)
   end
 
   def parry_disabled?(_entity), do: false

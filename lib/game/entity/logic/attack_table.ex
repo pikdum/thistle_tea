@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   @moduledoc """
   Vanilla melee attack table ported from vmangos `Unit::RollMeleeOutcomeAgainst`:
   one roll walks miss → dodge → parry → glancing → block → crit → crushing in
-  order, with weapon-skill/defense-skill adjustments (both approximated as
-  level × 5), and the outcome maps to damage modifiers plus the hit-info and
+  order, with learned defenses and weapon-skill/defense-skill adjustments,
+  and the outcome maps to damage modifiers plus the hit-info and
   victim-state values encoded in SMSG_ATTACKERSTATEUPDATE. Armor mitigation
   (`CalcArmorReducedDamage`) is applied to physical damage before the outcome
   modifiers.
@@ -46,7 +46,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
 
   @base_miss_chance 5.0
   @default_crit_chance 5.0
-  @mob_avoidance_chance 5.0
   @mob_block_cap 5.0
   @crit_multiplier 2.0
   @crushing_multiplier 1.5
@@ -158,6 +157,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     caster_level = positive_or(Map.get(attack, :caster_level), defender_level)
     attack_skill = positive_or(Map.get(attack, :caster_attack_skill), caster_level * 5)
     skill_diff = attack_skill - Skills.defense_value(defender)
+    defenses = CombatRatings.defensive_chances(defender)
 
     %{
       caster_level: caster_level,
@@ -173,10 +173,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       mechanic_resistance_bp:
         trunc(MechanicResistance.chance(MechanicResistance.projection(defender), Map.get(attack, :mechanic)) * 100),
       skill_diff: skill_diff,
+      avoidance_skill_diff: attack_skill - defender_level * 5,
       defender_level: defender_level,
       defender_player?: defender_player?,
-      defender_class: unit.class,
-      defender_agility: unit.agility || 0,
       defender_block_value: CombatRatings.block_value(defender),
       defender_armor:
         ResistancePenetration.resistance(
@@ -184,10 +183,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
           Map.get(attack, :resistance_penetration, []),
           :physical
         ),
-      defender_dodge_bonus: Aura.flat_amount(defender, :mod_dodge),
-      defender_parry_bonus: Aura.flat_amount(defender, :mod_parry_percent),
-      defender_block_chance: CombatRatings.block_chance(defender),
-      defender_has_shield?: CombatRatings.block_chance(unit.equipment_bonuses || %{}) > 0,
+      defender_dodge_chance: defenses.dodge,
+      defender_parry_chance: defenses.parry,
+      defender_block_chance: defenses.block,
       defender_extra_flags: extra_flags(defender),
       hit_chance_bonus: hit_chance_bonus(attack) + attacker_hit_debuff(defender, attack),
       versus_damage_pct: versus_pct(attack, :damage_done_versus, defender),
@@ -195,7 +193,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       standing?: (unit.stand_state || 0) == 0,
       from_behind?: from_behind?(defender, Map.get(attack, :caster_position)),
       avoidance_disabled?: casting?(defender) or stunned?(unit),
-      parry_disabled?: Disarm.parry_disabled?(defender)
+      block_disabled?: defender_player? and (unit.sheath_state || 0) == 0
     }
   end
 
@@ -309,27 +307,19 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   defp dodge_bp(%{defender_player?: true, from_behind?: true}), do: 0
 
   defp dodge_bp(ctx) do
-    base =
-      if ctx.defender_player? do
-        CombatRatings.dodge_chance(ctx.defender_class, ctx.defender_level, ctx.defender_agility) +
-          ctx.defender_dodge_bonus
-      else
-        @mob_avoidance_chance
-      end
-
-    (base - avoidance_skill_bonus(ctx))
+    (ctx.defender_dodge_chance - avoidance_skill_bonus(ctx))
     |> low_level_scale(ctx)
     |> max(0.0)
     |> bp()
   end
 
   defp parry_bp(%{ranged?: true}), do: 0
-  defp parry_bp(%{parry_disabled?: true}), do: 0
+  defp parry_bp(%{defender_parry_chance: chance}) when chance <= 0, do: 0
   defp parry_bp(%{avoidance_disabled?: true}), do: 0
   defp parry_bp(%{from_behind?: true}), do: 0
 
   defp parry_bp(%{defender_player?: true} = ctx) do
-    (CombatRatings.parry_chance(ctx.defender_class) + ctx.defender_parry_bonus - ctx.skill_diff * 0.04)
+    (ctx.defender_parry_chance - ctx.avoidance_skill_diff * 0.04)
     |> max(0.0)
     |> bp()
   end
@@ -339,7 +329,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       skill_bonus =
         if ctx.skill_diff < -10, do: ctx.skill_diff * 0.6, else: ctx.skill_diff * 0.2
 
-      (@mob_avoidance_chance - skill_bonus)
+      (ctx.defender_parry_chance - skill_bonus)
       |> low_level_scale(ctx)
       |> max(0.0)
       |> bp()
@@ -360,17 +350,18 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   defp block_bp(%{avoidance_disabled?: true}), do: 0
   defp block_bp(%{from_behind?: true}), do: 0
   defp block_bp(%{block_allowed?: false}), do: 0
-  defp block_bp(%{defender_player?: true, defender_has_shield?: false}), do: 0
+  defp block_bp(%{block_disabled?: true}), do: 0
+  defp block_bp(%{defender_block_chance: chance}) when chance <= 0, do: 0
 
   defp block_bp(%{defender_player?: true} = ctx) do
-    (ctx.defender_block_chance - ctx.skill_diff * 0.04)
+    (ctx.defender_block_chance - ctx.avoidance_skill_diff * 0.04)
     |> max(0.0)
     |> bp()
   end
 
   defp block_bp(ctx) do
     if (ctx.defender_extra_flags &&& @extra_flag_no_block) == 0 do
-      (@mob_avoidance_chance - ctx.skill_diff * 0.1)
+      (ctx.defender_block_chance - ctx.skill_diff * 0.1)
       |> min(@mob_block_cap)
       |> low_level_scale(ctx)
       |> max(0.0)
@@ -514,7 +505,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     low + (high - low) * clamp(factor_roll, 0.0, 1.0)
   end
 
-  defp avoidance_skill_bonus(%{defender_player?: true} = ctx), do: ctx.skill_diff * 0.04
+  defp avoidance_skill_bonus(%{defender_player?: true} = ctx), do: ctx.avoidance_skill_diff * 0.04
   defp avoidance_skill_bonus(ctx), do: ctx.skill_diff * 0.1
 
   defp low_level_scale(chance, %{defender_player?: false, defender_level: level}) when level < 10 do

@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Player.Spells do
   alias ThistleTea.Game.Entity.Data.TrainerSpell
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Casting
+  alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Entity.Logic.Skills
@@ -106,6 +107,7 @@ defmodule ThistleTea.Game.Player.Spells do
         apply_aura_spell(character, spell, now)
       end
     end)
+    |> CombatRatings.sync()
   end
 
   def apply_passives(character, _now), do: character

@@ -750,7 +750,13 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
     test "shield block forces blocks" do
       defender = warrior_fixture()
-      defender = %{defender | unit: %{defender.unit | equipment_bonuses: %{shields: 1, shield_block: 20}}}
+
+      defender = %{
+        defender
+        | unit: %{defender.unit | sheath_state: 1, equipment_bonuses: %{shields: 1, shield_block: 20}},
+          internal: %{defender.internal | spellbook: %{107 => %Spell{id: 107, effects: [%Effect{type: :block}]}}}
+      }
+
       attack = %{caster: 99, caster_level: 10, caster_player?: false, crit_chance: 5.0}
 
       without_block = AttackTable.resolve(defender, attack, 100, roll: 4_000)

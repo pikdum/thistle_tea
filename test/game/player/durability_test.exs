@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.SpiritHealer
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
@@ -281,7 +282,12 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
         id: guid,
         object: %Object{guid: guid},
         player: player,
-        internal: %Internal{},
+        internal: %Internal{
+          spellbook: %{
+            107 => %Spell{id: 107, effects: [%Effect{type: :block}]},
+            3127 => %Spell{id: 3127, effects: [%Effect{type: :parry}]}
+          }
+        },
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         unit: %Unit{health: 100, max_health: 100, base_health: 100, base_stamina: 20, level: 10, class: 1, auras: []}
       }

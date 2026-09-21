@@ -165,11 +165,17 @@ defmodule ThistleTea.Game.Entity.Logic.ShieldBlockTest do
         level: 60,
         strength: 140,
         agility: 0,
+        sheath_state: 1,
         equipment_bonuses: %{shields: 1, shield_block: 20},
         auras: []
       },
-      player: %Player{},
-      internal: %Internal{}
+      player: %Player{visible_item_16_0: 1},
+      internal: %Internal{
+        spellbook: %{
+          107 => %Spell{id: 107, effects: [%Effect{type: :block}]},
+          3127 => %Spell{id: 3127, effects: [%Effect{type: :parry}]}
+        }
+      }
     }
 
     %{character: character}

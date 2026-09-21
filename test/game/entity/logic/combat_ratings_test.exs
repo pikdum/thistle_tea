@@ -2,9 +2,12 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatingsTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.CombatRatings
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
 
   @warrior 1
   @rogue 4
@@ -45,13 +48,19 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatingsTest do
   end
 
   describe "parry_chance/1" do
-    test "parry classes parry at five percent" do
-      assert CombatRatings.parry_chance(@warrior) == 5.0
-      assert CombatRatings.parry_chance(@rogue) == 5.0
+    test "learned parry requires a usable weapon" do
+      character = trained_character()
+      assert CombatRatings.parry_chance(character) == 5.0
+      assert CombatRatings.parry_chance(%{character | player: %Player{}}) == 0.0
     end
 
-    test "mages cannot parry" do
-      assert CombatRatings.parry_chance(@mage) == 0.0
+    test "class alone does not grant parry" do
+      character = trained_character()
+
+      for class <- [@warrior, @rogue, 7, @mage] do
+        untrained = %{character | unit: %{character.unit | class: class}, internal: %Internal{}}
+        assert CombatRatings.parry_chance(untrained) == 0.0
+      end
     end
   end
 
@@ -71,12 +80,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatingsTest do
 
   describe "sync/1" do
     test "writes the derived percentages to the player component" do
-      character = %Character{
-        unit: %Unit{class: @warrior, level: 60, agility: 100, equipment_bonuses: %{shields: 1, shield_block: 20}},
-        player: %Player{}
-      }
-
-      character = CombatRatings.sync(character)
+      character = trained_character() |> CombatRatings.sync()
 
       assert_in_delta character.player.crit_percentage, 5.0, 0.001
       assert_in_delta character.player.dodge_percentage, 5.0, 0.001
@@ -89,5 +93,18 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatingsTest do
 
       assert CombatRatings.sync(entity) == entity
     end
+  end
+
+  defp trained_character do
+    %Character{
+      unit: %Unit{class: @warrior, level: 60, agility: 100, equipment_bonuses: %{shields: 1, shield_block: 20}},
+      player: %Player{visible_item_16_0: 1},
+      internal: %Internal{
+        spellbook: %{
+          107 => %Spell{id: 107, effects: [%Effect{type: :block}]},
+          3127 => %Spell{id: 3127, effects: [%Effect{type: :parry}]}
+        }
+      }
+    }
   end
 end

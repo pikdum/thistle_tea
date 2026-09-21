@@ -15,7 +15,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
   @deferred_effects %{
     19 => :block_passive,
     20 => :defense_passive,
-    23 => :spell_defense,
     26 => :dodge_passive,
     37 => :spell_defense_dnd,
     39 => :language,

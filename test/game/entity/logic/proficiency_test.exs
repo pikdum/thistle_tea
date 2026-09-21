@@ -27,6 +27,16 @@ defmodule ThistleTea.Game.Entity.Logic.ProficiencyTest do
   defp spellbook(spells), do: Map.new(spells, fn spell -> {spell.id, spell} end)
 
   describe "from_spellbook/1" do
+    test "derives defensive capabilities from every learned source" do
+      parry = %SpellData{id: 3127, effects: [%Effect{type: :parry}]}
+      block = %SpellData{id: 107, effects: [%Effect{type: :block}]}
+      alternate = %{parry | id: 999}
+      book = spellbook([parry, block, alternate])
+      assert %Proficiency{parry?: true, block?: true} = Proficiency.from_spellbook(book)
+      assert %Proficiency{parry?: true, block?: false} = Proficiency.from_spellbook(Map.drop(book, [3127, 107]))
+      assert %Proficiency{parry?: false, block?: false} = Proficiency.from_spellbook(%{})
+    end
+
     test "accumulates weapon and armor masks from proficiency effects" do
       prof =
         spellbook([

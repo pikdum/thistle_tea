@@ -157,6 +157,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
     :learn_spell,
     :learn_pet_spell,
     :parry,
+    :block,
     :dual_wield,
     :proficiency,
     :quest_complete,

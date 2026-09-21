@@ -51,8 +51,8 @@ defmodule ThistleTea.Game.Entity.Logic.DisarmTest do
       object: %Object{guid: 1},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       unit: unit,
-      player: %Player{skills: %{162 => %{value: 37}}},
-      internal: %Internal{}
+      player: %Player{visible_item_16_0: 1, skills: %{162 => %{value: 37}}},
+      internal: %Internal{spellbook: %{3127 => %Spell{id: 3127, effects: [%Effect{type: :parry}]}}}
     }
 
     %{character: character}
