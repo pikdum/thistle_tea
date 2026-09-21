@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Player.RaidQuestsTest do
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
@@ -55,6 +56,20 @@ defmodule ThistleTea.Game.Player.RaidQuestsTest do
       {:ok, _} = PartySystem.leave(other)
       resumed = Quests.credit_kill_entry(credited, 299, 124)
       assert QuestLog.get(resumed.character.player.quest_log, normal.id).counts == %{0 => 1}
+    end
+  end
+
+  describe "credit_cast/3" do
+    test "ignores player targets and retains matching creature credit in a raid", %{state: state, normal: quest} do
+      quest = %{quest | required_entity_objectives: [{0, :creature, 299, 10_292, 2}]}
+      :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
+      {:ok, _} = PartySystem.convert_raid(state.guid)
+
+      assert Quests.credit_cast(state, [state.guid], 10_292) == state
+
+      creature = Guid.from_low_guid(:creature, 299, 1)
+      credited = Quests.credit_cast(state, [state.guid, creature], 10_292)
+      assert QuestLog.get(credited.character.player.quest_log, quest.id).counts == %{0 => 1}
     end
   end
 

@@ -30,10 +30,14 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
     increment_entity_objective(quest_log, quest, entity_type, entry, 0)
   end
 
+  def increment_interaction(_quest_log, %Quest{}, _entity_type, _entry), do: :no_credit
+
   def increment_cast(quest_log, %Quest{} = quest, entity_type, entry, spell_id)
       when entity_type in [:creature, :game_object] and is_integer(spell_id) and spell_id > 0 do
     increment_entity_objective(quest_log, quest, entity_type, entry, spell_id)
   end
+
+  def increment_cast(_quest_log, %Quest{}, _entity_type, _entry, _spell_id), do: :no_credit
 
   defp increment_entity_objective(quest_log, %Quest{} = quest, entity_type, target_entry, spell_id) do
     with %Entry{status: :incomplete, counts: counts} <- get(quest_log, quest.id),

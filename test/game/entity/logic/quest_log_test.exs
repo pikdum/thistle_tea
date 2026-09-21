@@ -188,6 +188,7 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLogTest do
 
       assert QuestLog.increment_interaction(quest_log, quest, :game_object, 1721) == :no_credit
       assert QuestLog.increment_interaction(quest_log, quest, :creature, 3189) == :no_credit
+      assert QuestLog.increment_interaction(quest_log, quest, :player, 0) == :no_credit
     end
   end
 
@@ -210,6 +211,8 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLogTest do
                QuestLog.increment_cast(quest_log, quest, :game_object, 176_158, 17_155)
 
       assert QuestLog.increment_cast(quest_log, quest, :creature, 10_978, 17_155) == :no_credit
+      assert QuestLog.increment_cast(quest_log, quest, :player, 0, 10_292) == :no_credit
+      assert QuestLog.increment_cast(quest_log, quest, :pet, 10_978, 17_166) == :no_credit
     end
   end
 
