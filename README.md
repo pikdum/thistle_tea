@@ -106,6 +106,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - crowd-control diminishing returns, shared across casters with recovery after control ends
 - [Pacification and silence](docs/combat-control-playtest.md), including combined controls, attack suppression, channel interruption, and overlapping-source cleanup
 - creature and pet fear movement, with bounded panic runs, control cleanup, and Curse of Recklessness suppression
+- [Player fear and confusion](docs/player-control-movement-playtest.md), with forced movement, client control restoration, bounded wandering, teleport recovery, and death cleanup
 - Priest Fade: temporary threat reduction with target switching and restoration on expiry
 - Rogue Distract: ground-targeted facing and timed patrol pauses, preserving stealth
 - Hunter Beast Lore: caster-specific beast damage, armor, and resistance information, with expiry and death cleanup
