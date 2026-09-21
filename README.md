@@ -88,7 +88,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - ground mounts, mounted speed bonuses, and dismounting on cancellation or swimming
 - parry haste for player and mob melee swings, including dual-wield timing
 - shield block value from equipment, enchants, and percentage talents, shared by defensive blocks and Shield Slam
-- shield-dependent block chance, with equipment and aura bonuses reflected on the character sheet
+- learned parry and block capabilities, weapon and shield requirements, sheath restrictions, and defense-skill avoidance on the character sheet
 - main-hand disarm: unarmed player combat, armed-creature damage reduction, weapon ability checks, and off-hand preservation
 - rear-hit daze from uncontrolled creatures, with level and defense-skill scaling
 - mechanic resistance for spells and melee abilities, including Orc Hardiness
@@ -124,6 +124,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Wand attacks](docs/wand-playtest.md), with weapon-school damage, Wand Specialization, and shared auto-repeat timing and cancellation
 - [Creature and pet attack power](docs/attack-power-playtest.md), with damage scaling, buff and debuff cleanup, percentage modifiers, and ranged equipment bonuses
 - [Passive on-equip item spells](docs/equipment-passives-playtest.md), with crit, hit, dodge, mana regeneration, item procs, durability and reconnect lifecycles, and form restrictions
+- [Learned defensive capabilities](docs/defensive-capabilities-playtest.md), with Shaman Parry talent learning and reset, defense skill projection, weapon requirements, sheath restrictions, and reconnect validation
 - equipment durability, combat and death wear, broken-gear penalties, and vendor repairs with reputation discounts
 - alcohol intoxication, client drunkenness effects, gradual sobering, and death cleanup
 - looting + group loot
