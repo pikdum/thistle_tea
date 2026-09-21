@@ -44,6 +44,8 @@ defmodule ThistleTea.Game.World.Loader.Quest do
 
     load_creature_relations(Mangos.CreatureQuestRelation, :giver)
     load_creature_relations(Mangos.CreatureInvolvedRelation, :ender)
+    load_game_object_relations(Mangos.GameObjectQuestRelation, :giver)
+    load_game_object_relations(Mangos.GameObjectInvolvedRelation, :ender)
 
     :ok
   end
@@ -78,7 +80,15 @@ defmodule ThistleTea.Game.World.Loader.Quest do
 
   def given_by(creature_entry), do: relation_lookup({:giver, creature_entry})
 
+  def given_by(:unit, entry), do: given_by(entry)
+  def given_by(:game_object, entry), do: relation_lookup({:giver, :game_object, entry})
+  def given_by(_type, _entry), do: []
+
   def ended_by(creature_entry), do: relation_lookup({:ender, creature_entry})
+
+  def ended_by(:unit, entry), do: ended_by(entry)
+  def ended_by(:game_object, entry), do: relation_lookup({:ender, :game_object, entry})
+  def ended_by(_type, _entry), do: []
 
   defp relation_lookup(key) do
     case :ets.lookup(__MODULE__, key) do
@@ -91,6 +101,15 @@ defmodule ThistleTea.Game.World.Loader.Quest do
     schema
     |> Mangos.Repo.all()
     |> Enum.group_by(fn relation -> {role, relation.id} end, fn relation -> relation.quest end)
+    |> Enum.each(fn {key, quest_ids} ->
+      :ets.insert(__MODULE__, {key, Enum.sort(quest_ids)})
+    end)
+  end
+
+  defp load_game_object_relations(schema, role) do
+    schema
+    |> Mangos.Repo.all()
+    |> Enum.group_by(fn relation -> {role, :game_object, relation.id} end, fn relation -> relation.quest end)
     |> Enum.each(fn {key, quest_ids} ->
       :ets.insert(__MODULE__, {key, Enum.sort(quest_ids)})
     end)

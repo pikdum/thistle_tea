@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTemplate do
   @moduledoc false
   alias ThistleTea.DB.Mangos
 
-  defstruct [:entry, :type, :display_id, :name, :size, :flags, :faction, min_gold: 0, max_gold: 0, data: []]
+  defstruct [:entry, :type, :display_id, :name, :size, :flags, :faction, :bounds, min_gold: 0, max_gold: 0, data: []]
 
   def build(%Mangos.GameObjectTemplate{} = template) do
     %__MODULE__{

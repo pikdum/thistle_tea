@@ -16,9 +16,16 @@ defmodule ThistleTea.Game.World.Loader.GameObjectTemplate do
   end
 
   def load_all do
+    bounds =
+      Mangos.GameObjectDisplayInfoAddon
+      |> Mangos.Repo.all()
+      |> Map.new(fn row ->
+        {row.display_id, {{row.min_x, row.min_y, row.min_z}, {row.max_x, row.max_y, row.max_z}}}
+      end)
+
     Mangos.GameObjectTemplate
     |> Mangos.Repo.all()
-    |> Enum.each(&cache/1)
+    |> Enum.each(&cache(&1, Map.get(bounds, &1.display_id)))
   end
 
   def get(entry) when is_integer(entry) and entry > 0 do
@@ -41,13 +48,21 @@ defmodule ThistleTea.Game.World.Loader.GameObjectTemplate do
 
   defp load(entry) do
     case Mangos.Repo.get(Mangos.GameObjectTemplate, entry) do
-      %Mangos.GameObjectTemplate{} = row -> cache(row)
+      %Mangos.GameObjectTemplate{} = row -> cache(row, load_bounds(row.display_id))
       _ -> nil
     end
   end
 
-  defp cache(%Mangos.GameObjectTemplate{} = row) do
+  defp load_bounds(display_id) do
+    case Mangos.Repo.get(Mangos.GameObjectDisplayInfoAddon, display_id) do
+      nil -> nil
+      row -> {{row.min_x, row.min_y, row.min_z}, {row.max_x, row.max_y, row.max_z}}
+    end
+  end
+
+  defp cache(%Mangos.GameObjectTemplate{} = row, bounds) do
     template = GameObjectTemplate.build(row)
+    template = %{template | bounds: bounds}
     :ets.insert(__MODULE__, {template.entry, template})
     template
   end

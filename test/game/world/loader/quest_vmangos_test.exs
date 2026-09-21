@@ -22,6 +22,15 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
   end
 
   describe "load_all/0" do
+    test "preloads game-object relations independently of creatures with the same entry" do
+      assert QuestLoader.given_by(:game_object, 35) == [138]
+      assert QuestLoader.ended_by(:game_object, 35) == [136]
+      assert QuestLoader.given_by(:game_object, 68) == [176]
+      refute 176 in QuestLoader.given_by(:unit, 68)
+      assert QuestLoader.given_by(:item, 68) == []
+      assert QuestLoader.ended_by(:player, 35) == []
+    end
+
     test "preloads original quest-starting items for abandonment exchanges" do
       assert %Quest{src_item_id: 2223, start_item_template: %ItemTemplate{entry: 1307, start_quest: 123}} =
                QuestLoader.get(123)
