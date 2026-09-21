@@ -35,7 +35,7 @@ defmodule ThistleTea.MixProject do
       {:deps_nix, "~> 3.0", only: :dev, runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:binary, "~> 0.0.5"},
-      {:ecto_sqlite3, "~> 0.24"},
+      {:ecto_sqlite3, "~> 0.25"},
       {:group, "~> 0.2"},
       {:thousand_island, "~> 1.0"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
