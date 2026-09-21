@@ -7,21 +7,34 @@ defmodule ThistleTea.Game.Party do
 
   defmodule Member do
     @moduledoc false
-    defstruct [:guid, :name, flags: 0]
+    defstruct [:guid, :name, subgroup: 0, assistant?: false]
   end
 
   defmodule Group do
     @moduledoc false
-    defstruct [:id, :leader, members: [], loot_method: 3, master_looter: 0, loot_threshold: 2, looter: 0]
+    defstruct [
+      :id,
+      :leader,
+      members: [],
+      raid?: false,
+      icons: %{},
+      loot_method: 3,
+      master_looter: 0,
+      loot_threshold: 2,
+      looter: 0
+    ]
   end
 
   defstruct groups: %{}, member_index: %{}, invites: %{}, next_id: 1
 
   @max_members 5
+  @raid_subgroups 8
   @alliance_races [1, 3, 4, 7]
   @horde_races [2, 5, 6, 8]
 
   def max_members, do: @max_members
+  def max_members(%Group{raid?: true}), do: @max_members * @raid_subgroups
+  def max_members(%Group{}), do: @max_members
 
   def group_of(%__MODULE__{} = party, guid) do
     case Map.fetch(party.member_index, guid) do
@@ -40,6 +53,22 @@ defmodule ThistleTea.Game.Party do
 
   def leader?(%Group{leader: leader}, guid), do: leader == guid
 
+  def assistant?(%Group{raid?: true} = group, guid), do: match?(%Member{assistant?: true}, member(group, guid))
+  def assistant?(%Group{}, _guid), do: false
+
+  def manager?(%Group{} = group, guid), do: leader?(group, guid) or assistant?(group, guid)
+
+  def member_flags(%Member{subgroup: subgroup, assistant?: assistant?}) do
+    Bitwise.bor(subgroup, if(assistant?, do: 0x80, else: 0))
+  end
+
+  def subgroup_members(%Group{} = group, guid) do
+    case member(group, guid) do
+      %Member{subgroup: subgroup} -> Enum.filter(group.members, &(&1.subgroup == subgroup))
+      _ -> []
+    end
+  end
+
   def same_team?(race_a, race_b) do
     (race_a in @alliance_races and race_b in @alliance_races) or
       (race_a in @horde_races and race_b in @horde_races)
@@ -52,7 +81,7 @@ defmodule ThistleTea.Game.Party do
       in_group?(party, invitee_guid) or invited?(party, invitee_guid) ->
         {:error, :already_in_group}
 
-      group != nil and not leader?(group, inviter_guid) ->
+      group != nil and not manager?(group, inviter_guid) ->
         {:error, :not_leader}
 
       group != nil and full?(group) ->
@@ -97,7 +126,7 @@ defmodule ThistleTea.Game.Party do
       group == nil ->
         {:error, :not_in_group}
 
-      not leader?(group, remover_guid) ->
+      not manager?(group, remover_guid) or group.leader == target_guid ->
         {:error, :not_leader}
 
       invited_by?(party, target_guid, remover_guid) ->
@@ -169,6 +198,96 @@ defmodule ThistleTea.Game.Party do
     end
   end
 
+  def convert_raid(%__MODULE__{} = party, requester_guid) do
+    with {:ok, group} <- managed_group(party, requester_guid),
+         true <- leader?(group, requester_guid) do
+      updated(party, %{group | raid?: true})
+    else
+      false -> {:error, :not_leader}
+      error -> error
+    end
+  end
+
+  def set_assistant(%__MODULE__{} = party, requester_guid, target_guid, enabled?) when is_boolean(enabled?) do
+    with {:ok, group} <- managed_raid(party, requester_guid),
+         true <- leader?(group, requester_guid) and target_guid != requester_guid,
+         {:ok, target} <- fetch_member(group, target_guid) do
+      updated(party, replace_member(group, %{target | assistant?: enabled?}))
+    else
+      false -> {:error, :not_leader}
+      error -> error
+    end
+  end
+
+  def change_subgroup(%__MODULE__{} = party, requester_guid, target_guid, subgroup) when subgroup in 0..7 do
+    with {:ok, group} <- managed_raid(party, requester_guid),
+         {:ok, target} <- fetch_member(group, target_guid),
+         true <- target.subgroup == subgroup or subgroup_size(group, subgroup) < @max_members do
+      updated(party, replace_member(group, %{target | subgroup: subgroup}))
+    else
+      false -> {:error, :group_full}
+      error -> error
+    end
+  end
+
+  def change_subgroup(%__MODULE__{}, _requester_guid, _target_guid, _subgroup), do: {:error, :invalid_subgroup}
+
+  def swap_subgroups(%__MODULE__{} = party, requester_guid, first_guid, second_guid) do
+    with {:ok, group} <- managed_raid(party, requester_guid),
+         {:ok, first} <- fetch_member(group, first_guid),
+         {:ok, second} <- fetch_member(group, second_guid) do
+      group =
+        group
+        |> replace_member(%{first | subgroup: second.subgroup})
+        |> replace_member(%{second | subgroup: first.subgroup})
+
+      updated(party, group)
+    end
+  end
+
+  def set_icon(%__MODULE__{} = party, requester_guid, icon, target_guid)
+      when icon in 0..7 and is_integer(target_guid) and target_guid >= 0 do
+    with {:ok, group} <- managed_group(party, requester_guid) do
+      cleared = for {id, guid} <- group.icons, guid == target_guid and id != icon, do: {id, 0}
+      icons = Map.drop(group.icons, Enum.map(cleared, &elem(&1, 0)))
+      icons = if target_guid == 0, do: Map.delete(icons, icon), else: Map.put(icons, icon, target_guid)
+      group = %{group | icons: icons}
+      {:ok, group, Enum.sort(cleared) ++ [{icon, target_guid}], put_group(party, group)}
+    end
+  end
+
+  def set_icon(%__MODULE__{}, _requester_guid, _icon, _target_guid), do: {:error, :invalid_icon}
+
+  defp managed_group(party, requester_guid) do
+    case group_of(party, requester_guid) do
+      nil -> {:error, :not_in_group}
+      group -> if manager?(group, requester_guid), do: {:ok, group}, else: {:error, :not_leader}
+    end
+  end
+
+  defp managed_raid(party, requester_guid) do
+    case managed_group(party, requester_guid) do
+      {:ok, %Group{raid?: true} = group} -> {:ok, group}
+      {:ok, %Group{}} -> {:error, :not_raid}
+      error -> error
+    end
+  end
+
+  defp fetch_member(group, guid) do
+    case member(group, guid) do
+      %Member{} = member -> {:ok, member}
+      _ -> {:error, :target_not_in_group}
+    end
+  end
+
+  defp updated(party, group), do: {:ok, group, put_group(party, group)}
+
+  defp replace_member(group, member) do
+    %{group | members: Enum.map(group.members, &if(&1.guid == member.guid, do: member, else: &1))}
+  end
+
+  defp subgroup_size(group, subgroup), do: Enum.count(group.members, &(&1.subgroup == subgroup))
+
   defp join_group(party, nil, invite, invitee) do
     inviter = %Member{guid: invite.inviter, name: invite.inviter_name}
 
@@ -182,13 +301,14 @@ defmodule ThistleTea.Game.Party do
     {:ok, group, party |> put_group(group) |> index_members(group)}
   end
 
-  defp join_group(_party, %Group{members: members}, _invite, _invitee) when length(members) >= @max_members do
-    {:error, :group_full}
-  end
-
   defp join_group(party, group, _invite, invitee) do
-    group = %{group | members: group.members ++ [invitee]}
-    {:ok, group, party |> put_group(group) |> index_members(group)}
+    if full?(group) do
+      {:error, :group_full}
+    else
+      subgroup = Enum.find(0..(@raid_subgroups - 1), &(subgroup_size(group, &1) < @max_members))
+      group = %{group | members: group.members ++ [%{invitee | subgroup: subgroup}]}
+      {:ok, group, party |> put_group(group) |> index_members(group)}
+    end
   end
 
   defp remove_member(party, group, guid) do
@@ -219,7 +339,7 @@ defmodule ThistleTea.Game.Party do
     end
   end
 
-  defp full?(%Group{members: members}), do: length(members) >= @max_members
+  defp full?(%Group{members: members} = group), do: length(members) >= max_members(group)
 
   defp put_group(party, group), do: %{party | groups: Map.put(party.groups, group.id, group)}
 

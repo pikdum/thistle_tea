@@ -20,11 +20,13 @@ defmodule ThistleTea.Game.Party.Notifier do
 
     members =
       for member <- group.members, member.guid != guid do
-        %{name: member.name, guid: member.guid, online?: online?(member.guid), flags: member.flags}
+        %{name: member.name, guid: member.guid, online?: online?(member.guid), flags: Party.member_flags(member)}
       end
 
     Network.send_packet(
       %Message.SmsgGroupList{
+        group_type: if(group.raid?, do: 1, else: 0),
+        own_flags: own_flags(group, guid),
         members: members,
         leader: group.leader,
         loot_method: group.loot_method,
@@ -42,9 +44,10 @@ defmodule ThistleTea.Game.Party.Notifier do
 
   def broadcast(%Group{} = group, packet, opts \\ []) do
     except = Keyword.get(opts, :except)
+    subgroup = Keyword.get(opts, :subgroup)
 
     Enum.each(group.members, fn member ->
-      if member.guid != except do
+      if member.guid != except and (subgroup == nil or member.subgroup == subgroup) do
         Network.send_packet(packet, member.guid)
       end
     end)
@@ -90,6 +93,13 @@ defmodule ThistleTea.Game.Party.Notifier do
   end
 
   defp online?(guid), do: is_pid(EntityRegistry.whereis(guid))
+
+  defp own_flags(group, guid) do
+    case Party.member(group, guid) do
+      %Party.Member{} = member -> Party.member_flags(member)
+      _ -> 0
+    end
+  end
 
   defp notify_leader_status(guid, leader?) do
     case EntityRegistry.whereis(guid) do
