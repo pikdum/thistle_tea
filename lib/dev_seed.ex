@@ -206,7 +206,7 @@ defmodule ThistleTea.DevSeed do
     %{character | internal: %{internal | spells: all_ids}}
   end
 
-  defp debug_training_spells(3), do: @pet_training_spells
+  defp debug_training_spells(3), do: [264 | @pet_training_spells]
   defp debug_training_spells(_class), do: []
 
   defp set_debug_action_bars(
