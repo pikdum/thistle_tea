@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   changes.
   """
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AttackPower
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -283,7 +284,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defp main_hand_template(%Character{player: player}) when is_struct(player) do
     case Inventory.equipment_entry(player, :mainhand) do
-      entry when is_integer(entry) and entry > 0 -> ItemLoader.get_template(entry)
+      entry when is_integer(entry) and entry > 0 -> ItemLoader.get_template(Item.visible_entry(entry))
       _ -> nil
     end
   end
