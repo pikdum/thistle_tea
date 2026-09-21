@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.TradeTest do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Trade.Exchange
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
+  alias ThistleTea.Game.Entity.Logic.ItemLifetime
   alias ThistleTea.Game.Entity.Logic.Trade
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
@@ -60,6 +61,20 @@ defmodule ThistleTea.Game.Entity.Logic.TradeTest do
   end
 
   describe "plan/5" do
+    test "transfers a live deadline unchanged and rejects an expired offer", context do
+      %{trade: trade, first: first, characters: characters, items: items} = context
+      first = ItemLifetime.set_remaining(first, 1, -799)
+      items = Map.put(items, first.object.guid, first)
+      {:ok, trade} = Trade.put_item(trade, 1, 0, first, 0)
+      assert {:ok, exchange} = plan(trade, characters, &Map.get(items, &1))
+      assert [received] = ChangeSet.placed_items(exchange.changes[2])
+      assert received.item.owner == 2
+      assert ItemLifetime.deadline(received) == 201
+      {:ok, accepted} = Trade.accept(trade, 1, 200)
+      {:ok, accepted} = Trade.accept(accepted, 2, 200)
+      assert {:error, 1, :item_not_found} = Trade.plan(accepted, characters, 201, &Map.get(items, &1), fn _ -> nil end)
+    end
+
     test "rejects items committed to an unfinished cast", context do
       %{trade: trade, first: first, characters: characters, lookup: lookup} = context
       {:ok, trade} = Trade.put_item(trade, 1, 0, first, 0)

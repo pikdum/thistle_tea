@@ -86,6 +86,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.HomeBind
   alias ThistleTea.Game.Player.Honor
   alias ThistleTea.Game.Player.ItemCosts
+  alias ThistleTea.Game.Player.ItemDurations
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Login
   alias ThistleTea.Game.Player.Looting
@@ -1034,6 +1035,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   rescue
     error ->
       Logger.error("expire_item_enchantment crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:item_duration_tick, token}, %State{} = state) do
+    {:noreply, ItemDurations.tick(state, token), {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Item duration tick failed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, state}
   end
 

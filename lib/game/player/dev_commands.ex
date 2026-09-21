@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Player.Durability
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.Honor, as: PlayerHonor
+  alias ThistleTea.Game.Player.ItemDurations
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
@@ -126,6 +127,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".debug reputation war <faction_id> <on|off> - toggle at-war",
       ".debug skills - max out known skills for your level",
       ".debug durability <percent> [carried] - apply durability wear for testing",
+      ".debug item duration <entry> <seconds> - set an owned timed item's remaining lifetime",
       ".debug pet [loyalty|happiness <delta>] - inspect or adjust your hunter pet",
       ".debug spells - learn class trainer spells up to your level",
       ".debug events - show active events and the next scheduled change",
@@ -346,6 +348,17 @@ defmodule ThistleTea.Game.Player.DevCommands do
       _ -> system_message(state, "Use: .debug durability <percent> [carried]")
     end
     |> handled()
+  end
+
+  def run(state, ".debug item duration" <> params) do
+    with [entry, seconds] <- String.split(params),
+         {entry, ""} when entry > 0 <- Integer.parse(entry),
+         {seconds, ""} when seconds in 1..604_800 <- Integer.parse(seconds) do
+      {state, count} = ItemDurations.set_remaining(state, entry, seconds)
+      state |> system_message("Set #{count} timed item stacks to #{seconds} seconds remaining.") |> handled()
+    else
+      _ -> state |> system_message("Use: .debug item duration <entry> <seconds: 1..604800>") |> handled()
+    end
   end
 
   def run(state, ".debug random equipment" <> _) do

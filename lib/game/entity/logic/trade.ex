@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trade do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
+  alias ThistleTea.Game.Entity.Logic.ItemLifetime
   alias ThistleTea.Game.Entity.Logic.Trade.Spells, as: TradeSpells
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.Target
@@ -113,6 +114,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trade do
 
     cond do
       item.item.owner != character.object.guid -> {:error, :dont_own_that_item}
+      ItemLifetime.expired?(item, now) -> {:error, :item_not_found}
       is_nil(position) -> {:error, :item_not_found}
       Item.loot_generated?(item) -> {:error, :item_locked}
       casting_uses?(character, item) -> {:error, :item_locked}

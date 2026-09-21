@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :threat_refs,
     :last_hostile_time,
     :last_trade_id,
+    :item_logout_at,
     :last_auction_id,
     :last_mana_use_at,
     :next_sober_at,

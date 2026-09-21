@@ -52,6 +52,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.HomeBind
   alias ThistleTea.Game.Player.Honor
+  alias ThistleTea.Game.Player.ItemDurations
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
@@ -93,11 +94,12 @@ defmodule ThistleTea.Game.Player.Login do
 
   def enter_world(state, character_guid) do
     {:ok, c} = CharacterStore.fetch(state.account.id, character_guid)
+    c = c |> Trade.recover() |> Auction.recover()
+    old_item_counts = Quests.quest_item_counts(c)
 
     c =
       c
-      |> Trade.recover()
-      |> Auction.recover()
+      |> ItemDurations.restore()
       |> ChatStatus.reset()
       |> Emote.reset()
       |> restore_instance_world(character_guid)
@@ -188,6 +190,8 @@ defmodule ThistleTea.Game.Player.Login do
     state
     |> Trade.finish_recovery()
     |> Auction.finish_recovery()
+    |> Quests.on_inventory_changed(old_item_counts)
+    |> ItemDurations.start()
     |> schedule_aura_tick()
     |> Mail.schedule_delivery()
     |> Quests.restore_timers()

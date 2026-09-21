@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Player.Trade do
   alias ThistleTea.Game.Network.Message.SmsgTradeStatus
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.ItemCosts
+  alias ThistleTea.Game.Player.ItemDurations
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Target
@@ -101,7 +102,7 @@ defmodule ThistleTea.Game.Player.Trade do
   end
 
   def prepare(state, %Prepare{id: id, coordinator: coordinator}) do
-    state = ItemCosts.settle(state)
+    state = state |> ItemCosts.settle() |> ItemDurations.expire_due()
     monitor = Process.monitor(coordinator)
 
     try do

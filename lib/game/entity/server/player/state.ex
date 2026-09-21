@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Party.Notifier
+  alias ThistleTea.Game.Player.ItemDurations
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.QuestSharing
   alias ThistleTea.Game.Player.Taxi
@@ -67,6 +68,8 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :talent_reset_offer,
     :quest_share,
     :quest_share_monitor,
+    :item_duration_timer,
+    item_durations_active?: false,
     ready: false,
     pending_worldport?: false,
     movement_counter: 0,
@@ -121,6 +124,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     state = leave_transport(state)
 
     state = close_mailbox(state)
+    state = ItemDurations.logout(state)
 
     if state.guid && state.character do
       BattlegroundSystem.disconnect(state.guid, state.character.movement_block.position)

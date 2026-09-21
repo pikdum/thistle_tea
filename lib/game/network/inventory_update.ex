@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
   alias ThistleTea.Game.Network.Message.SmsgInventoryChangeFailure
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.ConditionContext
+  alias ThistleTea.Game.Player.ItemDurations
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
@@ -78,7 +79,7 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
 
     state = sync_condition_subject(state)
     broadcast_player(state)
-    state
+    ItemDurations.sync(state)
   end
 
   def apply(state, {:error, error, item1_guid, item2_guid}, _placement) do
@@ -120,7 +121,7 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
 
     state = sync_condition_subject(state)
     broadcast_player(state)
-    state
+    ItemDurations.sync(state)
   end
 
   def commit_placement(%Item{} = item, placement) do
