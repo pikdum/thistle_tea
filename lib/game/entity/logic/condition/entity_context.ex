@@ -58,6 +58,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.EntityContext do
           class: unit.class,
           honor_rank: Rank.visual_from_number(player.honor_rank || 0),
           skills: player.skills,
+          skill_bonuses: player.skill_bonuses,
           spellbook: internal.spellbook,
           quest_log: player.quest_log,
           rewarded_quests: player.rewarded_quests,

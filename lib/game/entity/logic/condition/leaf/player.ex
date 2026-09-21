@@ -104,11 +104,14 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Leaf.Player do
       nil ->
         {:handled, Result.unknown(condition, {:missing_catalog, :quest, quest_id})}
 
-      %Quest{required_condition_id: required_condition_id} when required_condition_id > 0 ->
-        {:handled, Result.unknown(condition, {:nested_required_condition, quest_id})}
-
       %Quest{} = quest ->
-        {:handled, quest_available(target, quest, condition)}
+        result =
+          case Enum.find(QuestRequirements.condition_quests(quest), &(&1.required_condition_id > 0)) do
+            nil -> quest_available(target, quest, condition)
+            nested -> Result.unknown(condition, {:nested_required_condition, nested.id})
+          end
+
+        {:handled, result}
     end
   end
 
@@ -147,10 +150,12 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Leaf.Player do
            class: class,
            quest_log: quest_log,
            rewarded_quests: rewarded,
+           skills: skills,
+           skill_bonuses: skill_bonuses,
            reputation: reputation
          },
          quest,
-         _condition
+         condition
        )
        when is_integer(level) and is_integer(race) and is_integer(class) and is_map(quest_log) and
               is_struct(rewarded, MapSet) and is_map(reputation) do
@@ -160,14 +165,25 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Leaf.Player do
       class: class,
       quest_log: quest_log,
       rewarded_quests: rewarded,
+      skills: skills || %{},
+      skill_bonuses: skill_bonuses || %{},
       reputation: reputation
     }
 
-    Result.truth(QuestRequirements.base_can_take?(quest, ctx))
+    if skill_facts?(skills, quest) do
+      Result.truth(QuestRequirements.base_can_take?(quest, ctx))
+    else
+      Result.unknown(condition, {:missing_facts, :quest_availability})
+    end
   end
 
   defp quest_available(_subject, _quest, condition),
     do: Result.unknown(condition, {:missing_facts, :quest_availability})
+
+  defp skill_facts?(skills, _quest) when is_map(skills), do: true
+
+  defp skill_facts?(_skills, quest),
+    do: Enum.all?(QuestRequirements.condition_quests(quest), &(&1.required_skill_value == 0))
 
   defp quest_taken?(%Entry{status: :incomplete}, mode) when mode in [0, 1], do: true
   defp quest_taken?(%Entry{status: :complete}, mode) when mode in [0, 2], do: true

@@ -1,4 +1,5 @@
 defmodule ThistleTea.DB.Mangos.QuestTemplate do
+  @moduledoc false
   use Ecto.Schema
 
   @primary_key {:entry, :integer, autogenerate: false}
@@ -27,6 +28,7 @@ defmodule ThistleTea.DB.Mangos.QuestTemplate do
     field(:prev_quest_id, :integer, default: 0, source: :PrevQuestId)
     field(:next_quest_id, :integer, default: 0, source: :NextQuestId)
     field(:exclusive_group, :integer, default: 0, source: :ExclusiveGroup)
+    field(:breadcrumb_for_quest_id, :integer, default: 0, source: :BreadcrumbForQuestId)
     field(:next_quest_in_chain, :integer, default: 0, source: :NextQuestInChain)
     field(:src_item_id, :integer, default: 0, source: :SrcItemId)
     field(:src_item_count, :integer, default: 0, source: :SrcItemCount)

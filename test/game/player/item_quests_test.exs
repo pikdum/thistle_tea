@@ -189,6 +189,7 @@ defmodule ThistleTea.Game.Player.ItemQuestsTest do
             {%{context.quest | required_races: 2}, 6},
             {%{context.quest | required_classes: 2}, 0},
             {%{context.quest | prev_quest_id: 12_345}, 0},
+            {%{context.quest | required_skill: 185, required_skill_value: 50}, 0},
             {%{
                context.quest
                | required_condition_id: 1,

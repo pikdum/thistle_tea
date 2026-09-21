@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Player.GameObjectQuestsTest do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.QuestDialogStatus
+  alias ThistleTea.Game.Entity.Logic.QuestGraph
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Server.Player.PacketSink
   alias ThistleTea.Game.Entity.Server.Player.State
@@ -44,6 +45,20 @@ defmodule ThistleTea.Game.Player.GameObjectQuestsTest do
   setup [:questgiver]
 
   describe "quest object activation" do
+    test "exclusive rewards disable object activation and reject stale acceptance", context do
+      alternate = %Quest{id: context.quest.id + 1, exclusive_group: context.quest.id}
+      [quest, _] = QuestGraph.compile([%{context.quest | exclusive_group: context.quest.id}, alternate])
+      put_quest(quest)
+      character = context.state.character
+      assert QuestGivers.personalize(object_update(context), character).game_object.dyn_flags == 1
+      character = %{character | player: %{character.player | rewarded_quests: MapSet.new([alternate.id])}}
+      assert QuestGivers.personalize(object_update(context), character).game_object.dyn_flags == 0
+      state = %{context.state | character: character}
+      assert Quests.accept(state, context.object_guid, quest.id) == state
+      assert count(state, context.source.entry) == 0
+      refute_received {:"$gen_cast", {:start_script, _, _}}
+    end
+
     test "personalizes create and values packets without changing shared flags", context do
       update = object_update(context)
       state = %{context.state | connection_pid: self()}

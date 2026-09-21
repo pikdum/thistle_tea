@@ -24,6 +24,9 @@ defmodule ThistleTea.Game.Entity.Data.QuestTest do
         required_races: 1,
         required_classes: 0,
         required_condition: 42,
+        required_skill: 185,
+        required_skill_value: 50,
+        breadcrumb_for_quest_id: 90,
         prev_quest_id: 0,
         src_item_id: 0,
         title: "Wolves Across the Border",
@@ -40,6 +43,9 @@ defmodule ThistleTea.Game.Entity.Data.QuestTest do
       assert quest.level == 8
       assert quest.required_races == 1
       assert quest.required_condition_id == 42
+      assert quest.required_skill == 185
+      assert quest.required_skill_value == 50
+      assert quest.breadcrumb_for_quest_id == 90
       assert quest.required_condition == nil
       assert quest.title == "Wolves Across the Border"
       assert quest.objective_texts == ["", "", "", ""]

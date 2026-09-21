@@ -55,6 +55,8 @@ defmodule ThistleTea.Game.Player.Quests do
       class: character.unit.class,
       quest_log: character.player.quest_log,
       rewarded_quests: character.player.rewarded_quests,
+      skills: character.player.skills,
+      skill_bonuses: character.player.skill_bonuses,
       reputation: PlayerReputation.standings(character)
     }
   end
@@ -572,6 +574,7 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def availability(%Character{} = character, quests) when is_list(quests) do
+    quests = quests |> Enum.flat_map(&QuestRequirements.condition_quests/1) |> Enum.uniq_by(& &1.id)
     conditions = quests |> Enum.map(& &1.required_condition) |> Enum.reject(&is_nil/1)
     context = ConditionContext.build(character, conditions, source: nil)
 
@@ -580,7 +583,10 @@ defmodule ThistleTea.Game.Player.Quests do
       |> Enum.reject(&is_nil(&1.required_condition))
       |> Map.new(fn quest -> {quest.id, ConditionEvaluator.evaluate(context, quest.required_condition)} end)
 
-    %Availability{quest_context: ctx(character), condition_results: condition_results}
+    %Availability{
+      quest_context: Map.put(ctx(character), :condition_results, condition_results),
+      condition_results: condition_results
+    }
   end
 
   def send_details(npc_guid, %Quest{} = quest) do

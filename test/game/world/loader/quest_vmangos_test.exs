@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Entity.Data.QuestDependencies.Prerequisite
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.Condition, as: Evaluator
   alias ThistleTea.Game.Entity.Logic.Condition.Context
@@ -22,6 +23,20 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
   end
 
   describe "load_all/0" do
+    test "compiles real chapter prerequisites, exclusive choices, breadcrumbs, and skills" do
+      for id <- 339..342 do
+        assert QuestLoader.get(id).dependencies.prerequisites == [
+                 %Prerequisite{quest_id: 338, state: :current, group_quests: [338]}
+               ]
+      end
+
+      assert QuestLoader.get(1282).dependencies.exclusive_quests == [{1302, false}]
+      assert QuestLoader.get(1302).dependencies.exclusive_quests == [{1282, false}]
+      assert Enum.map(QuestLoader.get(690).dependencies.breadcrumb_targets, & &1.id) == [691]
+      assert {690, false} in QuestLoader.get(691).dependencies.dependent_breadcrumb_quests
+      assert %Quest{required_skill: 185, required_skill_value: 50} = QuestLoader.get(90)
+    end
+
     test "preloads game-object relations independently of creatures with the same entry" do
       assert QuestLoader.given_by(:game_object, 35) == [138]
       assert QuestLoader.ended_by(:game_object, 35) == [136]

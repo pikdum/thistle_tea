@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Subject do
             team: nil,
             group?: nil,
             skills: nil,
+            skill_bonuses: nil,
             spellbook: nil,
             quest_log: nil,
             rewarded_quests: nil,

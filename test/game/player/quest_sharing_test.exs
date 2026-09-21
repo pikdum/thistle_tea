@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Player.QuestSharingTest do
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.QuestGraph
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Logic.QuestSharing.Offer
   alias ThistleTea.Game.Entity.Registry
@@ -91,6 +92,20 @@ defmodule ThistleTea.Game.Player.QuestSharingTest do
   end
 
   describe "accept/3" do
+    test "rechecks exclusive choices acquired after a share offer", context do
+      alternate = %Quest{id: context.quest.id + 1, exclusive_group: context.quest.id}
+      [quest, _] = QuestGraph.compile([%{context.quest | exclusive_group: context.quest.id}, alternate])
+      put_quest(quest)
+      state = offer(%{context | quest: quest})
+      {:ok, log} = QuestLog.add(%{}, alternate.id)
+      state = put_log(state, log)
+      rejected = Quests.accept(state, context.source.guid, quest.id)
+      assert rejected.quest_share == nil
+      refute QuestLog.active?(rejected.character.player.quest_log, quest.id)
+      assert QuestLog.active?(rejected.character.player.quest_log, alternate.id)
+      assert_result(1)
+    end
+
     test "requires the matching offer and rechecks current distance and conditions", context do
       assert Quests.accept(context.target, context.source.guid, context.quest.id) == context.target
       state = offer(context)

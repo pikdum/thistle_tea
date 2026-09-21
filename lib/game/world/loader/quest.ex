@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.Loader.Quest do
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Entity.Logic.QuestGraph
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.Script
 
@@ -29,18 +30,18 @@ defmodule ThistleTea.Game.World.Loader.Quest do
     start_items = load_start_items()
 
     rows
-    |> Enum.each(fn row ->
+    |> Enum.map(fn row ->
       quest = row |> Quest.build() |> attach_required_condition(required_conditions)
 
-      quest = %{
+      %{
         quest
         | start_item_template: Map.get(start_items, quest.id),
           start_script_steps: Map.get(start_scripts, quest.start_script_id, []),
           complete_script_steps: Map.get(complete_scripts, quest.complete_script_id, [])
       }
-
-      :ets.insert(__MODULE__, {{:quest, quest.id}, quest})
     end)
+    |> QuestGraph.compile()
+    |> Enum.each(&:ets.insert(__MODULE__, {{:quest, &1.id}, &1}))
 
     load_creature_relations(Mangos.CreatureQuestRelation, :giver)
     load_creature_relations(Mangos.CreatureInvolvedRelation, :ender)

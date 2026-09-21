@@ -143,6 +143,7 @@ defmodule ThistleTea.Game.Player.ConditionContext do
       team: Graveyard.team_for_race(unit.race),
       group?: group?(character.object.guid, requirements, options),
       skills: player.skills,
+      skill_bonuses: player.skill_bonuses,
       spellbook: internal.spellbook || %{},
       quest_log: player.quest_log,
       rewarded_quests: player.rewarded_quests,

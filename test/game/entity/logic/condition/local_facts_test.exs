@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.LocalFactsTest do
   alias ThistleTea.Game.Entity.Logic.Condition.Context
   alias ThistleTea.Game.Entity.Logic.Condition.Reason
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
+  alias ThistleTea.Game.Entity.Logic.QuestGraph
   alias ThistleTea.Game.Entity.Logic.QuestLog.Entry
 
   describe "evaluate/2 local facts" do
@@ -81,6 +82,40 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.LocalFactsTest do
 
       assert {:unknown, [%Reason{entry: 9, capability: {:missing_catalog, :quest, 100}}]} =
                Evaluator.evaluate(context(), condition)
+    end
+
+    test "quest availability uses compiled dependencies and profession bonuses" do
+      [quest, _] =
+        QuestGraph.compile([
+          %Quest{id: 1, exclusive_group: 1, required_skill: 185, required_skill_value: 50},
+          %Quest{id: 2, exclusive_group: 1}
+        ])
+
+      target =
+        subject(
+          level: 60,
+          race: 1,
+          class: 1,
+          quest_log: %{},
+          rewarded_quests: MapSet.new(),
+          reputation: %{},
+          skills: %{185 => %{value: 49}},
+          skill_bonuses: %{185 => {1, 0}}
+        )
+
+      context = Context.new(target: target, quests: %{1 => quest})
+      assert met?(context, :quest_available, 1)
+      refute met?(%{context | target: %{target | skill_bonuses: %{}}}, :quest_available, 1)
+      refute met?(%{context | target: %{target | rewarded_quests: MapSet.new([2])}}, :quest_available, 1)
+    end
+
+    test "breadcrumb target conditions preserve nested-condition unknown results" do
+      [quest, _] =
+        QuestGraph.compile([%Quest{id: 1, breadcrumb_for_quest_id: 2}, %Quest{id: 2, required_condition_id: 42}])
+
+      condition = %Condition{entry: 9, type: :quest_available, value1: 1}
+      context = Context.new(target: subject([]), quests: %{1 => quest})
+      assert {:unknown, [%Reason{capability: {:nested_required_condition, 2}}]} = Evaluator.evaluate(context, condition)
     end
 
     test "conditioned nested quest availability is unknown" do

@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Player.QuestRequiredConditionTest do
   alias ThistleTea.Game.Entity.Data.Reputation
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.QuestDialogStatus
+  alias ThistleTea.Game.Entity.Logic.QuestGraph
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
@@ -73,6 +74,52 @@ defmodule ThistleTea.Game.Player.QuestRequiredConditionTest do
      npc_guid: npc_guid,
      player_guid: player_guid,
      quest_id: quest_id}
+  end
+
+  describe "availability/2" do
+    test "evaluates breadcrumb target conditions for dialog and acceptance", context do
+      target =
+        conditioned_quest(context, %Condition{entry: 1, type: :item_with_bank, value1: context.item_id, value2: 1})
+
+      breadcrumb = %Quest{id: target.id + 1, breadcrumb_for_quest_id: target.id}
+      [target, breadcrumb] = QuestGraph.compile([target, breadcrumb])
+      put_quest(context, breadcrumb, giver: true)
+
+      assert Quests.dialog_status(context.npc_guid, context.character) == QuestDialogStatus.none()
+      assert Quests.quest_menu(context.npc_guid, context.character) == []
+      banked = bank_item(context, context.character)
+      assert Quests.availability(banked, [breadcrumb]).condition_results == %{target.id => :met}
+      assert Quests.dialog_status(context.npc_guid, banked) == QuestDialogStatus.available()
+      assert [{^breadcrumb, _}] = Quests.quest_menu(context.npc_guid, banked)
+      stale = state(context, context.character)
+      assert Quests.accept(stale, context.npc_guid, breadcrumb.id) == stale
+      accepted = Quests.accept(state(context, banked), context.npc_guid, breadcrumb.id)
+      assert QuestLog.active?(accepted.character.player.quest_log, breadcrumb.id)
+    end
+
+    test "prerequisite abandonment closes stale dialogs and profession bonuses reach eligibility", context do
+      parent = %Quest{id: context.quest_id + 1}
+      quest = %Quest{id: context.quest_id, prev_quest_id: -parent.id, required_skill: 185, required_skill_value: 50}
+      [quest, _] = QuestGraph.compile([quest, parent])
+      put_quest(context, quest, giver: true)
+      {:ok, log} = QuestLog.add(%{}, parent.id)
+
+      player = %{
+        context.character.player
+        | quest_log: log,
+          skills: %{185 => %{value: 49}},
+          skill_bonuses: %{185 => {1, 0}}
+      }
+
+      eligible = %{context.character | player: player}
+      assert Quests.dialog_status(context.npc_guid, eligible) == QuestDialogStatus.available()
+      assert [%QuestItem{}] = Gossip.quest_items(context.npc_guid, eligible)
+      stale = state(context, %{eligible | player: %{player | quest_log: %{}}})
+      assert Quests.accept(stale, context.npc_guid, quest.id) == stale
+      assert Quests.quest_menu(context.npc_guid, stale.character) == []
+      accepted = Quests.accept(state(context, eligible), context.npc_guid, quest.id)
+      assert QuestLog.active?(accepted.character.player.quest_log, quest.id)
+    end
   end
 
   test "status, native hello, and gossip share conditioned visibility", context do

@@ -19,6 +19,8 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
     type: 0,
     required_classes: 0,
     required_races: 0,
+    required_skill: 0,
+    required_skill_value: 0,
     required_condition_id: 0,
     required_condition: nil,
     reputation_objective_faction: 0,
@@ -34,6 +36,8 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
     prev_quest_id: 0,
     next_quest_id: 0,
     exclusive_group: 0,
+    breadcrumb_for_quest_id: 0,
+    dependencies: nil,
     next_quest_in_chain: 0,
     src_item_id: 0,
     src_item_count: 0,
@@ -75,6 +79,8 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
   def shareable?(%__MODULE__{flags: flags}), do: Bitwise.band(flags || 0, 0x8) != 0
   def party_accept?(%__MODULE__{flags: flags}), do: Bitwise.band(flags || 0, 0x2) != 0
 
+  def repeatable?(%__MODULE__{special_flags: flags}), do: Bitwise.band(flags || 0, 0x1) != 0
+
   def build(%Mangos.QuestTemplate{} = row) do
     %__MODULE__{
       id: row.entry,
@@ -87,6 +93,8 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
       type: row.type,
       required_classes: row.required_classes,
       required_races: row.required_races,
+      required_skill: row.required_skill,
+      required_skill_value: row.required_skill_value,
       required_condition_id: row.required_condition,
       reputation_objective_faction: row.rep_objective_faction,
       reputation_objective_value: row.rep_objective_value,
@@ -101,6 +109,7 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
       prev_quest_id: row.prev_quest_id,
       next_quest_id: row.next_quest_id,
       exclusive_group: row.exclusive_group,
+      breadcrumb_for_quest_id: row.breadcrumb_for_quest_id,
       next_quest_in_chain: row.next_quest_in_chain,
       src_item_id: row.src_item_id,
       src_item_count: row.src_item_count,
