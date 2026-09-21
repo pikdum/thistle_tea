@@ -110,6 +110,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - Priest Fade: temporary threat reduction with target switching and restoration on expiry
 - Rogue Distract: ground-targeted facing and timed patrol pauses, preserving stealth
 - Hunter Beast Lore: caster-specific beast damage, armor, and resistance information, with expiry and death cleanup
+- [Detect Magic](docs/detect-magic-playtest.md), with enemy buff revelation, live buff updates, and dispel, expiry, and death cleanup
 - pets
 - [Hunter pet happiness](docs/pet-happiness-playtest.md): feeding, timed decay, damage tiers, death penalties, and retained state across dismissal and reconnect
 - [Hunter pet experience](docs/pet-experience-playtest.md): kill rewards, level growth, owner-level caps, and retained progress, learned abilities, and reaction stance
