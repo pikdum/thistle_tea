@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Gathering, as: GatheringState
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot, as: InternalLoot
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Summon
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Logic.Gathering
   alias ThistleTea.Game.Entity.Logic.Loot
@@ -213,7 +214,11 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
   defp despawn(%GameObject{internal: %Internal{loot: %InternalLoot{} = loot}} = state) do
     state = Visibility.leave_entity(state)
     World.remove_position(state)
-    Process.send_after(self(), :chest_respawn, respawn_ms(state))
+
+    if match?(%Summon{}, state.internal.summon),
+      do: send(self(), :despawn),
+      else: Process.send_after(self(), :chest_respawn, respawn_ms(state))
+
     put_internal_loot(state, %{loot | session: nil, corpse_removed?: true})
   end
 

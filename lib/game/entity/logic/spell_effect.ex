@@ -140,6 +140,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp applicable_effects(_target, _context, effects), do: Enum.reject(effects, &caster_target_effect?/1)
 
   defp caster_target_effect?(%Effect{type: :apply_area_aura}), do: false
+  defp caster_target_effect?(%Effect{type: :summon_object_wild}), do: true
 
   defp caster_target_effect?(%Effect{} = effect) do
     (effect.implicit_target_a == :caster or effect.implicit_target_b == :caster) and
@@ -150,6 +151,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp caster_trigger_effect?(_effect), do: false
 
   defp caster_execution_effect?(%Effect{type: :dismiss_pet}), do: true
+  defp caster_execution_effect?(%Effect{type: :summon_object_wild}), do: true
   defp caster_execution_effect?(effect), do: PetTraining.training_effect?(effect)
 
   defp pet_target_effect?(%Effect{} = effect) do

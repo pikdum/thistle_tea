@@ -164,21 +164,28 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
         %Effects.SummonGameObject{entry: entry, duration_ms: duration_ms} = effect,
         context
       ) do
-    position = summon_position(effect.position, source_position)
+    position = if effect.owned?, do: summon_position(effect.position, source_position), else: effect.position
 
     case GameObjectTemplateLoader.get(entry) do
       %DataGameObjectTemplate{} = template ->
-        game_object =
-          GameObject.build_summoned(template, world, position,
-            summoned_by: owner_guid,
-            level: owner_level(entity),
-            despawn_in_ms: duration_ms,
-            ritual_target_guid: effect.target_guid,
-            ritual_zone_id: zone_id(world, position)
-          )
+        opts = [
+          summoned_by: if(effect.owned?, do: owner_guid),
+          level: owner_level(entity),
+          despawn_in_ms: duration_ms,
+          ritual_target_guid: effect.target_guid,
+          ritual_zone_id: zone_id(world, position)
+        ]
 
-        World.start_entity(game_object)
-        maybe_track_channel_game_object(game_object, context)
+        game_object = GameObject.build_summoned(template, world, position, opts)
+        linked = summon_linked_object(template, world, position, opts)
+        summon = %{game_object.internal.summon | linked_guids: linked}
+        game_object = %{game_object | internal: %{game_object.internal | summon: summon}}
+
+        case World.start_entity(game_object) do
+          {:ok, _pid} -> maybe_track_channel_game_object(game_object, context)
+          _failure -> Enum.each(linked, &World.stop_entity/1)
+        end
+
         entity
 
       _ ->
@@ -417,6 +424,17 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   end
 
   defp summon_position(_position, source_position), do: source_position
+
+  defp summon_linked_object(template, world, position, opts) do
+    with entry when is_integer(entry) and entry > 0 <- DataGameObjectTemplate.linked_entry(template),
+         %DataGameObjectTemplate{} = linked <- GameObjectTemplateLoader.get(entry),
+         game_object = GameObject.build_summoned(linked, world, position, opts),
+         {:ok, _pid} <- World.start_entity(game_object) do
+      [game_object.object.guid]
+    else
+      _missing -> []
+    end
+  end
 
   defp coordinate(value, _fallback) when is_number(value) and value != 0, do: value
   defp coordinate(_value, fallback), do: fallback

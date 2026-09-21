@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Summon do
     :despawn_in_ms,
     :spell_id,
     :charges,
+    linked_guids: [],
     party_only?: false
   ]
 end

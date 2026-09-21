@@ -524,6 +524,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(5), do: :teleport_units
   defp effect_type(31), do: :weapon_percent_damage
   defp effect_type(121), do: :normalized_weapon_damage
+  defp effect_type(76), do: :summon_object_wild
   defp effect_type(104), do: :summon_game_object
   defp effect_type(6), do: :apply_aura
   defp effect_type(8), do: :power_drain

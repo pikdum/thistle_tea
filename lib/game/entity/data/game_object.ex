@@ -39,7 +39,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   def build_summoned(%GameObjectTemplate{} = ot, world, {x, y, z, o}, opts \\ []) do
     %__MODULE__{
       object: %Object{
-        guid: Guid.from_low_guid(:game_object, ot.entry, :erlang.unique_integer([:positive, :monotonic])),
+        guid: Guid.runtime(:game_object, ot.entry),
         entry: ot.entry,
         scale_x: ot.size
       },
@@ -56,7 +56,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
         pos_y: y,
         pos_z: z,
         facing: o,
-        dyn_flags: 0,
+        dyn_flags: chest_dyn_flags(ot),
         faction: ot.faction,
         type_id: ot.type,
         level: Keyword.get(opts, :level, 1),
@@ -71,6 +71,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
         chair: chair(ot),
         fishing: Keyword.get(opts, :fishing),
         gathering: gathering(ot),
+        loot: chest_loot(ot),
         trap: trap(ot, Keyword.get(opts, :summoned_by)),
         ritual:
           ritual(
@@ -118,20 +119,36 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
 
   defp enabled?(value), do: value == 1
 
-  defp trap(%GameObjectTemplate{type: @go_type_trap, data: data}, owner_guid) do
+  defp trap(%GameObjectTemplate{type: @go_type_trap, data: data} = template, owner_guid) do
     %Trap{
       owner_guid: owner_guid,
-      radius: trap_radius(Enum.at(data, 2)),
+      radius: trap_radius(template),
       spell_id: Enum.at(data, 3),
-      charges: max(Enum.at(data, 4) || 1, 1),
-      start_delay_ms: max(Enum.at(data, 7) || 0, 0) * 1_000
+      charges: max(Enum.at(data, 4) || 0, 0),
+      start_delay_ms: max(Enum.at(data, 7) || 0, 0) * 1_000,
+      cooldown_ms: max(Enum.at(data, 5) || 0, 0) |> then(&if(&1 == 0, do: 4_000, else: &1 * 1_000))
     }
   end
 
   defp trap(_template, _owner_guid), do: nil
 
-  defp trap_radius(radius) when is_number(radius) and radius > 0, do: min(radius * 1.0, 2.5)
-  defp trap_radius(_radius), do: 2.5
+  defp trap_radius(%GameObjectTemplate{entry: entry})
+       when entry in [
+              2561,
+              164_638,
+              164_639,
+              164_839,
+              164_872,
+              164_873,
+              164_874,
+              164_875,
+              164_876,
+              164_877,
+              164_879,
+              164_880
+            ], do: 2.5
+
+  defp trap_radius(%GameObjectTemplate{data: data}), do: max(Enum.at(data, 2) || 0, 0) * 1.0
 
   defp spellcaster_spell(%GameObjectTemplate{type: @go_type_spellcaster, data: data}) do
     case Enum.at(data, 0) do
@@ -293,6 +310,11 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
     @go_dyn_flag_activate
   end
 
+  defp chest_dyn_flags(%GameObjectTemplate{type: @go_type_chest, flags: flags})
+       when is_integer(flags) and (flags &&& @go_flag_interact_cond) != 0 do
+    @go_dyn_flag_activate
+  end
+
   defp chest_dyn_flags(_template), do: 0
 
   defp chair(%Mangos.GameObjectTemplate{type: @go_type_chair, data0: slots, data1: height}) do
@@ -319,6 +341,11 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
       _no_loot ->
         nil
     end
+  end
+
+  defp chest_loot(%GameObjectTemplate{type: @go_type_chest, data: [_lock, loot_id | _]} = template)
+       when is_integer(loot_id) and loot_id > 0 do
+    %Internal.Loot{id: loot_id, min_gold: template.min_gold, max_gold: template.max_gold}
   end
 
   defp chest_loot(_template), do: nil

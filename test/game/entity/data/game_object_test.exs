@@ -21,6 +21,38 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTest do
   end
 
   describe "build_summoned/4" do
+    test "ownerless chests retain loot, lock, gold and activation fields" do
+      template = %GameObjectTemplate{
+        entry: 161_513,
+        type: 3,
+        size: 1.0,
+        flags: 4,
+        min_gold: 3,
+        max_gold: 9,
+        data: [57, 10_100, 0, 1, 1, 1]
+      }
+
+      chest = GameObject.build_summoned(template, 999, {1.0, 2.0, 3.0, 0.0}, despawn_in_ms: 120_000)
+      assert chest.game_object.created_by == nil
+      assert chest.internal.summon.owner_guid == nil
+      assert chest.internal.loot.id == 10_100
+      assert chest.internal.loot.min_gold == 3
+      assert chest.internal.loot.max_gold == 9
+      assert chest.internal.gathering.lock_id == 57
+      assert chest.game_object.dyn_flags == 1
+      assert Guid.low_guid(chest.object.guid) >= 0xC00000
+    end
+
+    test "environmental traps keep their radius, repeat count and cooldown" do
+      template = %GameObjectTemplate{entry: 180_647, type: 6, size: 1.0, data: [0, 0, 15, 25_656, 0, 3, 0, 4]}
+      trap = GameObject.build_summoned(template, 999, {1.0, 2.0, 3.0, 0.0}).internal.trap
+      assert trap.owner_guid == nil
+      assert trap.radius == 15.0
+      assert trap.charges == 0
+      assert trap.start_delay_ms == 4_000
+      assert trap.cooldown_ms == 3_000
+    end
+
     test "builds a spellcaster game object with use spell, charges, owner, and despawn" do
       go =
         GameObject.build_summoned(lightwell_template(), 0, {1.0, 2.0, 3.0, 0.5},

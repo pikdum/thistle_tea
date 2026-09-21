@@ -9,6 +9,12 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTemplate do
   def lock_id(%__MODULE__{type: type, data: data}) when type in [2, 3, 6, 10, 12, 13, 24, 26], do: Enum.at(data, 0, 0)
   def lock_id(_template), do: 0
 
+  def linked_entry(%__MODULE__{type: 1, data: data}), do: Enum.at(data, 3, 0)
+  def linked_entry(%__MODULE__{type: 3, data: data}), do: Enum.at(data, 7, 0)
+  def linked_entry(%__MODULE__{type: 8, data: data}), do: Enum.at(data, 2, 0)
+  def linked_entry(%__MODULE__{type: 10, data: data}), do: Enum.at(data, 12, 0)
+  def linked_entry(%__MODULE__{}), do: 0
+
   def build(%Mangos.GameObjectTemplate{} = template) do
     %__MODULE__{
       entry: template.entry,

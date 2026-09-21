@@ -90,6 +90,31 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
   end
 
   def apply(
+        %{object: %{guid: caster_guid}} = state,
+        %CastContext{
+          caster_guid: caster_guid,
+          caster_position: {_world, x, y, z},
+          caster_orientation: orientation,
+          destination_position: destination
+        },
+        %Spell{} = spell,
+        %Effect{type: :summon_object_wild, misc_value: entry} = effect,
+        _now
+      )
+      when is_integer(entry) and entry > 0 do
+    orientation = orientation || 0.0
+    {x, y, z} = wild_object_position(effect, destination, {x, y, z}, orientation)
+
+    {state,
+     [
+       Effects.summon_game_object(entry, max(spell.duration_ms || 0, 0),
+         owned?: false,
+         position: {x, y, z, orientation}
+       )
+     ]}
+  end
+
+  def apply(
         state,
         %CastContext{
           caster_guid: summoner_guid,
@@ -285,6 +310,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
     do: duration_ms
 
   defp summon_duration(%Spell{}), do: 3_600_000
+
+  defp wild_object_position(_effect, {x, y, z}, _caster_position, _orientation), do: {x, y, z}
+
+  defp wild_object_position(%Effect{implicit_target_a: target, radius_yards: radius}, nil, {x, y, z}, orientation)
+       when target in [:minion_position, 47] and is_number(radius) and radius > 0 do
+    angle = if target == :minion_position, do: orientation + :math.pi() / 4, else: orientation
+    {x + radius * :math.cos(angle), y + radius * :math.sin(angle), z}
+  end
+
+  defp wild_object_position(_effect, nil, caster_position, _orientation), do: caster_position
 
   defp summon_effect_position(%Effect{implicit_target_a: :minion_position}, _destination, {x, y, z}, orientation) do
     {x + 0.5 * :math.cos(orientation), y + 0.5 * :math.sin(orientation), z}

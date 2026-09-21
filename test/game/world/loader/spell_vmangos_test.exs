@@ -17,6 +17,18 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
 
   @moduletag :dbc_db
 
+  describe "wild object summons" do
+    test "loads temporary quest chests and environmental traps" do
+      egg = SpellLoader.load(13_563)
+      assert egg.duration_ms == 120_000
+      assert [%Effect{type: :summon_object_wild, misc_value: 161_513}] = egg.effects
+      trap = SpellLoader.load(25_648)
+      assert trap.duration_ms == 60_000
+      assert [%Effect{type: :summon_object_wild, misc_value: 180_647}] = trap.effects
+      assert Enum.count(SpellLoader.load(11_756).effects, &(&1.type == :summon_object_wild)) == 2
+    end
+  end
+
   describe "languages" do
     test "loads learned languages and the Curse of Tongues override" do
       for {id, language} <- [{668, 7}, {669, 1}, {670, 3}, {671, 2}, {672, 6}, {7340, 13}, {7341, 14}, {17_737, 33}] do

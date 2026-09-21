@@ -42,6 +42,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
@@ -68,7 +69,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     notify_instance_spawn(state)
     schedule_despawn(state)
     schedule_fishing_bite(state)
-    schedule_trap(state)
+    state = arm_trap(state)
     {:ok, state}
   end
 
@@ -195,6 +196,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   def handle_call({:open_lock, %Actor{} = actor, opened, gain?}, {owner_pid, _tag}, %GameObject{} = state) do
     {result, state} = __MODULE__.OpenLock.open(state, actor, opened, gain?, owner_pid: owner_pid)
+    if match?({:ok, _, _}, result), do: trigger_linked_objects(state, actor.guid)
     {:reply, result, state}
   rescue
     error ->
@@ -287,8 +289,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   def handle_info({:script_activate_object, user_guid}, %GameObject{internal: %Internal{trap: %Trap{} = trap}} = state)
       when is_integer(user_guid) do
-    trigger_trap(state, trap, user_guid)
-    {:noreply, state}
+    activate_trap(state, trap, user_guid)
   end
 
   def handle_info({:script_activate_object, _user_guid}, %GameObject{} = state) do
@@ -334,8 +335,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   def handle_info(:trap_tick, %GameObject{internal: %Internal{trap: %Trap{} = trap}} = state) do
     case TrapServer.target(state) do
       target_guid when is_integer(target_guid) ->
-        trigger_trap(state, trap, target_guid)
-        despawn(state)
+        activate_trap(state, trap, target_guid)
 
       _ ->
         Process.send_after(self(), :trap_tick, 200)
@@ -386,6 +386,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   @impl GenServer
   def terminate(_reason, state) do
     finish_ritual_channels(state)
+    stop_linked_objects(state)
     World.remove_position(state)
     Visibility.leave_entity(state)
     Metadata.delete(state.object.guid)
@@ -413,6 +414,28 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   defp schedule_despawn(_state), do: nil
 
+  defp stop_linked_objects(%GameObject{internal: %{summon: %Summon{linked_guids: guids}}}) do
+    Enum.each(guids, fn guid ->
+      case Entity.pid(guid) do
+        pid when is_pid(pid) -> send(pid, :despawn)
+        _missing -> :ok
+      end
+    end)
+  end
+
+  defp stop_linked_objects(%GameObject{}), do: :ok
+
+  defp trigger_linked_objects(%GameObject{internal: %{summon: %Summon{linked_guids: guids}}}, user_guid) do
+    Enum.each(guids, fn guid ->
+      case Entity.pid(guid) do
+        pid when is_pid(pid) -> send(pid, {:script_activate_object, user_guid})
+        _missing -> :ok
+      end
+    end)
+  end
+
+  defp trigger_linked_objects(%GameObject{}, _user_guid), do: :ok
+
   defp schedule_fishing_bite(%GameObject{internal: %Internal{fishing: %{bite_delay_ms: delay}}})
        when is_integer(delay) and delay > 0 do
     Process.send_after(self(), :fishing_bite, delay)
@@ -421,11 +444,13 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   defp schedule_fishing_bite(_state), do: nil
 
-  defp schedule_trap(%GameObject{internal: %Internal{trap: %Trap{start_delay_ms: delay}}}) do
-    Process.send_after(self(), :trap_tick, max(delay, 200))
+  defp arm_trap(%GameObject{internal: %Internal{trap: %Trap{start_delay_ms: delay} = trap}} = state) do
+    if trap.radius > 0, do: Process.send_after(self(), :trap_tick, max(delay, 200))
+    trap = %{trap | ready_at: Time.now() + delay}
+    %{state | internal: %{state.internal | trap: trap}}
   end
 
-  defp schedule_trap(_state), do: nil
+  defp arm_trap(state), do: state
 
   defp run_script(%GameObject{} = state, steps, target_guid) do
     now = Time.now()
@@ -535,11 +560,36 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     end
   end
 
+  defp activate_trap(state, trap, target_guid) do
+    now = Time.now()
+
+    if TrapServer.ready?(trap, now) do
+      do_activate_trap(state, trap, target_guid, now)
+    else
+      {:noreply, state}
+    end
+  end
+
+  defp do_activate_trap(state, trap, target_guid, now) do
+    trigger_trap(state, trap, target_guid)
+
+    case TrapServer.consume(trap) do
+      :depleted ->
+        state = %{state | internal: %{state.internal | trap: %{trap | depleted?: true}}}
+        despawn(state)
+
+      %Trap{} = remaining ->
+        if remaining.radius > 0, do: Process.send_after(self(), :trap_tick, remaining.cooldown_ms)
+        remaining = %{remaining | ready_at: now + remaining.cooldown_ms}
+        {:noreply, %{state | internal: %{state.internal | trap: remaining}}}
+    end
+  end
+
   defp trap_caster(state, owner_guid, level) do
     %{
-      object: %{guid: owner_guid},
+      object: %{guid: owner_guid || state.object.guid},
       unit: %{level: level},
-      internal: %{world: state.internal.world},
+      internal: %Internal{world: state.internal.world},
       movement_block: state.movement_block
     }
   end
@@ -593,11 +643,14 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   defp broadcast_if_pending(%GameObject{} = state), do: state
 
   defp publish_condition_metadata(%GameObject{} = state, spawned? \\ true) do
-    Metadata.update(state.object.guid, %{
-      db_guid: condition_db_guid(state),
-      go_spawned?: spawned?,
-      go_state: state.game_object.state
-    })
+    metadata =
+      Map.merge(FactionLoader.metadata(state.game_object.faction), %{
+        db_guid: condition_db_guid(state),
+        go_spawned?: spawned?,
+        go_state: state.game_object.state
+      })
+
+    Metadata.update(state.object.guid, metadata)
 
     publish_geometry(state)
   end

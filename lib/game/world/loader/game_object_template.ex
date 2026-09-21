@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.Loader.GameObjectTemplate do
   """
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
+  alias ThistleTea.Game.World.Loader.Faction
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
@@ -61,6 +62,7 @@ defmodule ThistleTea.Game.World.Loader.GameObjectTemplate do
   end
 
   defp cache(%Mangos.GameObjectTemplate{} = row, bounds) do
+    Faction.metadata(row.faction)
     template = GameObjectTemplate.build(row)
     template = %{template | bounds: bounds}
     :ets.insert(__MODULE__, {template.entry, template})

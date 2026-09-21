@@ -18,7 +18,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
     44 => :skill_step,
     47 => :tradeskill,
     49 => :detect,
-    76 => :summon_object_wild,
     78 => :attack,
     84 => :stuck,
     86 => :holiday_gift,
