@@ -71,6 +71,9 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
   def allowed_in_raid?(%__MODULE__{type: 62}), do: true
   def allowed_in_raid?(%__MODULE__{flags: flags}), do: Bitwise.band(flags || 0, 0x40) != 0
 
+  def shareable?(%__MODULE__{flags: flags}), do: Bitwise.band(flags || 0, 0x8) != 0
+  def party_accept?(%__MODULE__{flags: flags}), do: Bitwise.band(flags || 0, 0x2) != 0
+
   def build(%Mangos.QuestTemplate{} = row) do
     %__MODULE__{
       id: row.entry,
