@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.VendorTest do
   alias ThistleTea.Game.Entity.Data.Reputation
   alias ThistleTea.Game.Entity.Data.VendorItem
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Registry
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.SmsgBuyFailed
   alias ThistleTea.Game.Player.Vendor
@@ -29,6 +30,7 @@ defmodule ThistleTea.Game.Player.VendorTest do
       vendor = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
       publish_vendor(vendor)
       owner = System.unique_integer([:positive, :monotonic])
+      Registry.register(owner)
       template = %ItemTemplate{entry: 999_956, buy_price: 2, buy_count: 3, stackable: 5}
       :ets.insert(VendorLoader, {vendor_entry, [%VendorItem{index: 1, template: template, max_count: 0}]})
       character = character(30)

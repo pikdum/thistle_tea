@@ -15,12 +15,14 @@ defmodule ThistleTea.Game.Player.Vendor do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.ConditionContext
-  alias ThistleTea.Game.Player.Items
+  alias ThistleTea.Game.Player.ItemCosts
   alias ThistleTea.Game.Player.Reputation
+  alias ThistleTea.Game.Player.VendorPurchase
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.System.VendorStock
 
   def list(%{ready: true, character: %Character{} = character} = state, vendor_guid) do
     if valid_vendor?(character, vendor_guid) do
@@ -37,7 +39,8 @@ defmodule ThistleTea.Game.Player.Vendor do
 
   def buy(%{ready: true, character: %Character{} = character} = state, vendor_guid, item_id, requested_count) do
     if valid_vendor?(character, vendor_guid) do
-      buy_authorized(state, character, vendor_guid, item_id, max(requested_count, 1))
+      state = state |> VendorPurchase.settle() |> ItemCosts.settle()
+      buy_authorized(state, state.character, vendor_guid, item_id, max(requested_count, 1))
     else
       send_buy_failed(vendor_guid, item_id, :distance_too_far)
       state
@@ -77,7 +80,8 @@ defmodule ThistleTea.Game.Player.Vendor do
     conditions = Enum.map(items, &condition_of/1)
 
     visible = condition_visible_items(character, vendor_guid, items, conditions)
-    Reputation.vendor_items(character, vendor_guid, visible)
+    priced = Reputation.vendor_items(character, vendor_guid, visible)
+    VendorStock.list(character.internal.world, vendor_guid, priced)
   end
 
   defp condition_of(%{} = item), do: Map.get(item, :condition)
@@ -121,35 +125,7 @@ defmodule ThistleTea.Game.Player.Vendor do
         state
 
       true ->
-        complete_purchase(state, character, vendor_guid, vendor_item, template, total_count, price)
-    end
-  end
-
-  defp complete_purchase(state, character, vendor_guid, vendor_item, template, total_count, price) do
-    purchase = %{character | player: %{character.player | coinage: character.player.coinage - price}}
-
-    case Items.store(%{state | character: purchase}, template, total_count) do
-      {:ok, state, {bag_slot, item_slot}} ->
-        Network.send_packet(%Message.SmsgBuyItem{
-          vendor_guid: vendor_guid,
-          vendor_slot: vendor_item.index,
-          count: total_count
-        })
-
-        Network.send_packet(%Message.SmsgItemPushResult{
-          player_guid: state.guid,
-          item_id: template.entry,
-          bag_slot: bag_slot,
-          item_slot: item_slot,
-          count: total_count,
-          received: 1
-        })
-
-        state
-
-      _error ->
-        send_buy_failed(vendor_guid, template.entry, :cant_carry_more)
-        state
+        VendorPurchase.buy(state, vendor_guid, vendor_item, count, price)
     end
   end
 

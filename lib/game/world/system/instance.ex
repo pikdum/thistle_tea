@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.System.Instance do
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.System.VendorStock
   alias ThistleTea.Game.WorldRef
 
   require Logger
@@ -382,5 +383,6 @@ defmodule ThistleTea.Game.World.System.Instance do
     SpawnPool.stop_world(world)
     World.stop_world_entities(world)
     CellActivator.deactivate_world(world)
+    VendorStock.clear_world(world)
   end
 end

@@ -11,10 +11,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
   alias ThistleTea.Game.Entity.Data.Reputation.Catalog
   alias ThistleTea.Game.Entity.Data.Reputation.Definition
   alias ThistleTea.Game.Entity.Data.Reputation.Variant
+  alias ThistleTea.Game.Entity.Data.VendorItem
   alias ThistleTea.Game.Entity.Logic.Reputation
+  alias ThistleTea.Game.Entity.Registry
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.CmsgBuyItem
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
@@ -40,7 +43,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
         required_reputation_rank: 4
       }
 
-      :ets.insert(VendorLoader, {vendor_entry, [%{index: 1, template: template, max_count: 0}]})
+      :ets.insert(VendorLoader, {vendor_entry, [%VendorItem{index: 1, template: template, max_count: 0}]})
 
       on_exit(fn ->
         ReputationLoader.put_catalog(previous_catalog)
@@ -82,7 +85,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
       player_guid = Guid.from_low_guid(:player, player_id)
       template = %ItemTemplate{entry: 1_235, buy_price: 25, stackable: 20}
 
-      :ets.insert(VendorLoader, {vendor_entry, [%{index: 1, template: template, max_count: 0}]})
+      Registry.register(player_guid)
+      :ets.insert(VendorLoader, {vendor_entry, [%VendorItem{index: 1, template: template, max_count: 0}]})
       Metadata.update(vendor_guid, %{faction_template: %FactionTemplate{faction: 72}})
 
       on_exit(fn ->
@@ -95,6 +99,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
       {reputation, _changes} = Reputation.set(reputation, catalog, 72, 9_000, %{race: 1, class: 1})
 
       character = %Character{
+        id: player_id,
         object: %Object{guid: player_guid},
         unit: %Unit{race: 1, class: 1, level: 10, health: 100},
         player: %Player{coinage: 100, reputation: reputation},
@@ -111,6 +116,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
       item_guid = state.character.player.inv1
       assert ItemStore.get(item_guid).item.stack_count == 2
       ItemStore.delete(item_guid)
+      :ets.delete(CharacterStore, player_id)
+      Metadata.delete(player_guid)
     end
   end
 

@@ -2,9 +2,18 @@ defmodule ThistleTea.Game.Network.Message.SmsgListInventoryTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Data.VendorItem
   alias ThistleTea.Game.Network.Message.SmsgListInventory
 
   describe "to_binary/1" do
+    test "encodes sold-out limited stock as zero rather than unlimited" do
+      item = %VendorItem{index: 1, template: %ItemTemplate{entry: 25}, max_count: 2, available: 0, price: 1}
+      binary = SmsgListInventory.to_binary(%SmsgListInventory{vendor_guid: 42, items: [item]})
+
+      assert <<42::little-size(64), 1, 1::little-size(32), 25::little-size(32), _display::little-size(32),
+               0::little-size(32), _rest::binary>> = binary
+    end
+
     test "encodes a boundary-supplied discounted price" do
       template = %ItemTemplate{
         entry: 1_234,

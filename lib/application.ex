@@ -85,6 +85,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
   alias ThistleTea.Game.World.System.Trade, as: TradeSystem
+  alias ThistleTea.Game.World.System.VendorStock
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Native.Namigator
 
@@ -138,6 +139,7 @@ defmodule ThistleTea.Application do
         TradeSystem,
         PostOffice,
         AuctionSystem,
+        VendorStock,
         AreaEffects,
         SpellMagnets,
         ThistleTea.DBC,

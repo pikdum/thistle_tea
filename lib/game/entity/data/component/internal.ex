@@ -49,6 +49,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :last_trade_id,
     :item_logout_at,
     :last_auction_id,
+    :last_vendor_purchase_id,
     :last_mana_use_at,
     :next_sober_at,
     :health_regen_carry,

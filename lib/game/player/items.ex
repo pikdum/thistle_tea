@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Player.Items do
   item-creating spells, consumable on-use items, and the `.additem` dev
   command.
   """
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Crafting
@@ -54,9 +55,15 @@ defmodule ThistleTea.Game.Player.Items do
   def store(state, item_id, count, recipe \\ nil)
 
   def store(state, %ItemTemplate{} = template, count, recipe) when is_integer(count) and count > 0 do
-    items = prepare_stacks(template, state.guid, count)
-    batch = Enum.reduce(items, Batch.new(state.character.player), &Batch.add(&2, &1))
-    commit_stacks(state, batch, hd(items).object.guid, recipe)
+    case plan_store(state.character, template, count) do
+      {:ok, changes, position} ->
+        character = Crafting.skill_up(%{state.character | player: changes.player}, recipe, :rand.uniform(100) - 1)
+        changes = ChangeSet.put_player(changes, character.player)
+        {:ok, InventoryUpdate.apply(state, {:ok, changes}), position}
+
+      {:error, reason} ->
+        {:error, reason, state}
+    end
   end
 
   def store(state, item_id, count, recipe) when is_integer(count) and count > 0 do
@@ -70,6 +77,16 @@ defmodule ThistleTea.Game.Player.Items do
   end
 
   def store(state, _item_id, _count, _recipe), do: {:error, :item_not_found, state}
+
+  def plan_store(%Character{} = character, %ItemTemplate{} = template, count) when is_integer(count) and count > 0 do
+    items = prepare_stacks(template, character.object.guid, count)
+    batch = Enum.reduce(items, Batch.new(character.player), &Batch.add(&2, &1))
+
+    with {:ok, changes} <- Inventory.plan(batch, &ItemStore.get/1) do
+      position = placement_position(ChangeSet.placement(changes, hd(items).object.guid))
+      {:ok, changes, position}
+    end
+  end
 
   def store_many(state, entries) when is_list(entries) do
     items =
@@ -113,19 +130,6 @@ defmodule ThistleTea.Game.Player.Items do
     stack_count = min(count, max(template.stackable || 1, 1))
     item = ItemStore.prepare(template, owner: owner, stack_count: stack_count)
     [item | prepare_stacks(template, owner, count - stack_count)]
-  end
-
-  defp commit_stacks(state, batch, first_guid, recipe) do
-    case Inventory.plan(batch, &ItemStore.get/1) do
-      {:ok, changes} ->
-        character = Crafting.skill_up(%{state.character | player: changes.player}, recipe, :rand.uniform(100) - 1)
-        changes = ChangeSet.put_player(changes, character.player)
-        position = placement_position(ChangeSet.placement(changes, first_guid))
-        {:ok, InventoryUpdate.apply(state, {:ok, changes}), position}
-
-      {:error, reason} ->
-        {:error, reason, state}
-    end
   end
 
   defp placement_position(%Placement{status: :placed, position: position}), do: position

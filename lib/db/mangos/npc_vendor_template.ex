@@ -1,14 +1,9 @@
-defmodule ThistleTea.DB.Mangos.NpcVendor do
+defmodule ThistleTea.DB.Mangos.NpcVendorTemplate do
   @moduledoc false
   use Ecto.Schema
 
-  import Ecto.Query
-
-  alias ThistleTea.DB.Mangos
-
   @primary_key false
-
-  schema "npc_vendor" do
+  schema "npc_vendor_template" do
     field(:entry, :integer)
     field(:slot, :integer, default: 0)
     field(:item, :integer)
@@ -16,9 +11,5 @@ defmodule ThistleTea.DB.Mangos.NpcVendor do
     field(:incrtime, :integer, default: 0)
     field(:itemflags, :integer, default: 0)
     field(:condition_id, :integer, default: 0)
-  end
-
-  def query(entry) do
-    from(nv in Mangos.NpcVendor, where: nv.entry == ^entry, order_by: [nv.slot, nv.item])
   end
 end

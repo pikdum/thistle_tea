@@ -62,6 +62,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Player.Spells, as: PlayerSpells
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Player.Trade
+  alias ThistleTea.Game.Player.VendorPurchase
   alias ThistleTea.Game.Player.WorldStates
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Time
@@ -95,7 +96,7 @@ defmodule ThistleTea.Game.Player.Login do
 
   def enter_world(state, character_guid) do
     {:ok, c} = CharacterStore.fetch(state.account.id, character_guid)
-    c = c |> Trade.recover() |> Auction.recover()
+    c = c |> Trade.recover() |> Auction.recover() |> VendorPurchase.recover()
     old_item_counts = Quests.quest_item_counts(c)
 
     c =
@@ -192,6 +193,7 @@ defmodule ThistleTea.Game.Player.Login do
     state
     |> Trade.finish_recovery()
     |> Auction.finish_recovery()
+    |> VendorPurchase.finish_recovery()
     |> Quests.on_inventory_changed(old_item_counts)
     |> ItemDurations.start()
     |> schedule_aura_tick()
