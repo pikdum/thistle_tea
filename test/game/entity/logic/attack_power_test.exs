@@ -22,6 +22,21 @@ defmodule ThistleTea.Game.Entity.Logic.AttackPowerTest do
   setup [:creature]
 
   describe "recompute/1" do
+    test "pets ignore ranged AP modifiers while retaining melee AP buffs", %{mob: mob} do
+      auras = [
+        holder(:mod_attack_power, 100),
+        holder(:mod_ranged_attack_power, 100),
+        holder(:mod_ranged_attack_power_pct, 50)
+      ]
+
+      for {model, base} <- [hunter_pet: 180, summoned_pet: 180, imp: 90] do
+        unit = recompute(%{mob.unit | attack_power_model: model, base_attack_power: base}, auras)
+        assert unit.attack_power == base + 100
+        assert unit.ranged_attack_power == 0
+        assert Stats.recompute(unit) == unit
+      end
+    end
+
     test "keeps seed damage and applies melee and ranged modifiers independently", %{mob: mob} do
       assert mob.unit.attack_power == 200
       assert Combat.damage_range(mob) == {100.0, 100.0}

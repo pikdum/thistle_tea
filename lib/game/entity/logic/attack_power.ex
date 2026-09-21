@@ -11,6 +11,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackPower do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
 
+  def total(%Unit{attack_power_model: model}, _base, :ranged) when model in [:hunter_pet, :summoned_pet, :imp], do: 0
+
   def total(%Unit{} = unit, base, kind) when is_number(base) and kind in [:melee, :ranged] do
     {flat_type, percent_type, equipment_key} = modifier_types(kind)
     flat = AuraLogic.flat_amount(%{unit: unit}, flat_type)
