@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.GameObjectInteraction
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
@@ -575,6 +576,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   defp spend_charge(state), do: state
 
   defp broadcast_if_pending(%GameObject{internal: %Internal{broadcast_update?: true} = internal} = state) do
+    publish_geometry(state)
     Core.update_object(state, :values) |> World.broadcast_packet(state)
     %{state | internal: %{internal | broadcast_update?: false}}
   end
@@ -586,6 +588,20 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
       db_guid: condition_db_guid(state),
       go_spawned?: spawned?,
       go_state: state.game_object.state
+    })
+
+    publish_geometry(state)
+  end
+
+  defp publish_geometry(%GameObject{} = state) do
+    object = state.game_object
+    rotation = {object.rotation0 || 0.0, object.rotation1 || 0.0, object.rotation2 || 0.0, object.rotation3 || 0.0}
+
+    Metadata.update(state.object.guid, %{
+      go_type: state.game_object.type_id,
+      go_flags: state.game_object.flags,
+      go_scale: state.object.scale_x,
+      go_rotation: GameObjectInteraction.rotation(rotation, object.facing || 0.0)
     })
 
     state

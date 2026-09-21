@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.GameObjects do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Deadmines
   alias ThistleTea.Game.Player.Fishing
+  alias ThistleTea.Game.Player.Gossip
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World
@@ -24,10 +25,18 @@ defmodule ThistleTea.Game.Player.GameObjects do
 
   @go_type_chest 3
   @go_type_chair 7
+  @go_type_questgiver 2
 
-  def use_object(%{character: %Character{} = character} = state, guid) do
+  def use_object(%{character: %Character{}} = state, guid) do
+    if questgiver?(guid) do
+      Gossip.hello_game_object(state, guid)
+    else
+      state |> Quests.credit_entity_interaction(guid) |> use_non_questgiver(guid)
+    end
+  end
+
+  defp use_non_questgiver(%{character: %Character{} = character} = state, guid) do
     Logger.info("CMSG_GAMEOBJ_USE: entry #{Guid.entry(guid)} chest?=#{chest?(guid)}")
-    state = Quests.credit_entity_interaction(state, guid)
 
     cond do
       Deadmines.cannon?(guid) ->
@@ -60,6 +69,11 @@ defmodule ThistleTea.Game.Player.GameObjects do
 
         state
     end
+  end
+
+  defp questgiver?(guid) do
+    Guid.type_id(guid) == :game_object and
+      match?(%GameObjectTemplate{type: @go_type_questgiver}, GameObjectTemplateLoader.cached(Guid.entry(guid)))
   end
 
   defp fishing_bobber?(guid) do

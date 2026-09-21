@@ -11,6 +11,9 @@ defmodule ThistleTea.Game.Player.Gossip do
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
   alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Entity.Logic.GameObjectInteraction
+  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
+  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
@@ -25,16 +28,20 @@ defmodule ThistleTea.Game.Player.Gossip do
   alias ThistleTea.Game.Player.HomeBind
   alias ThistleTea.Game.Player.PetStable
   alias ThistleTea.Game.Player.PetUntraining
+  alias ThistleTea.Game.Player.QuestGiver
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.Player.TalentReset
   alias ThistleTea.Game.Player.Taxi
   alias ThistleTea.Game.Player.Vendor
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Gossip.Menu
   alias ThistleTea.Game.World.Loader.Gossip.Option
   alias ThistleTea.Game.World.Loader.Gossip.Text
+  alias ThistleTea.Game.World.Metadata
 
   @default_gossip_text_id 68
 
@@ -54,7 +61,35 @@ defmodule ThistleTea.Game.Player.Gossip do
 
   def hello(state, _guid), do: state
 
-  def select(%{character: %Character{} = character} = state, guid, gossip_list_id) do
+  def hello_game_object(%{character: %Character{} = character} = state, guid) do
+    with true <- QuestGiver.interactable?(character, guid),
+         template = GameObjectTemplateLoader.cached(Guid.entry(guid)),
+         {:ok, character} <-
+           GameObjectInteraction.prepare_questgiver_use(character, template, Metadata.get(guid)[:go_flags], Time.now()) do
+      state = put_object_user(state, character)
+      menu_id = Enum.at(template.data, 3, 0)
+
+      case GossipLoader.get_menu(menu_id) do
+        %Menu{} = menu when menu_id > 0 ->
+          state = Quests.credit_entity_interaction(state, guid)
+          send_menu(guid, menu, quest_items(guid, state.character), state)
+
+        _missing ->
+          Quests.hello(state, guid)
+      end
+    else
+      _invalid -> state
+    end
+  end
+
+  defp put_object_user(%{character: character} = state, character), do: state
+
+  defp put_object_user(state, character) do
+    character = character |> EventSink.emit_pending() |> CharacterStore.put()
+    PlayerServer.maybe_broadcast_update(%{state | character: character})
+  end
+
+  def select(%{character: %Character{} = character, gossip_menu_guid: guid} = state, guid, gossip_list_id) do
     option_ids = option_ids()
 
     option =
@@ -64,7 +99,7 @@ defmodule ThistleTea.Game.Player.Gossip do
 
     context = condition_context(character, guid, option_conditions(option))
 
-    if option_allowed?(context, option, :deny_unknown) do
+    if source_allowed?(character, guid) and option_allowed?(context, option, :deny_unknown) do
       dispatch(state, character, guid, option, option_ids)
     else
       state
@@ -97,7 +132,14 @@ defmodule ThistleTea.Game.Player.Gossip do
       quests: quests
     })
 
-    %{state | gossip_menu_options: options}
+    put_menu(state, npc_guid, options)
+  end
+
+  defp put_menu(%State{} = state, guid, options), do: %{state | gossip_menu_guid: guid, gossip_menu_options: options}
+  defp put_menu(state, guid, options), do: Map.merge(state, %{gossip_menu_guid: guid, gossip_menu_options: options})
+
+  defp source_allowed?(character, guid) do
+    Guid.type_id(guid) != :game_object or QuestGiver.interactable?(character, guid)
   end
 
   def title_text_id(%Menu{} = menu, %Character{} = character), do: title_text_id(menu, character, 0)
@@ -185,7 +227,7 @@ defmodule ThistleTea.Game.Player.Gossip do
 
   defp dispatch(state, character, guid, %Option{action_menu_id: action_menu_id}, _option_ids) do
     case GossipLoader.get_menu(action_menu_id) do
-      %Menu{} = menu -> send_menu(guid, menu, quest_items(guid, character), state)
+      %Menu{} = menu -> send_menu(guid, menu, submenu_quests(guid, action_menu_id, character), state)
       nil -> state
     end
   end
@@ -203,6 +245,15 @@ defmodule ThistleTea.Game.Player.Gossip do
   end
 
   defp dispatch_gossip_menu(state, _character, _guid, _action_menu_id), do: state
+
+  defp submenu_quests(guid, menu_id, character) do
+    if Guid.type_id(guid) == :game_object do
+      template = GameObjectTemplateLoader.cached(Guid.entry(guid))
+      if template && Enum.at(template.data, 3, 0) == menu_id, do: quest_items(guid, character), else: []
+    else
+      quest_items(guid, character)
+    end
+  end
 
   defp visible_options(options, npc_guid, %Character{unit: unit} = character, context) do
     trainer = GossipLoader.option_trainer()
@@ -240,9 +291,15 @@ defmodule ThistleTea.Game.Player.Gossip do
     end)
   end
 
-  defp npc_flag_allowed?(%Option{npc_flag: npc_flag}, _npc_guid) when npc_flag in [nil, 0], do: true
+  defp npc_flag_allowed?(%Option{} = option, guid) do
+    if Guid.type_id(guid) == :game_object,
+      do: option.option_id == GossipLoader.option_gossip(),
+      else: creature_flag_allowed?(option, guid)
+  end
 
-  defp npc_flag_allowed?(%Option{npc_flag: npc_flag}, npc_guid) do
+  defp creature_flag_allowed?(%Option{npc_flag: npc_flag}, _npc_guid) when npc_flag in [nil, 0], do: true
+
+  defp creature_flag_allowed?(%Option{npc_flag: npc_flag}, npc_guid) do
     GossipLoader.npc_flags(Guid.entry(npc_guid))
     |> Bitwise.band(npc_flag)
     |> Kernel.!=(0)

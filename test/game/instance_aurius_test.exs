@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.InstanceAuriusTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -26,10 +27,12 @@ defmodule ThistleTea.Game.InstanceAuriusTest do
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Gossip, as: PlayerGossip
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.Loader.Gossip.Menu
   alias ThistleTea.Game.World.Loader.Gossip.Text
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
   setup do
@@ -55,12 +58,19 @@ defmodule ThistleTea.Game.InstanceAuriusTest do
     quest_5125 = quest(5_125, condition(3_757, 7, 2))
     npc_entry = 10_917
     npc_guid = Guid.from_low_guid(:mob, npc_entry, id)
+    first = character(first_guid, first_world)
+    npc = %{object: %Object{guid: npc_guid}, internal: first.internal, movement_block: first.movement_block}
+    Entity.register(npc_guid)
+    Metadata.put(npc_guid, %{alive?: true, npc_flags: 2})
+    World.update_position(npc, :mobs)
 
     :ets.insert(QuestLoader, [{{:quest, 5_122}, quest_5122}, {{:quest, 5_125}, quest_5125}])
     :ets.insert(QuestLoader, {{:giver, npc_entry}, [5_122, 5_125]})
     :ets.insert(QuestLoader, {{:ender, npc_entry}, [5_122, 5_125]})
 
     on_exit(fn ->
+      Metadata.delete(npc_guid)
+      World.remove_position(npc, :mobs)
       InstanceData.remove(first_world)
       InstanceData.remove(second_world)
       :ets.delete(QuestLoader, {:quest, 5_122})

@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Player.QuestRequiredConditionTest do
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage.QuestItem
   alias ThistleTea.Game.Player.Gossip
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
@@ -46,6 +47,10 @@ defmodule ThistleTea.Game.Player.QuestRequiredConditionTest do
     source_item_id = 700_000 + id
     character = character(id, player_guid)
     CharacterStore.put(character)
+    Entity.register(npc_guid)
+    npc = %{object: %Object{guid: npc_guid}, internal: character.internal, movement_block: character.movement_block}
+    World.update_position(npc, :mobs)
+    Metadata.put(npc_guid, %{alive?: true, npc_flags: 2})
 
     on_exit(fn ->
       Enum.each(0..5, &:ets.delete(QuestLoader, {:quest, quest_id + &1}))
@@ -55,6 +60,7 @@ defmodule ThistleTea.Game.Player.QuestRequiredConditionTest do
       :ets.delete(CharacterStore, id)
       Metadata.delete(player_guid)
       Metadata.delete(npc_guid)
+      World.remove_position(npc, :mobs)
       delete_owned_items(player_guid)
     end)
 
@@ -106,7 +112,7 @@ defmodule ThistleTea.Game.Player.QuestRequiredConditionTest do
       )
 
     put_quest(context, quest, giver: true)
-    assert {:ok, _owner} = Entity.register(context.npc_guid)
+    assert Entity.online?(context.npc_guid)
     on_exit(fn -> Entity.unregister(context.npc_guid) end)
     banked = bank_item(context, context.character)
     assert [{^quest, _icon}] = Quests.quest_menu(context.npc_guid, banked)
@@ -120,7 +126,7 @@ defmodule ThistleTea.Game.Player.QuestRequiredConditionTest do
     assert CharacterStore.get(context.id) == current
     refute owned_entry?(context.player_guid, source_item_id)
 
-    assert [%Message.SmsgQuestgiverQuestInvalid{reason: 0}] = sent_packets()
+    assert [%Message.SmsgQuestgiverQuestInvalid{reason: 0}, %Message.SmsgGossipComplete{}] = sent_packets()
     refute_receive {:"$gen_cast", {:start_script, _steps, _target_guid}}
     refute_receive {:quest_timer_expired, _, _}
   end
@@ -133,7 +139,7 @@ defmodule ThistleTea.Game.Player.QuestRequiredConditionTest do
     assert Quests.dialog_status(context.npc_guid, context.character) == QuestDialogStatus.none()
     assert Quests.accept(state, context.npc_guid, quest.id) == state
     refute QuestLog.active?(state.character.player.quest_log, quest.id)
-    assert [%Message.SmsgQuestgiverQuestInvalid{reason: 0}] = sent_packets()
+    assert [%Message.SmsgQuestgiverQuestInvalid{reason: 0}, %Message.SmsgGossipComplete{}] = sent_packets()
   end
 
   test "met acceptance uses the normal transition and force acceptance still bypasses", context do

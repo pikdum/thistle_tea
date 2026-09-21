@@ -107,12 +107,12 @@ defmodule ThistleTea.Game.Player.GossipConditionTest do
       assert_receive {:send_taxi_path, 315}
 
       withdrawn = %{deposited | player: %{deposited.player | bank1: 0, inv1: item.object.guid}}
-      withdrawn_state = %{character: withdrawn, gossip_menu_options: [option]}
+      withdrawn_state = %{character: withdrawn, gossip_menu_options: [option], gossip_menu_guid: 2}
       assert %{gossip_menu_options: []} = Gossip.select(withdrawn_state, 2, 0)
       assert_receive {:send_taxi_path, 315}
 
       absent = %{withdrawn | player: %{withdrawn.player | inv1: 0}}
-      absent_state = %{character: absent, gossip_menu_options: [option]}
+      absent_state = %{character: absent, gossip_menu_options: [option], gossip_menu_guid: 2}
       assert Gossip.select(absent_state, 2, 0) == absent_state
       refute_receive {:send_taxi_path, 315}
     end

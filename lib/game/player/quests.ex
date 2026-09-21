@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Mail
+  alias ThistleTea.Game.Player.QuestGiver
   alias ThistleTea.Game.Player.QuestSharing
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
@@ -59,7 +60,7 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def dialog_status(npc_guid, %Character{} = character) do
-    if PlayerReputation.can_interact?(character, npc_guid) do
+    if QuestGiver.present?(character, npc_guid) do
       {giver_quests, ender_quests} = npc_quests(npc_guid)
       availability = availability(character, giver_quests)
 
@@ -75,7 +76,7 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def hello(state, npc_guid) do
-    if PlayerReputation.can_interact?(state.character, npc_guid) do
+    if QuestGiver.interactable?(state.character, npc_guid) do
       do_hello(state, npc_guid)
     else
       state
@@ -129,13 +130,13 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   defp query_world_quest(state, npc_guid, quest_id) do
-    entry = Guid.entry(npc_guid)
-
-    with true <- PlayerReputation.can_interact?(state.character, npc_guid),
+    with true <- QuestGiver.present?(state.character, npc_guid),
          %Quest{} = quest <- QuestLoader.get(quest_id),
          true <-
-           quest_id in QuestLoader.given_by(entry) or quest_id in QuestLoader.ended_by(entry) do
+           quest_id in giver_ids(npc_guid) or quest_id in ender_ids(npc_guid) do
       send_details(npc_guid, quest)
+    else
+      _invalid -> Network.send_packet(%Message.SmsgGossipComplete{})
     end
 
     state
@@ -169,7 +170,7 @@ defmodule ThistleTea.Game.Player.Quests do
           else: accepted
       else
         {:error, reason} ->
-          send_item_quest_invalid(reason)
+          send_quest_invalid(reason)
           state
 
         _invalid ->
@@ -179,7 +180,7 @@ defmodule ThistleTea.Game.Player.Quests do
     cancel_dialog(state)
   end
 
-  defp send_item_quest_invalid(reason) do
+  defp send_quest_invalid(reason) do
     code =
       case reason do
         :wrong_race -> 6
@@ -193,29 +194,28 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   defp accept_from_questgiver(state, npc_guid, quest_id) do
-    with true <- PlayerReputation.can_interact?(state.character, npc_guid),
-         %Quest{} = quest <- QuestLoader.get(quest_id),
-         true <- quest_id in QuestLoader.given_by(Guid.entry(npc_guid)),
-         :ok <- takeability(state.character, quest) do
-      accepted = force_accept(state, quest_id, npc_guid)
+    state = QuestSharing.clear(state)
 
-      if QuestLog.active?(accepted.character.player.quest_log, quest_id) do
-        accepted |> QuestSharing.clear() |> QuestSharing.party_accept(quest)
+    state =
+      with true <- QuestGiver.interactable?(state.character, npc_guid),
+           %Quest{} = quest <- QuestLoader.get(quest_id),
+           true <- quest_id in giver_ids(npc_guid),
+           :ok <- takeability(state.character, quest) do
+        accepted = force_accept(state, quest_id, npc_guid)
+
+        if QuestLog.active?(accepted.character.player.quest_log, quest_id),
+          do: QuestSharing.party_accept(accepted, quest),
+          else: accepted
       else
-        accepted
+        {:error, reason} ->
+          send_quest_invalid(reason)
+          state
+
+        _invalid ->
+          state
       end
-    else
-      {:error, :required_condition} ->
-        send_condition_invalid()
-        state
 
-      {:error, {:required_condition_unknown, _reasons}} ->
-        send_condition_invalid()
-        state
-
-      _other ->
-        state
-    end
+    cancel_dialog(state)
   end
 
   def force_accept(state, quest_id), do: force_accept(state, quest_id, nil)
@@ -339,7 +339,7 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def complete_quest(%{character: %Character{} = character} = state, npc_guid, quest_id) do
-    with true <- PlayerReputation.can_interact?(character, npc_guid),
+    with true <- QuestGiver.rewardable?(character, npc_guid),
          %Quest{} = quest <- ender_quest(npc_guid, quest_id),
          %Entry{} = entry <- QuestLog.get(character.player.quest_log, quest_id) do
       send_turn_in_dialog(npc_guid, quest, entry.status == :complete)
@@ -349,7 +349,7 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def request_reward(%{character: %Character{} = character} = state, npc_guid, quest_id) do
-    with true <- PlayerReputation.can_interact?(character, npc_guid),
+    with true <- QuestGiver.rewardable?(character, npc_guid),
          %Quest{} = quest <- ender_quest(npc_guid, quest_id),
          %Entry{status: :complete} <- QuestLog.get(character.player.quest_log, quest_id) do
       send_offer_reward(npc_guid, quest)
@@ -359,7 +359,7 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def choose_reward(%{character: %Character{} = character} = state, npc_guid, quest_id, reward_index) do
-    with true <- PlayerReputation.can_interact?(character, npc_guid),
+    with true <- QuestGiver.rewardable?(character, npc_guid),
          %Quest{} = quest <- ender_quest(npc_guid, quest_id),
          %Entry{status: :complete} <- QuestLog.get(character.player.quest_log, quest_id),
          {:ok, choice} <- validate_reward_choice(quest, reward_index),
@@ -418,7 +418,7 @@ defmodule ThistleTea.Game.Player.Quests do
 
   defp send_next_quest(state, npc_guid, %Quest{next_quest_in_chain: next_id}) when next_id > 0 do
     with %Quest{} = next_quest <- QuestLoader.get(next_id),
-         true <- next_id in QuestLoader.given_by(Guid.entry(npc_guid)),
+         true <- next_id in giver_ids(npc_guid),
          :ok <- takeability(state.character, next_quest) do
       send_details(npc_guid, next_quest)
     end
@@ -450,7 +450,7 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   defp ender_quest(npc_guid, quest_id) do
-    if quest_id in QuestLoader.ended_by(Guid.entry(npc_guid)) do
+    if quest_id in ender_ids(npc_guid) do
       QuestLoader.get(quest_id)
     end
   end
@@ -553,9 +553,11 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def npc_quests(npc_guid) do
-    entry = Guid.entry(npc_guid)
-    {load_quests(QuestLoader.given_by(entry)), load_quests(QuestLoader.ended_by(entry))}
+    {load_quests(giver_ids(npc_guid)), load_quests(ender_ids(npc_guid))}
   end
+
+  defp giver_ids(guid), do: QuestLoader.given_by(Guid.type_id(guid), Guid.entry(guid))
+  defp ender_ids(guid), do: QuestLoader.ended_by(Guid.type_id(guid), Guid.entry(guid))
 
   def quest_menu(npc_guid, %Character{} = character) do
     {giver_quests, ender_quests} = npc_quests(npc_guid)
@@ -593,10 +595,6 @@ defmodule ThistleTea.Game.Player.Quests do
     availability = availability(character, [quest])
     result = Map.get(availability.condition_results, quest.id)
     QuestRequirements.can_take(quest, availability.quest_context, result)
-  end
-
-  defp send_condition_invalid do
-    Network.send_packet(%Message.SmsgQuestgiverQuestInvalid{reason: 0})
   end
 
   defp send_quest_list(npc_guid, entries) do

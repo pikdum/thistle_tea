@@ -22,10 +22,12 @@ defmodule ThistleTea.Game.Player.QuestSharingTest do
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.QuestSharing
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.WorldRef
@@ -217,8 +219,23 @@ defmodule ThistleTea.Game.Player.QuestSharingTest do
       source = put_log(context.source, %{})
       npc = Guid.from_low_guid(:mob, quest.id, 1)
       Registry.register(npc)
+
+      npc_entity = %{
+        object: %Object{guid: npc},
+        internal: source.character.internal,
+        movement_block: source.character.movement_block
+      }
+
+      World.update_position(npc_entity, :mobs)
+      Metadata.put(npc, %{alive?: true, npc_flags: 2})
       :ets.insert(QuestLoader, {{:giver, quest.id}, [quest.id]})
-      on_exit(fn -> :ets.delete(QuestLoader, {:giver, quest.id}) end)
+
+      on_exit(fn ->
+        :ets.delete(QuestLoader, {:giver, quest.id})
+        Metadata.delete(npc)
+        World.remove_position(npc_entity, :mobs)
+      end)
+
       source = Quests.accept(source, npc, quest.id)
       assert QuestLog.active?(source.character.player.quest_log, quest.id)
       assert_receive {:"$gen_cast", {:start_script, _, _}}

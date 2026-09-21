@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
         internal: %Internal{world: WorldRef.open(0), spellbook: %{}}
       }
 
-      state = %{character: character, gossip_menu_options: [option]}
+      state = %{character: character, gossip_menu_options: [option], gossip_menu_guid: 1}
       message = %CmsgGossipSelectOption{guid: 1, gossip_list_id: 0}
 
       assert %{gossip_menu_options: []} = CmsgGossipSelectOption.handle(message, state)
@@ -76,7 +76,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
         internal: %Internal{world: WorldRef.open(0), spellbook: %{}}
       }
 
-      state = %{character: character, gossip_menu_options: [option]}
+      state = %{character: character, gossip_menu_options: [option], gossip_menu_guid: creature_guid}
       message = %CmsgGossipSelectOption{guid: creature_guid, gossip_list_id: 0}
 
       assert %{gossip_menu_options: []} = CmsgGossipSelectOption.handle(message, state)
@@ -137,7 +137,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
       }
 
       option = %Option{id: 0, option_id: 4}
-      state = %{character: character, gossip_menu_options: [option]}
+      state = %{character: character, gossip_menu_options: [option], gossip_menu_guid: flightmaster_guid}
       message = %CmsgGossipSelectOption{guid: flightmaster_guid, gossip_list_id: 0}
 
       assert CmsgGossipSelectOption.handle(message, state) == state
@@ -169,7 +169,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
       }
 
       option = %Option{id: 0, option_id: 9}
-      state = %State{ready: true, guid: player_guid, character: character, gossip_menu_options: [option]}
+
+      state = %State{
+        ready: true,
+        guid: player_guid,
+        character: character,
+        gossip_menu_options: [option],
+        gossip_menu_guid: banker_guid
+      }
+
       message = %CmsgGossipSelectOption{guid: banker_guid, gossip_list_id: 0}
 
       assert %State{active_banker_guid: ^banker_guid} = CmsgGossipSelectOption.handle(message, state)
@@ -206,7 +214,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
         internal: %Internal{world: WorldRef.open(0), spellbook: %{}}
       }
 
-      state = %{character: character, gossip_menu_options: [option]}
+      state = %{character: character, gossip_menu_options: [option], gossip_menu_guid: 2}
       message = %CmsgGossipSelectOption{guid: 2, gossip_list_id: 0}
 
       assert CmsgGossipSelectOption.handle(message, state) == state

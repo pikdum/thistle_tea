@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Player.QuestTurnInTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -13,6 +14,7 @@ defmodule ThistleTea.Game.Player.QuestTurnInTest do
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -37,6 +39,16 @@ defmodule ThistleTea.Game.Player.QuestTurnInTest do
     npc_entry = 98_200
     npc_guid = Guid.from_low_guid(:mob, npc_entry, id)
     quest_id = 98_300 + rem(id, 10_000)
+    Entity.register(npc_guid)
+
+    npc = %{
+      object: %Object{guid: npc_guid},
+      internal: %Internal{world: WorldRef.open(0)},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+    }
+
+    World.update_position(npc, :mobs)
+    Metadata.put(npc_guid, %{alive?: true, npc_flags: 2})
 
     templates = [
       %ItemTemplate{entry: @required_entry, name: "Required"},
@@ -62,6 +74,8 @@ defmodule ThistleTea.Game.Player.QuestTurnInTest do
       :ets.delete(QuestLoader, {:ender, npc_entry})
       :ets.delete(CharacterStore, id)
       Metadata.delete(player_guid)
+      Metadata.delete(npc_guid)
+      World.remove_position(npc, :mobs)
       delete_owned_items(player_guid)
     end)
 

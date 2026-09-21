@@ -33,7 +33,7 @@ defmodule ThistleTea.Game.Player.HomeBindTest do
 
   describe "confirm/2" do
     test "gossip requests confirmation without changing the home", %{state: state, guid: guid} do
-      state = %{state | gossip_menu_options: [%Option{id: 2, option_id: 8}]}
+      state = %{state | gossip_menu_options: [%Option{id: 2, option_id: 8}], gossip_menu_guid: guid}
       message = %Message.CmsgGossipSelectOption{guid: guid, gossip_list_id: 2}
       result = Message.CmsgGossipSelectOption.handle(message, state)
 

@@ -1,9 +1,38 @@
 defmodule ThistleTea.Game.Entity.Logic.GameObjectInteraction do
   @moduledoc """
-  Pure interaction geometry for scaled, rotated game objects.
+  Pure interaction preparation and geometry for scaled, rotated game objects.
   Display bounds expand by the interaction radius before world rotation.
   Objects without usable bounds use distance from their origin.
   """
+
+  import Bitwise, only: [&&&: 2]
+
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.GameObjectTemplate
+  alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Mount
+
+  def prepare_questgiver_use(%Character{} = character, %GameObjectTemplate{type: 2, data: data}, flags, now) do
+    cond do
+      ((flags || 0) &&& 0x10) != 0 ->
+        {:error, :not_interactable}
+
+      Enum.at(data, 5, 0) != 0 and ((character.unit.flags || 0) &&& 0x80000000) != 0 ->
+        {:error, :immune}
+
+      true ->
+        {character, effects} = Aura.remove_with_interrupt_flags(character, 0x800, now)
+        character = Effects.enqueue(character, effects)
+        character = if Enum.at(data, 8, 0) == 0, do: Mount.dismount(character, now), else: character
+        {:ok, character}
+    end
+  end
+
+  def rotation({x, y, z, w}, orientation) when z == 0 and w == 0,
+    do: {x, y, :math.sin(orientation / 2), :math.cos(orientation / 2)}
+
+  def rotation(quaternion, _orientation), do: quaternion
 
   def within?(position, origin, rotation, scale, bounds, radius)
 

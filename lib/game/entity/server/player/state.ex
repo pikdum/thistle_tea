@@ -60,6 +60,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :server_movement,
     :active_mover_guid,
     :active_banker_guid,
+    :gossip_menu_guid,
     :companion_monitor,
     :pet_unlearn_offer,
     :talent_reset_offer,
