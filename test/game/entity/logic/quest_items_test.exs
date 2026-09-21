@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.QuestItemsTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
@@ -9,6 +11,57 @@ defmodule ThistleTea.Game.Entity.Logic.QuestItemsTest do
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
   alias ThistleTea.Game.Entity.Logic.QuestItems
+
+  describe "starter/4" do
+    test "resolves only an owned instance that starts the requested quest" do
+      item = Item.build(%ItemTemplate{entry: 10, start_quest: 7}, 1, owner: 42)
+      character = %Character{object: %Object{guid: 42}, player: %Player{inv1: 1}}
+      lookup = lookup([item])
+
+      assert QuestItems.starter(character, 1, 7, lookup) == item
+      assert QuestItems.starter(character, 1, 8, lookup) == nil
+      assert QuestItems.starter(character, 2, 7, lookup) == nil
+      assert QuestItems.starter(%{character | player: %Player{}}, 1, 7, lookup) == nil
+      assert QuestItems.starter(%{character | object: %Object{guid: 43}}, 1, 7, lookup) == nil
+    end
+
+    test "resolves banked starters and items inside owned bags" do
+      item = Item.build(%ItemTemplate{entry: 10, start_quest: 7}, 1, owner: 42)
+      bag = Item.build(%ItemTemplate{entry: 20, class: 1, inventory_type: 18, container_slots: 4}, 2, owner: 42)
+      bag = %{bag | container: %{bag.container | slot_1: 1}}
+      character = %Character{object: %Object{guid: 42}, player: %Player{bag1: 2}}
+      lookup = lookup([item, bag])
+
+      assert QuestItems.starter(character, 1, 7, lookup) == item
+      assert QuestItems.starter(%{character | player: %Player{bank1: 1}}, 1, 7, lookup) == item
+    end
+  end
+
+  describe "acceptance/3" do
+    test "consumes the exact starter instance and preserves other copies" do
+      template = %ItemTemplate{entry: 10, start_quest: 7}
+      first = Item.build(template, 1, owner: 42)
+      second = Item.build(template, 2, owner: 42)
+      player = %Player{inv1: 1, inv2: 2}
+      batch = QuestItems.acceptance(player, %Quest{id: 7}, second)
+
+      assert {:ok, changes} = Inventory.plan(batch, lookup([first, second]))
+      assert changes.player.inv1 == 1
+      assert changes.player.inv2 == 0
+      assert ChangeSet.destroyed_items(changes) == [second]
+    end
+
+    test "retains a starter needed as a source or objective item" do
+      item = Item.build(%ItemTemplate{entry: 10, start_quest: 7}, 1, owner: 42)
+      player = %Player{inv1: 1}
+
+      for quest <- [%Quest{id: 7, src_item_id: 10}, %Quest{id: 7, required_items: [{0, 10, 1}]}] do
+        assert Batch.removals(QuestItems.acceptance(player, quest, item)) == []
+      end
+
+      assert Batch.removals(QuestItems.acceptance(player, %Quest{id: 7}, nil)) == []
+    end
+  end
 
   describe "missing_source_count/3" do
     test "counts carried and banked stacks and grants only the deficit" do

@@ -1,16 +1,41 @@
 defmodule ThistleTea.Game.Entity.Logic.QuestItems do
   @moduledoc """
-  Quest source-item counts and atomic abandonment inventory requests.
+  Quest starter ownership, source-item counts, and atomic inventory requests.
   Source counts include bank storage. Abandonment consumes quest-bound
   objectives and restores a distinct quest-starting item when appropriate.
   """
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
+
+  def starter(%Character{object: %{guid: owner}, player: player}, guid, quest_id, get_item) when quest_id > 0 do
+    with %Item{item: %{owner: ^owner}} = item <- get_item.(guid),
+         true <- Item.template(item).start_quest == quest_id,
+         {_bag, _slot} <- Inventory.find_position(player, guid, :all_owned, get_item) do
+      item
+    else
+      _invalid -> nil
+    end
+  end
+
+  def starter(%Character{}, _guid, _quest_id, _get_item), do: nil
+
+  def acceptance(%Player{} = player, %Quest{}, nil), do: Batch.new(player)
+
+  def acceptance(%Player{} = player, %Quest{} = quest, %Item{object: %{entry: entry}} = starter) do
+    batch = Batch.new(player)
+
+    if quest.src_item_id == entry or Enum.any?(quest.required_items, fn {_slot, id, _count} -> id == entry end) do
+      batch
+    else
+      Batch.consume_item(batch, starter.object.guid, starter.item.stack_count || 1)
+    end
+  end
 
   def missing_source_count(%Player{} = player, %Quest{} = quest, get_item) do
     if quest.src_item_id > 0 do
