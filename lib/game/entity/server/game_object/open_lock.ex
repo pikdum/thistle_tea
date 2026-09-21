@@ -24,15 +24,34 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.OpenLock do
       updated = %{state | internal: %{state.internal | gathering: gathering}}
 
       case content(updated, actor) do
-        {{:ok, content}, updated} -> {{:ok, content, gained?}, updated}
-        {{:error, :nothing_to_take}, updated} -> {{:ok, %Loot{}, gained?}, updated}
-        {error, _changed} -> {error, state}
+        {{:ok, content}, updated} ->
+          {{:ok, content, gained?}, monitor_viewer(updated, actor, content, opts)}
+
+        {{:error, :nothing_to_take}, updated} ->
+          {{:ok, %Loot{}, gained?}, monitor_viewer(updated, actor, %Loot{}, opts)}
+
+        {error, _changed} ->
+          {error, state}
       end
     else
       false -> {{:error, :try_again}, state}
       error -> {error, state}
     end
   end
+
+  defp monitor_viewer(state, actor, %Loot{}, opts) do
+    case Keyword.get(opts, :owner_pid) do
+      pid when is_pid(pid) ->
+        gathering = state.internal.gathering
+        monitors = Map.put(gathering.viewer_monitors, Process.monitor(pid), actor)
+        %{state | internal: %{state.internal | gathering: %{gathering | viewer_monitors: monitors}}}
+
+      _ ->
+        state
+    end
+  end
+
+  defp monitor_viewer(state, _actor, _content, _opts), do: state
 
   defp content(state, actor) do
     if Chest.lootable?(state), do: Chest.view(state, actor), else: {{:ok, :activate}, state}

@@ -1081,26 +1081,37 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
         ends_at: Time.now()
       }
 
-      mob = %Mob{
+      character = %Character{
+        player: %Player{},
         object: %Object{guid: 1},
         unit: %Unit{health: 100, max_health: 100},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
-      mob = Casting.complete(mob, casting, 1_000)
+      character = Casting.complete(character, casting, 1_000)
 
-      assert Enum.any?(mob.internal.events, fn event ->
+      assert Enum.any?(character.internal.events, fn event ->
                is_struct(event, Effects.OpenLock) and event.target_guid == 0xF110_0001 and event.spell == spell and
                  event.cast_item_guid == 55
              end)
 
       refute Enum.any?(
-               mob.internal.events,
-               &(is_struct(&1, Effects.ConsumeCastItem) or is_struct(&1, Effects.ConsumeReagents))
+               character.internal.events,
+               &(&1.__struct__ in [
+                   Effects.ConsumeCastItem,
+                   Effects.ConsumeReagents,
+                   Effects.SpellGo,
+                   Effects.SpellCastResult,
+                   Effects.QuestCastCredit
+                 ])
              )
 
-      assert Enum.any?(mob.internal.events, fn event ->
+      opening = Enum.find(character.internal.events, &is_struct(&1, Effects.OpenLock))
+      assert Enum.any?(opening.success_events, &is_struct(&1, Effects.SpellCastResult))
+      assert Enum.any?(opening.success_events, &is_struct(&1, Effects.QuestCastCredit))
+
+      assert Enum.any?(opening.success_events, fn event ->
                is_struct(event, Effects.SpellGo) and event.hit_guids == [0xF110_0001]
              end)
     end

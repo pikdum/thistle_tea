@@ -876,7 +876,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
-  def handle_info({:open_lock, _guid, _spell, _item} = command, state) do
+  def handle_info({:open_lock, _guid, _spell, _item, _success_events} = command, state) do
     {:noreply, ItemCosts.apply(state, command)}
   rescue
     error ->

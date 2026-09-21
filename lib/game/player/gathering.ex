@@ -9,7 +9,10 @@ defmodule ThistleTea.Game.Player.Gathering do
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.Lock
+  alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Gathering, as: GatheringLogic
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
@@ -60,14 +63,20 @@ defmodule ThistleTea.Game.Player.Gathering do
     end
   end
 
-  def complete(%{character: %Character{} = character} = state, guid, %Spell{} = spell, cast_item_guid) do
+  def complete(
+        %{character: %Character{} = character} = state,
+        guid,
+        %Spell{} = spell,
+        cast_item_guid,
+        success_events \\ []
+      ) do
     with {:ok, lock, entry} <- context(state, spell, Target.object(guid), cast_item_guid),
          :ok <- validate_tools(character, spell),
          {:ok, opened} <- OpenLock.resolve(character, spell, lock, entry) do
       state = Looting.release(state)
 
       case costs(state.character, spell, cast_item_guid) do
-        {:ok, changes} -> open(state, guid, opened, changes, spell.id)
+        {:ok, changes} -> open(state, guid, opened, changes, spell.id, success_events)
         {:error, reason} -> failure(state, spell.id, reason)
       end
     else
@@ -81,21 +90,21 @@ defmodule ThistleTea.Game.Player.Gathering do
       {:ok, _template} ->
         state = Looting.release(state)
         {:ok, changes} = Inventory.plan(Batch.new(state.character.player), &ItemStore.get/1)
-        open(state, guid, opened, changes, nil)
+        open(state, guid, opened, changes, nil, [])
 
       _ ->
         state
     end
   end
 
-  defp open(state, guid, opened, changes, spell_id) do
+  defp open(state, guid, opened, changes, spell_id, success_events) do
     gain = skill_gain(state.character, opened)
 
     case Entity.call(guid, {:open_lock, Looting.actor(state, guid), opened, match?({:gained, _}, gain)}) do
       {:ok, content, gained?} ->
         skills = if gained?, do: elem(gain, 1), else: changes.player.skills
         changes = ChangeSet.put_player(changes, %{changes.player | skills: skills})
-        state |> InventoryUpdate.apply({:ok, changes}) |> project(guid, content)
+        state |> InventoryUpdate.apply({:ok, changes}) |> emit(success_events) |> project(guid, content)
 
       {:error, reason} ->
         failure(state, spell_id, reason)
@@ -103,6 +112,10 @@ defmodule ThistleTea.Game.Player.Gathering do
       _ ->
         failure(state, spell_id, :bad_targets)
     end
+  end
+
+  defp emit(state, events) do
+    %{state | character: EventSink.emit(state.character, events, Context.new(self()))}
   end
 
   defp project(state, guid, :activate), do: GameObjects.open_object(state, guid)
@@ -179,7 +192,6 @@ defmodule ThistleTea.Game.Player.Gathering do
   defp failure(state, nil, _reason), do: state
 
   defp failure(state, spell_id, reason) do
-    Network.send_packet(Message.SmsgCastResult.failure(spell_id, reason))
-    state
+    emit(state, Effects.spell_cast_failed(spell_id, reason))
   end
 end

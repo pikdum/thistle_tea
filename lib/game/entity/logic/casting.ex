@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.MechanicResistance
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Mount
+  alias ThistleTea.Game.Entity.Logic.OpenLock
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.PetLearning
   alias ThistleTea.Game.Entity.Logic.Pickpocket
@@ -258,20 +259,23 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     end
   end
 
-  defp queue_quest_cast_credit(%Character{} = character, %Cast{spell: %Spell{id: spell_id}}, %CastResolution{
-         hits: hits,
-         followups: %Followups{object_guid: object_guid}
-       }) do
+  defp queue_quest_cast_credit(%Character{} = character, %Cast{spell: %Spell{} = spell}, resolution) do
+    if OpenLock.spell?(spell),
+      do: character,
+      else: Effects.enqueue(character, quest_cast_credit(resolution, spell.id))
+  end
+
+  defp queue_quest_cast_credit(entity, _casting, _resolution), do: entity
+
+  defp quest_cast_credit(%CastResolution{hits: hits, followups: %Followups{object_guid: object_guid}}, spell_id) do
     targets =
       case object_guid do
         guid when is_integer(guid) and guid > 0 -> Enum.uniq([guid | hits])
         _guid -> hits
       end
 
-    Effects.enqueue(character, Effects.quest_cast_credit(targets, spell_id))
+    Effects.quest_cast_credit(targets, spell_id)
   end
-
-  defp queue_quest_cast_credit(entity, _casting, _resolution), do: entity
 
   defp resolve(entity, %Cast{spell: %Spell{} = spell, targets: %Target{} = targets} = casting) do
     resolved_targets = resolve_targets(entity, casting)
@@ -456,11 +460,14 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     end
   end
 
-  defp queue_open_object(character, %Cast{
-         spell: %Spell{} = spell,
-         cast_item_guid: cast_item_guid,
-         resolution: %CastResolution{followups: %Followups{object_guid: object_guid}}
-       }) do
+  defp queue_open_object(
+         character,
+         %Cast{
+           spell: %Spell{} = spell,
+           cast_item_guid: cast_item_guid,
+           resolution: %CastResolution{followups: %Followups{object_guid: object_guid}}
+         } = casting
+       ) do
     cond do
       is_integer(object_guid) and Enum.any?(spell.effects, &(&1.type == :activate_object)) ->
         Effects.enqueue(character, %Effects.OpenGameObject{target_guid: object_guid, spell_id: spell.id})
@@ -469,12 +476,28 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         Effects.enqueue(character, %Effects.OpenLock{
           target_guid: object_guid,
           spell: spell,
-          cast_item_guid: cast_item_guid
+          cast_item_guid: cast_item_guid,
+          success_events: opening_success_events(character, casting)
         })
 
       true ->
         character
     end
+  end
+
+  defp opening_success_events(character, %Cast{spell: spell, resolution: resolution} = casting) do
+    [
+      Effects.spell_cast_result(spell.id),
+      Effects.spell_go(
+        character.object.guid,
+        spell.id,
+        resolution.followups.packet_hits,
+        launch_targets(casting),
+        casting.cast_item_guid,
+        resolution.misses
+      ),
+      quest_cast_credit(resolution, spell.id)
+    ]
   end
 
   defp queue_feed_pet(%Character{} = character, %Cast{
@@ -904,8 +927,8 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp start_cooldown(character, _casting, _now), do: character
 
-  defp queue_cast_result(character, %{spell: %Spell{id: spell_id}}) do
-    Effects.enqueue(character, Effects.spell_cast_result(spell_id))
+  defp queue_cast_result(character, %{spell: %Spell{} = spell}) do
+    if OpenLock.spell?(spell), do: character, else: Effects.enqueue(character, Effects.spell_cast_result(spell.id))
   end
 
   defp queue_cast_result(character, _casting), do: character
@@ -1047,10 +1070,14 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     {targets, misses} =
       if Spell.reflectable?(spell), do: {targets ++ Enum.map(misses, & &1.guid), []}, else: {targets, misses}
 
-    Effects.enqueue(
-      character,
-      Effects.spell_go(guid, spell_id, targets, launch_targets(casting), casting.cast_item_guid, misses)
-    )
+    if OpenLock.spell?(spell) do
+      character
+    else
+      Effects.enqueue(
+        character,
+        Effects.spell_go(guid, spell_id, targets, launch_targets(casting), casting.cast_item_guid, misses)
+      )
+    end
   end
 
   defp queue_spell_go(character, _casting, _targets, _misses), do: character

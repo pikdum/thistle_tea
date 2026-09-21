@@ -137,7 +137,21 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
 
   def reservation_lost(%GameObject{} = state, token) when is_reference(token) do
     Process.demonitor(token, [:flush])
+    state = release_lost_reservation(state, token)
 
+    case state.internal.gathering do
+      %GatheringState{viewer_monitors: monitors} ->
+        case Map.get(monitors, token) do
+          %Actor{} = actor -> release(state, actor)
+          nil -> state
+        end
+
+      _ ->
+        state
+    end
+  end
+
+  defp release_lost_reservation(state, token) do
     case session(state) do
       %LootSession{} = session -> put_session(state, LootSession.release(session, token))
       _no_session -> state
@@ -145,6 +159,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
   end
 
   def respawn(%GameObject{internal: %Internal{loot: %InternalLoot{} = loot}} = state) do
+    clear_viewer_monitors(state.internal.gathering)
     state = put_internal_loot(state, %{loot | session: nil, corpse_removed?: false})
     state = put_gathering(state, GatheringState.reset(state.internal.gathering))
     World.update_position(state)
@@ -175,10 +190,23 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
   defp finish_harvest(state, _actor), do: despawn(state)
 
   defp close_access(%GameObject{internal: %{gathering: %GatheringState{} = gathering}} = state, actor) do
-    put_gathering(state, %{gathering | opened_by: Map.delete(gathering.opened_by, actor.guid)})
+    {closed, monitors} = Enum.split_with(gathering.viewer_monitors, fn {_ref, viewer} -> viewer.guid == actor.guid end)
+    Enum.each(closed, fn {ref, _viewer} -> Process.demonitor(ref, [:flush]) end)
+
+    put_gathering(state, %{
+      gathering
+      | opened_by: Map.delete(gathering.opened_by, actor.guid),
+        viewer_monitors: Map.new(monitors)
+    })
   end
 
   defp close_access(state, _actor), do: state
+
+  defp clear_viewer_monitors(%GatheringState{viewer_monitors: monitors}) do
+    Enum.each(monitors, fn {ref, _actor} -> Process.demonitor(ref, [:flush]) end)
+  end
+
+  defp clear_viewer_monitors(nil), do: :ok
 
   defp put_gathering(state, gathering), do: %{state | internal: %{state.internal | gathering: gathering}}
 

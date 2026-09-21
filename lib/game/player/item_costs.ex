@@ -55,6 +55,6 @@ defmodule ThistleTea.Game.Player.ItemCosts do
 
   def apply(state, {:disenchant_item, guid, spell_id}), do: Disenchant.complete(state, guid, spell_id)
 
-  def apply(state, {:open_lock, guid, spell, cast_item_guid}),
-    do: Gathering.complete(state, guid, spell, cast_item_guid)
+  def apply(state, {:open_lock, guid, spell, cast_item_guid, success_events}),
+    do: Gathering.complete(state, guid, spell, cast_item_guid, success_events)
 end

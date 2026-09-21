@@ -89,7 +89,7 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
   def emit(entity, %Effects.OpenGameObject{}, _context), do: entity
 
   def emit(%Character{} = entity, %Effects.OpenLock{} = effect, context) do
-    Context.send(context, {:open_lock, effect.target_guid, effect.spell, effect.cast_item_guid})
+    Context.send(context, {:open_lock, effect.target_guid, effect.spell, effect.cast_item_guid, effect.success_events})
     entity
   end
 

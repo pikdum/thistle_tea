@@ -79,12 +79,22 @@ defmodule ThistleTea.Game.Player.GatheringTest do
     test "typed completion grants loot and one stored skill point", %{state: state, node: node, spell: spell} do
       assert Looting.open(state, node).loot_guid == nil
       assert GameObjects.use_object(state, node) == state
-      EventSink.emit(state.character, [%Effects.OpenLock{target_guid: node, spell: spell}], Context.new(self()))
-      assert_receive {:open_lock, ^node, ^spell, nil} = command
+      events = [Effects.spell_cast_result(spell.id), Effects.quest_cast_credit([node], spell.id)]
+
+      EventSink.emit(
+        state.character,
+        [%Effects.OpenLock{target_guid: node, spell: spell, success_events: events}],
+        Context.new(self())
+      )
+
+      assert_receive {:open_lock, ^node, ^spell, nil, ^events} = command
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{result: 0}}}
       assert {:noreply, opened} = PlayerServer.handle_info(command, state)
       assert opened.loot_guid == node
       assert opened.character.player.skills[186].value == 2
       assert CharacterStore.get(state.guid).player.skills == opened.character.player.skills
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{result: 0}}}
+      assert_receive {:quest_cast_credit, [^node], @spell}
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgLootResponse{guid: ^node, loot_type: 2}}}
       closed = Looting.release(opened)
       assert Looting.open(closed, node).loot_guid == nil
@@ -120,6 +130,20 @@ defmodule ThistleTea.Game.Player.GatheringTest do
       assert Looting.open(state, node).loot_guid == nil
     end
 
+    test "rejected completion sends full failure without success or quest credit", %{
+      state: state,
+      node: node,
+      spell: spell
+    } do
+      Gathering.complete(state, node, spell, nil)
+      events = [Effects.spell_cast_result(spell.id), Effects.quest_cast_credit([node], spell.id)]
+      assert Gathering.complete(state, node, spell, nil, events) == state
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{spell: @spell, reason: 0x15}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgSpellFailure{spell: @spell, result: 0x15}}}
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{result: 0}}}
+      refute_receive {:quest_cast_credit, _, _}
+    end
+
     test "item-based opening consumes a charge only after success and never grants skill", %{state: state, node: node} do
       key =
         ItemStore.create(%ItemTemplate{entry: 999_886, spellid_1: @spell, spelltrigger_1: 0, spellcharges_1: -1},
@@ -143,6 +167,39 @@ defmodule ThistleTea.Game.Player.GatheringTest do
   end
 
   describe "loot lifecycle" do
+    test "an abruptly terminated looter releases access and retains unclaimed contents", %{
+      state: state,
+      node: node,
+      spell: spell
+    } do
+      parent = self()
+
+      looter =
+        spawn(fn ->
+          opened = Gathering.complete(state, node, spell, nil)
+          send(parent, {:opened, opened})
+
+          receive do
+            :finish -> :ok
+          end
+        end)
+
+      assert_receive {:opened, opened}
+      assert opened.loot_guid == node
+      object = :sys.get_state(Entity.pid(node))
+      assert map_size(object.internal.gathering.viewer_monitors) == 1
+      Process.exit(looter, :kill)
+      object = await_closed(node, 100)
+      assert object.internal.gathering.opened_by == %{}
+      assert object.internal.gathering.viewer_monitors == %{}
+      assert LootSession.viewers(object.internal.loot.session) == []
+      refute LootSession.finished?(object.internal.loot.session)
+      assert object.internal.gathering.uses == 0
+      reopened = Gathering.complete(opened, node, spell, nil)
+      assert reopened.loot_guid == node
+      assert reopened.character.player.skills[186].value == 2
+    end
+
     test "movement and logout release node access without discarding remaining loot", %{
       state: state,
       node: node,
@@ -172,6 +229,17 @@ defmodule ThistleTea.Game.Player.GatheringTest do
                {:error, :bad_targets}
 
       assert CastValidation.validate(state.character, spell, targets, nil, 0) == {:error, :bad_targets}
+    end
+  end
+
+  defp await_closed(node, remaining) do
+    object = :sys.get_state(Entity.pid(node))
+
+    if map_size(object.internal.gathering.viewer_monitors) == 0 or remaining == 0 do
+      object
+    else
+      Process.sleep(10)
+      await_closed(node, remaining - 1)
     end
   end
 

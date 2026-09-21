@@ -193,8 +193,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     {:reply, result, state}
   end
 
-  def handle_call({:open_lock, %Actor{} = actor, opened, gain?}, _from, %GameObject{} = state) do
-    {result, state} = __MODULE__.OpenLock.open(state, actor, opened, gain?)
+  def handle_call({:open_lock, %Actor{} = actor, opened, gain?}, {owner_pid, _tag}, %GameObject{} = state) do
+    {result, state} = __MODULE__.OpenLock.open(state, actor, opened, gain?, owner_pid: owner_pid)
     {:reply, result, state}
   rescue
     error ->
