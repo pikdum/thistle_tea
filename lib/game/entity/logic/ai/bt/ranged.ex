@@ -14,7 +14,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
   alias ThistleTea.Game.Entity.Logic.CombatControl
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
 
@@ -40,10 +39,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
 
   defp shoot_at_distance(character, blackboard, now, distance, auto_shot) do
     cond do
-      CombatControl.pacified?(character) or CombatControl.prevention(character, auto_shot.spell) != :ok ->
-        {:failure, stop(character), blackboard}
-
-      :ranged in (character.player.broken_equipment || []) ->
+      blocked?(character, auto_shot.spell) ->
         {:failure, stop(character), blackboard}
 
       not is_number(distance) ->
@@ -55,9 +51,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
       now < auto_shot.next_at ->
         {:success, character, blackboard}
 
+      Map.get(auto_shot, :pending?, false) ->
+        {:success, character, blackboard}
+
       true ->
-        {:success, fire(character, auto_shot, now), blackboard}
+        speed = max(character.unit.ranged_attack_time || 2_000, 1)
+        auto_shot = auto_shot |> Map.put(:next_at, now + speed) |> Map.put(:pending?, true)
+        character = %{character | internal: %{character.internal | auto_shot: auto_shot}}
+        request = %Effects.LaunchRanged{kind: :repeat, request: auto_shot, now: now}
+        {:success, Effects.enqueue(character, request), blackboard}
     end
+  end
+
+  defp blocked?(character, spell) do
+    CombatControl.pacified?(character) or CombatControl.prevention(character, spell) != :ok or
+      :ranged in (character.player.broken_equipment || [])
   end
 
   defp wait(%Character{internal: %Internal{auto_shot: %{next_at: next_at}}} = character, blackboard, %Context{now: now}) do
@@ -72,27 +80,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
     Effects.enqueue(character, effects)
   end
 
-  defp fire(character, auto_shot, now) do
+  def fire(%Character{} = character, auto_shot, now) do
     {character, events} = Aura.remove_with_interrupt_flags(character, Aura.interrupt_mask(:attack), now)
     character = Effects.enqueue(character, events)
     context = CastContext.from_caster(character, auto_shot.spell, auto_shot.target_guid)
-    speed = max(character.unit.ranged_attack_time || 2_000, 1)
-    auto_shot = %{auto_shot | next_at: now + speed}
 
     character
-    |> then(&%{&1 | internal: %{&1.internal | auto_shot: auto_shot}})
+    |> then(&%{&1 | internal: %{&1.internal | auto_shot: Map.delete(auto_shot, :pending?)}})
     |> Effects.enqueue(
       Effects.spell_go(character.object.guid, auto_shot.spell.id, [auto_shot.target_guid], auto_shot.targets)
     )
     |> Effects.enqueue(Effects.deliver_spell(auto_shot.target_guid, context, auto_shot.spell))
-    |> consume_ammo(auto_shot.spell)
-  end
-
-  defp consume_ammo(character, %Spell{} = spell) do
-    case Hunter.ammo_reagents(character, spell) do
-      [] -> character
-      reagents -> Effects.enqueue(character, Effects.consume_reagents(reagents))
-    end
   end
 
   defp combat_distance(%Character{unit: unit} = character, target_guid, %Context{perception: perception} = context) do

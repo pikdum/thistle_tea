@@ -153,7 +153,6 @@ defmodule ThistleTea.Game.Entity.Logic.SkinningTest do
           power: %PowerCost{power_type: nil, amount: 0},
           channel_power: %PowerCost{power_type: nil, amount: 0},
           reagents: [],
-          ammo: [],
           cast_item_guid: nil,
           modifier_holder_ids: []
         },

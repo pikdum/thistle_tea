@@ -76,6 +76,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party.MemberStats
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
+  alias ThistleTea.Game.Player.Ammunition
   alias ThistleTea.Game.Player.Auction.ClientProjection, as: AuctionProjection
   alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.ConditionContext
@@ -1052,6 +1053,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   rescue
     error ->
       Logger.error("consume_reagents crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:launch_ranged, %Effects.LaunchRanged{} = request}, state) do
+    {:noreply, Ammunition.launch(state, request), {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Ranged launch failed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, state}
   end
 

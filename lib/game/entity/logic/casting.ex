@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.Ammunition
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
@@ -124,6 +125,8 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   def complete(entity, _casting, _now), do: entity
 
+  defp advance_phase(entity, %Cast{ammunition: :pending}, _now), do: {:waiting, entity, 50}
+
   defp advance_phase(entity, %Cast{phase: :preparing} = casting, now) do
     if now >= Cast.launch_at(casting) do
       launch(entity, casting, now)
@@ -163,16 +166,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp launch(entity, %Cast{} = casting, now) do
     with :ok <- Disarm.validate(entity, casting.spell),
          true <- cast_target_visible?(entity, casting) do
-      resolution = resolve(entity, casting)
-
-      casting =
-        casting
-        |> Cast.transition(:launch)
-        |> Cast.put_resolution(resolution)
-
-      entity
-      |> put_cast(casting)
-      |> advance_phase(casting, now)
+      prepare_launch(entity, casting, now)
     else
       failure ->
         reason =
@@ -188,6 +182,28 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
         {:finished, entity}
     end
+  end
+
+  defp prepare_launch(%Character{} = entity, %Cast{ammunition: :unpaid} = casting, now) do
+    if Ammunition.required?(casting.spell) do
+      casting = %{casting | ammunition: :pending}
+
+      entity =
+        entity
+        |> put_cast(casting)
+        |> Effects.enqueue(%Effects.LaunchRanged{kind: :cast, request: casting, now: now})
+
+      {:waiting, entity, 50}
+    else
+      launch_ready(entity, casting, now)
+    end
+  end
+
+  defp prepare_launch(entity, casting, now), do: launch_ready(entity, casting, now)
+
+  defp launch_ready(entity, casting, now) do
+    casting = casting |> Cast.transition(:launch) |> Cast.put_resolution(resolve(entity, casting))
+    entity |> put_cast(casting) |> advance_phase(casting, now)
   end
 
   defp apply_launch(entity, %Cast{resolution: %CastResolution{} = resolution} = casting, now) do
@@ -289,7 +305,6 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         power: power_cost(entity, spell),
         channel_power: channel_power_cost(entity, casting),
         reagents: if(deferred_item_costs?(spell), do: [], else: spell.reagents || []),
-        ammo: Hunter.ammo_reagents(entity, spell),
         cast_item_guid: if(!deferred_item_costs?(spell), do: cast_item_cost(casting)),
         modifier_holder_ids: casting.modifier_holder_ids
       },
@@ -332,7 +347,6 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         power: %PowerCost{power_type: nil, amount: 0},
         channel_power: %PowerCost{power_type: nil, amount: 0},
         reagents: [],
-        ammo: [],
         cast_item_guid: nil,
         modifier_holder_ids: []
       },
@@ -907,7 +921,6 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp queue_consume_costs(character, %Costs{} = costs) do
     character
     |> queue_reagents(costs.reagents)
-    |> queue_reagents(costs.ammo)
     |> queue_cast_item(costs.cast_item_guid)
   end
 

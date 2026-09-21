@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.CancelAutoRepeat,
     Effects.ConsumeCastItem,
     Effects.ConsumeReagents,
+    Effects.LaunchRanged,
     Effects.CreateItem,
     Effects.EmoteAnimation,
     Effects.EmoteState,

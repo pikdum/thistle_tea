@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:CreateItem, [:item_id, :count], [spell_id: nil]},
     {:GiveItem, [:target_guid, :item_id, :count], []},
     {:ConsumeReagents, [:reagents], []},
+    {:LaunchRanged, [:kind, :request, :now], []},
     {:MonsterTalk, [:text, :chat_type, :target_guid], []},
     {:Emote, [:emote_id], []},
     {:EmoteAnimation, [:emote_id], []},

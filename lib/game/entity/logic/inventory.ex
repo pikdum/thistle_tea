@@ -81,6 +81,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   @error_codes %{
     ok: 0,
     cant_equip_level_i: 1,
+    only_ammo_can_go_here: 7,
     item_doesnt_go_to_slot: 3,
     nonempty_bag_over_other_bag: 5,
     cant_trade_equip_bags: 6,

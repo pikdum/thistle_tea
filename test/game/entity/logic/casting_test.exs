@@ -1540,7 +1540,6 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
         power: %PowerCost{power_type: nil, amount: 0},
         channel_power: Keyword.get(opts, :channel_power, %PowerCost{power_type: nil, amount: 0}),
         reagents: [],
-        ammo: [],
         cast_item_guid: nil,
         modifier_holder_ids: []
       },

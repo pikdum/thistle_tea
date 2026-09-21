@@ -105,7 +105,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.RangedTest do
 
         {_status, result} = BT.tick(Ranged.sequence(), caster, context)
 
-        assert Enum.any?(result.internal.events, &is_struct(&1, Effects.DeliverSpell)) == visible?
+        assert Enum.any?(result.internal.events, &is_struct(&1, Effects.LaunchRanged)) == visible?
+        refute Enum.any?(result.internal.events, &is_struct(&1, Effects.DeliverSpell))
         assert is_nil(result.internal.auto_shot) == not visible?
         assert Enum.any?(result.internal.events, &is_struct(&1, Effects.CancelAutoRepeat)) == not visible?
       end

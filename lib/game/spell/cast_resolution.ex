@@ -25,14 +25,13 @@ defmodule ThistleTea.Game.Spell.CastResolution do
   defmodule Costs do
     @moduledoc false
 
-    @enforce_keys [:power, :channel_power, :reagents, :ammo, :cast_item_guid, :modifier_holder_ids]
-    defstruct [:power, :channel_power, :reagents, :ammo, :cast_item_guid, :modifier_holder_ids]
+    @enforce_keys [:power, :channel_power, :reagents, :cast_item_guid, :modifier_holder_ids]
+    defstruct [:power, :channel_power, :reagents, :cast_item_guid, :modifier_holder_ids]
 
     @type t :: %__MODULE__{
             power: PowerCost.t(),
             channel_power: PowerCost.t(),
             reagents: list(),
-            ammo: list(),
             cast_item_guid: non_neg_integer() | nil,
             modifier_holder_ids: [non_neg_integer()]
           }

@@ -1,7 +1,6 @@
 defmodule ThistleTea.Game.Entity.Logic.Hunter do
   @moduledoc """
-  Pure Hunter ranged-ammunition rules derived from the equipped weapon and
-  selected projectile item.
+  Pure Hunter pet, reactive ability, and combat lifecycle rules.
   """
   import Bitwise, only: [&&&: 2, <<<: 2, |||: 2, bnot: 1]
 
@@ -18,25 +17,9 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
 
-  @item_class_projectile 6
   @hunter_family 9
   @auto_shot_family_mask 0x00000001
   @refocus_family_mask 0x00023800
-
-  def validate_ammo(%Spell{} = spell, ammo_id, ammo_template, equipped_items, count_item)
-      when is_list(equipped_items) do
-    if Spell.ranged_ability?(spell) do
-      validate_projectile(ammo_id, ammo_template, ranged_weapon(equipped_items), count_item)
-    else
-      :ok
-    end
-  end
-
-  def ammo_reagents(%{player: %{ammo_id: ammo_id}}, %Spell{} = spell) when is_integer(ammo_id) and ammo_id > 0 do
-    if Spell.ranged_ability?(spell), do: [{ammo_id, 1}], else: []
-  end
-
-  def ammo_reagents(_character, _spell), do: []
 
   def validate_tame(caster, %Spell{} = spell, target) do
     if tame_creature?(spell), do: validate_tame_target(caster, target), else: :ok
@@ -214,23 +197,6 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
   defp tame_creature?(%Spell{id: 1515}), do: true
   defp tame_creature?(%Spell{effects: effects}), do: Enum.any?(effects, &(&1.type == :tame_creature))
   defp feed_pet?(%Spell{effects: effects}), do: Enum.any?(effects, &(&1.type == :feed_pet))
-
-  defp validate_projectile(_ammo_id, _ammo, %{ammo_type: 0}, _count_item), do: :ok
-
-  defp validate_projectile(
-         ammo_id,
-         %{class: @item_class_projectile, subclass: subclass},
-         %{ammo_type: subclass},
-         count_item
-       )
-       when is_integer(ammo_id) and ammo_id > 0 and is_function(count_item, 1) do
-    if count_item.(ammo_id) > 0, do: :ok, else: {:error, :no_ammo}
-  end
-
-  defp validate_projectile(_ammo_id, _ammo, _weapon, _count_item), do: {:error, :no_ammo}
-
-  defp ranged_weapon(items),
-    do: Enum.find(items, &match?(%{class: 2, inventory_type: type} when type in [15, 25, 26], &1))
 
   defp attack_stop_events(%Character{object: %{guid: guid}, unit: %{target: target}})
        when is_integer(target) and target > 0, do: [Effects.attack_stop(guid, target)]

@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
     {:ClearCooldown, [:target_guid, :spell_id], []},
     {:StandState, [:stand_state], []},
     {:SpellStart, [:source_guid, :spell_id, :duration_ms, :targets], []},
-    {:SpellGo, [:source_guid, :spell_id, :hit_guids, :misses, :targets], [cast_item_guid: nil]},
+    {:SpellGo, [:source_guid, :spell_id, :hit_guids, :misses, :targets], [cast_item_guid: nil, projectile: nil]},
     {:ChannelStart, [:source_guid, :spell_id, :channel_time_ms], []},
     {:ChannelUpdate, [:source_guid, :channel_time_ms], []},
     {:SpellDelayed, [:source_guid, :delay_ms], []},

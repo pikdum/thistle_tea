@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Spell.Cast do
     :next_channel_tick_at,
     :cast_item_guid,
     phase: :preparing,
+    ammunition: :unpaid,
     modifier_holder_ids: [],
     consume_item: false,
     pushback_count: 0,

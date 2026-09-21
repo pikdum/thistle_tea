@@ -42,7 +42,6 @@ defmodule ThistleTea.Game.Spell.CastTest do
         power: %CastResolution.PowerCost{power_type: 0, amount: 0},
         channel_power: %CastResolution.PowerCost{power_type: 0, amount: 0},
         reagents: [],
-        ammo: [],
         cast_item_guid: nil,
         modifier_holder_ids: []
       },

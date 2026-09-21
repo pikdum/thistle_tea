@@ -140,6 +140,13 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
 
   def emit(entity, %Effects.ConsumeReagents{}, _context), do: entity
 
+  def emit(%Character{} = entity, %Effects.LaunchRanged{} = request, context) do
+    Context.send(context, {:launch_ranged, request})
+    entity
+  end
+
+  def emit(entity, %Effects.LaunchRanged{}, _context), do: entity
+
   def emit(
         %{object: %{guid: guid}, internal: %Internal{name: name}} = entity,
         %Effects.MonsterTalk{} = effect,

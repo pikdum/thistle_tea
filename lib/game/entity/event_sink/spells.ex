@@ -265,7 +265,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   def emit(entity, %Effects.ClearCooldown{}, _context), do: entity
 
   def emit(%{object: %{guid: guid}} = entity, %Effects.SpellGo{} = effect, _context) when is_integer(guid) do
-    projectile = Projectile.fields(entity, effect.spell_id)
+    projectile = effect.projectile || Projectile.fields(entity, effect.spell_id)
 
     %Message.SmsgSpellGo{
       cast_item: effect.cast_item_guid || effect.source_guid || guid,

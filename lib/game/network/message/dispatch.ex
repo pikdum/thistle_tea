@@ -150,6 +150,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_SWAP_ITEM: Message.CmsgSwapItem,
               CMSG_SPLIT_ITEM: Message.CmsgSplitItem,
               CMSG_DESTROYITEM: Message.CmsgDestroyitem,
+              CMSG_SET_AMMO: Message.CmsgSetAmmo,
               CMSG_BANKER_ACTIVATE: Message.CmsgBankerActivate,
               CMSG_BINDER_ACTIVATE: Message.CmsgBinderActivate,
               CMSG_BUY_BANK_SLOT: Message.CmsgBuyBankSlot,

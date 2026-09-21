@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   import Bitwise, only: [&&&: 2, <<<: 2]
 
   alias ThistleTea.Game.Duel
+  alias ThistleTea.Game.Entity.Logic.Ammunition
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Aura.Dispel
   alias ThistleTea.Game.Entity.Logic.CombatControl
@@ -126,7 +127,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     if godmode?(caster) do
       :ok
     else
-      Hunter.validate_ammo(
+      Ammunition.validate(
         spell,
         Keyword.get(opts, :ammo_id),
         Keyword.get(opts, :ammo_template),

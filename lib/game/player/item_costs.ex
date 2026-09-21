@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Player.ItemCosts do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
   alias ThistleTea.Game.Network.InventoryUpdate
+  alias ThistleTea.Game.Player.Ammunition
   alias ThistleTea.Game.Player.Disenchant
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.Gathering
@@ -17,6 +18,7 @@ defmodule ThistleTea.Game.Player.ItemCosts do
   @commands [
     :consume_cast_item,
     :consume_reagents,
+    :launch_ranged,
     :enchant_item,
     :enchant_item_permanent,
     :disenchant_item,
@@ -32,6 +34,8 @@ defmodule ThistleTea.Game.Player.ItemCosts do
   end
 
   def apply(state, {:consume_cast_item, guid}), do: Items.consume_cast_item(state, guid)
+
+  def apply(state, {:launch_ranged, request}), do: Ammunition.launch(state, request)
 
   def apply(state, {:consume_reagents, reagents}) do
     batch =
