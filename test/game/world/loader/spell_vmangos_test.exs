@@ -17,6 +17,21 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
 
   @moduletag :dbc_db
 
+  describe "languages" do
+    test "loads learned languages and the Curse of Tongues override" do
+      for {id, language} <- [{668, 7}, {669, 1}, {670, 3}, {671, 2}, {672, 6}, {7340, 13}, {7341, 14}, {17_737, 33}] do
+        assert Enum.any?(SpellLoader.load(id).effects, &match?(%Effect{type: :language, misc_value: ^language}, &1))
+      end
+
+      for id <- [1714, 11_719] do
+        spell = SpellLoader.load(id)
+        assert Enum.any?(spell.effects, &match?(%Effect{aura: :mod_language, misc_value: 8}, &1))
+        assert spell.duration_ms == 30_000
+        assert spell.dispel_type == 2
+      end
+    end
+  end
+
   describe "Detect Magic" do
     test "loads the aura reveal, duration, and dispel category" do
       spell = SpellLoader.load(2855)

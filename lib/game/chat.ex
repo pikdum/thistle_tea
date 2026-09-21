@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Chat do
   alias ThistleTea.Game.Chat.Channel.Member
   alias ThistleTea.Game.Entity.Data.ChatStatus
   alias ThistleTea.Game.Entity.Logic.ChatStatus, as: StatusLogic
+  alias ThistleTea.Game.Entity.Logic.Language
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party
@@ -39,9 +40,27 @@ defmodule ThistleTea.Game.Chat do
   @emote_range 25
 
   def handle(state, chat_type, language, message, target_name) do
-    case DevCommands.run(state, message) do
-      {:handled, state} -> state
-      :unhandled -> route(state, chat_type, language, message, target_name)
+    if language == Language.addon() do
+      handle_message(state, chat_type, language, message, target_name)
+    else
+      case DevCommands.run(state, message) do
+        {:handled, state} -> state
+        :unhandled -> handle_message(state, chat_type, language, message, target_name)
+      end
+    end
+  end
+
+  defp handle_message(state, chat_type, language, message, target_name) do
+    case Language.resolve(state.character, chat_type, language) do
+      {:ok, language} ->
+        route(state, chat_type, language, message, target_name)
+
+      {:error, :not_learned} ->
+        Network.send_packet(%Message.SmsgNotification{message: "You have not learned that language."})
+        state
+
+      {:error, :invalid_language} ->
+        state
     end
   end
 

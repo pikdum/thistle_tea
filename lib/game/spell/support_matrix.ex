@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
   spell and fails when a value falls outside this matrix, so new content
   can never silently no-op.
 
-  Language and VMangos linked auras remain deferred.
+  VMangos linked auras remain deferred.
   """
 
   @deferred_effects %{
@@ -15,7 +15,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
     20 => :defense_passive,
     26 => :dodge_passive,
     37 => :spell_defense_dnd,
-    39 => :language,
     44 => :skill_step,
     47 => :tradeskill,
     49 => :detect,
@@ -28,7 +27,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
   }
 
   @deferred_auras %{
-    75 => :mod_language,
     192 => :vmangos_linked_aura
   }
 

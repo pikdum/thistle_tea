@@ -545,6 +545,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(35), do: :apply_area_aura
   defp effect_type(36), do: :learn_spell
   defp effect_type(38), do: :dispel
+  defp effect_type(39), do: :language
   defp effect_type(40), do: :dual_wield
   defp effect_type(45), do: :honor
   defp effect_type(60), do: :proficiency
@@ -667,6 +668,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(78), do: :mounted
   defp aura_type(87), do: :mod_damage_percent_taken
   defp aura_type(74), do: :reflect_spells_school
+  defp aura_type(75), do: :mod_language
   defp aura_type(77), do: :mechanic_immunity
   defp aura_type(84), do: :mod_regen
   defp aura_type(85), do: :mod_power_regen

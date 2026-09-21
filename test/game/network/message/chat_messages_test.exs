@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.ChatMessagesTest do
 
   alias ThistleTea.Game.Network.Message.CmsgMessagechat
   alias ThistleTea.Game.Network.Message.SmsgMessagechat
+  alias ThistleTea.Game.Network.Message.SmsgNotification
 
   describe "from_binary/1" do
     test "decodes status commands including empty toggle messages" do
@@ -14,6 +15,10 @@ defmodule ThistleTea.Game.Network.Message.ChatMessagesTest do
   end
 
   describe "to_binary/1" do
+    test "encodes a client notification as a terminated string" do
+      assert SmsgNotification.to_binary(%SmsgNotification{message: "Café"}) == <<"Café", 0>>
+    end
+
     test "encodes whisper confirmation and status replies with byte lengths" do
       for type <- [6, 7, 0x14, 0x15] do
         packet = %SmsgMessagechat{chat_type: type, language: 0, sender_guid: 42, message: "Café", tag: 2}
