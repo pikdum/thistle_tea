@@ -25,8 +25,9 @@ quest, casting, and spell-removal transition. Relearning starts at the initial
 value. Removing a higher rank while a lower granting rank remains follows
 VMangos's lower-rank value and cap rule.
 
-This change implements learned-spell effect 118. General cast-time effect 44
-(`SKILL_STEP`) remains deferred in the support matrix.
+This change implements learned-spell effect 118. Cast-time effect 44
+(`SKILL_STEP`) is covered by the subsequent
+[teaching spells and recipe books implementation](spell-teaching-playtest.md).
 
 References:
 

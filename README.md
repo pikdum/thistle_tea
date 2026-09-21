@@ -137,6 +137,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Gathering and object locks](docs/gathering-playtest.md), with Mining, Herbalism, shared key and skill requirements, repeated vein harvests, and per-spawn skill gains
 - [Spell focus requirements](docs/spell-focus-playtest.md), with forges, anvils, cooking fires, alchemy labs, native errors, and revalidation before casting costs
 - [Spell-granted skill ranks](docs/spell-skills-playtest.md), with profession starter recipes, preserved progress on rank upgrades, riding values, and abandonment cleanup
+- [Teaching spells and recipe books](docs/spell-teaching-playtest.md), with recipe learning, Expert profession books, atomic consumption, cancellation, and specialization requirements
 - [Inventory containers and lockboxes](docs/item-containers-playtest.md), with retained private loot, Pick Lock, consumable keys, atomic claims, and full-bag recovery
 - [Trade-slot unlocking](docs/trade-opening-playtest.md), with paid lockpicking, consumable keys, final requirement checks, and retry without closing the trade
 - [Wrapped gifts](docs/gift-wrapping-playtest.md), with atomic paper consumption, creator labels, and retained item identity, charges, and enchants through trade and opening
