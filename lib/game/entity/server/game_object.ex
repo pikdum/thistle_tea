@@ -543,10 +543,10 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   defp finish_ritual_channels(%GameObject{}), do: nil
 
-  defp trigger_trap(state, %Trap{owner_guid: owner_guid, spell_id: spell_id}, target_guid) do
+  defp trigger_trap(state, %Trap{owner_guid: owner_guid, spell_id: spell_id, level: template_level}, target_guid) do
     case SpellLoader.load(spell_id) do
       %Spell{} = spell ->
-        level = state.game_object.level || 1
+        level = Enum.find([template_level, state.game_object.level, 60], &(is_integer(&1) and &1 > 0))
         caster = trap_caster(state, owner_guid, level)
 
         spell

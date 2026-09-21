@@ -170,7 +170,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
       %DataGameObjectTemplate{} = template ->
         opts = [
           summoned_by: if(effect.owned?, do: owner_guid),
-          level: owner_level(entity),
+          level: if(effect.owned?, do: owner_level(entity), else: 0),
           despawn_in_ms: duration_ms,
           ritual_target_guid: effect.target_guid,
           ritual_zone_id: zone_id(world, position)

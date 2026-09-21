@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Server.WildObjectTest do
       pid = Entity.pid(guid)
       state = :sys.get_state(pid)
       assert state.game_object.created_by == nil
+      assert state.game_object.level == 0
       assert state.internal.summon.owner_guid == nil
       assert World.position(guid) == {caster.internal.world, 0.0, 0.0, 0.0}
       assert %{db_guid: nil, go_spawned?: true} = Metadata.query(guid, [:db_guid, :go_spawned?])

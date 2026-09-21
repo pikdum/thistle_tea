@@ -44,7 +44,7 @@ defmodule ThistleTea.Game.Entity.Server.WildTrapDbcTest do
         data: [0, 0, 0, 25_656, 1, 0, 0, 0]
       }
 
-      trap = GameObject.build_summoned(template, player.internal.world, {0.0, 0.0, 0.0, 0.0})
+      trap = GameObject.build_summoned(template, player.internal.world, {0.0, 0.0, 0.0, 0.0}, level: 0)
       {:ok, pid} = World.start_entity(trap)
       guid = trap.object.guid
       ref = Process.monitor(pid)
@@ -60,7 +60,11 @@ defmodule ThistleTea.Game.Entity.Server.WildTrapDbcTest do
 
       send(pid, {:script_activate_object, player_guid})
       send(pid, {:script_activate_object, player_guid})
-      assert_receive {:"$gen_cast", {:receive_spell, %CastContext{caster_guid: ^guid}, %Spell{id: 25_656}}}, 1_000
+
+      assert_receive {:"$gen_cast",
+                      {:receive_spell, %CastContext{caster_guid: ^guid, caster_level: 60}, %Spell{id: 25_656}}},
+                     1_000
+
       assert_receive {:DOWN, ^ref, :process, ^pid, _}, 1_000
       refute_receive {:"$gen_cast", {:receive_spell, _, %Spell{id: 25_656}}}
     end

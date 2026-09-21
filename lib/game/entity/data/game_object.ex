@@ -122,6 +122,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   defp trap(%GameObjectTemplate{type: @go_type_trap, data: data} = template, owner_guid) do
     %Trap{
       owner_guid: owner_guid,
+      level: Enum.at(data, 1) || 0,
       radius: trap_radius(template),
       spell_id: Enum.at(data, 3),
       charges: max(Enum.at(data, 4) || 0, 0),
