@@ -128,6 +128,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Charged weapon coatings](docs/weapon-coatings-playtest.md), with finite poison charges, proc chance talents, atomic application, and depletion cleanup
 - [Creature-specific flat damage](docs/creature-damage-playtest.md), including Beastslayer and Elemental Slayer enchants across weapon attacks, spells, and periodic damage
 - quests
+- [Quest dependencies](docs/quest-dependencies-playtest.md), with signed and alternative prerequisites, exclusive groups, chains, breadcrumbs, profession requirements, and live NPC marker refreshes
 - [Quest sharing](docs/quest-sharing-playtest.md), with party confirmations, eligibility feedback, inherited timers, source-item lifecycle, and stale-offer cleanup
 - [Item-started quests](docs/item-quests-playtest.md), with owned starter validation, atomic item exchanges, retained objectives, full-bag rejection, and party confirmation
 - [Game-object questgivers](docs/game-object-quests-playtest.md), with per-player activation, native quest chains, conditioned gossip, and scripted player casts
