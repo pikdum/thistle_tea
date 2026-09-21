@@ -40,14 +40,7 @@ defmodule ThistleTea.Game.World.Loader.Durability do
     lost = max((component.max_durability || 0) - (component.durability || 0), 0)
 
     if lost > 0 do
-      with {level, class, subclass, quality_id} <- DurabilityLogic.cost_key(Item.template(item)),
-           [{_key, multiplier}] <- :ets.lookup(table, {level, class, subclass}),
-           [{_key, quality}] <- :ets.lookup(table, {:quality, quality_id}) do
-        <<cost::float-size(32)>> = <<lost * multiplier * quality::float-size(32)>>
-        max(trunc(cost), 1)
-      else
-        _ -> nil
-      end
+      cost(item, 1.0, table)
     else
       0
     end

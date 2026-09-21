@@ -164,11 +164,11 @@ defmodule ThistleTea.Game.Player.BuybackTest do
   end
 
   describe "sale_penalty/2" do
-    test "uses vendor-sale truncation without a reputation discount", %{item: item} do
+    test "uses client repair rounding without a reputation discount", %{item: item} do
       table = :ets.new(:sale_penalty, [:set])
       :ets.insert(table, [{{1, 2, 7}, 3}, {{:quality, 2}, 0.6}])
       item = %{item | item: %{item.item | max_durability: 10, durability: 9}}
-      assert DurabilityLoader.sale_penalty(item, table) == 1
+      assert DurabilityLoader.sale_penalty(item, table) == 2
       assert DurabilityLoader.cost(item, 1.0, table) == 2
       item = %{item | item: %{item.item | durability: 10}}
       assert DurabilityLoader.sale_penalty(item, table) == 0
