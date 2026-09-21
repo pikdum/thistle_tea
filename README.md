@@ -122,6 +122,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Limited vendor stock](docs/vendor-stock-playtest.md), shared between buyers at each merchant, with timed restocking, template inventories, sold-out feedback, and recoverable purchases
 - [Ammunition](docs/ammunition-playtest.md), with client selection, compatible projectile costs, Auto Shot depletion, and thrown-stack or durability consumption
 - [Wand attacks](docs/wand-playtest.md), with weapon-school damage, Wand Specialization, and shared auto-repeat timing and cancellation
+- [Creature and pet attack power](docs/attack-power-playtest.md), with damage scaling, buff and debuff cleanup, percentage modifiers, and ranged equipment bonuses
 - equipment durability, combat and death wear, broken-gear penalties, and vendor repairs with reputation discounts
 - alcohol intoxication, client drunkenness effects, gradual sobering, and death cleanup
 - looting + group loot
