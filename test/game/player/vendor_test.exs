@@ -8,19 +8,49 @@ defmodule ThistleTea.Game.Player.VendorTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Condition
+  alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Reputation
   alias ThistleTea.Game.Entity.Data.VendorItem
+  alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.SmsgBuyFailed
   alias ThistleTea.Game.Player.Vendor
+  alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
   describe "buy/4" do
+    test "splits purchases into legal stacks and pays once" do
+      vendor_entry = System.unique_integer([:positive, :monotonic])
+      vendor = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
+      publish_vendor(vendor)
+      owner = System.unique_integer([:positive, :monotonic])
+      template = %ItemTemplate{entry: 999_956, buy_price: 2, buy_count: 3, stackable: 5}
+      :ets.insert(VendorLoader, {vendor_entry, [%VendorItem{index: 1, template: template, max_count: 0}]})
+      character = character(30)
+      character = %{character | id: owner, object: %{character.object | guid: owner}}
+      state = %{ready: true, guid: owner, character: character}
+      bought = Vendor.buy(state, vendor, template.entry, 4)
+      items = Inventory.owned_items(bought.character.player, &ItemStore.get/1)
+      assert Enum.map(items, & &1.item.stack_count) == [5, 5, 2]
+      assert bought.character.player.coinage == 92
+
+      on_exit(fn ->
+        for {guid, %Item{item: %{owner: ^owner}}} <- :ets.tab2list(ItemStore), do: ItemStore.delete(guid)
+        :ets.delete(VendorLoader, vendor_entry)
+        :ets.delete(CharacterStore, owner)
+        Metadata.delete(owner)
+      end)
+    end
+
     test "rechecks current rank and level without hiding ranked merchandise" do
       vendor_entry = System.unique_integer([:positive, :monotonic])
       vendor_guid = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
+      publish_vendor(vendor_guid)
       template = %ItemTemplate{entry: 15_200, required_honor_rank: 8, required_level: 30, buy_price: 1}
       :ets.insert(VendorLoader, {vendor_entry, [%VendorItem{index: 1, template: template, max_count: 0}]})
       on_exit(fn -> :ets.delete(VendorLoader, vendor_entry) end)
@@ -48,6 +78,7 @@ defmodule ThistleTea.Game.Player.VendorTest do
     test "hides, shows, and rejects a stale conditioned purchase" do
       vendor_entry = System.unique_integer([:positive, :monotonic])
       vendor_guid = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
+      publish_vendor(vendor_guid)
       hidden_template = %ItemTemplate{entry: 1001, buy_price: 1}
       visible_template = %ItemTemplate{entry: 1002, buy_price: 1}
       condition = %Condition{entry: 1, type: :level, value1: 10, value2: 1}
@@ -122,5 +153,15 @@ defmodule ThistleTea.Game.Player.VendorTest do
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{world: WorldRef.open(1), spellbook: %{}}
     }
+  end
+
+  defp publish_vendor(guid) do
+    Metadata.put(guid, %{alive?: true, npc_flags: 128})
+    SpatialHash.update(:mobs, guid, WorldRef.open(1), 2.0, 0.0, 0.0)
+
+    on_exit(fn ->
+      Metadata.delete(guid)
+      SpatialHash.remove(:mobs, guid)
+    end)
   end
 end

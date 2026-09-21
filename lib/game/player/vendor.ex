@@ -1,25 +1,29 @@
 defmodule ThistleTea.Game.Player.Vendor do
   @moduledoc """
-  Owns condition-aware vendor listing and purchase authorization.
+  Owns condition-aware vendor listing, live vendor authorization, and purchases.
   """
+
+  import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.Condition
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
-  alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Honor.ItemRequirements
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
-  alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.ConditionContext
+  alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Reputation
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
+  alias ThistleTea.Game.World.Metadata
 
   def list(%{ready: true, character: %Character{} = character} = state, vendor_guid) do
-    if !Core.dead?(character) and Reputation.can_interact?(character, vendor_guid) do
+    if valid_vendor?(character, vendor_guid) do
       Network.send_packet(%Message.SmsgListInventory{
         vendor_guid: vendor_guid,
         items: visible_items(character, vendor_guid)
@@ -32,8 +36,32 @@ defmodule ThistleTea.Game.Player.Vendor do
   def list(state, _vendor_guid), do: state
 
   def buy(%{ready: true, character: %Character{} = character} = state, vendor_guid, item_id, requested_count) do
-    count = max(requested_count, 1)
+    if valid_vendor?(character, vendor_guid) do
+      buy_authorized(state, character, vendor_guid, item_id, max(requested_count, 1))
+    else
+      send_buy_failed(vendor_guid, item_id, :distance_too_far)
+      state
+    end
+  end
 
+  def buy(state, _vendor_guid, _item_id, _count), do: state
+
+  def valid_vendor?(%Character{} = character, vendor_guid) do
+    with true <- Death.alive?(character),
+         :mob <- Guid.entity_type(vendor_guid),
+         %{alive?: true, npc_flags: flags} when is_integer(flags) <- Metadata.query(vendor_guid, [:alive?, :npc_flags]),
+         true <- (flags &&& 0x80) != 0,
+         true <- Reputation.can_interact?(character, vendor_guid),
+         world = character.internal.world,
+         {^world, _x, _y, _z} <- World.position(vendor_guid),
+         distance when is_number(distance) and distance <= 5.0 <- World.distance_between(character, vendor_guid) do
+      true
+    else
+      _ -> false
+    end
+  end
+
+  defp buy_authorized(state, character, vendor_guid, item_id, count) do
     case Enum.find(visible_items(character, vendor_guid), &(&1.template.entry == item_id)) do
       %{template: template} = vendor_item ->
         buy_visible(state, character, vendor_guid, vendor_item, template, count)
@@ -43,8 +71,6 @@ defmodule ThistleTea.Game.Player.Vendor do
         state
     end
   end
-
-  def buy(state, _vendor_guid, _item_id, _count), do: state
 
   def visible_items(%Character{} = character, vendor_guid) do
     items = VendorLoader.items(Guid.entry(vendor_guid))
@@ -100,14 +126,10 @@ defmodule ThistleTea.Game.Player.Vendor do
   end
 
   defp complete_purchase(state, character, vendor_guid, vendor_item, template, total_count, price) do
-    item = ItemStore.create(template, owner: state.guid, stack_count: total_count)
+    purchase = %{character | player: %{character.player | coinage: character.player.coinage - price}}
 
-    case Inventory.store(character.player, state.guid, item, &ItemStore.get/1) do
-      {:ok, result, placement} ->
-        {bag_slot, item_slot} = InventoryUpdate.commit_placement(item, placement)
-        player = %{result.player | coinage: character.player.coinage - price}
-        state = InventoryUpdate.apply(state, {:ok, %{result | player: player}}, placement)
-
+    case Items.store(%{state | character: purchase}, template, total_count) do
+      {:ok, state, {bag_slot, item_slot}} ->
         Network.send_packet(%Message.SmsgBuyItem{
           vendor_guid: vendor_guid,
           vendor_slot: vendor_item.index,
@@ -126,7 +148,6 @@ defmodule ThistleTea.Game.Player.Vendor do
         state
 
       _error ->
-        ItemStore.delete(item.object.guid)
         send_buy_failed(vendor_guid, template.entry, :cant_carry_more)
         state
     end

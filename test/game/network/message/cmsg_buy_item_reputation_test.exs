@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
   describe "handle/2" do
@@ -30,6 +31,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
 
       vendor_entry = System.unique_integer([:positive, :monotonic])
       vendor_guid = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
+      publish_vendor(vendor_guid)
 
       template = %ItemTemplate{
         entry: 1_234,
@@ -47,7 +49,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
 
       character = %Character{
         object: %Object{guid: 1},
-        unit: %Unit{race: 1, class: 1},
+        unit: %Unit{race: 1, class: 1, health: 100},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         player: %Player{coinage: 100, reputation: Reputation.initialize(catalog, 1, 1)},
         internal: %Internal{}
       }
@@ -74,12 +77,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
 
       vendor_entry = System.unique_integer([:positive, :monotonic])
       vendor_guid = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
+      publish_vendor(vendor_guid)
       player_id = System.unique_integer([:positive, :monotonic])
       player_guid = Guid.from_low_guid(:player, player_id)
-      template = %ItemTemplate{entry: 1_235, buy_price: 25}
+      template = %ItemTemplate{entry: 1_235, buy_price: 25, stackable: 20}
 
       :ets.insert(VendorLoader, {vendor_entry, [%{index: 1, template: template, max_count: 0}]})
-      Metadata.put(vendor_guid, %{faction_template: %FactionTemplate{faction: 72}})
+      Metadata.update(vendor_guid, %{faction_template: %FactionTemplate{faction: 72}})
 
       on_exit(fn ->
         ReputationLoader.put_catalog(previous_catalog)
@@ -92,7 +96,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
 
       character = %Character{
         object: %Object{guid: player_guid},
-        unit: %Unit{race: 1, class: 1, level: 10},
+        unit: %Unit{race: 1, class: 1, level: 10, health: 100},
         player: %Player{coinage: 100, reputation: reputation},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         internal: %Internal{world: WorldRef.open(0)}
@@ -108,5 +112,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
       assert ItemStore.get(item_guid).item.stack_count == 2
       ItemStore.delete(item_guid)
     end
+  end
+
+  defp publish_vendor(guid) do
+    Metadata.put(guid, %{alive?: true, npc_flags: 128})
+    SpatialHash.update(:mobs, guid, WorldRef.open(0), 2.0, 0.0, 0.0)
+
+    on_exit(fn ->
+      Metadata.delete(guid)
+      SpatialHash.remove(:mobs, guid)
+    end)
   end
 end

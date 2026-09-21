@@ -53,12 +53,16 @@ defmodule ThistleTea.Game.Player.Items do
 
   def store(state, item_id, count, recipe \\ nil)
 
+  def store(state, %ItemTemplate{} = template, count, recipe) when is_integer(count) and count > 0 do
+    items = prepare_stacks(template, state.guid, count)
+    batch = Enum.reduce(items, Batch.new(state.character.player), &Batch.add(&2, &1))
+    commit_stacks(state, batch, hd(items).object.guid, recipe)
+  end
+
   def store(state, item_id, count, recipe) when is_integer(count) and count > 0 do
     case ItemLoader.get_template(item_id) do
       %ItemTemplate{} = template ->
-        items = prepare_stacks(template, state.guid, count)
-        batch = Enum.reduce(items, Batch.new(state.character.player), &Batch.add(&2, &1))
-        commit_stacks(state, batch, hd(items).object.guid, recipe)
+        store(state, template, count, recipe)
 
       _ ->
         {:error, :item_not_found, state}
