@@ -7,9 +7,7 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
   spell and fails when a value falls outside this matrix, so new content
   can never silently no-op.
 
-  Deferred auras that are mapped to atoms but currently inert:
-  auras_visible, and the
-  language/reputation cosmetics.
+  Language and VMangos linked auras remain deferred.
   """
 
   @deferred_effects %{
@@ -31,8 +29,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
 
   @deferred_auras %{
     75 => :mod_language,
-    100 => :auras_visible,
-    156 => :mod_reputation_gain,
     192 => :vmangos_linked_aura
   }
 

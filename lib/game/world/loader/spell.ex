@@ -682,6 +682,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(97), do: :mana_shield
   defp aura_type(98), do: :mod_skill_talent
   defp aura_type(99), do: :mod_attack_power
+  defp aura_type(100), do: :auras_visible
   defp aura_type(101), do: :mod_resistance_percent
   defp aura_type(102), do: :mod_melee_attack_power_versus
   defp aura_type(103), do: :mod_total_threat

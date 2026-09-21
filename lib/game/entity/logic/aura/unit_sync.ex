@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
 
   @unit_flag_disarmed 0x00200000
   @unit_flag_non_attackable 0x00010000
+  @unit_flag_auras_visible 0x08000000
   @judgement_aura_state_bit 1 <<< 4
 
   def sync_unit(%Unit{} = unit) do
@@ -39,6 +40,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
     |> sync_disarm()
     |> CombatControl.sync()
     |> sync_unattackable()
+    |> sync_auras_visible()
     |> sync_aura_state()
     |> sync_aura_fields()
   end
@@ -150,6 +152,20 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   end
 
   defp sync_unattackable(unit), do: unit
+
+  defp sync_auras_visible(%Unit{auras: holders} = unit) do
+    visible? = Enum.any?(holders || [], &Holder.has_aura_type?(&1, :auras_visible))
+    flags = unit.flags || 0
+
+    flags =
+      if visible? do
+        flags ||| @unit_flag_auras_visible
+      else
+        flags &&& bnot(@unit_flag_auras_visible)
+      end
+
+    %{unit | flags: flags}
+  end
 
   defp sync_aura_state(%Unit{auras: holders, aura_state: aura_state} = unit) when is_list(holders) do
     active? = Enum.any?(holders, &match?(%Holder{spell: %Spell{exclusive_category: :paladin_seal}}, &1))

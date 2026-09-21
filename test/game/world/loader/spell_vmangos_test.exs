@@ -17,6 +17,16 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
 
   @moduletag :dbc_db
 
+  describe "Detect Magic" do
+    test "loads the aura reveal, duration, and dispel category" do
+      spell = SpellLoader.load(2855)
+
+      assert spell.duration_ms == 120_000
+      assert spell.dispel_type == 1
+      assert [%Effect{type: :apply_aura, aura: :auras_visible, implicit_target_a: :target_enemy}] = spell.effects
+    end
+  end
+
   describe "spell reflection" do
     test "loads general reflection and the guaranteed first reflection from Sheen of Zanza" do
       sheen = SpellLoader.load(24_417)
