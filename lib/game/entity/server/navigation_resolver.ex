@@ -31,12 +31,23 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
 
     {allow_steep, opts} = Keyword.pop(opts, :allow_steep, true)
     {max_distance, opts} = Keyword.pop(opts, :max_distance)
+    {within_radius, opts} = Keyword.pop(opts, :within_radius)
     start = {start_x, start_y, start_z}
 
     case find_path.(world.map_id, start, destination, allow_steep: allow_steep) do
-      path when is_list(path) -> Movement.move_along_path(entity, limit_path(path, start, max_distance), opts, now)
-      _no_path -> entity
+      path when is_list(path) ->
+        path = path |> limit_path(start, max_distance) |> within_radius(start, within_radius)
+        Movement.move_along_path(entity, path, opts, now)
+
+      _no_path ->
+        entity
     end
+  end
+
+  defp within_radius(path, _start, nil), do: path
+
+  defp within_radius(path, start, {anchor, radius}) do
+    if Enum.all?([start | path], &(Math.distance(anchor, &1) <= radius + 0.01)), do: path, else: []
   end
 
   defp limit_path(path, _start, nil), do: path

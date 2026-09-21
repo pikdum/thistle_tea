@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Confusion do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Math
 
   @radius 4.0
 
@@ -58,9 +59,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Confusion do
         pause(entity, blackboard, context)
 
       destination ->
+        destination = bound_destination(destination, memory.anchor)
         entity = %{entity | internal: %{entity.internal | running: false}}
-        entity = Navigation.move_to(entity, destination, [run?: false, allow_steep: false, max_distance: 8.0], context)
+        opts = [run?: false, allow_steep: false, max_distance: 8.0, within_radius: {memory.anchor, @radius}]
+        entity = Navigation.move_to(entity, destination, opts, context)
         {BT.running(0, :navigation), entity, %{blackboard | confusion: %{memory | moving?: true}}}
+    end
+  end
+
+  defp bound_destination({x, y, z} = destination, {ax, ay, az} = anchor) do
+    distance = Math.distance(anchor, destination)
+
+    if distance > @radius do
+      fraction = @radius / distance
+      {ax + (x - ax) * fraction, ay + (y - ay) * fraction, az + (z - az) * fraction}
+    else
+      destination
     end
   end
 

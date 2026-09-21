@@ -129,6 +129,26 @@ defmodule ThistleTea.Game.Entity.Logic.ControlMovementTest do
   end
 
   describe "tick/3" do
+    test "bounds confusion even when a navigation sample escapes its circle", %{character: character} do
+      {character, _} = change(character, [holder(1, :mod_confuse)], 0)
+      navigation = Navigation.new(%{{0, {0.0, 0.0, 0.0}, 4.0} => {30.0, 0.0, 0.0}})
+      {_, character} = BehaviorRunner.tick(PlayerBT.tree(), character, Context.new(0, navigation: navigation))
+      character = NavigationResolver.resolve(character, 0, fn _, _, destination, _ -> [destination] end)
+      assert character.movement_block.spline_nodes == [{4.0, 0.0, 0.0}]
+    end
+
+    test "rejects detours that leave the confusion circle", %{character: character} do
+      {character, _} = change(character, [holder(1, :mod_confuse)], 0)
+      {_, character} = BehaviorRunner.tick(PlayerBT.tree(), character, context(0))
+
+      character =
+        NavigationResolver.resolve(character, 0, fn _, _, destination, _ -> [{4.1, 0.0, 0.0}, destination] end)
+
+      refute Movement.moving?(character, 0)
+      assert character.movement_block.spline_nodes == []
+      assert {{:running, 500, :confusion}, _} = BehaviorRunner.tick(PlayerBT.tree(), character, context(100))
+    end
+
     test "the player tree runs fear paths and pauses after arrival", %{character: character} do
       {character, _} = change(character, [holder(1, :mod_fear)], 0)
       character = step(character, 0)
