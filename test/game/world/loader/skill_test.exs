@@ -49,6 +49,18 @@ defmodule ThistleTea.Game.World.Loader.SkillTest do
   end
 
   describe "initial_skills/5" do
+    test "grants full language skills despite a training tier", %{table: table} do
+      Skill.load(
+        [%SkillLine{id: 111, category: 10}],
+        [%SkillRaceClassInfo{skill_line: 111, race_mask: 1, class_mask: 1, flags: 160, skill_tier: 21}],
+        [ability(111, 672, 2, 1)],
+        table
+      )
+
+      assert %{111 => %{value: 300, max: 300, range: :language}} = Skill.initial_skills([672], 1, 1, 1, table)
+      assert Skill.initial_skills([], 1, 1, 1, table) == %{}
+    end
+
     test "derives weapon skills without recreating tiered professions", %{table: table} do
       assert Skill.initial_skills([201, 2575], 1, 1, 20, table) ==
                %{43 => %{value: 1, max: 100, range: :level, always_max?: false, slot: 0}}

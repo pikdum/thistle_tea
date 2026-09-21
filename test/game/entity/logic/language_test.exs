@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.LanguageTest do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Language
+  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.SpellRemoval
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
@@ -25,11 +26,15 @@ defmodule ThistleTea.Game.Entity.Logic.LanguageTest do
 
       dwarven = %Spell{id: 672, effects: [%Effect{type: :language, misc_value: 6}]}
       internal = %{character.internal | spellbook: Map.put(character.internal.spellbook, 672, dwarven)}
-      character = %{character | internal: internal}
+      skills = Map.put(character.player.skills, 111, Skills.new_entry(:language, false, 50))
+      character = %{character | internal: internal, player: %{character.player | skills: skills}}
       assert Language.known?(character, 6)
+      assert Enum.sort(Language.skill_ids(character)) == [98, 111]
 
       character = SpellRemoval.remove(character, [672], 1_000)
       refute Language.known?(character, 6)
+      refute Map.has_key?(character.player.skills, 111)
+      assert character.player.skills[98].value == 300
       assert Language.known?(character, 7)
     end
   end
@@ -118,7 +123,7 @@ defmodule ThistleTea.Game.Entity.Logic.LanguageTest do
       character: %Character{
         object: %Object{guid: 1},
         unit: %Unit{health: 100, max_health: 100, level: 50, auras: []},
-        player: %Player{skills: %{}},
+        player: %Player{skills: %{98 => Skills.new_entry(:language, false, 50)}},
         internal: %Internal{spells: [668], spellbook: %{668 => common}},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }

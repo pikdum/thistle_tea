@@ -11,7 +11,22 @@ defmodule ThistleTea.Game.Entity.Logic.Language do
   alias ThistleTea.Game.Spell.Effect
 
   @addon 0xFFFFFFFF
-  @languages [1, 2, 3, 6, 7, 8, 9, 10, 11, 12, 13, 14, 33]
+  @language_skills %{
+    1 => 109,
+    2 => 113,
+    3 => 115,
+    6 => 111,
+    7 => 98,
+    8 => 139,
+    9 => 140,
+    10 => 137,
+    11 => 138,
+    12 => 141,
+    13 => 313,
+    14 => 315,
+    33 => 673
+  }
+  @languages Map.keys(@language_skills)
   @chat_types [0, 1, 2, 3, 4, 5, 6, 8, 0x0E, 0x14, 0x15, 0x57, 0x58]
   @addon_types [1, 2, 3, 4, 0x0E, 0x57, 0x58]
   @status_types [0x14, 0x15]
@@ -40,6 +55,10 @@ defmodule ThistleTea.Game.Entity.Logic.Language do
   end
 
   def known?(%Character{}, _language), do: false
+
+  def skill_ids(%Character{} = character) do
+    for {language, skill_id} <- @language_skills, known?(character, language), do: skill_id
+  end
 
   defp override(character, language) do
     character

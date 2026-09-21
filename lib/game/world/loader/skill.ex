@@ -85,8 +85,9 @@ defmodule ThistleTea.Game.World.Loader.Skill do
   end
 
   defp build_entry(id, race, class, level, table) do
-    with %{skill_tier: 0, flags: flags} <- race_class_info(id, race, class, table),
-         category when is_integer(category) <- lookup(table, {:category, id}, nil) do
+    with %{skill_tier: tier, flags: flags} <- race_class_info(id, race, class, table),
+         category when is_integer(category) <- lookup(table, {:category, id}, nil),
+         true <- tier == 0 or category == 10 do
       [{id, Skills.new_entry(range(category), (flags &&& 0x10) != 0, level)}]
     else
       _skip -> []
