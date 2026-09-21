@@ -21,8 +21,7 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
     78 => :attack,
     84 => :stuck,
     86 => :holiday_gift,
-    116 => :remove_insignia,
-    118 => :skill
+    116 => :remove_insignia
   }
 
   @deferred_auras %{

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Player.SpellsDbcTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.TrainerSpell
   alias ThistleTea.Game.Entity.Logic.Breathing
+  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Player.Spells
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Skill
@@ -33,6 +34,50 @@ defmodule ThistleTea.Game.Player.SpellsDbcTest do
     test "does not automatically cast an active spell", %{character: character} do
       assert {:ok, learned, [{:learned, 5697}]} = Spells.learn(character, [5697])
       assert learned.unit.auras == []
+    end
+
+    test "direct profession learning grants its rank, tools and starting recipes", %{character: character} do
+      assert {:ok, learned, events} = Spells.learn(character, [2575])
+      assert %{value: 1, max: 75, step: 1, range: :tier} = learned.player.skills[186]
+      assert Skills.free_profession_slots(learned.player.skills) == 1
+      assert Enum.all?([2575, 2580, 2656, 2657], &(&1 in learned.internal.spells))
+      assert {:learned, 2657} in events
+      refute 2658 in learned.internal.spells
+      assert CharacterStore.get(learned.id) == learned
+      assert Spells.learn(learned, [2575]) == :already_known
+
+      learned = put_in(learned.player.skills[186].value, 50)
+      assert {:ok, upgraded, _events} = Spells.learn(learned, [2576])
+      assert %{value: 50, max: 150, step: 2} = upgraded.player.skills[186]
+      assert upgraded.player.skills[186].slot == learned.player.skills[186].slot
+      assert CharacterStore.get(upgraded.id) == upgraded
+    end
+
+    test "secondary skills and riding use their learned rank values", %{character: character} do
+      assert {:ok, learned, _events} = Spells.learn(character, [2550, 3273, 7620, 33_388])
+      for id <- [185, 129, 356], do: assert(%{value: 1, max: 75, step: 1} = learned.player.skills[id])
+      assert %{value: 75, max: 75, step: 1} = learned.player.skills[762]
+      assert Skills.free_profession_slots(learned.player.skills) == 2
+      assert Enum.all?([2538, 3275], &(&1 in learned.internal.spells))
+      assert {:ok, upgraded, _events} = Spells.learn(learned, [33_391])
+      assert %{value: 150, max: 150, step: 2} = upgraded.player.skills[762]
+    end
+
+    test "removing the granting profession clears its recipes and relearning resets progress", %{character: character} do
+      assert {:ok, learned, _events} = Spells.learn(character, [2575, 2550])
+      learned = put_in(learned.player.skills[186].value, 60)
+      removed = Spells.unlearn(learned, [2575], 1_000)
+      refute Map.has_key?(removed.player.skills, 186)
+      refute Map.has_key?(removed.internal.forgotten_skills, 186)
+      refute Enum.any?([2575, 2580, 2656, 2657], &(&1 in removed.internal.spells))
+      assert removed.player.skills[185].value == 1
+      assert 2538 in removed.internal.spells
+      assert Skills.free_profession_slots(removed.player.skills) == 2
+      assert CharacterStore.get(removed.id) == removed
+
+      assert {:ok, relearned, _events} = Spells.learn(removed, [2575])
+      assert %{value: 1, max: 75, step: 1} = relearned.player.skills[186]
+      assert 2657 in relearned.internal.spells
     end
 
     test "publishes language skill changes on learning and removal", %{character: character} do

@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Entity.Logic.SpellRemoval do
-  @moduledoc "Removes known spells, their auras, and lost weapon and language skills as one pure transition."
+  @moduledoc "Removes known spells, their auras, and lost skills as one pure transition."
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
@@ -9,9 +9,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellRemoval do
   alias ThistleTea.Game.Entity.Logic.Language
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Entity.Logic.Skills
+  alias ThistleTea.Game.Entity.Logic.SpellSkills
 
   def remove(%Character{} = character, spell_ids, now) when is_list(spell_ids) and is_integer(now) do
     previous_skills = granted_skills(character)
+    previous_ranks = SpellSkills.grants(character.internal.spellbook || %{})
     {character, aura_events} = AuraLogic.remove_spells(character, spell_ids, now)
     character = Effects.enqueue(character, aura_events)
     internal = character.internal
@@ -26,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellRemoval do
     }
 
     current_skills = granted_skills(character)
+    current_ranks = SpellSkills.grants(character.internal.spellbook || %{})
 
     {skills, forgotten} =
       Skills.forget(
@@ -33,6 +36,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellRemoval do
         previous_skills -- current_skills,
         character.internal.forgotten_skills
       )
+
+    skills = SpellSkills.remove(skills, previous_ranks, current_ranks)
+    forgotten = Map.drop(forgotten, Map.keys(previous_ranks) -- Map.keys(current_ranks))
 
     character = %{
       character

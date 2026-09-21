@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Player.Spells do
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.SpellBook
   alias ThistleTea.Game.Entity.Logic.SpellRemoval
+  alias ThistleTea.Game.Entity.Logic.SpellSkills
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
@@ -46,23 +47,13 @@ defmodule ThistleTea.Game.Player.Spells do
 
   defp maybe_cancel_channel(character, _spell_id), do: character
 
-  def learn(%Character{internal: internal} = character, spell_ids) do
-    existing_ids = internal.spells || []
-    superseded_by = SpellLoader.superseded_by_map(existing_ids ++ spell_ids)
-
-    case SpellBook.learn(existing_ids, spell_ids, superseded_by) do
-      {_all_ids, []} ->
+  def learn(%Character{} = character, spell_ids) do
+    case learn_spells(character, spell_ids, MapSet.new()) do
+      {_character, []} ->
         :already_known
 
-      {all_ids, events} ->
-        spellbook = SpellLoader.build_spellbook(all_ids)
-
-        character =
-          %{character | internal: %{internal | spells: all_ids, spellbook: spellbook}}
-          |> learn_skills()
-          |> apply_passives(Time.now())
-          |> Core.mark_broadcast_update()
-
+      {character, events} ->
+        character = character |> apply_passives(Time.now()) |> Core.mark_broadcast_update()
         CharacterStore.put(character)
         Enum.each(events, &send_event_packet/1)
         send_proficiencies(character)
@@ -70,22 +61,55 @@ defmodule ThistleTea.Game.Player.Spells do
     end
   end
 
+  defp learn_spells(%Character{internal: internal} = character, spell_ids, attempted) do
+    spell_ids = Enum.reject(spell_ids, &MapSet.member?(attempted, &1))
+    attempted = MapSet.union(attempted, MapSet.new(spell_ids))
+    existing_ids = internal.spells || []
+    superseded_by = SpellLoader.superseded_by_map(existing_ids ++ spell_ids)
+
+    case SpellBook.learn(existing_ids, spell_ids, superseded_by) do
+      {_all_ids, []} ->
+        {character, []}
+
+      {all_ids, events} ->
+        spellbook = SpellLoader.build_spellbook(all_ids)
+
+        character =
+          %{character | internal: %{internal | spells: all_ids, spellbook: spellbook}}
+          |> learn_skills()
+
+        {character, reward_events} = learn_spells(character, skill_rewards(character), attempted)
+        {character, events ++ reward_events}
+    end
+  end
+
   defp learn_skills(%Character{unit: unit, player: player, internal: internal} = character) do
     new_skills = SkillLoader.initial_skills(internal.spells, unit.race, unit.class, unit.level)
     {new_skills, forgotten} = Skills.restore(new_skills, internal.forgotten_skills)
-    skills = Skills.merge(player.skills || %{}, new_skills)
+    grants = SpellSkills.grants(internal.spellbook)
+    skills = (player.skills || %{}) |> Skills.merge(new_skills) |> SpellSkills.learn(grants)
     %{character | player: %{player | skills: skills}, internal: %{internal | forgotten_skills: forgotten}}
   end
 
   def learn_training(%Character{} = character, %TrainerSpell{} = training) do
     skills = Skills.learn_rank(character.player.skills, training.skill_id, training.skill_max)
-    value = Skills.value(skills, training.skill_id)
-    rewards = SkillLoader.reward_spells(training.skill_id, value, character.unit.race, character.unit.class)
     character = %{character | player: %{character.player | skills: skills}}
-    learn(character, [training.learned_spell_id | rewards])
+    learn(character, [training.learned_spell_id])
+  end
+
+  defp skill_rewards(%Character{player: player, unit: unit}) do
+    player.skills
+    |> Enum.flat_map(fn {id, skill} -> SkillLoader.reward_spells(id, skill.value, unit.race, unit.class) end)
+    |> Enum.uniq()
+    |> Enum.sort()
   end
 
   def unlearn(%Character{} = character, spell_ids, now) when is_list(spell_ids) and is_integer(now) do
+    previous = SpellSkills.grants(character.internal.spellbook || %{})
+    current = SpellSkills.grants(Map.drop(character.internal.spellbook || %{}, spell_ids))
+    lost_skills = Map.keys(previous) -- Map.keys(current)
+    associated = Enum.flat_map(lost_skills, &SkillLoader.spells/1)
+    spell_ids = Enum.uniq(spell_ids ++ Enum.filter(character.internal.spells || [], &(&1 in associated)))
     character = SpellRemoval.remove(character, spell_ids, now)
     CharacterStore.put(character)
     notify_unlearned(character, spell_ids)

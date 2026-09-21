@@ -203,7 +203,8 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
   def known?(skills, skill_id) when is_map(skills), do: Map.has_key?(skills, skill_id)
   def known?(_skills, _skill_id), do: false
 
-  def learn_rank(skills, skill_id, skill_max) when is_map(skills) and is_integer(skill_id) and skill_id > 0 do
+  def learn_rank(skills, skill_id, skill_max)
+      when is_map(skills) and is_integer(skill_id) and skill_id > 0 and is_integer(skill_max) and skill_max > 0 do
     skills = with_slots(skills)
     entry = Map.get(skills, skill_id, %{value: 1, max: skill_max, range: :tier, always_max?: false})
     entry = Map.put(entry, :step, max(Map.get(entry, :step, 0), div(skill_max, 75)))

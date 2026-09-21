@@ -3,11 +3,34 @@ defmodule ThistleTea.Game.World.Loader.ProfessionDBCTest do
 
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity.Logic.Skills
+  alias ThistleTea.Game.Entity.Logic.SpellSkills
   alias ThistleTea.Game.World.Loader.Skill
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db
 
   describe "vanilla profession catalog" do
+    test "initial ranks agree with loaded spell effects across professions and riding" do
+      table = :ets.new(__MODULE__, [:set, :public])
+      Skill.load_all(table)
+
+      for {spell_id, skill_id, cap, value} <- [
+            {2575, 186, 75, 1},
+            {10_248, 186, 300, 1},
+            {2550, 185, 75, 1},
+            {18_260, 185, 300, 1},
+            {3273, 129, 75, 1},
+            {7620, 356, 75, 1},
+            {33_388, 762, 75, 75},
+            {33_391, 762, 150, 150}
+          ] do
+        initial = Skill.initial_skills([spell_id], 1, 1, 60, table)
+        grants = SpellSkills.grants(SpellLoader.load(spell_id))
+        assert initial[skill_id] == grants[skill_id]
+        assert %{value: ^value, max: ^cap, range: :tier} = initial[skill_id]
+      end
+    end
+
     test "loads item-producing recipes and excludes ordinary class spells" do
       table = :ets.new(__MODULE__, [:set, :public])
       Skill.load_all(table)

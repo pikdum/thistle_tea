@@ -4,9 +4,20 @@ defmodule ThistleTea.Game.World.Loader.Skill do
   Runtime training and abandonment read the catalog without database queries.
   """
   import Bitwise, only: [&&&: 2, <<<: 2]
+  import Ecto.Query
 
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity.Logic.Skills
+  alias ThistleTea.Game.Entity.Logic.SpellSkills
+  alias ThistleTea.Game.Spell, as: SpellData
+  alias ThistleTea.Game.Spell.Effect
+
+  @skill_fields [:id] ++
+                  for(
+                    index <- 0..2,
+                    field <- [:effect, :effect_misc_value, :effect_base_points, :effect_base_dice],
+                    do: :"#{field}_#{index}"
+                  )
 
   def init(table \\ __MODULE__) do
     case :ets.whereis(table) do
@@ -17,6 +28,29 @@ defmodule ThistleTea.Game.World.Loader.Skill do
 
   def load_all(table \\ __MODULE__) do
     load(DBC.all(SkillLine), DBC.all(SkillRaceClassInfo), DBC.all(SkillLineAbility), table)
+    load_spell_skills(table)
+  end
+
+  defp load_spell_skills(table) do
+    DBC.all(
+      from(s in Spell,
+        where: s.effect_0 == 118 or s.effect_1 == 118 or s.effect_2 == 118,
+        select: map(s, ^@skill_fields)
+      )
+    )
+    |> Enum.each(fn row ->
+      effects =
+        for index <- 0..2, Map.fetch!(row, :"effect_#{index}") == 118 do
+          %Effect{
+            type: :skill,
+            misc_value: Map.fetch!(row, :"effect_misc_value_#{index}"),
+            base_points: Map.fetch!(row, :"effect_base_points_#{index}"),
+            base_dice: Map.fetch!(row, :"effect_base_dice_#{index}")
+          }
+        end
+
+      :ets.insert(table, {{:spell_grants, row.id}, SpellSkills.grants(%SpellData{id: row.id, effects: effects})})
+    end)
   end
 
   def load(lines, infos, abilities, table \\ __MODULE__) do
@@ -30,14 +64,17 @@ defmodule ThistleTea.Game.World.Loader.Skill do
   def initial_skills(spell_ids, race, class, level, table \\ __MODULE__)
 
   def initial_skills(spell_ids, race, class, level, table) when is_list(spell_ids) do
-    spell_ids
-    |> Enum.flat_map(&lookup(table, {:spell_skills, &1}, []))
-    |> Enum.filter(&(learned_with_spell?(&1) and fits?(&1, race, class)))
-    |> Enum.map(& &1.skill_line)
-    |> Enum.uniq()
-    |> Enum.flat_map(&build_entry(&1, race, class, level, table))
-    |> Map.new()
-    |> Skills.with_slots()
+    skills =
+      spell_ids
+      |> Enum.flat_map(&lookup(table, {:spell_skills, &1}, []))
+      |> Enum.filter(&(learned_with_spell?(&1) and fits?(&1, race, class)))
+      |> Enum.map(& &1.skill_line)
+      |> Enum.uniq()
+      |> Enum.flat_map(&build_entry(&1, race, class, level, table))
+      |> Map.new()
+      |> Skills.with_slots()
+
+    Enum.reduce(spell_ids, skills, &SpellSkills.learn(&2, lookup(table, {:spell_grants, &1}, %{})))
   end
 
   def initial_skills(_spell_ids, _race, _class, _level, _table), do: %{}

@@ -546,6 +546,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(33), do: :open_lock
   defp effect_type(35), do: :apply_area_aura
   defp effect_type(36), do: :learn_spell
+  defp effect_type(118), do: :skill
   defp effect_type(38), do: :dispel
   defp effect_type(39), do: :language
   defp effect_type(40), do: :dual_wield
