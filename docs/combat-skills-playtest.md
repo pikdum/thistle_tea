@@ -23,9 +23,11 @@ of how many spell effects execute. Fishing poles do not train through combat.
 The existing level cap, intellect bonus, and skill-gain probabilities remain
 in `Logic.Skills`.
 
-Review also found that packed visible-item enchantments were reaching the
-main-hand template lookup. Spell snapshots now extract the item entry, keeping
-enchanted weapons' normalized attack speeds and weapon-specific talent bonuses.
+Regression coverage confirms that enchanted weapons retain normalized attack
+speeds and weapon-specific talent bonuses. A follow-up audit corrected the
+original bug claim: `Inventory.equipment_entry/2` already extracts the item
+entry, so the additional decode in the cast snapshot was redundant and has
+been removed. The regression coverage remains.
 
 References used:
 
@@ -55,7 +57,8 @@ maximizes known skills and now refreshes those fields too.
 Implementation commits:
 
 - `cf59cc26`: shared snapshots and resolved combat progression.
-- `1b4bbca9`: enchanted weapon template lookup.
+- `1b4bbca9`: enchanted weapon snapshot regression coverage and a redundant
+  decode, subsequently removed after auditing the inventory accessor.
 - `5b8f1c86`: ranged spell-damage and debuff attack resolution.
 
 Gate logs: `/tmp/thistle-combat-skills-final-{all,compile,credo}.log`.
