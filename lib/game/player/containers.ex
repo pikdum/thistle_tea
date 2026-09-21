@@ -33,22 +33,22 @@ defmodule ThistleTea.Game.Player.Containers do
 
   def open(state, _position), do: state
 
-  def open_guid(state, guid) do
+  def open_guid(state, guid, loot_type \\ 1) when loot_type in [1, 2] do
     with {:ok, state, item} <- authorize(state, guid),
          :ok <- ItemOpening.validate(state.character, item) do
-      state |> Looting.release() |> Spellcasting.cancel() |> open_current(guid)
+      state |> Looting.release() |> Spellcasting.cancel() |> open_current(guid, loot_type)
     else
       {:error, reason} -> failure(state, reason, guid)
     end
   end
 
-  defp open_current(state, guid) do
+  defp open_current(state, guid, loot_type) do
     with {:ok, state, item} <- authorize(state, guid),
          item = ensure_loot(state.character, item),
          {:ok, changes} <-
            state.character.player |> Batch.new() |> Batch.update(item) |> Inventory.plan(&ItemStore.get/1) do
       state = InventoryUpdate.apply(state, {:ok, changes})
-      Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: Item.loot(item), loot_type: 1})
+      Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: Item.loot(item), loot_type: loot_type})
       state = %{state | loot_guid: guid, loot_type: :container}
       if Loot.empty?(Item.loot(item)), do: Looting.release(state), else: state
     else

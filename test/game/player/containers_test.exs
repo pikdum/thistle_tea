@@ -163,6 +163,7 @@ defmodule ThistleTea.Game.Player.ContainersTest do
       assert Item.unlocked?(ItemStore.get(guid))
       assert opened.character.player.skills[633].value == 2
       assert opened.loot_guid == guid
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgLootResponse{guid: ^guid, loot_type: 2}}}
       assert CharacterStore.get(state.guid).player.skills[633].value == 2
       assert Gathering.complete(opened, guid, spell, nil) == opened
       closed = Looting.release(opened)
@@ -195,6 +196,7 @@ defmodule ThistleTea.Game.Player.ContainersTest do
       assert ItemStore.get(key.object.guid) == nil
       assert Item.unlocked?(ItemStore.get(source.object.guid))
       assert opened.character.player.skills[633].value == 1
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgLootResponse{loot_type: 2}}}
     end
 
     test "completion rejects changed skill, removed targets and death", %{state: state, source: source, spell: spell} do

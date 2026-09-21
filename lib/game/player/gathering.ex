@@ -112,7 +112,7 @@ defmodule ThistleTea.Game.Player.Gathering do
         end
 
       changes = ChangeSet.put_player(changes, %{changes.player | skills: skills})
-      state |> InventoryUpdate.apply({:ok, changes}) |> emit(success_events) |> Containers.open_guid(guid)
+      state |> InventoryUpdate.apply({:ok, changes}) |> emit(success_events) |> Containers.open_guid(guid, 2)
     else
       false -> failure(state, spell_id, :try_again)
       {:error, reason} -> failure(state, spell_id, reason)
