@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Data.Character do
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.EquipmentAuras
   alias ThistleTea.Game.Entity.Logic.EquipmentSets
+  alias ThistleTea.Game.Entity.Logic.EquipmentSpells
   alias ThistleTea.Game.Entity.Logic.EquipmentStats
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Time
@@ -39,13 +40,14 @@ defmodule ThistleTea.Game.Entity.Data.Character do
     enchantments = equipment_enchantments(character, now)
     templates = Inventory.equipped_templates(character.player, &ItemStore.get/1)
     set_sources = EquipmentSets.sources(character, templates, &ItemSetLoader.get/1)
+    equip_sources = character.player |> Inventory.usable_equipped_items(&ItemStore.get/1) |> EquipmentSpells.sources()
 
     character
     |> sync_mainhand_inputs()
     |> sync_offhand_inputs()
     |> sync_ranged_inputs()
     |> EquipmentStats.resync(&ItemStore.get/1, &SpellLoader.load/1, enchantments)
-    |> EquipmentAuras.sync(enchantments, &SpellLoader.load/1, now, set_sources)
+    |> EquipmentAuras.sync(enchantments, &SpellLoader.load/1, now, set_sources ++ equip_sources)
     |> CombatRatings.sync()
   end
 

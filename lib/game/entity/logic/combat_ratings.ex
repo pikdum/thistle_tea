@@ -136,14 +136,16 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
   def sync(%{unit: %Unit{} = unit, player: %Player{} = player} = character) do
     level = unit.level || 1
     agility = unit.agility || 0
-    crit = melee_crit_chance(unit.class, level, agility)
+    crit = max(melee_crit_chance(unit.class, level, agility) + Aura.flat_amount(character, :mod_crit_percent), 0.0)
+    dodge = max(dodge_chance(unit.class, level, agility) + Aura.flat_amount(character, :mod_dodge), 0.0)
+    parry = max(parry_chance(unit.class) + Aura.flat_amount(character, :mod_parry_percent), 0.0)
 
     player = %{
       player
       | crit_percentage: crit,
         ranged_crit_percentage: crit,
-        dodge_percentage: dodge_chance(unit.class, level, agility),
-        parry_percentage: if(Disarm.parry_disabled?(character), do: 0.0, else: parry_chance(unit.class)),
+        dodge_percentage: dodge,
+        parry_percentage: if(Disarm.parry_disabled?(character), do: 0.0, else: parry),
         block_percentage: block_chance(character)
     }
 

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Logic.EquipmentSpells
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Spell
@@ -48,14 +49,12 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
         |> Map.new(fn key -> {key, 0} end)
         |> Map.merge(%{spell_damage_versus: [], damage_done_creature: [], resistance_penetration: []})
 
-  @spelltrigger_on_equip 1
-
   @stat_mods %{0 => :mana, 1 => :health, 3 => :agility, 4 => :strength, 5 => :intellect, 6 => :spirit, 7 => :stamina}
 
   def resync(character, get_item, get_spell \\ fn _spell_id -> nil end, enchantments \\ [])
 
   def resync(%{unit: %Unit{} = unit, player: %Player{} = player} = character, get_item, get_spell, enchantments) do
-    bonuses = player |> Inventory.usable_equipped_templates(get_item) |> bonuses(get_spell)
+    bonuses = player |> Inventory.usable_equipped_templates(get_item) |> bonuses(get_spell, unit.shapeshift_form)
     bonuses = Enum.reduce(enchantments, bonuses, &add_enchantment(&2, &1, unit.class))
     unit = %{unit | equipment_bonuses: bonuses} |> Stats.recompute()
     player = apply_spell_damage_fields(player, bonuses)
@@ -87,11 +86,11 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
   defp add_weapon_damage(acc, :ranged, amount), do: add(acc, :ranged_damage, amount)
   defp add_weapon_damage(acc, _slot, _amount), do: acc
 
-  def bonuses(templates, get_spell \\ fn _spell_id -> nil end) do
-    Enum.reduce(templates, @zero, &add_template(&2, &1, get_spell))
+  def bonuses(templates, get_spell \\ fn _spell_id -> nil end, form \\ 0) do
+    Enum.reduce(templates, @zero, &add_template(&2, &1, get_spell, form))
   end
 
-  defp add_template(acc, %ItemTemplate{} = template, get_spell) do
+  defp add_template(acc, %ItemTemplate{} = template, get_spell, form) do
     acc =
       acc
       |> add(:armor, template.armor)
@@ -102,7 +101,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
       |> add(:shadow, template.shadow_res)
       |> add(:arcane, template.arcane_res)
       |> add_shield(template)
-      |> add_equip_spells(template, get_spell)
+      |> add_equip_spells(template, get_spell, form)
 
     Enum.reduce(1..10, acc, fn i, acc ->
       case Map.get(@stat_mods, Map.get(template, :"stat_type#{i}")) do
@@ -122,16 +121,10 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
 
   defp add_shield(acc, _template), do: acc
 
-  defp add_equip_spells(acc, %ItemTemplate{} = template, get_spell) do
-    Enum.reduce(1..5, acc, fn i, acc ->
-      spell_id = Map.get(template, :"spellid_#{i}")
-      trigger = Map.get(template, :"spelltrigger_#{i}")
-
-      if is_integer(spell_id) and spell_id > 0 and trigger == @spelltrigger_on_equip do
-        add_spell_auras(acc, get_spell.(spell_id))
-      else
-        acc
-      end
+  defp add_equip_spells(acc, %ItemTemplate{} = template, get_spell, form) do
+    Enum.reduce(EquipmentSpells.spell_ids(template), acc, fn spell_id, acc ->
+      spell = get_spell.(spell_id)
+      if EquipmentSpells.eligible?(spell, form), do: add_spell_auras(acc, spell), else: acc
     end)
   end
 
@@ -174,8 +167,6 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
         acc
     end)
   end
-
-  defp add_spell_auras(acc, _spell), do: acc
 
   defp add_schools(acc, mask, amount) when is_integer(mask) do
     @schools

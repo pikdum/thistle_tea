@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.Entity.Logic.EquipmentAuras do
   @moduledoc """
-  Reconciles passive equipment auras by enchantment or set source. Existing
+  Reconciles passive equipment auras by item, enchantment, or set source. Existing
   holders retain their proc state while their equipment requirements hold.
   """
 
@@ -9,9 +9,10 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentAuras do
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.EquipmentSpells
   alias ThistleTea.Game.Spell
 
-  def sync(character, enchantments, get_spell, now, set_sources \\ []) do
+  def sync(character, enchantments, get_spell, now, spell_sources \\ []) do
     previous = character.unit.auras || []
     ordinary = Enum.filter(previous, &is_nil(&1.item_source))
     existing = Map.new(previous, &{&1.item_source, &1})
@@ -22,7 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentAuras do
           do: {item.object.guid, enchant_slot, spell_id}
 
     equipped =
-      for {_kind, _id, spell_id} = source <- Enum.uniq(enchant_sources ++ set_sources),
+      for {_kind, _id, spell_id} = source <- Enum.uniq(enchant_sources ++ spell_sources),
           holder = Map.get(existing, source) || build_holder(character, get_spell.(spell_id), source, now),
           not is_nil(holder),
           eligible?(character, holder),
@@ -34,18 +35,25 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentAuras do
     Effects.enqueue(character, events)
   end
 
-  defp eligible?(character, %Holder{item_source: {:item_set, _id, _spell_id}, spell: spell}) do
-    Spell.shapeshift_cast_error(spell, character.unit.shapeshift_form || 0) == :ok
+  defp eligible?(character, %Holder{item_source: {kind, _id, _spell_id}, spell: spell})
+       when kind in [:item_set, :item_equip] do
+    EquipmentSpells.eligible?(spell, character.unit.shapeshift_form)
   end
 
   defp eligible?(_character, _holder), do: true
 
-  defp build_holder(character, %Spell{} = spell, source, now) do
+  defp build_holder(character, spell, {:item_equip, _guid, _spell_id} = source, now) do
+    build_aura_holder(character, EquipmentSpells.aura_spell(spell), source, now)
+  end
+
+  defp build_holder(character, spell, source, now), do: build_aura_holder(character, spell, source, now)
+
+  defp build_aura_holder(character, %Spell{} = spell, source, now) do
     case Application.equipment_holder(character, spell, source, now) do
       %Holder{auras: []} -> nil
       holder -> holder
     end
   end
 
-  defp build_holder(_character, _spell, _source, _now), do: nil
+  defp build_aura_holder(_character, _spell, _source, _now), do: nil
 end

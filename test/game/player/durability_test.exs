@@ -117,6 +117,20 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
       assert repaired.character.unit.equipment_bonuses.armor == 100
     end
 
+    @tag :dbc_db
+    test "item passives follow committed durability changes", %{state: state, item: item, vendor: vendor} do
+      template = %{item.internal.template | spellid_1: 7598, spelltrigger_1: 1}
+      ItemStore.put(%{item | internal: %{item.internal | template: template}})
+      equipped = Character.sync_equipment_stats(state.character)
+      assert equipped.player.crit_percentage == 2.0
+      broken = Durability.lose(%{state | character: equipped}, :percent, 100, :equipped)
+      assert broken.character.player.crit_percentage == 0.0
+      assert CharacterStore.get(state.guid).player.crit_percentage == 0.0
+      repaired = Durability.repair(broken, vendor, item.object.guid)
+      assert repaired.character.player.crit_percentage == 2.0
+      assert CharacterStore.get(state.guid).player.crit_percentage == 2.0
+    end
+
     test "an unaffordable repair preserves damage and money", %{state: state, item: item, vendor: vendor} do
       state = Durability.lose(state, :percent, 100, :equipped)
       state = %{state | character: %{state.character | player: %{state.character.player | coinage: 499}}}

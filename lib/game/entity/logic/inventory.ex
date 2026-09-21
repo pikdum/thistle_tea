@@ -199,7 +199,11 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   end
 
   def usable_equipped_templates(%Player{} = player, get_item) do
-    player |> equipped_items(get_item) |> Enum.reject(&Item.broken?/1) |> Enum.map(&Item.template/1)
+    player |> usable_equipped_items(get_item) |> Enum.map(&Item.template/1)
+  end
+
+  def usable_equipped_items(%Player{} = player, get_item) do
+    player |> equipped_items(get_item) |> Enum.reject(&Item.broken?/1)
   end
 
   defp equipped_items(player, get_item) do
