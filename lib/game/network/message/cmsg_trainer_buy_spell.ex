@@ -2,76 +2,19 @@ defmodule ThistleTea.Game.Network.Message.CmsgTrainerBuySpell do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_TRAINER_BUY_SPELL
 
-  alias ThistleTea.Game.Entity.Data.TrainerSpell
-  alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Trainer
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Player.Reputation
-  alias ThistleTea.Game.Player.Spells
-  alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
-  alias ThistleTea.Game.World.Loader.Trainer, as: TrainerLoader
+  alias ThistleTea.Game.Player.Training
 
   defstruct [:trainer_guid, :spell_id]
 
   @impl ClientMessage
-  def handle(
-        %__MODULE__{trainer_guid: trainer_guid, spell_id: spell_id},
-        %{ready: true, character: %Character{} = c} = state
-      ) do
-    entry = Guid.entry(trainer_guid)
-
-    with true <- Reputation.can_interact?(c, trainer_guid),
-         true <-
-           GossipLoader.trainer_of?(
-             entry,
-             c.unit.class,
-             c.unit.race,
-             Reputation.exalted_with?(c, trainer_guid)
-           ),
-         %TrainerSpell{} = spell <- find_spell(entry, spell_id),
-         true <- Trainer.fits_class_race?(spell, c.unit.class, c.unit.race),
-         :green <- Trainer.state(spell, c.internal.spells, c.unit.level, c.player.skills),
-         price = Reputation.price(c, trainer_guid, spell.cost),
-         true <- price <= c.player.coinage do
-      buy(state, c, trainer_guid, spell, price)
-    else
-      _ -> state
-    end
+  def handle(%__MODULE__{trainer_guid: guid, spell_id: id}, %{ready: true, character: %Character{}} = state) do
+    Training.buy(state, guid, id)
   end
 
   def handle(_message, state), do: state
 
   @impl ClientMessage
-  def from_binary(payload) do
-    <<trainer_guid::little-size(64), spell_id::little-size(32)>> = payload
-
-    %__MODULE__{
-      trainer_guid: trainer_guid,
-      spell_id: spell_id
-    }
-  end
-
-  defp find_spell(creature_entry, teach_spell_id) do
-    TrainerLoader.trainer_info(creature_entry).spells
-    |> Enum.find(&(&1.teach_spell_id == teach_spell_id))
-  end
-
-  defp buy(state, c, trainer_guid, %TrainerSpell{} = spell, price) do
-    character = %{c | player: %{c.player | coinage: c.player.coinage - price}}
-
-    case Spells.learn_training(character, spell) do
-      {:ok, character, _events} ->
-        Network.send_packet(%Message.SmsgTrainerBuySucceeded{
-          trainer_guid: trainer_guid,
-          spell_id: spell.teach_spell_id
-        })
-
-        Network.send_packet(Core.update_object(character, :values))
-
-        %{state | character: character}
-
-      _ ->
-        state
-    end
+  def from_binary(<<trainer_guid::little-size(64), spell_id::little-size(32)>>) do
+    %__MODULE__{trainer_guid: trainer_guid, spell_id: spell_id}
   end
 end

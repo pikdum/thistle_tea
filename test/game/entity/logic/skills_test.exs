@@ -119,7 +119,7 @@ defmodule ThistleTea.Game.Entity.Logic.SkillsTest do
       assert rest == <<0::size(127 * 12 * 8)>>
     end
 
-    test "returns nil for empty or missing skills" do
+    test "clears an empty skill block and omits missing skills" do
       assert Skills.encode(%{}) == :binary.copy(<<0>>, 128 * 12)
       assert Skills.encode(nil) == nil
     end
