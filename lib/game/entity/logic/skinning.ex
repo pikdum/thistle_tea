@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Skinning do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Experience
+  alias ThistleTea.Game.Entity.Logic.Gathering
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -94,28 +95,16 @@ defmodule ThistleTea.Game.Entity.Logic.Skinning do
   def attempt?(level, skill, roll), do: skill >= 300 or required_skill(level, skill) <= roll
 
   def skill_up(skills, level, rank, roll) do
-    with %{value: value, max: cap} = entry when value < cap <- Map.get(skills, @skill),
-         true <- roll < gain_chance(value, level, rank) do
-      {:gained, Map.put(skills, @skill, %{entry | value: value + 1})}
-    else
-      _ -> :unchanged
-    end
+    Gathering.skill_up(skills, @skill, gain_requirement(level), roll, gain_multiplier(rank))
   end
 
   def gain_chance(value, level, rank) do
-    required = if level < 20, do: max((level - 10) * 10, 0), else: level * 5
-
-    chance =
-      cond do
-        value >= required + 100 -> 0
-        value >= required + 50 -> 25
-        value >= required + 25 -> 75
-        true -> 100
-      end
-
-    multiplier = if Experience.elite_rank?(rank), do: 2, else: 1
-    min(chance * multiplier / (1 <<< div(value, 75)), 100)
+    Gathering.gain_chance(@skill, value, gain_requirement(level), gain_multiplier(rank))
   end
+
+  defp gain_requirement(level) when level < 20, do: max((level - 10) * 10, 0)
+  defp gain_requirement(level), do: level * 5
+  defp gain_multiplier(rank), do: if(Experience.elite_rank?(rank), do: 2, else: 1)
 
   defp check_tool(count_item) when is_function(count_item, 1) do
     if Enum.any?([7005, 12_709, 19_901], &(count_item.(&1) > 0)), do: :ok, else: {:error, :equipped_item}
