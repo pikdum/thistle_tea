@@ -74,6 +74,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - logging in + creating characters
 - entering world + seeing other players
 - chatting, channels, and parties
+- [AFK and DND status](docs/chat-status-playtest.md), with public tags, whisper echoes and automatic replies, reconnect cleanup, and AFK battleground departure
 - mob spawns, combat, navigation, and respawns
 - auto-attacks + class abilities
 - creature-specific melee and ranged attack power from slaying gear and consumables, with weapon-speed scaling and live target debuffs
