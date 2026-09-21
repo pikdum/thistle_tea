@@ -711,26 +711,25 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp stop_channel(character, casting, reason), do: stop_channel(character, casting, reason, Time.now())
 
   defp stop_channel(
-         %{object: %{guid: user_guid}, internal: %Internal{} = internal, unit: unit} = character,
+         %{object: %{guid: user_guid}, internal: %Internal{} = internal} = character,
          %Cast{} = casting,
          reason,
          now
        ) do
     channel_game_object_guid = internal.channel_game_object_guid
     channel_game_object_owned? = internal.channel_game_object_owned?
+    {character, aura_events} = channel_aura_events(character, casting, reason, now)
 
     character = %{
       character
       | internal: %{
-          internal
+          character.internal
           | casting: nil,
             channel_game_object_guid: nil,
             channel_game_object_owned?: nil
         },
-        unit: %{unit | channel_object: 0, channel_spell: 0}
+        unit: %{character.unit | channel_object: 0, channel_spell: 0}
     }
-
-    {character, aura_events} = channel_aura_events(character, casting, reason, now)
 
     object_events = channel_object_events(channel_game_object_guid, channel_game_object_owned?, user_guid, reason)
 
@@ -768,7 +767,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp channel_aura_events(character, casting, :cancelled, now), do: remove_channel_auras(character, casting, now)
 
   defp remove_channel_auras(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{id: spell_id}} = casting, now) do
-    target_guid = channel_target_guid(character, casting)
+    target_guid = channel_cleanup_target_guid(character, casting)
     {character, events} = AuraLogic.remove_source_spell(character, spell_id, guid, now)
 
     remote_events =
@@ -782,6 +781,11 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp remove_channel_auras(character, _casting, _now), do: {character, []}
+
+  defp channel_cleanup_target_guid(%{unit: %{channel_object: guid}}, _casting) when is_integer(guid) and guid > 0,
+    do: guid
+
+  defp channel_cleanup_target_guid(character, casting), do: channel_target_guid(character, casting)
 
   defp queue_area_effects(
          character,

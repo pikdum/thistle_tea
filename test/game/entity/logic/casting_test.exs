@@ -33,6 +33,41 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
+  describe "cancel/2" do
+    test "removes a channel aura from its recorded target after pet possession changes ownership" do
+      pet_guid = Guid.from_low_guid(:pet, 1, 44)
+
+      spell = %Spell{
+        id: 1002,
+        duration_ms: 60_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{type: :apply_aura, aura: :mod_possess_pet, implicit_target_a: :pet}]
+      }
+
+      cast = %{Cast.new(spell, Target.self(1), 1_000) | phase: :channel_tick, channel_ms: 60_000}
+
+      character =
+        %Character{
+          object: %Object{guid: 1},
+          unit: %Unit{target: 10, channel_object: pet_guid, channel_spell: 1002},
+          internal: %Internal{casting: cast}
+        }
+        |> Companion.activate(:possession, %EntityRef{guid: pet_guid, entry: 1, spell_id: 1002})
+
+      assert Companion.summon_guid(character) == nil
+      cancelled = Casting.cancel(character, 2_000)
+      assert cancelled.internal.casting == nil
+      assert cancelled.unit.channel_object == 0
+      assert cancelled.unit.channel_spell == 0
+
+      assert [
+               %Effects.RemoveAura{source_guid: 1, target_guid: ^pet_guid, spell_id: 1002},
+               %Effects.DespawnAreaEffects{spell_id: 1002},
+               %Effects.ChannelUpdate{channel_time_ms: 0}
+             ] = cancelled.internal.events
+    end
+  end
+
   describe "start/5" do
     test "waits for the scheduled tick before delivering a periodic channel trigger" do
       fixture = final_channel_tick_fixture()
