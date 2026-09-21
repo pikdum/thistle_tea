@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Player.Looting do
   alias ThistleTea.Game.Player.ItemLoot
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -130,6 +131,24 @@ defmodule ThistleTea.Game.Player.Looting do
   end
 
   def release(state), do: state
+
+  def close_unavailable(%{character: %Character{} = character, loot_guid: guid} = state) when is_integer(guid) do
+    if Core.dead?(character) or chest_out_of_range?(character, guid), do: release(state), else: state
+  end
+
+  def close_unavailable(state), do: state
+
+  defp chest_out_of_range?(character, guid) do
+    if Guid.entity_type(guid) == :game_object and
+         match?(%{type: 3}, GameObjectTemplateLoader.cached(Guid.entry(guid))) do
+      case World.distance_between(character, guid) do
+        distance when is_number(distance) and distance <= 5.0 -> false
+        _ -> true
+      end
+    else
+      false
+    end
+  end
 
   def take_item(%{loot_type: :item} = state, slot), do: ItemLoot.take_item(state, slot)
 

@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Player.Deadmines
   alias ThistleTea.Game.Player.Disenchant
   alias ThistleTea.Game.Player.Fishing
+  alias ThistleTea.Game.Player.Gathering
   alias ThistleTea.Game.Player.ItemLoot
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.PetTraining
@@ -119,7 +120,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
   defp cast_target(state, spell, targets, cast_item_guid) do
     with :ok <- Deadmines.validate_cast(state, spell, targets, cast_item_guid),
-         :ok <- validate_cast(state, spell, targets),
+         :ok <- validate_cast(state, spell, targets, cast_item_guid),
          :ok <- PetTraining.validate(state.character, spell),
          {:ok, state} <- Fishing.prepare_cast(state, spell) do
       {:ok, do_cast(state, spell, targets, cast_item_guid)}
@@ -264,7 +265,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     end
   end
 
-  defp validate_cast(%{character: character} = state, %Spell{} = spell, %Target{} = targets) do
+  defp validate_cast(%{character: character} = state, %Spell{} = spell, %Target{} = targets, cast_item_guid) do
     enchant_guid = Enchantments.target_guid(character.player, spell, Target.item_guid(targets))
 
     CastValidation.validate(
@@ -275,6 +276,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       Time.now(),
       count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end,
       equipped_items: equipped_weapon_templates(character),
+      lock_context: Gathering.context(state, spell, targets, cast_item_guid),
       disenchant_item: Disenchant.owned_item(character, Target.item_guid(targets)),
       enchant_item: Disenchant.owned_item(character, enchant_guid),
       ammo_id: character.player.ammo_id,

@@ -284,9 +284,9 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       costs: %Costs{
         power: power_cost(entity, spell),
         channel_power: channel_power_cost(entity, casting),
-        reagents: if(Enchantments.item_enchant?(spell), do: [], else: spell.reagents || []),
+        reagents: if(deferred_item_costs?(spell), do: [], else: spell.reagents || []),
         ammo: Hunter.ammo_reagents(entity, spell),
-        cast_item_guid: if(!Enchantments.item_enchant?(spell), do: cast_item_cost(casting)),
+        cast_item_guid: if(!deferred_item_costs?(spell), do: cast_item_cost(casting)),
         modifier_holder_ids: casting.modifier_holder_ids
       },
       impacts: resolved_impacts(entity, spell, hits, misses),
@@ -349,6 +349,10 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp cast_item_cost(%Cast{consume_item: true, cast_item_guid: item_guid}) when is_integer(item_guid), do: item_guid
   defp cast_item_cost(%Cast{}), do: nil
+
+  defp deferred_item_costs?(spell) do
+    Enchantments.item_enchant?(spell) or Enum.any?(spell.effects, &(&1.type == :open_lock))
+  end
 
   defp power_cost(entity, %Spell{} = spell) do
     %PowerCost{power_type: spell.power_type, amount: Resources.power_cost(entity, spell)}
@@ -454,6 +458,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp queue_open_object(character, %Cast{
          spell: %Spell{} = spell,
+         cast_item_guid: cast_item_guid,
          resolution: %CastResolution{followups: %Followups{object_guid: object_guid}}
        }) do
     cond do
@@ -461,7 +466,11 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         Effects.enqueue(character, %Effects.OpenGameObject{target_guid: object_guid, spell_id: spell.id})
 
       is_integer(object_guid) and Enum.any?(spell.effects, &(&1.type == :open_lock)) ->
-        Effects.enqueue(character, Effects.open_gameobject(object_guid))
+        Effects.enqueue(character, %Effects.OpenLock{
+          target_guid: object_guid,
+          spell: spell,
+          cast_item_guid: cast_item_guid
+        })
 
       true ->
         character

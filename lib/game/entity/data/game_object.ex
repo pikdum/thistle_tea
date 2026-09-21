@@ -70,6 +70,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
         world: WorldRef.coerce(world),
         chair: chair(ot),
         fishing: Keyword.get(opts, :fishing),
+        gathering: gathering(ot),
         trap: trap(ot, Keyword.get(opts, :summoned_by)),
         ritual:
           ritual(
@@ -202,6 +203,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
         event: event,
         fishing: fishing_hole(ot),
         loot: chest_loot(ot),
+        gathering: gathering(GameObjectTemplate.build(ot)),
         spawn: chest_spawn(ot, o)
       }
     }
@@ -320,6 +322,21 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   end
 
   defp chest_loot(_template), do: nil
+
+  defp gathering(%GameObjectTemplate{type: 3, data: data} = template) do
+    %Internal.Gathering{
+      lock_id: GameObjectTemplate.lock_id(template),
+      min_uses: Enum.at(data, 4, 1),
+      max_uses: Enum.at(data, 5, 1)
+    }
+  end
+
+  defp gathering(%GameObjectTemplate{} = template) do
+    case GameObjectTemplate.lock_id(template) do
+      id when is_integer(id) and id > 0 -> %Internal.Gathering{lock_id: id}
+      _ -> nil
+    end
+  end
 
   @go_type_fishing_hole 25
 

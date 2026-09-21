@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:FeedPet, [:cast_item_guid, :target_guid, :spell_id, :range_yards], []},
     {:EnchantItem, [:target_guid, :spell, :effect], [cast_item_guid: nil]},
     {:OpenGameObject, [:target_guid], [spell_id: nil]},
+    {:OpenLock, [:target_guid, :spell], [cast_item_guid: nil]},
     {:PickPocket, [:target_guid, :spell_id], []},
     {:SkinCorpse, [:target_guid, :spell_id], []},
     {:DisenchantItem, [:target_guid, :spell_id], []},

@@ -14,6 +14,20 @@ defmodule ThistleTea.Game.Entity.Logic.OpenLock do
 
   def spell?(%Spell{effects: effects}), do: Enum.any?(effects, &(&1.type == :open_lock))
 
+  def validate(character, %Spell{} = spell, context) do
+    if spell?(spell), do: validate_context(character, spell, context), else: :ok
+  end
+
+  defp validate_context(character, spell, {:ok, %Lock{} = lock, entry}) do
+    case resolve(character, spell, lock, entry) do
+      {:ok, _opened} -> :ok
+      error -> error
+    end
+  end
+
+  defp validate_context(_character, _spell, {:error, _reason} = error), do: error
+  defp validate_context(_character, _spell, _missing), do: {:error, :bad_targets}
+
   def resolve(%Character{} = character, %Spell{} = spell, %Lock{} = lock, cast_item_entry \\ nil) do
     effects = Enum.filter(spell.effects, &(&1.type == :open_lock))
 

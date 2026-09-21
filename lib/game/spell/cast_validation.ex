@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Mount
+  alias ThistleTea.Game.Entity.Logic.OpenLock
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Pickpocket
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -46,6 +47,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_combat_state(caster, spell),
          :ok <- Pickpocket.validate(caster, spell, target_info),
          :ok <- Skinning.validate(caster, spell, target_info, opts),
+         :ok <- OpenLock.validate(caster, spell, Keyword.get(opts, :lock_context)),
          :ok <- Disenchant.validate(caster, spell, Keyword.get(opts, :disenchant_item)),
          :ok <-
            Enchantments.validate(

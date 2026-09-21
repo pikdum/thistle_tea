@@ -10,10 +10,18 @@ defmodule ThistleTea.Game.Player.ItemCosts do
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Player.Disenchant
   alias ThistleTea.Game.Player.Enchantments
+  alias ThistleTea.Game.Player.Gathering
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.World.ItemStore
 
-  @commands [:consume_cast_item, :consume_reagents, :enchant_item, :enchant_item_permanent, :disenchant_item]
+  @commands [
+    :consume_cast_item,
+    :consume_reagents,
+    :enchant_item,
+    :enchant_item_permanent,
+    :disenchant_item,
+    :open_lock
+  ]
 
   def settle(state) do
     receive do
@@ -46,4 +54,7 @@ defmodule ThistleTea.Game.Player.ItemCosts do
   end
 
   def apply(state, {:disenchant_item, guid, spell_id}), do: Disenchant.complete(state, guid, spell_id)
+
+  def apply(state, {:open_lock, guid, spell, cast_item_guid}),
+    do: Gathering.complete(state, guid, spell, cast_item_guid)
 end

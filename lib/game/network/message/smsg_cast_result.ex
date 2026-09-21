@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     bad_targets: 0x0A,
     cant_do_that_yet: 0x12,
     caster_dead: 0x13,
+    chest_in_use: 0x15,
     equipped_item: 0x18,
     equipped_item_class: @cast_failure_reason_equipped_item_class,
     confused: 0x16,

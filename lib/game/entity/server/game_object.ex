@@ -193,6 +193,15 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     {:reply, result, state}
   end
 
+  def handle_call({:open_lock, %Actor{} = actor, opened, gain?}, _from, %GameObject{} = state) do
+    {result, state} = __MODULE__.OpenLock.open(state, actor, opened, gain?)
+    {:reply, result, state}
+  rescue
+    error ->
+      Logger.error("Open lock failed: #{Exception.message(error)}")
+      {:reply, {:error, :bad_targets}, state}
+  end
+
   def handle_call({:chair_seat, user_map, {user_x, user_y, user_z} = user_position}, _from, %GameObject{} = state) do
     result =
       with {:ok, {seat_x, seat_y, seat_z, _orientation} = position, stand_state} <-

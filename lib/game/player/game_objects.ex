@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.GameObjects do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Deadmines
   alias ThistleTea.Game.Player.Fishing
+  alias ThistleTea.Game.Player.Gathering
   alias ThistleTea.Game.Player.Gossip
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.Quests
@@ -28,6 +29,14 @@ defmodule ThistleTea.Game.Player.GameObjects do
   @go_type_questgiver 2
 
   def use_object(%{character: %Character{}} = state, guid) do
+    case Gathering.authorize_use(state, guid) do
+      :ok -> open_object(state, guid)
+      {:ok, opened} -> Gathering.open_key(state, guid, opened)
+      _ -> state
+    end
+  end
+
+  def open_object(%{character: %Character{}} = state, guid) do
     if questgiver?(guid) do
       Gossip.hello_game_object(state, guid)
     else
@@ -107,10 +116,9 @@ defmodule ThistleTea.Game.Player.GameObjects do
   end
 
   def open_chest(state, guid), do: Looting.open(state, guid)
-  def open_object(state, guid), do: use_object(state, guid)
 
   def activate_object(state, guid, 6_250), do: Deadmines.fire(state, guid, false)
-  def activate_object(state, guid, _spell_id), do: use_object(state, guid)
+  def activate_object(state, guid, _spell_id), do: open_object(state, guid)
 
   def chest?(guid) do
     Guid.entity_type(guid) == :game_object and

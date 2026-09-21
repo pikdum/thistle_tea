@@ -6,15 +6,18 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
   fresh loot.
   """
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Gathering, as: GatheringState
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot, as: InternalLoot
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.GameObject
+  alias ThistleTea.Game.Entity.Logic.Gathering
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Logic.Loot.Reservation
   alias ThistleTea.Game.Entity.Logic.LootSession
+  alias ThistleTea.Game.Entity.Logic.OpenLock
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
@@ -27,12 +30,26 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
   def lootable?(%GameObject{}), do: false
 
   def view(%GameObject{} = state, %Actor{} = actor) do
+    if authorized?(state, actor), do: view_authorized(state, actor), else: {{:error, :locked}, state}
+  end
+
+  defp authorized?(%GameObject{internal: %{gathering: %GatheringState{lock_id: id, opened_by: opened}}}, actor)
+       when id > 0 do
+    Map.has_key?(opened, actor.guid)
+  end
+
+  defp authorized?(_state, _actor), do: true
+
+  defp view_authorized(%GameObject{} = state, %Actor{} = actor) do
     case ensure_session(state) do
       {%LootSession{} = session, state} ->
         case LootSession.view(session, actor) do
           {:ok, %Loot{} = loot} ->
             session = LootSession.add_viewer(session, actor)
             {{:ok, loot}, put_session(state, session)}
+
+          {:error, :nothing_to_take} ->
+            {{:error, :nothing_to_take}, put_session(state, LootSession.add_viewer(session, actor))}
 
           {:error, reason} ->
             {{:error, reason}, state}
@@ -44,6 +61,12 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
   end
 
   def reserve_item(%GameObject{} = state, %Actor{} = actor, slot, owner_pid) when is_pid(owner_pid) do
+    if authorized?(state, actor),
+      do: reserve_authorized(state, actor, slot, owner_pid),
+      else: {{:error, :locked}, state}
+  end
+
+  defp reserve_authorized(state, actor, slot, owner_pid) do
     case session(state) do
       %LootSession{} = session ->
         token = Process.monitor(owner_pid)
@@ -63,7 +86,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
   end
 
   def take_gold(%GameObject{} = state, %Actor{} = actor) do
-    with %LootSession{} = session <- session(state),
+    with true <- authorized?(state, actor),
+         %LootSession{} = session <- session(state),
          {:ok, gold, session} <- LootSession.take_gold(session, actor) do
       {{:ok, gold}, put_session(state, session)}
     else
@@ -73,11 +97,16 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
   end
 
   def release(%GameObject{} = state, %Actor{} = actor) do
+    if authorized?(state, actor), do: release_authorized(state, actor), else: state
+  end
+
+  defp release_authorized(state, actor) do
     case session(state) do
       %LootSession{} = session ->
         session = LootSession.remove_viewer(session, actor)
         state = put_session(state, session)
-        if LootSession.finished?(session), do: despawn(state), else: state
+        state = if LootSession.finished?(session), do: finish_harvest(state, actor), else: state
+        close_access(state, actor)
 
       _no_session ->
         state
@@ -117,11 +146,41 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
 
   def respawn(%GameObject{internal: %Internal{loot: %InternalLoot{} = loot}} = state) do
     state = put_internal_loot(state, %{loot | session: nil, corpse_removed?: false})
+    state = put_gathering(state, GatheringState.reset(state.internal.gathering))
     World.update_position(state)
     Visibility.join_entity(state)
   end
 
   def respawn(%GameObject{} = state), do: state
+
+  defp finish_harvest(%GameObject{internal: %{gathering: %GatheringState{} = gathering}} = state, actor) do
+    uses = gathering.uses + 1
+    opened = Map.get(gathering.opened_by, actor.guid, %OpenLock{required: 175})
+    state = put_gathering(state, %{gathering | uses: uses, opened_by: %{}})
+
+    if Gathering.replenish?(
+         uses,
+         gathering.min_uses,
+         gathering.max_uses,
+         opened.value,
+         opened.required,
+         :rand.uniform() * 100
+       ) do
+      put_session(state, nil)
+    else
+      despawn(state)
+    end
+  end
+
+  defp finish_harvest(state, _actor), do: despawn(state)
+
+  defp close_access(%GameObject{internal: %{gathering: %GatheringState{} = gathering}} = state, actor) do
+    put_gathering(state, %{gathering | opened_by: Map.delete(gathering.opened_by, actor.guid)})
+  end
+
+  defp close_access(state, _actor), do: state
+
+  defp put_gathering(state, gathering), do: %{state | internal: %{state.internal | gathering: gathering}}
 
   defp despawn(%GameObject{internal: %Internal{loot: %InternalLoot{} = loot}} = state) do
     state = Visibility.leave_entity(state)

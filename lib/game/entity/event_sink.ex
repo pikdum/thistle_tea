@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.GiveItem,
     Effects.MonsterTalk,
     Effects.OpenGameObject,
+    Effects.OpenLock,
     Effects.PickPocket,
     Effects.SkinCorpse,
     Effects.PlayObjectSound,

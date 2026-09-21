@@ -1070,12 +1070,14 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
       assert mob.unit.auras == []
     end
 
-    test "queues an open-gameobject event for open-lock casts at objects" do
-      spell = %Spell{id: 6478, effects: [%Effect{index: 0, type: :open_lock}]}
+    test "queues the spell identity for open-lock casts at objects" do
+      spell = %Spell{id: 6478, reagents: [{123, 1}], effects: [%Effect{index: 0, type: :open_lock}]}
 
       casting = %Cast{
         spell: spell,
         targets: Target.object(0xF110_0001, :locked),
+        cast_item_guid: 55,
+        consume_item: true,
         ends_at: Time.now()
       }
 
@@ -1089,8 +1091,14 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
       mob = Casting.complete(mob, casting, 1_000)
 
       assert Enum.any?(mob.internal.events, fn event ->
-               is_struct(event, Effects.OpenGameObject) and event.target_guid == 0xF110_0001
+               is_struct(event, Effects.OpenLock) and event.target_guid == 0xF110_0001 and event.spell == spell and
+                 event.cast_item_guid == 55
              end)
+
+      refute Enum.any?(
+               mob.internal.events,
+               &(is_struct(&1, Effects.ConsumeCastItem) or is_struct(&1, Effects.ConsumeReagents))
+             )
 
       assert Enum.any?(mob.internal.events, fn event ->
                is_struct(event, Effects.SpellGo) and event.hit_guids == [0xF110_0001]

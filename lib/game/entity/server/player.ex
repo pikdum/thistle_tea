@@ -876,6 +876,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
+  def handle_info({:open_lock, _guid, _spell, _item} = command, state) do
+    {:noreply, ItemCosts.apply(state, command)}
+  rescue
+    error ->
+      Logger.error("Open lock failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_info({:pickpocket, guid, spell_id}, state) do
     {:noreply, Looting.pickpocket(state, guid, spell_id)}
   rescue
@@ -1265,6 +1273,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     state
     |> cancel_cast_if_dead()
     |> finalize_death()
+    |> Looting.close_unavailable()
     |> sync_equipment_requirements()
     |> sync_character_metadata()
     |> then(fn state -> %{state | character: EventSink.emit_pending(state.character)} end)

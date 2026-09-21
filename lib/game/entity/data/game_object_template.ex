@@ -4,6 +4,11 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTemplate do
 
   defstruct [:entry, :type, :display_id, :name, :size, :flags, :faction, :bounds, min_gold: 0, max_gold: 0, data: []]
 
+  def lock_id(%__MODULE__{type: type, data: data}) when type in [0, 1], do: Enum.at(data, 1, 0)
+  def lock_id(%__MODULE__{type: 25, data: data}), do: Enum.at(data, 4, 0)
+  def lock_id(%__MODULE__{type: type, data: data}) when type in [2, 3, 6, 10, 12, 13, 24, 26], do: Enum.at(data, 0, 0)
+  def lock_id(_template), do: 0
+
   def build(%Mangos.GameObjectTemplate{} = template) do
     %__MODULE__{
       entry: template.entry,
