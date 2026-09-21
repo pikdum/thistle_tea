@@ -115,7 +115,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   end
 
   defp cast_target(state, spell, %Target{selection: {:trade_item, slot}}, cast_item_guid) do
-    Trade.enchant(state, spell, slot, cast_item_guid)
+    Trade.cast(state, spell, slot, cast_item_guid)
   end
 
   defp cast_target(state, spell, targets, cast_item_guid) do

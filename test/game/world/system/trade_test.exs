@@ -6,12 +6,18 @@ defmodule ThistleTea.Game.World.System.TradeTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Data.Lock
+  alias ThistleTea.Game.Entity.Data.Lock.Requirement
+  alias ThistleTea.Game.Entity.Data.Trade.Cast, as: TradeCast
   alias ThistleTea.Game.Entity.Data.Trade.Decision
   alias ThistleTea.Game.Entity.Data.Trade.Prepare
   alias ThistleTea.Game.Entity.Data.Trade.Receipt
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Trade, as: PlayerTrade
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.System.Trade
@@ -89,6 +95,132 @@ defmodule ThistleTea.Game.World.System.TradeTest do
       assert ItemStore.pending_trade(guid) == nil
       assert ItemStore.get(item.object.guid) == item
     end
+  end
+
+  describe "trade opening lifecycle" do
+    setup [:build_opening]
+
+    test "commits the unlock and skill gain once, retaining private ownership through recovery", context do
+      %{first: first, second: second, server: server, second_item: target} = context
+      id = prepare_opening(context)
+      assert :ok = as_owner(context, first, fn -> Trade.prepared(server, id, first, %{}) end)
+      refute Item.unlocked?(ItemStore.get(target.object.guid))
+      assert ItemStore.pending_trade(first.object.guid) == nil
+      assert :ok = as_owner(context, second, fn -> Trade.prepared(server, id, second, %{}) end)
+      item = ItemStore.get(target.object.guid)
+      assert Item.unlocked?(item)
+      assert item.item.owner == second.object.guid
+      refute Item.loot_generated?(item)
+      assert ItemStore.pending_trade(first.object.guid).changes.player.skills[633].value == 2
+
+      GenServer.stop(server)
+      recovered = PlayerTrade.recover(first)
+      assert recovered.player.skills[633].value == 2
+      assert recovered.player.coinage == 1075
+      assert PlayerTrade.recover(recovered) == recovered
+      owner = PlayerTrade.recover(second)
+      assert owner.player.coinage == 925
+      assert owner.player.inv1 == target.object.guid
+      assert CharacterStore.get(second.object.guid) == owner
+    end
+
+    test "disconnect before both snapshots commit preserves the locked source and both balances", context do
+      %{first: first, second: second, owners: owners, server: server, second_item: target} = context
+      id = prepare_opening(context)
+      assert :ok = as_owner(context, first, fn -> Trade.prepared(server, id, first, %{}) end)
+      Process.exit(owners[second.object.guid], :kill)
+      guid = first.object.guid
+      assert_receive {:packet, ^guid, %Message.SmsgTradeStatus{status: :trade_canceled}}, 1_000
+      assert ItemStore.get(target.object.guid) == target
+      assert ItemStore.pending_trade(guid) == nil
+      assert PlayerTrade.recover(first).player.coinage == 1000
+      assert PlayerTrade.recover(first).player.skills[633].value == 1
+      assert PlayerTrade.recover(second).player.coinage == 1000
+    end
+
+    test "failed casts clear their preview and retry without accepting stale preparation", context do
+      %{first: first, second: second, server: server, second_item: target} = context
+      previous_id = prepare_opening(context)
+      without_tool = %{first | player: %{first.player | inv2: 0}}
+      assert :ok = as_owner(context, first, fn -> Trade.prepared(server, previous_id, without_tool, %{}) end)
+      assert :ok = as_owner(context, second, fn -> Trade.prepared(server, previous_id, second, %{}) end)
+      guid = first.object.guid
+      failure = Message.SmsgCastResult.failure(1804, :item_gone)
+      assert_receive {:packet, ^guid, ^failure}
+      assert_receive {:packet, ^guid, %Message.SmsgTradeStatus{status: :back_to_trade}}
+      assert {:ok, id, ^target, offer} = request(context, first, :spell_target)
+      assert id != previous_id
+      assert offer.spell == nil
+      refute offer.accepted?
+      assert ItemStore.pending_trade(guid) == nil
+      refute Item.unlocked?(ItemStore.get(target.object.guid))
+      send(server, {:prepare_timeout, previous_id})
+      assert :stale = as_owner(context, first, fn -> Trade.prepared(server, previous_id, first, %{}) end)
+      assert :ok = as_owner(context, first, fn -> Trade.abort(server, previous_id, guid) end)
+      assert {:error, :not_trading} = request(context, first, {:spell, previous_id, context.cast})
+      assert {:ok, ^id, ^target, _offer} = request(context, first, :spell_target)
+
+      assert :ok = request(context, first, {:spell, id, context.cast})
+      :ets.insert(context.table, {:now, 400})
+      assert :ok = request(context, first, :accept)
+      assert :ok = request(context, second, :accept)
+      assert_receive {:owner_message, _guid, %Prepare{id: ^id}}
+      assert_receive {:owner_message, _guid, %Prepare{id: ^id}}
+      assert :ok = as_owner(context, first, fn -> Trade.prepared(server, id, first, %{}) end)
+      assert :ok = as_owner(context, second, fn -> Trade.prepared(server, id, second, %{}) end)
+      assert %Receipt{id: ^id} = ItemStore.pending_trade(guid)
+      assert Item.unlocked?(ItemStore.get(target.object.guid))
+      assert PlayerTrade.recover(first).player.coinage == 1075
+      assert PlayerTrade.recover(first).player.skills[633].value == 2
+      assert PlayerTrade.recover(second).player.coinage == 925
+    end
+  end
+
+  defp build_opening(context) do
+    spell = %Spell{id: 1804, tools: [5060], effects: [%Effect{type: :open_lock, misc_value: 1, base_points: -1}]}
+    target = ItemStore.create(%ItemTemplate{entry: 4632, flags: 4, lockid: 5}, owner: context.second.object.guid)
+    tool = ItemStore.create(%ItemTemplate{entry: 5060}, owner: context.first.object.guid)
+    first = context.first
+    second = context.second
+
+    first = %{
+      first
+      | unit: %Unit{health: 100, class: 4, race: 1, level: 20},
+        player: %{first.player | inv2: tool.object.guid, skills: %{633 => %{value: 1, max: 100}}},
+        internal: %{first.internal | spellbook: %{1804 => spell}}
+    }
+
+    cast = %TradeCast{
+      spell: spell,
+      target_guid: target.object.guid,
+      effects: [],
+      lock: %Lock{id: 5, requirements: [%Requirement{type: :skill, index: 1, skill: 1}]},
+      skill_roll: 0
+    }
+
+    %{
+      first: first,
+      second: %{second | player: %{second.player | inv1: target.object.guid}},
+      second_item: target,
+      cast: cast
+    }
+  end
+
+  defp prepare_opening(context) do
+    %{first: first, second: second, server: server, table: table} = context
+    assert :ok = request(context, first, {:initiate, second.object.guid})
+    assert :ok = request(context, second, :open)
+    assert :ok = request(context, second, {:item, 6, context.second_item})
+    assert :ok = request(context, second, {:money, 75})
+    assert {:ok, id, item, _offer} = request(context, first, :spell_target)
+    assert item == context.second_item
+    assert :ok = request(context, first, {:spell, id, context.cast})
+    :ets.insert(table, {:now, 200})
+    assert :ok = request(context, first, :accept)
+    assert :ok = request(context, second, :accept)
+    assert_receive {:owner_message, _guid, %Prepare{id: ^id, coordinator: ^server}}
+    assert_receive {:owner_message, _guid, %Prepare{id: ^id, coordinator: ^server}}
+    id
   end
 
   defp build_session(_context) do

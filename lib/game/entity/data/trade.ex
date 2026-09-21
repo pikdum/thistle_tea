@@ -6,7 +6,7 @@ end
 defmodule ThistleTea.Game.Entity.Data.Trade do
   @moduledoc """
   A two-player trade and the exact item instances each participant offered.
-  The seventh slot retains ownership and can receive an item enchantment.
+  The seventh slot retains ownership and can receive an enchantment or unlock.
   """
   @enforce_keys [:id, :initiator, :recipient, :offers, :modified_at]
   defstruct @enforce_keys ++ [phase: :requested]
@@ -36,8 +36,8 @@ defmodule ThistleTea.Game.Entity.Data.Trade.Receipt do
   defstruct @enforce_keys ++ [cast: nil, committed_at: nil]
 end
 
-defmodule ThistleTea.Game.Entity.Data.Trade.Enchantment do
+defmodule ThistleTea.Game.Entity.Data.Trade.Cast do
   @moduledoc false
   @enforce_keys [:spell, :target_guid, :effects]
-  defstruct @enforce_keys ++ [cast_item_guid: nil, recipe: nil, skill_roll: 99]
+  defstruct @enforce_keys ++ [cast_item_guid: nil, recipe: nil, lock: nil, skill_roll: 99]
 end

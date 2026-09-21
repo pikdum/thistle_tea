@@ -5,8 +5,8 @@ defmodule ThistleTea.Game.Player.Trade do
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Entity.Data.Trade.Cast, as: TradeCast
   alias ThistleTea.Game.Entity.Data.Trade.Decision
-  alias ThistleTea.Game.Entity.Data.Trade.Enchantment
   alias ThistleTea.Game.Entity.Data.Trade.Prepare
   alias ThistleTea.Game.Entity.Data.Trade.Receipt
   alias ThistleTea.Game.Entity.EventSink
@@ -14,9 +14,10 @@ defmodule ThistleTea.Game.Player.Trade do
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
+  alias ThistleTea.Game.Entity.Logic.OpenLock
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Trade, as: TradeLogic
-  alias ThistleTea.Game.Entity.Logic.Trade.Enchantments, as: TradeEnchantments
+  alias ThistleTea.Game.Entity.Logic.Trade.Spells, as: TradeSpells
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
@@ -31,6 +32,7 @@ defmodule ThistleTea.Game.Player.Trade do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemEnchantment
+  alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
   alias ThistleTea.Game.World.System.Trade, as: TradeSystem
 
   def request(%{ready: true, character: %Character{}} = state, action) do
@@ -51,14 +53,14 @@ defmodule ThistleTea.Game.Player.Trade do
 
   def request(state, _action), do: state
 
-  def enchant(%{ready: true, character: %Character{} = character} = state, spell, 6, cast_item_guid) do
-    with {:ok, id, %Item{} = item, offer} <- TradeSystem.request(state.guid, :enchant_target),
-         cast = enchantment(spell, item.object.guid, cast_item_guid),
+  def cast(%{ready: true, character: %Character{} = character} = state, spell, 6, cast_item_guid) do
+    with {:ok, id, %Item{} = item, offer} <- TradeSystem.request(state.guid, :spell_target),
+         cast = trade_cast(spell, item, cast_item_guid),
          offer = %{offer | spell: cast},
-         :ok <- TradeEnchantments.validate(character, offer, item, Time.now(), &ItemStore.get/1, &ItemEnchantment.get/1),
-         {:ok, batch} <- TradeEnchantments.costs(Batch.new(character.player), character, offer, &ItemStore.get/1),
+         :ok <- TradeSpells.validate(character, offer, item, Time.now(), &ItemStore.get/1, &ItemEnchantment.get/1),
+         {:ok, batch} <- TradeSpells.costs(Batch.new(character.player), character, offer, &ItemStore.get/1),
          {:ok, _changes} <- Inventory.plan(batch, &ItemStore.get/1),
-         :ok <- TradeSystem.request(state.guid, {:enchant, id, cast}) do
+         :ok <- TradeSystem.request(state.guid, {:spell, id, cast}) do
       Network.send_packet(Message.SmsgCastResult.failure(spell.id, :dont_report))
       {:ok, state}
     else
@@ -68,9 +70,9 @@ defmodule ThistleTea.Game.Player.Trade do
     end
   end
 
-  def enchant(state, spell, _slot, _cast_item_guid), do: cast_failure(state, spell, :item_not_ready)
+  def cast(state, spell, _slot, _cast_item_guid), do: cast_failure(state, spell, :item_not_ready)
 
-  defp enchantment(spell, target_guid, cast_item_guid) do
+  defp trade_cast(spell, item, cast_item_guid) do
     effects =
       for effect <- spell.effects, effect.type in [:enchant_item, :enchant_item_temporary] do
         %{
@@ -82,11 +84,12 @@ defmodule ThistleTea.Game.Player.Trade do
         }
       end
 
-    %Enchantment{
+    %TradeCast{
       spell: spell,
-      target_guid: target_guid,
+      target_guid: item.object.guid,
       cast_item_guid: cast_item_guid,
       effects: effects,
+      lock: if(OpenLock.spell?(spell), do: LockLoader.get(Item.template(item).lockid)),
       recipe: ItemEnchantment.recipe(spell.id),
       skill_roll: :rand.uniform(100) - 1
     }
@@ -193,7 +196,7 @@ defmodule ThistleTea.Game.Player.Trade do
         state = InventoryUpdate.apply_committed(state, receipt.changes, receipt.old_counts, receipt.outgoing)
         state = %{state | character: state.character |> Enchantments.restore() |> EventSink.emit_pending()}
         Enchantments.send_active_timers(state.character)
-        project_enchantment(state.character, receipt.cast)
+        project_cast(state.character, receipt.cast)
         CharacterStore.put(state.character)
         ItemStore.acknowledge_trade(receipt)
         Network.send_packet(%SmsgTradeStatus{status: :trade_complete})
@@ -213,22 +216,22 @@ defmodule ThistleTea.Game.Player.Trade do
         internal: %{character.internal | last_trade_id: receipt.id}
     }
 
-    spend_enchantment(character, receipt.cast, receipt.committed_at)
+    spend_cast(character, receipt.cast, receipt.committed_at)
   end
 
-  defp spend_enchantment(character, nil, _now), do: character
+  defp spend_cast(character, nil, _now), do: character
 
-  defp spend_enchantment(character, %Enchantment{cast_item_guid: guid, spell: spell}, now) when is_integer(guid) do
+  defp spend_cast(character, %TradeCast{cast_item_guid: guid, spell: spell}, now) when is_integer(guid) do
     Cooldowns.start(character, spell, now)
   end
 
-  defp spend_enchantment(character, %Enchantment{spell: spell}, now) do
+  defp spend_cast(character, %TradeCast{spell: spell}, now) do
     character |> Resources.spend_power(spell, now) |> Cooldowns.start(spell, now)
   end
 
-  defp project_enchantment(_character, nil), do: :ok
+  defp project_cast(_character, nil), do: :ok
 
-  defp project_enchantment(character, %Enchantment{} = cast) do
+  defp project_cast(character, %TradeCast{} = cast) do
     Network.send_packet(%Message.SmsgCastResult{spell: cast.spell.id, result: 0})
 
     World.broadcast_packet(

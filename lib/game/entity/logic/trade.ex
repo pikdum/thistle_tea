@@ -6,14 +6,14 @@ defmodule ThistleTea.Game.Entity.Logic.Trade do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.Trade
-  alias ThistleTea.Game.Entity.Data.Trade.Enchantment
+  alias ThistleTea.Game.Entity.Data.Trade.Cast, as: TradeCast
   alias ThistleTea.Game.Entity.Data.Trade.Exchange
   alias ThistleTea.Game.Entity.Data.Trade.Offer
   alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
-  alias ThistleTea.Game.Entity.Logic.Trade.Enchantments, as: TradeEnchantments
+  alias ThistleTea.Game.Entity.Logic.Trade.Spells, as: TradeSpells
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.Target
 
@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trade do
 
   def clear_item(_trade, _guid, _slot, _now), do: {:error, :trade_canceled}
 
-  def enchant(%Trade{phase: :open} = trade, guid, %Enchantment{} = cast, now) do
+  def cast(%Trade{phase: :open} = trade, guid, %TradeCast{} = cast, now) do
     case target_item(trade, guid) do
       %Item{object: %{guid: target}} when target == cast.target_guid ->
         update_offer(trade, guid, now, &%{&1 | spell: cast})
@@ -71,7 +71,11 @@ defmodule ThistleTea.Game.Entity.Logic.Trade do
     end
   end
 
-  def enchant(_trade, _guid, _cast, _now), do: {:error, :trade_canceled}
+  def cast(_trade, _guid, _cast, _now), do: {:error, :trade_canceled}
+
+  def clear_spell(%Trade{phase: :open} = trade, guid, now) do
+    update_offer(trade, guid, now, &%{&1 | spell: nil})
+  end
 
   def target_item(%Trade{} = trade, guid) do
     case Map.get(trade.offers, other(trade, guid)) do
@@ -132,7 +136,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trade do
 
   def plan(%Trade{phase: :preparing} = trade, characters, now, get_item, get_enchantment) do
     with :ok <- validate_offers(trade, characters, now, get_item, get_enchantment),
-         :ok <- validate_enchantments(trade, characters, now, get_item, get_enchantment),
+         :ok <- validate_spells(trade, characters, now, get_item, get_enchantment),
          {:ok, first} <- plan_side(trade, trade.initiator, characters, get_item, now),
          {:ok, second} <- plan_side(trade, trade.recipient, characters, get_item, now) do
       outgoing = Map.new(trade.offers, fn {guid, offer} -> {guid, Enum.map(traded_items(offer), & &1.object.guid)} end)
@@ -152,7 +156,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trade do
     case Map.get(trade.offers, guid) do
       %Offer{} = offer ->
         offers = trade.offers |> Map.put(guid, update.(offer)) |> clear_acceptance()
-        {:ok, clear_invalid_enchantments(%{trade | offers: offers, modified_at: now})}
+        {:ok, clear_invalid_spells(%{trade | offers: offers, modified_at: now})}
 
       _ ->
         {:error, :trade_canceled}
@@ -161,10 +165,10 @@ defmodule ThistleTea.Game.Entity.Logic.Trade do
 
   defp clear_acceptance(offers), do: Map.new(offers, fn {guid, offer} -> {guid, %{offer | accepted?: false}} end)
 
-  defp clear_invalid_enchantments(trade) do
+  defp clear_invalid_spells(trade) do
     offers =
       Map.new(trade.offers, fn
-        {guid, %Offer{spell: %Enchantment{target_guid: target}} = offer} ->
+        {guid, %Offer{spell: %TradeCast{target_guid: target}} = offer} ->
           case target_item(trade, guid) do
             %Item{object: %{guid: ^target}} -> {guid, offer}
             _ -> {guid, %{offer | spell: nil}}
@@ -177,9 +181,9 @@ defmodule ThistleTea.Game.Entity.Logic.Trade do
     %{trade | offers: offers}
   end
 
-  defp validate_enchantments(trade, characters, now, get_item, get_enchantment) do
+  defp validate_spells(trade, characters, now, get_item, get_enchantment) do
     Enum.reduce_while(trade.offers, :ok, fn {guid, offer}, :ok ->
-      case TradeEnchantments.validate(
+      case TradeSpells.validate(
              Map.fetch!(characters, guid),
              offer,
              target_item(trade, guid),
@@ -237,8 +241,8 @@ defmodule ThistleTea.Game.Entity.Logic.Trade do
         Batch.add(batch, received)
       end)
 
-    with {:ok, batch} <- TradeEnchantments.costs(batch, character, own, get_item),
-         batch = TradeEnchantments.target_change(batch, own, other, get_item, now),
+    with {:ok, batch} <- TradeSpells.costs(batch, character, own, get_item),
+         batch = TradeSpells.target_change(batch, own, other, get_item, now),
          {:ok, changes} <- Inventory.plan(batch, get_item) do
       merged = for %{status: :merged, incoming_guid: guid} <- changes.placements, do: get_item.(guid)
       {:ok, ChangeSet.absorb(changes, %{player: changes.player, items: [], destroyed: merged})}

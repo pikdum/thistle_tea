@@ -1,4 +1,4 @@
-defmodule ThistleTea.Game.Entity.Logic.Trade.EnchantmentsTest do
+defmodule ThistleTea.Game.Entity.Logic.Trade.SpellsTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Entity.Data.Character
@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trade.EnchantmentsTest do
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemEnchantment
   alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Data.Trade.Enchantment
+  alias ThistleTea.Game.Entity.Data.Trade.Cast, as: TradeCast
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
   alias ThistleTea.Game.Entity.Logic.Trade
   alias ThistleTea.Game.Spell
@@ -60,7 +60,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trade.EnchantmentsTest do
                plan(%{context | characters: %{context.characters | 1 => exhausted}})
 
       own_only = %{context.cast | spell: %{context.cast.spell | attributes: MapSet.new([:enchant_own_item_only])}}
-      {:ok, trade} = Trade.enchant(context.trade, 1, own_only, 0)
+      {:ok, trade} = Trade.cast(context.trade, 1, own_only, 0)
       assert {:error, 1, {:cast, 7418, :not_tradeable}} = plan(%{context | trade: trade})
 
       assert {:error, 1, {:cast, 7418, :not_tradeable}} =
@@ -101,7 +101,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trade.EnchantmentsTest do
           effects: [%{type: :enchant_item_temporary, id: 2623, duration_ms: 1_800_000, charges: 0, token: :oil}]
       }
 
-      {:ok, trade} = Trade.enchant(context.trade, 1, cast, 0)
+      {:ok, trade} = Trade.cast(context.trade, 1, cast, 0)
 
       lookup = fn
         103 -> oil
@@ -138,7 +138,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trade.EnchantmentsTest do
 
     caster = %Character{
       object: %Object{guid: 1},
-      unit: %Unit{health: 100, max_health: 100, power1: 100, level: 50},
+      unit: %Unit{health: 100, max_health: 100, power1: 100, level: 50, race: 1, class: 1},
       player: %Player{coinage: 1000, inv1: 101, inv2: 102, skills: %{333 => %{value: 1, max: 75}}},
       internal: %Internal{spellbook: %{7418 => spell}}
     }
@@ -150,7 +150,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trade.EnchantmentsTest do
       internal: %Internal{}
     }
 
-    cast = %Enchantment{
+    cast = %TradeCast{
       spell: spell,
       target_guid: 201,
       effects: [%{type: :enchant_item, id: 41}],
@@ -162,7 +162,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trade.EnchantmentsTest do
     {:ok, trade} = Trade.new(:enchant, 1, 2, 0) |> Trade.open(2)
     {:ok, trade} = Trade.put_item(trade, 2, 6, target, 0)
     {:ok, trade} = Trade.money(trade, 2, 500, 0)
-    {:ok, trade} = Trade.enchant(trade, 1, cast, 0)
+    {:ok, trade} = Trade.cast(trade, 1, cast, 0)
 
     %{
       trade: trade,
