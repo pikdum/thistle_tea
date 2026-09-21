@@ -72,6 +72,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     pending_movement_acks: %{},
     tracked_entities: MapSet.new(),
     quest_object_flags: %{},
+    questgiver_statuses: %{},
     player_guids: [],
     mob_guids: [],
     gossip_menu_options: [],

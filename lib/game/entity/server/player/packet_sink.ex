@@ -62,6 +62,14 @@ defmodule ThistleTea.Game.Entity.Server.Player.PacketSink do
     end
   end
 
+  def send(%State{} = state, %Message.SmsgQuestgiverStatus{} = message, opts) do
+    if source_tracked?(state, Keyword.get(opts, :source_guid)) do
+      state |> send_message(message) |> QuestGivers.remember(message)
+    else
+      state
+    end
+  end
+
   def send(%State{} = state, message, opts) do
     if source_tracked?(state, Keyword.get(opts, :source_guid)) do
       send_message(state, message)
