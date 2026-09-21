@@ -808,6 +808,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, state}
   end
 
+  def handle_info({:scripted_cast, entry, target_guid}, %State{} = state) do
+    {:noreply, Spellcasting.scripted_cast(state, entry, target_guid), {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Scripted player cast failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   @impl GenServer
   def handle_info(:logout_complete, %{logout_timer: timer} = state) when is_reference(timer) do
     state = State.leave_world(state)

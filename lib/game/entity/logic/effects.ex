@@ -5,7 +5,12 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
   the owning boundary later drains and interprets them.
   """
   alias __MODULE__, as: Effects
+  alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Spell.Target
+
+  def scripted_cast(%CreatureSpell{} = entry, target_guid) when is_integer(target_guid) and target_guid > 0 do
+    %Effects.ScriptedCast{entry: entry, target_guid: target_guid}
+  end
 
   def environmental_damage(type, damage) when type in [:fall, :drowning] and is_integer(damage) and damage > 0 do
     %Effects.EnvironmentalDamage{type: type, damage: damage}

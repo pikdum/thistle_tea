@@ -33,6 +33,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   setup [:mob]
 
   describe "run/5" do
+    test "normal player casts request the owner spellcasting path" do
+      character = %Character{object: %Object{guid: 2}, unit: %Unit{level: 50}, internal: %Internal{}}
+      step = %ScriptStep{command: :cast_spell, datalong: 15_065, target_self?: true}
+      {character, _} = Script.run(character, Blackboard.new(), [step], 123, 1_000)
+      assert [%Effects.ScriptedCast{entry: %{spell_id: 15_065}, target_guid: 2}] = character.internal.events
+      assert character.internal.casting == nil
+    end
+
+    test "triggered player casts retain trigger semantics" do
+      character = %Character{object: %Object{guid: 2}, unit: %Unit{level: 50}, internal: %Internal{}}
+      step = %ScriptStep{command: :cast_spell, datalong: 15_065, datalong2: 2, target_self?: true}
+      {character, _} = Script.run(character, Blackboard.new(), [step], 123, 1_000)
+      assert [%Effects.TriggerSpell{source_guid: 2, target_guid: 2, spell_id: 15_065}] = character.internal.events
+    end
+
+    test "rejects script casts whose source has no unit" do
+      object = %GameObjectEntity{object: %Object{guid: 123}, internal: %Internal{}}
+      step = %ScriptStep{command: :cast_spell, datalong: 15_065, target_self?: true}
+      assert {^object, _} = Script.run(object, Blackboard.new(), [step], 2, 1_000)
+    end
+
     test "talk enqueues a monster talk event plus the text emote", %{mob: mob} do
       step = %ScriptStep{
         command: :talk,

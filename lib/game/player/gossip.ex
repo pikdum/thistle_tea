@@ -181,7 +181,15 @@ defmodule ThistleTea.Game.Player.Gossip do
          %{gossip: option_id}
        ) do
     state = dispatch_gossip_menu(state, character, guid, action_menu_id)
-    if steps != [], do: Entity.start_script(guid, steps, character.object.guid)
+
+    if steps != [] do
+      if Guid.type_id(guid) == :game_object do
+        Entity.start_script(character.object.guid, steps, guid)
+      else
+        Entity.start_script(guid, steps, character.object.guid)
+      end
+    end
+
     state
   end
 

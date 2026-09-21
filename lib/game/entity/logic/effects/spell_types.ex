@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
     {:DelayAura, [:source_guid, :target_guid, :spell_id, :delay_ms], []},
     {:DeliverSpell, [:target_guid, :cast_context, :spell], [delay_ms: nil]},
     {:TriggerSpellRequest, [:source_guid, :target_guid, :spell_id, :opts], []},
+    {:ScriptedCast, [:entry, :target_guid], []},
     {:DeliverHealThreat, [:mob_guid, :source_guid, :target_guid, :amount], []},
     {:DeliverSpellOutcome, [:source_guid, :target_guid, :spell, :outcome], []},
     {:DrainPower, [:target_guid, :misc_value], []},

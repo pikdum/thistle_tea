@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
@@ -42,6 +43,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -50,6 +52,31 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   require Logger
 
   @spell_failed_interrupted 0x23
+
+  def scripted_cast(state, %CreatureSpell{} = entry, target_guid) do
+    case SpellLoader.load(entry.spell_id) do
+      %Spell{} = spell -> scripted_cast(state, spell, entry, target_guid)
+      nil -> state
+    end
+  end
+
+  def scripted_cast(
+        %{character: %Character{} = character} = state,
+        %Spell{} = spell,
+        %CreatureSpell{} = entry,
+        target_guid
+      ) do
+    if character.internal.casting == nil or CreatureSpell.flag?(entry, :interrupt_previous) do
+      state = if character.internal.casting, do: cancel(state), else: state
+
+      state
+      |> snapshot_action_position()
+      |> cast_target(spell, Target.unit(target_guid), nil)
+      |> cast_state()
+    else
+      state
+    end
+  end
 
   def cast(state, spell_id, spell_cast_targets) when is_integer(spell_id) do
     state

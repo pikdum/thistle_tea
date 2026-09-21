@@ -11,9 +11,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   unsupported commands are logged and skipped. Steps flagged to swap final
   targets run on the resolved buddy creature instead: they are rewritten to
   provided-target form and forwarded to the buddy's owning process, matching
-  vmangos source/target swap semantics. Casts honor the triggered cast flag: triggered and
-  out-of-combat casts go through the trigger-spell pipeline, in-combat casts
-  through the mob casting machinery.
+  vmangos source/target swap semantics. Triggered casts use the trigger-spell
+  pipeline; normal casts use the caster's mob or player casting machinery.
   """
   import Bitwise, only: [&&&: 2, |||: 2, bnot: 1]
 
@@ -527,8 +526,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
       is_nil(target) or entry.spell_id <= 0 ->
         {state, blackboard}
 
+      not MobSpells.flags_allow?(state, entry, target, context) ->
+        {state, blackboard}
+
       CreatureSpell.flag?(entry, :triggered) ->
         {trigger_cast(state, entry, target, context), blackboard}
+
+      is_struct(state, Character) ->
+        {Effects.enqueue(state, Effects.scripted_cast(entry, target)), blackboard}
 
       true ->
         MobSpells.attempt_scripted_cast(state, blackboard, entry, target, context)
@@ -1268,13 +1273,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
          %{object: %{guid: guid}, unit: %Unit{level: level}} = state,
          %CreatureSpell{} = entry,
          target_guid,
-         %Context{} = context
+         %Context{}
        ) do
-    if MobSpells.flags_allow?(state, entry, target_guid, context) do
-      Effects.enqueue(state, Effects.trigger_spell(guid, level, target_guid, entry.spell_id))
-    else
-      state
-    end
+    Effects.enqueue(state, Effects.trigger_spell(guid, level, target_guid, entry.spell_id))
   end
 
   defp pick_talk_text(%ScriptStep{texts: [_ | _] = texts}, random), do: Random.choice(random, texts)

@@ -469,7 +469,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   defp missing_buff_spell_id(%CreatureSpell{spell_id: spell_id}), do: spell_id
 
-  def flags_allow?(%Mob{object: %{guid: guid}} = state, %CreatureSpell{} = entry, target_guid, %Context{} = context) do
+  def flags_allow?(
+        %{object: %{guid: guid}, unit: %Unit{}} = state,
+        %CreatureSpell{} = entry,
+        target_guid,
+        %Context{} = context
+      ) do
     cond do
       CreatureSpell.flag?(entry, :target_unreachable) ->
         false
@@ -491,9 +496,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     end
   end
 
-  defp in_melee_range?(%Mob{object: %{guid: guid}}, target_guid, %Context{}) when target_guid == guid, do: false
+  def flags_allow?(_state, _entry, _target_guid, _context), do: false
 
-  defp in_melee_range?(%Mob{} = state, target_guid, %Context{perception: perception}) do
+  defp in_melee_range?(%{object: %{guid: guid}}, target_guid, %Context{}) when target_guid == guid, do: false
+
+  defp in_melee_range?(state, target_guid, %Context{perception: perception}) do
     case Perception.distance(perception, target_guid) do
       distance when is_number(distance) ->
         distance <= CombatLogic.melee_reach(own_combat_reach(state), target_combat_reach(target_guid, perception))
@@ -503,8 +510,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     end
   end
 
-  defp own_combat_reach(%Mob{unit: %Unit{combat_reach: reach}}) when is_number(reach) and reach > 0, do: reach
-  defp own_combat_reach(%Mob{}), do: Unit.default_combat_reach()
+  defp own_combat_reach(%{unit: %Unit{combat_reach: reach}}) when is_number(reach) and reach > 0, do: reach
+  defp own_combat_reach(_state), do: Unit.default_combat_reach()
 
   defp target_combat_reach(target_guid, perception) when is_integer(target_guid) do
     case Perception.metadata(perception, target_guid) do

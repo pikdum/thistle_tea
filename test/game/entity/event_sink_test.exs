@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.HomeBind
   alias ThistleTea.Game.Entity.Data.Mob
@@ -38,6 +39,17 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   end
 
   describe "emit/2" do
+    test "delivers scripted casts only through the explicit player owner context" do
+      character = %Character{object: %Object{guid: unique_guid()}}
+      entry = %CreatureSpell{spell_id: 15_065}
+      effect = Effects.scripted_cast(entry, character.object.guid)
+      EventSink.emit(character, effect)
+      refute_received {:scripted_cast, _, _}
+      EventSink.emit(character, effect, Context.new(self()))
+      guid = character.object.guid
+      assert_received {:scripted_cast, ^entry, ^guid}
+    end
+
     setup [:metadata_fixtures]
 
     test "direct healing reaches the recipient and observers without duplicating periodic logs" do

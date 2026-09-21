@@ -294,6 +294,7 @@ defmodule ThistleTea.Game.Player.GameObjectQuestsTest do
     end
 
     test "shows conditioned object gossip, excludes NPC services, and binds selections to the source", context do
+      Entity.register(context.state.guid)
       steps = [%ScriptStep{command: :talk}]
       option = %Option{id: 0, option_id: 1, npc_flag: 1, text: "Read", action_menu_id: -1, action_steps: steps}
       vendor = %Option{id: 1, option_id: 3, npc_flag: 0, text: "Vendor"}
@@ -307,7 +308,8 @@ defmodule ThistleTea.Game.Player.GameObjectQuestsTest do
       assert Gossip.select(state, context.object_guid + 1, 0) == state
       refute_received {:"$gen_cast", {:start_script, _, _}}
       assert %{gossip_menu_options: []} = Gossip.select(state, context.object_guid, 0)
-      assert_received {:"$gen_cast", {:start_script, ^steps, _}}
+      object_guid = context.object_guid
+      assert_received {:"$gen_cast", {:start_script, ^steps, ^object_guid}}
     end
 
     test "revalidates distance and option conditions before executing object gossip", context do
