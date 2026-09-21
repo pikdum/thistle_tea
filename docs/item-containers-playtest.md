@@ -116,5 +116,5 @@ unavailable sources, death, remote bank access, full-bag rollback, atomic
 instant-key costs, completion-time revalidation, transfer restrictions,
 cached generation, and persistence through the runtime stores.
 
-Trade-slot unlocking and wrapped gifts remain separate parity work. This
-feature covers opening and unlocking containers in the player's own inventory.
+[Trade-slot unlocking](trade-opening-playtest.md) extends these systems to
+another player's retained item. Wrapped gifts remain separate parity work.

@@ -125,6 +125,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - Skinning, with corpse loot prerequisites, profession skill checks and gains, and private leather loot
 - [Gathering and object locks](docs/gathering-playtest.md), with Mining, Herbalism, shared key and skill requirements, repeated vein harvests, and per-spawn skill gains
 - [Inventory containers and lockboxes](docs/item-containers-playtest.md), with retained private loot, Pick Lock, consumable keys, atomic claims, and full-bag recovery
+- [Trade-slot unlocking](docs/trade-opening-playtest.md), with paid lockpicking, consumable keys, final requirement checks, and retry without closing the trade
 - Disenchanting, with exact-item consumption, private material loot, Enchanting skill gains, and recovery when bags are full
 - Permanent equipment enchants, with atomic material costs, profession skill gains, independent equipment bonuses, and weapon procs
 - [Charged weapon coatings](docs/weapon-coatings-playtest.md), with finite poison charges, proc chance talents, atomic application, and depletion cleanup

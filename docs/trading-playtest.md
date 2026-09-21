@@ -1,9 +1,10 @@
 # Player trading
 
 Implemented vanilla player trade negotiation, six transferred-item slots, gold
-offers, and the seventh slot for permanent enchants and temporary coatings.
+offers, and the seventh slot for permanent enchants, temporary coatings, and
+[lockpicking or consumable keys](trade-opening-playtest.md).
 Changing an offer clears both acceptances and starts the 200 ms acceptance
-delay. Changing the seventh-slot target clears its queued enchantment.
+delay. Changing the seventh-slot target clears its queued spell.
 
 Both player owners prepare their current inventory snapshots before completion.
 The coordinator plans both inventories and commits items and recovery receipts
@@ -16,6 +17,10 @@ its item target, or its reagents cannot be offered. Enchant costs exclude items
 offered for transfer. Failed inventory plans, stale items, insufficient money,
 invalid enchants, disconnection, death, and separation leave the exchange
 uncommitted.
+
+If a queued spell fails final validation, both acceptances and the failed
+preview clear while the trade stays open. A new preparation identity prevents
+delayed messages from the failed attempt from affecting a retry.
 
 References: `refs/vmangos/src/game/Handlers/TradeHandler.cpp`,
 `Objects/Item.cpp::CanBeTraded`, `Spells/Spell.cpp::CheckCast` and `TakeCastItem`,
