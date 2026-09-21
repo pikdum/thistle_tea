@@ -81,6 +81,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Emotes and posture](docs/emote-playtest.md), with DBC animations, persistent poses, movement and channel interruption, and Feign Death and pet-control cleanup
 - mob spawns, combat, navigation, and respawns
 - auto-attacks + class abilities
+- [Ownerless summoned objects](docs/wild-object-playtest.md), with shared loot, caster-independent lifetimes, linked objects, and environmental trap activation
 - creature-specific melee and ranged attack power from slaying gear and consumables, with weapon-speed scaling and live target debuffs
 - [Armor and spell penetration](docs/resistance-penetration-playtest.md), with school masks, stacking, equipment bonuses, and periodic damage
 - school-based spell cost reductions, with stacking, client cost displays, and free casts
