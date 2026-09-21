@@ -132,7 +132,8 @@ defmodule ThistleTea.Game.Entity.Data.ItemTemplate do
     min_money_loot: 0,
     max_money_loot: 0,
     duration: 0,
-    extra_flags: 0
+    extra_flags: 0,
+    wrapped_gift: 0
   ]
 
   def build(%Mangos.ItemTemplate{} = row) do

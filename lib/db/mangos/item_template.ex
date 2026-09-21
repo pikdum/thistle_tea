@@ -135,6 +135,7 @@ defmodule ThistleTea.DB.Mangos.ItemTemplate do
     field(:max_money_loot, :integer, default: 0)
     field(:duration, :integer, default: 0)
     field(:extra_flags, :integer, default: 0)
+    field(:wrapped_gift, :integer, default: 0)
   end
 
   def random_usable_by_type(inventory_type, race, class, level, limit \\ 1) do

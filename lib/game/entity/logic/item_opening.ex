@@ -15,12 +15,23 @@ defmodule ThistleTea.Game.Entity.Logic.ItemOpening do
 
   def validate(%Character{} = character, %Item{} = item) do
     cond do
-      Core.dead?(character) -> {:error, :you_are_dead}
-      not is_nil(character.internal.taxi_flight) -> {:error, :cant_do_right_now}
-      item.item.owner != character.object.guid -> {:error, :dont_own_that_item}
-      Item.container?(item) or not openable?(Item.template(item)) -> {:error, :cant_do_right_now}
-      locked?(item) -> {:error, :item_locked}
-      true -> :ok
+      Core.dead?(character) ->
+        {:error, :you_are_dead}
+
+      not is_nil(character.internal.taxi_flight) ->
+        {:error, :cant_do_right_now}
+
+      item.item.owner != character.object.guid ->
+        {:error, :dont_own_that_item}
+
+      Item.container?(item) or not (Item.wrapped?(item) or openable?(Item.template(item))) ->
+        {:error, :cant_do_right_now}
+
+      locked?(item) ->
+        {:error, :item_locked}
+
+      true ->
+        :ok
     end
   end
 

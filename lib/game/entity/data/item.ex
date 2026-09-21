@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Data.Item do
   alias ThistleTea.Game.Entity.Data.Component.Item, as: ItemComponent
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Data.WrappedItem
   alias ThistleTea.Game.Entity.Logic.Loot
 
   defstruct object: %Object{},
@@ -53,6 +54,34 @@ defmodule ThistleTea.Game.Entity.Data.Item do
   defp initial_flags(%ItemTemplate{}), do: 0
 
   def unlocked?(%__MODULE__{} = item), do: ((item.item.flags || 0) &&& 4) != 0
+  def wrapped?(%__MODULE__{} = item), do: ((item.item.flags || 0) &&& 8) != 0
+
+  def wrap(%__MODULE__{} = item, %ItemTemplate{} = gift, creator) do
+    original = %WrappedItem{template: template(item), flags: item.item.flags || 0}
+    internal = item.internal |> Map.put(:wrapped_item, original) |> Map.put(:template, gift)
+
+    %{
+      item
+      | object: %{item.object | entry: gift.entry},
+        item: %{item.item | flags: 8, gift_creator: creator},
+        internal: internal
+    }
+  end
+
+  def unwrap(%__MODULE__{internal: %{wrapped_item: %WrappedItem{} = original}} = item) do
+    internal = item.internal |> Map.delete(:wrapped_item) |> Map.put(:template, original.template)
+
+    {:ok,
+     %{
+       item
+       | object: %{item.object | entry: original.template.entry},
+         item: %{item.item | flags: original.flags, gift_creator: 0},
+         internal: internal
+     }}
+  end
+
+  def unwrap(%__MODULE__{}), do: {:error, :cant_do_right_now}
+
   def unlock(%__MODULE__{} = item), do: %{item | item: %{item.item | flags: (item.item.flags || 0) ||| 4}}
   def loot(%__MODULE__{internal: internal}), do: Map.get(internal, :loot)
   def loot_generated?(%__MODULE__{} = item), do: match?(%Loot{}, loot(item))

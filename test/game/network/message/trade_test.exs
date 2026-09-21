@@ -70,5 +70,14 @@ defmodule ThistleTea.Game.Network.Message.TradeTest do
                99::little-64, 3::little-32, 0::little-32, 0::little-32, 0::little-32, 20::little-32, 12::little-32>> =
                binary_part(slots, 6 * 61, 61)
     end
+
+    test "projects a wrapped gift's visible identity and creator" do
+      item = Item.build(%ItemTemplate{entry: 25}, 101, owner: 1)
+      gift = Item.wrap(item, %ItemTemplate{entry: 5043, flags: 512, display_id: 8000}, 1)
+      binary = Message.SmsgTradeStatusExtended.to_binary(%Message.SmsgTradeStatusExtended{items: %{0 => gift}})
+
+      assert <<_header::binary-size(17), 0, 5043::little-32, 8000::little-32, 1::little-32, 1::little-32, 1::little-64,
+               _rest::binary>> = binary
+    end
   end
 end

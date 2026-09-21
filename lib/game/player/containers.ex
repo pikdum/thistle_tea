@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.Containers do
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet.Placement
   alias ThistleTea.Game.Entity.Logic.ItemOpening
+  alias ThistleTea.Game.Entity.Logic.ItemWrapping
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
@@ -43,6 +44,23 @@ defmodule ThistleTea.Game.Player.Containers do
   end
 
   defp open_current(state, guid, loot_type) do
+    case ItemStore.get(guid) do
+      %Item{} = item ->
+        if Item.wrapped?(item), do: unwrap(state, item), else: open_loot(state, guid, loot_type)
+
+      _ ->
+        failure(state, :item_not_found, guid)
+    end
+  end
+
+  defp unwrap(state, item) do
+    case ItemWrapping.unwrap(state.character, item, &ItemStore.get/1) do
+      {:ok, changes} -> InventoryUpdate.apply(state, {:ok, changes})
+      {:error, reason} -> failure(state, reason, item.object.guid)
+    end
+  end
+
+  defp open_loot(state, guid, loot_type) do
     with {:ok, state, item} <- authorize(state, guid),
          item = ensure_loot(state.character, item),
          {:ok, changes} <-
