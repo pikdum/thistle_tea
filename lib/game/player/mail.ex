@@ -372,6 +372,7 @@ defmodule ThistleTea.Game.Player.Mail do
 
   defp validate_item(%Item{} = item) do
     if Bitwise.band(Item.template(item).flags || 0, 0x02) == 0 and
+         not Item.loot_generated?(item) and
          not Enchantments.bound?(item, Time.now(), &EnchantmentLoader.get/1),
        do: :ok,
        else: {:error, :invalid_item}

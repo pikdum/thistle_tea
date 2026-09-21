@@ -115,7 +115,7 @@ defmodule ThistleTea.Game.World.Loader.Loot do
   def generate_item(entry, min_gold, max_gold, wanted_quest_item? \\ &always_wanted/1) do
     %Loot{
       gold: roll_gold(min_gold, max_gold),
-      items: roll_items(entry, &item_rows/1, wanted_quest_item?)
+      items: roll_items(entry, &item_rows/1, wanted_quest_item?, &ItemLoader.get_cached_template/1)
     }
   end
 
@@ -166,15 +166,15 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     %Loot{gold: gold, items: items}
   end
 
-  defp roll_items(loot_id, rows_fn, wanted_quest_item? \\ &always_wanted/1)
+  defp roll_items(loot_id, rows_fn, wanted_quest_item? \\ &always_wanted/1, get_template \\ &ItemLoader.get_template/1)
 
-  defp roll_items(loot_id, rows_fn, wanted_quest_item?) when is_integer(loot_id) and loot_id > 0 do
+  defp roll_items(loot_id, rows_fn, wanted_quest_item?, get_template) when is_integer(loot_id) and loot_id > 0 do
     loot_id
     |> rows_fn.()
     |> Loot.roll(&reference_rows/1)
     |> Enum.filter(fn {item_id, _count, quest_item, _condition} -> not quest_item or wanted_quest_item?.(item_id) end)
     |> Enum.map(fn {item_id, count, quest_item, condition} ->
-      {ItemLoader.get_template(item_id), count, quest_item, condition}
+      {get_template.(item_id), count, quest_item, condition}
     end)
     |> Enum.reject(fn {template, _count, _quest_item, _condition} -> is_nil(template) end)
     |> Enum.with_index()
@@ -191,7 +191,7 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     end)
   end
 
-  defp roll_items(_loot_id, _rows_fn, _wanted_quest_item?), do: []
+  defp roll_items(_loot_id, _rows_fn, _wanted_quest_item?, _get_template), do: []
 
   defp always_wanted(_item_id), do: true
 

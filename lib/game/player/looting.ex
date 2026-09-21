@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Player.Looting do
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party
+  alias ThistleTea.Game.Player.Containers
   alias ThistleTea.Game.Player.ItemLoot
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.World
@@ -77,6 +78,19 @@ defmodule ThistleTea.Game.Player.Looting do
   end
 
   def open(%{character: %Character{} = character} = state, guid, opts) do
+    if Guid.entity_type(guid) == :item do
+      Containers.open_guid(state, guid)
+    else
+      open_entity(state, character, guid, opts)
+    end
+  end
+
+  def open(state, guid, _opts) do
+    Network.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
+    state
+  end
+
+  defp open_entity(state, character, guid, opts) do
     state = release(state)
     actor = actor(state, guid)
 
@@ -112,9 +126,10 @@ defmodule ThistleTea.Game.Player.Looting do
     end
   end
 
-  def open(state, guid, _opts) do
-    Network.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
-    state
+  def release(%{loot_type: :container} = state) do
+    state = Containers.release(state)
+    Network.send_packet(%Message.SmsgLootReleaseResponse{guid: state.loot_guid})
+    %{state | loot_guid: nil, loot_type: nil}
   end
 
   def release(%{loot_type: :item} = state) do
@@ -133,10 +148,17 @@ defmodule ThistleTea.Game.Player.Looting do
   def release(state), do: state
 
   def close_unavailable(%{character: %Character{} = character, loot_guid: guid} = state) when is_integer(guid) do
-    if Core.dead?(character) or chest_out_of_range?(character, guid), do: release(state), else: state
+    if Core.dead?(character) or chest_out_of_range?(character, guid) or container_unavailable?(state),
+      do: release(state),
+      else: state
   end
 
   def close_unavailable(state), do: state
+
+  defp container_unavailable?(%{loot_type: :container, loot_guid: guid} = state),
+    do: not Containers.available?(state, guid)
+
+  defp container_unavailable?(_state), do: false
 
   defp chest_out_of_range?(character, guid) do
     if Guid.entity_type(guid) == :game_object and
@@ -151,6 +173,7 @@ defmodule ThistleTea.Game.Player.Looting do
   end
 
   def take_item(%{loot_type: :item} = state, slot), do: ItemLoot.take_item(state, slot)
+  def take_item(%{loot_type: :container} = state, slot), do: Containers.take_item(state, slot)
 
   def take_item(%{character: %Character{}, loot_guid: loot_guid} = state, slot) when is_integer(loot_guid) do
     actor = actor(state, loot_guid)
@@ -194,6 +217,7 @@ defmodule ThistleTea.Game.Player.Looting do
   end
 
   def take_money(%{loot_type: :item} = state), do: state
+  def take_money(%{loot_type: :container} = state), do: Containers.take_money(state)
 
   def take_money(%{character: %Character{} = character, loot_guid: loot_guid} = state) when is_integer(loot_guid) do
     actor = actor(state, loot_guid)

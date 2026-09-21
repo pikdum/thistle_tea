@@ -63,7 +63,7 @@ defmodule ThistleTea.Game.Entity.Logic.ItemUseTest do
         spellcharges_2: -5
       }
 
-      item = Item.build(template, 101, owner: 1)
+      item = template |> Item.build(101, owner: 1) |> Item.unlock()
       assert item.item.flags == 4
       [used] = item |> use_item() |> ChangeSet.changed_items()
       assert used.item.flags == 5

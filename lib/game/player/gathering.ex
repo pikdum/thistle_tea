@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.Player.Gathering do
   @moduledoc """
-  Revalidates object-opening casts against live objects and cached locks.
-  The object grants loot access and per-spawn gains; the player commits costs
-  and skill progress only after a successful opening.
+  Revalidates opening casts against live objects, owned items, and cached locks.
+  Objects grant loot access and per-spawn gains; item unlocks, costs, and skill
+  progress commit together through the player's inventory transaction.
   """
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
@@ -17,12 +17,14 @@ defmodule ThistleTea.Game.Player.Gathering do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
+  alias ThistleTea.Game.Entity.Logic.ItemOpening
   alias ThistleTea.Game.Entity.Logic.ItemUse
   alias ThistleTea.Game.Entity.Logic.OpenLock
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Player.Containers
   alias ThistleTea.Game.Player.Disenchant
   alias ThistleTea.Game.Player.GameObjects
   alias ThistleTea.Game.Player.Looting
@@ -39,13 +41,13 @@ defmodule ThistleTea.Game.Player.Gathering do
 
   def context(state, spell, targets, cast_item_guid) do
     if OpenLock.spell?(spell) do
-      with {:ok, template} <- target(state, Target.object_guid(targets)),
-           id when is_integer(id) and id > 0 <- GameObjectTemplate.lock_id(template),
+      with {:ok, id} <- target_lock(state, Target.object_guid(targets) || Target.item_guid(targets)),
+           true <- id > 0,
            %Lock{} = lock <- LockLoader.get(id),
            {:ok, entry} <- cast_item_entry(state.character, cast_item_guid) do
         {:ok, lock, entry}
       else
-        0 -> {:error, :already_open}
+        false -> {:error, :already_open}
         {:error, _reason} = error -> error
         _ -> {:error, :bad_targets}
       end
@@ -70,13 +72,15 @@ defmodule ThistleTea.Game.Player.Gathering do
         cast_item_guid,
         success_events \\ []
       ) do
-    with {:ok, lock, entry} <- context(state, spell, Target.object(guid), cast_item_guid),
+    targets = if Guid.entity_type(guid) == :item, do: Target.item(guid), else: Target.object(guid)
+
+    with {:ok, lock, entry} <- context(state, spell, targets, cast_item_guid),
          :ok <- validate_tools(character, spell),
          {:ok, opened} <- OpenLock.resolve(character, spell, lock, entry) do
       state = Looting.release(state)
 
-      case costs(state.character, spell, cast_item_guid) do
-        {:ok, changes} -> open(state, guid, opened, changes, spell.id, success_events)
+      case cost_batch(state.character, spell, cast_item_guid) do
+        {:ok, batch} -> complete_opening(state, guid, opened, batch, spell.id, success_events)
         {:error, reason} -> failure(state, spell.id, reason)
       end
     else
@@ -84,6 +88,43 @@ defmodule ThistleTea.Game.Player.Gathering do
       _ -> failure(state, spell.id, :bad_targets)
     end
   end
+
+  defp complete_opening(state, guid, opened, batch, spell_id, success_events) do
+    if Guid.entity_type(guid) == :item do
+      unlock_item(state, guid, opened, batch, spell_id, success_events)
+    else
+      case Inventory.plan(batch, &ItemStore.get/1) do
+        {:ok, changes} -> open(state, guid, opened, changes, spell_id, success_events)
+        {:error, reason} -> failure(state, spell_id, reason)
+      end
+    end
+  end
+
+  defp unlock_item(state, guid, opened, batch, spell_id, success_events) do
+    with %Item{} = item <- Disenchant.owned_item(state.character, guid),
+         :ok <- ItemOpening.validate_unlock(item),
+         true <- successful_attempt?(opened),
+         {:ok, changes} <- batch |> Batch.update(Item.unlock(item)) |> Inventory.plan(&ItemStore.get/1) do
+      skills =
+        case skill_gain(state.character, opened) do
+          {:gained, skills} -> skills
+          :unchanged -> changes.player.skills
+        end
+
+      changes = ChangeSet.put_player(changes, %{changes.player | skills: skills})
+      state |> InventoryUpdate.apply({:ok, changes}) |> emit(success_events) |> Containers.open_guid(guid)
+    else
+      false -> failure(state, spell_id, :try_again)
+      {:error, reason} -> failure(state, spell_id, reason)
+      _ -> failure(state, spell_id, :item_gone)
+    end
+  end
+
+  defp successful_attempt?(%OpenLock{skill_id: id, value: value, required: required}) when id in [182, 186, 633] do
+    GatheringLogic.attempt?(id, value, required, value - 26 + :rand.uniform(63))
+  end
+
+  defp successful_attempt?(_opened), do: true
 
   def open_key(state, guid, %OpenLock{} = opened) do
     case target(state, guid) do
@@ -133,15 +174,13 @@ defmodule ThistleTea.Game.Player.Gathering do
 
   defp skill_gain(_character, _opened), do: :unchanged
 
-  defp costs(character, spell, cast_item_guid) do
+  defp cost_batch(character, spell, cast_item_guid) do
     batch =
       Enum.reduce(spell.reagents || [], Batch.new(character.player), fn {id, count}, batch ->
         Batch.remove(batch, id, count)
       end)
 
-    with {:ok, batch} <- item_cost(batch, character, spell, cast_item_guid) do
-      Inventory.plan(batch, &ItemStore.get/1)
-    end
+    item_cost(batch, character, spell, cast_item_guid)
   end
 
   defp item_cost(batch, _character, _spell, nil), do: {:ok, batch}
@@ -170,6 +209,24 @@ defmodule ThistleTea.Game.Player.Gathering do
       else: {:error, :item_gone}
   end
 
+  defp target_lock(state, guid) when is_integer(guid) do
+    if Guid.entity_type(guid) == :item do
+      with false <- Core.dead?(state.character),
+           %Item{} = item <- Disenchant.owned_item(state.character, guid),
+           true <- item.item.owner == state.guid,
+           :ok <- ItemOpening.validate_unlock(item) do
+        {:ok, Item.template(item).lockid}
+      else
+        {:error, _reason} = error -> error
+        _ -> {:error, :item_gone}
+      end
+    else
+      with {:ok, template} <- target(state, guid), do: {:ok, GameObjectTemplate.lock_id(template)}
+    end
+  end
+
+  defp target_lock(_state, _guid), do: {:error, :bad_targets}
+
   defp target(%{character: %Character{} = character} = state, guid) when is_integer(guid) do
     with false <- Core.dead?(character),
          :game_object <- Guid.entity_type(guid),
@@ -190,6 +247,7 @@ defmodule ThistleTea.Game.Player.Gathering do
   defp target(_state, _guid), do: {:error, :bad_targets}
 
   defp failure(state, nil, _reason), do: state
+  defp failure(state, spell_id, :item_not_found), do: failure(state, spell_id, :reagents)
 
   defp failure(state, spell_id, reason) do
     emit(state, Effects.spell_cast_failed(spell_id, reason))

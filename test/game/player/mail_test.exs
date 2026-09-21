@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Player.MailTest do
   alias ThistleTea.Game.Entity.Data.ItemEnchantment
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.CmsgSendMail
   alias ThistleTea.Game.Network.Message.SmsgSendMailResult
@@ -91,6 +92,12 @@ defmodule ThistleTea.Game.Player.MailTest do
       ItemStore.put(coated)
       assert Mail.send_mail(state, message) == state
       assert ItemStore.get(item.object.guid) == coated
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgSendMailResult{action: 0, result: 19}}}
+
+      opened = %{item | item: %{item.item | flags: 0}} |> Item.put_loot(%Loot{gold: 1})
+      ItemStore.put(opened)
+      assert Mail.send_mail(state, message) == state
+      assert ItemStore.get(item.object.guid) == opened
       assert_receive {:"$gen_cast", {:send_packet, %SmsgSendMailResult{action: 0, result: 19}}}
     end
   end
