@@ -117,4 +117,5 @@ instant-key costs, completion-time revalidation, transfer restrictions,
 cached generation, and persistence through the runtime stores.
 
 [Trade-slot unlocking](trade-opening-playtest.md) extends these systems to
-another player's retained item. Wrapped gifts remain separate parity work.
+another player's retained item. [Wrapped gifts](gift-wrapping-playtest.md) use
+the same opening packet to restore their original item directly in inventory.
