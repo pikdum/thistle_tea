@@ -83,7 +83,7 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
   end
 
   def off_hand_weapon_skill(player, get_template) when is_function(get_template, 1) do
-    equipped_weapon_skill(Inventory.equipment_entry(player, :offhand), get_template, @unarmed_skill)
+    equipped_weapon_skill(Inventory.equipment_entry(player, :offhand), get_template, nil)
   end
 
   def ranged_weapon_skill(player, get_template) when is_function(get_template, 1) do

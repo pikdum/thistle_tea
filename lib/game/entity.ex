@@ -116,6 +116,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:attack_outcome, payload})
   end
 
+  def advance_combat_skill(entity, skill_id) do
+    dispatch_cast(entity, {:advance_combat_skill, skill_id})
+  end
+
   def spell_outcome(entity, payload) do
     dispatch_cast(entity, {:spell_outcome, payload})
   end

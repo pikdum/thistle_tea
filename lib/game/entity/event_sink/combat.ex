@@ -149,6 +149,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
     entity
   end
 
+  def emit(entity, %Effects.AdvanceCombatSkill{} = effect, _context) do
+    Entity.advance_combat_skill(effect.target_guid, effect.skill_id)
+    entity
+  end
+
   def emit(entity, %Effects.AttackOutcome{} = effect, _context) do
     Entity.attack_outcome(effect.target_guid, %{
       victim_guid: effect.source_guid,

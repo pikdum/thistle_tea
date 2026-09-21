@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.BoundaryResult
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.CombatSkills
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
@@ -353,6 +354,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     character = Casting.finish_game_object_channel(character, game_object_guid)
     character = EventSink.emit_pending(character)
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast({:advance_combat_skill, skill_id}, %{character: %Character{} = character} = state) do
+    character = CombatSkills.advance(character, skill_id)
+    {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Combat skill update failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:attack_outcome, payload}, %{character: %Character{} = character} = state) do

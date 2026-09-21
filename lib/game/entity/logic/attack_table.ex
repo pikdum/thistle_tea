@@ -155,7 +155,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     defender_level = unit.level || 1
     defender_player? = player?(defender)
     caster_level = positive_or(Map.get(attack, :caster_level), defender_level)
-    attack_skill = positive_or(Map.get(attack, :caster_attack_skill), caster_level * 5)
+    attack_skill = non_negative_or(Map.get(attack, :caster_attack_skill), caster_level * 5)
     skill_diff = attack_skill - Skills.defense_value(defender)
     defenses = CombatRatings.defensive_chances(defender)
 
@@ -554,6 +554,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
 
   defp positive_or(value, _default) when is_integer(value) and value > 0, do: value
   defp positive_or(_value, default), do: default
+
+  defp non_negative_or(value, _default) when is_integer(value) and value >= 0, do: value
+  defp non_negative_or(_value, default), do: default
 
   defp bp(chance) when is_number(chance), do: trunc(chance * 100)
 

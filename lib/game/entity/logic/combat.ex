@@ -6,12 +6,11 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   """
   import Bitwise, only: [band: 2, bnot: 1, bor: 2, &&&: 2, >>>: 2]
 
-  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.CombatRatings
+  alias ThistleTea.Game.Entity.Logic.CombatSkills
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.Daze
@@ -20,7 +19,6 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Logic.ParryHaste
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.Reactive
-  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
 
@@ -154,6 +152,8 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   def receive_attack(%{object: %{guid: target_guid}} = entity, attack, now, opts)
       when is_map(attack) and is_integer(target_guid) and is_integer(now) do
     result = resolve_attack(entity, attack, opts)
+    skill_opts = Keyword.take(opts, [:skill_roll]) |> Keyword.new(fn {:skill_roll, roll} -> {:roll, roll} end)
+    {entity, skill_events} = CombatSkills.resolve(entity, attack, result.outcome, skill_opts)
     entity = ParryHaste.apply(entity, result.outcome, now)
 
     {entity, damage, absorbed} =
@@ -185,9 +185,8 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
     daze_roll = Keyword.get(opts, :daze_roll, fn -> :rand.uniform() * 100 end)
     daze_events = Daze.events(entity, attack, result.damage - absorbed, daze_roll)
-    entity = maybe_defense_skill_up(entity, attack, opts)
 
-    {entity, daze_events ++ [event | reaction_events] ++ feedback_events}
+    {entity, daze_events ++ [event | reaction_events] ++ feedback_events ++ skill_events}
   end
 
   def receive_attack(entity, _attack, _now, _opts), do: {entity, []}
@@ -199,26 +198,6 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
       AttackTable.resolve(entity, attack, attack_damage(attack), opts)
     end
   end
-
-  defp maybe_defense_skill_up(%Character{unit: unit, player: player} = entity, attack, opts) do
-    skill_up_opts = [
-      player_level: unit.level || 1,
-      mob_level: Map.get(attack, :caster_level) || unit.level || 1,
-      defense?: true,
-      roll: Keyword.get(opts, :skill_roll, fn chance -> :rand.uniform() * 100.0 < chance end)
-    ]
-
-    with false <- Map.get(attack, :caster_player?, false),
-         {:gained, skills} <- Skills.combat_skill_up(player.skills, Skills.defense_skill(), skill_up_opts) do
-      %{entity | player: %{player | skills: skills}}
-      |> CombatRatings.sync()
-      |> Core.mark_broadcast_update()
-    else
-      _no_gain -> entity
-    end
-  end
-
-  defp maybe_defense_skill_up(entity, _attack, _opts), do: entity
 
   defp maybe_mark_defense(entity, attacker_guid, outcome, now) when outcome in [:dodge, :parry, :block] do
     Reactive.mark_defense(entity, attacker_guid, outcome, now)

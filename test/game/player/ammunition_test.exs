@@ -98,6 +98,7 @@ defmodule ThistleTea.Game.Player.AmmunitionTest do
       assert cast.spell == delivered
       assert cast.attack_power == 0
       assert cast.attack_skill == 217
+      assert cast.weapon_skill_id == 228
       assert cast.weapon_base_min == 20.0
       assert ItemStore.get(wand.object.guid).item.durability == 50
       assert ItemStore.get(arrows.object.guid).item.stack_count == 2

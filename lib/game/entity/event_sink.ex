@@ -53,6 +53,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.ScriptSteps
   ]
   @combat_effects [
+    Effects.AdvanceCombatSkill,
     Effects.DurabilityLoss,
     Effects.AttackNotInRange,
     Effects.AttackOutcome,

@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   """
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.CombatSkills
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
@@ -68,8 +69,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
          ] ++ reactions}
 
       context.hit_outcome == :resist ->
+        {target, skill_events} = CombatSkills.resolve(target, special_attack(context, spell), :resist)
         {target, reactions} = receive_outcome(target, context.caster_guid, spell, :resist, now)
-        {target, [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :resist) | reactions]}
+
+        {target,
+         [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :resist) | reactions] ++
+           skill_events}
 
       true ->
         effects =
@@ -185,8 +190,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp receive_melee_ability(target, %CastContext{} = context, spell, now) do
-    result = AttackTable.roll_special(target, special_attack(context, spell))
+    attack = special_attack(context, spell)
+    result = AttackTable.roll_special(target, attack)
+    {target, skill_events} = CombatSkills.resolve(target, attack, result.outcome)
+    {target, events} = receive_melee_result(target, context, spell, result, now)
+    {target, events ++ skill_events}
+  end
 
+  defp receive_melee_result(target, context, spell, result, now) do
     case result.outcome do
       :resist ->
         {target, reactions} = receive_outcome(target, context.caster_guid, spell, :resist, now)
@@ -411,9 +422,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp special_attack(%CastContext{} = context, spell) do
     %{
       caster: context.caster_guid,
+      caster_owner_guid: context.caster_owner_guid,
       caster_level: context.caster_level,
       caster_player?: context.caster_type == :player,
       caster_attack_skill: context.attack_skill,
+      weapon_skill_id: context.weapon_skill_id,
+      skill_training?: spell.equipped_item_class == 2 and (Spell.melee_ability?(spell) or Spell.ranged_attack?(spell)),
       hit_chance_bonus: context.hit_chance_bonus,
       crit_chance: context.melee_crit_chance,
       caster_position: attack_position(context.caster_position),

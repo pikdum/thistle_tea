@@ -18,16 +18,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.CombatControl
-  alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.CombatSkills
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Resources
-  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.SpellTargetResolver
-  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Target
@@ -281,9 +279,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   defp send_white_swing(state, target) do
     attack = CombatLogic.finalize_attack(melee_attack_payload(state))
 
-    state
-    |> maybe_weapon_skill_up(target)
-    |> Effects.enqueue(Effects.deliver_attack(target, attack))
+    Effects.enqueue(state, Effects.deliver_attack(target, attack))
   end
 
   defp send_offhand_attack(state, target) do
@@ -292,7 +288,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     attack =
       state
       |> melee_attack_payload()
-      |> Map.merge(offhand_skill_context(state))
+      |> Map.merge(CombatSkills.snapshot(state, :offhand, &ItemLoader.get_template/1))
       |> Map.merge(%{min_damage: min_damage, max_damage: max_damage, offhand?: true})
       |> CombatLogic.finalize_attack()
 
@@ -320,7 +316,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     targets = queued_spell_targets(state, spell, target)
 
     state
-    |> maybe_weapon_skill_up(target)
     |> Resources.spend_power(spell, now)
     |> queue_queued_spell_go(spell, target, targets)
     |> deliver_queued_spell(spell, targets)
@@ -356,44 +351,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
       threat_multiplier: Aura.percent_multiplier(state, :mod_threat, Spell.school_mask(:physical))
     }
     |> Map.merge(AttackTable.attacker_context(state))
-    |> Map.merge(attack_skill_context(state))
+    |> Map.merge(CombatSkills.snapshot(state, :mainhand, &ItemLoader.get_template/1))
   end
 
   defp caster_owner_guid(%{internal: %{pet: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid
   defp caster_owner_guid(%{object: %{guid: guid}}), do: guid
-
-  defp attack_skill_context(%Character{unit: unit, player: player} = state) when is_struct(player) do
-    default = Skills.max_for_level(unit.level || 1)
-    %{caster_attack_skill: Skills.value(player.skills, weapon_skill_id(state), default)}
-  end
-
-  defp attack_skill_context(_state), do: %{}
-
-  defp offhand_skill_context(%Character{unit: unit, player: player}) do
-    skill_id = Skills.off_hand_weapon_skill(player, &ItemLoader.get_template/1)
-    %{caster_attack_skill: Skills.value(player.skills, skill_id, Skills.max_for_level(unit.level || 1))}
-  end
-
-  defp offhand_skill_context(_state), do: %{}
-
-  defp weapon_skill_id(%Character{player: player} = state) do
-    if Disarm.unarmed?(state),
-      do: Skills.unarmed_skill(),
-      else: Skills.main_hand_weapon_skill(player, &ItemLoader.get_template/1)
-  end
-
-  defp maybe_weapon_skill_up(%Character{unit: unit, player: player} = state, target) when is_struct(player) do
-    opts = [player_level: unit.level || 1, intellect: unit.intellect || 0]
-
-    with false <- Guid.entity_type(target) == :player,
-         {:gained, skills} <- Skills.combat_skill_up(player.skills, weapon_skill_id(state), opts) do
-      Core.mark_broadcast_update(%{state | player: %{player | skills: skills}})
-    else
-      _no_gain -> state
-    end
-  end
-
-  defp maybe_weapon_skill_up(state, _target), do: state
 
   defp queue_queued_spell_go(%{object: %{guid: guid}} = state, %{id: spell_id}, target, targets)
        when is_integer(guid) and is_integer(spell_id) and is_integer(target) and is_list(targets) do

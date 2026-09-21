@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
   alias ThistleTea.Game.Entity.Data.Taxi.Network
   alias ThistleTea.Game.Entity.Data.Taxi.Node
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
+  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
   alias ThistleTea.Game.Entity.Server.Transport, as: TransportServer
   alias ThistleTea.Game.Guid
@@ -35,6 +36,30 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
   alias ThistleTea.Game.World.System.Honor, as: HonorSystem
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.WorldRef
+
+  describe ".debug skill" do
+    test "sets only known skills within their cap and refreshes defense fields" do
+      guid = System.unique_integer([:positive, :monotonic])
+
+      character = %{
+        debug_character()
+        | id: guid,
+          object: %Object{guid: guid},
+          unit: %Unit{level: 60, class: 1, agility: 100},
+          player: %Player{skills: %{95 => Skills.new_entry(:level, false, 60)}}
+      }
+
+      state = %{character: character, ready: false, packed_guid: <<0>>, guid: guid, connection_pid: self()}
+      assert {:handled, updated} = DevCommands.run(state, ".debug skill 95 300")
+      assert updated.character.player.skills[95].value == 300
+      assert updated.character.player.dodge_percentage > 0
+      assert CharacterStore.get(guid).player.skills[95].value == 300
+
+      for command <- [".debug skill 95 301", ".debug skill 95 0", ".debug skill 43 100", ".debug skill bad value"] do
+        assert {:handled, ^updated} = DevCommands.run(updated, command)
+      end
+    end
+  end
 
   describe ".debug honor" do
     test "changes the ledger and owner projection while retaining the earned rank" do

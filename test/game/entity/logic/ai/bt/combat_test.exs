@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.World.Loader.Item
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -62,6 +63,64 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   end
 
   describe "melee_attack/3" do
+    test "white swings and abilities share bonuses and leave progression to the defender" do
+      target_guid = Guid.from_low_guid(:unit, 1, 99_876)
+      sword = %ItemTemplate{entry: 99_987_655, class: 2, subclass: 7}
+      dagger = %ItemTemplate{entry: 99_987_656, class: 2, subclass: 15}
+      :ets.insert(Item, [{sword.entry, sword}, {dagger.entry, dagger}])
+      SpatialHash.update(:mobs, target_guid, 0, 1.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        :ets.delete(Item, sword.entry)
+        :ets.delete(Item, dagger.entry)
+        SpatialHash.remove(:mobs, target_guid)
+      end)
+
+      skill = %{value: 1, max: 250, range: :level, always_max?: false}
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{
+          target: target_guid,
+          level: 50,
+          min_damage: 10.0,
+          max_damage: 10.0,
+          min_offhand_damage: 10.0,
+          max_offhand_damage: 10.0,
+          base_attack_time: 2_000,
+          offhand_attack_time: 1_500,
+          combat_reach: 1.5,
+          auras: [
+            %Holder{
+              spell: %Spell{id: 20_597},
+              caster_guid: 1,
+              auras: [%Aura{type: :mod_skill, misc_value: 43, amount: 5}]
+            }
+          ]
+        },
+        player: %Player{
+          visible_item_16_0: sword.entry,
+          visible_item_17_0: dagger.entry,
+          skills: %{43 => skill, 173 => skill}
+        },
+        internal: %Internal{world: WorldRef.open(0), in_combat: true},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 0}}
+      assert {:success, swung, _blackboard} = Combat.melee_attack(character, blackboard, 1_000)
+      assert swung.player.skills == character.player.skills
+
+      assert [
+               %Effects.DeliverAttack{attack: %{caster_attack_skill: 6, weapon_skill_id: 43}},
+               %Effects.DeliverAttack{attack: %{caster_attack_skill: 1, weapon_skill_id: 173, offhand?: true}}
+             ] = swung.internal.events
+
+      cast = CastContext.from_caster(character, %Spell{id: 78, dmg_class: 2, equipped_item_class: 2}, target_guid)
+      assert cast.attack_skill == 6
+      assert cast.weapon_skill_id == 43
+    end
+
     test "replaces a disarmed queued weapon ability with an unarmed swing" do
       target_guid = 2
       template = %ItemTemplate{entry: 99_987_654, class: 2, subclass: 15}

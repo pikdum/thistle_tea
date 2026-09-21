@@ -10,12 +10,12 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.AttackPower
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
+  alias ThistleTea.Game.Entity.Logic.CombatSkills
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.ResistancePenetration
-  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
   alias ThistleTea.Game.Entity.Logic.TargetDamage
   alias ThistleTea.Game.Entity.Logic.TargetSpellPower
@@ -62,6 +62,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :attack_time_ms,
     :normalized_speed,
     :attack_skill,
+    :weapon_skill_id,
     :melee_crit_chance,
     :hit_chance_bonus,
     :spell_crit_chance,
@@ -187,6 +188,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     cond do
       Spell.ranged_attack?(spell) ->
         {min_damage, max_damage} = AttackPower.weapon_range(caster.unit, :ranged)
+        skill = CombatSkills.snapshot(caster, :ranged, &ItemLoader.get_template/1)
 
         %{
           context
@@ -196,13 +198,15 @@ defmodule ThistleTea.Game.Spell.CastContext do
             weapon_base_max: max_damage,
             attack_time_ms: caster.unit.ranged_attack_time,
             normalized_speed: @normalized_ranged,
-            attack_skill: ranged_attack_skill(caster),
+            attack_skill: skill.caster_attack_skill,
+            weapon_skill_id: skill.weapon_skill_id,
             melee_crit_chance: ranged_crit_chance(caster, spell),
             spell_crit_chance: ranged_crit_chance(caster, spell)
         }
 
       melee_snapshot?(spell) ->
         {min_damage, max_damage} = weapon_range(caster)
+        skill = CombatSkills.snapshot(caster, :mainhand, &ItemLoader.get_template/1)
 
         %{
           context
@@ -212,7 +216,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
             weapon_base_max: max_damage,
             attack_time_ms: caster.unit.base_attack_time,
             normalized_speed: normalized_speed(caster),
-            attack_skill: attack_skill(caster),
+            attack_skill: skill.caster_attack_skill,
+            weapon_skill_id: skill.weapon_skill_id,
             melee_crit_chance: melee_crit_chance(caster, spell),
             shield_block_value: CombatRatings.block_value(caster),
             caster_power: caster_power(caster)
@@ -262,25 +267,6 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defp normalized_speed(_caster), do: @normalized_unarmed
 
-  defp attack_skill(%Character{unit: unit, player: player} = caster) when is_struct(player) do
-    skill_id =
-      if Disarm.unarmed?(caster),
-        do: Skills.unarmed_skill(),
-        else: Skills.main_hand_weapon_skill(player, &ItemLoader.get_template/1)
-
-    Skills.value(player.skills, skill_id, Skills.max_for_level(unit.level || 1)) + skill_aura_bonus(caster, skill_id)
-  end
-
-  defp attack_skill(_caster), do: nil
-
-  defp skill_aura_bonus(caster, skill_id) do
-    [:mod_skill, :mod_skill_talent]
-    |> Enum.flat_map(&Aura.auras_of_type(caster, &1))
-    |> Enum.filter(&(&1.misc_value == skill_id and is_integer(&1.amount)))
-    |> Enum.map(& &1.amount)
-    |> Enum.sum()
-  end
-
   defp melee_crit_chance(%Character{unit: unit} = caster, %Spell{} = spell) do
     base =
       CombatRatings.melee_crit_chance(unit.class, unit.level || 1, unit.agility || 0) +
@@ -311,13 +297,6 @@ defmodule ThistleTea.Game.Spell.CastContext do
       true -> nil
     end
   end
-
-  defp ranged_attack_skill(%Character{unit: unit, player: player} = caster) when is_struct(player) do
-    skill_id = Skills.ranged_weapon_skill(player, &ItemLoader.get_template/1)
-    Skills.value(player.skills, skill_id, Skills.max_for_level(unit.level || 1)) + skill_aura_bonus(caster, skill_id)
-  end
-
-  defp ranged_attack_skill(_caster), do: nil
 
   defp ranged_crit_chance(%Character{player: player, unit: unit} = caster, %Spell{} = spell) when is_struct(player) do
     base =

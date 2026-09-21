@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Entity.Data.Reputation.Definition
   alias ThistleTea.Game.Entity.Data.Reputation.State, as: ReputationState
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Entity.Logic.Core
@@ -126,6 +127,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".debug reputation set <faction_id> <standing> - set absolute standing",
       ".debug reputation war <faction_id> <on|off> - toggle at-war",
       ".debug skills - max out known skills for your level",
+      ".debug skill <id> <value> - set a known skill within its trained cap",
       ".debug durability <percent> [carried] - apply durability wear for testing",
       ".debug item duration <entry> <seconds> - set an owned timed item's remaining lifetime",
       ".debug pet [loyalty|happiness <delta>] - inspect or adjust your hunter pet",
@@ -321,6 +323,16 @@ defmodule ThistleTea.Game.Player.DevCommands do
     state
     |> max_skills()
     |> handled()
+  end
+
+  def run(state, ".debug skill " <> params) do
+    params
+    |> String.split()
+    |> Enum.map(&Integer.parse/1)
+    |> case do
+      [{skill_id, ""}, {value, ""}] -> state |> set_skill(skill_id, value) |> handled()
+      _ -> state |> system_message("Usage: .debug skill <id> <value>") |> handled()
+    end
   end
 
   def run(state, ".debug professions" <> _) do
@@ -1242,11 +1254,26 @@ defmodule ThistleTea.Game.Player.DevCommands do
       |> Skills.merge(derived)
       |> Skills.max_out()
 
-    character = %{character | player: %{player | skills: skills}}
+    character = %{character | player: %{player | skills: skills}} |> CombatRatings.sync()
 
     state
     |> put_character(character)
     |> system_message("Skills maxed for level #{unit.level}.")
+  end
+
+  defp set_skill(%{character: %Character{player: player} = character} = state, skill_id, value) do
+    case Map.get(player.skills || %{}, skill_id) do
+      %{max: maximum} = skill when value >= 1 and value <= maximum ->
+        skills = Map.put(player.skills, skill_id, %{skill | value: value})
+        character = %{character | player: %{player | skills: skills}} |> CombatRatings.sync()
+
+        state
+        |> put_character(character)
+        |> system_message("Skill #{skill_id} set to #{value}/#{maximum}.")
+
+      _ ->
+        system_message(state, "Choose a known skill and a value from 1 to its trained maximum.")
+    end
   end
 
   defp max_professions(%{character: %Character{player: player} = character} = state) do
