@@ -152,6 +152,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Item-started quests](docs/item-quests-playtest.md), with owned starter validation, atomic item exchanges, retained objectives, full-bag rejection, and party confirmation
 - [Game-object questgivers](docs/game-object-quests-playtest.md), with per-player activation, native quest chains, conditioned gossip, and scripted player casts
 - xp, leveling, and exploration
+- [Rested experience and logout](docs/rest-logout-playtest.md), with offline inn and wilderness gains, idle rest updates, native logout countdowns, and cancellation cleanup
 - isolated dungeon instances (Ragefire Chasm)
 - Deadmines boss doors and gunpowder cannon breach, with Smite's alarms and pirate response
 - dying + resurrecting
