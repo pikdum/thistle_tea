@@ -74,6 +74,24 @@ defmodule ThistleTea.Game.Party.RaidTest do
   end
 
   describe "leave/2" do
+    test "pending invitations stay with the original raid and disappear on disband", %{party: party} do
+      {:ok, _, party} = Party.convert_raid(party, 1)
+      party = join(party, 1, 3)
+      {:ok, _, party} = Party.set_assistant(party, 1, 2, true)
+      {:ok, party} = Party.invite(party, 2, "Member2", 4)
+      assert {:error, :already_in_group} = Party.invite(party, 4, "Member4", 5)
+      {:ok, {:removed, raid, false}, party} = Party.leave(party, 2)
+      {:ok, joined, party} = Party.accept(party, 4, "Member4")
+      assert joined.id == raid.id
+      assert joined.leader == 1
+      refute Party.in_group?(party, 2)
+      {:ok, party} = Party.invite(party, 1, "Member1", 5)
+      {:ok, _, party} = Party.leave(party, 3)
+      {:ok, {:disbanded, _}, party} = Party.leave(party, 4)
+      assert party.invites == %{}
+      assert {:error, :not_invited} = Party.accept(party, 5, "Member5")
+    end
+
     test "retains raid mode on leadership transfer and removes the final group", %{party: party} do
       {:ok, _, party} = Party.convert_raid(party, 1)
       party = join(party, 1, 3)

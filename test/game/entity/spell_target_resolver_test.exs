@@ -15,9 +15,40 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.WorldRef
 
   describe "resolve/3" do
+    test "party buffs follow subgroups while class-wide blessings cross the raid" do
+      [leader, moved, other] = guids = for _ <- 1..3, do: player_guid()
+      pet = Guid.runtime(:pet, 2960)
+      :ok = PartySystem.invite(leader, "Leader", moved)
+      {:ok, _} = PartySystem.accept(moved, "Moved")
+      :ok = PartySystem.invite(leader, "Leader", other)
+      {:ok, _} = PartySystem.accept(other, "Other")
+      {:ok, _} = PartySystem.convert_raid(leader)
+      {:ok, _} = PartySystem.change_subgroup(leader, moved, 1)
+      on_exit(fn -> Enum.each(guids, &PartySystem.leave/1) end)
+
+      for guid <- guids do
+        put_spatial_target(:players, guid, {1.0, 0.0, 0.0})
+        Metadata.update(guid, %{class: if(guid == other, do: 1, else: 8)})
+      end
+
+      put_spatial_target(:mobs, pet, {2.0, 0.0, 0.0})
+      Metadata.update(pet, %{owner_guid: moved})
+      caster = caster(leader, {1.0, 0.0, 0.0})
+      party_buff = aoe_spell(:party_around_caster)
+      class_buff = aoe_spell(:raid_and_class)
+      assert Enum.sort(SpellTargetResolver.resolve(caster, party_buff, Target.none())) == Enum.sort([leader, other])
+
+      assert Enum.sort(SpellTargetResolver.resolve(caster, class_buff, Target.unit(moved))) ==
+               Enum.sort([leader, moved])
+
+      {:ok, _} = PartySystem.change_subgroup(leader, moved, 0)
+      assert Enum.sort(SpellTargetResolver.resolve(caster, party_buff, Target.none())) == Enum.sort([pet | guids])
+    end
+
     test "party buffs include the owner's pet and the casting pet" do
       owner = player_guid()
       pet = Guid.runtime(:pet, 2960)

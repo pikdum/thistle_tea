@@ -103,7 +103,9 @@ defmodule ThistleTea.Game.Entity.Logic.ExperienceTest do
       assert Experience.group_rate(3) == 1.166
       assert Experience.group_rate(4) == 1.3
       assert Experience.group_rate(5) == 1.4
-      assert Experience.group_rate(6) == 1.4
+      assert_in_delta Experience.group_rate(6), 0.7, 0.0001
+      assert Experience.group_rate(10) == 0.5
+      assert Experience.group_rate(40) == 0.01
     end
   end
 

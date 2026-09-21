@@ -36,6 +36,14 @@ defmodule ThistleTea.Game.World.System.Party do
     GenServer.call(__MODULE__, {:set_loot, requester_guid, method, master_looter, threshold})
   end
 
+  def convert_raid(guid), do: raid_action(:convert_raid, [guid])
+  def set_assistant(guid, target, enabled?), do: raid_action(:set_assistant, [guid, target, enabled?])
+  def change_subgroup(guid, target, subgroup), do: raid_action(:change_subgroup, [guid, target, subgroup])
+  def swap_subgroups(guid, first, second), do: raid_action(:swap_subgroups, [guid, first, second])
+  def set_icon(guid, icon, target), do: GenServer.call(__MODULE__, {:set_icon, guid, icon, target})
+
+  defp raid_action(action, arguments), do: GenServer.call(__MODULE__, {:raid_action, action, arguments})
+
   def update_looter(group_id, eligible_guids) do
     GenServer.call(__MODULE__, {:update_looter, group_id, eligible_guids})
   end
@@ -144,6 +152,29 @@ defmodule ThistleTea.Game.World.System.Party do
       {:ok, group, party} ->
         index_group(group)
         {:reply, {:ok, group}, party}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, party}
+    end
+  end
+
+  def handle_call({:raid_action, action, arguments}, _from, party)
+      when action in [:convert_raid, :set_assistant, :change_subgroup, :swap_subgroups] do
+    case apply(Party, action, [party | arguments]) do
+      {:ok, group, party} ->
+        index_group(group)
+        {:reply, {:ok, group}, party}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, party}
+    end
+  end
+
+  def handle_call({:set_icon, guid, icon, target}, _from, party) do
+    case Party.set_icon(party, guid, icon, target) do
+      {:ok, group, changes, party} ->
+        index_group(group)
+        {:reply, {:ok, group, changes}, party}
 
       {:error, reason} ->
         {:reply, {:error, reason}, party}

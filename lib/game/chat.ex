@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Chat do
   alias ThistleTea.Game.Entity.Logic.ChatStatus, as: StatusLogic
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Party
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
   alias ThistleTea.Game.Player.ChatStatus, as: PlayerStatus
@@ -30,6 +31,8 @@ defmodule ThistleTea.Game.Chat do
   @channel 0x0E
   @afk 0x14
   @dnd 0x15
+  @raid_leader 0x57
+  @raid_warning 0x58
 
   @say_range 25
   @yell_range 300
@@ -89,7 +92,8 @@ defmodule ThistleTea.Game.Chat do
     case PartySystem.group_of(state.guid) do
       %Group{} = group ->
         packet = chat_packet(@party, language, state.guid, message, StatusLogic.tag(state.character))
-        PartyNotifier.broadcast(group, packet)
+        member = Party.member(group, state.guid)
+        PartyNotifier.broadcast(group, packet, subgroup: member.subgroup)
 
       _ ->
         :ok
@@ -98,7 +102,18 @@ defmodule ThistleTea.Game.Chat do
     state
   end
 
-  defp route(state, chat_type, _language, _message, _target_name) when chat_type in [@raid, @guild, @officer] do
+  defp route(state, chat_type, language, message, _target_name)
+       when chat_type in [@raid, @raid_leader, @raid_warning] do
+    with %Group{raid?: true} = group <- PartySystem.group_of(state.guid),
+         true <- raid_chat_allowed?(group, state.guid, chat_type) do
+      packet = chat_packet(chat_type, language, state.guid, message, StatusLogic.tag(state.character))
+      PartyNotifier.broadcast(group, packet)
+    end
+
+    state
+  end
+
+  defp route(state, chat_type, _language, _message, _target_name) when chat_type in [@guild, @officer] do
     Logger.warning("Unsupported chat audience: #{chat_type}")
     state
   end
@@ -128,6 +143,10 @@ defmodule ThistleTea.Game.Chat do
         :ok
     end
   end
+
+  defp raid_chat_allowed?(_group, _guid, @raid), do: true
+  defp raid_chat_allowed?(group, guid, @raid_leader), do: Party.leader?(group, guid)
+  defp raid_chat_allowed?(group, guid, @raid_warning), do: Party.manager?(group, guid)
 
   defp chat_packet(chat_type, language, sender_guid, message, tag) do
     %Message.SmsgMessagechat{

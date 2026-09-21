@@ -59,7 +59,8 @@ defmodule ThistleTea.Game.Entity.Logic.Experience do
 
   def group_rate(3), do: 1.166
   def group_rate(4), do: 1.3
-  def group_rate(count) when is_integer(count) and count >= 5, do: 1.4
+  def group_rate(5), do: 1.4
+  def group_rate(count) when is_integer(count) and count > 5, do: max(1.0 - count * 0.05, 0.01)
   def group_rate(_count), do: 1.0
 
   def group_shares(members, mob_level, opts \\ [])

@@ -255,14 +255,20 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     |> Enum.map(fn {guid, _distance} -> guid end)
   end
 
-  defp nearby_party_guids(caster, caster_guid, radius) when is_number(radius) and radius > 0 do
+  defp nearby_party_guids(caster, caster_guid, radius, scope \\ :subgroup)
+
+  defp nearby_party_guids(caster, caster_guid, radius, scope) when is_number(radius) and radius > 0 do
     party_guid = party_owner_guid(caster, caster_guid)
     nearby_guids = caster |> nearby_units(radius) |> Enum.map(fn {guid, _distance} -> guid end)
 
     members =
       case PartySystem.group_of(party_guid) do
-        %Party.Group{} = group -> MapSet.new(group.members, & &1.guid)
-        _ -> MapSet.new([party_guid])
+        %Party.Group{} = group ->
+          members = if scope == :raid, do: group.members, else: Party.subgroup_members(group, party_guid)
+          MapSet.new(members, & &1.guid)
+
+        _ ->
+          MapSet.new([party_guid])
       end
 
     [caster_guid | nearby_guids]
@@ -273,7 +279,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     end)
   end
 
-  defp nearby_party_guids(_caster, caster_guid, _radius), do: [caster_guid]
+  defp nearby_party_guids(_caster, caster_guid, _radius, _scope), do: [caster_guid]
 
   defp party_pet?(guid, members) do
     Guid.high_guid(guid) == Guid.high_guid(:pet) and
@@ -299,7 +305,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     reference_class = metadata_class(class_guid || caster_guid)
 
     caster
-    |> nearby_party_guids(caster_guid, radius)
+    |> nearby_party_guids(caster_guid, radius, :raid)
     |> Enum.filter(&(reference_class != nil and metadata_class(&1) == reference_class))
   end
 

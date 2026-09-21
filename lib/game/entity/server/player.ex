@@ -526,6 +526,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def handle_cast(:party_visibility_changed, %{character: %Character{} = character} = state) do
+    Quests.sync_needed_items(character)
     Visibility.notify_visibility_changed(character)
     {:noreply, Visibility.resync_player(state), {:continue, :maybe_broadcast_update}}
   rescue

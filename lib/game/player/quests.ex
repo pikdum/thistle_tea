@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
@@ -408,11 +409,13 @@ defmodule ThistleTea.Game.Player.Quests do
     MapSet.member?(needed_items(character), item_id)
   end
 
-  def needed_items(%Character{player: player}) do
+  def needed_items(%Character{player: player} = character) do
+    raid_restricted? = raid?(character) and not battleground?(character)
+
     player.quest_log
     |> QuestLog.active_entries()
     |> Enum.flat_map(fn
-      %Entry{quest_id: quest_id, status: :incomplete} -> missing_items(player, quest_id)
+      %Entry{quest_id: quest_id, status: :incomplete} -> missing_items(player, quest_id, raid_restricted?)
       %Entry{} -> []
     end)
     |> MapSet.new()
@@ -433,10 +436,11 @@ defmodule ThistleTea.Game.Player.Quests do
     character
   end
 
-  defp missing_items(player, quest_id) do
+  defp missing_items(player, quest_id, raid_restricted?) do
     case QuestLoader.get(quest_id) do
-      %Quest{required_items: required_items} ->
+      %Quest{required_items: required_items} = quest ->
         for {_index, item_id, required_count} <- required_items,
+            not raid_restricted? or Quest.allowed_in_raid?(quest),
             Inventory.count_entry(player, item_id, &ItemStore.get/1) < required_count,
             do: item_id
 
@@ -519,9 +523,11 @@ defmodule ThistleTea.Game.Player.Quests do
 
   def credit_kill_entry(%{character: %Character{} = character} = state, creature_entry, victim_guid) do
     player = character.player
+    raid? = raid?(character)
+    quests = Enum.filter(active_quests(player), &(not raid? or Quest.allowed_in_raid?(&1)))
 
     {quest_log, credited?} =
-      Enum.reduce(active_quests(player), {player.quest_log, false}, fn quest, {quest_log, credited?} ->
+      Enum.reduce(quests, {player.quest_log, false}, fn quest, {quest_log, credited?} ->
         case QuestLog.increment_kill(quest_log, quest, creature_entry) do
           {:ok, quest_log, credit} ->
             Network.send_packet(%Message.SmsgQuestupdateAddKill{
@@ -679,6 +685,12 @@ defmodule ThistleTea.Game.Player.Quests do
       _group -> nil
     end
   end
+
+  defp raid?(%Character{object: %{guid: guid}}), do: match?(%Group{raid?: true}, PartySystem.group_of(guid))
+  defp raid?(%Character{}), do: false
+
+  defp battleground?(%Character{internal: %{world: %{map_id: map_id}}}), do: MapTemplate.battleground?(map_id)
+  defp battleground?(%Character{}), do: false
 
   defp send_to_other_members(nil, _player_guid, _message), do: :ok
 

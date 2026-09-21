@@ -68,6 +68,9 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
     offer_reward_emotes: []
   ]
 
+  def allowed_in_raid?(%__MODULE__{type: 62}), do: true
+  def allowed_in_raid?(%__MODULE__{flags: flags}), do: Bitwise.band(flags || 0, 0x40) != 0
+
   def build(%Mangos.QuestTemplate{} = row) do
     %__MODULE__{
       id: row.entry,

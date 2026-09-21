@@ -78,7 +78,7 @@ defmodule ThistleTea.Game.Party do
     group = group_of(party, inviter_guid)
 
     cond do
-      in_group?(party, invitee_guid) or invited?(party, invitee_guid) ->
+      unavailable_for_invite?(party, inviter_guid, invitee_guid) ->
         {:error, :already_in_group}
 
       group != nil and not manager?(group, inviter_guid) ->
@@ -88,12 +88,22 @@ defmodule ThistleTea.Game.Party do
         {:error, :group_full}
 
       true ->
-        invite = %{inviter: inviter_guid, inviter_name: inviter_name}
+        invite = %{inviter: inviter_guid, inviter_name: inviter_name, group_id: if(group, do: group.id)}
         {:ok, %{party | invites: Map.put(party.invites, invitee_guid, invite)}}
     end
   end
 
+  defp unavailable_for_invite?(party, inviter_guid, invitee_guid) do
+    in_group?(party, invitee_guid) or invited?(party, invitee_guid) or invited?(party, inviter_guid)
+  end
+
   def accept(%__MODULE__{} = party, invitee_guid, invitee_name) do
+    if in_group?(party, invitee_guid),
+      do: {:error, :already_in_group},
+      else: accept_invite(party, invitee_guid, invitee_name)
+  end
+
+  defp accept_invite(party, invitee_guid, invitee_name) do
     case Map.pop(party.invites, invitee_guid) do
       {nil, _invites} ->
         {:error, :not_invited}
@@ -101,7 +111,11 @@ defmodule ThistleTea.Game.Party do
       {invite, invites} ->
         party = %{party | invites: invites}
         invitee = %Member{guid: invitee_guid, name: invitee_name}
-        join_group(party, group_of(party, invite.inviter), invite, invitee)
+
+        case invited_group(party, invite) do
+          :disbanded -> {:error, :not_invited}
+          group -> join_group(party, group, invite, invitee)
+        end
     end
   end
 
@@ -129,7 +143,7 @@ defmodule ThistleTea.Game.Party do
       not manager?(group, remover_guid) or group.leader == target_guid ->
         {:error, :not_leader}
 
-      invited_by?(party, target_guid, remover_guid) ->
+      invited_to_group?(party, target_guid, group) ->
         {:ok, :invite_cancelled, %{party | invites: Map.delete(party.invites, target_guid)}}
 
       member(group, target_guid) == nil ->
@@ -318,7 +332,8 @@ defmodule ThistleTea.Game.Party do
       party = %{
         party
         | groups: Map.delete(party.groups, group.id),
-          member_index: Map.drop(party.member_index, Enum.map(group.members, & &1.guid))
+          member_index: Map.drop(party.member_index, Enum.map(group.members, & &1.guid)),
+          invites: remaining_invites(party, group)
       }
 
       {:ok, {:disbanded, group}, party}
@@ -332,11 +347,22 @@ defmodule ThistleTea.Game.Party do
     end
   end
 
-  defp invited_by?(party, target_guid, inviter_guid) do
+  defp invited_to_group?(party, target_guid, group) do
     case Map.get(party.invites, target_guid) do
-      %{inviter: ^inviter_guid} -> true
+      %{inviter: inviter} = invite -> Map.get(invite, :group_id) == group.id or member(group, inviter) != nil
       _ -> false
     end
+  end
+
+  defp invited_group(party, %{group_id: group_id}) when is_integer(group_id),
+    do: Map.get(party.groups, group_id, :disbanded)
+
+  defp invited_group(party, invite), do: group_of(party, invite.inviter)
+
+  defp remaining_invites(party, group) do
+    Map.reject(party.invites, fn {_guid, invite} ->
+      Map.get(invite, :group_id) == group.id or member(group, invite.inviter) != nil
+    end)
   end
 
   defp full?(%Group{members: members} = group), do: length(members) >= max_members(group)

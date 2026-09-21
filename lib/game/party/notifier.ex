@@ -35,6 +35,10 @@ defmodule ThistleTea.Game.Party.Notifier do
       },
       guid
     )
+
+    if map_size(group.icons) > 0 do
+      Network.send_packet(%Message.MsgRaidTargetUpdateResponse{icons: Enum.sort(group.icons)}, guid)
+    end
   end
 
   def send_empty_group_list(guid) do

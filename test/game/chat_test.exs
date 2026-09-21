@@ -80,6 +80,40 @@ defmodule ThistleTea.Game.ChatTest do
       EntityRegistry.unregister(second)
     end
 
+    test "restricts party chat to the subgroup and authorizes raid leadership channels" do
+      [first, second, third] = guids = for _ <- 1..3, do: unique_guid()
+      Enum.each(guids, &EntityRegistry.register/1)
+      :ok = PartySystem.invite(first, "First", second)
+      {:ok, _} = PartySystem.accept(second, "Second")
+      :ok = PartySystem.invite(first, "First", third)
+      {:ok, _} = PartySystem.accept(third, "Third")
+      {:ok, _} = PartySystem.convert_raid(first)
+      {:ok, _} = PartySystem.change_subgroup(first, second, 1)
+      on_exit(fn -> Enum.each(guids, &PartySystem.leave/1) end)
+
+      Chat.handle(state(first, "First"), 1, 0, "subgroup", nil)
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{chat_type: 1, message: "subgroup"}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{chat_type: 1, message: "subgroup"}}}
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{}}}
+
+      for type <- [2, 0x57, 0x58] do
+        Chat.handle(state(first, "First"), type, 0, "raid", nil)
+
+        for _ <- 1..3 do
+          assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{chat_type: ^type, message: "raid"}}}
+        end
+      end
+
+      for type <- [0x57, 0x58], do: Chat.handle(state(second, "Second"), type, 0, "forged", nil)
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{}}}
+      {:ok, _} = PartySystem.set_assistant(first, second, true)
+      Chat.handle(state(second, "Second"), 0x58, 0, "assistant", nil)
+
+      for _ <- 1..3 do
+        assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{chat_type: 0x58, message: "assistant"}}}
+      end
+    end
+
     test "does not turn unsupported audiences into global chat" do
       observer = unique_guid()
       {:ok, _owner} = EntityRegistry.register(observer)

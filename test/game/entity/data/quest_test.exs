@@ -4,6 +4,14 @@ defmodule ThistleTea.Game.Entity.Data.QuestTest do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Quest
 
+  describe "allowed_in_raid?/1" do
+    test "accepts the raid quest type or flag" do
+      assert Quest.allowed_in_raid?(%Quest{type: 62})
+      assert Quest.allowed_in_raid?(%Quest{flags: 0x40})
+      refute Quest.allowed_in_raid?(%Quest{type: 1, flags: 0x20})
+    end
+  end
+
   describe "build/1" do
     test "translates core fields from a quest_template row" do
       row = %Mangos.QuestTemplate{
