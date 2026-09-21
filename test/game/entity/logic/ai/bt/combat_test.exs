@@ -87,6 +87,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
           max_damage: 10.0,
           min_offhand_damage: 10.0,
           max_offhand_damage: 10.0,
+          base_offhand_max_damage: 20.0,
           base_attack_time: 2_000,
           offhand_attack_time: 1_500,
           combat_reach: 1.5,
@@ -112,13 +113,63 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       assert swung.player.skills == character.player.skills
 
       assert [
-               %Effects.DeliverAttack{attack: %{caster_attack_skill: 6, weapon_skill_id: 43}},
-               %Effects.DeliverAttack{attack: %{caster_attack_skill: 1, weapon_skill_id: 173, offhand?: true}}
+               %Effects.DeliverAttack{
+                 attack: %{caster_attack_skill: 6, weapon_skill_id: 43, dual_wield_penalty?: true}
+               },
+               %Effects.DeliverAttack{
+                 attack: %{caster_attack_skill: 1, weapon_skill_id: 173, offhand?: true, dual_wield_penalty?: true}
+               }
              ] = swung.internal.events
 
       cast = CastContext.from_caster(character, %Spell{id: 78, dmg_class: 2, equipped_item_class: 2}, target_guid)
       assert cast.attack_skill == 6
       assert cast.weapon_skill_id == 43
+    end
+
+    test "offhand accuracy follows the live queued attack lifecycle" do
+      target_guid = Guid.from_low_guid(:unit, 1, 99_875)
+      SpatialHash.update(:mobs, target_guid, 0, 1.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:mobs, target_guid) end)
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{
+          target: target_guid,
+          level: 20,
+          min_damage: 10.0,
+          max_damage: 10.0,
+          min_offhand_damage: 5.0,
+          max_offhand_damage: 5.0,
+          base_offhand_max_damage: 10.0,
+          base_attack_time: 2_000,
+          offhand_attack_time: 1_500,
+          combat_reach: 1.5,
+          power2: 1_000
+        },
+        player: %Player{},
+        internal: %Internal{
+          world: WorldRef.open(0),
+          in_combat: true,
+          next_swing_spell: %Spell{id: 78, mana_cost: 150, power_type: 1, dmg_class: 2}
+        },
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 2_000}}
+      assert {:success, queued, blackboard} = Combat.melee_attack(character, blackboard, 1_000)
+      assert queued.internal.next_swing_spell.id == 78
+      assert [%Effects.DeliverAttack{attack: %{offhand?: true, dual_wield_penalty?: false}}] = queued.internal.events
+
+      queued = %{queued | internal: %{queued.internal | events: []}}
+      assert {:success, consumed, _blackboard} = Combat.melee_attack(queued, blackboard, 2_500)
+      assert consumed.internal.next_swing_spell == nil
+      assert consumed.unit.power2 == 850
+      assert Enum.any?(consumed.internal.events, &match?(%Effects.DeliverSpell{spell: %Spell{id: 78}}, &1))
+
+      assert Enum.any?(
+               consumed.internal.events,
+               &match?(%Effects.DeliverAttack{attack: %{offhand?: true, dual_wield_penalty?: true}}, &1)
+             )
     end
 
     test "replaces a disarmed queued weapon ability with an unarmed swing" do

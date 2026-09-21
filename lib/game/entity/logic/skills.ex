@@ -48,13 +48,16 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
 
   def defense_skill, do: @defense_skill
 
-  def defense_value(%{player: %{skills: skills}, unit: %{level: level}} = entity) do
-    base = value(skills, @defense_skill, max_for_level(level || 1))
+  def defense_value(entity, attacker_player? \\ false)
+
+  def defense_value(%{player: %{skills: skills}, unit: %{level: level}} = entity, attacker_player?) do
+    field = if attacker_player?, do: :max, else: :value
+    base = skills |> Kernel.||(%{}) |> Map.get(@defense_skill, %{}) |> Map.get(field, max_for_level(level || 1))
     {temporary, permanent} = Map.get(bonuses(entity), @defense_skill, {0, 0})
     max(base + temporary + permanent, 0)
   end
 
-  def defense_value(%{unit: %{level: level}}), do: max_for_level(level || 1)
+  def defense_value(%{unit: %{level: level}}, _attacker_player?), do: max_for_level(level || 1)
   def unarmed_skill, do: @unarmed_skill
   def fishing_skill, do: @fishing_skill
 

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   """
   import Bitwise, only: [&&&: 2, |||: 2]
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -26,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
   alias ThistleTea.Game.Entity.Logic.TargetDamage
   alias ThistleTea.Game.Math
+  alias ThistleTea.Game.Spell
 
   @hitinfo_affects_victim 0x2
   @hitinfo_miss 0x10
@@ -58,6 +60,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       caster_level: unit.level || 1,
       caster_owner_guid: caster_owner_guid(attacker),
       caster_player?: player?(attacker),
+      caster_class: unit.class,
+      dual_wield_penalty?: offhand_weapon?(attacker) and not physical_spell_active?(attacker),
       caster_can_daze?: Daze.attacker?(attacker),
       crit_chance: attacker_crit_chance(attacker) + Aura.flat_amount(attacker, :mod_crit_percent),
       hit_chance_bonus: Aura.flat_amount(attacker, :mod_hit_chance),
@@ -74,6 +78,21 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   end
 
   def attacker_context(_attacker), do: %{}
+
+  defp offhand_weapon?(%Character{unit: %Unit{shapeshift_form: form}}) when form in [1, 2, 3, 4, 5, 8], do: false
+
+  defp offhand_weapon?(%Character{unit: %Unit{base_offhand_max_damage: damage}}), do: is_number(damage)
+  defp offhand_weapon?(%{unit: %Unit{virtual_item_info: <<_mainhand::binary-size(8), 2, _rest::binary>>}}), do: true
+  defp offhand_weapon?(_attacker), do: false
+
+  defp physical_spell_active?(%{internal: %Internal{} = internal}) do
+    not is_nil(internal.next_swing_spell) or physical_cast?(internal.casting) or physical_cast?(internal.auto_shot)
+  end
+
+  defp physical_spell_active?(_attacker), do: false
+
+  defp physical_cast?(%{spell: %Spell{} = spell}), do: (Spell.school_mask(spell) &&& 1) != 0
+  defp physical_cast?(_cast), do: false
 
   defp caster_owner_guid(%{internal: %{pet: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid
   defp caster_owner_guid(%{object: %{guid: guid}}) when is_integer(guid), do: guid
@@ -123,7 +142,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   end
 
   def roll_special(defender, attack, opts \\ []) when is_map(attack) do
-    ctx = context(defender, attack)
+    ctx = %{context(defender, attack) | spell_swing?: true}
     roll = Keyword.get_lazy(opts, :roll, fn -> Math.random_int(0, 9_999) end)
 
     case roll_special_outcome(ctx, roll) do
@@ -155,13 +174,17 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     defender_level = unit.level || 1
     defender_player? = player?(defender)
     caster_level = positive_or(Map.get(attack, :caster_level), defender_level)
+    caster_player? = Map.get(attack, :caster_player?, false)
     attack_skill = non_negative_or(Map.get(attack, :caster_attack_skill), caster_level * 5)
-    skill_diff = attack_skill - Skills.defense_value(defender)
+    defense_skill = Skills.defense_value(defender, caster_player?)
+    skill_diff = attack_skill - defense_skill
     defenses = CombatRatings.defensive_chances(defender)
 
     %{
       caster_level: caster_level,
-      caster_player?: Map.get(attack, :caster_player?, false),
+      caster_player?: caster_player?,
+      caster_class: Map.get(attack, :caster_class),
+      dual_wield_penalty?: Map.get(attack, :dual_wield_penalty?, false),
       crit_chance:
         (Map.get(attack, :crit_chance) || @default_crit_chance) +
           attacker_crit_bonus(defender, attack),
@@ -173,6 +196,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       mechanic_resistance_bp:
         trunc(MechanicResistance.chance(MechanicResistance.projection(defender), Map.get(attack, :mechanic)) * 100),
       skill_diff: skill_diff,
+      capped_skill_diff: min(attack_skill, caster_level * 5) - defense_skill,
+      capped_avoidance_skill_diff: min(attack_skill, caster_level * 5) - defender_level * 5,
       avoidance_skill_diff: attack_skill - defender_level * 5,
       defender_level: defender_level,
       defender_player?: defender_player?,
@@ -187,7 +212,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       defender_parry_chance: defenses.parry,
       defender_block_chance: defenses.block,
       defender_extra_flags: extra_flags(defender),
-      hit_chance_bonus: hit_chance_bonus(attack) + attacker_hit_debuff(defender, attack),
+      hit_chance_bonus: hit_chance_bonus(attack),
+      attacker_hit_bonus: attacker_hit_debuff(defender, attack),
       versus_damage_pct: versus_pct(attack, :damage_done_versus, defender),
       versus_crit_pct: versus_pct(attack, :crit_damage_versus, defender),
       standing?: (unit.stand_state || 0) == 0,
@@ -219,7 +245,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     Aura.flat_amount(defender, :mod_attacker_ranged_hit_chance)
   end
 
-  defp attacker_hit_debuff(_defender, _attack), do: 0
+  defp attacker_hit_debuff(defender, _attack), do: Aura.flat_amount(defender, :mod_attacker_melee_hit_chance)
 
   defp attacker_crit_bonus(defender, attack) do
     type =
@@ -296,8 +322,14 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
         true -> ctx.skill_diff * 0.1
       end
 
-    (@base_miss_chance - skill_bonus - ctx.hit_chance_bonus)
-    |> low_level_scale(ctx)
+    penalty = if ctx.dual_wield_penalty? and not ctx.spell_swing? and not ctx.ranged?, do: 19.0, else: 0.0
+
+    hit_bonus =
+      if ctx.skill_diff < -10 and ctx.hit_chance_bonus > 0,
+        do: ctx.hit_chance_bonus - 1.0,
+        else: ctx.hit_chance_bonus
+
+    (low_level_scale(@base_miss_chance + penalty - skill_bonus, ctx) - hit_bonus - ctx.attacker_hit_bonus)
     |> clamp(0.0, 60.0)
     |> bp()
   end
@@ -327,7 +359,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   defp parry_bp(ctx) do
     if (ctx.defender_extra_flags &&& @extra_flag_no_parry) == 0 do
       skill_bonus =
-        if ctx.skill_diff < -10, do: ctx.skill_diff * 0.6, else: ctx.skill_diff * 0.2
+        if ctx.capped_avoidance_skill_diff < -10,
+          do: ctx.capped_avoidance_skill_diff * 0.6,
+          else: ctx.capped_avoidance_skill_diff * 0.2
 
       (ctx.defender_parry_chance - skill_bonus)
       |> low_level_scale(ctx)
@@ -338,8 +372,10 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     end
   end
 
+  defp glancing_bp(%{ranged?: true}), do: 0
+
   defp glancing_bp(%{caster_player?: true, defender_player?: false, spell_swing?: false} = ctx) do
-    (10 + -ctx.skill_diff * 2)
+    (10 + -ctx.capped_skill_diff * 2)
     |> max(0)
     |> bp()
     |> min(4_000)
@@ -347,6 +383,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
 
   defp glancing_bp(_ctx), do: 0
 
+  defp block_bp(%{ranged?: true}), do: 0
   defp block_bp(%{avoidance_disabled?: true}), do: 0
   defp block_bp(%{from_behind?: true}), do: 0
   defp block_bp(%{block_allowed?: false}), do: 0
@@ -376,7 +413,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       if ctx.defender_player? or ctx.skill_diff > 0 do
         ctx.skill_diff * 0.04
       else
-        ctx.skill_diff * 0.2
+        ctx.capped_skill_diff * 0.2
       end
 
     (ctx.crit_chance + skill_term)
@@ -499,8 +536,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
 
   defp glancing_factor(ctx, factor_roll) do
     defense_gap = -ctx.skill_diff
-    low = clamp(1.3 - 0.05 * defense_gap, 0.01, 0.91)
-    high = clamp(1.2 - 0.03 * defense_gap, 0.2, 0.99)
+    caster? = ctx.caster_class in [5, 8, 9]
+    low = clamp(1.3 - 0.05 * defense_gap - if(caster?, do: 0.7, else: 0.0), 0.01, if(caster?, do: 0.6, else: 0.91))
+    high = clamp(1.2 - 0.03 * defense_gap - if(caster?, do: 0.3, else: 0.0), 0.2, 0.99)
 
     low + (high - low) * clamp(factor_roll, 0.0, 1.0)
   end

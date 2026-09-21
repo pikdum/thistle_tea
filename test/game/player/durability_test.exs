@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
   alias ThistleTea.Game.Entity.EffectResolver.Durability, as: Resolver
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
+  alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -109,6 +110,7 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
       character = %{state.character | player: Inventory.equip(state.character.player, :offhand, item)}
       character = Character.sync_equipment_stats(character)
       assert character.player.block_percentage == 5.0
+      refute AttackTable.attacker_context(character).dual_wield_penalty?
       assert character.unit.equipment_bonuses.armor == 100
       broken = Durability.lose(%{state | character: character}, :percent, 100, :offhand)
       assert broken.character.player.block_percentage == 0.0
@@ -116,6 +118,20 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
       repaired = Durability.repair(broken, vendor, item.object.guid)
       assert repaired.character.player.block_percentage == 5.0
       assert repaired.character.unit.equipment_bonuses.armor == 100
+    end
+
+    test "a broken offhand loses its dual-wield penalty until repaired", %{state: state, item: mainhand, vendor: vendor} do
+      item = ItemStore.create(mainhand.internal.template, owner: state.guid)
+      on_exit(fn -> ItemStore.delete(item.object.guid) end)
+      character = %{state.character | player: Inventory.equip(state.character.player, :offhand, item)}
+      character = Character.sync_equipment_stats(character)
+      assert AttackTable.attacker_context(character).dual_wield_penalty?
+
+      broken = Durability.lose(%{state | character: character}, :percent, 100, :offhand)
+      refute AttackTable.attacker_context(broken.character).dual_wield_penalty?
+      assert broken.character.player.visible_item_17_0 == character.player.visible_item_17_0
+      repaired = Durability.repair(broken, vendor, item.object.guid)
+      assert AttackTable.attacker_context(repaired.character).dual_wield_penalty?
     end
 
     @tag :dbc_db
