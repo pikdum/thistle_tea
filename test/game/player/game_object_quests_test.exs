@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Player.GameObjectQuestsTest do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.GameObject
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -17,9 +18,11 @@ defmodule ThistleTea.Game.Player.GameObjectQuestsTest do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.QuestDialogStatus
   alias ThistleTea.Game.Entity.Logic.QuestLog
+  alias ThistleTea.Game.Entity.Server.Player.PacketSink
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Gossip
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Spell
@@ -34,9 +37,102 @@ defmodule ThistleTea.Game.Player.GameObjectQuestsTest do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Game.World.Visibility.QuestGivers
   alias ThistleTea.Game.WorldRef
 
   setup [:questgiver]
+
+  describe "quest object activation" do
+    test "personalizes create and values packets without changing shared flags", context do
+      update = object_update(context)
+      state = %{context.state | connection_pid: self()}
+      eligible = PacketSink.send(state, update)
+      expected = %{update | game_object: %{update.game_object | dyn_flags: 1}}
+      packet = UpdateObject.to_packet([expected], state.guid)
+      assert_received {:"$gen_cast", {:write_packet, ^packet}}
+      assert eligible.quest_object_flags == %{context.object_guid => 1}
+
+      character = state.character
+      character = %{character | player: %{character.player | rewarded_quests: MapSet.new([context.quest.id])}}
+      ineligible = PacketSink.send(%{state | character: character}, update)
+      assert ineligible.quest_object_flags == %{context.object_guid => 0}
+      packet = UpdateObject.to_packet([%{update | game_object: %{update.game_object | dyn_flags: 0}}], state.guid)
+      assert_received {:"$gen_cast", {:write_packet, ^packet}}
+
+      values = %{update | update_type: :values, game_object: %GameObject{state: 1}}
+      assert QuestGivers.personalize(values, state.character).game_object.dyn_flags == 1
+      assert update.game_object.flags == 4
+      assert update.game_object.dyn_flags == nil
+    end
+
+    test "refreshes accepted and abandoned quests and forgets objects that leave view", context do
+      :ets.delete(QuestLoader, {:ender, :game_object, context.template.entry})
+      state = PacketSink.send(%{context.state | connection_pid: self()}, object_update(context))
+      assert_received {:"$gen_cast", {:write_packet, _}}
+      QuestGivers.refresh(state)
+      refute_received {:"$gen_cast", {:send_packet, _, _}}
+
+      {:ok, quest_log} = QuestLog.add(state.character.player.quest_log, context.quest, 0, 0)
+      character = %{state.character | player: %{state.character.player | quest_log: quest_log}}
+      state = QuestGivers.refresh(%{state | character: character})
+      assert_received {:"$gen_cast", {:send_packet, %UpdateObject{game_object: %{dyn_flags: 0}} = update, opts}}
+      state = PacketSink.send(state, update, opts)
+      assert_received {:"$gen_cast", {:write_packet, _}}
+      assert state.quest_object_flags == %{context.object_guid => 0}
+      QuestGivers.refresh(state)
+      refute_received {:"$gen_cast", {:send_packet, _, _}}
+
+      state = QuestGivers.refresh(%{state | character: context.state.character})
+      assert_received {:"$gen_cast", {:send_packet, %UpdateObject{game_object: %{dyn_flags: 1}}, _}}
+      state = Visibility.untrack_entity(state, context.object_guid)
+      assert state.quest_object_flags == %{}
+      QuestGivers.refresh(state)
+      refute_received {:"$gen_cast", {:send_packet, _, _}}
+      assert PacketSink.ensure_created(state, object_update(context)).quest_object_flags == %{context.object_guid => 1}
+    end
+
+    test "keeps incomplete and complete turn-ins active but excludes failed quests", context do
+      :ets.delete(QuestLoader, {:giver, :game_object, context.template.entry})
+      {:ok, log} = QuestLog.add(context.state.character.player.quest_log, context.quest, 0, 0)
+
+      for status <- [:incomplete, :complete, :failed] do
+        log = Map.new(log, fn {slot, entry} -> {slot, %{entry | status: status}} end)
+        character = context.state.character
+        character = %{character | player: %{character.player | quest_log: log}}
+        flags = QuestGivers.personalize(object_update(context), character).game_object.dyn_flags
+        assert flags == if(status == :failed, do: 0, else: 1)
+      end
+    end
+
+    test "respects minimum levels and live required conditions", context do
+      character = context.state.character
+      quest = %{context.quest | min_level: 51}
+      put_quest(quest)
+      assert QuestGivers.personalize(object_update(context), character).game_object.dyn_flags == 0
+
+      put_quest(%{
+        quest
+        | min_level: 1,
+          required_condition_id: 1,
+          required_condition: %Condition{entry: 1, type: :level, value1: 51, value2: 1}
+      })
+
+      assert QuestGivers.personalize(object_update(context), character).game_object.dyn_flags == 0
+      character = %{character | unit: %{character.unit | level: 51}}
+      assert QuestGivers.personalize(object_update(context), character).game_object.dyn_flags == 1
+    end
+  end
+
+  defp object_update(context) do
+    %UpdateObject{
+      update_type: :create_object2,
+      object_type: :game_object,
+      object: %Object{guid: context.object_guid, entry: context.template.entry},
+      game_object: %GameObject{flags: 4, type_id: 2},
+      movement_block: %MovementBlock{update_flag: 0}
+    }
+  end
 
   describe "use_object/2" do
     test "opens the native details through the game-object use codec", context do

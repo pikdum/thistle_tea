@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.World.Visibility do
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility.Filter
+  alias ThistleTea.Game.World.Visibility.QuestGivers
   alias ThistleTea.Game.WorldRef
 
   @group Groups
@@ -218,7 +219,9 @@ defmodule ThistleTea.Game.World.Visibility do
   end
 
   def untrack_entity(state, guid) when is_integer(guid) do
-    Map.update(state, :tracked_entities, MapSet.new(), &MapSet.delete(&1, guid))
+    state
+    |> Map.update(:tracked_entities, MapSet.new(), &MapSet.delete(&1, guid))
+    |> QuestGivers.forget(guid)
   end
 
   def tracked?(state, guid) when is_integer(guid) do
@@ -264,6 +267,7 @@ defmodule ThistleTea.Game.World.Visibility do
     (Map.get(state, :player_guids, []) ++ Map.get(state, :mob_guids, []))
     |> Enum.filter(&match?(%{stealthed?: true}, Metadata.get(&1)))
     |> Enum.reduce(state, &reevaluate_entity(&2, &1))
+    |> QuestGivers.refresh()
     |> schedule_stealth_detection()
   end
 

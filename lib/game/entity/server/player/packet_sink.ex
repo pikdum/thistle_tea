@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.PacketSink do
   alias ThistleTea.Game.Network.UpdateBatcher
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Game.World.Visibility.QuestGivers
   alias ThistleTea.Game.World.Visibility.Tap
 
   def send(state, message, opts \\ [])
@@ -73,7 +74,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.PacketSink do
     if duplicate_create?(state, update) or not visible_update?(state, update) do
       state
     else
-      update = Tap.personalize(update, state.guid)
+      update = personalize(update, state)
       packet = UpdateObject.to_packet([update], state.guid)
 
       state
@@ -84,7 +85,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.PacketSink do
 
   defp send_update(%UpdateObject{} = update, %State{} = state) do
     viewer = state.guid
-    {packet, updates} = UpdateBatcher.batch(update, viewer, &Tap.personalize(&1, viewer), &visible_update?(state, &1))
+    {packet, updates} = UpdateBatcher.batch(update, viewer, &personalize(&1, state), &visible_update?(state, &1))
 
     if updates == [] do
       state
@@ -93,6 +94,12 @@ defmodule ThistleTea.Game.Entity.Server.Player.PacketSink do
       |> send_packet(packet)
       |> track_updates(updates)
     end
+  end
+
+  defp personalize(update, %State{} = state) do
+    update
+    |> Tap.personalize(state.guid)
+    |> QuestGivers.personalize(state.character)
   end
 
   defp visible_update?(state, %UpdateObject{object: %{guid: guid}}) when is_integer(guid) do
@@ -133,6 +140,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.PacketSink do
   end
 
   defp track_update(%UpdateObject{} = update, state) do
+    state = QuestGivers.remember(state, update)
     if create_update?(update), do: Visibility.track_entities(state, MapSet.new([update.object.guid])), else: state
   end
 
