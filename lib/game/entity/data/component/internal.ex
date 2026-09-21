@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
   phase), and `Internal.Summon` (summoned game objects) — which stay nil on
   entities they don't apply to.
   """
+  alias ThistleTea.Game.Entity.Data.ChatStatus
   alias ThistleTea.Game.Entity.Data.Companion
   alias ThistleTea.Game.Entity.Data.Honor.Damage, as: HonorDamage
   alias ThistleTea.Game.Entity.Data.PetStable
@@ -71,6 +72,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :undetectable_until,
     :invincibility_health_threshold,
     world: WorldRef.open(0),
+    chat_status: %ChatStatus{},
     temporary_threat: %{},
     diminishing_returns: %{},
     companion: Companion.none(),

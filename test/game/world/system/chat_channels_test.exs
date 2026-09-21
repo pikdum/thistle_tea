@@ -43,6 +43,22 @@ defmodule ThistleTea.Game.World.System.ChatChannelsTest do
   end
 
   describe "say/4" do
+    test "uses the current chat tag after joining" do
+      actor = member("Status")
+      receiver = start_receiver(actor.guid, :actor)
+      channel = unique_name("Status")
+      assert :ok = ChatChannels.join(actor, channel, "")
+      drain_mailbox()
+
+      for tag <- [1, 2, 0] do
+        assert :ok = ChatChannels.say(%{actor | chat_tag: tag}, channel, 7, "hello")
+
+        assert_receive {:actor, {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "hello", tag: ^tag}}}}
+      end
+
+      cleanup([actor], [receiver])
+    end
+
     test "rejects non-members instead of broadcasting" do
       actor = member("Outsider")
       receiver = start_receiver(actor.guid, :actor)

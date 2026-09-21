@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Chat.Channel do
 
   defmodule Member do
     @moduledoc false
-    defstruct [:guid, :name, :team, flags: 0]
+    defstruct [:guid, :name, :team, flags: 0, chat_tag: 0]
   end
 
   defstruct [

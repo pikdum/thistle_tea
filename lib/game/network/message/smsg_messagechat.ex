@@ -75,7 +75,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgMessagechat do
   def to_binary(
         %__MODULE__{
           chat_type: chat_type,
-          language: _language,
+          language: language,
           sender_guid: sender_guid,
           message: message,
           channel_name: channel_name,
@@ -83,9 +83,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgMessagechat do
           tag: tag
         } = msg
       ) do
-    message_length = String.length(message) + 1
-    # TODO: hardcoded language to 0 (universal) for now
-    language = 0
+    message_length = byte_size(message) + 1
 
     <<chat_type::little-size(8), language::little-size(32)>> <>
       sender_block(chat_type, msg, sender_guid, channel_name, player_rank) <>

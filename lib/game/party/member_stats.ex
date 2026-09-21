@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Party.MemberStats do
   """
   import Bitwise
 
+  alias ThistleTea.Game.Entity.Logic.ChatStatus
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Network.BinaryUtils
 
@@ -58,6 +59,8 @@ defmodule ThistleTea.Game.Party.MemberStats do
     @status_online
     |> set_flag(@status_dead, not Death.alive?(character))
     |> set_flag(@status_ghost, Death.ghost?(character))
+    |> set_flag(0x40, ChatStatus.tag(character) == 1)
+    |> set_flag(0x80, ChatStatus.tag(character) == 2)
   end
 
   defp set_flag(status, flag, true), do: status ||| flag

@@ -97,7 +97,7 @@ defmodule ThistleTea.Game.World.System.ChatChannels do
         message: message,
         channel_name: channel.name,
         player_rank: 0,
-        tag: 0
+        tag: actor.chat_tag
       }
 
       send_to_members(members, packet)

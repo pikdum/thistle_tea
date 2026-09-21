@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.ChatStatus
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
   alias ThistleTea.Game.Entity.Logic.Core
@@ -88,6 +89,7 @@ defmodule ThistleTea.Game.Player.Login do
       c
       |> Trade.recover()
       |> Auction.recover()
+      |> ChatStatus.reset()
       |> restore_instance_world(character_guid)
       |> normalize_movement_state()
       |> normalize_combat_stats()

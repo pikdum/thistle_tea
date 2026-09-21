@@ -53,6 +53,7 @@ defmodule ThistleTea.Game.World.Presence do
        ) do
     %{
       area: area,
+      chat_status: character.internal.chat_status,
       orientation: orientation,
       viewpoint: viewpoint(character),
       creature_type: Character.creature_type(character),
