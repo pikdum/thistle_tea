@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Logic.QuestLog.Entry
   alias ThistleTea.Game.Entity.Logic.QuestRequirements
+  alias ThistleTea.Game.Entity.Logic.QuestSharing, as: Sharing
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -27,6 +28,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Mail
+  alias ThistleTea.Game.Player.QuestSharing
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Time
@@ -120,11 +122,25 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def accept(state, npc_guid, quest_id) do
+    if Guid.type_id(npc_guid) == :player do
+      QuestSharing.accept(state, npc_guid, quest_id)
+    else
+      accept_from_questgiver(state, npc_guid, quest_id)
+    end
+  end
+
+  defp accept_from_questgiver(state, npc_guid, quest_id) do
     with true <- PlayerReputation.can_interact?(state.character, npc_guid),
          %Quest{} = quest <- QuestLoader.get(quest_id),
          true <- quest_id in QuestLoader.given_by(Guid.entry(npc_guid)),
          :ok <- takeability(state.character, quest) do
-      force_accept(state, quest_id, npc_guid)
+      accepted = force_accept(state, quest_id, npc_guid)
+
+      if QuestLog.active?(accepted.character.player.quest_log, quest_id) do
+        accepted |> QuestSharing.clear() |> QuestSharing.party_accept(quest)
+      else
+        accepted
+      end
     else
       {:error, :required_condition} ->
         send_condition_invalid()
@@ -141,10 +157,13 @@ defmodule ThistleTea.Game.Player.Quests do
 
   def force_accept(state, quest_id), do: force_accept(state, quest_id, nil)
 
-  def force_accept(%{character: %Character{player: player}} = state, quest_id, source_guid) do
+  def force_accept(state, quest_id, source_guid), do: force_accept(state, quest_id, source_guid, [])
+
+  def force_accept(%{character: %Character{player: player}} = state, quest_id, source_guid, opts) do
     with %Quest{} = quest <- QuestLoader.get(quest_id),
          {:ok, quest_log} <-
            QuestLog.add(player.quest_log, quest, Time.now(), System.system_time(:second)),
+         {:ok, quest_log} <- Sharing.inherit_timer(quest_log, quest.id, Keyword.get(opts, :shared_entry)),
          {:ok, state} <- grant_source_item(state, quest) do
       {quest_log, event} =
         QuestLog.evaluate(
@@ -900,6 +919,7 @@ defmodule ThistleTea.Game.Player.Quests do
 
   defp put_character(state, %Character{} = character) do
     CharacterStore.put(character)
+    QuestSharing.quest_log_changed(state.character, character)
     sync_needed_items(character)
     PlayerServer.maybe_broadcast_update(%{state | character: Core.mark_broadcast_update(character)})
   end

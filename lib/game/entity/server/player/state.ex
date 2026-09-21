@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Party.Notifier
+  alias ThistleTea.Game.Player.QuestSharing
   alias ThistleTea.Game.Player.Taxi
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.AggroProbe
@@ -62,6 +63,8 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :companion_monitor,
     :pet_unlearn_offer,
     :talent_reset_offer,
+    :quest_share,
+    :quest_share_monitor,
     ready: false,
     pending_worldport?: false,
     movement_counter: 0,
@@ -106,6 +109,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
         state
       end
 
+    state = QuestSharing.disconnect(state)
     state = disengage(state)
     state = CompanionOwner.suspend(state)
     state = ServerMovement.cancel(state)

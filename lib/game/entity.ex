@@ -160,6 +160,14 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:summon_request, summoner_guid, area, world, position})
   end
 
+  def offer_quest(entity, sharer_guid, quest_id, mode) do
+    dispatch_cast(entity, {:quest_share, sharer_guid, quest_id, mode})
+  end
+
+  def cancel_quest_share(entity, sharer_guid, quest_id) do
+    dispatch_cast(entity, {:cancel_quest_share, sharer_guid, quest_id})
+  end
+
   def start_game_object_channel(entity, game_object_guid, spell, duration_ms) do
     dispatch_cast(entity, {:start_game_object_channel, game_object_guid, spell, duration_ms})
   end

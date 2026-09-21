@@ -93,6 +93,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.PetExperience
   alias ThistleTea.Game.Player.PetTraining
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.Player.QuestSharing
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.SelfResurrection
@@ -456,6 +457,22 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, Quests.credit_scripted_kill(state, creature_entry, false)}
   end
 
+  def handle_cast({:quest_share, sharer, quest_id, mode}, %State{} = state) do
+    {:noreply, QuestSharing.receive_offer(state, sharer, quest_id, mode)}
+  rescue
+    error ->
+      Logger.error("Quest share failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:cancel_quest_share, sharer, quest_id}, %State{} = state) do
+    {:noreply, QuestSharing.cancel(state, sharer, quest_id)}
+  rescue
+    error ->
+      Logger.error("Quest share cancellation failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_cast({:delay_aura, spell_id, caster_guid, delay_ms}, %{character: %Character{} = character} = state) do
     character = Aura.delay_source_spell(character, spell_id, caster_guid, delay_ms, Time.now())
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
@@ -526,6 +543,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def handle_cast(:party_visibility_changed, %{character: %Character{} = character} = state) do
+    state = QuestSharing.refresh(state)
     Quests.sync_needed_items(character)
     Visibility.notify_visibility_changed(character)
     {:noreply, Visibility.resync_player(state), {:continue, :maybe_broadcast_update}}
@@ -674,6 +692,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_info({:DOWN, _monitor, :process, connection_pid, _reason}, %State{connection_pid: connection_pid} = state) do
     {:stop, :normal, State.leave_world(state)}
+  end
+
+  def handle_info({:DOWN, monitor, :process, _pid, _reason}, %State{quest_share_monitor: monitor} = state)
+      when is_reference(monitor) do
+    {:noreply, QuestSharing.close(state)}
+  rescue
+    error ->
+      Logger.error("Quest share owner cleanup failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_info(
