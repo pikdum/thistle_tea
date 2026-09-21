@@ -74,6 +74,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - logging in + creating characters
 - entering world + seeing other players
 - chatting, channels, and parties
+- [Friends and ignore lists](docs/social-playtest.md), with offline contacts, live presence, reconnect retention, chat filtering, and invitation restrictions
 - [Raid groups](docs/raid-playtest.md), with 40-member rosters, assistants, subgroups, target markers, ready checks, raid chat, subgroup buffs, and quest eligibility
 - [AFK and DND status](docs/chat-status-playtest.md), with public tags, whisper echoes and automatic replies, reconnect cleanup, and AFK battleground departure
 - [Emotes and posture](docs/emote-playtest.md), with DBC animations, persistent poses, movement and channel interruption, and Feign Death and pet-control cleanup
