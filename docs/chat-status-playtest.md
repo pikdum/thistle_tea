@@ -78,4 +78,5 @@ tags, Unicode byte lengths, and spoken/addon language encoding.
 No server errors or unknown chat-type warnings occurred. Existing unsupported
 account-data, raid-info, GM-ticket, query-time, and meeting-stone requests remain
 outside this change. Both clients and the retained server were stopped; evidence
-was retained. Emote animation and cancellation remain separate follow-up work.
+was retained. Emote animation and cancellation are covered in the separate
+[emote acceptance](emote-playtest.md).
