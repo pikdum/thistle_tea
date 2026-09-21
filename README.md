@@ -137,6 +137,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - chests, fishing, and chairs
 - resource tracking for herbs, minerals, and treasure, with exclusive tracking modes
 - mail
+- [Auction houses](docs/auction-playtest.md), with linked faction markets, neutral auctions, bids, buyout, cancellation, expiry, exact-item escrow, and recoverable mail settlement
 
 ## helpful resources
 

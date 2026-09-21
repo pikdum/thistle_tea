@@ -2,7 +2,8 @@
 
 The market rules, runtime escrow, coordinator recovery, mail delivery,
 auctioneer authorization, and vanilla client protocol are implemented.
-Real-client acceptance remains in progress.
+[Build-5875 client acceptance](auction-playtest.md) covers separate accounts,
+all settlement paths, full bags, reconnect, and linked versus neutral markets.
 
 ## Rules implemented
 
@@ -59,12 +60,13 @@ faction interaction, world, and distance. Search eligibility also checks
 equipment requirements, reputation, required spells, and learned recipes.
 Listing packets carry the exact vanilla 64-byte rows.
 
-## Pending client acceptance
+## Client acceptance
 
-Exercise real auctioneer and mailbox UI with distinct accounts: sale, bid
-increase, outbid refund, buyout, cancellation, unsold and sold expiry, full
-bags, offline delivery, reconnect, and market isolation. Verify owner state,
-ledger/escrow state, client messages, and lifecycle cleanup.
+Three real clients completed sale, bid increase, outbid refund, buyout,
+cancellation, unsold and sold expiry, full bags, offline delivery, reconnect,
+and market isolation. The final owner and saved balances reconcile with the
+fees; all exact item instances reached their intended inventories. The book,
+settlement mailboxes, pending receipts, and outbox were empty afterward.
 
 Development seeding provides `debugbuyer/debugbuyer` and
 `debugbidder/debugbidder` alongside the original debug account. The command
