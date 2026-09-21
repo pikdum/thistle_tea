@@ -118,6 +118,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - typed invisibility and detection, with observer visibility, creature aggro, and action interruption
 - observer-specific stealth detection, with Perception, Paranoia, Track Hidden, facing, line of sight, and caster-specific Hunter's Mark
 - items, bags, equipment, and vendors
+- [Vendor buyback](docs/vendor-buyback-playtest.md), with 12 session slots, partial-stack sales, preserved item state, charge and durability pricing, paused timers, and logout cleanup
 - equipment durability, combat and death wear, broken-gear penalties, and vendor repairs with reputation discounts
 - alcohol intoxication, client drunkenness effects, gradual sobering, and death cleanup
 - looting + group loot
