@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
                 :arcane,
                 :healing,
                 :attack_power,
+                :ranged_attack_power,
                 :ranged_haste,
                 :shields,
                 :block_chance,
@@ -152,6 +153,9 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
 
       %Effect{type: :apply_aura, aura: :mod_attack_power} = effect, acc ->
         add(acc, :attack_power, Effect.damage_roll(effect))
+
+      %Effect{type: :apply_aura, aura: :mod_ranged_attack_power} = effect, acc ->
+        add(acc, :ranged_attack_power, Effect.damage_roll(effect))
 
       %Effect{type: :apply_aura, aura: :mod_target_resistance, misc_value: mask} = effect, acc
       when is_integer(mask) ->

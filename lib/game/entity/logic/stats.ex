@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.AttackPower
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.WeaponDamage
@@ -71,31 +72,30 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   @shaman 7
   @druid 11
 
-  def melee_attack_power(class, level, strength, agility) do
-    value =
-      case class do
-        @warrior -> level * 3 + strength * 2 - 20
-        @paladin -> level * 3 + strength * 2 - 20
-        @rogue -> level * 2 + strength + agility - 20
-        @hunter -> level * 2 + strength + agility - 20
-        @shaman -> level * 2 + strength * 2 - 20
-        @druid -> strength * 2 - 20
-        _ -> strength - 10
-      end
+  def melee_attack_power(class, level, strength, agility),
+    do: max(stat_melee_attack_power(class, level, strength, agility), 0)
 
-    max(value, 0)
+  defp stat_melee_attack_power(class, level, strength, agility) do
+    case class do
+      @warrior -> level * 3 + strength * 2 - 20
+      @paladin -> level * 3 + strength * 2 - 20
+      @rogue -> level * 2 + strength + agility - 20
+      @hunter -> level * 2 + strength + agility - 20
+      @shaman -> level * 2 + strength * 2 - 20
+      @druid -> strength * 2 - 20
+      _ -> strength - 10
+    end
   end
 
-  def ranged_attack_power(class, level, agility) do
-    value =
-      case class do
-        @hunter -> level * 2 + agility * 2 - 10
-        @rogue -> level + agility - 10
-        @warrior -> level + agility - 10
-        _ -> agility - 10
-      end
+  def ranged_attack_power(class, level, agility), do: max(stat_ranged_attack_power(class, level, agility), 0)
 
-    max(value, 0)
+  defp stat_ranged_attack_power(class, level, agility) do
+    case class do
+      @hunter -> level * 2 + agility * 2 - 10
+      @rogue -> level + agility - 10
+      @warrior -> level + agility - 10
+      _ -> agility - 10
+    end
   end
 
   defp derive_stats(%Unit{} = unit) do
@@ -191,20 +191,47 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
 
   defp aura_power_multiplier(_unit, _type, _power_type), do: 1.0
 
-  defp derive_attack_power(%Unit{base_strength: base_strength} = unit) when is_integer(base_strength) do
-    attack_power =
-      unit_attack_power(unit) +
-        equipment_bonus(unit, :attack_power) + aura_attack_power(unit)
+  defp derive_attack_power(%Unit{base_attack_power: base} = unit) when is_number(base) do
+    melee = base + creature_stat_attack_power(unit, :melee)
+    ranged = (unit.base_ranged_attack_power || 0) + creature_stat_attack_power(unit, :ranged)
 
     %{
       unit
-      | attack_power: attack_power,
+      | attack_power: AttackPower.total(unit, melee, :melee),
+        ranged_attack_power: AttackPower.total(unit, ranged, :ranged)
+    }
+  end
+
+  defp derive_attack_power(%Unit{base_strength: base_strength} = unit) when is_integer(base_strength) do
+    %{
+      unit
+      | attack_power: AttackPower.total(unit, unit_attack_power(unit), :melee),
         ranged_attack_power:
-          ranged_attack_power(unit.class, unit.level, unit.agility || 0) + aura_ranged_attack_power(unit)
+          AttackPower.total(unit, ranged_attack_power(unit.class, unit.level, unit.agility || 0), :ranged)
     }
   end
 
   defp derive_attack_power(%Unit{} = unit), do: unit
+
+  defp creature_stat_attack_power(%Unit{attack_power_model: model} = unit, kind)
+       when model in [:hunter_pet, :summoned_pet, :imp] do
+    if kind == :melee, do: AttackPower.pet_base(unit) - unit.base_attack_power, else: 0
+  end
+
+  defp creature_stat_attack_power(%Unit{base_strength: strength, base_agility: agility} = unit, kind)
+       when is_integer(strength) and is_integer(agility) do
+    level = unit.level || 1
+
+    if kind == :ranged do
+      stat_ranged_attack_power(unit.class, level, unit.agility) -
+        stat_ranged_attack_power(unit.class, level, agility)
+    else
+      stat_melee_attack_power(unit.class, level, unit.strength, unit.agility) -
+        stat_melee_attack_power(unit.class, level, strength, agility)
+    end
+  end
+
+  defp creature_stat_attack_power(_unit, _kind), do: 0
 
   defp unit_attack_power(%Unit{max_power5: capacity, strength: strength}) when is_integer(capacity) and capacity > 0 do
     max(strength * 2 - 20, 0)
@@ -265,8 +292,10 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   defp derive_melee_attack_time(%Unit{class: @druid, shapeshift_form: form} = unit) when form in [5, 8],
     do: %{unit | base_attack_time: 2_500}
 
-  defp derive_melee_attack_time(%Unit{base_melee_attack_time: base} = unit) when is_number(base) and base > 0,
-    do: %{unit | base_attack_time: if(Disarm.unarmed?(unit), do: 2_000, else: base)}
+  defp derive_melee_attack_time(%Unit{base_melee_attack_time: base} = unit) when is_number(base) and base > 0 do
+    unarmed? = not AttackPower.creature?(unit) and Disarm.unarmed?(unit)
+    %{unit | base_attack_time: if(unarmed?, do: 2_000, else: base)}
+  end
 
   defp derive_melee_attack_time(%Unit{} = unit), do: unit
 
@@ -287,9 +316,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   defp derive_ranged_damage(%Unit{} = unit) do
     with base_min when is_number(base_min) <- unit.base_ranged_min_damage,
          base_max when is_number(base_max) <- unit.base_ranged_max_damage do
-      bonus =
-        attack_power_bonus(WeaponDamage.ranged_attack_power(unit), unit.ranged_attack_time) +
-          equipment_bonus(unit, :ranged_damage)
+      {base_min, base_max, bonus} = ranged_damage_inputs(unit, base_min, base_max)
 
       multiplier =
         if WeaponDamage.wand?(unit.ranged_weapon),
@@ -302,6 +329,19 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     end
   end
 
+  defp ranged_damage_inputs(%Unit{} = unit, base_min, base_max) do
+    if AttackPower.creature?(unit) do
+      multiplier = AttackPower.creature_multiplier(unit, :ranged)
+      {base_min * multiplier, base_max * multiplier, equipment_bonus(unit, :ranged_damage)}
+    else
+      bonus =
+        attack_power_bonus(WeaponDamage.ranged_attack_power(unit), unit.ranged_attack_time) +
+          equipment_bonus(unit, :ranged_damage)
+
+      {base_min, base_max, bonus}
+    end
+  end
+
   defp derive_mainhand_damage(%Unit{class: @druid, shapeshift_form: form} = unit) when form in [1, 5, 8] do
     speed = (unit.base_attack_time || 2000) / 1000
     level = min(unit.level || 1, 60)
@@ -310,7 +350,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   end
 
   defp derive_mainhand_damage(%Unit{} = unit) do
-    if is_number(unit.base_melee_attack_time) and Disarm.unarmed?(unit) do
+    if not AttackPower.creature?(unit) and is_number(unit.base_melee_attack_time) and Disarm.unarmed?(unit) do
       bonus = attack_power_bonus(unit.attack_power, unit.base_attack_time)
       %{unit | min_damage: 1.0 + bonus, max_damage: 2.0 + bonus}
     else
@@ -322,13 +362,20 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     with base_min when is_number(base_min) <- Map.get(unit, base_min_field),
          base_max when is_number(base_max) <- Map.get(unit, base_max_field) do
       key = if min_field == :min_offhand_damage, do: :offhand_damage, else: :mainhand_damage
-      bonus = attack_power_bonus(unit.attack_power, attack_time) + equipment_bonus(unit, key)
+      {base_min, base_max, bonus} = melee_damage_inputs(unit, base_min, base_max, attack_time, key)
 
-      unit
-      |> Map.put(min_field, base_min + bonus)
-      |> Map.put(max_field, base_max + bonus)
+      struct!(unit, [{min_field, base_min + bonus}, {max_field, base_max + bonus}])
     else
       _ -> unit
+    end
+  end
+
+  defp melee_damage_inputs(unit, base_min, base_max, attack_time, key) do
+    if AttackPower.creature?(unit) do
+      multiplier = AttackPower.creature_multiplier(unit, :melee)
+      {base_min * multiplier, base_max * multiplier, equipment_bonus(unit, key)}
+    else
+      {base_min, base_max, attack_power_bonus(unit.attack_power, attack_time) + equipment_bonus(unit, key)}
     end
   end
 
@@ -338,20 +385,6 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   end
 
   defp attack_power_bonus(_attack_power, _attack_time), do: 0.0
-
-  defp aura_attack_power(%Unit{} = unit) do
-    sum_aura_amounts(unit, fn
-      %Aura{type: :mod_attack_power, amount: amount} when is_integer(amount) -> amount
-      _aura -> 0
-    end)
-  end
-
-  defp aura_ranged_attack_power(%Unit{} = unit) do
-    sum_aura_amounts(unit, fn
-      %Aura{type: :mod_ranged_attack_power, amount: amount} when is_integer(amount) -> amount
-      _aura -> 0
-    end)
-  end
 
   defp clamp(current, max) when is_number(current) and current > max, do: max
   defp clamp(current, _max), do: current

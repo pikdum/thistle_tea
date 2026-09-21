@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgressionTest do
     test "preserves active buffs while replacing canonical growth inputs", %{pet: pet, levels: levels} do
       holder = %Holder{
         spell: %Spell{id: 10},
-        auras: [%Aura{type: :mod_stat, misc_value: 2, amount: 5}],
+        auras: [%Aura{type: :mod_stat, misc_value: 2, amount: 5}, %Aura{type: :mod_attack_power, amount: 40}],
         stacks: 1
       }
 
@@ -71,8 +71,12 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgressionTest do
       assert updated.unit.stamina == 34
       assert updated.unit.max_health == 226
       assert updated.unit.health == 226
+      assert updated.unit.base_attack_power == 40
+      assert updated.unit.attack_power == 80
+      assert_in_delta updated.unit.min_damage, 9 * 1.15 * 1.05 * 1.3 * 1.25, 0.0001
       assert Stats.recompute(updated.unit) == updated.unit
       assert Stats.recompute(%{updated.unit | auras: []}).max_health == 176
+      assert_in_delta Stats.recompute(%{updated.unit | auras: []}).min_damage, 9 * 1.15 * 1.05 * 1.25, 0.0001
     end
 
     test "level gains award training points before the kill loyalty bonus", %{pet: pet, levels: levels} do

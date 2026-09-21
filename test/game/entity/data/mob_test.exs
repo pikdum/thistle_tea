@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
@@ -193,6 +194,63 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       assert mob.unit.base_health == nil
 
       assert Stats.recompute(mob.unit) == mob.unit
+    end
+
+    test "anchors creature attack power and damage to class-level data or template fallback" do
+      template = %Mangos.CreatureTemplate{
+        entry: 2,
+        name: "Test Creature",
+        speed_walk: 1.0,
+        speed_run: 1.0,
+        min_level: 60,
+        max_level: 60,
+        unit_class: 1,
+        scale: 1.0,
+        damage_multiplier: 2.0,
+        damage_variance: 0.2,
+        melee_attack_power: 200,
+        ranged_attack_power: 100,
+        min_melee_dmg: 160.0,
+        max_melee_dmg: 240.0,
+        min_ranged_dmg: 80.0,
+        max_ranged_dmg: 120.0,
+        melee_base_attack_time: 2_000,
+        ranged_base_attack_time: 2_500
+      }
+
+      creature =
+        %Mangos.Creature{
+          guid: 1,
+          id: 2,
+          modelid: 3,
+          curhealth: 1_000,
+          creature_movement: [],
+          creature_template: template
+        }
+        |> Map.put(:equip_items, [nil, nil, nil])
+
+      stats = %Mangos.CreatureClassLevelStats{
+        class: 1,
+        level: 60,
+        health: 1_000,
+        mana: 0,
+        melee_damage: 100.0,
+        ranged_damage: 50.0,
+        attack_power: 200,
+        ranged_attack_power: 100,
+        strength: 100,
+        agility: 50
+      }
+
+      for seed <- [creature, Map.put(creature, :creature_class_level_stats, stats)] do
+        mob = Mob.build(seed)
+        assert mob.unit.base_attack_power == 200
+        assert mob.unit.base_ranged_attack_power == 100
+        assert Stats.recompute(mob.unit) == mob.unit
+        assert Combat.damage_range(mob) == {160.0, 240.0}
+        assert mob.unit.min_ranged_damage == 80.0
+        assert mob.unit.ranged_attack_time == 2_500
+      end
     end
 
     test "stores respawn delay from creature spawn time" do

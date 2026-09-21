@@ -8,7 +8,6 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -93,18 +92,6 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
     max(melee_reach * @chase_rechase_range_factor - target_bounding_radius, 0.0)
   end
 
-  def damage_range(
-        %{
-          unit: %Unit{min_damage: min_damage, max_damage: max_damage},
-          internal: %Internal{creature: %Creature{damage_multiplier: damage_multiplier}}
-        } = entity
-      )
-      when is_number(min_damage) and is_number(max_damage) do
-    multiplier = damage_multiplier(damage_multiplier)
-
-    mainhand_damage_range(entity, {min_damage * multiplier, max_damage * multiplier})
-  end
-
   def damage_range(%{unit: %Unit{min_damage: min_damage, max_damage: max_damage}} = entity)
       when is_number(min_damage) and is_number(max_damage) do
     mainhand_damage_range(entity, {min_damage, max_damage})
@@ -146,9 +133,6 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   end
 
   def attack_damage(_attack), do: @default_damage
-
-  defp damage_multiplier(multiplier) when is_number(multiplier) and multiplier > 0, do: multiplier
-  defp damage_multiplier(_multiplier), do: 1.0
 
   def finalize_attack(attack) when is_map(attack) do
     Map.put_new(attack, :damage, attack_damage(attack))

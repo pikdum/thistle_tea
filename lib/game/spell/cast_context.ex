@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.AttackPower
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Disarm
@@ -86,6 +87,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     damage_done_multiplier: 1.0,
     happiness_multiplier: 1.0,
     effect_damage_multiplier: 1.0,
+    weapon_attack_power_included?: false,
     effect_healing_multiplier: 1.0,
     melee_crit?: false
   ]
@@ -183,11 +185,14 @@ defmodule ThistleTea.Game.Spell.CastContext do
   defp put_attack_snapshot(%__MODULE__{} = context, caster, %Spell{} = spell) do
     cond do
       Spell.ranged_attack?(spell) ->
+        {min_damage, max_damage} = AttackPower.weapon_range(caster.unit, :ranged)
+
         %{
           context
           | attack_power: WeaponDamage.ranged_attack_power(caster.unit),
-            weapon_base_min: caster.unit.base_ranged_min_damage || caster.unit.min_ranged_damage || 0,
-            weapon_base_max: caster.unit.base_ranged_max_damage || caster.unit.max_ranged_damage || 0,
+            weapon_attack_power_included?: AttackPower.creature?(caster.unit),
+            weapon_base_min: min_damage,
+            weapon_base_max: max_damage,
             attack_time_ms: caster.unit.ranged_attack_time,
             normalized_speed: @normalized_ranged,
             attack_skill: ranged_attack_skill(caster),
@@ -196,11 +201,14 @@ defmodule ThistleTea.Game.Spell.CastContext do
         }
 
       melee_snapshot?(spell) ->
+        {min_damage, max_damage} = weapon_range(caster)
+
         %{
           context
           | attack_power: melee_attack_power(caster),
-            weapon_base_min: weapon_base(caster, :base_min_damage, :min_damage),
-            weapon_base_max: weapon_base(caster, :base_max_damage, :max_damage),
+            weapon_attack_power_included?: AttackPower.creature?(caster.unit),
+            weapon_base_min: min_damage,
+            weapon_base_max: max_damage,
             attack_time_ms: caster.unit.base_attack_time,
             normalized_speed: normalized_speed(caster),
             attack_skill: attack_skill(caster),
@@ -232,18 +240,11 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defp melee_attack_power(_caster), do: 0
 
-  defp weapon_base(%{unit: unit} = caster, base_field, current_field) do
+  defp weapon_range(%{unit: unit} = caster) do
     if match?(%Character{}, caster) and Disarm.unarmed?(caster) do
-      if base_field == :base_min_damage, do: 1.0, else: 2.0
+      {1.0, 2.0}
     else
-      equipped_weapon_base(unit, base_field, current_field)
-    end
-  end
-
-  defp equipped_weapon_base(unit, base_field, current_field) do
-    case Map.get(unit, base_field) do
-      base when is_number(base) -> base
-      _ -> Map.get(unit, current_field) || 0
+      AttackPower.weapon_range(unit, :melee)
     end
   end
 

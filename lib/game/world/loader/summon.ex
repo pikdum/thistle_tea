@@ -84,7 +84,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
 
       unit =
         mob.unit
-        |> apply_pet_stats(stats, level)
+        |> apply_pet_stats(stats, level, entry)
         |> apply_pet_resources(hunter_pet?)
         |> then(fn unit ->
           %{
@@ -479,7 +479,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
 
   defp pet_food_mask(_family), do: 0
 
-  defp apply_pet_stats(unit, %Mangos.PetLevelStats{} = stats, level) do
+  defp apply_pet_stats(unit, %Mangos.PetLevelStats{} = stats, level, entry) do
     %{
       unit
       | level: level,
@@ -493,15 +493,21 @@ defmodule ThistleTea.Game.World.Loader.Summon do
         max_damage: stats.dmg_max,
         base_min_damage: stats.dmg_min,
         base_max_damage: stats.dmg_max,
+        attack_power_model: if(entry == 416, do: :imp, else: :summoned_pet),
+        base_attack_power: if(entry == 416, do: stats.strength - 10, else: stats.strength * 2 - 20),
+        base_ranged_attack_power: 0,
+        base_strength: stats.strength,
+        base_agility: stats.agility,
         strength: stats.strength,
         agility: stats.agility,
         stamina: stats.stamina,
         intellect: stats.intellect,
         spirit: stats.spirit
     }
+    |> Stats.recompute()
   end
 
-  defp apply_pet_stats(unit, _stats, level), do: %{unit | level: level}
+  defp apply_pet_stats(unit, _stats, level, _entry), do: %{unit | level: level}
 
   defp apply_pet_resources(unit, true) do
     %{unit | power_type: 2, power3: 100, max_power3: 100, power5: 166_500, max_power5: 1_050_000}

@@ -104,6 +104,11 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
       assert pet.unit.level == 50
       assert pet.unit.health == 558
       assert pet.unit.max_power1 == 1450
+      assert pet.unit.attack_power_model == :imp
+      assert pet.unit.base_attack_power == pet.unit.base_strength - 10
+      assert pet.unit.attack_power == pet.unit.strength - 10
+      assert pet.unit.min_damage == pet.unit.base_min_damage
+      assert pet.unit.max_damage == pet.unit.base_max_damage
       assert pet.unit.summoned_by == owner_guid
       assert (pet.unit.flags &&& 0x00000008) != 0
       assert pet.unit.faction_template == owner.unit.faction_template
@@ -126,6 +131,9 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
       pet = Summon.build_pet(1863, owner)
 
       assert Map.keys(pet.internal.spellbook) |> Enum.sort() == [6358, 7870, 11_778, 11_784]
+      assert pet.unit.attack_power_model == :summoned_pet
+      assert pet.unit.base_attack_power == pet.unit.base_strength * 2 - 20
+      assert pet.unit.min_damage == pet.unit.base_min_damage
     end
 
     test "builds tameable beasts with generic hunter-pet stats and DBC family diet" do

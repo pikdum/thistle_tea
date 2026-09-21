@@ -386,12 +386,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
   defp weapon_base_roll(_context), do: 0
 
+  defp attack_power_bonus(%CastContext{weapon_attack_power_included?: true}, _speed_seconds), do: 0
+
   defp attack_power_bonus(%CastContext{attack_power: attack_power}, speed_seconds)
        when is_integer(attack_power) and attack_power > 0 do
     trunc(attack_power / 14 * speed_seconds)
   end
 
   defp attack_power_bonus(_context, _speed_seconds), do: 0
+
+  defp attack_power_bonus_ms(%CastContext{weapon_attack_power_included?: true}, _attack_time_ms), do: 0
 
   defp attack_power_bonus_ms(%CastContext{attack_power: attack_power}, attack_time_ms)
        when is_integer(attack_power) and attack_power > 0 and is_integer(attack_time_ms) do

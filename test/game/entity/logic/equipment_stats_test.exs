@@ -115,6 +115,30 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
   end
 
   describe "resync/2" do
+    test "ranged attack power disappears when gear breaks or is removed", %{character: character} do
+      item =
+        Item.build(
+          %ItemTemplate{entry: 300, inventory_type: 5, spellid_1: 9000, spelltrigger_1: 1, max_durability: 50},
+          0x4000_0000_0000_0003,
+          owner: 1
+        )
+
+      spell = %Spell{effects: [%Effect{type: :apply_aura, aura: :mod_ranged_attack_power, base_points: 40}]}
+      get_spell = fn 9000 -> spell end
+      character = %{character | player: Inventory.equip(character.player, :chest, item)}
+      equipped = EquipmentStats.resync(character, get_item_fn([item]), get_spell)
+      assert equipped.unit.ranged_attack_power == 61
+      assert equipped.unit.attack_power == 70
+      assert equipped.unit.equipment_bonuses.ranged_attack_power == 40
+
+      broken = %{item | item: %{item.item | durability: 0}}
+      without = EquipmentStats.resync(equipped, get_item_fn([broken]), get_spell)
+      assert without.unit.ranged_attack_power == 21
+      assert without.unit.equipment_bonuses.ranged_attack_power == 0
+      removed = EquipmentStats.resync(%{equipped | player: %Player{}}, get_item_fn([]), get_spell)
+      assert removed.unit.ranged_attack_power == 21
+    end
+
     test "penetration follows equip, break, repair, and unequip", %{character: character} do
       spell = %Spell{
         effects: [%Effect{type: :apply_aura, aura: :mod_target_resistance, base_points: -10, misc_value: 124}]

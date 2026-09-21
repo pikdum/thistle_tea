@@ -105,21 +105,23 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgression do
 
   defp apply_level(%Mob{unit: %Unit{} = unit} = pet, %PetLevel{} = stats) do
     speed = (unit.base_attack_time || 2_000) / 1_000
-    attack_power_damage = max(stats.strength * 2 - 20, 0) / 14 * speed
 
     unit =
       %{
         unit
         | level: stats.level,
           base_strength: stats.strength,
+          base_attack_power: max(stats.strength * 2 - 20, 0),
+          attack_power_model: :hunter_pet,
+          base_ranged_attack_power: 0,
           base_agility: stats.agility,
           base_stamina: stats.stamina,
           base_intellect: stats.intellect,
           base_spirit: stats.spirit,
           base_health: stats.health - Stats.stamina_health_bonus(stats.stamina),
           base_normal_resistance: stats.armor,
-          base_min_damage: stats.level * 1.15 * 1.05 * speed / 2 - attack_power_damage,
-          base_max_damage: stats.level * 1.45 * 1.05 * speed / 2 - attack_power_damage,
+          base_min_damage: stats.level * 1.15 * 1.05 * speed / 2,
+          base_max_damage: stats.level * 1.45 * 1.05 * speed / 2,
           pet_experience: 0,
           pet_next_level_exp: stats.next_level_xp
       }

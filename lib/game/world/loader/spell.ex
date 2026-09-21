@@ -737,6 +737,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(162), do: :periodic_power_burn
   defp aura_type(165), do: :melee_attack_power_attacker_bonus
   defp aura_type(166), do: :mod_attack_power_pct
+  defp aura_type(167), do: :mod_ranged_attack_power_pct
   defp aura_type(168), do: :mod_damage_done_versus
   defp aura_type(169), do: :mod_crit_percent_versus
   defp aura_type(171), do: :mod_speed_not_stack

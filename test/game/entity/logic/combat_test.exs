@@ -57,7 +57,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
   end
 
   describe "damage_range/1" do
-    test "scales creature melee by damage multiplier only" do
+    test "uses the loaded creature damage range without repeating the template multiplier" do
       mob = %Mob{
         unit: %Unit{min_damage: 10.0, max_damage: 20.0, attack_power: 70, base_attack_time: 2_000},
         internal: %Internal{creature: %Creature{damage_multiplier: 1.5}}
@@ -65,8 +65,8 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
 
       {min_damage, max_damage} = Combat.damage_range(mob)
 
-      assert min_damage == 15.0
-      assert max_damage == 30.0
+      assert min_damage == 10.0
+      assert max_damage == 20.0
     end
 
     test "leaves non-creature damage ranges unchanged" do
