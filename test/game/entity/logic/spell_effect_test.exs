@@ -57,12 +57,17 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
           {1, %{}, [%ThistleTea.Game.Aura{type: :mod_dodge, amount: 100}]}
 
         :parry ->
-          {1, %{}, [%ThistleTea.Game.Aura{type: :mod_parry_percent, amount: 100}]}
+          {1, %{},
+           [
+             %ThistleTea.Game.Aura{type: :mod_dodge, amount: -100},
+             %ThistleTea.Game.Aura{type: :mod_parry_percent, amount: 100}
+           ]}
 
         :block ->
           {8, %{shields: 1},
            [
              %ThistleTea.Game.Aura{type: :mod_dodge, amount: -100},
+             %ThistleTea.Game.Aura{type: :mod_parry_percent, amount: -100},
              %ThistleTea.Game.Aura{type: :mod_block_percent, amount: 100}
            ]}
       end
