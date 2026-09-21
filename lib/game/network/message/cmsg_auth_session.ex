@@ -2,6 +2,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgAuthSession do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_AUTH_SESSION
 
+  alias ThistleTea.Game.Network.Sessions
+
   defstruct [
     :build,
     :server_id,
@@ -23,6 +25,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAuthSession do
       })
 
       {:ok, account} = ThistleTea.Account.get_user(username)
+      :ok = Sessions.authenticate(account.id)
 
       %{state | conn: conn, account: account}
     else

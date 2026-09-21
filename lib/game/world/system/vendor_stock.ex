@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.System.VendorStock do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.VendorStock.Receipt
   alias ThistleTea.Game.Entity.Logic.VendorStock, as: Stock
+  alias ThistleTea.Game.Network.Sessions
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.VendorStockStore
@@ -37,7 +38,7 @@ defmodule ThistleTea.Game.World.System.VendorStock do
        now: Keyword.get(opts, :now, &Time.now/0),
        owner: Keyword.get(opts, :owner, &Entity.pid/1),
        random: Keyword.get(opts, :random, fn -> :rand.uniform(41) + 79 end),
-       population: Keyword.get(opts, :population, fn -> :ets.info(:session, :size) end)
+       population: Keyword.get(opts, :population, &Sessions.count/0)
      }}
   end
 

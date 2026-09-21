@@ -9,6 +9,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.Entity.Server.PlayerSupervisor
   alias ThistleTea.Game.InstanceScript
   alias ThistleTea.Game.Network.Server, as: GameServer
+  alias ThistleTea.Game.Network.Sessions
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.AreaEffects
@@ -135,6 +136,7 @@ defmodule ThistleTea.Application do
         DuelSystem,
         {Group, name: Groups, log: false},
         EntityRegistry,
+        Sessions,
         HonorSystem,
         TradeSystem,
         PostOffice,
