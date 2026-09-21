@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.DiminishingReturns
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Fear
+  alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Entity.Logic.SpellMagnet
   alias ThistleTea.Game.Spell
@@ -82,6 +83,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     {entity, control_events} = ControlSync.sync(entity, now)
     {entity, movement_events} = MovementSync.sync_movement_state(entity, now)
     {entity, fear_events} = Fear.reconcile(entity, previous, holders, now)
+    {entity, feign_events} = Hunter.reconcile_feign_death(entity, previous, holders, now)
     entity = maybe_interrupt_fear_casting(entity)
     viewpoint_events = ViewpointSync.events(previous, holders, entity_guid(entity))
     release_events = release_controlled_events(entity, removed)
@@ -95,6 +97,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
         cooldown_events ++
         script_events ++
         control_events ++
+        feign_events ++
         viewpoint_events ++ release_events ++ movement_events ++ fear_events ++ forced_reaction_events ++ threat_events
 
     {Core.mark_broadcast_update(entity), events}

@@ -5,7 +5,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Aura do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Aura.Dispel
   alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Amount
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
@@ -15,8 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Aura do
 
   def apply_group(target, %CastContext{} = context, now) do
     {target, events} = Aura.apply_spell(target, context, context.spell, now)
-    {target, class_events} = Hunter.after_aura(target, context.spell, now)
-    {target, events ++ script_trigger_events(target, context) ++ class_events}
+    {target, events ++ script_trigger_events(target, context)}
   end
 
   def apply(state, %CastContext{}, _spell, %Effect{type: :persistent_area_aura}, _now), do: {state, []}

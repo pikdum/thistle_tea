@@ -5,8 +5,10 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
   """
   import Bitwise, only: [&&&: 2, <<<: 2]
 
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Companion, as: CompanionData
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Companion
@@ -108,11 +110,15 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
 
   def apply_food_benefit(%Spell{} = spell, _benefit), do: spell
 
-  def after_aura(%Character{} = character, %Spell{} = spell, now) do
-    if feign_death?(spell), do: apply_feign_death(character, now), else: {character, []}
+  def reconcile_feign_death(%{unit: %Unit{}} = entity, previous, current, now) do
+    case {feigning?(previous), feigning?(current)} do
+      {false, true} -> apply_feign_death(entity, now)
+      {true, false} -> {%{entity | unit: %{entity.unit | stand_state: 0}}, [Effects.stand_state(0)]}
+      _ -> {entity, []}
+    end
   end
 
-  def after_aura(entity, _spell, _now), do: {entity, []}
+  defp feigning?(holders), do: Enum.any?(holders, &Holder.has_aura_type?(&1, :feign_death))
 
   def auto_shot?(%Spell{} = spell) do
     Spell.family_flag?(spell, @hunter_family, @auto_shot_family_mask) and
@@ -136,7 +142,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
 
   def reset_cooldowns(entity, _spell), do: entity
 
-  defp apply_feign_death(character, now) do
+  defp apply_feign_death(%Character{} = character, now) do
     {character, mob_guids} = PlayerCombat.vanish(character, now)
     {character, auto_repeat_events} = AutoRepeat.cancel(character)
 
@@ -151,6 +157,10 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
       |> then(&%{&1 | unit: %{&1.unit | stand_state: 7}})
 
     {character, events ++ [Effects.stand_state(7)]}
+  end
+
+  defp apply_feign_death(entity, _now) do
+    {%{entity | unit: %{entity.unit | stand_state: 7}}, [Effects.stand_state(7)]}
   end
 
   defp validate_companion_state(%CompanionData{kind: :hunter_pet, dead?: true}, :revive_pet), do: :ok
@@ -205,10 +215,6 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
   defp tame_creature?(%Spell{id: 1515}), do: true
   defp tame_creature?(%Spell{effects: effects}), do: Enum.any?(effects, &(&1.type == :tame_creature))
   defp feed_pet?(%Spell{effects: effects}), do: Enum.any?(effects, &(&1.type == :feed_pet))
-
-  defp feign_death?(%Spell{effects: effects}) do
-    Enum.any?(effects, &(&1.type in [:apply_aura, :apply_area_aura] and &1.aura == :feign_death))
-  end
 
   defp validate_projectile(_ammo_id, _ammo, %{ammo_type: 0}, _count_item), do: :ok
 

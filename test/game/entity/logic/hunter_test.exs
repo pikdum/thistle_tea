@@ -152,7 +152,7 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
     end
   end
 
-  describe "after_aura/3" do
+  describe "reconcile_feign_death/4" do
     test "feign death clears combat and drops every threat reference" do
       character = %Character{
         object: %Object{guid: 1},
@@ -164,8 +164,8 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
         }
       }
 
-      spell = %Spell{effects: [%Effect{type: :apply_aura, aura: :feign_death}]}
-      {character, events} = Hunter.after_aura(character, spell, 1_000)
+      spell = %Spell{id: 5384, effects: [%Effect{type: :apply_aura, aura: :feign_death}]}
+      {character, events} = Aura.apply_spell(character, 1, 50, spell, 1_000)
 
       refute character.internal.in_combat
       assert character.internal.threat_refs == MapSet.new()
