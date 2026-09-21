@@ -170,12 +170,13 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
       refute character.internal.in_combat
       assert character.internal.threat_refs == MapSet.new()
       assert character.internal.auto_shot == nil
-      assert character.unit.stand_state == 7
+      assert character.unit.stand_state == 0
+      assert character.unit.dynamic_flags == 0x20
       assert Enum.count(events, &is_struct(&1, Effects.DropThreat)) == 2
       assert Enum.any?(events, &is_struct(&1, Effects.DropNearbyThreat))
       assert Enum.any?(events, &(is_struct(&1, Effects.AttackStop) and &1.target_guid == 2))
       assert Enum.any?(events, &is_struct(&1, Effects.CancelAutoRepeat))
-      assert Enum.any?(events, &(is_struct(&1, Effects.StandState) and &1.stand_state == 7))
+      refute Enum.any?(events, &is_struct(&1, Effects.StandState))
     end
   end
 

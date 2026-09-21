@@ -34,12 +34,15 @@ defmodule ThistleTea.Game.Entity.Logic.EmoteTest do
     test "animation removes Feign Death through the aura transition", %{character: c} do
       spell = buff(5384, :feign_death, 0x20)
       {feigning, _} = Aura.apply_spell(c, 1, 50, spell, 1_000)
-      assert feigning.unit.stand_state == 7
+      assert feigning.unit.stand_state == 0
+      assert feigning.unit.dynamic_flags == 0x28
       assert Enum.any?(feigning.unit.auras, &(&1.spell.id == 5384))
 
       standing = Emote.command(feigning, 0, 2_000)
       assert standing.unit.auras == []
       assert standing.unit.stand_state == 0
+      assert standing.unit.dynamic_flags == 0x08
+      assert standing.unit.health == feigning.unit.health
       assert Enum.any?(standing.internal.events, &is_struct(&1, Effects.EmoteAnimation))
     end
 
@@ -129,14 +132,16 @@ defmodule ThistleTea.Game.Entity.Logic.EmoteTest do
       spell = buff(5384, :feign_death, 0x20)
       {feigning, _} = Aura.apply_spell(c, 1, 50, spell, 1_000)
       {refreshed, events} = Aura.apply_spell(feigning, 1, 50, spell, 2_000)
-      assert refreshed.unit.stand_state == 7
+      assert refreshed.unit.stand_state == 0
+      assert refreshed.unit.dynamic_flags == 0x28
       refute Enum.any?(events, &is_struct(&1, Effects.DropNearbyThreat))
 
       for transition <- [&Aura.remove_spells(&1, [5384], 3_000), &Aura.expire_due(&1, 12_000)] do
         {standing, events} = transition.(refreshed)
         assert standing.unit.stand_state == 0
+        assert standing.unit.dynamic_flags == 0x08
         assert standing.unit.auras == []
-        assert Enum.any?(events, &(&1 == Effects.stand_state(0)))
+        refute Enum.any?(events, &is_struct(&1, Effects.StandState))
       end
     end
 
@@ -158,7 +163,16 @@ defmodule ThistleTea.Game.Entity.Logic.EmoteTest do
       character: %Character{
         object: %Object{guid: 1},
         player: %Player{flags: 0},
-        unit: %Unit{health: 100, max_health: 100, level: 50, auras: [], flags: 0, stand_state: 0, npc_emote_state: 0},
+        unit: %Unit{
+          health: 100,
+          max_health: 100,
+          level: 50,
+          auras: [],
+          flags: 0,
+          dynamic_flags: 0x08,
+          stand_state: 0,
+          npc_emote_state: 0
+        },
         internal: %Internal{},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
