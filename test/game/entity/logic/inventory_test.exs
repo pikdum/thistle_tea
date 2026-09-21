@@ -454,6 +454,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
 
     test "binds equipment once and preserves binding through unequip", %{unit: unit} do
       item = build_item(99, %ItemTemplate{entry: 990, inventory_type: 5, bonding: 2, flags: 4})
+      item = Item.unlock(item)
       player = store(%Player{}, @backpack_start, item)
       get_item = get_item_fn([item])
       assert {:ok, equipped} = Inventory.auto_equip(player, unit, @prof, @owner, {@bag_0, @backpack_start}, get_item)

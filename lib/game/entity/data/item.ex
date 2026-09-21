@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Data.Item do
   alias ThistleTea.Game.Entity.Data.Component.Item, as: ItemComponent
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Logic.Loot
 
   defstruct object: %Object{},
             item: %ItemComponent{},
@@ -48,8 +49,15 @@ defmodule ThistleTea.Game.Entity.Data.Item do
 
   def template(%__MODULE__{internal: %{template: template}}), do: template
 
-  defp initial_flags(%ItemTemplate{bonding: bonding, flags: flags}) when bonding in [1, 4], do: flags ||| 1
-  defp initial_flags(%ItemTemplate{flags: flags}), do: flags
+  defp initial_flags(%ItemTemplate{bonding: bonding}) when bonding in [1, 4], do: 1
+  defp initial_flags(%ItemTemplate{}), do: 0
+
+  def unlocked?(%__MODULE__{} = item), do: ((item.item.flags || 0) &&& 4) != 0
+  def unlock(%__MODULE__{} = item), do: %{item | item: %{item.item | flags: (item.item.flags || 0) ||| 4}}
+  def loot(%__MODULE__{internal: internal}), do: Map.get(internal, :loot)
+  def loot_generated?(%__MODULE__{} = item), do: match?(%Loot{}, loot(item))
+
+  def put_loot(%__MODULE__{} = item, %Loot{} = loot), do: %{item | internal: Map.put(item.internal, :loot, loot)}
 
   def bind_on_equip(%__MODULE__{} = item) do
     if template(item).bonding in [1, 2, 4] do

@@ -110,6 +110,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trade do
     cond do
       item.item.owner != character.object.guid -> {:error, :dont_own_that_item}
       is_nil(position) -> {:error, :item_not_found}
+      Item.loot_generated?(item) -> {:error, :item_locked}
       casting_uses?(character, item) -> {:error, :item_locked}
       true -> validate_slot(character, item, position, slot, now, get_enchantment)
     end

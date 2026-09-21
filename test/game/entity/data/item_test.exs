@@ -17,7 +17,7 @@ defmodule ThistleTea.Game.Entity.Data.ItemTest do
       assert item.item.owner == 99
       assert item.item.contained == 99
       assert item.item.stack_count == 1
-      assert item.item.flags == 4
+      assert item.item.flags == 0
       assert item.item.durability == 20
       assert item.item.max_durability == 20
       assert Item.template(item) == template
@@ -34,12 +34,12 @@ defmodule ThistleTea.Game.Entity.Data.ItemTest do
     test "binds pickup and quest items when their instances are created" do
       for bonding <- [1, 4] do
         item = Item.build(%ItemTemplate{entry: 25, bonding: bonding, flags: 4}, 1, owner: 99)
-        assert item.item.flags == 5
+        assert item.item.flags == 1
       end
 
       for bonding <- [0, 2, 3] do
         item = Item.build(%ItemTemplate{entry: 25, bonding: bonding, flags: 4}, 1, owner: 99)
-        assert item.item.flags == 4
+        assert item.item.flags == 0
       end
     end
   end
@@ -48,6 +48,7 @@ defmodule ThistleTea.Game.Entity.Data.ItemTest do
     test "binds equipment without changing other instance flags" do
       for bonding <- [1, 2, 4] do
         item = Item.build(%ItemTemplate{entry: 1, bonding: bonding, flags: 4}, 1)
+        item = Item.unlock(item)
         bound = Item.bind_on_equip(item)
         assert bound.item.flags == 5
         assert Item.bind_on_equip(bound) == bound

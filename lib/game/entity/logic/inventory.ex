@@ -103,6 +103,8 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     must_purchase_that_bag_slot: 34,
     too_far_away_from_bank: 35,
     item_locked: 36,
+    you_are_dead: 38,
+    cant_do_right_now: 39,
     int_bag_error: 40,
     already_looted: 49,
     inventory_full: 50,
@@ -680,6 +682,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
 
   defp mergeable?(%Item{} = src_item, %Item{} = dst_item) do
     src_item.object.entry == dst_item.object.entry and
+      not Item.loot_generated?(src_item) and not Item.loot_generated?(dst_item) and
       max_stack(dst_item) > 1 and
       stack_count(dst_item) < max_stack(dst_item)
   end
@@ -707,11 +710,11 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     entry = item.object.entry
     incoming_guid = item.object.guid
 
-    if max_stack > 1 do
+    if max_stack > 1 and not Item.loot_generated?(item) do
       Enum.reduce_while(stack_positions(ctx, scope, item), {ctx, stack_count(item)}, fn pos, {ctx, remaining} ->
         case item_at(ctx, pos) do
           %Item{object: %Object{entry: ^entry, guid: guid}} = stack when guid != incoming_guid ->
-            space = max_stack - stack_count(stack)
+            space = available_stack_room(stack, max_stack)
             moved = min(max(space, 0), remaining)
             ctx = if moved > 0, do: mark_changed(ctx, add_stack(stack, moved)), else: ctx
             remaining = remaining - moved
@@ -733,11 +736,18 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     stack_positions(ctx, scope, template)
     |> Enum.map(fn pos ->
       case item_at(ctx, pos) do
-        %Item{object: %Object{entry: ^entry}} = stack -> max(max_stack - stack_count(stack), 0)
-        _ -> 0
+        %Item{object: %Object{entry: ^entry}} = stack ->
+          available_stack_room(stack, max_stack)
+
+        _ ->
+          0
       end
     end)
     |> Enum.sum()
+  end
+
+  defp available_stack_room(stack, maximum) do
+    if Item.loot_generated?(stack), do: 0, else: max(maximum - stack_count(stack), 0)
   end
 
   defp stack_positions(ctx, :carried, item_or_template) do
@@ -802,6 +812,12 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   end
 
   defp validate_split(ctx, %Item{} = src_item, dst_pos, count) do
+    if Item.loot_generated?(src_item),
+      do: {:error, :item_locked},
+      else: validate_split_destination(ctx, src_item, dst_pos, count)
+  end
+
+  defp validate_split_destination(ctx, src_item, dst_pos, count) do
     cond do
       count <= 0 or count >= stack_count(src_item) -> {:error, :tried_to_split_more_than_count}
       not match?({:ok, _}, valid_destination(ctx, dst_pos)) -> {:error, :couldnt_split_items}
