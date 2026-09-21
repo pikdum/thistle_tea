@@ -56,6 +56,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
+  alias ThistleTea.Game.World.System.Auction, as: AuctionSystem
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Honor, as: HonorSystem
@@ -118,6 +119,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".debug position <guid> - show an entity's projected world position",
       ".debug reputation <faction_id> - show standing and flags",
       ".debug honor [points <0..65000>] - show or set honor rank points",
+      ".debug auction expire <id> - settle your auction through its expiry path",
       ".debug reputation add <faction_id> <delta> - change standing",
       ".debug reputation find <name> - find faction ids",
       ".debug reputation set <faction_id> <standing> - set absolute standing",
@@ -262,6 +264,22 @@ defmodule ThistleTea.Game.Player.DevCommands do
     |> String.split(" ", trim: true)
     |> debug_honor(state)
     |> handled()
+  end
+
+  def run(state, ".debug auction expire " <> value) do
+    state =
+      case Integer.parse(String.trim(value)) do
+        {id, ""} when id > 0 ->
+          case AuctionSystem.debug_expire(state.guid, id) do
+            :ok -> system_message(state, "Auction #{id} expired and settled.")
+            {:error, _reason} -> system_message(state, "No active auction #{id} owned by this character.")
+          end
+
+        _ ->
+          system_message(state, "Use: .debug auction expire <id>")
+      end
+
+    handled(state)
   end
 
   def run(state, ".debug position" <> params) do

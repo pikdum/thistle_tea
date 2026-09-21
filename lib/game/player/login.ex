@@ -45,6 +45,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Party.Notifier
+  alias ThistleTea.Game.Player.Auction
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.HomeBind
@@ -86,6 +87,7 @@ defmodule ThistleTea.Game.Player.Login do
     c =
       c
       |> Trade.recover()
+      |> Auction.recover()
       |> restore_instance_world(character_guid)
       |> normalize_movement_state()
       |> normalize_combat_stats()
@@ -172,6 +174,7 @@ defmodule ThistleTea.Game.Player.Login do
 
     state
     |> Trade.finish_recovery()
+    |> Auction.finish_recovery()
     |> schedule_aura_tick()
     |> Mail.schedule_delivery()
     |> Quests.restore_timers()

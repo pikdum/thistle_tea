@@ -34,6 +34,8 @@ defmodule ThistleTea.Game.World.System.Auction do
 
   def settle(server \\ __MODULE__), do: GenServer.call(server, :settle)
 
+  def debug_expire(guid, id, server \\ __MODULE__), do: GenServer.call(server, {:debug_expire, guid, id}, :infinity)
+
   @impl GenServer
   def init(opts) do
     state = %{
@@ -101,6 +103,27 @@ defmodule ThistleTea.Game.World.System.Auction do
   rescue
     error ->
       Logger.error("Auction settlement failed: #{Exception.message(error)}")
+      {:reply, {:error, :database}, schedule(state)}
+  end
+
+  def handle_call({:debug_expire, guid, id}, {pid, _tag}, state) do
+    book = AuctionStore.book(state.table)
+
+    with true <- state.owner.(guid) == pid,
+         %{owner: ^guid} = auction <- Map.get(book.auctions, id) do
+      now = state.now.()
+      auction = %{auction | expires_at: now}
+      book = %{book | auctions: Map.put(book.auctions, id, auction)}
+      change = AuctionLogic.expire(book, now)
+      AuctionStore.commit(change, nil, state.table)
+      Enum.each(change.notices, state.notify)
+      {:reply, :ok, finish(state)}
+    else
+      _ -> {:reply, {:error, :not_owner}, state}
+    end
+  rescue
+    error ->
+      Logger.error("Auction expiry command failed: #{Exception.message(error)}")
       {:reply, {:error, :database}, schedule(state)}
   end
 

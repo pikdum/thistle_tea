@@ -31,6 +31,13 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
                     |> Map.new(fn opcode -> {opcode, Message.MsgMove} end)
 
   @messages %{
+              MSG_AUCTION_HELLO: Message.MsgAuctionHelloClient,
+              CMSG_AUCTION_SELL_ITEM: Message.CmsgAuctionSellItem,
+              CMSG_AUCTION_REMOVE_ITEM: Message.CmsgAuctionRemoveItem,
+              CMSG_AUCTION_PLACE_BID: Message.CmsgAuctionPlaceBid,
+              CMSG_AUCTION_LIST_ITEMS: Message.CmsgAuctionListItems,
+              CMSG_AUCTION_LIST_OWNER_ITEMS: Message.CmsgAuctionListOwnerItems,
+              CMSG_AUCTION_LIST_BIDDER_ITEMS: Message.CmsgAuctionListBidderItems,
               CMSG_INITIATE_TRADE: Message.CmsgInitiateTrade,
               CMSG_BEGIN_TRADE: Message.CmsgBeginTrade,
               CMSG_ACCEPT_TRADE: Message.CmsgAcceptTrade,

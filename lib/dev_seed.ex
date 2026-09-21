@@ -2,7 +2,9 @@ defmodule ThistleTea.DevSeed do
   @moduledoc """
   Seeds a debug playground on Programmer Isle (`.go xyz 16303.2 16318.1 69.44 451`):
   a `debug`/`debug` account with pre-leveled, spell-trained, gold-stocked
-  characters for multi-session group testing, plus fast-respawning mobs —
+  characters for multi-session group testing. Separate `debugbuyer/debugbuyer`
+  and `debugbidder/debugbidder` accounts support auction and trade acceptance.
+  The playground also has fast-respawning mobs —
   loot piñatas with guaranteed green drops for roll testing, level-50
   hostiles for combat and XP testing, and a Devilsaur (combat reach 5.0)
   for big-hitbox spell-range testing, a Defias Thug for pickpocketing, and a
@@ -97,8 +99,20 @@ defmodule ThistleTea.DevSeed do
 
   def run do
     seed_account_and_characters()
+    seed_trading_accounts()
     seed_mobs()
     Logger.info("Debug seed ready: #{@account}/#{@account} on Programmer Isle (.go xyz 16303.2 16318.1 69.44 451)")
+  end
+
+  defp seed_trading_accounts do
+    for {account, character} <- [
+          {"debugbuyer", {"Debugbuyer", @human, 1}},
+          {"debugbidder", {"Debugbidder", @human, 8}}
+        ] do
+      ThistleTea.Account.register(account, account)
+      {:ok, %ThistleTea.Account{id: account_id}} = ThistleTea.Account.get_user(account)
+      create_character(character, account_id)
+    end
   end
 
   defp seed_account_and_characters do

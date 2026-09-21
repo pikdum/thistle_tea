@@ -76,6 +76,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party.MemberStats
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
+  alias ThistleTea.Game.Player.Auction.ClientProjection, as: AuctionProjection
   alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Durability
@@ -211,6 +212,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   rescue
     error ->
       Logger.error("mail delivery crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:auction_notice, notice}, state) do
+    AuctionProjection.notice(notice)
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("Auction notification failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 

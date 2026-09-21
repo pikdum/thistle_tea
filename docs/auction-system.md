@@ -1,9 +1,8 @@
 # Auction house implementation
 
-The auction system is in development. The pure market, inventory planning,
-search rules, and cached house data are implemented. Runtime escrow,
-coordinator recovery, idempotent mail delivery, protocol handlers, and client
-acceptance remain required before auctioneers can be used in-game.
+The market rules, runtime escrow, coordinator recovery, mail delivery,
+auctioneer authorization, and vanilla client protocol are implemented.
+Real-client acceptance remains in progress.
 
 ## Rules implemented
 
@@ -40,20 +39,37 @@ The core has no database, clock, process, metadata, or packet dependencies.
 internal house data. Neither listings nor queries perform gameplay database
 queries.
 
-## Required integration
+## Runtime ownership and recovery
 
-1. Commit market state, item escrow, a player receipt, and settlement outbox
-   together in application-owned ETS. Recover unacknowledged receipts on
-   login and retain the book across coordinator restarts.
-2. Deliver the outbox through an idempotent Post Office operation, retaining
-   delivery identity and mailbox custody across coordinator restarts.
-3. Validate each auctioneer interaction at the player boundary. Wire the
-   vanilla hello, sell, bid, cancel, search, owner list, bidder list, result,
-   and notification packets without trusting client prices or positions.
-4. Exercise real auctioneer and mailbox UI with distinct accounts: sale,
-   bid increase, outbid refund, buyout, cancellation, unsold and sold expiry,
-   full bags, offline delivery, reconnect, and market isolation. Verify
-   owner state, ledger/escrow state, client messages, and lifecycle cleanup.
+`World.System.Auction` serializes transactions while the requesting player
+is blocked. `AuctionStore` commits the book, exact item ownership, player
+receipt, and settlement outbox in one insertion into the application-owned
+ItemStore table. The player projects and acknowledges its receipt; login
+recovers an interrupted projection without applying it twice.
+
+The Post Office retains custody and keyed delivery identities in
+application-owned ETS. The outbox retries with stable keys, and replaying a
+posted delivery never restores an acknowledged attachment or refund. Players
+save incoming mail before acknowledging custody and reject stale or duplicate
+delivery notifications. These are runtime guarantees; restarting the whole
+server deliberately wipes all accounts, characters, items, and mail.
+
+Each request checks the live vanilla auctioneer flag (`0x1000`), life state,
+faction interaction, world, and distance. Search eligibility also checks
+equipment requirements, reputation, required spells, and learned recipes.
+Listing packets carry the exact vanilla 64-byte rows.
+
+## Pending client acceptance
+
+Exercise real auctioneer and mailbox UI with distinct accounts: sale, bid
+increase, outbid refund, buyout, cancellation, unsold and sold expiry, full
+bags, offline delivery, reconnect, and market isolation. Verify owner state,
+ledger/escrow state, client messages, and lifecycle cleanup.
+
+Development seeding provides `debugbuyer/debugbuyer` and
+`debugbidder/debugbidder` alongside the original debug account. The command
+`.debug auction expire <id>` settles only the invoking character's own
+auction through the normal expiry and mail path.
 
 ## References and checks
 
@@ -62,9 +78,13 @@ Rules and layouts were checked against local VMangos
 `Server/Packets/AuctionHouse.cpp`, and `Mail/Mail.cpp`, plus the vanilla
 `refs/wow_messages` auction definitions and actual `AuctionHouse` DBC rows.
 
-The foundation passes 3,907 tests through `mix test.all`, compilation with
+The implementation passes 3,932 tests through `mix test.all`, compilation with
 warnings as errors, strict Credo, and formatting checks. Focused tests cover
 money conservation paths, exact item identity, same-account and market
 rejection, repeated refunds, deadline settlement, fees, queries, transfer
-eligibility, and loaded DBC rates. Logs are
-`/tmp/thistle-auction-core-{all,compile,credo,format}.log`.
+eligibility, and loaded DBC rates. Boundary tests additionally cover competing
+buyouts, coordinator and Post Office restarts, delivery retries, player
+recovery, client dispatch, and exact wire layouts. Final logs are
+`/tmp/thistle-auction-protocol-all.log`,
+`/tmp/thistle-auction-protocol-final-compile.log`, and
+`/tmp/thistle-auction-protocol-credo.log`.

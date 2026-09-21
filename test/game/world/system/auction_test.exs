@@ -138,6 +138,20 @@ defmodule ThistleTea.Game.World.System.AuctionTest do
     end
   end
 
+  describe "debug_expire/3" do
+    test "uses the ordinary return path and restricts the command to the seller", context do
+      {:ok, sale} = sell(context)
+      assert {:error, :not_owner} = Auction.debug_expire(2, sale.auction.id, context.server)
+      assert :ok = Auction.debug_expire(1, sale.auction.id, context.server)
+      assert AuctionStore.book(context.table).auctions == %{}
+      assert {_token, [returned]} = PostOffice.open(1, self(), context.post_office)
+      assert returned.subject == "25:0:3"
+      assert returned.item_guid == 100
+      assert returned.money == 0
+      assert AuctionStore.item(100, context.table).item.owner == 1
+    end
+  end
+
   defp market(_context) do
     table = :ets.new(:auctions, [:public])
     owners = :ets.new(:owners, [:public])

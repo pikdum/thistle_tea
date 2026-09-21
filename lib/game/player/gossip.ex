@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Player.Gossip do
   alias ThistleTea.Game.Network.Message.CmsgTrainerList
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage.GossipItem
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage.QuestItem
+  alias ThistleTea.Game.Player.Auction
   alias ThistleTea.Game.Player.Bank
   alias ThistleTea.Game.Player.Battlegrounds
   alias ThistleTea.Game.Player.ConditionContext
@@ -179,6 +180,9 @@ defmodule ThistleTea.Game.Player.Gossip do
   defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{battlefield: option_id}),
     do: Battlegrounds.battlemaster_hello(state, guid)
 
+  defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{auctioneer: option_id}),
+    do: Auction.hello(state, guid)
+
   defp dispatch(state, character, guid, %Option{action_menu_id: action_menu_id}, _option_ids) do
     case GossipLoader.get_menu(action_menu_id) do
       %Menu{} = menu -> send_menu(guid, menu, quest_items(guid, character), state)
@@ -270,6 +274,7 @@ defmodule ThistleTea.Game.Player.Gossip do
       spirit_healer: GossipLoader.option_spirit_healer(),
       innkeeper: GossipLoader.option_innkeeper(),
       banker: GossipLoader.option_banker(),
+      auctioneer: GossipLoader.option_auctioneer(),
       stable: GossipLoader.option_stable(),
       battlefield: GossipLoader.option_battlefield(),
       pet_untrain: GossipLoader.option_pet_untrain(),
