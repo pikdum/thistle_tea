@@ -18,7 +18,6 @@ defmodule ThistleTea.Game.Player.Auction.Eligibility do
 
     Inventory.can_use(character.unit, Proficiency.from_character(character), template, character.player) == :ok and
       Reputation.validate_item_requirement(character, template) == :ok and
-      (template.required_spell == 0 or template.required_spell in known) and
       not known_recipe?(template, known, get_spell)
   end
 

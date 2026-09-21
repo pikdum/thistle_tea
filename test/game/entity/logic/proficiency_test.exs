@@ -60,13 +60,19 @@ defmodule ThistleTea.Game.Entity.Logic.ProficiencyTest do
     test "ignores non-proficiency effects and handles nil" do
       fireball = %SpellData{id: 133, effects: [%Effect{index: 0, type: :school_damage}]}
 
-      assert Proficiency.from_spellbook(spellbook([fireball])) == %Proficiency{}
+      assert Proficiency.from_spellbook(spellbook([fireball])) == %Proficiency{known_spell_ids: MapSet.new([133])}
       assert Proficiency.from_spellbook(nil) == %Proficiency{}
     end
   end
 
   describe "from_character/1" do
     @fishing_skill 356
+
+    test "honors known spell IDs before their spellbook entries are loaded" do
+      character = %Character{player: %Player{}, internal: %Internal{spells: [9788], spellbook: %{}}}
+      prof = Proficiency.from_character(character)
+      assert Proficiency.can_equip?(prof, %ItemTemplate{required_spell: 9788}) == :ok
+    end
 
     test "adds the fishing-pole weapon bit when Fishing is known" do
       skills = %{@fishing_skill => %{value: 1, max: 75, range: :tier, always_max?: false}}
@@ -89,6 +95,19 @@ defmodule ThistleTea.Game.Entity.Logic.ProficiencyTest do
   end
 
   describe "can_equip?/2" do
+    test "requires specialization spells for recipes and equipment" do
+      book = spellbook([%SpellData{id: 9788}])
+      qualified = Proficiency.from_spellbook(book)
+      removed = Proficiency.from_spellbook(Map.delete(book, 9788))
+
+      for class <- [4, 9] do
+        template = %ItemTemplate{class: class, subclass: 0, required_spell: 9788}
+        assert Proficiency.can_equip?(removed, template) == {:error, :no_required_proficiency}
+        assert Proficiency.can_equip?(qualified, template) == :ok
+        assert Proficiency.can_equip?(Proficiency.all(), template) == :ok
+      end
+    end
+
     test "checks weapon subclass bits" do
       prof = %Proficiency{weapon_mask: @staves}
 

@@ -41,6 +41,27 @@ defmodule ThistleTea.Game.Player.TeachingDbcTest do
   setup [:character]
 
   describe "recipe book casting" do
+    test "specialization plans require their spell at admission and completion", %{state: state} do
+      {:ok, character, _events} = Spells.learn(state.character, [9785])
+      character = put_in(character.player.skills[164].value, 285)
+      state = %{state | character: character}
+      {state, item} = book(state, 11_612, 15_299, 285, required_skill: 164, required_spell: 9788)
+      rejected = use_book(state)
+      assert rejected.character.internal.casting == nil
+      assert ItemStore.get(item.object.guid) == item
+
+      {:ok, character, _events} = Spells.learn(state.character, [9788])
+      started = use_book(%{state | character: character})
+      removed = Spells.unlearn(started.character, [9788], 1_000)
+      stale = finish(%{started | character: removed})
+      assert ItemStore.get(item.object.guid) == item
+      refute 15_296 in stale.character.internal.spells
+
+      completed = finish(started)
+      assert 15_296 in completed.character.internal.spells
+      assert ItemStore.get(item.object.guid) == nil
+    end
+
     test "teaches on completion, consumes once, and rejects a duplicate", %{state: state} do
       {state, item} = book(state, 6325, 7756, 1)
       started = use_book(state)
@@ -162,12 +183,13 @@ defmodule ThistleTea.Game.Player.TeachingDbcTest do
     ItemCosts.apply(%{state | character: character}, {:teach_spell, effect})
   end
 
-  defp book(state, entry, spell_id, required_rank) do
+  defp book(state, entry, spell_id, required_rank, opts \\ []) do
     template = %ItemTemplate{
       entry: entry,
       name: "Teaching book",
       stackable: 1,
-      required_skill: 185,
+      required_skill: Keyword.get(opts, :required_skill, 185),
+      required_spell: Keyword.get(opts, :required_spell, 0),
       required_skill_rank: required_rank,
       spellid_1: spell_id,
       spelltrigger_1: 0,
