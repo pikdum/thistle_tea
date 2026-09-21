@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Confusion do
   def request(_entity, _now), do: nil
 
   defp ready_request(entity, now) do
-    memory = memory(entity, Blackboard.ensure(entity.internal.blackboard))
+    memory = memory(entity, Blackboard.ensure(entity.internal.blackboard), now)
 
     if not Movement.moving?(entity, now) and not memory.moving? and now >= memory.next_move_at do
       {entity.internal.world.map_id, memory.anchor, @radius}
@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Confusion do
 
   def tick(%{unit: %Unit{}, internal: %Internal{}} = entity, %Blackboard{} = blackboard, %Context{} = context) do
     if ControlMovement.mode(entity) == :confusion do
-      run(entity, %{blackboard | confusion: memory(entity, blackboard)}, context)
+      run(entity, %{blackboard | confusion: memory(entity, blackboard, context.now)}, context)
     else
       {:failure, entity, blackboard}
     end
@@ -88,10 +88,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Confusion do
     internal.rooted? or Enum.any?(unit.auras, &Holder.has_any_type?(&1, [:mod_root, :mod_stun]))
   end
 
-  defp memory(_entity, %Blackboard{confusion: %Memory{} = memory}), do: memory
+  defp memory(_entity, %Blackboard{confusion: %Memory{} = memory}, _now), do: memory
 
-  defp memory(entity, _blackboard) do
+  defp memory(entity, _blackboard, now) do
     {x, y, z, _} = entity.movement_block.position
-    %Memory{anchor: {x, y, z}, previous_running: entity.internal.running}
+    %Memory{anchor: {x, y, z}, next_move_at: now, previous_running: entity.internal.running}
   end
 end

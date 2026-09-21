@@ -233,6 +233,19 @@ defmodule ThistleTea.Game.Entity.Logic.ControlMovementTest do
   end
 
   describe "reset_navigation/1" do
+    test "resumes forced movement with a negative monotonic clock", %{character: character} do
+      for type <- [:mod_fear, :mod_confuse] do
+        {character, _} = change(character, [holder(1, type)], -10_000)
+        character = ControlMovement.reset_navigation(character)
+        if type == :mod_confuse, do: assert(Confusion.request(character, -9_000) == {0, {0.0, 0.0, 0.0}, 4.0})
+
+        assert {{:running, 0, :navigation}, character} =
+                 BehaviorRunner.tick(PlayerBT.tree(), character, context(-9_000))
+
+        assert character.internal.navigation_intents != []
+      end
+    end
+
     test "discards a movement projection queued before cancellation", %{character: character} do
       {character, _} = change(character, [holder(1, :mod_confuse)], 0)
       character = step(character, 0)

@@ -18,7 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Fear do
 
   def tick(%{unit: %Unit{}, internal: %Internal{}} = mob, %Blackboard{} = blackboard, %Context{} = context) do
     if ControlMovement.mode(mob) == :fear do
-      memory = blackboard.fear || %FearMemory{previous_running: mob.internal.running}
+      memory = blackboard.fear || %FearMemory{next_move_at: context.now, previous_running: mob.internal.running}
       run(mob, %{blackboard | fear: memory}, context)
     else
       {:failure, mob, blackboard}
