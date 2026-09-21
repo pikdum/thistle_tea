@@ -139,7 +139,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatSkillsTest do
     end
   end
 
-  describe "combat delivery" do
+  describe "receive_attack/4" do
     test "the killing blow can train but late attacks on the corpse cannot", %{mob: mob} do
       attack = %{
         caster: 5,
@@ -172,7 +172,9 @@ defmodule ThistleTea.Game.Entity.Logic.CombatSkillsTest do
       assert [%Effects.AdvanceCombatSkill{target_guid: 5, skill_id: 173}] =
                Enum.filter(events, &is_struct(&1, Effects.AdvanceCombatSkill))
     end
+  end
 
+  describe "receive/4" do
     test "melee and ranged weapon abilities train once, non-weapon abilities do not", %{mob: mob} do
       for {class, skill_id} <- [{2, 43}, {3, 45}] do
         spell = %Spell{
@@ -271,7 +273,9 @@ defmodule ThistleTea.Game.Entity.Logic.CombatSkillsTest do
                  Enum.filter(events, &is_struct(&1, Effects.AdvanceCombatSkill))
       end
     end
+  end
 
+  describe "handle_cast/2" do
     test "typed feedback reaches the registered player owner and publishes progress", %{character: character, mob: mob} do
       guid = Guid.from_low_guid(:player, System.unique_integer([:positive]) + 10_000_000)
       Entity.register(guid)
