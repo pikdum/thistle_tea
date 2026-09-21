@@ -84,6 +84,13 @@ defmodule ThistleTea.Game.Player.Login do
   @update_flag_living 0x20
   @update_flag_has_position 0x40
 
+  def query_time(%{ready: true, guid: guid} = state) do
+    Network.send_packet(%Message.SmsgQueryTimeResponse{time: System.system_time(:second)}, guid)
+    state
+  end
+
+  def query_time(state), do: state
+
   def enter_world(state, character_guid) do
     {:ok, c} = CharacterStore.fetch(state.account.id, character_guid)
 

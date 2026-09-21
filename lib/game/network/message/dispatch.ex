@@ -167,6 +167,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_LOOT_RELEASE: Message.CmsgLootRelease,
               CMSG_QUESTGIVER_STATUS_QUERY: Message.CmsgQuestgiverStatusQuery,
               CMSG_QUEST_QUERY: Message.CmsgQuestQuery,
+              CMSG_QUERY_TIME: Message.CmsgQueryTime,
               CMSG_QUESTGIVER_HELLO: Message.CmsgQuestgiverHello,
               CMSG_QUESTGIVER_QUERY_QUEST: Message.CmsgQuestgiverQueryQuest,
               CMSG_QUESTGIVER_ACCEPT_QUEST: Message.CmsgQuestgiverAcceptQuest,
