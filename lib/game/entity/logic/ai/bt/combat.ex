@@ -313,12 +313,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   end
 
   defp send_valid_queued_spell_swing(state, %Spell{} = spell, target, now) do
-    targets = queued_spell_targets(state, spell, target)
+    cost = Resources.power_cost(state, spell)
 
-    state
-    |> Resources.spend_power(spell, now)
-    |> queue_queued_spell_go(spell, target, targets)
-    |> deliver_queued_spell(spell, targets)
+    if Resources.can_pay_cost?(state, spell.power_type, cost) do
+      targets = queued_spell_targets(state, spell, target)
+
+      state
+      |> Resources.spend_cost(spell.power_type, cost, now)
+      |> queue_queued_spell_go(spell, target, targets)
+      |> deliver_queued_spell(spell, targets)
+    else
+      state
+      |> Effects.enqueue(Effects.spell_cast_failed(spell.id, :no_power))
+      |> send_white_swing(target)
+    end
   end
 
   defp queued_spell_targets(state, %Spell{} = spell, target) do

@@ -164,6 +164,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
 
       SpatialHash.update(:mobs, target_guid, 0, 1.0, 0.0, 0.0)
       distant = %{distant | internal: %{distant.internal | events: []}}
+
+      starved = %{distant | unit: %{distant.unit | power2: 149}}
+      assert {:success, rejected, _blackboard} = Combat.melee_attack(starved, blackboard, 2_700)
+      assert rejected.internal.next_swing_spell == nil
+      assert rejected.unit.power2 == 149
+      refute Enum.any?(rejected.internal.events, &match?(%Effects.DeliverSpell{}, &1))
+
+      assert [
+               %Effects.SpellCastFailed{spell_id: 78, reason: :no_power},
+               %Effects.DeliverAttack{attack: %{dual_wield_penalty?: true}},
+               %Effects.DeliverAttack{attack: %{offhand?: true, dual_wield_penalty?: true}}
+             ] = rejected.internal.events
+
       assert {:success, queued, blackboard} = Combat.melee_attack(distant, blackboard, 2_550)
       assert queued.internal.next_swing_spell.id == 78
       assert [%Effects.DeliverAttack{attack: %{offhand?: true, dual_wield_penalty?: false}}] = queued.internal.events
