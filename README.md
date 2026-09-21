@@ -123,6 +123,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Ammunition](docs/ammunition-playtest.md), with client selection, compatible projectile costs, Auto Shot depletion, and thrown-stack or durability consumption
 - [Wand attacks](docs/wand-playtest.md), with weapon-school damage, Wand Specialization, and shared auto-repeat timing and cancellation
 - [Creature and pet attack power](docs/attack-power-playtest.md), with damage scaling, buff and debuff cleanup, percentage modifiers, and ranged equipment bonuses
+- [Passive on-equip item spells](docs/equipment-passives-playtest.md), with crit, hit, dodge, mana regeneration, item procs, durability and reconnect lifecycles, and form restrictions
 - equipment durability, combat and death wear, broken-gear penalties, and vendor repairs with reputation discounts
 - alcohol intoxication, client drunkenness effects, gradual sobering, and death cleanup
 - looting + group loot
