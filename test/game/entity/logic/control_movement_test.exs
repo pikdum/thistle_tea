@@ -194,6 +194,14 @@ defmodule ThistleTea.Game.Entity.Logic.ControlMovementTest do
   end
 
   describe "handle/2" do
+    test "ordinary movement cannot move a corpse but permits a released ghost", %{character: character} do
+      character = %{character | unit: %{character.unit | health: 0}}
+      state = %State{guid: 1, ready: true, character: character}
+      assert MsgMove.handle(%MsgMove{payload: <<1>>, opcode: 0xEE}, state) == state
+      character = %{character | unit: %{character.unit | health: 1}, player: %{character.player | flags: 0x10}}
+      assert PlayerMovement.accepts_input?(character)
+    end
+
     test "possessed creatures reject input and notify the controller", %{character: character} do
       mob = %Mob{
         object: character.object,

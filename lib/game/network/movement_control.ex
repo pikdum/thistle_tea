@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Network.MovementControl do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Player.Movement, as: PlayerMovement
   alias ThistleTea.Game.World.Transports
 
   @ack_timeout_ms 4_000
@@ -112,11 +113,15 @@ defmodule ThistleTea.Game.Network.MovementControl do
 
   def reconcile_movement(%State{ready: false} = state, _payload), do: state
 
-  def reconcile_movement(
-        %State{character: %Character{movement_block: %MovementBlock{} = previous} = character} = state,
-        payload
-      )
-      when is_binary(payload) do
+  def reconcile_movement(%State{character: %Character{} = character} = state, payload) do
+    if PlayerMovement.accepts_input?(character), do: reconcile_client_movement(state, payload), else: state
+  end
+
+  defp reconcile_client_movement(
+         %State{character: %Character{movement_block: %MovementBlock{} = previous} = character} = state,
+         payload
+       )
+       when is_binary(payload) do
     movement_block = MovementBlock.from_binary(payload, previous)
 
     case Transports.reconcile(character, movement_block) do

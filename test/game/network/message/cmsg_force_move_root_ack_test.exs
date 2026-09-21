@@ -1,10 +1,14 @@
 defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.CmsgForceMoveRootAck
@@ -13,6 +17,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
   alias ThistleTea.Game.Network.Message.SmsgNewWorld
   alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Network.Opcodes
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.WorldRef
 
   describe "from_binary/1" do
@@ -34,6 +39,51 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
   end
 
   describe "handle/2" do
+    test "acknowledges control changes without moving corpses or server-controlled players" do
+      base = ack_state(%{2 => :root})
+      block = %{base.character.movement_block | position: {10.0, 20.0, 30.0, 0.0}}
+      character = %{base.character | movement_block: block, unit: %Unit{health: 100}}
+
+      holders =
+        for type <- [:mod_fear, :mod_confuse] do
+          %Holder{spell: %Spell{id: 1}, auras: [%Aura{type: type}]}
+        end
+
+      characters = [
+        %{character | unit: %{character.unit | health: 0}},
+        %{character | internal: %Internal{movement_start_time: -1_000}},
+        %{character | unit: %{character.unit | auras: [hd(holders)]}},
+        %{character | unit: %{character.unit | auras: [List.last(holders)]}}
+      ]
+
+      for character <- characters do
+        state = %{base | character: character}
+
+        state =
+          CmsgForceMoveRootAck.handle(
+            %CmsgForceMoveRootAck{guid: 1, counter: 2, movement_payload: movement_payload()},
+            state
+          )
+
+        assert state.pending_movement_acks == %{}
+        assert state.character.movement_block == block
+      end
+    end
+
+    test "released ghosts still reconcile their unroot acknowledgement" do
+      state = ack_state(%{3 => :unroot})
+      character = %{state.character | unit: %Unit{health: 1}, player: %Player{flags: 0x10}}
+
+      state =
+        CmsgForceMoveUnrootAck.handle(
+          %CmsgForceMoveUnrootAck{guid: 1, counter: 3, movement_payload: movement_payload()},
+          %{state | character: character}
+        )
+
+      assert state.pending_movement_acks == %{}
+      assert state.character.movement_block.position == {1.0, 2.0, 3.0, 4.0}
+    end
+
     test "acknowledges unroot without replacing the destination while loading a new map" do
       state = %{ack_state(%{3 => :unroot}) | ready: false}
       destination = %MovementBlock{position: {-9002.0, -450.0, 85.0, 0.0}}

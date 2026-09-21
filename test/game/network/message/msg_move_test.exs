@@ -195,7 +195,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
   defp moving_character(guid) do
     %Character{
       object: %Object{guid: guid},
-      unit: %Unit{health: 0, auras: []},
+      unit: %Unit{health: 100, max_health: 100, auras: []},
       player: %Player{flags: 0},
       internal: %Internal{world: WorldRef.open(0)},
       movement_block: %MovementBlock{
