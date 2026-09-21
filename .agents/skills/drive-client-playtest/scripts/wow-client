@@ -60,7 +60,7 @@ process_start_time() {
   local pid="$1"
 
   process_alive "$pid" || return 1
-  awk '{print $22}' "/proc/$pid/stat"
+  awk '{print $22}' "/proc/$pid/stat" 2>/dev/null
 }
 
 record_process() {
