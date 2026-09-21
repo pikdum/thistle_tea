@@ -53,6 +53,30 @@ defmodule ThistleTea.Game.World.Loader.SkillTest do
       assert Skill.initial_skills([201, 2575], 1, 1, 20, table) ==
                %{43 => %{value: 1, max: 100, range: :level, always_max?: false, slot: 0}}
     end
+
+    test "derives rogue class skills from base abilities, excluding recipes and other classes", %{table: table} do
+      Skill.load(
+        [%SkillLine{id: 633, category: 7}, %SkillLine{id: 40, category: 7}],
+        for(
+          id <- [40, 633],
+          do: %SkillRaceClassInfo{skill_line: id, race_mask: 0, class_mask: 8, flags: 128, skill_tier: 0}
+        ),
+        [
+          %{ability(633, 1804, 0, 0) | trivial_skill_line_rank_high: 0},
+          %{ability(40, 2842, 0, 0) | trivial_skill_line_rank_high: 0},
+          %{ability(40, 2835, 0, 0) | trivial_skill_line_rank_high: 225}
+        ],
+        table
+      )
+
+      skills = Skill.initial_skills([1804, 2842], 1, 4, 20, table)
+      assert skills[633].value == 1
+      assert skills[633].max == 100
+      assert skills[40].value == 1
+      assert skills[40].max == 100
+      assert Skill.initial_skills([2835], 1, 4, 20, table) == %{}
+      assert Skill.initial_skills([1804, 2842], 1, 1, 20, table) == %{}
+    end
   end
 
   defp ability(skill, spell, method, rank) do

@@ -32,7 +32,7 @@ defmodule ThistleTea.Game.World.Loader.Skill do
   def initial_skills(spell_ids, race, class, level, table) when is_list(spell_ids) do
     spell_ids
     |> Enum.flat_map(&lookup(table, {:spell_skills, &1}, []))
-    |> Enum.filter(&(&1.acquire_method == 2 and fits?(&1, race, class)))
+    |> Enum.filter(&(learned_with_spell?(&1) and fits?(&1, race, class)))
     |> Enum.map(& &1.skill_line)
     |> Enum.uniq()
     |> Enum.flat_map(&build_entry(&1, race, class, level, table))
@@ -41,6 +41,12 @@ defmodule ThistleTea.Game.World.Loader.Skill do
   end
 
   def initial_skills(_spell_ids, _race, _class, _level, _table), do: %{}
+
+  defp learned_with_spell?(%{acquire_method: 2}), do: true
+
+  defp learned_with_spell?(%{skill_line: id, trivial_skill_line_rank_high: 0}) when id in [40, 633], do: true
+
+  defp learned_with_spell?(_ability), do: false
 
   def reward_spells(skill_id, value, race, class, table \\ __MODULE__) do
     table
