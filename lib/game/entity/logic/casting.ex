@@ -606,17 +606,19 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp action_interrupt_mask(action, _spell), do: AuraLogic.interrupt_mask(action)
 
-  def cancel(%{internal: %Internal{} = internal} = character) do
+  def cancel(character), do: cancel(character, Time.now())
+
+  def cancel(%{internal: %Internal{} = internal} = character, now) do
     case internal.casting do
       %Cast{channel_ms: channel_ms} = casting when is_integer(channel_ms) and channel_ms > 0 ->
-        stop_channel(character, casting)
+        stop_channel(character, casting, :cancelled, now)
 
       _ ->
         %{character | internal: %{internal | casting: nil}}
     end
   end
 
-  def cancel(character), do: character
+  def cancel(character, _now), do: character
 
   def start_game_object_channel(
         %{internal: %Internal{} = internal, unit: unit, object: %{guid: guid}} = character,
@@ -706,10 +708,13 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp stop_channel(character, casting), do: stop_channel(character, casting, :cancelled)
 
+  defp stop_channel(character, casting, reason), do: stop_channel(character, casting, reason, Time.now())
+
   defp stop_channel(
          %{object: %{guid: user_guid}, internal: %Internal{} = internal, unit: unit} = character,
          %Cast{} = casting,
-         reason
+         reason,
+         now
        ) do
     channel_game_object_guid = internal.channel_game_object_guid
     channel_game_object_owned? = internal.channel_game_object_owned?
@@ -725,7 +730,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         unit: %{unit | channel_object: 0, channel_spell: 0}
     }
 
-    {character, aura_events} = channel_aura_events(character, casting, reason)
+    {character, aura_events} = channel_aura_events(character, casting, reason, now)
 
     object_events = channel_object_events(channel_game_object_guid, channel_game_object_owned?, user_guid, reason)
 
@@ -743,7 +748,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     |> Effects.enqueue(aura_events ++ object_events ++ events)
   end
 
-  defp stop_channel(%{internal: %Internal{} = internal} = character, %Cast{}, _reason) do
+  defp stop_channel(%{internal: %Internal{} = internal} = character, %Cast{}, _reason, _now) do
     %{character | internal: %{internal | casting: nil}}
   end
 
@@ -759,12 +764,12 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp channel_object_events(_guid, _owned?, _user_guid, _reason), do: []
 
-  defp channel_aura_events(character, _casting, :completed), do: {character, []}
-  defp channel_aura_events(character, casting, :cancelled), do: remove_channel_auras(character, casting)
+  defp channel_aura_events(character, _casting, :completed, _now), do: {character, []}
+  defp channel_aura_events(character, casting, :cancelled, now), do: remove_channel_auras(character, casting, now)
 
-  defp remove_channel_auras(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{id: spell_id}} = casting) do
+  defp remove_channel_auras(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{id: spell_id}} = casting, now) do
     target_guid = channel_target_guid(character, casting)
-    {character, events} = AuraLogic.remove_source_spell(character, spell_id, guid, Time.now())
+    {character, events} = AuraLogic.remove_source_spell(character, spell_id, guid, now)
 
     remote_events =
       if target_guid > 0 and target_guid != guid do
@@ -776,7 +781,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     {character, events ++ remote_events ++ [Effects.despawn_area_effects(spell_id)]}
   end
 
-  defp remove_channel_auras(character, _casting), do: {character, []}
+  defp remove_channel_auras(character, _casting, _now), do: {character, []}
 
   defp queue_area_effects(
          character,

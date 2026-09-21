@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Emote
   alias ThistleTea.Game.Network.ClientMessage
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.MovementControl
@@ -84,12 +85,11 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
 
   defp handle_player_movement(
          message,
-         %{character: %Character{movement_block: %MovementBlock{} = previous_movement_block, unit: %Unit{} = unit}} =
-           state,
+         %{character: %Character{movement_block: %MovementBlock{} = previous_movement_block}} = state,
          %MovementBlock{} = movement_block
        ) do
     character = state.character
-    character = %{character | movement_block: movement_block, unit: %{unit | stand_state: 0}}
+    character = %{character | movement_block: movement_block}
     %{internal: %{world: world}} = character
     %MovementBlock{position: {x1, y1, z1, orientation}} = movement_block
     now = Time.now()
@@ -107,6 +107,8 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     }
 
     moved? = position_changed? or translating?
+    moving_or_turning? = moved? or Bitwise.band(movement_block.movement_flags || 0, 0x3F) != 0
+    character = Emote.move(character, moved?, moving_or_turning?, now)
     character = PlayerMovement.apply_environment(character, message.opcode, now)
     character = interrupt_auras(character, moved?)
     character = interrupt_water_auras(character, movement_block, state.character.movement_block)

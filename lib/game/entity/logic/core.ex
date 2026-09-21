@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Durability
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Emote
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Honor.Combat, as: HonorCombat
   alias ThistleTea.Game.Entity.Logic.Intoxication
@@ -383,6 +384,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     }
 
     %{entity | unit: unit, internal: internal, movement_block: movement_block}
+    |> Emote.reset()
     |> Intoxication.clear()
     |> Effects.enqueue(Effects.movement_stopped())
     |> maybe_release_companion()

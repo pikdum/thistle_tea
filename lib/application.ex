@@ -28,6 +28,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.ClassSpell, as: ClassSpellLoader
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
+  alias ThistleTea.Game.World.Loader.Emote, as: EmoteLoader
   alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Fishing, as: FishingLoader
@@ -165,6 +166,7 @@ defmodule ThistleTea.Application do
     ItemSetLoader.init()
     DurabilityLoader.init()
     AuctionHouseLoader.init()
+    EmoteLoader.init()
     ItemStore.init()
     MailStore.init()
     CharacterStore.init()
@@ -271,6 +273,7 @@ defmodule ThistleTea.Application do
         StableSlotPriceLoader.load_all()
         DurabilityLoader.load_all()
         AuctionHouseLoader.load_all()
+        EmoteLoader.load_all()
         PetLevelLoader.load_all()
         BattlegroundLoader.load_all()
 

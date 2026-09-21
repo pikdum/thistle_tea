@@ -2,135 +2,17 @@ defmodule ThistleTea.Game.Network.Message.CmsgTextEmote do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_TEXT_EMOTE
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.Player.Emotes
 
   defstruct [:text_emote, :emote, :target]
 
-  @text_emote_agree 1
-  @text_emote_applaud 5
-  @text_emote_bow 17
-  @text_emote_cheer 21
-  @text_emote_chicken 22
-  @text_emote_cry 31
-  @text_emote_dance 34
-  @text_emote_eat 37
-  @text_emote_flex 41
-  @text_emote_kiss 58
-  @text_emote_kneel 59
-  @text_emote_laugh 60
-  @text_emote_no 66
-  @text_emote_point 72
-  @text_emote_roar 75
-  @text_emote_rude 77
-  @text_emote_salute 78
-  @text_emote_shout 82
-  @text_emote_shy 84
-  @text_emote_sit 86
-  @text_emote_sleep 87
-  @text_emote_stand 141
-  @text_emote_talk 93
-  @text_emote_wave 101
-  @text_emote_yes 273
-
-  @emote_oneshot_talk 1
-  @emote_oneshot_bow 2
-  @emote_oneshot_wave 3
-  @emote_oneshot_cheer 4
-  @emote_oneshot_eat 7
-  @emote_state_dance 10
-  @emote_oneshot_laugh 11
-  @emote_state_sleep 12
-  @emote_state_sit 13
-  @emote_oneshot_rude 14
-  @emote_oneshot_roar 15
-  @emote_oneshot_kneel 16
-  @emote_oneshot_kiss 17
-  @emote_oneshot_cry 18
-  @emote_oneshot_chicken 19
-  @emote_oneshot_applaud 21
-  @emote_oneshot_shout 22
-  @emote_oneshot_flex 23
-  @emote_oneshot_shy 24
-  @emote_oneshot_point 25
-  @emote_state_stand 26
-  @emote_oneshot_salute 66
-  @emote_oneshot_yes 273
-  @emote_oneshot_no 274
-
-  def text_emote_to_emote do
-    %{
-      @text_emote_agree => @emote_oneshot_yes,
-      @text_emote_applaud => @emote_oneshot_applaud,
-      @text_emote_bow => @emote_oneshot_bow,
-      @text_emote_cheer => @emote_oneshot_cheer,
-      @text_emote_chicken => @emote_oneshot_chicken,
-      @text_emote_cry => @emote_oneshot_cry,
-      @text_emote_dance => @emote_state_dance,
-      @text_emote_eat => @emote_oneshot_eat,
-      @text_emote_flex => @emote_oneshot_flex,
-      @text_emote_kiss => @emote_oneshot_kiss,
-      @text_emote_kneel => @emote_oneshot_kneel,
-      @text_emote_laugh => @emote_oneshot_laugh,
-      @text_emote_no => @emote_oneshot_no,
-      @text_emote_point => @emote_oneshot_point,
-      @text_emote_roar => @emote_oneshot_roar,
-      @text_emote_rude => @emote_oneshot_rude,
-      @text_emote_salute => @emote_oneshot_salute,
-      @text_emote_shout => @emote_oneshot_shout,
-      @text_emote_shy => @emote_oneshot_shy,
-      # TODO: /sit isn't working properly
-      # might be conflicting with CMSG_STANDSTATECHANGE implementation?
-      @text_emote_sit => @emote_state_sit,
-      @text_emote_sleep => @emote_state_sleep,
-      @text_emote_stand => @emote_state_stand,
-      @text_emote_talk => @emote_oneshot_talk,
-      @text_emote_wave => @emote_oneshot_wave,
-      @text_emote_yes => @emote_oneshot_yes
-    }
-  end
-
-  defp get_target_name(0) do
-    ""
-  end
-
-  defp get_target_name(target_guid) when is_integer(target_guid) do
-    case Metadata.query(target_guid, [:name]) do
-      %{name: name} -> name
-      _ -> ""
-    end
-  end
-
-  defp get_target_name(_target_guid), do: ""
-
   @impl ClientMessage
   def handle(%__MODULE__{text_emote: text_emote, emote: emote, target: target}, state) do
-    target_name = get_target_name(target)
-    emote_id = text_emote_to_emote()[text_emote] || 0
-
-    if Guid.entity_type(target) == :mob do
-      Entity.receive_emote(target, state.guid, text_emote)
-    end
-
-    [
-      %Message.SmsgTextEmote{guid: state.guid, text_emote: text_emote, emote: emote, name: target_name},
-      %Message.SmsgEmote{emote: emote_id, guid: state.guid}
-    ]
-    |> World.broadcast_packet(state.character, range: 25)
-
-    state
+    Emotes.text(state, text_emote, emote, target)
   end
 
   @impl ClientMessage
-  def from_binary(payload) do
-    <<text_emote::little-size(32), emote::little-size(32), target::little-size(64)>> = payload
-
-    %__MODULE__{
-      text_emote: text_emote,
-      emote: emote,
-      target: target
-    }
+  def from_binary(<<text_emote::little-size(32), emote::little-size(32), target::little-size(64)>>) do
+    %__MODULE__{text_emote: text_emote, emote: emote, target: target}
   end
 end

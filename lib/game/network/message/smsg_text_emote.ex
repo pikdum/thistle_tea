@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgTextEmote do
 
   @impl ServerMessage
   def to_binary(%__MODULE__{guid: guid, text_emote: text_emote, emote: emote, name: name}) do
-    name_length = String.length(name) + 1
+    name_length = byte_size(name) + 1
 
     <<guid::little-size(64)>> <>
       <<text_emote::little-size(32)>> <>

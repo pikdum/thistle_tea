@@ -12,6 +12,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   alias ThistleTea.Game.Entity.EffectResolver.Pvp
   alias ThistleTea.Game.Entity.EffectResolver.Spells
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Emote
+  alias ThistleTea.Game.World.Loader.Emote, as: EmoteLoader
 
   @combat_requests [Effects.BladeFlurry, Effects.DropNearbyThreat, Effects.SecondaryMelee]
   @movement_requests [Effects.Charge, Effects.Leap, Effects.TeleportHome, Effects.TeleportToSpellTarget]
@@ -30,6 +32,14 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   end
 
   def resolve(entity, %Effects.DurabilityDamage{} = effect), do: Durability.resolve(entity, effect)
+
+  def resolve(_entity, %Effects.Emote{emote_id: id}) do
+    case EmoteLoader.animation(id) do
+      nil -> []
+      definition -> [Emote.animation_effect(definition)]
+    end
+  end
+
   def resolve(entity, %Effects.PlayerDefeated{} = effect), do: Battleground.resolve(entity, effect)
   def resolve(_entity, %Effects.HonorDamage{} = effect), do: Honor.resolve(effect)
   def resolve(entity, %Effects.HonorCreatureKill{} = effect), do: Honor.creature_kill(entity, effect)

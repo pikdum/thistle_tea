@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.DispelResistance
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Emote
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerFlags
@@ -90,6 +91,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> Trade.recover()
       |> Auction.recover()
       |> ChatStatus.reset()
+      |> Emote.reset()
       |> restore_instance_world(character_guid)
       |> normalize_movement_state()
       |> normalize_combat_stats()

@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message.MsgMove
   alias ThistleTea.Game.Network.Message.SmsgEnvironmentalDamageLog
+  alias ThistleTea.Game.Network.Message.SmsgStandstateUpdate
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -27,6 +28,38 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
   alias ThistleTea.Game.WorldRef
 
   describe "handle/2" do
+    test "stationary heartbeats preserve sitting and movement acknowledges standing" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      {:ok, _} = Entity.register(guid)
+      character = moving_character(guid)
+
+      character = %{
+        character
+        | unit: %{character.unit | health: 100, max_health: 100, stand_state: 1, npc_emote_state: 10}
+      }
+
+      on_exit(fn -> Presence.leave(character) end)
+
+      state = %State{
+        guid: guid,
+        packed_guid: BinaryUtils.pack_guid(guid),
+        ready: true,
+        character: character,
+        next_exploration_check_at: Time.now() + 60_000,
+        player_guids: []
+      }
+
+      sitting = MsgMove.handle(move_message(:MSG_MOVE_HEARTBEAT, 0, {0.0, 0.0, 0.0, 0.0}), state)
+      assert sitting.character.unit.stand_state == 1
+      assert sitting.character.unit.npc_emote_state == 10
+      refute_receive {:"$gen_cast", {:send_packet, %SmsgStandstateUpdate{}}}
+
+      moving = MsgMove.handle(move_message(:MSG_MOVE_START_FORWARD, 1, {0.0, 0.0, 0.0, 0.0}), sitting)
+      assert moving.character.unit.stand_state == 0
+      assert moving.character.unit.npc_emote_state == 0
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgStandstateUpdate{stand_state: 0}}}
+    end
+
     test "landing damages the owner, projects health, and broadcasts the combat log once" do
       guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
       {:ok, _owner} = Entity.register(guid)

@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Emote
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
@@ -145,9 +146,20 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
     entity
   end
 
-  def emit(%{object: %{guid: guid}} = entity, %Effects.Emote{emote_id: emote_id}, _context) do
+  def emit(%{object: %{guid: guid}} = entity, %Effects.EmoteAnimation{emote_id: emote_id}, _context) do
     %Message.SmsgEmote{emote: emote_id, guid: guid}
     |> World.broadcast_packet(entity)
+
+    entity
+  end
+
+  def emit(entity, %Effects.EmoteState{emote_id: id}, _context) do
+    Emote.set_state(entity, id)
+  end
+
+  def emit(%{object: %{guid: guid}} = entity, %Effects.TextEmote{} = effect, _context) do
+    %Message.SmsgTextEmote{guid: guid, text_emote: effect.text_emote, emote: effect.emote, name: effect.name}
+    |> World.broadcast_packet(entity, range: 25)
 
     entity
   end
