@@ -48,17 +48,31 @@ defmodule ThistleTea.Game.Player.Spells do
   defp maybe_cancel_channel(character, _spell_id), do: character
 
   def learn(%Character{} = character, spell_ids) do
+    case prepare(character, spell_ids) do
+      {:ok, character, events} ->
+        CharacterStore.put(character)
+        notify_learned(character, events)
+        {:ok, character, events}
+
+      :already_known ->
+        :already_known
+    end
+  end
+
+  def prepare(%Character{} = character, spell_ids) do
     case learn_spells(character, spell_ids, MapSet.new()) do
       {_character, []} ->
         :already_known
 
       {character, events} ->
         character = character |> apply_passives(Time.now()) |> Core.mark_broadcast_update()
-        CharacterStore.put(character)
-        Enum.each(events, &send_event_packet/1)
-        send_proficiencies(character)
         {:ok, character, events}
     end
+  end
+
+  def notify_learned(%Character{} = character, events) do
+    Enum.each(events, &send_event_packet/1)
+    send_proficiencies(character)
   end
 
   defp learn_spells(%Character{internal: internal} = character, spell_ids, attempted) do
@@ -76,17 +90,17 @@ defmodule ThistleTea.Game.Player.Spells do
 
         character =
           %{character | internal: %{internal | spells: all_ids, spellbook: spellbook}}
-          |> learn_skills()
+          |> learn_skills(all_ids -- existing_ids)
 
         {character, reward_events} = learn_spells(character, skill_rewards(character), attempted)
         {character, events ++ reward_events}
     end
   end
 
-  defp learn_skills(%Character{unit: unit, player: player, internal: internal} = character) do
+  defp learn_skills(%Character{unit: unit, player: player, internal: internal} = character, learned_ids) do
     new_skills = SkillLoader.initial_skills(internal.spells, unit.race, unit.class, unit.level)
     {new_skills, forgotten} = Skills.restore(new_skills, internal.forgotten_skills)
-    grants = SpellSkills.grants(internal.spellbook)
+    grants = SpellSkills.grants(Map.take(internal.spellbook, learned_ids))
     skills = (player.skills || %{}) |> Skills.merge(new_skills) |> SpellSkills.learn(grants)
     %{character | player: %{player | skills: skills}, internal: %{internal | forgotten_skills: forgotten}}
   end

@@ -941,6 +941,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, %{state | character: character}}
   end
 
+  def handle_info({:teach_spell, _effect} = command, state) do
+    state = ItemCosts.apply(state, command)
+    {:noreply, state, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Spell teaching crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_info({:consume_cast_item, _item_guid} = command, state) do
     state = ItemCosts.apply(state, command)
     {:noreply, state}

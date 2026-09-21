@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.PetTraining
   alias ThistleTea.Game.Player.Projectile
+  alias ThistleTea.Game.Player.Teaching
   alias ThistleTea.Game.Player.Trade
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
@@ -125,6 +126,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
     with :ok <- Deadmines.validate_cast(state, spell, targets, cast_item_guid),
          :ok <- validate_cast(state, spell, targets, cast_item_guid),
+         :ok <- Teaching.validate(state.character, spell, cast_item_guid),
          :ok <- PetTraining.validate(state.character, spell),
          {:ok, state} <- Fishing.prepare_cast(state, spell) do
       {:ok, do_cast(state, spell, targets, cast_item_guid)}

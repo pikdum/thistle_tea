@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   @normalized_ranged 2.8
 
   defstruct [
+    :cast_item_guid,
     :caster_guid,
     :caster_owner_guid,
     :reflected_by_guid,

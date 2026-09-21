@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellMagnet
   alias ThistleTea.Game.Entity.Logic.SpellResist
+  alias ThistleTea.Game.Entity.Logic.SpellTeaching
   alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
@@ -342,8 +343,8 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       costs: %Costs{
         power: power_cost(entity, spell),
         channel_power: channel_power_cost(entity, casting),
-        reagents: if(deferred_item_costs?(spell), do: [], else: spell.reagents || []),
-        cast_item_guid: if(!deferred_item_costs?(spell), do: cast_item_cost(casting)),
+        reagents: if(deferred_item_costs?(casting), do: [], else: spell.reagents || []),
+        cast_item_guid: if(!deferred_item_costs?(casting), do: cast_item_cost(casting)),
         modifier_holder_ids: casting.modifier_holder_ids
       },
       impacts: resolved_impacts(entity, spell, hits, misses),
@@ -406,8 +407,9 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp cast_item_cost(%Cast{consume_item: true, cast_item_guid: item_guid}) when is_integer(item_guid), do: item_guid
   defp cast_item_cost(%Cast{}), do: nil
 
-  defp deferred_item_costs?(spell) do
-    Enchantments.item_enchant?(spell) or Enum.any?(spell.effects, &(&1.type == :open_lock))
+  defp deferred_item_costs?(%Cast{spell: spell, cast_item_guid: item_guid}) do
+    Enchantments.item_enchant?(spell) or (is_integer(item_guid) and SpellTeaching.spell?(spell)) or
+      Enum.any?(spell.effects, &(&1.type == :open_lock))
   end
 
   defp power_cost(entity, %Spell{} = spell) do
@@ -1236,7 +1238,8 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     Enum.reduce(impacts, character, fn %Impact{target_guid: target_guid, target_role: target_role} = impact, caster ->
       context = %{
         CastContext.from_caster(caster, spell, target_guid)
-        | selected_target_guid: casting.resolution.followups.selected_unit_guid,
+        | cast_item_guid: casting.cast_item_guid,
+          selected_target_guid: casting.resolution.followups.selected_unit_guid,
           destination_position: Target.ground_location(casting.targets),
           target_hostile?: target_guid != caster_guid and Hostility.valid_attack_target?(caster, target_guid),
           target_role: target_role,

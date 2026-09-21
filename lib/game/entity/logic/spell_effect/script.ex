@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
   alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal
+  alias ThistleTea.Game.Entity.Logic.SpellTeaching
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -21,14 +22,25 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
   alias ThistleTea.Game.Spell.Semantics
   alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
 
-  def apply(%Character{} = state, %CastContext{caster_guid: guid}, spell, %Effect{type: type} = effect, _now)
-      when type in [:learn_spell, :learn_pet_spell] and guid == state.object.guid do
+  def apply(%Character{} = state, %CastContext{} = context, spell, %Effect{type: type} = effect, _now)
+      when type in [:learn_spell, :learn_pet_spell, :skill_step] do
     pet_guid = Companion.summon_guid(state)
 
-    if PetTraining.training_effect?(effect) and is_integer(pet_guid) do
-      {state, [%Effects.LearnPetSpell{target_guid: pet_guid, spell: spell}]}
-    else
-      {state, []}
+    cond do
+      PetTraining.training_effect?(effect) and context.caster_guid == state.object.guid and is_integer(pet_guid) ->
+        {state, [%Effects.LearnPetSpell{target_guid: pet_guid, spell: spell}]}
+
+      SpellTeaching.effect?(effect) and effect == Enum.find(spell.effects, &SpellTeaching.effect?/1) ->
+        event = %Effects.TeachSpell{
+          spell: spell,
+          skill_steps: SpellTeaching.skill_steps(spell),
+          cast_item_guid: if(context.caster_guid == state.object.guid, do: context.cast_item_guid)
+        }
+
+        {state, [event]}
+
+      true ->
+        {state, []}
     end
   end
 

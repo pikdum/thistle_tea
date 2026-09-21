@@ -15,7 +15,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
     20 => :defense_passive,
     26 => :dodge_passive,
     37 => :spell_defense_dnd,
-    44 => :skill_step,
     47 => :tradeskill,
     49 => :detect,
     78 => :attack,

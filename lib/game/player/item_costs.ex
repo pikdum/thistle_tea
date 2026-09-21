@@ -13,9 +13,11 @@ defmodule ThistleTea.Game.Player.ItemCosts do
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.Gathering
   alias ThistleTea.Game.Player.Items
+  alias ThistleTea.Game.Player.Teaching
   alias ThistleTea.Game.World.ItemStore
 
   @commands [
+    :teach_spell,
     :consume_cast_item,
     :consume_reagents,
     :launch_ranged,
@@ -34,6 +36,8 @@ defmodule ThistleTea.Game.Player.ItemCosts do
   end
 
   def apply(state, {:consume_cast_item, guid}), do: Items.consume_cast_item(state, guid)
+
+  def apply(state, {:teach_spell, effect}), do: Teaching.complete(state, effect)
 
   def apply(state, {:launch_ranged, request}), do: Ammunition.launch(state, request)
 

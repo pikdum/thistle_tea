@@ -17,6 +17,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
   @spell_hit_type_crit 0x2
 
+  def emit(%Character{} = entity, %Effects.TeachSpell{} = effect, context) do
+    Context.send(context, {:teach_spell, effect})
+    entity
+  end
+
+  def emit(entity, %Effects.TeachSpell{}, _context), do: entity
+
   def emit(entity, %Effects.SpellMagnetsChanged{magnets: magnets}, %Context{owner_pid: owner}) do
     SpellMagnets.sync(entity.object.guid, owner, magnets)
     entity
