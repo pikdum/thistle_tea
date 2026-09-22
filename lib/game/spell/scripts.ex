@@ -114,6 +114,11 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def dummy_effect(%Spell{id: @tame_beast_completion}), do: :tame_beast_completion
   def dummy_effect(%Spell{id: @preparation}), do: :preparation
 
+  @guardian_trinkets %{23_074 => 19_804, 23_075 => 12_749, 23_076 => 4073, 23_133 => 13_166}
+
+  def dummy_effect(%Spell{id: id}) when is_map_key(@guardian_trinkets, id),
+    do: {:guardian_trinket, Map.fetch!(@guardian_trinkets, id)}
+
   @script_dummy_effects %{
     "spell_paladin_judgement_of_command_dummy" => :judgement_of_command,
     "spell_warrior_execute_dummy" => :execute,

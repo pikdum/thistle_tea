@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Pet do
     :original_npc_flags,
     :original_pvp?,
     :stay_position,
+    :follow_angle,
     :possession_original_kind,
     :possession_original_owner_guid,
     :possession_original_control_spell_id,

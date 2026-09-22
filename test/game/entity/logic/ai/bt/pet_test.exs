@@ -6,7 +6,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.PetTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Server.AIEnvironment
@@ -16,6 +20,46 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.PetTest do
   alias ThistleTea.Game.WorldRef
 
   @now 10_000
+
+  describe "tree/0" do
+    test "aggressive pets ignore neutral and obstructed units and acquire hostile players" do
+      state = pet_beside_owner(1)
+
+      state = %{
+        state
+        | unit: %{state.unit | health: 100},
+          internal: %{state.internal | pet: %{state.internal.pet | reaction_state: :aggressive}}
+      }
+
+      source = %FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
+      enemy = %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+      neutral = %FactionTemplate{id: 7, faction: 7, faction_group: 0, enemy_group: 0}
+      player_guid = Guid.from_low_guid(:player, 700)
+      neutral_guid = Guid.from_low_guid(:mob, 7, 700)
+      obstructed_guid = Guid.from_low_guid(:mob, 17, 701)
+
+      entities = %{
+        state.object.guid => %Observation{guid: state.object.guid, metadata: %{faction_template: source}},
+        neutral_guid => %Observation{guid: neutral_guid, metadata: %{faction_template: neutral, alive?: true}},
+        obstructed_guid => %Observation{
+          guid: obstructed_guid,
+          metadata: %{faction_template: enemy, alive?: true},
+          line_of_sight?: false
+        },
+        player_guid => %Observation{guid: player_guid, metadata: %{faction_template: enemy, alive?: true, pvp?: true}}
+      }
+
+      perception =
+        Perception.new(@now, {world(), 0.0, 2.0, 0.0}, entities, %{
+          mobs: [{neutral_guid, 1.0}, {obstructed_guid, 2.0}],
+          players: [{player_guid, 3.0}]
+        })
+
+      assert {:success, attacking} = BT.tick(PetBT.tree(), state, Context.new(@now, perception: perception))
+      assert attacking.unit.target == player_guid
+      assert attacking.internal.in_combat
+    end
+  end
 
   describe "follow_owner/3" do
     test "stays put while a stationary owner turns in place" do

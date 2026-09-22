@@ -99,6 +99,34 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
     end
   end
 
+  def apply(
+        %{object: %{guid: guid}, unit: _unit} = state,
+        %CastContext{caster_guid: guid} = context,
+        %Spell{} = spell,
+        %Effect{type: :summon_guardian, misc_value: entry} = effect,
+        _now
+      )
+      when is_integer(entry) and entry > 0 do
+    {x, y, z, orientation} = state.movement_block.position
+    {x, y, z} = guardian_position(effect, context.destination_position, {x, y, z}, orientation)
+
+    {state,
+     [
+       %Effects.SummonGuardians{
+         entry: entry,
+         spell_id: spell.id,
+         count: max(Amount.roll(spell, effect, context), 1),
+         duration_ms: max(spell.duration_ms || 0, 0),
+         position: {x, y, z, orientation},
+         radius_yards: max(effect.radius_yards || 0.0, 0.0),
+         level_offset: effect.multiple_value || 0.0,
+         cast_item_guid: context.cast_item_guid,
+         triggered?: context.triggered?,
+         replace?: spell.duration_ms not in [nil, 0] and spell.category > 0
+       }
+     ]}
+  end
+
   def apply(%Character{} = state, %CastContext{}, _spell, %Effect{type: :dismiss_pet}, _now) do
     Companion.dismiss(state)
   end
@@ -354,6 +382,29 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
   end
 
   defp wild_object_position(_effect, nil, caster_position, _orientation), do: caster_position
+
+  defp guardian_position(%Effect{}, {x, y, z}, _position, _orientation), do: {x, y, z}
+
+  @guardian_angles %{
+    :minion_position => 0.25,
+    41 => 1.75,
+    42 => 1.25,
+    43 => 0.75,
+    44 => 0.25,
+    47 => 0.0,
+    48 => 1.0,
+    49 => 0.5,
+    50 => -0.5
+  }
+
+  defp guardian_position(%Effect{implicit_target_a: target, radius_yards: radius}, nil, {x, y, z}, orientation)
+       when is_map_key(@guardian_angles, target) and is_number(radius) do
+    offset = Map.fetch!(@guardian_angles, target) * :math.pi()
+
+    {x + radius * :math.cos(orientation + offset), y + radius * :math.sin(orientation + offset), z}
+  end
+
+  defp guardian_position(_effect, nil, position, _orientation), do: position
 
   defp summon_effect_position(%Effect{implicit_target_a: :minion_position}, _destination, {x, y, z}, orientation) do
     {x + 0.5 * :math.cos(orientation), y + 0.5 * :math.sin(orientation), z}

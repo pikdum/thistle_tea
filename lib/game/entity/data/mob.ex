@@ -38,7 +38,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
             movement_block: %MovementBlock{},
             internal: %Internal{}
 
-  def build(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{} = ct} = c) do
+  def build(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{} = ct} = c, opts \\ []) do
     event =
       case c.game_event_creature do
         %Mangos.GameEventCreature{event: event} -> event
@@ -194,7 +194,9 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         spellbook: c.spellbook
       }
     }
-    |> apply_addon_auras(Time.now())
+    |> then(fn mob ->
+      if Keyword.get(opts, :apply_addon_auras?, true), do: apply_addon_auras(mob, Time.now()), else: mob
+    end)
   end
 
   def apply_addon_auras(%__MODULE__{internal: %Internal{creature: %Creature{addon_auras: [_ | _] = spells}}} = mob, now)

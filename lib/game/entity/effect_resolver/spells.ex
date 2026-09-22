@@ -93,6 +93,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
     [
       Effects.trigger_spell_request(source, effect.spell_id, effect.target_guid,
         base_points: effect.amount,
+        cast_item_guid: effect.cast_item_guid,
         effect_index: effect.slot,
         resolve_targets?: true,
         extra_attack?: effect.extra_attack?,
@@ -121,6 +122,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
       [
         Effects.trigger_spell_request(effect.source_guid, effect.spell_id, effect.target_guid,
           base_points: effect.amount,
+          cast_item_guid: effect.cast_item_guid,
           effect_index: effect.slot,
           resolve_targets?: true,
           extra_attack?: effect.extra_attack?,
@@ -254,6 +256,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
     %{
       CastContext.from_caster(entity, spell, effect.target_guid)
       | target_hostile?: Spell.requires_hostile_target?(spell),
+        triggered?: true,
+        cast_item_guid: effect.cast_item_guid,
         extra_attack?: effect.extra_attack?,
         triggered_by_aura?: is_integer(effect.triggering_spell_id),
         target_role: effect.target_role
@@ -263,6 +267,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   defp trigger_context(_entity, %Effects.TriggerSpell{} = effect, spell) do
     %CastContext{
       caster_guid: effect.source_guid,
+      triggered?: true,
+      cast_item_guid: effect.cast_item_guid,
       extra_attack?: effect.extra_attack?,
       triggered_by_aura?: is_integer(effect.triggering_spell_id),
       caster_level: effect.source_level || 1,

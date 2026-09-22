@@ -121,6 +121,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
     :duel,
     :summon_pet,
     :summon_mini_pet,
+    :summon_guardian,
     :revive_pet,
     :dismiss_pet,
     :summon_game_object,

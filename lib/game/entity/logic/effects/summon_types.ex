@@ -23,6 +23,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SummonTypes do
     {:ViewpointReleased, [:source_guid, :target_guid], []},
     {:SummonPet, [:source_guid, :entry, :spell_id], [health_percent: nil]},
     {:SummonMiniPet, [:entry, :spell_id, :duration_ms], [position: nil]},
+    {:SummonGuardians, [:entry, :spell_id, :count, :duration_ms],
+     [position: nil, radius_yards: 0.0, level_offset: 0.0, cast_item_guid: nil, triggered?: false, replace?: false]},
     {:TameCreature, [:source_guid, :entry], []},
     {:DismissPet, [:target_guid], []},
     {:LearnPetSpell, [:target_guid, :spell], []},

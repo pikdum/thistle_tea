@@ -166,6 +166,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp caster_execution_effect?(%Effect{type: :dismiss_pet}), do: true
   defp caster_execution_effect?(%Effect{type: :summon_object_wild}), do: true
   defp caster_execution_effect?(%Effect{type: :summon_mini_pet}), do: true
+  defp caster_execution_effect?(%Effect{type: :summon_guardian}), do: true
   defp caster_execution_effect?(effect), do: PetTraining.training_effect?(effect)
 
   defp pet_target_effect?(%Effect{} = effect) do

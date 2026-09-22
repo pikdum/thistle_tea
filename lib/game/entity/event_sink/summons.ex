@@ -239,6 +239,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
 
   def emit(entity, %Effects.SummonCreature{}, _context), do: entity
 
+  def emit(%{unit: _unit} = entity, %Effects.SummonGuardians{} = effect, context) do
+    Context.send(context, effect)
+    entity
+  end
+
+  def emit(entity, %Effects.SummonGuardians{}, _context), do: entity
+
   def emit(entity, %Effects.ControlGranted{} = effect, _context) do
     case {Entity.pid(effect.source_guid), Entity.pid(effect.target_guid)} do
       {owner_pid, controlled_pid} when is_pid(owner_pid) and is_pid(controlled_pid) ->

@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request, as: ObservationRequest
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Guardian, as: GuardianBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.MiniPet
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
@@ -67,6 +68,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.AIEnvironment
+  alias ThistleTea.Game.Entity.Server.GuardianOwner
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Entity.Server.Mob.Pockets
@@ -736,9 +738,28 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, Corpse.roll_timeout(state, slot)}
   end
 
+  def handle_info({:DOWN, token, :process, _pid, _reason}, %Mob{internal: %{guardian_monitors: monitors}} = state)
+      when is_map_key(monitors, token) do
+    {state, monitors} = GuardianOwner.process_down(state, monitors, token)
+    {:noreply, %{state | internal: %{state.internal | guardian_monitors: monitors}}}
+  rescue
+    error ->
+      Logger.error("Guardian cleanup failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_info({:DOWN, token, :process, _pid, _reason}, %Mob{} = state) when is_reference(token) do
     owner = if Pockets.owns_reservation?(state, token), do: Pockets, else: Corpse
     {:noreply, owner.reservation_lost(state, token)}
+  end
+
+  def handle_info(%Effects.SummonGuardians{} = effect, %Mob{} = state) do
+    {state, monitors} = GuardianOwner.summon(state, state.internal.guardian_monitors, effect)
+    {:noreply, %{state | internal: %{state.internal | guardian_monitors: monitors}}}
+  rescue
+    error ->
+      Logger.error("Guardian summon failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   @impl GenServer
@@ -1171,6 +1192,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def terminate(_reason, state) do
+    GuardianOwner.owner_stopped(state)
     notify_totem_owner(state)
     release_victim(state)
     unwatch_chase(state)
@@ -1191,6 +1213,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp behavior_tree(%Mob{internal: %Internal{totem: %Totem{}}}), do: TotemBT.tree()
 
   defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{kind: :mini_pet}}}), do: MiniPet.tree()
+  defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{kind: :guardian}}}), do: GuardianBT.tree()
 
   defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{}}}), do: PetBT.tree()
   defp behavior_tree(%Mob{}), do: MobBT.tree()
@@ -1400,6 +1423,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     was_in_combat = from == :engaged
 
     if to == :engaged do
+      GuardianOwner.defend(state, caster)
+
       state
       |> maybe_tap(caster)
       |> maybe_call_assistance(was_in_combat, caster, opts)
@@ -1523,7 +1548,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp maybe_finalize_death(%Mob{internal: %Internal{pet: %Pet{}}} = state) do
     if Core.dead?(state) do
-      Process.send_after(self(), :pet_stop, 100)
+      corpse_ms = if state.internal.pet.kind == :guardian, do: 15_000, else: 100
+      Process.send_after(self(), :pet_stop, corpse_ms)
 
       state
       |> PetHappiness.on_death(MapTemplate.battleground?(state.internal.world.map_id))

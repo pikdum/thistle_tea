@@ -53,14 +53,36 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   end
 
   def build(entry, world, {x, y, z, o}, opts \\ []) when is_integer(entry) and is_list(opts) do
-    creature = template(entry)
+    creature = entry |> template() |> select_level(Keyword.get(opts, :level))
     world = WorldRef.coerce(world)
 
     %{creature | guid: next_low_guid(), map: world.map_id, position_x: x, position_y: y, position_z: z, orientation: o}
-    |> Mob.build()
+    |> Mob.build(opts)
     |> then(&%{&1 | internal: %{&1.internal | world: world}})
     |> Mob.prepare_summon(opts)
   end
+
+  def prototype(entry), do: template(entry)
+
+  defp select_level(%Mangos.Creature{} = creature, level) when is_integer(level) and level > 0 do
+    class = creature.creature_template.unit_class
+    key = {:class_level_stats, class, level}
+
+    stats =
+      case :ets.lookup(__MODULE__, key) do
+        [{^key, stats}] ->
+          stats
+
+        _ ->
+          stats = Mangos.CreatureClassLevelStats.get(class, level)
+          :ets.insert(__MODULE__, {key, stats})
+          stats
+      end
+
+    %{creature | selected_level: level, creature_class_level_stats: stats, health_percent: 100, mana_percent: 100}
+  end
+
+  defp select_level(creature, _level), do: creature
 
   def build_pet(
         entry,

@@ -74,6 +74,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :combo_points,
     :spell_threat,
     triggered_by_aura?: false,
+    triggered?: false,
     proc_damage?: false,
     extra_attack?: false,
     hit_outcome: :hit,

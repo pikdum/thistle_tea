@@ -166,6 +166,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.SummonGameObject,
     Effects.SummonPet,
     Effects.SummonMiniPet,
+    Effects.SummonGuardians,
     Effects.SummonRequest,
     Effects.SummonTotem,
     Effects.TameCreature,

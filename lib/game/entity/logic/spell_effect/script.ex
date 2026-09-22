@@ -103,6 +103,23 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
     DamageHeal.execute(state, context, spell, effect, now)
   end
 
+  defp apply_class_dummy(
+         state,
+         %CastContext{cast_item_guid: item_guid} = context,
+         _spell,
+         _effect,
+         {:guardian_trinket, spell_id},
+         _now
+       )
+       when is_integer(item_guid) and state.object.guid == context.caster_guid do
+    event =
+      Effects.trigger_spell(context.caster_guid, context.caster_level, context.caster_guid, spell_id,
+        cast_item_guid: item_guid
+      )
+
+    {state, [event]}
+  end
+
   defp apply_class_dummy(state, context, _spell, _effect, :last_stand, _now) do
     event =
       Effects.trigger_spell(

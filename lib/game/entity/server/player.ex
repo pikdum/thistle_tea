@@ -59,6 +59,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
   alias ThistleTea.Game.Entity.Server.AIEnvironment
+  alias ThistleTea.Game.Entity.Server.GuardianOwner
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
@@ -725,6 +726,25 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   rescue
     error ->
       Logger.error("Quest share owner cleanup failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:DOWN, token, :process, _pid, _reason}, %State{guardian_monitors: monitors} = state)
+      when is_map_key(monitors, token) do
+    {character, monitors} = GuardianOwner.process_down(state.character, monitors, token)
+    {:noreply, %{state | character: character, guardian_monitors: monitors}}
+  rescue
+    error ->
+      Logger.error("Guardian cleanup failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info(%Effects.SummonGuardians{} = effect, %State{character: %Character{}} = state) do
+    {character, monitors} = GuardianOwner.summon(state.character, state.guardian_monitors, effect)
+    {:noreply, %{state | character: character, guardian_monitors: monitors}}
+  rescue
+    error ->
+      Logger.error("Guardian summon failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 
@@ -1681,6 +1701,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   defp notify_defensive_pet(%Character{} = character, attacker_guid) when is_integer(attacker_guid) do
+    GuardianOwner.defend(character, attacker_guid)
+
     case Entity.pid(Character.controlled_guid(character)) do
       pid when is_pid(pid) -> send(pid, {:owner_attacked, attacker_guid})
       _ -> :ok

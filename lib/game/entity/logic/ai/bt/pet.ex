@@ -184,19 +184,24 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   defp aggressive?(%Mob{internal: %Internal{pet: %Pet{reaction_state: :aggressive}}}, _blackboard), do: true
   defp aggressive?(_state, _blackboard), do: false
 
-  defp acquire_aggressive_target(state, blackboard, %Context{perception: perception}) do
+  defp acquire_aggressive_target(state, blackboard, %Context{now: now, perception: perception}) do
     target_guid =
-      perception
-      |> Perception.nearby(:mobs, 20.0)
+      [:mobs, :players]
+      |> Enum.flat_map(&Perception.nearby(perception, &1, 20.0))
+      |> Enum.sort_by(&elem(&1, 1))
       |> Enum.find_value(fn {guid, _distance} ->
         source = Perception.actor(perception, state.object.guid)
         target = Perception.actor(perception, guid)
-        if Hostility.valid_attack_target?(source, target), do: guid
+        if Hostility.valid_hostile_target?(source, target) and Perception.line_of_sight?(perception, guid), do: guid
       end)
 
     case target_guid do
-      guid when is_integer(guid) -> {:success, command(state, :attack, guid), blackboard}
-      _ -> {:failure, state, blackboard}
+      guid when is_integer(guid) ->
+        %Engagement.Result{entity: state} = Engagement.enter(state, guid, now, selection: :target)
+        {:success, state, blackboard}
+
+      _ ->
+        {:failure, state, blackboard}
     end
   end
 
@@ -258,6 +263,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   end
 
   defp follow_angle(%Mob{internal: %{pet: %Pet{kind: :mini_pet}}}), do: :math.pi()
+  defp follow_angle(%Mob{internal: %{pet: %Pet{follow_angle: angle}}}) when is_number(angle), do: angle
   defp follow_angle(_state), do: @follow_angle
 
   defp distance_to(%Mob{movement_block: %{position: {x, y, z, _o}}}, {tx, ty, tz}) do

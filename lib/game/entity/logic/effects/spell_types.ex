@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
     {:DeliverSpellToQuery, [:source_guid, :source_level, :spell, :query], [exclude_guids: []]},
     {:TriggerSpell, [:source_guid, :source_level, :target_guid, :spell_id],
      [
+       cast_item_guid: nil,
        target_role: nil,
        extra_attack?: false,
        triggering_spell_id: nil,
