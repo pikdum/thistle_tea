@@ -63,13 +63,21 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
 
   def apply(
         %Character{object: %{guid: guid}} = state,
-        %CastContext{caster_guid: guid},
+        %CastContext{caster_guid: guid} = context,
         %Spell{id: spell_id, duration_ms: duration},
-        %Effect{type: :summon_mini_pet, misc_value: entry},
+        %Effect{type: :summon_mini_pet, misc_value: entry} = effect,
         _now
       )
       when is_integer(entry) and entry > 0 do
-    {state, [%Effects.SummonMiniPet{entry: entry, spell_id: spell_id, duration_ms: max(duration || 0, 0)}]}
+    {state,
+     [
+       %Effects.SummonMiniPet{
+         entry: entry,
+         spell_id: spell_id,
+         duration_ms: max(duration || 0, 0),
+         position: mini_pet_position(state, context, effect)
+       }
+     ]}
   end
 
   def apply(
@@ -328,6 +336,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
     do: duration_ms
 
   defp summon_duration(%Spell{}), do: 3_600_000
+
+  defp mini_pet_position(state, context, effect) do
+    if context.destination_position != nil or effect.implicit_target_a in [:minion_position, 47] do
+      {x, y, z, orientation} = state.movement_block.position
+      angle = orientation + :math.pi() / 4
+      {x + 2.0 * :math.cos(angle), y + 2.0 * :math.sin(angle), z, angle + :math.pi()}
+    end
+  end
 
   defp wild_object_position(_effect, {x, y, z}, _caster_position, _orientation), do: {x, y, z}
 

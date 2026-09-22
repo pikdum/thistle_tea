@@ -49,7 +49,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.MiniPetOwner do
   def process_down(%State{} = state, _token), do: state
 
   defp replace(state, %Effects.SummonMiniPet{} = effect) do
-    case Summon.build_mini_pet(effect.entry, state.character, effect.spell_id, effect.duration_ms) do
+    case Summon.build_mini_pet(effect.entry, state.character, effect.spell_id, effect.duration_ms, effect.position) do
       %Mob{} = pet ->
         state = dismiss(state)
 

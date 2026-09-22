@@ -55,6 +55,21 @@ defmodule ThistleTea.Game.Entity.Logic.MiniPetTest do
   end
 
   describe "SpellEffect.receive/4" do
+    test "destination summons appear beside the owner and face back", %{character: character} do
+      for {target, destination} <- [{:minion_position, nil}, {47, nil}, {nil, {50.0, 60.0, 70.0}}] do
+        spell = %Spell{id: 500, effects: [%Effect{type: :summon_mini_pet, misc_value: 5000, implicit_target_a: target}]}
+        context = %CastContext{caster_guid: 1, caster_level: 60, destination_position: destination}
+
+        {_, [%Effects.SummonMiniPet{position: {x, y, z, orientation}}]} =
+          SpellEffect.receive(character, context, spell, 1000)
+
+        assert_in_delta x, :math.sqrt(2), 0.001
+        assert_in_delta y, :math.sqrt(2), 0.001
+        assert z == 0.0
+        assert_in_delta orientation, :math.pi() * 1.25, 0.001
+      end
+    end
+
     test "emits a timed critter request only for its player caster", %{character: character} do
       spell = %Spell{id: 500, duration_ms: 6000, effects: [%Effect{type: :summon_mini_pet, misc_value: 5000}]}
       context = %CastContext{caster_guid: 1, caster_level: 60}

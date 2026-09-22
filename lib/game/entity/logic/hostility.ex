@@ -101,8 +101,9 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   def can_assist?(source, target) when is_integer(target), do: can_assist?(source, target_metadata(target))
 
   def can_assist?(source, target) do
-    not both_player_controlled?(source, target) or same_controller?(source, target) or
-      player_projection(target, :duel_started?) != true
+    assist_flags_allow?(source, target) and
+      (not both_player_controlled?(source, target) or same_controller?(source, target) or
+         player_projection(target, :duel_started?) != true)
   end
 
   def faction_template(%FactionTemplate{} = faction_template), do: faction_template
@@ -382,6 +383,10 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
 
   defp attack_flags_allow?(source, target) do
     not immune_to?(source, target) and not immune_to?(target, source)
+  end
+
+  defp assist_flags_allow?(source, target) do
+    not is_integer(player_owner_guid(source)) or (unit_flags(target) &&& @unit_flag_immune_to_player) == 0
   end
 
   defp immune_to?(entity, other) do

@@ -6,6 +6,18 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
 
   describe "attack immunity flags" do
+    test "player immunity also blocks helpful spells while NPC immunity does not" do
+      player = player(alliance())
+      npc = mob(alliance())
+      controlled = Map.put(npc, :owner_guid, player.object.guid)
+      protected = Map.put(npc, :unit_flags, 0x300)
+      refute Hostility.can_assist?(player, protected)
+      refute Hostility.can_assist?(controlled, protected)
+      assert Hostility.can_assist?(npc, protected)
+      assert Hostility.can_assist?(player, %{protected | unit_flags: 0x200})
+      assert Hostility.can_assist?(protected, player)
+    end
+
     test "noncombat pets cannot attack or be attacked by players or creatures" do
       pet = mob(defias()) |> Map.put(:unit_flags, 0x300)
 

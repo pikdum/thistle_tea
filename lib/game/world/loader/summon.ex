@@ -133,9 +133,10 @@ defmodule ThistleTea.Game.World.Loader.Summon do
 
   def build_pet(_entry, _owner), do: nil
 
-  def build_mini_pet(entry, %Character{} = owner, spell_id, duration_ms)
+  def build_mini_pet(entry, %Character{} = owner, spell_id, duration_ms, position \\ nil)
       when is_integer(entry) and entry > 0 and is_integer(spell_id) and is_integer(duration_ms) do
-    %Mob{} = mob = build(entry, owner.internal.world, owner.movement_block.position, despawn_delay_ms: duration_ms)
+    position = position || owner.movement_block.position
+    %Mob{} = mob = build(entry, owner.internal.world, position, despawn_delay_ms: duration_ms)
     guid = Guid.from_low_guid(:pet, entry, next_low_guid())
     spells = mini_pet_spells(entry)
 
