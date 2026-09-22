@@ -4,8 +4,6 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
   @root Path.expand("../../..", __DIR__)
 
   @allowed_logic_boundaries MapSet.new([
-                              {"lib/game/entity/logic/ai/bt/combat.ex", "ThistleTea.Game.World"},
-                              {"lib/game/entity/logic/ai/bt/combat.ex", "ThistleTea.Game.World.Metadata"},
                               {"lib/game/entity/logic/ai/bt/mob.ex", "ThistleTea.Game.World"},
                               {"lib/game/entity/logic/ai/bt/mob.ex", "ThistleTea.Game.World.Metadata"},
                               {"lib/game/entity/logic/casting.ex", "ThistleTea.Game.World"},

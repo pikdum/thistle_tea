@@ -18,12 +18,32 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Item
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
+
+  defp melee_attack(entity, blackboard, now) do
+    target = entity.unit.target
+    position = World.target_position(target)
+    {x, y, z, _o} = entity.movement_block.position
+    {_world, tx, ty, tz} = position
+    metadata = Metadata.query(target, [:combat_reach, :alive?]) || %{}
+
+    observation = %Observation{
+      guid: target,
+      position: position,
+      distance: Math.distance({x, y, z}, {tx, ty, tz}),
+      metadata: metadata
+    }
+
+    perception = Perception.new(now, nil, %{target => observation}, %{mobs: [], players: []})
+    Combat.melee_attack_with_context(entity, blackboard, Context.new(now, perception: perception))
+  end
 
   describe "target_valid_same_map?/3" do
     test "retained melee targets must still be detectable" do
@@ -62,7 +82,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
     end
   end
 
-  describe "melee_attack/3" do
+  describe "melee_attack_with_context/3" do
     test "white swings and abilities share bonuses and leave progression to the defender" do
       target_guid = Guid.from_low_guid(:unit, 1, 99_876)
       sword = %ItemTemplate{entry: 99_987_655, class: 2, subclass: 7}
@@ -111,7 +131,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       }
 
       blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 0}}
-      assert {:success, swung, _blackboard} = Combat.melee_attack(character, blackboard, 1_000)
+      assert {:success, swung, blackboard} = melee_attack(character, blackboard, 1_000)
+      assert {:success, swung, _blackboard} = melee_attack(swung, blackboard, 1_200)
       assert swung.player.skills == character.player.skills
 
       assert [
@@ -157,8 +178,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 2_000}}
-      assert {:success, distant, blackboard} = Combat.melee_attack(character, blackboard, 2_500)
+      blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 4_000}}
+      assert {:success, distant, blackboard} = melee_attack(character, blackboard, 2_500)
       assert distant.internal.next_swing_spell.id == 78
       assert distant.unit.power2 == 1_000
       refute Enum.any?(distant.internal.events, &match?(%Effects.DeliverSpell{}, &1))
@@ -168,7 +189,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       distant = %{distant | internal: %{distant.internal | events: []}}
 
       starved = %{distant | unit: %{distant.unit | power2: 149}}
-      assert {:success, rejected, _blackboard} = Combat.melee_attack(starved, blackboard, 2_700)
+      assert {:success, rejected, rejected_blackboard} = melee_attack(starved, blackboard, 4_100)
+      assert {:success, rejected, _blackboard} = melee_attack(rejected, rejected_blackboard, 4_300)
       assert rejected.internal.next_swing_spell == nil
       assert rejected.unit.power2 == 149
       refute Enum.any?(rejected.internal.events, &match?(%Effects.DeliverSpell{}, &1))
@@ -179,12 +201,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
                %Effects.DeliverAttack{attack: %{offhand?: true, dual_wield_penalty?: true}}
              ] = rejected.internal.events
 
-      assert {:success, queued, blackboard} = Combat.melee_attack(distant, blackboard, 2_550)
+      assert {:success, waiting, _} = melee_attack(distant, blackboard, 2_550)
+      assert waiting.internal.events == []
+      assert {:success, queued, blackboard} = melee_attack(distant, blackboard, 2_600)
       assert queued.internal.next_swing_spell.id == 78
       assert [%Effects.DeliverAttack{attack: %{offhand?: true, dual_wield_penalty?: false}}] = queued.internal.events
 
       queued = %{queued | internal: %{queued.internal | events: []}}
-      assert {:success, consumed, _blackboard} = Combat.melee_attack(queued, blackboard, 4_100)
+      assert {:success, consumed, blackboard} = melee_attack(queued, blackboard, 4_100)
+      assert {:success, consumed, _blackboard} = melee_attack(consumed, blackboard, 4_300)
       assert consumed.internal.next_swing_spell == nil
       assert consumed.unit.power2 == 850
       assert Enum.any?(consumed.internal.events, &match?(%Effects.DeliverSpell{spell: %Spell{id: 78}}, &1))
@@ -228,7 +253,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       }
 
       blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 0}}
-      assert {:success, character, blackboard} = Combat.melee_attack(character, blackboard, 1_000)
+      assert {:success, character, blackboard} = melee_attack(character, blackboard, 1_000)
+      assert {:success, character, blackboard} = melee_attack(character, blackboard, 1_200)
       assert character.internal.next_swing_spell == nil
       assert character.unit.power2 == 500
       assert blackboard.combat.next_attack_at == 3_000
@@ -262,7 +288,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
 
       blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 0}}
 
-      assert {:success, mob, %Blackboard{}} = Combat.melee_attack(mob, blackboard, 1_000)
+      assert {:success, mob, %Blackboard{}} = melee_attack(mob, blackboard, 1_000)
 
       assert [
                %Effects.DeliverAttack{
@@ -297,13 +323,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
 
       blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 0}}
 
-      assert {:success, pet, %Blackboard{}} = Combat.melee_attack(pet, blackboard, 1_000)
+      assert {:success, pet, %Blackboard{}} = melee_attack(pet, blackboard, 1_000)
 
       assert [%Effects.DeliverAttack{attack: %{caster: 1, caster_owner_guid: ^owner_guid}}] =
                pet.internal.events
     end
 
-    test "queues independent main-hand and off-hand swings for dual wielders" do
+    test "separates simultaneous dual-wield swings by 200 milliseconds" do
       target_guid = 2
       SpatialHash.update(:players, target_guid, 0, 1.0, 0.0, 0.0)
       on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
@@ -332,13 +358,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
         }
       }
 
-      assert {:success, mob, blackboard} = Combat.melee_attack(mob, blackboard, 1_000)
+      assert {:success, mob, blackboard} = melee_attack(mob, blackboard, 1_000)
+
+      assert [%Effects.DeliverAttack{attack: %{damage: 10}}] = mob.internal.events
+      assert blackboard.combat.next_offhand_attack_at == 1_200
+      assert Combat.next_attack_delay(mob, blackboard, 1_000) == 200
+      assert {:success, mob, blackboard} = melee_attack(mob, blackboard, 1_200)
 
       attacks = Enum.filter(mob.internal.events, &is_struct(&1, Effects.DeliverAttack))
       assert length(attacks) == 2
       assert Enum.any?(attacks, &(Map.get(&1.attack, :offhand?) == true and &1.attack.damage == 4))
       assert blackboard.combat.next_attack_at == 3_000
-      assert blackboard.combat.next_offhand_attack_at == 2_500
+      assert blackboard.combat.next_offhand_attack_at == 2_700
     end
 
     test "sends queued melee spell go before delivering the attack" do
@@ -363,7 +394,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
 
       blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 0}}
 
-      assert {:success, mob, %Blackboard{}} = Combat.melee_attack(mob, blackboard, 1_000)
+      assert {:success, mob, %Blackboard{}} = melee_attack(mob, blackboard, 1_000)
 
       assert [
                %Effects.SpellCastResult{spell_id: 78},
@@ -431,7 +462,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       }
 
       assert {:success, character, %Blackboard{}} =
-               Combat.melee_attack(
+               melee_attack(
                  character,
                  %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 0}},
                  1_000
@@ -468,7 +499,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
               %Blackboard{
                 combat: %Blackboard.Combat{attack_started: true, next_attack_at: 3_000}
               }} =
-               Combat.melee_attack(mob, blackboard, 1_000)
+               melee_attack(mob, blackboard, 1_000)
 
       assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.DeliverAttack))
     end
@@ -497,7 +528,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
               %Blackboard{
                 combat: %Blackboard.Combat{attack_started: true, next_attack_at: 1_100}
               }} =
-               Combat.melee_attack(mob, blackboard, 1_000)
+               melee_attack(mob, blackboard, 1_000)
 
       refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.DeliverAttack))
     end
@@ -523,26 +554,26 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
 
       blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: false, next_attack_at: 0}}
 
-      assert {:success, character, blackboard} = Combat.melee_attack(character, blackboard, 1_000)
+      assert {:success, character, blackboard} = melee_attack(character, blackboard, 1_000)
       assert Enum.count(character.internal.events, &is_struct(&1, Effects.AttackNotInRange)) == 1
       assert blackboard.combat.last_swing_error == :not_in_range
 
       character = %{character | internal: %{character.internal | events: []}}
 
-      assert {:success, character, blackboard} = Combat.melee_attack(character, blackboard, 1_100)
+      assert {:success, character, blackboard} = melee_attack(character, blackboard, 1_100)
       refute Enum.any?(character.internal.events, &is_struct(&1, Effects.AttackNotInRange))
       assert blackboard.combat.next_attack_at == 1_200
 
       SpatialHash.update(:mobs, target_guid, 0, 1.0, 0.0, 0.0)
 
-      assert {:success, character, blackboard} = Combat.melee_attack(character, blackboard, 1_200)
+      assert {:success, character, blackboard} = melee_attack(character, blackboard, 1_200)
       assert Enum.any?(character.internal.events, &is_struct(&1, Effects.DeliverAttack))
       assert blackboard.combat.last_swing_error == nil
 
       character = %{character | internal: %{character.internal | events: []}}
       SpatialHash.update(:mobs, target_guid, 0, 50.0, 0.0, 0.0)
 
-      assert {:success, character, _blackboard} = Combat.melee_attack(character, blackboard, 3_200)
+      assert {:success, character, _blackboard} = melee_attack(character, blackboard, 3_200)
       assert Enum.count(character.internal.events, &is_struct(&1, Effects.AttackNotInRange)) == 1
     end
 
@@ -571,7 +602,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
 
       blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 0}}
 
-      assert {:success, character, %Blackboard{}} = Combat.melee_attack(character, blackboard, 1_000)
+      assert {:success, character, %Blackboard{}} = melee_attack(character, blackboard, 1_000)
 
       assert character.unit.power2 == 0
 

@@ -780,7 +780,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp combat_wait(%Mob{} = state, %Blackboard{} = blackboard, now, %Context{} = context) do
-    attack_delay = Blackboard.delay_until(blackboard, :next_attack_at, now)
+    attack_delay = CombatBT.next_attack_delay(state, blackboard, now)
     chase_delay = combat_chase_delay(state, blackboard, attack_delay, now, context)
 
     blackboard =

@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat, as: CombatMemory
@@ -24,17 +25,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Target
-  alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Metadata
 
   @attack_retry_delay_ms 100
+  @attack_display_delay_ms 200
 
   def melee_sequence do
     BT.sequence([
@@ -59,30 +60,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def in_combat?(_state, _blackboard), do: false
 
-  def target_valid_same_map?(%{internal: %Internal{world: world}, unit: %Unit{target: target}}, _blackboard) do
-    case World.target_position(target) do
-      {^world, _x, _y, _z} -> true
-      _ -> false
-    end
-  end
-
-  def target_valid_same_map?(_state, _blackboard), do: false
-
   def target_valid_same_map?(%{unit: %Unit{target: target}} = state, _blackboard, %Context{} = context) do
     Navigation.target_valid_same_map?(state, target, context) and
       Detection.detectable?(state, target, context)
   end
 
   def target_valid_same_map?(_state, _blackboard, %Context{}), do: false
-
-  def in_combat_range?(%{unit: %Unit{target: target}} = state, _blackboard) do
-    case World.distance_between(state, target) do
-      distance when is_number(distance) -> distance <= combat_reach(state, target)
-      _ -> false
-    end
-  end
-
-  def in_combat_range?(_state, _blackboard), do: false
 
   def in_combat_range?(
         %{movement_block: %{position: {x, y, z, _orientation}}, unit: %Unit{target: target}} = state,
@@ -101,39 +84,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def in_combat_range?(_state, _blackboard, %Context{}), do: false
 
-  def melee_attack(%{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard)
-      when is_integer(target) and target > 0 do
-    melee_attack(state, blackboard, Time.now())
-  end
-
-  def melee_attack(state, blackboard), do: {:success, state, blackboard}
-
-  def melee_attack(%{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, now)
-      when is_integer(target) and target > 0 and is_integer(now) do
-    {state, blackboard} = maybe_start_melee_attack(state, target, blackboard)
-    in_range = in_combat_range?(state, blackboard)
-    attack_ready = Blackboard.ready_for?(blackboard, :next_attack_at, now)
-    offhand_ready = offhand_ready?(state, blackboard, now)
-
-    {state, blackboard} =
-      cond do
-        in_range and (attack_ready or offhand_ready) ->
-          perform_ready_attacks(state, target, blackboard, attack_ready, offhand_ready, now)
-
-        in_range ->
-          {state, blackboard}
-
-        attack_ready ->
-          handle_out_of_range(state, blackboard, now)
-
-        true ->
-          {state, blackboard}
-      end
-
-    {:success, state, blackboard}
-  end
-
-  def melee_attack(state, blackboard, _now), do: {:success, state, blackboard}
+  def melee_attack_with_context(%{internal: %Internal{casting: %Cast{}}} = state, blackboard, %Context{}),
+    do: {:success, state, blackboard}
 
   def melee_attack_with_context(
         %{unit: %Unit{target: target}} = state,
@@ -142,23 +94,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
       )
       when is_integer(target) and target > 0 do
     {state, blackboard} = maybe_start_melee_attack(state, target, blackboard)
-    in_range = in_combat_range?(state, blackboard, context)
     attack_ready = Blackboard.ready_for?(blackboard, :next_attack_at, now)
     offhand_ready = offhand_ready?(state, blackboard, now)
 
     {state, blackboard} =
-      cond do
-        in_range and (attack_ready or offhand_ready) ->
-          perform_ready_attacks(state, target, blackboard, attack_ready, offhand_ready, now)
+      if attack_ready or offhand_ready do
+        state = face_melee_victim(state, blackboard, context)
 
-        in_range ->
-          {state, blackboard}
-
-        attack_ready ->
-          handle_out_of_range(state, blackboard, now)
-
-        true ->
-          {state, blackboard}
+        case attack_readiness(state, blackboard, context) do
+          :ok -> perform_ready_attacks(state, target, blackboard, attack_ready, now)
+          error -> retry_attacks(state, blackboard, error, now)
+        end
+      else
+        {state, blackboard}
       end
 
     {:success, state, blackboard}
@@ -166,25 +114,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def melee_attack_with_context(state, blackboard, %Context{}), do: {:success, state, blackboard}
 
-  defp perform_ready_attacks(state, target, blackboard, main_ready?, offhand_ready?, now) do
-    if CombatControl.pacified?(state) do
-      {state, blackboard}
-    else
-      perform_unrestricted_attacks(state, target, blackboard, main_ready?, offhand_ready?, now)
-    end
-  end
-
-  defp perform_unrestricted_attacks(state, target, blackboard, main_ready?, offhand_ready?, now) do
+  defp perform_ready_attacks(state, target, blackboard, main_ready?, now) do
     {state, events} = Aura.remove_with_interrupt_flags(state, Aura.interrupt_mask(:attack), now)
     state = Effects.enqueue(state, events)
     state = PlayerCombat.mark_initiated(state, now)
     blackboard = clear_swing_error(blackboard)
     {state, blackboard} = perform_main_hand(state, target, blackboard, main_ready?, now)
-    perform_offhand(state, target, blackboard, offhand_ready?, now)
+    perform_offhand(state, target, blackboard, offhand_ready?(state, blackboard, now), now)
   end
 
   defp perform_main_hand(state, target, blackboard, true, now) do
     speed = CombatLogic.attack_speed_ms(state)
+
+    blackboard =
+      if CombatLogic.offhand_damage_range(state),
+        do: delay_nearby_attack(blackboard, :next_offhand_attack_at, now),
+        else: blackboard
+
     {send_melee_attack(state, target, now), Blackboard.put_next_at(blackboard, :next_attack_at, speed, now)}
   end
 
@@ -192,17 +138,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   defp perform_offhand(state, target, blackboard, true, now) do
     speed = CombatLogic.offhand_attack_speed_ms(state)
+    blackboard = delay_nearby_attack(blackboard, :next_attack_at, now)
 
     {send_offhand_attack(state, target), Blackboard.put_next_at(blackboard, :next_offhand_attack_at, speed, now)}
   end
 
   defp perform_offhand(state, _target, blackboard, false, _now), do: {state, blackboard}
 
-  def wait_for_next_attack(state, %Blackboard{} = blackboard) do
-    wait_for_next_attack(state, blackboard, Time.now())
+  def wait_for_next_attack(state, %Blackboard{} = blackboard, now) when is_integer(now) do
+    delay_ms = next_attack_delay(state, blackboard, now)
+    status = if delay_ms > 0, do: {:running, delay_ms}, else: :running
+    {status, state, blackboard}
   end
 
-  def wait_for_next_attack(state, %Blackboard{} = blackboard, now) when is_integer(now) do
+  def next_attack_delay(state, %Blackboard{} = blackboard, now) do
     delays = [Blackboard.delay_until(blackboard, :next_attack_at, now)]
 
     delays =
@@ -212,19 +161,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
         delays
       end
 
-    delay_ms = Enum.min(delays)
-
-    status =
-      if delay_ms > 0 do
-        {:running, delay_ms}
-      else
-        :running
-      end
-
-    {status, state, blackboard}
+    Enum.min(delays)
   end
-
-  def wait_for_next_attack(state, blackboard, _now), do: {:running, state, blackboard}
 
   defp wait_for_next_attack_with_context(state, %Blackboard{} = blackboard, %Context{now: now}) do
     wait_for_next_attack(state, blackboard, now)
@@ -242,18 +180,43 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     {state, %{blackboard | combat: combat}}
   end
 
-  defp handle_out_of_range(%Character{} = state, blackboard, now) do
-    blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, @attack_retry_delay_ms, now)
-    repeated? = blackboard.combat.last_swing_error == :not_in_range
-    combat = %{blackboard.combat | last_swing_error: :not_in_range}
-    state = if repeated?, do: state, else: Effects.enqueue(state, Effects.attack_not_in_range())
-    {state, %{blackboard | combat: combat}}
+  defp delay_nearby_attack(blackboard, key, now) do
+    if Blackboard.delay_until(blackboard, key, now) < @attack_display_delay_ms,
+      do: Blackboard.put_next_at(blackboard, key, @attack_display_delay_ms, now),
+      else: blackboard
   end
 
-  defp handle_out_of_range(state, blackboard, now) do
-    blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, @attack_retry_delay_ms, now)
-    {state, blackboard}
+  defp retry_attacks(state, blackboard, error, now) do
+    state = notify_swing_error(state, blackboard, error)
+    blackboard = delay_ready_attack(blackboard, :next_attack_at, now)
+
+    blackboard =
+      if CombatLogic.offhand_damage_range(state),
+        do: delay_ready_attack(blackboard, :next_offhand_attack_at, now),
+        else: blackboard
+
+    {state, %{blackboard | combat: %{blackboard.combat | last_swing_error: error}}}
   end
+
+  defp delay_ready_attack(blackboard, key, now) do
+    if Blackboard.ready_for?(blackboard, key, now),
+      do: Blackboard.put_next_at(blackboard, key, @attack_retry_delay_ms, now),
+      else: blackboard
+  end
+
+  defp notify_swing_error(%Character{} = state, blackboard, error) do
+    if blackboard.combat.last_swing_error == error do
+      state
+    else
+      case error do
+        :not_in_range -> Effects.enqueue(state, Effects.attack_not_in_range())
+        :bad_facing -> Effects.enqueue(state, %Effects.AttackBadFacing{})
+        _ -> state
+      end
+    end
+  end
+
+  defp notify_swing_error(state, _blackboard, _error), do: state
 
   defp clear_swing_error(%Blackboard{} = blackboard) do
     %{blackboard | combat: %{blackboard.combat | last_swing_error: nil}}
@@ -276,6 +239,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
         %Context{} = context
       )
       when count > 0 do
+    state = face_melee_victim(state, blackboard, context)
+
     if extra_attack_ready?(state, blackboard, context) do
       {state, events} = Aura.remove_with_interrupt_flags(state, Aura.interrupt_mask(:attack), context.now)
       state = state |> Effects.enqueue(events) |> PlayerCombat.mark_initiated(context.now)
@@ -291,12 +256,32 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   def consume_extra_attacks(state, blackboard, _context), do: {:failure, state, blackboard}
 
   defp extra_attack_ready?(state, blackboard, context) do
-    Death.alive?(state) and not CombatControl.pacified?(state) and in_combat?(state, blackboard) and
-      not Enum.any?([:mod_stun, :mod_confuse, :mod_fear], &Aura.has_aura?(state, &1)) and
-      not match?(%{alive?: false}, Perception.metadata(context.perception, state.unit.target)) and
-      target_valid_same_map?(state, blackboard, context) and in_combat_range?(state, blackboard, context) and
-      facing_target?(state, context)
+    in_combat?(state, blackboard) and attack_readiness(state, blackboard, context) == :ok
   end
+
+  defp attack_readiness(state, blackboard, context) do
+    cond do
+      CombatControl.auto_attack_blocked?(state) -> :cannot_attack
+      not Death.alive?(state) -> :dead
+      match?(%{alive?: false}, Perception.metadata(context.perception, state.unit.target)) -> :dead
+      not target_valid_same_map?(state, blackboard, context) -> :unavailable
+      not in_combat_range?(state, blackboard, context) -> :not_in_range
+      not facing_target?(state, context) -> :bad_facing
+      true -> :ok
+    end
+  end
+
+  defp face_melee_victim(%Mob{internal: %Internal{casting: nil}} = state, blackboard, %Context{now: now} = context) do
+    if in_combat?(state, blackboard) and attack_readiness(state, blackboard, context) == :bad_facing and
+         not Movement.moving?(state, now) do
+      {_world, x, y, _z} = Perception.position(context.perception, state.unit.target)
+      state |> Movement.face_towards({x, y}) |> Effects.enqueue(Effects.set_facing({:target, state.unit.target}))
+    else
+      state
+    end
+  end
+
+  defp face_melee_victim(state, _blackboard, _context), do: state
 
   defp facing_target?(%{unit: %Unit{target: target}, movement_block: %{position: {x, y, _z, orientation}}}, context) do
     case Perception.position(context.perception, target) do
@@ -408,10 +393,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   defp queue_queued_spell_go(state, _queued_spell, _target, _targets), do: state
 
-  defp combat_reach(%{unit: unit} = state, target) do
-    CombatLogic.melee_reach(combat_reach_value(unit), target_combat_reach(state, target))
-  end
-
   defp combat_reach(%{unit: unit}, target, perception) do
     CombatLogic.melee_reach(combat_reach_value(unit), perceived_target_combat_reach(target, perception))
   end
@@ -425,19 +406,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   end
 
   defp combat_reach_value(_unit), do: Unit.default_combat_reach()
-
-  defp target_combat_reach(%{object: %{guid: guid}, unit: unit}, target) when is_integer(target) and target == guid do
-    combat_reach_value(unit)
-  end
-
-  defp target_combat_reach(_state, target) when is_integer(target) do
-    case Metadata.query(target, [:combat_reach]) do
-      %{combat_reach: combat_reach} -> combat_reach_value(combat_reach)
-      _ -> Unit.default_combat_reach()
-    end
-  end
-
-  defp target_combat_reach(_state, _target), do: Unit.default_combat_reach()
 
   defp perceived_target_combat_reach(target, perception) when is_integer(target) do
     case Perception.metadata(perception, target) do

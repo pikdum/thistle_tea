@@ -164,6 +164,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
         attack_started: false,
         auto_attacking: false,
         auto_attack_target: nil,
+        last_swing_error: nil,
         melee_enabled: true
     }
 
@@ -224,7 +225,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   def clear_auto_attack(%__MODULE__{combat: combat} = blackboard) do
     %{
       blackboard
-      | combat: %{combat | attack_started: false, auto_attacking: false, auto_attack_target: nil, extra_attacks: 0}
+      | combat: %{
+          combat
+          | attack_started: false,
+            auto_attacking: false,
+            auto_attack_target: nil,
+            extra_attacks: 0,
+            last_swing_error: nil
+        }
     }
   end
 

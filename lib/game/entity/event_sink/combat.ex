@@ -10,8 +10,6 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Opcodes
-  alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CallForHelp
   alias ThistleTea.Game.World.Metadata
@@ -144,7 +142,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   end
 
   def emit(entity, %Effects.AttackNotInRange{}, context) do
-    Context.send_packet(context, Packet.build(<<>>, Opcodes.get(:SMSG_ATTACKSWING_NOTINRANGE)))
+    Context.send_packet(context, %Message.SmsgAttackswingNotinrange{})
+
+    entity
+  end
+
+  def emit(entity, %Effects.AttackBadFacing{}, context) do
+    Context.send_packet(context, %Message.SmsgAttackswingBadfacing{})
 
     entity
   end

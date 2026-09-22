@@ -169,14 +169,15 @@ defmodule ThistleTea.Game.Entity.Logic.CombatControlTest do
         {:success, controlled, updated} = Combat.melee_attack_with_context(controlled, blackboard, context)
         assert controlled.internal.events == []
         assert controlled.internal.next_swing_spell == queued
-        assert updated == blackboard
+        assert updated.combat.next_attack_at == 200
+        assert updated.combat.next_offhand_attack_at == 200
         pending = %{blackboard | combat: %{blackboard.combat | extra_attacks: 2}}
         {:failure, controlled, ^pending} = Combat.consume_extra_attacks(controlled, pending, context)
         assert controlled.internal.events == []
         {released, _} = Aura.remove_spells(controlled, [1], 100)
         released = %{released | internal: %{released.internal | next_swing_spell: nil}}
         {:success, released, _} = Combat.melee_attack_with_context(released, blackboard, context)
-        assert Enum.count(released.internal.events, &is_struct(&1, Effects.DeliverAttack)) == 2
+        assert Enum.count(released.internal.events, &is_struct(&1, Effects.DeliverAttack)) == 1
       end
     end
 
@@ -184,7 +185,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatControlTest do
       entity = apply_control(entity, :mod_silence, 1)
       blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true}}
       {:success, entity, _} = Combat.melee_attack_with_context(entity, blackboard, combat_context())
-      assert Enum.count(entity.internal.events, &is_struct(&1, Effects.DeliverAttack)) == 2
+      assert Enum.count(entity.internal.events, &is_struct(&1, Effects.DeliverAttack)) == 1
     end
   end
 

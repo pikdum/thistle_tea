@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
     {:DuelInterrupted, [:target_guid], []},
     {:DuelRequest, [:source_guid, :source_level, :target_guid, :entry, :position, :facing], []},
     {:AttackNotInRange, [], []},
+    {:AttackBadFacing, [], []},
     {:AttackerGained, [:target_guid], []},
     {:AttackerLost, [:target_guid], []},
     {:ThreatRefGained, [:target_guid], []},

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatControl do
 
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Spell
 
   @pacified 0x00020000
@@ -15,6 +16,10 @@ defmodule ThistleTea.Game.Entity.Logic.CombatControl do
 
   def pacified?(entity), do: has_control?(entity, [:mod_pacify, :mod_pacify_silence])
   def silenced?(entity), do: has_control?(entity, [:mod_silence, :mod_pacify_silence])
+
+  def auto_attack_blocked?(entity) do
+    pacified?(entity) or ControlMovement.active?(entity) or has_control?(entity, [:mod_stun, :feign_death])
+  end
 
   def prevention(entity, %Spell{prevention_type: 1}) do
     if silenced?(entity), do: {:error, :silenced}, else: :ok

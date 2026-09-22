@@ -68,10 +68,10 @@ defmodule ThistleTea.Game.Entity.Logic.ExtraAttacksTest do
       assert {:failure, ^entity, ^updated} = Combat.consume_extra_attacks(entity, updated, context())
     end
 
-    test "waits for range, a live visible victim, facing, and attack readiness", %{entity: entity} do
+    test "waits for range, a live visible victim, and attack readiness", %{entity: entity} do
       entity = ExtraAttacks.grant(entity, 2)
 
-      unavailable = [context(20), context(-3), context(3, %{alive?: false}), context(3, %{invisibility: %{0 => 100}})]
+      unavailable = [context(20), context(3, %{alive?: false}), context(3, %{invisibility: %{0 => 100}})]
 
       for context <- unavailable do
         assert {:failure, ^entity, blackboard} =
