@@ -39,7 +39,8 @@ Reference: `refs/vmangos` at `8f4e60845`, particularly
 
 The raw DBC contains 211 guardian-effect occurrences. VMangos converts 13 of
 these to wild summons, including all three Target Dummies. Those retain the
-wild-summon distinction and are not implemented by this guardian change.
+wild-summon distinction and are now covered by the separate
+[wild summon system](wild-summon-playtest.md).
 Individual summon scripts, such as Arcanite Dragonling spell timers and Battle
 Chicken behavior, remain separate content work.
 
