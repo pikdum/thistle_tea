@@ -5,7 +5,9 @@ defmodule ThistleTea.Game.Spell.CastContext do
   numbers — so effects apply consistently even after the caster's state
   changes.
   """
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AttackPower
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -110,7 +112,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       spell: spell,
       spell_damage_bonus: spell_damage_bonus(caster),
       spell_damage_versus: TargetSpellPower.snapshot(caster),
-      healing_bonus: healing_bonus(caster),
+      healing_bonus: healing_bonus(caster, spell),
       resistance_penetration: ResistancePenetration.snapshot(caster),
       spell_threat: SpellThreatLoader.get(spell_id(spell)),
       spell_modifiers: Modifiers.snapshot(caster, spell),
@@ -317,13 +319,32 @@ defmodule ThistleTea.Game.Spell.CastContext do
     bonuses = equipment_bonuses(caster)
 
     Map.new(@schools, fn school ->
-      {school, Map.get(bonuses, :"spell_#{school}", 0) + stat_scaled_spell_damage(caster, school)}
+      {school,
+       Map.get(bonuses, :"spell_#{school}", 0) + temporary_spell_damage(caster, school) +
+         stat_scaled_spell_damage(caster, school)}
     end)
   end
 
-  defp healing_bonus(caster) do
+  defp temporary_spell_damage(%{unit: %Unit{auras: holders}} = caster, school) when is_list(holders) do
+    unrestricted =
+      Enum.filter(holders, fn %Holder{spell: %Spell{} = spell} ->
+        spell.equipped_item_class in [nil, -1] and spell.equipped_item_inventory_type_mask in [nil, 0]
+      end)
+
+    Aura.flat_modifier(
+      %{caster | unit: %{caster.unit | auras: unrestricted}},
+      :mod_damage_done,
+      Spell.school_mask(school)
+    )
+  end
+
+  defp temporary_spell_damage(_caster, _school), do: 0
+
+  defp healing_bonus(caster, spell) do
     equipment = caster |> equipment_bonuses() |> Map.get(:healing, 0)
-    equipment + stat_scaled_amount(caster, :mod_spell_healing_of_stat_percent, 1)
+
+    equipment + Aura.flat_modifier(caster, :mod_healing_done, Spell.school_mask(spell)) +
+      stat_scaled_amount(caster, :mod_spell_healing_of_stat_percent, 1)
   end
 
   defp stat_scaled_spell_damage(caster, school) do
