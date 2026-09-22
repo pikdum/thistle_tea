@@ -93,6 +93,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - learned parry and block capabilities, weapon and shield requirements, sheath restrictions, and defense-skill avoidance on the character sheet
 - [Combat skill progression](docs/combat-skills-playtest.md), with shared weapon bonuses, off-hand and ranged training, resolved outcome checks, and launch-time weapon attribution
 - [Weapon attack accuracy](docs/attack-accuracy-playtest.md), with dual-wield miss penalties, queued-attack suppression, hit scaling, PvP defense, and capped glancing adjustments
+- [Weapon-dependent offensive bonuses](docs/weapon-bonuses-playtest.md), with per-hand hit, weapon talents and enchants, skill-derived crit displays, and filtered white-attack damage
 - main-hand disarm: unarmed player combat, armed-creature damage reduction, weapon ability checks, and off-hand preservation
 - rear-hit daze from uncontrolled creatures, with level and defense-skill scaling
 - mechanic resistance for spells and melee abilities, including Orc Hardiness
