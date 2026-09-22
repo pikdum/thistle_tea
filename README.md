@@ -169,6 +169,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - dying + resurrecting
 - Soulstones and Reincarnation, with reagent consumption, cooldowns, and talent modifiers
 - fall damage, Safe Fall, and Slow Fall protection
+- [Environmental fire damage](docs/environmental-fire-playtest.md), with world campfires, resistance, shield depletion, combat-log feedback, and death durability loss
 - underwater breath timers, drowning, water-breathing effects, and extended breath reserves
 - swimming speed bonuses and snare updates, synchronized with the player and nearby observers
 - gossip + trainers
