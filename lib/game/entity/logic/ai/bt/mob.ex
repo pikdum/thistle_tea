@@ -650,7 +650,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   def drop_threat(state, _source_guid, %Context{}), do: state
 
-  defp reset_after_combat(%Mob{} = state, %Context{} = context) do
+  def reset_after_combat(%Mob{} = state, %Context{} = context) do
     reset_after_combat(state, Blackboard.ensure(state.internal.blackboard), context)
   end
 

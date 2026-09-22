@@ -120,7 +120,7 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
                  55,
                  59
                ])
-  @partial MapSet.new([20, 21, 25, 34, 35, 36, 37, 38, 47, 50, 54, 56])
+  @partial MapSet.new([20, 21, 25, 34, 35, 36, 37, 38, 47, 50, 54, 56, 57, 58])
 
   @partial_dependencies %{
     20 => "scripted-event boundary only",
@@ -134,7 +134,9 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
     47 => "scripted-event target snapshots only",
     50 => "spawned game objects; child capabilities still apply",
     54 => "scripted-event boundary only",
-    56 => "scripted-event boundary only"
+    56 => "scripted-event boundary only",
+    57 => "registered creature-group owner",
+    58 => "registered creature-group owner"
   }
 
   @blocked_dependencies %{
@@ -143,9 +145,7 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
     18 => "instance-script callbacks",
     26 => "holiday projection",
     31 => "typed update-field capability",
-    49 => "authoritative VMangos loot-state owner",
-    57 => "creature formation owner",
-    58 => "creature formation owner"
+    49 => "authoritative VMangos loot-state owner"
   }
 
   def audit(repo \\ Repo) do
@@ -239,8 +239,7 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
     2. Partial world facts currently collected only by the scripted-event
        boundary or for spawned game objects.
     3. Explicitly blocked owners: saved variables, instance-specific callbacks,
-       unregistered instance fields, raw flags, game-object loot state, and
-       creature formations.
+       unregistered instance fields, raw flags, and game-object loot state.
 
     The inventory includes every schema column whose normalized name is
     `condition_id`, `conditionId`, `required_condition`, or `RequiredCondition`.

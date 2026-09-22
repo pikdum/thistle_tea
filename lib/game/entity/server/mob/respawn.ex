@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.CreatureGroups
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpawnPool
@@ -93,6 +94,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
 
       true ->
         state = %{state | unit: %{state.unit | health: 0}}
+        CreatureGroups.event(state, :despawn, self())
         Metadata.update(state.object.guid, %{alive?: false, health_pct: 0.0})
 
         state
@@ -146,12 +148,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       |> TemporaryFaction.after_respawn()
       |> Mob.apply_addon_auras(now)
       |> BT.init(MobBT.tree())
+      |> register_group_respawn()
       |> EventAI.with_blackboard(&EventAI.on_spawned(&1, &2, now, AIEnvironment.context(&1, now)))
       |> NavigationResolver.resolve(now)
       |> put_spawn_position()
       |> broadcast_respawn()
 
     kick_ai_tick()
+    state
+  end
+
+  defp register_group_respawn(%Mob{} = state) do
+    CreatureGroups.respawn(state, self())
     state
   end
 

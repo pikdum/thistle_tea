@@ -87,6 +87,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CallForHelp
   alias ThistleTea.Game.World.ChaseWatch
+  alias ThistleTea.Game.World.CreatureGroups
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
@@ -143,6 +144,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state = sync_orientation_metadata(state)
     World.update_position(state)
     state = Visibility.join_entity(state)
+    CreatureGroups.register(state, self())
 
     state =
       state
@@ -863,6 +865,19 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, Respawn.handle(state)}
   end
 
+  def handle_info({:creature_group, token, command}, %Mob{} = state) do
+    if CreatureGroups.valid_command?(state.internal.world, state.object.guid, token, self()) do
+      state = apply_creature_group_command(state, command)
+      {:noreply, state, {:continue, :maybe_broadcast}}
+    else
+      {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("creature group command crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_info({:script_respawn, even_if_alive?}, %Mob{} = state) when is_boolean(even_if_alive?) do
     {:noreply, Respawn.force(state, even_if_alive?)}
   rescue
@@ -1441,6 +1456,41 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp engage_combat(state, caster), do: engage_combat(state, caster, [])
+
+  defp apply_creature_group_command(%Mob{internal: %Internal{in_combat: false}} = state, {:attack, target}) do
+    if not Core.dead?(state) and not Corpse.removed?(state) and Hostility.valid_attack_target?(state, target) do
+      state |> engage_combat(target, call_assistance: false) |> wake_ai_tick()
+    else
+      state
+    end
+  end
+
+  defp apply_creature_group_command(%Mob{internal: %Internal{in_combat: true}} = state, :evade) do
+    now = Time.now()
+
+    state
+    |> MobBT.reset_after_combat(AIEnvironment.context(state, now))
+    |> NavigationResolver.resolve(now)
+    |> wake_ai_tick()
+  end
+
+  defp apply_creature_group_command(%Mob{} = state, :respawn), do: Respawn.force(state, false)
+
+  defp apply_creature_group_command(%Mob{} = state, {:member_died, guid, entry, leader?}) do
+    if Core.dead?(state) do
+      state
+    else
+      now = Time.now()
+      context = AIEnvironment.context(state, now, ObservationRequest.actor(guid))
+
+      state
+      |> EventAI.with_blackboard(&EventAI.on_group_member_died(&1, &2, guid, entry, leader?, context))
+      |> NavigationResolver.resolve(now)
+      |> wake_ai_tick()
+    end
+  end
+
+  defp apply_creature_group_command(%Mob{} = state, _command), do: state
 
   defp engage_combat(%Mob{} = state, caster, opts) when is_integer(caster) do
     now = Time.now()

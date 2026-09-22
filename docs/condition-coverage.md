@@ -84,7 +84,7 @@ every consumer has migrated.
 | 11 | `saved_variable` | 5 | blocked | global saved-variable owner |
 | 18 | `instance_script` | 5 | blocked | instance-script callbacks |
 | 33 | `map_id` | 5 | evaluable | - |
-| 57 | `creature_group_member` | 5 | blocked | creature formation owner |
+| 57 | `creature_group_member` | 5 | partial | registered creature-group owner |
 | 6 | `team` | 4 | evaluable | - |
 | 29 | `skill_below` | 4 | evaluable | - |
 | 35 | `map_event_data` | 4 | partial | scripted-event boundary only |
@@ -110,7 +110,7 @@ every consumer has migrated.
 | 44 | `reaction` | 1 | evaluable | - |
 | 47 | `map_event_targets` | 1 | partial | scripted-event target snapshots only |
 | 49 | `object_loot_state` | 1 | blocked | authoritative VMangos loot-state owner |
-| 58 | `creature_group_dead` | 1 | blocked | creature formation owner |
+| 58 | `creature_group_dead` | 1 | partial | registered creature-group owner |
 | 59 | `area_explored` | 1 | evaluable | - |
 
 ## Consumer integration
@@ -131,8 +131,7 @@ every consumer has migrated.
 2. Partial world facts currently collected only by the scripted-event
    boundary or for spawned game objects.
 3. Explicitly blocked owners: saved variables, instance-specific callbacks,
-   unregistered instance fields, raw flags, game-object loot state, and
-   creature formations.
+   unregistered instance fields, raw flags, and game-object loot state.
 
 The inventory includes every schema column whose normalized name is
 `condition_id`, `conditionId`, `required_condition`, or `RequiredCondition`.

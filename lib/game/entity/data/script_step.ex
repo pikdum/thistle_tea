@@ -251,6 +251,8 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(73), do: :combat_stop
   defp command(74), do: :add_aura
   defp command(76), do: :summon_object
+  defp command(78), do: :join_creature_group
+  defp command(79), do: :leave_creature_group
   defp command(80), do: :set_game_object_state
   defp command(81), do: :despawn_game_object
   defp command(82), do: :load_game_object_spawn

@@ -4,6 +4,11 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
 
   describe "build/1" do
+    test "decodes creature group commands" do
+      assert row(78) |> ScriptStep.build() |> Map.fetch!(:command) == :join_creature_group
+      assert row(79) |> ScriptStep.build() |> Map.fetch!(:command) == :leave_creature_group
+    end
+
     test "decodes commands, delays, and target flags" do
       step =
         ScriptStep.build(%{

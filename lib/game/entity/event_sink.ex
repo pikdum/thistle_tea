@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity.EventSink.ClientProjection
   alias ThistleTea.Game.Entity.EventSink.Combat
   alias ThistleTea.Game.Entity.EventSink.Context
+  alias ThistleTea.Game.Entity.EventSink.CreatureGroups
   alias ThistleTea.Game.Entity.EventSink.Honor
   alias ThistleTea.Game.Entity.EventSink.InstanceData
   alias ThistleTea.Game.Entity.EventSink.Movement
@@ -203,6 +204,11 @@ defmodule ThistleTea.Game.Entity.EventSink do
   defp emit_resolved(entity, %Effects.BattlegroundDeath{world: world, defeat: defeat}, _context) do
     Battleground.player_died(world, defeat)
     entity
+  end
+
+  defp emit_resolved(entity, %{__struct__: type} = effect, context)
+       when type in [Effects.CreatureGroupEvent, Effects.CreatureGroupCommand] do
+    CreatureGroups.emit(entity, effect, context)
   end
 
   defp emit_resolved(entity, %{__struct__: type} = effect, context)

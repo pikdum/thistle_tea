@@ -16,6 +16,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Battleground.Supervisor, as: BattlegroundSupervisor
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ChaseWatch
+  alias ThistleTea.Game.World.CreatureGroups
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.HonorStore
@@ -27,6 +28,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Loader.BroadcastText, as: BroadcastTextLoader
   alias ThistleTea.Game.World.Loader.ClassSpell, as: ClassSpellLoader
+  alias ThistleTea.Game.World.Loader.CreatureGroup, as: CreatureGroupLoader
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
   alias ThistleTea.Game.World.Loader.Emote, as: EmoteLoader
@@ -132,6 +134,7 @@ defmodule ThistleTea.Application do
         ThistleTea.Telemetry,
         PartySystem,
         ScriptedEventSystem,
+        CreatureGroups,
         InstanceSystem,
         DuelSystem,
         {Group, name: Groups, log: false},
@@ -269,6 +272,7 @@ defmodule ThistleTea.Application do
 
     with {:ok, pid} <- Supervisor.start_link(children, opts) do
       if !test do
+        CreatureGroupLoader.load_all()
         Logger.info("Loading waypoints...")
         WaypointLoader.load_all()
         Logger.info("Loading quests...")

@@ -24,6 +24,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
   @talk_step %ScriptStep{command: :talk, texts: [%{text: "!", chat_type: :say, language: 0, emote_id: 0}]}
 
+  describe "on_group_member_died/6" do
+    test "matches entry and original-leader status" do
+      trigger = event(:group_member_died, param1: 7, param2: 1)
+      state = mob(events: [trigger])
+      context = Context.new(0)
+      {wrong_entry, _} = EventAI.on_group_member_died(state, Blackboard.new(), 99, 8, true, context)
+      {follower, _} = EventAI.on_group_member_died(state, Blackboard.new(), 99, 7, false, context)
+      {leader, _} = EventAI.on_group_member_died(state, Blackboard.new(), 99, 7, true, context)
+      assert wrong_entry.internal.events == []
+      assert follower.internal.events == []
+      assert [%Effects.MonsterTalk{}] = leader.internal.events
+    end
+  end
+
   describe "on_spawned/3" do
     test "fires spawned events" do
       mob = mob(events: [event(:spawned)])

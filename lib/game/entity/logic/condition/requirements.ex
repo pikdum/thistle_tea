@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Requirements do
   alias ThistleTea.Game.Entity.Data.Condition
 
   @scripted_event_types [
+    :creature_group_member,
+    :creature_group_dead,
     :escort,
     :map_event_data,
     :map_event_active,

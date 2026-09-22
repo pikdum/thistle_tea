@@ -48,7 +48,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     :reached_home,
     :receive_emote,
     :spell_hit_target,
-    :script_event
+    :script_event,
+    :group_member_died
   ]
 
   def tick_ms, do: @tick_ms
@@ -279,6 +280,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end
 
     fire_edges(state, blackboard, matcher, invoker_guid, now, context)
+  end
+
+  def on_group_member_died(state, %Blackboard{} = blackboard, guid, entry, leader?, %Context{now: now} = context) do
+    matcher = fn %AIEvent{} = event ->
+      event.event_type == :group_member_died and event.param1 in [0, entry] and event.param2 != 0 == leader?
+    end
+
+    fire_edges(state, blackboard, matcher, guid, now, context)
   end
 
   def ooc_timer_delay(state, %Blackboard{} = blackboard, now) when is_integer(now) do

@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionEvaluator
   alias ThistleTea.Game.Entity.Logic.Condition.EntityContext
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.CreatureGroup.Member
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Hostility
@@ -956,6 +957,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   defp execute(state, blackboard, %ScriptStep{command: :summon_object} = step, _target_guid, _now) do
     effect = Effects.summon_game_object(step.datalong, step.datalong2 * 1_000, position: step.position)
     {Effects.enqueue(state, effect), blackboard}
+  end
+
+  defp execute(
+         %Mob{} = state,
+         blackboard,
+         %ScriptStep{command: :join_creature_group, position: {distance, _, _, angle}} = step,
+         target,
+         _now
+       )
+       when is_integer(target) and is_number(distance) and distance >= 0 and is_number(angle) do
+    member = %Member{distance: distance, angle: angle, flags: step.datalong}
+    {Effects.enqueue(state, Effects.creature_group_command({:join, target, member})), blackboard}
+  end
+
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :leave_creature_group}, _target, _now) do
+    {Effects.enqueue(state, Effects.creature_group_command(:leave)), blackboard}
   end
 
   defp execute(%GameObject{} = state, blackboard, %ScriptStep{command: :set_game_object_state} = step, _target, _now) do

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.SpatialGrid
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.CreatureGroups
   alias ThistleTea.Game.World.InstanceSpawn
   alias ThistleTea.Game.World.Loader
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
@@ -178,6 +179,8 @@ defmodule ThistleTea.Game.World.SpawnPool do
       {{^world, _group} = key, pid} -> SpawnPoolSupervisor.terminate_child(key, pid)
       {_other_key, _pid} -> :ok
     end)
+
+    CreatureGroups.stop_world(world)
   end
 
   defp ensure_started(key, blueprint) do

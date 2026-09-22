@@ -116,6 +116,17 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Leaf.World do
   def evaluate(%Context{target: %Subject{go_state: go_state}}, %Condition{type: :object_go_state, value1: required})
       when is_integer(go_state), do: handled(go_state == required)
 
+  def evaluate(
+        %Context{source: %Subject{kind: :creature, formation_leader_guid: leader, formation_dead?: dead?}},
+        %Condition{type: :creature_group_member, value1: required}
+      )
+      when is_boolean(dead?), do: handled(not is_nil(leader) and (required == 0 or required == leader))
+
+  def evaluate(%Context{source: %Subject{kind: :creature, formation_dead?: dead?}}, %Condition{
+        type: :creature_group_dead
+      })
+      when is_boolean(dead?), do: handled(dead?)
+
   def evaluate(_context, _condition), do: :unhandled
 
   defp handled(boolean), do: {:handled, Result.truth(boolean)}

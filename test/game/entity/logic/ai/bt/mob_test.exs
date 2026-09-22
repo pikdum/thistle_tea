@@ -887,7 +887,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
       assert [
                %Effects.ThreatRefGained{target_guid: ^target_guid},
-               %Effects.AttackerGained{target_guid: ^target_guid}
+               %Effects.AttackerGained{target_guid: ^target_guid},
+               %Effects.CreatureGroupEvent{event: {:attack, ^target_guid}}
              ] = state.internal.events
 
       assert Metadata.query(target_guid, [:attacker_count]) == %{attacker_count: 0}

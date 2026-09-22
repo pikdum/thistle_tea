@@ -69,6 +69,12 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
       select_on_enter(entity, target_guid, selection)
 
     entity = entity |> Combat.sync_combat_flag() |> mark_broadcast_update()
+
+    entity =
+      if previous.internal.in_combat == true or is_nil(victim(entity)),
+        do: entity,
+        else: Effects.enqueue(entity, Effects.creature_group_event({:attack, victim(entity)}))
+
     result(previous, entity, :enter, decision)
   end
 
@@ -127,6 +133,9 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
       |> mark_broadcast_update()
       |> TemporaryFaction.restore(:combat_stop)
 
+    group_event = if reason in [:death, :evade], do: reason, else: :combat_stop
+    entity = Effects.enqueue(entity, Effects.creature_group_event(group_event))
+
     result(previous, entity, reason)
   end
 
@@ -148,7 +157,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
         blackboard: nil
     }
 
-    entity = %{entity | unit: unit, internal: internal}
+    entity = %{entity | unit: unit, internal: internal} |> Effects.enqueue(Effects.creature_group_event(:respawn))
     result(previous, entity, :respawn)
   end
 

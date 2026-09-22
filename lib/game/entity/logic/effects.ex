@@ -9,6 +9,9 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Target
 
+  def creature_group_event(event), do: %Effects.CreatureGroupEvent{event: event}
+  def creature_group_command(command), do: %Effects.CreatureGroupCommand{command: command}
+
   def scripted_cast(%CreatureSpell{} = entry, target_guid) when is_integer(target_guid) and target_guid > 0 do
     %Effects.ScriptedCast{entry: entry, target_guid: target_guid}
   end

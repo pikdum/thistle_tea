@@ -11,7 +11,10 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.Condition.Context
+  alias ThistleTea.Game.Entity.Logic.Condition.Leaf
   alias ThistleTea.Game.Entity.Logic.Condition.Result
+  alias ThistleTea.Game.Entity.Logic.Condition.Subject
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Reputation
@@ -19,6 +22,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.CreatureGroups
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.WorldRef
@@ -592,6 +596,19 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
       Result.truth(Guid.low_guid(source) in [condition.value1, condition.value2, condition.value3, condition.value4])
     else
       Result.unknown(condition, {:missing_fact, :source, :db_guid})
+    end
+  end
+
+  defp evaluate_condition(%Condition{type: type} = condition, _events, world, source, _target)
+       when type in [:creature_group_member, :creature_group_dead] do
+    case CreatureGroups.snapshot(world, source) do
+      %{leader: leader, dead?: dead?} ->
+        subject = %Subject{guid: source, kind: :creature, formation_leader_guid: leader, formation_dead?: dead?}
+        {:handled, result} = Leaf.evaluate(Context.new(source: subject), condition)
+        result
+
+      nil ->
+        Result.unknown(condition, {:missing_fact, :source, :formation})
     end
   end
 
