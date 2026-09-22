@@ -43,5 +43,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
     Knockback.apply(state, context, (effect.misc_value || 0) / 10, vertical_speed, now)
   end
 
+  def apply(state, %CastContext{} = context, _spell, %Effect{type: :player_pull} = effect, now) do
+    Knockback.pull(state, context, max(effect.misc_value || 0, 1) / 10, now)
+  end
+
   def apply(state, _context, _spell, _effect, _now), do: {state, []}
 end

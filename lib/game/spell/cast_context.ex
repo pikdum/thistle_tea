@@ -49,6 +49,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :caster_type,
     :caster_faction_template,
     :caster_position,
+    :caster_bounding_radius,
     :caster_orientation,
     :destination_position,
     :caster_zone,
@@ -109,6 +110,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_type: caster_type(caster),
       caster_faction_template: caster_faction_template(caster),
       caster_position: caster_position(caster),
+      caster_bounding_radius: caster_bounding_radius(caster),
       caster_orientation: caster_orientation(caster),
       target_guid: target_guid,
       spell: spell,
@@ -145,6 +147,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_type: caster_type(caster),
       caster_faction_template: caster_faction_template(caster),
       caster_position: caster_position(caster),
+      caster_bounding_radius: caster_bounding_radius(caster),
       caster_orientation: caster_orientation(caster),
       target_guid: target_guid,
       spell: spell,
@@ -177,6 +180,9 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defp caster_orientation(%{movement_block: %{position: {_x, _y, _z, orientation}}}), do: orientation
   defp caster_orientation(_caster), do: nil
+
+  defp caster_bounding_radius(%{unit: %Unit{bounding_radius: radius}}), do: radius || Unit.default_bounding_radius()
+  defp caster_bounding_radius(_caster), do: 0.0
 
   defp put_melee_snapshot(%__MODULE__{} = context, caster, %Spell{} = spell) do
     if Semantics.rules(spell).melee_spell_crit? do

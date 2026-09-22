@@ -588,6 +588,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(41), do: :summon_wild
   defp effect_type(42), do: :summon_guardian
   defp effect_type(98), do: :knockback
+  defp effect_type(124), do: :player_pull
   defp effect_type(101), do: :feed_pet
   defp effect_type(100), do: :inebriate
   defp effect_type(102), do: :dismiss_pet
