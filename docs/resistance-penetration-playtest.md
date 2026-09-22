@@ -16,8 +16,9 @@ Caster modifiers are captured in the existing attack/cast snapshots. Periodic
 holders retain their penetration until refreshed, while target resistance is
 read at each tick. This follows the project's existing snapshot architecture;
 VMangos reads the caster's current penetration at impact/tick. Physical
-periodic damage retains its existing armor-bypassing behavior. This change
-does not add school resistance to the separate binary spell-hit calculation.
+periodic damage retains its existing armor-bypassing behavior. A subsequent
+[binary spell resistance change](binary-spells-playtest.md) adds school resistance
+and caster penetration to the separate all-or-nothing spell-hit calculation.
 
 Reference arithmetic: `SpellCaster::CalcArmorReducedDamage` and
 `SpellCaster::GetSpellResistChance` in
