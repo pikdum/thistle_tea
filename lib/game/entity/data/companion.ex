@@ -13,9 +13,9 @@ end
 
 defmodule ThistleTea.Game.Entity.Data.Companion do
   @moduledoc """
-  Canonical relationship between a player and one controlled companion.
+  Canonical relationship between a unit and one controlled companion.
 
-  Live process bookkeeping stays with the player owner; this value contains
+  Live process bookkeeping stays with the owning boundary; this value contains
   only stable domain identity and suspension data.
   """
 

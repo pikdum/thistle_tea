@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.Entity.Logic.Companion do
   @moduledoc """
-  Pure lifecycle transitions for a player's canonical companion relationship.
+  Pure lifecycle transitions for a unit's canonical companion relationship.
 
   Unit summon and charm fields are derived client projections of this state.
   """
@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
@@ -18,6 +19,10 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
   @control_kinds [:enslaved, :charm, :possession]
   @act_enabled 0xC1
   @act_disabled 0x81
+
+  def activate(%Mob{} = entity, :guardian, %EntityRef{} = entity_ref) do
+    put_relationship(entity, %Companion{kind: :guardian, status: {:active, entity_ref}, reaction_state: :aggressive})
+  end
 
   def activate(
         %Character{
@@ -129,7 +134,10 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
 
   def suspend(%Character{} = character), do: project(character)
 
-  def removed(%Character{} = character, reason \\ nil) do
+  def removed(entity, reason \\ nil)
+  def removed(%Mob{} = entity, _reason), do: clear(entity)
+
+  def removed(%Character{} = character, reason) do
     case relationship(character) do
       %Companion{possession_spell_id: spell_id} = companion when is_integer(spell_id) and reason == :released ->
         put_relationship(character, %{companion | possession_spell_id: nil})
@@ -182,6 +190,8 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
     put_relationship(character, Companion.none())
   end
 
+  def clear(%Mob{} = entity), do: put_relationship(entity, Companion.none())
+
   def restore(%Character{} = character, %Companion{status: {:suspended, _, _}} = companion) do
     put_relationship(character, companion)
   end
@@ -207,17 +217,18 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
     end
   end
 
-  def relationship(%Character{internal: %Internal{companion: %Companion{} = companion}}), do: companion
+  def relationship(%{internal: %Internal{companion: %Companion{} = companion}}), do: companion
   def relationship(%Character{}), do: Companion.none()
+  def relationship(%Mob{}), do: Companion.none()
 
-  def active_ref(%Character{} = character) do
+  def active_ref(%{internal: _internal} = character) do
     case relationship(character) do
       %Companion{status: {:active, %EntityRef{} = entity_ref}} -> entity_ref
       _ -> nil
     end
   end
 
-  def active_guid(%Character{} = character) do
+  def active_guid(%{internal: _internal} = character) do
     case active_ref(character) do
       %EntityRef{guid: guid} -> guid
       _ -> nil
@@ -252,7 +263,7 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
     end
   end
 
-  def entry(%Character{} = character) do
+  def entry(%{internal: _internal} = character) do
     case relationship(character) do
       %Companion{status: {:active, %EntityRef{entry: entry}}} -> entry
       %Companion{status: {:suspended, entry, _spell_id}} -> entry
@@ -285,7 +296,9 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
 
   def project(%Character{} = character), do: character
 
-  defp put_relationship(%Character{internal: %Internal{} = internal} = character, %Companion{} = companion) do
+  def project(%Mob{unit: %Unit{} = unit} = entity), do: %{entity | unit: %{unit | summon: active_guid(entity) || 0}}
+
+  defp put_relationship(%{internal: %Internal{} = internal} = character, %Companion{} = companion) do
     %{character | internal: %{internal | companion: companion}}
     |> project()
   end

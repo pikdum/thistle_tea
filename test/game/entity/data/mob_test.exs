@@ -395,7 +395,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
 
       mob = Mob.respawn(mob)
 
-      assert mob.unit == spawn_unit
+      assert mob.unit == %{spawn_unit | summon: 0}
       assert mob.movement_block == spawn_movement_block
       refute mob.internal.in_combat
       refute mob.internal.running
@@ -716,7 +716,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       assert {:noreply, %Mob{} = respawned} = MobServer.handle_info(:respawn, mob)
 
       assert respawned.object.guid == mob_guid
-      assert respawned.unit == spawn_unit
+      assert respawned.unit == %{spawn_unit | summon: 0}
       assert respawned.movement_block == spawn_movement_block
       assert respawned.internal.spawn.respawn_ref == nil
       assert respawned.internal.spawn.incarnation_id != previous_incarnation_id

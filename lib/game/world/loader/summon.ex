@@ -293,9 +293,9 @@ defmodule ThistleTea.Game.World.Loader.Summon do
     end
   end
 
-  defp apply_pet_passive_auras(%Mob{internal: %{pet: %Pet{kind: :hunter}}} = mob, _entry, _level), do: mob
+  def apply_pet_passive_auras(%Mob{internal: %{pet: %Pet{kind: :hunter}}} = mob, _entry, _level), do: mob
 
-  defp apply_pet_passive_auras(%Mob{} = mob, entry, level) do
+  def apply_pet_passive_auras(%Mob{} = mob, entry, level) do
     entry
     |> pet_passive_spells(level)
     |> Enum.reduce(mob, fn spell, acc ->
@@ -501,7 +501,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
     creature
   end
 
-  defp pet_stats(entry, level) do
+  def pet_stats(entry, level) do
     key = {:pet_stats, entry, level}
 
     case :ets.lookup(__MODULE__, key) do

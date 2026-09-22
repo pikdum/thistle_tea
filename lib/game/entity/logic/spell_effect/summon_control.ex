@@ -54,11 +54,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
         state,
         %CastContext{caster_guid: caster_guid},
         %Spell{id: spell_id},
-        %Effect{type: :summon_pet, misc_value: entry},
+        %Effect{type: :summon_pet, misc_value: entry, multiple_value: offset},
         _now
       )
       when state.object.guid == caster_guid and is_integer(entry) and entry > 0 do
-    {state, [Effects.summon_pet(caster_guid, entry, spell_id)]}
+    effect = %{Effects.summon_pet(caster_guid, entry, spell_id) | level_offset: offset || 0.0}
+    {state, [effect]}
   end
 
   def apply(

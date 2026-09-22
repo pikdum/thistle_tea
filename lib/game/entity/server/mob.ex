@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request, as: ObservationRequest
+  alias ThistleTea.Game.Entity.Logic.AI.BT.CreaturePet, as: CreaturePetBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Guardian, as: GuardianBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.MiniPet
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
@@ -43,6 +44,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
@@ -70,6 +72,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.AIEnvironment
+  alias ThistleTea.Game.Entity.Server.CreaturePetOwner
   alias ThistleTea.Game.Entity.Server.GuardianOwner
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
@@ -136,6 +139,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       state.object.guid,
       StealthDetection.target_metadata(state)
       |> Map.put(:incarnation_id, Incarnation.id(state))
+      |> Map.put(:pet_guid, Companion.active_guid(state))
       |> Map.put(:unit_flags, state.unit.flags)
       |> Map.put(:no_spell_defense?, CreatureFlags.has?(state, :no_spell_defense))
       |> Map.merge(control_metadata(state))
@@ -761,6 +765,17 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       {:noreply, state}
   end
 
+  def handle_info(
+        {:DOWN, token, :process, _pid, _reason},
+        %Mob{internal: %{companion_monitor: %CreaturePetOwner.Monitor{token: token}}} = state
+      ) do
+    {:noreply, CreaturePetOwner.process_down(state, token), {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Creature pet cleanup failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_info({:DOWN, token, :process, _pid, _reason}, %Mob{} = state) when is_reference(token) do
     owner = if Pockets.owns_reservation?(state, token), do: Pockets, else: Corpse
     {:noreply, owner.reservation_lost(state, token)}
@@ -772,6 +787,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   rescue
     error ->
       Logger.error("Guardian summon failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info(%Effects.SummonPet{} = effect, %Mob{} = state) do
+    {:noreply, CreaturePetOwner.summon(state, effect), {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Creature pet summon failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 
@@ -1224,6 +1247,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def terminate(_reason, state) do
+    CreaturePetOwner.owner_stopped(state)
     GuardianOwner.owner_stopped(state)
     notify_totem_owner(state)
     release_victim(state)
@@ -1246,6 +1270,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{kind: :mini_pet}}}), do: MiniPet.tree()
   defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{kind: :guardian}}}), do: GuardianBT.tree()
+  defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{kind: :creature_pet}}}), do: CreaturePetBT.tree()
 
   defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{}}}), do: PetBT.tree()
   defp behavior_tree(%Mob{internal: %Internal{creature: %Creature{stationary?: true}}}), do: PassiveBT.tree()
@@ -1508,6 +1533,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
     if to == :engaged do
       GuardianOwner.defend(state, caster)
+      CreaturePetOwner.defend(state, caster)
 
       state
       |> maybe_tap(caster)
@@ -1632,7 +1658,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp maybe_finalize_death(%Mob{internal: %Internal{pet: %Pet{}}} = state) do
     if Core.dead?(state) do
-      corpse_ms = if state.internal.pet.kind == :guardian, do: 15_000, else: 100
+      corpse_ms = if state.internal.pet.kind in [:guardian, :creature_pet], do: 15_000, else: 100
       Process.send_after(self(), :pet_stop, corpse_ms)
 
       state

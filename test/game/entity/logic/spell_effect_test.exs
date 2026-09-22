@@ -1152,6 +1152,19 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
                SpellEffect.receive(target, context, ownership, 21_000)
     end
 
+    test "NPC pet summons preserve their signed level adjustment" do
+      target = target_fixture()
+      context = %CastContext{caster_guid: 1, caster_level: 20}
+
+      spell = %Spell{
+        id: 8722,
+        effects: [%Effect{index: 0, type: :summon_pet, misc_value: 10_928, multiple_value: -2.0}]
+      }
+
+      assert {^target, [%Effects.SummonPet{source_guid: 1, entry: 10_928, level_offset: -2.0}]} =
+               SpellEffect.receive(target, context, spell, 1_000)
+    end
+
     test "call, revive, and dismiss use the stable hunter pet entry" do
       character = dead_character_fixture()
 

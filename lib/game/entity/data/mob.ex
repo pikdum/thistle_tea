@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Skinning
@@ -313,7 +314,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
     %Engagement.Result{entity: mob} =
       Engagement.reset(%{mob | unit: unit, movement_block: movement_block, internal: internal})
 
-    Skinning.sync(mob)
+    mob |> Companion.project() |> Skinning.sync()
   end
 
   defp effective_scale(%Mangos.CreatureTemplate{scale: scale}, _display_scale) when is_number(scale) and scale > 0,

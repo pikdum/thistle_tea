@@ -776,6 +776,15 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       on_exit(fn -> World.stop_entity(pet_guid) end)
     end
 
+    test "NPC pet summons reach the explicit owner context", %{mob: mob} do
+      parent = self()
+      receiver = spawn(fn -> receive do: (message -> send(parent, {:forwarded, message})) end)
+      event = Effects.summon_pet(mob.object.guid, 10_928, 8722)
+      assert ^mob = EventSink.emit(mob, event, Context.new(receiver))
+      assert_receive {:forwarded, ^event}
+      refute_receive ^event, 0
+    end
+
     test "script attack_start schedules a forced attack", %{mob: mob, target_guid: target_guid} do
       assert ^mob = EventSink.emit(mob, Effects.attack_start(target_guid), Context.new(self()))
       assert_receive {:force_attack, ^target_guid}
