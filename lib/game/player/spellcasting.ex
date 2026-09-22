@@ -450,6 +450,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
         %{
           guid: guid,
           visible?: Visibility.can_see?(%{guid: character.object.guid, character: character}, guid),
+          unit_flags: Map.get(metadata, :unit_flags, 0),
           alive?: Map.get(metadata, :alive?, true),
           hostile?: Hostility.hostile?(character, metadata),
           friendly?: Hostility.friendly?(character, metadata),

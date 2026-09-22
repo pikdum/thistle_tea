@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.SpellTest do
 
   describe "harmful?/1" do
     test "external instant kills are hostile even with an any-unit target" do
-      spell = %Spell{effects: [%Effect{type: :instakill, implicit_target_a: :target_any}]}
+      spell = %Spell{effects: [%Effect{type: :instakill, implicit_target_a: :any_unit}]}
       assert Spell.harmful?(spell)
       assert Spell.starts_combat?(spell)
       assert Spell.starts_combat?(spell, :miss)
@@ -16,13 +16,19 @@ defmodule ThistleTea.Game.SpellTest do
 
     test "self kills and positive sacrifices retain their polarity" do
       suicide = %Spell{effects: [%Effect{type: :instakill, implicit_target_a: :caster}]}
-      sacrifice = %Spell{effects: [%Effect{type: :instakill, implicit_target_a: :target_pet}], custom_flags: 4}
+      sacrifice = %Spell{effects: [%Effect{type: :instakill, implicit_target_a: :pet}], custom_flags: 4}
       voidwalker = %{sacrifice | custom_flags: 0, spell_family: 5, family_flags_0: 0x02000000}
 
       for spell <- [suicide, sacrifice, voidwalker] do
         refute Spell.harmful?(spell)
         refute Spell.starts_combat?(spell)
       end
+    end
+
+    test "instant-kill custom polarity takes precedence over targeting" do
+      spell = %Spell{effects: [%Effect{type: :instakill, implicit_target_a: :caster}], custom_flags: 2}
+      assert Spell.harmful?(spell)
+      refute Spell.harmful?(%{spell | custom_flags: 6})
     end
 
     test "damage effects are harmful" do

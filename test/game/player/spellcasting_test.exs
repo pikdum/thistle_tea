@@ -10,17 +10,41 @@ defmodule ThistleTea.Game.Player.SpellcastingTest do
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
 
   describe "scripted_cast/4" do
     setup [:script_caster]
+
+    test "any-unit casts receive template immunity from metadata", %{state: state, spell: spell, entry: entry} do
+      guid = Guid.from_low_guid(:mob, 4952, System.unique_integer([:positive]))
+      Metadata.put(guid, %{alive?: true, unit_flags: 0})
+      on_exit(fn -> Metadata.delete(guid) end)
+
+      spell = %{
+        spell
+        | effects: [%Effect{type: :instakill, implicit_target_a: :any_unit}],
+          attributes: MapSet.new([:ignore_line_of_sight])
+      }
+
+      allowed = Spellcasting.scripted_cast(state, spell, entry, guid)
+      assert allowed.character.internal.casting.spell.id == spell.id
+
+      Metadata.update(guid, %{unit_flags: 0x100})
+      rejected = Spellcasting.scripted_cast(state, spell, entry, guid)
+      assert rejected.character.internal.casting == nil
+      assert rejected.character.unit.power1 == state.character.unit.power1
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{result: 2}}}
+    end
 
     test "starts an unlearned script spell with its real cast time", %{state: state, spell: spell, entry: entry} do
       cast_state = Spellcasting.scripted_cast(state, spell, entry, state.guid)

@@ -4,10 +4,12 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
   alias ThistleTea.Game.Aura, as: AuraData
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Cooldowns
@@ -16,6 +18,45 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
   alias ThistleTea.Game.WorldRef
 
   @now 10_000
+
+  describe "validate/6 target flags" do
+    test "NPC and player-controlled casters use different immunity flags" do
+      spell = %Spell{id: 5, effects: [%Effect{type: :instakill, implicit_target_a: :any_unit}]}
+      npc = caster()
+      npc = %{npc | object: %{npc.object | guid: Guid.from_low_guid(:mob, 1, 1)}}
+      pet = %{npc | internal: %{npc.internal | pet: %Pet{owner_guid: 100}}}
+
+      for {source, immune, allowed} <- [{npc, 0x200, 0x100}, {pet, 0x100, 0x200}] do
+        assert {:error, :bad_targets} =
+                 CastValidation.validate(source, spell, Target.unit(7), hostile_target(unit_flags: immune), @now)
+
+        assert :ok = CastValidation.validate(source, spell, Target.unit(7), hostile_target(unit_flags: allowed), @now)
+      end
+    end
+
+    test "any-unit instant kills respect player immunity and targetability" do
+      spell = %Spell{id: 5, effects: [%Effect{type: :instakill, implicit_target_a: :any_unit}]}
+
+      for flags <- [0x100, 0x2, 0x10000, 0x02000000] do
+        target = hostile_target(unit_flags: flags)
+        assert {:error, :bad_targets} = CastValidation.validate(caster(), spell, Target.unit(7), target, @now)
+      end
+
+      assert :ok = CastValidation.validate(caster(), spell, Target.unit(7), friendly_target(unit_flags: 0), @now)
+    end
+
+    test "any-unit healing respects player immunity without inheriting harmful-only flags" do
+      spell = %Spell{id: 99, effects: [%Effect{type: :heal, implicit_target_a: :any_unit}]}
+
+      for flags <- [0x100, 0x10000] do
+        assert {:error, :bad_targets} =
+                 CastValidation.validate(caster(), spell, Target.unit(7), friendly_target(unit_flags: flags), @now)
+      end
+
+      assert :ok =
+               CastValidation.validate(caster(), spell, Target.unit(7), friendly_target(unit_flags: 0x02000200), @now)
+    end
+  end
 
   defp caster(unit_overrides \\ []) do
     unit =

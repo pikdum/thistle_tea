@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureFlagsTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -209,6 +210,23 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureFlagsTest do
       {_status, arrived} = BT.tick(MobBT.tree(), reset, context(20.0))
       assert arrived.internal.blackboard.navigation.move_target == nil
       assert arrived.internal.navigation_intents == []
+    end
+  end
+
+  describe "MobSpells.attempt_commanded_cast/5" do
+    test "any-unit NPC casts receive immunity from immutable observations", %{creature: creature} do
+      spell = %Spell{id: 99, cast_time_ms: 1_500, effects: [%Effect{type: :instakill, implicit_target_a: :any_unit}]}
+      mob = build(creature, 0)
+      mob = %{mob | internal: %{mob.internal | spellbook: %{spell.id => spell}}}
+      entry = %CreatureSpell{spell_id: spell.id}
+      context = context(5.0)
+      assert {:ok, {casting, _blackboard}} = MobSpells.attempt_commanded_cast(mob, Blackboard.new(), entry, 1, context)
+      assert casting.internal.casting.spell.id == spell.id
+
+      observation = context.perception.entities[1]
+      observation = %{observation | metadata: %{alive?: true, unit_flags: 0x200}}
+      context = %{context | perception: %{context.perception | entities: %{1 => observation}}}
+      assert {:error, :bad_targets} = MobSpells.attempt_commanded_cast(mob, Blackboard.new(), entry, 1, context)
     end
   end
 

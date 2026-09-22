@@ -69,7 +69,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   end
 
   def valid_hostile_target?(source, target) do
-    alive?(target) and targetable?(target) and attack_flags_allow?(source, target) and hostile?(source, target) and
+    alive?(target) and targetable_by?(source, target) and hostile?(source, target) and
       pvp_attack_allowed?(source, target)
   end
 
@@ -80,7 +80,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   end
 
   def valid_attack_target?(source, target) do
-    alive?(target) and targetable?(target) and attack_flags_allow?(source, target) and
+    alive?(target) and targetable_by?(source, target) and
       attack_reaction_allows?(source, target) and
       pvp_attack_allowed?(source, target)
   end
@@ -101,10 +101,18 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   def can_assist?(source, target) when is_integer(target), do: can_assist?(source, target_metadata(target))
 
   def can_assist?(source, target) do
-    assist_flags_allow?(source, target) and
+    targetable_by?(source, target, true) and
       (not both_player_controlled?(source, target) or same_controller?(source, target) or
          player_projection(target, :duel_started?) != true)
   end
+
+  def targetable_by?(source, target, helpful? \\ false)
+
+  def targetable_by?(source, target, true) do
+    (unit_flags(target) &&& @unit_flag_non_attackable_2) == 0 and assist_flags_allow?(source, target)
+  end
+
+  def targetable_by?(source, target, false), do: targetable?(target) and attack_flags_allow?(source, target)
 
   def faction_template(%FactionTemplate{} = faction_template), do: faction_template
   def faction_template(%{faction_template: %FactionTemplate{} = faction_template}), do: faction_template

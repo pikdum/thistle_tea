@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Fear
+  alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.OpenLock
@@ -80,6 +81,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- Warlock.validate_ritual(spell, Keyword.get(opts, :ritual_context)),
          :ok <- check_reagents(caster, spell, Keyword.get(opts, :count_item)),
          :ok <- check_duel(spell, Keyword.get(opts, :duel_context)),
+         :ok <- check_target_flags(caster, spell, target_info),
          :ok <- check_target(spell, target_info),
          :ok <- check_target_power_type(spell, targets, target_info),
          :ok <- check_dispel_target(caster, spell, targets, target_info),
@@ -411,6 +413,14 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   defp check_tools(_spell, _count_item), do: :ok
+
+  defp check_target_flags(%{object: %{guid: guid}}, _spell, %{guid: guid}), do: :ok
+
+  defp check_target_flags(caster, spell, target_info) when is_map(target_info) do
+    if Hostility.targetable_by?(caster, target_info, not Spell.harmful?(spell)), do: :ok, else: {:error, :bad_targets}
+  end
+
+  defp check_target_flags(_caster, _spell, _target_info), do: :ok
 
   defp check_target(%Spell{}, %{visible?: false}), do: {:error, :bad_targets}
 
