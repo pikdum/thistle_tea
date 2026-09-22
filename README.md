@@ -132,6 +132,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - typed invisibility and detection, with observer visibility, creature aggro, and action interruption
 - observer-specific stealth detection, with Perception, Paranoia, Track Hidden, facing, line of sight, and caster-specific Hunter's Mark
 - items, bags, equipment, and vendors
+- [Spell item transformation](docs/item-transformation-playtest.md), with atomic same-slot replacement, retained enchants and wear, shared cooldowns, and full-inventory support
 - [Vendor buyback](docs/vendor-buyback-playtest.md), with 12 session slots, partial-stack sales, preserved item state, charge and durability pricing, paused timers, and logout cleanup
 - [Limited vendor stock](docs/vendor-stock-playtest.md), shared between buyers at each merchant, with timed restocking, template inventories, sold-out feedback, and recoverable purchases
 - [Ammunition](docs/ammunition-playtest.md), with client selection, compatible projectile costs, Auto Shot depletion, and thrown-stack or durability consumption
