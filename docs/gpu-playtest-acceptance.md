@@ -84,6 +84,24 @@ An earlier Steam shutdown was observed while no playtest stop command was
 running. Its cause was not established; it is not evidence for or against the
 new cleanup behavior. The cleanup claims above come from the controlled checks.
 
+## Screenshot capture follow-up
+
+The subsequent [binary spell playtest](binary-spells-playtest.md) exposed stale
+OpenGL frames from X11 window capture. Gameplay and GPU rendering continued,
+but repeated captures could show a previous frame. GPU screenshots now use
+Gamescope's `screenshot` command on the session's recorded socket, with a unique
+temporary path and completion check before publishing the image. Software
+captures continue to use the game window. The compositor command is defined in
+[Gamescope 3.16.28](https://github.com/ValveSoftware/gamescope/blob/3.16.28/src/steamcompmgr.cpp).
+
+A fresh GPU client in `/home/pikdum/.cache/thistle-wow-playtest.G07DZd` verified
+three successive account-field values (`CAPTURE_A`, `CAPTURE_B`, `CAPTURE_C`).
+Each capture showed the current value and a new animation frame, including an
+overwrite of the second output path. Retained images are `screenshots/frame-a.png`
+and `screenshots/frame-b.png` (the latter now shows `CAPTURE_C`). Capture after
+session cleanup was refused. Bash syntax, ShellCheck, skill validation, and all
+cleanup regressions passed again; the fresh client was stopped.
+
 ## Final validation
 
 Bash syntax checks, ShellCheck, the cleanup regressions, and skill validation all

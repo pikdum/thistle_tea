@@ -23,7 +23,7 @@ Keep `SPEC.md` and unrelated worktree changes untouched.
 
 ## Launch an isolated client
 
-Use the bundled helper directly. It enters a one-off Nix shell when Xvfb, xdotool, or ImageMagick is unavailable.
+Use the bundled helper directly. It enters a one-off Nix shell when the selected renderer's tools are unavailable.
 
 ```bash
 .agents/skills/drive-client-playtest/scripts/wow-client launch

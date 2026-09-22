@@ -23,7 +23,7 @@ Override defaults only with task-specific variables:
 
 The launcher uses `umu-run`, a new `WINEPREFIX`, dummy audio, and `STEAM_COMPAT_MOUNTS=/storage`. GPU sessions unset inherited software-rendering overrides and run Gamescope with `--backend headless` at 1280×720 and 60 Hz. No window appears on the user's desktop. Required graphics tools are obtained with a one-off Nix shell when missing. A working systemd user manager is required for both rendering modes.
 
-The helper writes the private display to `display`, the selected mode to `renderer`, and GLX hardware details to `renderer.log`. It rejects a software renderer in GPU mode. For native acceptance, also verify WoW's own GPU usage through its `/proc/PID/fdinfo` DRM counters; the compositor's renderer alone is not proof. Captures target the game window because a root-window capture is unavailable under rootless Xwayland.
+The helper writes the private X display to `display`, the Gamescope socket to `wayland.display`, the selected mode to `renderer`, and GLX hardware details to `renderer.log`. It rejects a software renderer in GPU mode. For native acceptance, also verify WoW's own GPU usage through its `/proc/PID/fdinfo` DRM counters; the compositor's renderer alone is not proof. GPU captures use `gamescopectl screenshot` on the recorded socket and wait for completion before publishing the image. X11 window capture can return an old OpenGL frame even while gameplay continues. Software captures use the game window.
 
 The launcher does not edit `realmlist.wtf` or client files; the game can still save its normal settings. XKB warnings are harmless. A Proton game-drive warning can also be nonfatal; require the WoW window and a screenshot rather than judging launch from that line alone.
 

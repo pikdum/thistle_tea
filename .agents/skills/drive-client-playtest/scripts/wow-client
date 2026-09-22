@@ -9,15 +9,22 @@ ensure_tools() {
   case "${1:-}" in
     _run|_game) return ;;
     launch)
-      required=(systemd-run systemctl xdotool import glxinfo)
+      required=(systemd-run systemctl xdotool glxinfo)
       case "${THISTLE_PLAYTEST_RENDERER:-gpu}" in
-        gpu) required+=(gamescope) ;;
-        software) required+=(Xvfb) ;;
+        gpu) required+=(gamescope gamescopectl) ;;
+        software) required+=(Xvfb import) ;;
         *) fail "THISTLE_PLAYTEST_RENDERER must be gpu or software" ;;
       esac
       ;;
     stop) required=(systemctl) ;;
-    capture) required=(xdotool import) ;;
+    capture)
+      required=(xdotool systemctl)
+      case "$(session_value "$(require_session "${2:-}")" renderer)" in
+        gpu) required+=(gamescopectl) ;;
+        software) required+=(import) ;;
+        *) fail "unknown session renderer" ;;
+      esac
+      ;;
     *) required=(xdotool systemctl) ;;
   esac
 
@@ -27,6 +34,7 @@ ensure_tools() {
         Xvfb) packages+=(nixpkgs#xorg-server) ;;
         glxinfo) packages+=(nixpkgs#mesa-demos) ;;
         import) packages+=(nixpkgs#imagemagick) ;;
+        gamescopectl) packages+=(nixpkgs#gamescope) ;;
         systemd-run|systemctl) fail "a systemd user manager is required" ;;
         *) packages+=("nixpkgs#$command_name") ;;
       esac
@@ -258,7 +266,7 @@ run_session() {
   local xvfb_pid
 
   renderer="$(session_value "$session_dir" renderer)"
-  unset DISPLAY WAYLAND_DISPLAY LIBGL_ALWAYS_SOFTWARE GALLIUM_DRIVER MESA_LOADER_DRIVER_OVERRIDE
+  unset DISPLAY WAYLAND_DISPLAY GAMESCOPE_WAYLAND_DISPLAY LIBGL_ALWAYS_SOFTWARE GALLIUM_DRIVER MESA_LOADER_DRIVER_OVERRIDE
 
   if [[ "$renderer" == gpu ]]; then
     exec gamescope --backend headless -W 1280 -H 720 -w 1280 -h 720 -r 60 -- \
@@ -288,6 +296,9 @@ run_game() {
   local proton_path="$3"
 
   printf '%s\n' "$DISPLAY" >"$session_dir/display"
+  if [[ "$(session_value "$session_dir" renderer)" == gpu ]]; then
+    printf '%s\n' "${GAMESCOPE_WAYLAND_DISPLAY:?gamescope did not publish its display}" >"$session_dir/wayland.display"
+  fi
   glxinfo -B >"$session_dir/renderer.log"
   if [[ "$(session_value "$session_dir" renderer)" == gpu ]] &&
     grep -Eiq 'llvmpipe|softpipe|Accelerated: no' "$session_dir/renderer.log"; then
@@ -413,8 +424,35 @@ capture_screen() {
   display="$(session_value "$session_dir" display)"
   window_id="$(find_window "$session_dir")" || fail "WoW window is not available"
   path="$session_dir/screenshots/$name.png"
-  DISPLAY="$display" import -window "$window_id" "$path"
+  if [[ "$(session_value "$session_dir" renderer)" == gpu ]]; then
+    capture_gpu_frame "$session_dir" "$path"
+  else
+    DISPLAY="$display" import -window "$window_id" "$path"
+  fi
   printf '%s\n' "$path"
+}
+
+capture_gpu_frame() {
+  local session_dir="$1"
+  local path="$2"
+  local pending
+  local wayland_display
+
+  wayland_display="$(session_value "$session_dir" wayland.display)"
+  [[ -n "$wayland_display" ]] || fail "session is missing its Gamescope display"
+  pending="$(mktemp "$session_dir/screenshots/.capture.XXXXXX.png")"
+  GAMESCOPE_WAYLAND_DISPLAY="$wayland_display" timeout 10s gamescopectl screenshot "$pending"
+
+  for _attempt in $(seq 1 100); do
+    if grep -Fq "Screenshot saved to $pending" "$session_dir/wow.log" && [[ -s "$pending" ]]; then
+      mv -- "$pending" "$path"
+      return
+    fi
+    session_alive "$session_dir" || fail "session stopped during capture"
+    sleep 0.1
+  done
+
+  fail "Gamescope did not finish the screenshot; see $session_dir/wow.log"
 }
 
 stop_client() {
