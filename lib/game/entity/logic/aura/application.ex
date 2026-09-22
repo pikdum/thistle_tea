@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.Change
+  alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.DiminishingReturns
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
@@ -190,6 +191,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   end
 
   defp do_apply_unblocked(entity, existing, %Holder{} = holder, now) do
+    case StackingProc.prepare(holder, existing) do
+      nil -> {entity, []}
+      holder -> upsert_unblocked(entity, existing, holder, now)
+    end
+  end
+
+  defp upsert_unblocked(entity, existing, %Holder{} = holder, now) do
     existing =
       existing
       |> remove_immune_mechanics(holder)
@@ -441,9 +449,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     end
   end
 
-  defp next_stacks(%Holder{stacks: stacks}, %Holder{spell: %Spell{stack_amount: cap}})
+  defp next_stacks(%Holder{stacks: stacks}, %Holder{spell: %Spell{stack_amount: cap}, stacks: incoming_stacks})
        when is_integer(cap) and cap > 1 do
-    min((stacks || 1) + 1, cap)
+    min((stacks || 1) + incoming_stacks, cap)
   end
 
   defp next_stacks(_old, _incoming), do: 1

@@ -25,6 +25,23 @@ defmodule ThistleTea.Game.Entity.Logic.CastProcTest do
   setup [:caster]
 
   describe "complete/3" do
+    test "all area recipients snapshot Unstable Power before its one-stack reduction", %{caster: caster} do
+      holder = %{
+        hd(caster.unit.auras)
+        | spell: %Spell{id: 24_659, proc_type_mask: 0x15550, proc_chance: 100, proc_rule: %ProcRule{proc_ex: 0x80000}},
+          charges: nil,
+          stacks: 12,
+          auras: [%Aura{type: :mod_damage_done, amount: 17, misc_value: 126}]
+      }
+
+      caster = %{caster | unit: %{caster.unit | auras: [holder]}}
+      result = Casting.complete(caster, launch_cast(), 1_000)
+      impacts = Enum.filter(result.internal.events, &is_struct(&1, Effects.DeliverSpell))
+      assert length(impacts) == 2
+      assert Enum.all?(impacts, &(&1.cast_context.spell_damage_bonus.frost == 204))
+      assert hd(result.unit.auras).stacks == 11
+    end
+
     test "area casts trigger once and later impacts cannot spend another charge", %{caster: caster} do
       cast = launch_cast()
       result = Casting.complete(caster, cast, 1_000)

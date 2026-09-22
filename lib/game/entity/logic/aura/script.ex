@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   """
 
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Priest
@@ -52,7 +53,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
         master_of_elements_proc(holders, holder, owner_guid, context)
 
       true ->
-        :unhandled
+        StackingProc.outgoing_proc(holders, holder, owner_guid, context)
     end
   end
 

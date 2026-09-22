@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Aura.ObjectSync
   alias ThistleTea.Game.Entity.Logic.Aura.PlayerSync
   alias ThistleTea.Game.Entity.Logic.Aura.Script
+  alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
   alias ThistleTea.Game.Entity.Logic.Aura.StealthSync
   alias ThistleTea.Game.Entity.Logic.Aura.ThreatSync
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
@@ -56,6 +57,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     previous = if is_list(unit.auras), do: unit.auras, else: []
     desired = MountSync.interrupt_holders(previous, desired)
     desired = StealthSync.interrupt_holders(previous, desired)
+    desired = StackingProc.reconcile(previous, desired)
 
     if desired == previous do
       {entity, []}
@@ -248,7 +250,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
 
     duration_events = Enum.flat_map(touched, &applied_duration_events(entity, &1, now))
     shapeshift_events = Enum.flat_map(touched, &shapeshift_talent_events(entity, &1))
-    {entity, immediate_events ++ duration_events ++ shapeshift_events}
+    {entity, immediate_events ++ duration_events ++ shapeshift_events ++ StackingProc.after_apply(touched)}
   end
 
   defp application_hooks(entity, _touched, _cause, _now), do: {entity, []}

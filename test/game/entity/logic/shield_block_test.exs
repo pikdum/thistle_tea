@@ -182,7 +182,7 @@ defmodule ThistleTea.Game.Entity.Logic.ShieldBlockTest do
   end
 
   defp holder(type, amount, stacks \\ 1) do
-    %Holder{auras: [%AuraData{type: type, amount: amount}], stacks: stacks}
+    %Holder{spell: %Spell{id: 90_000}, auras: [%AuraData{type: type, amount: amount}], stacks: stacks}
   end
 
   defp with_auras(character, holders), do: %{character | unit: %{character.unit | auras: holders}}
