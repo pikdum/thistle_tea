@@ -36,7 +36,8 @@ defmodule ThistleTea.Game.Entity.Data.Taxi.Flight do
     :destination_position,
     :mount_display_id,
     :started_at,
-    :duration_ms
+    :duration_ms,
+    :remaining_nodes
   ]
 end
 

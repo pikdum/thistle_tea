@@ -183,7 +183,7 @@ defmodule ThistleTea.Game.Player.Taxi do
         } = state,
         spline_id
       )
-      when is_integer(spline_id) and mover_guid in [nil, guid] do
+      when is_integer(spline_id) and is_integer(flight.started_at) and mover_guid in [nil, guid] do
     if Time.now() >= flight.started_at + flight.duration_ms, do: arrive(state, flight.token), else: state
   end
 
@@ -208,11 +208,27 @@ defmodule ThistleTea.Game.Player.Taxi do
 
   def progress(state, _token), do: state
 
+  def resume(%{ready: true, character: %Character{internal: %{taxi_flight: %Flight{remaining_nodes: [_ | _]}}}} = state) do
+    token = make_ref()
+    now = Time.now()
+    {character, effects} = TaxiLogic.resume(state.character, token, now)
+
+    if TaxiLogic.active?(character) do
+      publish_flight(state, character, effects, token, now)
+    else
+      World.update_position(character)
+      CharacterStore.put(character)
+      PlayerServer.maybe_broadcast_update(%{state | character: character})
+    end
+  end
+
+  def resume(state), do: state
+
   def disconnect(%{character: %Character{} = character} = state) do
     cancel_arrival(state)
 
     if TaxiLogic.active?(character) do
-      character = TaxiLogic.finish(character, Time.now())
+      character = TaxiLogic.pause(character, Time.now())
       World.update_position(character)
       %{state | character: character, taxi_arrival_ref: nil}
     else
@@ -221,6 +237,15 @@ defmodule ThistleTea.Game.Player.Taxi do
   end
 
   def disconnect(state), do: state
+
+  def cancel(%{character: %Character{internal: %{taxi_flight: %Flight{}}} = character} = state) do
+    cancel_arrival(state)
+    character = TaxiLogic.cancel(character, Time.now())
+    World.update_position(character)
+    %{state | character: character, taxi_arrival_ref: nil}
+  end
+
+  def cancel(state), do: state
 
   def unlock_all(%{character: %Character{player: player} = character} = state, %TaxiNetwork{} = network) do
     player = %{player | taxi_nodes: network.network_node_ids}
@@ -364,6 +389,10 @@ defmodule ThistleTea.Game.Player.Taxi do
     now = Time.now()
     {character, effects} = TaxiLogic.start(state.character, itinerary, destination, mount_display_id, token, now)
 
+    publish_flight(state, character, effects, token, now)
+  end
+
+  defp publish_flight(state, character, effects, token, now) do
     state =
       %{state | character: character}
       |> PlayerServer.maybe_broadcast_update()

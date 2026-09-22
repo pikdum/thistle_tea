@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.Entity.Logic.Taxi do
   @moduledoc """
-  Pure character transitions for entering and finishing a taxi flight.
+  Pure character transitions for starting, suspending, resuming, and finishing taxi flights.
   """
   import Bitwise, only: [&&&: 2, bnot: 1, |||: 2]
 
@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Taxi do
   alias ThistleTea.Game.Entity.Data.Taxi.Node
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Entity.Logic.Falling
@@ -85,6 +86,79 @@ defmodule ThistleTea.Game.Entity.Logic.Taxi do
   end
 
   def finish(%Character{} = character, _now), do: character
+
+  def pause(%Character{internal: %Internal{taxi_flight: %Flight{remaining_nodes: [_ | _]}}} = character, _now),
+    do: character
+
+  def pause(%Character{internal: %Internal{taxi_flight: %Flight{} = flight}} = character, now) do
+    case Movement.resume_spline(character, now) do
+      %Character{movement_block: movement} ->
+        character = Movement.finish(character, now)
+
+        flight = %{
+          flight
+          | token: nil,
+            started_at: nil,
+            duration_ms: movement.duration,
+            remaining_nodes: movement.spline_nodes
+        }
+
+        %{character | internal: %{character.internal | taxi_flight: flight}}
+
+      nil ->
+        if is_integer(character.internal.movement_start_time), do: finish(character, now), else: cancel(character, now)
+    end
+  end
+
+  def pause(%Character{} = character, _now), do: character
+
+  def resume(
+        %Character{internal: %Internal{taxi_flight: %Flight{remaining_nodes: [_ | _] = nodes} = flight}} = character,
+        token,
+        now
+      )
+      when is_reference(token) and is_integer(now) do
+    if Death.alive?(character) do
+      opts = [flying?: true, run?: true]
+      character = Movement.start_timed_path(character, nodes, flight.duration_ms, now, opts)
+      resume_started_path(character, flight, token, now, opts)
+    else
+      {cancel(character, now), []}
+    end
+  end
+
+  def resume(%Character{} = character, _token, _now), do: {character, []}
+
+  defp resume_started_path(
+         %Character{internal: %Internal{movement_start_time: nil}} = character,
+         _flight,
+         _token,
+         now,
+         _opts
+       ), do: {finish(character, now), []}
+
+  defp resume_started_path(%Character{} = character, %Flight{} = flight, token, now, opts) do
+    flight = %{flight | token: token, started_at: now, remaining_nodes: nil}
+
+    unit = %{
+      character.unit
+      | flags: (character.unit.flags || 0) ||| @taxi_flags,
+        mount_display_id: flight.mount_display_id
+    }
+
+    character = %{character | unit: unit, internal: %{character.internal | taxi_flight: flight}}
+    {Core.mark_broadcast_update(character), [Effects.monster_move(opts)]}
+  end
+
+  def cancel(%Character{internal: %Internal{taxi_flight: %Flight{}}} = character, now) do
+    character = Movement.finish(character, now)
+    unit = %{character.unit | flags: (character.unit.flags || 0) &&& bnot(@taxi_flags), mount_display_id: 0}
+    internal = %{character.internal | taxi_flight: nil}
+
+    %{character | unit: unit, internal: internal} |> Falling.reset() |> Core.mark_broadcast_update()
+  end
+
+  def cancel(%Character{} = character, _now), do: character
 
   def active?(%Character{internal: %Internal{taxi_flight: %Flight{}}}), do: true
   def active?(%Character{}), do: false

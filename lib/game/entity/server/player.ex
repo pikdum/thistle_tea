@@ -1837,8 +1837,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp cancel_authoritative_movement(%State{} = state) do
     state
+    |> PlayerTaxi.cancel()
     |> ServerMovement.cancel()
-    |> PlayerTaxi.disconnect()
   end
 
   defp transport_worldport(%State{} = state, %{entry: entry, world: %WorldRef{} = world}, {x, y, z, orientation}) do

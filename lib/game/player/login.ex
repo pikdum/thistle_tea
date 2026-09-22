@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.Data.Honor.Damage, as: HonorDamage
   alias ThistleTea.Game.Entity.Data.Reputation
+  alias ThistleTea.Game.Entity.Data.Taxi.Flight
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
@@ -206,6 +207,8 @@ defmodule ThistleTea.Game.Player.Login do
     |> Mail.schedule_delivery()
     |> Quests.restore_timers()
   end
+
+  def restore_companion(%{character: %Character{internal: %Internal{taxi_flight: %Flight{}}}} = state), do: state
 
   def restore_companion(
         %{

@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.TaxiTest do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Entity.Logic.Falling
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.Taxi
   alias ThistleTea.Game.Spell
@@ -124,6 +125,95 @@ defmodule ThistleTea.Game.Entity.Logic.TaxiTest do
       assert (character.unit.flags &&& 0x00100004) == 0
       refute Taxi.active?(character)
       assert character.internal.broadcast_update?
+    end
+  end
+
+  describe "pause/2" do
+    test "checkpoints the current position and trims completed segments" do
+      {flying, _} = Taxi.start(character(), itinerary(), node(4, {64.0, 0.0, 0.0}), 6852, make_ref(), 1_000)
+      paused = Taxi.pause(flying, 2_500)
+
+      assert paused.movement_block.position == {48.0, 0.0, 0.0, 0.0}
+      assert paused.movement_block.spline_nodes == []
+      assert paused.internal.movement_start_time == nil
+      assert paused.internal.taxi_flight.remaining_nodes == [{64.0, 0.0, 0.0}]
+      assert paused.internal.taxi_flight.duration_ms == 500
+      assert paused.internal.taxi_flight.started_at == nil
+      assert paused.internal.taxi_flight.token == nil
+      assert paused.unit.mount_display_id == 6852
+      assert (paused.unit.flags &&& 0x00100004) == 0x00100004
+      assert Movement.sync_position(paused, 100_000) == paused
+      assert Taxi.pause(paused, 100_000) == paused
+    end
+
+    test "completes a flight whose movement already elapsed" do
+      {flying, _} = Taxi.start(character(), itinerary(), node(4, {64.0, 0.0, 0.0}), 6852, make_ref(), 1_000)
+      landed = Taxi.pause(flying, 3_001)
+      refute Taxi.active?(landed)
+      assert landed.movement_block.position == {64.0, 0.0, 0.0, 0.0}
+      assert landed.unit.mount_display_id == 0
+    end
+  end
+
+  describe "resume/3" do
+    test "finishes a checkpoint within movement tolerance without an empty spline" do
+      {flying, _} = Taxi.start(character(), itinerary(), node(4, {64.0, 0.0, 0.0}), 6852, make_ref(), 1_000)
+      paused = Taxi.pause(flying, 2_999)
+      assert paused.internal.taxi_flight.duration_ms == 1
+      {landed, []} = Taxi.resume(paused, make_ref(), 100_000)
+      assert landed.movement_block.position == {64.0, 0.0, 0.0, 0.0}
+      refute Taxi.active?(landed)
+      assert landed.unit.mount_display_id == 0
+    end
+
+    test "continues the remaining route after offline time without another fare" do
+      {flying, _} = Taxi.start(character(), itinerary(), node(4, {64.0, 0.0, 0.0}), 6852, make_ref(), 1_000)
+      paused = Taxi.pause(flying, 2_500)
+      token = make_ref()
+      {resumed, effects} = Taxi.resume(paused, token, 100_000)
+
+      assert resumed.movement_block.position == paused.movement_block.position
+      assert resumed.movement_block.spline_nodes == [{64.0, 0.0, 0.0}]
+      assert resumed.movement_block.duration == 500
+      assert resumed.internal.taxi_flight.token == token
+      assert resumed.internal.taxi_flight.started_at == 100_000
+      assert resumed.internal.taxi_flight.remaining_nodes == nil
+      assert resumed.internal.spline_id != flying.internal.spline_id
+      assert resumed.player.coinage == 75
+      assert [%Effects.MonsterMove{move_opts: [flying?: true, run?: true]}] = effects
+      assert Taxi.resume(resumed, make_ref(), 100_100) == {resumed, []}
+
+      paused_again = Taxi.pause(resumed, 100_250)
+      assert paused_again.movement_block.position == {56.0, 0.0, 0.0, 0.0}
+      assert paused_again.internal.taxi_flight.duration_ms == 250
+      {resumed_again, _} = Taxi.resume(paused_again, make_ref(), 200_000)
+      landed = Taxi.finish(resumed_again, 200_250)
+      assert landed.movement_block.position == {64.0, 0.0, 0.0, 0.0}
+      assert landed.player.coinage == 75
+      refute Taxi.active?(landed)
+    end
+
+    test "cancels a dead passenger's checkpoint without moving to the destination" do
+      {flying, _} = Taxi.start(character(), itinerary(), node(4, {64.0, 0.0, 0.0}), 6852, make_ref(), 1_000)
+      paused = flying |> Taxi.pause(2_500) |> put_in([Access.key(:unit), Access.key(:health)], 0)
+      {canceled, []} = Taxi.resume(paused, make_ref(), 100_000)
+      refute Taxi.active?(canceled)
+      assert canceled.movement_block.position == paused.movement_block.position
+      assert canceled.unit.mount_display_id == 0
+      assert (canceled.unit.flags &&& 0x00100004) == 0
+    end
+  end
+
+  describe "cancel/2" do
+    test "clears a flight at its current position" do
+      {flying, _} = Taxi.start(character(), itinerary(), node(4, {64.0, 0.0, 0.0}), 6852, make_ref(), 1_000)
+      canceled = Taxi.cancel(flying, 1_500)
+      assert canceled.movement_block.position == {16.0, 0.0, 0.0, 0.0}
+      assert canceled.movement_block.spline_nodes == []
+      assert canceled.internal.movement_start_time == nil
+      assert canceled.unit.mount_display_id == 0
+      assert (canceled.unit.flags &&& 0x00100004) == 0
+      refute Taxi.active?(canceled)
     end
   end
 

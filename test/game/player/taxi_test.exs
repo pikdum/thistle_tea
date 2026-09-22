@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Player.TaxiTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -17,7 +18,9 @@ defmodule ThistleTea.Game.Player.TaxiTest do
   alias ThistleTea.Game.Entity.Logic.Reputation
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Network.Message.CmsgSetActiveMover
   alias ThistleTea.Game.Network.Message.SmsgActivatetaxireply
+  alias ThistleTea.Game.Network.Message.SmsgMonsterMove
   alias ThistleTea.Game.Network.Message.SmsgNewTaxiPath
   alias ThistleTea.Game.Network.Message.SmsgShowtaxinodes
   alias ThistleTea.Game.Network.Message.SmsgTaxinodeStatus
@@ -37,6 +40,7 @@ defmodule ThistleTea.Game.Player.TaxiTest do
     flightmaster_guid = Guid.from_low_guid(:mob, 352, System.unique_integer([:positive, :monotonic]))
     character_id = System.unique_integer([:positive, :monotonic])
     character = character(character_id) |> CharacterStore.put()
+    Entity.register(character.object.guid)
 
     Metadata.put(flightmaster_guid, %{npc_flags: 0x8, alive?: true})
     SpatialHash.update(:mobs, flightmaster_guid, WorldRef.open(0), 2.0, 0.0, 0.0)
@@ -329,6 +333,89 @@ defmodule ThistleTea.Game.Player.TaxiTest do
       poor = put_in(state.character.player.coinage, 24)
       assert Taxi.start_path(poor, 12, network(), spell_id: 27_998) == poor
       assert_receive {:"$gen_cast", {:send_packet, %SmsgActivatetaxireply{reply: 3}}}
+    end
+  end
+
+  describe "disconnect/1" do
+    setup [:start_flight]
+
+    test "stops projection and rejects callbacks from the old flight", %{flight_state: flying} do
+      token = flying.character.internal.taxi_flight.token
+      spline_id = flying.character.internal.spline_id
+      paused = Taxi.disconnect(flying)
+
+      assert paused.taxi_arrival_ref == nil
+      assert Process.read_timer(flying.taxi_arrival_ref) == false
+      refute Position.projection(flying.guid)
+      assert paused.character.internal.taxi_flight.remaining_nodes != []
+      assert Taxi.arrive(paused, token) == paused
+      assert Taxi.progress(paused, token) == paused
+      assert Taxi.spline_done(paused, spline_id) == paused
+    end
+
+    test "world teardown saves the checkpoint before discarding movement", %{flight_state: flying} do
+      assert State.leave_world(flying) == %State{}
+      saved = CharacterStore.get(flying.character.id)
+      assert saved.internal.taxi_flight.remaining_nodes != []
+      assert saved.internal.taxi_flight.started_at == nil
+      assert saved.internal.movement_start_time == nil
+      assert saved.movement_block.spline_nodes == []
+      assert saved.movement_block.position != {100.0, 0.0, 0.0, 0.0}
+      assert saved.player.coinage == 75
+      assert saved.unit.mount_display_id == 6852
+      refute Position.projection(flying.guid)
+    end
+  end
+
+  describe "resume/1" do
+    setup [:start_flight]
+
+    test "starts once after the client's active mover and finishes under a fresh token", %{flight_state: flying} do
+      old_token = flying.character.internal.taxi_flight.token
+      old_spline_id = flying.character.internal.spline_id
+      paused = Taxi.disconnect(flying)
+      loading = %{paused | ready: false}
+      assert Taxi.resume(loading) == loading
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgMonsterMove{}}}
+
+      message = %CmsgSetActiveMover{guid: flying.guid}
+      resumed = CmsgSetActiveMover.handle(message, loading)
+      new_token = resumed.character.internal.taxi_flight.token
+
+      assert new_token != old_token
+      assert resumed.character.internal.spline_id != old_spline_id
+      assert resumed.character.player.coinage == 75
+      assert resumed.character.player.taxi_nodes == flying.character.player.taxi_nodes
+      assert resumed.character.internal.taxi_flight.remaining_nodes == nil
+      assert is_reference(resumed.taxi_arrival_ref)
+      assert Position.projection(resumed.guid)
+      assert CharacterStore.get(resumed.character.id).internal.taxi_flight.token == new_token
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgMonsterMove{}}}
+      assert CmsgSetActiveMover.handle(message, resumed) == resumed
+      assert Taxi.arrive(resumed, old_token) == resumed
+      assert Taxi.progress(resumed, old_token) == resumed
+      assert Taxi.spline_done(resumed, old_spline_id) == resumed
+
+      landed = resumed |> expire_flight() |> Taxi.progress(new_token)
+      assert landed.character.internal.taxi_flight == nil
+      assert landed.character.movement_block.position == {100.0, 0.0, 0.0, 0.0}
+      assert landed.character.unit.mount_display_id == 0
+      assert landed.character.player.coinage == 75
+      refute Position.projection(landed.guid)
+      finish_test_flight(landed)
+    end
+  end
+
+  describe "cancel/1" do
+    setup [:start_flight]
+
+    test "discards the route without advancing to its destination", %{flight_state: flying} do
+      canceled = Taxi.cancel(flying)
+      assert canceled.taxi_arrival_ref == nil
+      assert canceled.character.internal.taxi_flight == nil
+      assert canceled.character.movement_block.position != {100.0, 0.0, 0.0, 0.0}
+      refute Position.projection(canceled.guid)
+      assert Taxi.resume(canceled) == canceled
     end
   end
 

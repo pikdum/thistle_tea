@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Player.LoginTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Companion
   alias ThistleTea.Game.Entity.Data.Component.Internal
@@ -10,10 +11,14 @@ defmodule ThistleTea.Game.Player.LoginTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Data.Taxi.Flight
   alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Login
+  alias ThistleTea.Game.World
+  alias ThistleTea.Game.WorldRef
 
   defmodule TransportUpdateServer do
     @moduledoc false
@@ -33,6 +38,41 @@ defmodule ThistleTea.Game.Player.LoginTest do
   end
 
   describe "restore_companion/1" do
+    @tag :dbc_db
+    test "keeps a saved pet suspended while a taxi route is unfinished" do
+      flight = %Flight{
+        token: nil,
+        path_ids: [12],
+        source_node_id: 2,
+        destination_node_id: 4,
+        destination_position: {100.0, 0.0, 0.0},
+        mount_display_id: 6852,
+        started_at: nil,
+        duration_ms: 500,
+        remaining_nodes: [{100.0, 0.0, 0.0}]
+      }
+
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      Entity.register(guid)
+      character = put_in(character(health: 100).object.guid, guid)
+
+      character = %{
+        character
+        | unit: %{character.unit | level: 60, faction_template: 1, summon: 0},
+          movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+          internal: %{character.internal | taxi_flight: flight, world: WorldRef.open(0)}
+      }
+
+      state = %{character: character}
+      assert Login.restore_companion(state) == state
+      refute_receive %Attachment{}
+
+      landed = put_in(state.character.internal.taxi_flight, nil)
+      assert Login.restore_companion(landed) == landed
+      assert_receive %Attachment{entity_ref: %{entry: 416, guid: pet_guid}}
+      on_exit(fn -> World.stop_entity(pet_guid) end)
+    end
+
     test "does not resummon a pet that died before logout" do
       character = character(health: 100)
 

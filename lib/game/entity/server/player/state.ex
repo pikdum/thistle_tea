@@ -134,8 +134,8 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     state = CompanionOwner.suspend(state)
     state = MiniPetOwner.dismiss(state)
     state = dismiss_guardians(state)
-    state = ServerMovement.cancel(state)
     state = Taxi.disconnect(state)
+    state = ServerMovement.cancel(state)
     state = leave_transport(state)
 
     state = close_mailbox(state)
