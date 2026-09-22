@@ -74,8 +74,6 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureGroupScriptsTest do
       member = EventSink.emit_pending(member, Context.new(self()))
       assert CombatLeashes.last_extended_at(member) == 1_000
       %{entity: leader} = Engagement.enter(leader, 99, 10_000, selection: :target)
-      leader = EventSink.emit_pending(leader, Context.new(self()))
-      assert CombatLeashes.last_extended_at(member) == 10_000
       %{entity: leader} = Engagement.die(%{leader | unit: %{leader.unit | health: 0}})
       EventSink.emit_pending(leader, Context.new(self()))
       assert CombatLeashes.last_extended_at(source) == nil

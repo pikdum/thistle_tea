@@ -7,8 +7,15 @@ defmodule ThistleTea.Game.Entity.EventSink.CombatLeashes do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.World.CombatLeashes
 
+  def emit(%Mob{} = entity, %Effects.CombatLeashEvent{ref: ref, event: {:start, _now, _source} = event}, %Context{
+        owner_pid: owner
+      }) do
+    if ref == CombatLeash.reference(entity), do: CombatLeashes.event(ref, event, owner)
+    entity
+  end
+
   def emit(%Mob{} = entity, %Effects.CombatLeashEvent{ref: ref, event: event}, %Context{owner_pid: owner}) do
-    if event == :stop or ref == CombatLeash.reference(entity), do: CombatLeashes.event(ref, event, owner)
+    CombatLeashes.event(ref, event, owner)
     entity
   end
 
