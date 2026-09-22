@@ -95,6 +95,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Weapon attack accuracy](docs/attack-accuracy-playtest.md), with dual-wield miss penalties, queued-attack suppression, hit scaling, PvP defense, and capped glancing adjustments
 - [Weapon-dependent offensive bonuses](docs/weapon-bonuses-playtest.md), with per-hand hit, weapon talents and enchants, skill-derived crit displays, and filtered white-attack damage
 - [Extra attacks](docs/extra-attacks-playtest.md), with pending melee batches, proc recursion guards, swing timing, combat-log feedback, and lifecycle cleanup
+- [Melee readiness](docs/melee-readiness-playtest.md), with shared facing and control checks, per-hand retries, dual-wield swing separation, and native error feedback
 - main-hand disarm: unarmed player combat, armed-creature damage reduction, weapon ability checks, and off-hand preservation
 - rear-hit daze from uncontrolled creatures, with level and defense-skill scaling
 - mechanic resistance for spells and melee abilities, including Orc Hardiness
