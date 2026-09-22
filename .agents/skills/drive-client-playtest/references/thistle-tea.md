@@ -8,7 +8,8 @@ The helper defaults to:
 - executable: `WoW.exe`
 - realm list: `realmlist.wtf`, which must already point to localhost
 - Proton: `/home/pikdum/.local/share/Steam/steamapps/common/Proton - Experimental`
-- display search: Xvfb displays 98 through 109
+- rendering: hardware OpenGL through headless Gamescope and its private Xwayland display
+- software fallback: Xvfb displays 98 through 109
 - resolution: 1280x720x24
 - session root: `${XDG_CACHE_HOME:-$HOME/.cache}/thistle-wow-playtest.*`
 
@@ -17,9 +18,28 @@ Override defaults only with task-specific variables:
 - `THISTLE_PLAYTEST_WOW_DIR`
 - `THISTLE_PLAYTEST_PROTON_PATH`
 - `THISTLE_PLAYTEST_CACHE_DIR`
-- `THISTLE_PLAYTEST_DISPLAY_NUMBER`
+- `THISTLE_PLAYTEST_RENDERER` (`gpu`, the default, or `software`)
+- `THISTLE_PLAYTEST_DISPLAY_NUMBER` (software sessions only)
 
-The launcher uses `umu-run`, a new `WINEPREFIX`, software OpenGL, dummy audio, and `STEAM_COMPAT_MOUNTS=/storage`. It never edits `realmlist.wtf` or client files. XKB warnings are harmless. A Proton game-drive warning can also be nonfatal; require the WoW window and a screenshot rather than judging launch from that line alone.
+The launcher uses `umu-run`, a new `WINEPREFIX`, dummy audio, and `STEAM_COMPAT_MOUNTS=/storage`. GPU sessions unset inherited software-rendering overrides and run Gamescope with `--backend headless` at 1280×720 and 60 Hz. No window appears on the user's desktop. Required graphics tools are obtained with a one-off Nix shell when missing. A working systemd user manager is required for both rendering modes.
+
+The helper writes the private display to `display`, the selected mode to `renderer`, and GLX hardware details to `renderer.log`. It rejects a software renderer in GPU mode. For native acceptance, also verify WoW's own GPU usage through its `/proc/PID/fdinfo` DRM counters; the compositor's renderer alone is not proof. Captures target the game window because a root-window capture is unavailable under rootless Xwayland.
+
+The launcher does not edit `realmlist.wtf` or client files; the game can still save its normal settings. XKB warnings are harmless. A Proton game-drive warning can also be nonfatal; require the WoW window and a screenshot rather than judging launch from that line alone.
+
+## Session ownership and cleanup
+
+Each launch creates `thistle-wow-playtest.TOKEN.service` with `KillMode=control-group` and a five-second stop timeout. The directory stores the unit name and invocation ID. `stop` verifies both before asking systemd to terminate the owned cgroup. This includes Wine and Proton children that create their own process groups or sessions. Repeated stops are harmless. A stale directory cannot stop a replacement unit or send input to a reused display.
+
+Use `wow-client status SESSION` and `systemctl --user show UNIT -p ControlGroup -p InvocationID` to inspect ownership. The host Steam process must be outside that cgroup. For legacy sessions without a unit record, inspect each candidate's saved PID/start time, command, and `WINEPREFIX` before stopping it individually. Never use `pkill wine`, `killall wineserver`, or broad Proton/Steam process matches.
+
+Run the helper's cleanup regressions with:
+
+```bash
+.agents/skills/drive-client-playtest/scripts/test-cleanup
+```
+
+They create temporary services, exercise detached children, sibling survival, repeated cleanup, stale and mismatched ownership, legacy refusal, and failed-startup cleanup. Fixtures and logs remain under the printed temporary directory. Also run `bash -n` and ShellCheck on both scripts after changes. Native performance and isolation evidence is recorded in [the GPU playtest acceptance notes](../../../../docs/gpu-playtest-acceptance.md).
 
 ## Helper commands
 

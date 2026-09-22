@@ -2,22 +2,43 @@
 set -euo pipefail
 
 ensure_tools() {
-  local missing=0
+  local required=()
+  local packages=()
+  local command_name
 
-  for command_name in Xvfb xdotool import; do
+  case "${1:-}" in
+    _run|_game) return ;;
+    launch)
+      required=(systemd-run systemctl xdotool import glxinfo)
+      case "${THISTLE_PLAYTEST_RENDERER:-gpu}" in
+        gpu) required+=(gamescope) ;;
+        software) required+=(Xvfb) ;;
+        *) fail "THISTLE_PLAYTEST_RENDERER must be gpu or software" ;;
+      esac
+      ;;
+    stop) required=(systemctl) ;;
+    capture) required=(xdotool import) ;;
+    *) required=(xdotool systemctl) ;;
+  esac
+
+  for command_name in "${required[@]}"; do
     if ! command -v "$command_name" >/dev/null 2>&1; then
-      missing=1
+      case "$command_name" in
+        Xvfb) packages+=(nixpkgs#xorg-server) ;;
+        glxinfo) packages+=(nixpkgs#mesa-demos) ;;
+        import) packages+=(nixpkgs#imagemagick) ;;
+        systemd-run|systemctl) fail "a systemd user manager is required" ;;
+        *) packages+=("nixpkgs#$command_name") ;;
+      esac
     fi
   done
 
-  if [[ "$missing" == 1 && "${THISTLE_PLAYTEST_NIX_READY:-0}" != 1 ]]; then
+  if [[ "${#packages[@]}" -gt 0 && "${THISTLE_PLAYTEST_NIX_READY:-0}" != 1 ]]; then
     export THISTLE_PLAYTEST_NIX_READY=1
-    exec nix shell nixpkgs#xorg-server nixpkgs#xdotool nixpkgs#imagemagick --command bash "$0" "$@"
+    exec nix shell "${packages[@]}" --command bash "$0" "$@"
   fi
 
-  if [[ "$missing" == 1 ]]; then
-    fail "Xvfb, xdotool, and ImageMagick are required"
-  fi
+  [[ "${#packages[@]}" == 0 ]] || fail "required playtest tools are unavailable"
 }
 
 fail() {
@@ -37,7 +58,7 @@ require_session() {
   [[ -d "$session_dir" ]] || fail "session directory does not exist: $session_dir"
   [[ -f "$session_dir/session.kind" ]] || fail "not a playtest session: $session_dir"
   [[ "$(<"$session_dir/session.kind")" == drive-client-playtest ]] || fail "not a playtest session: $session_dir"
-  printf '%s\n' "$session_dir"
+  realpath -e "$session_dir"
 }
 
 session_value() {
@@ -56,33 +77,28 @@ process_alive() {
   kill -0 "$pid" 2>/dev/null
 }
 
-process_start_time() {
-  local pid="$1"
+session_unit() {
+  local session_dir="$1"
+  local unit
 
-  process_alive "$pid" || return 1
-  awk '{print $22}' "/proc/$pid/stat" 2>/dev/null
+  [[ -f "$session_dir/unit" && -f "$session_dir/unit.invocation" ]] ||
+    fail "session has no systemd ownership record; legacy sessions require individual process inspection"
+  unit="$(session_value "$session_dir" unit)"
+  [[ "$unit" == "$(basename "$session_dir").service" && "$unit" == thistle-wow-playtest.*.service ]] ||
+    fail "session unit does not match its directory"
+  printf '%s\n' "$unit"
 }
 
-record_process() {
+session_alive() {
   local session_dir="$1"
-  local name="$2"
-  local pid="$3"
+  local unit
+  local expected
+  local current
 
-  printf '%s\n' "$pid" >"$session_dir/$name.pid"
-  process_start_time "$pid" >"$session_dir/$name.start"
-}
-
-session_process_alive() {
-  local session_dir="$1"
-  local name="$2"
-  local pid
-  local expected_start
-  local actual_start
-
-  pid="$(session_value "$session_dir" "$name.pid")"
-  expected_start="$(session_value "$session_dir" "$name.start")"
-  actual_start="$(process_start_time "$pid")" || return 1
-  [[ "$actual_start" == "$expected_start" ]]
+  unit="$(session_unit "$session_dir")" || return 1
+  expected="$(session_value "$session_dir" unit.invocation)"
+  current="$(systemctl --user show "$unit" -p InvocationID --value 2>/dev/null)" || return 1
+  [[ -n "$expected" && "$current" == "$expected" ]] && systemctl --user is-active --quiet "$unit"
 }
 
 find_window() {
@@ -90,6 +106,8 @@ find_window() {
   local display
   local ids
 
+  session_alive "$session_dir" || return 1
+  [[ -f "$session_dir/display" ]] || return 1
   display="$(session_value "$session_dir" display)"
   mapfile -t ids < <(DISPLAY="$display" xdotool search --onlyvisible --name '^World of Warcraft$' 2>/dev/null || true)
 
@@ -107,7 +125,7 @@ wait_for_window() {
       return 0
     fi
 
-    session_process_alive "$session_dir" wow || return 1
+    session_alive "$session_dir" || return 1
     sleep 0.5
   done
 
@@ -154,31 +172,25 @@ choose_display() {
   fail "no free X display between :98 and :109"
 }
 
-terminate_session_process() {
+stop_session_unit() {
   local session_dir="$1"
-  local name="$2"
-  local pid
-  local pgid
+  local unit
+  local expected
+  local current
 
-  session_process_alive "$session_dir" "$name" || return 0
-  pid="$(session_value "$session_dir" "$name.pid")"
-  pgid="$(ps -o pgid= -p "$pid" | tr -d ' ')"
+  unit="$(session_unit "$session_dir")" || return 1
+  expected="$(session_value "$session_dir" unit.invocation)" || return 1
+  current="$(systemctl --user show "$unit" -p InvocationID --value 2>/dev/null || true)"
+  [[ -n "$current" ]] || return 0
+  [[ -n "$expected" && "$current" == "$expected" ]] || fail "unit ownership changed; refusing to stop $unit"
+  systemctl --user stop "$unit"
+}
 
-  if [[ "$pgid" == "$pid" ]]; then
-    kill -TERM -- "-$pid" 2>/dev/null || true
-  else
-    kill -TERM "$pid" 2>/dev/null || true
-  fi
+cleanup_failed_launch() {
+  local session_dir="$1"
 
-  for _attempt in $(seq 1 40); do
-    session_process_alive "$session_dir" "$name" || return 0
-    sleep 0.1
-  done
-
-  if [[ "$pgid" == "$pid" ]]; then
-    kill -KILL -- "-$pid" 2>/dev/null || true
-  else
-    kill -KILL "$pid" 2>/dev/null || true
+  if [[ -f "$session_dir/unit.invocation" ]]; then
+    stop_session_unit "$session_dir"
   fi
 }
 
@@ -186,68 +198,105 @@ launch_client() {
   local wow_dir="${THISTLE_PLAYTEST_WOW_DIR:-/storage/games/World of Warcraft - Vanilla (Automation)}"
   local proton_path="${THISTLE_PLAYTEST_PROTON_PATH:-/home/pikdum/.local/share/Steam/steamapps/common/Proton - Experimental}"
   local cache_dir="${THISTLE_PLAYTEST_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}}"
-  local display_number
-  local display
+  local renderer="${THISTLE_PLAYTEST_RENDERER:-gpu}"
   local session_dir
-  local xvfb_pid
-  local wow_pid
+  local unit
   local window_id
+  local script_path
 
   [[ -f "$wow_dir/WoW.exe" ]] || fail "WoW.exe not found in $wow_dir"
   [[ -f "$wow_dir/realmlist.wtf" ]] || fail "realmlist.wtf not found in $wow_dir"
   grep -Eiq 'set[[:space:]]+realmlist[[:space:]]+(localhost|127\.0\.0\.1)' "$wow_dir/realmlist.wtf" || fail "realmlist.wtf does not point to localhost"
   [[ -d "$proton_path" ]] || fail "Proton path does not exist: $proton_path"
   command -v umu-run >/dev/null 2>&1 || fail "umu-run is not available"
-  command -v setsid >/dev/null 2>&1 || fail "setsid is not available"
+  systemctl --user show-environment >/dev/null || fail "the systemd user manager is unavailable"
+  if [[ "$renderer" == gpu && -n "${THISTLE_PLAYTEST_DISPLAY_NUMBER:-}" ]]; then
+    fail "GPU sessions allocate a private Xwayland display; DISPLAY_NUMBER applies only to software sessions"
+  fi
 
   mkdir -p "$cache_dir"
   session_dir="$(mktemp -d "$cache_dir/thistle-wow-playtest.XXXXXX")"
+  session_dir="$(realpath -e "$session_dir")"
   mkdir -p "$session_dir/prefix" "$session_dir/screenshots"
   printf 'drive-client-playtest\n' >"$session_dir/session.kind"
-  display_number="$(choose_display)"
-  display=":$display_number"
-  printf '%s\n' "$display" >"$session_dir/display"
+  printf '%s\n' "$renderer" >"$session_dir/renderer"
+  unit="$(basename "$session_dir").service"
+  printf '%s\n' "$unit" >"$session_dir/unit"
 
-  (
-    exec setsid Xvfb "$display" -screen 0 1280x720x24 -ac -nolisten tcp
-  ) >"$session_dir/xvfb.log" 2>&1 </dev/null &
+  if [[ "$renderer" == software ]]; then
+    printf ':%s\n' "$(choose_display)" >"$session_dir/display.requested"
+  fi
+
+  script_path="$(realpath -e "$0")"
+  trap 'cleanup_failed_launch "$session_dir"' EXIT
+  trap 'exit 130' INT TERM
+  systemd-run --user --quiet --collect --unit="$unit" --service-type=exec \
+    --property=KillMode=control-group --property=TimeoutStopSec=5s \
+    --property="StandardOutput=append:$session_dir/wow.log" \
+    --property="StandardError=append:$session_dir/wow.log" \
+    --setenv="PATH=$PATH" \
+    "$BASH" "$script_path" _run "$session_dir" "$(realpath -e "$wow_dir")" "$(realpath -e "$proton_path")"
+  systemctl --user show "$unit" -p InvocationID --value >"$session_dir/unit.invocation"
+
+  window_id="$(wait_for_window "$session_dir")" || fail "WoW window did not appear; see $session_dir/wow.log"
+  trap - EXIT INT TERM
+
+  printf 'session=%s\n' "$session_dir"
+  printf 'renderer=%s\n' "$renderer"
+  printf 'unit=%s\n' "$unit"
+  printf 'display=%s\n' "$(session_value "$session_dir" display)"
+  printf 'window=%s\n' "$window_id"
+  printf 'screenshots=%s\n' "$session_dir/screenshots"
+  printf 'wow_log=%s\n' "$session_dir/wow.log"
+}
+
+run_session() {
+  local session_dir="$1"
+  local wow_dir="$2"
+  local proton_path="$3"
+  local renderer
+  local xvfb_pid
+
+  renderer="$(session_value "$session_dir" renderer)"
+  unset DISPLAY WAYLAND_DISPLAY LIBGL_ALWAYS_SOFTWARE GALLIUM_DRIVER MESA_LOADER_DRIVER_OVERRIDE
+
+  if [[ "$renderer" == gpu ]]; then
+    exec gamescope --backend headless -W 1280 -H 720 -w 1280 -h 720 -r 60 -- \
+      "$BASH" "$0" _game "$session_dir" "$wow_dir" "$proton_path"
+  fi
+
+  DISPLAY="$(session_value "$session_dir" display.requested)"
+  export DISPLAY
+  export LIBGL_ALWAYS_SOFTWARE=1
+  Xvfb "$DISPLAY" -displayfd 3 -screen 0 1280x720x24 -ac -nolisten tcp \
+    3>"$session_dir/display.ready" >"$session_dir/xvfb.log" 2>&1 &
   xvfb_pid=$!
-  record_process "$session_dir" xvfb "$xvfb_pid"
 
   for _attempt in $(seq 1 50); do
-    [[ -S "/tmp/.X11-unix/X$display_number" ]] && break
+    [[ -s "$session_dir/display.ready" ]] && break
     process_alive "$xvfb_pid" || fail "Xvfb exited; see $session_dir/xvfb.log"
     sleep 0.1
   done
 
-  [[ -S "/tmp/.X11-unix/X$display_number" ]] || fail "Xvfb did not become ready; see $session_dir/xvfb.log"
+  [[ -s "$session_dir/display.ready" ]] || fail "Xvfb did not become ready"
+  run_game "$session_dir" "$wow_dir" "$proton_path"
+}
 
-  (
-    cd "$wow_dir"
-    exec setsid env \
-      DISPLAY="$display" \
-      WINEPREFIX="$session_dir/prefix" \
-      PROTONPATH="$proton_path" \
-      WINEDEBUG=-all \
-      LIBGL_ALWAYS_SOFTWARE=1 \
-      SDL_AUDIODRIVER=dummy \
-      STEAM_COMPAT_MOUNTS=/storage \
-      umu-run WoW.exe -windowed -opengl
-  ) >"$session_dir/wow.log" 2>&1 </dev/null &
-  wow_pid=$!
-  record_process "$session_dir" wow "$wow_pid"
+run_game() {
+  local session_dir="$1"
+  local wow_dir="$2"
+  local proton_path="$3"
 
-  if ! window_id="$(wait_for_window "$session_dir")"; then
-    terminate_session_process "$session_dir" wow
-    terminate_session_process "$session_dir" xvfb
-    fail "WoW window did not appear; see $session_dir/wow.log"
+  printf '%s\n' "$DISPLAY" >"$session_dir/display"
+  glxinfo -B >"$session_dir/renderer.log"
+  if [[ "$(session_value "$session_dir" renderer)" == gpu ]] &&
+    grep -Eiq 'llvmpipe|softpipe|Accelerated: no' "$session_dir/renderer.log"; then
+    fail "GPU session obtained a software renderer; see $session_dir/renderer.log"
   fi
 
-  printf 'session=%s\n' "$session_dir"
-  printf 'display=%s\n' "$display"
-  printf 'window=%s\n' "$window_id"
-  printf 'screenshots=%s\n' "$session_dir/screenshots"
-  printf 'wow_log=%s\n' "$session_dir/wow.log"
+  cd "$wow_dir"
+  exec env WINEPREFIX="$session_dir/prefix" PROTONPATH="$proton_path" WINEDEBUG=-all \
+    SDL_AUDIODRIVER=dummy STEAM_COMPAT_MOUNTS=/storage umu-run WoW.exe -windowed -opengl
 }
 
 show_status() {
@@ -258,8 +307,9 @@ show_status() {
 
   printf 'session=%s\n' "$session_dir"
   printf 'display=%s\n' "$(session_value "$session_dir" display)"
-  printf 'xvfb_alive=%s\n' "$(session_process_alive "$session_dir" xvfb && printf true || printf false)"
-  printf 'wow_alive=%s\n' "$(session_process_alive "$session_dir" wow && printf true || printf false)"
+  printf 'renderer=%s\n' "$(session_value "$session_dir" renderer)"
+  printf 'unit=%s\n' "$(session_unit "$session_dir")"
+  printf 'session_alive=%s\n' "$(session_alive "$session_dir" && printf true || printf false)"
   printf 'window=%s\n' "$window_id"
   printf 'screenshots=%s\n' "$session_dir/screenshots"
   printf 'wow_log=%s\n' "$session_dir/wow.log"
@@ -272,7 +322,7 @@ login_debug() {
 
   display="$(session_value "$session_dir" display)"
   window_id="$(focus_window "$session_dir")"
-  DISPLAY="$display" xdotool mousemove --window "$window_id" 650 390 click 1 key ctrl+a type --clearmodifiers --delay 50 debug
+  DISPLAY="$display" xdotool mousemove --window "$window_id" 650 378 click 1 key ctrl+a type --clearmodifiers --delay 50 debug
   DISPLAY="$display" xdotool mousemove --window "$window_id" 650 448 click 1 key ctrl+a type --clearmodifiers --delay 50 debug
   DISPLAY="$display" xdotool key Return
   sleep 6
@@ -357,19 +407,20 @@ capture_screen() {
   local name="${2:-$(date +%Y%m%d-%H%M%S)}"
   local display
   local path
+  local window_id
 
   [[ "$name" =~ ^[A-Za-z0-9._-]+$ ]] || fail "capture name may contain only letters, digits, dot, underscore, and hyphen"
   display="$(session_value "$session_dir" display)"
+  window_id="$(find_window "$session_dir")" || fail "WoW window is not available"
   path="$session_dir/screenshots/$name.png"
-  DISPLAY="$display" import -window root "$path"
+  DISPLAY="$display" import -window "$window_id" "$path"
   printf '%s\n' "$path"
 }
 
 stop_client() {
   local session_dir="$1"
 
-  terminate_session_process "$session_dir" wow
-  terminate_session_process "$session_dir" xvfb
+  stop_session_unit "$session_dir"
   printf 'stopped=%s\n' "$session_dir"
   printf 'artifacts_retained=%s\n' "$session_dir"
 }
@@ -380,6 +431,14 @@ main() {
   shift || true
 
   case "$command_name" in
+    _run)
+      [[ "$#" == 3 ]] || usage
+      run_session "$@"
+      ;;
+    _game)
+      [[ "$#" == 3 ]] || usage
+      run_game "$@"
+      ;;
     launch)
       [[ "$#" == 0 ]] || usage
       launch_client
@@ -441,4 +500,6 @@ main() {
   esac
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

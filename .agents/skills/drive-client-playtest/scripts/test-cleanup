@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+source "$script_dir/wow-client"
+
+test_root=$(mktemp -d /tmp/thistle-playtest-cleanup.XXXXXX)
+created_units=()
+
+cleanup_test_units() {
+  local unit
+  for unit in "${created_units[@]}"; do
+    systemctl --user stop "$unit" 2>/dev/null || true
+  done
+}
+trap cleanup_test_units EXIT
+
+cat > "$test_root/children" <<'CHILD'
+#!/usr/bin/env bash
+set -euo pipefail
+trap '' TERM
+setsid sleep 300 &
+printf '%s\n' "$!" > "$1"
+wait
+CHILD
+
+start_test_session() {
+  local session_dir=$1
+  local unit
+  unit="$(basename "$session_dir").service"
+  mkdir -p "$session_dir"
+  printf 'drive-client-playtest\n' > "$session_dir/session.kind"
+  printf '%s\n' "$unit" > "$session_dir/unit"
+  systemd-run --user --quiet --collect --unit="$unit" --service-type=exec \
+    --property=KillMode=control-group --property=TimeoutStopSec=1s \
+    "$BASH" "$test_root/children" "$session_dir/child.pid"
+  created_units+=("$unit")
+  systemctl --user show "$unit" -p InvocationID --value > "$session_dir/unit.invocation"
+  for _attempt in $(seq 1 30); do
+    [[ -s "$session_dir/child.pid" ]] && return
+    sleep 0.1
+  done
+  fail "test child did not start"
+}
+
+first=$(mktemp -d "$test_root/thistle-wow-playtest.XXXXXX")
+second=$(mktemp -d "$test_root/thistle-wow-playtest.XXXXXX")
+start_test_session "$first"
+start_test_session "$second"
+first_child=$(cat "$first/child.pid")
+second_child=$(cat "$second/child.pid")
+[[ "$(ps -o sid= -p "$first_child" | tr -d ' ')" == "$first_child" ]]
+
+stop_session_unit "$first"
+if process_alive "$first_child"; then
+  fail "detached child survived cleanup"
+fi
+process_alive "$second_child"
+session_alive "$second"
+stop_session_unit "$first"
+printf 'PASS: detached children stopped; sibling session survives; repeated stop succeeds\n'
+
+old_invocation=$(cat "$first/unit.invocation")
+start_test_session "$first"
+new_invocation=$(cat "$first/unit.invocation")
+printf '%s\n' "$old_invocation" > "$first/unit.invocation"
+if (stop_session_unit "$first") 2> "$test_root/stale.log"; then
+  fail "stale ownership stopped a replacement unit"
+fi
+if (find_window "$first") 2>/dev/null; then
+  fail "stale session reached a display"
+fi
+process_alive "$(cat "$first/child.pid")"
+printf '%s\n' "$new_invocation" > "$first/unit.invocation"
+printf 'PASS: stale ownership refuses to stop a replacement unit\n'
+
+first_unit=$(cat "$first/unit")
+cat "$second/unit" > "$first/unit"
+if (stop_session_unit "$first") 2> "$test_root/mismatched.log"; then
+  fail "mismatched session stopped another unit"
+fi
+process_alive "$second_child"
+printf '%s\n' "$first_unit" > "$first/unit"
+printf 'PASS: mismatched session cannot stop its sibling\n'
+
+legacy=$(mktemp -d "$test_root/thistle-wow-playtest.XXXXXX")
+printf 'drive-client-playtest\n' > "$legacy/session.kind"
+if (stop_session_unit "$legacy") 2> "$test_root/legacy.log"; then
+  fail "legacy session was accepted without ownership"
+fi
+process_alive "$second_child"
+printf 'PASS: legacy session requires ownership inspection\n'
+
+mkdir -p "$test_root/fake-bin" "$test_root/game" "$test_root/proton" "$test_root/cache"
+touch "$test_root/game/WoW.exe"
+printf 'set realmlist localhost\n' > "$test_root/game/realmlist.wtf"
+cat > "$test_root/fake-bin/gamescope" <<'FAKE'
+#!/usr/bin/env bash
+set -euo pipefail
+setsid sleep 300 &
+printf '%s\n' "$!" > "$(dirname "$0")/failed-child.pid"
+exit 42
+FAKE
+chmod +x "$test_root/fake-bin/gamescope"
+
+if PATH="$test_root/fake-bin:$PATH" THISTLE_PLAYTEST_RENDERER=gpu \
+  THISTLE_PLAYTEST_WOW_DIR="$test_root/game" THISTLE_PLAYTEST_PROTON_PATH="$test_root/proton" \
+  THISTLE_PLAYTEST_CACHE_DIR="$test_root/cache" \
+  "$script_dir/wow-client" launch > "$test_root/failed-launch.log" 2>&1; then
+  fail "failed compositor launch succeeded"
+fi
+failed_sessions=("$test_root/cache"/thistle-wow-playtest.*)
+[[ "${#failed_sessions[@]}" == 1 ]]
+failed_unit=$(cat "${failed_sessions[0]}/unit")
+created_units+=("$failed_unit")
+if process_alive "$(cat "$test_root/fake-bin/failed-child.pid")"; then
+  fail "failed launch left a child running"
+fi
+if systemctl --user is-active --quiet "$failed_unit"; then
+  fail "failed launch left its unit running"
+fi
+process_alive "$second_child"
+printf 'PASS: failed startup cleans its descendants and preserves sibling sessions\n'
+printf 'artifacts=%s\n' "$test_root"

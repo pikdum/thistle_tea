@@ -37,7 +37,7 @@ playtest_session=/home/pikdum/.cache/thistle-wow-playtest.example
 .agents/skills/drive-client-playtest/scripts/wow-client login-debug "$playtest_session"
 ```
 
-The launcher must create a new Wine prefix and a private Xvfb display. Never point it at an existing prefix or the user's active display.
+The launcher creates a new Wine prefix, a private headless Gamescope/Xwayland display, and a dedicated systemd user service. GPU rendering is the default. Check `renderer.log` in the session directory for the selected renderer. Use `THISTLE_PLAYTEST_RENDERER=software` to explicitly select Xvfb and software OpenGL when needed. Never point a playtest at an existing prefix or the user's active display.
 
 ## Drive the client
 
@@ -71,10 +71,12 @@ Prove all relevant layers:
 
 ## Finish
 
-Stop the helper-owned client and X server while retaining logs and screenshots:
+Stop the helper-owned session while retaining logs and screenshots:
 
 ```bash
 .agents/skills/drive-client-playtest/scripts/wow-client stop "$playtest_session"
 ```
 
 Stop the retained server PTY. Keep evidence until the result is recorded. Trash the exact helper-owned session directory only after it is no longer needed; never clean a broad cache or temporary root.
+
+Cleanup must go through the session's recorded systemd unit and matching invocation ID. The helper stops the entire owned cgroup, including detached Wine children. Do not use broad Wine, Proton, Steam, or user-session kill commands. Legacy sessions without ownership records require individual process inspection; do not substitute a process-name match. See [references/thistle-tea.md](references/thistle-tea.md) for ownership checks and helper validation.
