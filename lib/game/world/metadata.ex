@@ -25,14 +25,17 @@ defmodule ThistleTea.Game.World.Metadata do
   end
 
   def update(table \\ __MODULE__, guid, metadata) do
-    current =
-      case :ets.lookup(table, guid) do
-        [{^guid, data}] when is_map(data) -> data
-        _ -> %{}
-      end
+    metadata = normalize_metadata(metadata)
 
-    :ets.insert(table, {guid, Map.merge(current, normalize_metadata(metadata))})
-    :ok
+    case get(table, guid) do
+      nil ->
+        if :ets.insert_new(table, {guid, metadata}), do: :ok, else: update(table, guid, metadata)
+
+      current ->
+        if replace(table, guid, current, Map.merge(current, metadata)),
+          do: :ok,
+          else: update(table, guid, metadata)
+    end
   end
 
   def get(table \\ __MODULE__, guid) do
@@ -101,13 +104,24 @@ defmodule ThistleTea.Game.World.Metadata do
   end
 
   defp update_counter(table, guid, key, delta, bound) do
-    current = get(table, guid) || %{}
-    value = Map.get(current, key, 0)
-    value = if is_number(value), do: value, else: 0
-    updated = value + delta
-    updated = apply_bound(updated, delta, bound)
-    :ets.insert(table, {guid, Map.put(current, key, updated)})
-    updated
+    case get(table, guid) do
+      nil ->
+        0
+
+      current ->
+        value = Map.get(current, key, 0)
+        value = if is_number(value), do: value, else: 0
+        updated = apply_bound(value + delta, delta, bound)
+
+        if replace(table, guid, current, Map.put(current, key, updated)),
+          do: updated,
+          else: update_counter(table, guid, key, delta, bound)
+    end
+  end
+
+  defp replace(table, guid, current, updated) do
+    :ets.select_replace(table, [{{guid, :"$1"}, [{:"=:=", :"$1", {:const, current}}], [{{guid, {:const, updated}}}]}]) ==
+      1
   end
 
   defp apply_bound(value, delta, bound) when is_number(bound) do

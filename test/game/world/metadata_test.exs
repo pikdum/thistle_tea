@@ -81,8 +81,36 @@ defmodule ThistleTea.Game.World.MetadataTest do
   describe "increment/4 and decrement/4" do
     test "increments from zero", %{table: table} do
       guid = 400
+      Metadata.put(table, guid, %{})
       assert Metadata.increment(table, guid, :attacker_count) == 1
       assert Metadata.get(table, guid) == %{attacker_count: 1}
+    end
+
+    test "late counter changes never recreate a deleted entity", %{table: table} do
+      Metadata.put(table, 403, %{attacker_count: 1, alive?: true})
+      Metadata.delete(table, 403)
+      assert Metadata.decrement(table, 403, :attacker_count, 0) == 0
+      assert Metadata.increment(table, 403, :attacker_count) == 0
+      assert Metadata.get(table, 403) == nil
+    end
+
+    test "concurrent counters preserve each other and owner metadata", %{table: table} do
+      Metadata.put(table, 404, %{attacker_count: 0, alive?: true})
+
+      1..12
+      |> Task.async_stream(
+        fn worker ->
+          for iteration <- 1..100 do
+            if worker == 1,
+              do: Metadata.update(table, 404, %{iteration: iteration}),
+              else: Metadata.increment(table, 404, :attacker_count)
+          end
+        end,
+        max_concurrency: 12
+      )
+      |> Enum.each(fn result -> assert {:ok, _} = result end)
+
+      assert Metadata.get(table, 404) == %{attacker_count: 1100, alive?: true, iteration: 100}
     end
 
     test "respects max bound", %{table: table} do

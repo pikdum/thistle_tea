@@ -448,6 +448,13 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       assert Metadata.query(target_guid, [:attacker_count]) == %{attacker_count: 0}
     end
 
+    test "late engagement events do not resurrect removed target metadata", %{mob: mob, target_guid: target_guid} do
+      Metadata.delete(target_guid)
+      assert ^mob = EventSink.emit(mob, Effects.attacker_lost(target_guid))
+      assert ^mob = EventSink.emit(mob, Effects.attacker_gained(target_guid))
+      assert Metadata.get(target_guid) == nil
+    end
+
     test "threat ref messages carry the mob incarnation" do
       player_guid = Guid.from_low_guid(:player, unique_guid())
       mob_guid = Guid.from_low_guid(:mob, 1, unique_guid())
