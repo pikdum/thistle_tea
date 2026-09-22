@@ -43,6 +43,6 @@ Artifacts:
 - Final checks: `/tmp/thistle-owned-leashes-final-tests.log`, `-final-compile.log`, and `-final-credo.log`.
 - Screenshots: the client session's `screenshots/` directory.
 
-## Next uncovered path
+## Follow-up
 
-NPC combat-pet spells remain unsupported: spell effect 56 produces `SummonPet`, but its boundary implementation only accepts player characters. Ilkrud's spawn-time Summon Succubus, spell 8722, exercises this gap. It requires the creature's single combat-pet relationship, rather than another guardian in the collection; `Unit::EffectSummonPet` in the reference owns that distinction. This is the next implementation follow-up. Full vanilla parity remains ongoing.
+This run uncovered an unsupported NPC combat-pet path: spell effect 56 produced `SummonPet`, but its boundary implementation only accepted player characters. Ilkrud's spawn-time Summon Succubus, spell 8722, exercised the gap. [Creature-owned combat pets](creature-pets-playtest.md) now records its implementation and native acceptance, including the single pet relationship alongside the independent guardian collection. Full vanilla parity remains ongoing.
