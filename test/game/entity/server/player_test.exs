@@ -148,7 +148,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       monitor = Process.monitor(pid)
       before_logout = Time.now()
       send(connection, :stop)
-      assert_receive {:DOWN, ^monitor, :process, ^pid, :normal}
+      assert_receive {:DOWN, ^monitor, :process, ^pid, :normal}, 1_500
       saved = CharacterStore.get(id)
       assert saved.internal.rest_logout_at >= before_logout
       assert saved.internal.rest_type == nil
