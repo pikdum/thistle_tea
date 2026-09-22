@@ -810,7 +810,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
                Aura.reactions(entity, :spell_hit_dealt, Map.put(context, :outcome, :crit))
     end
 
-    test "treats cast-end proc rules as eligible" do
+    test "cast-end procs require the cast completion event" do
       entity = fixture_entity()
       spell = %{clearcasting_fixture() | proc_rule: %ProcRule{proc_ex: 0x80000}}
 
@@ -824,8 +824,10 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
         now: 1_000
       }
 
+      assert {_entity, []} = Aura.reactions(entity, :spell_hit_dealt, context)
+
       assert {_entity, [%Effects.TriggerSpell{spell_id: 12_536}]} =
-               Aura.reactions(entity, :spell_hit_dealt, context)
+               Aura.reactions(entity, :spell_cast_completed, %{context | outcome: :cast_end})
     end
 
     test "never procs a spell aura from its own spell" do

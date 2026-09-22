@@ -840,6 +840,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
     base
     |> add_if(attrs_ex1, 0x00000008, :no_redirection)
+    |> add_if(attrs_ex3, 0x00010000, :suppress_caster_procs)
     |> add_if(attrs_ex3, 0x00020000, :suppress_target_procs)
     |> add_if(attrs_ex1, 0x00000020, :allow_while_stealthed)
     |> add_if(attrs_ex1, 0x00000080, :no_reflection)

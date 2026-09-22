@@ -6,6 +6,31 @@ defmodule ThistleTea.Game.Spell.ProcTest do
   alias ThistleTea.Game.Spell.ProcRule
 
   describe "eligible?/4" do
+    test "cast-end and hit procs remain separate even with always-trigger flags" do
+      for rule <- [nil, %ProcRule{proc_ex: 1}, %ProcRule{proc_ex: 0x10000}] do
+        spell = %Spell{proc_type_mask: 0x10000, proc_rule: rule}
+        assert Proc.eligible?(spell, %Spell{}, :deal_harmful_spell, :normal)
+        refute Proc.eligible?(spell, %Spell{}, :deal_harmful_spell, :cast_end)
+        refute Proc.eligible?(spell, %Spell{}, :deal_harmful_spell, %{proc_ex: 0x80001})
+      end
+
+      for flags <- [0x80000, 0x90000, 0x80001] do
+        spell = %Spell{proc_type_mask: 0x10000, proc_rule: %ProcRule{proc_ex: flags}}
+        assert Proc.eligible?(spell, %Spell{}, :deal_harmful_spell, :cast_end)
+
+        for outcome <- [:normal, :crit, :miss, :resist] do
+          refute Proc.eligible?(spell, %Spell{}, :deal_harmful_spell, outcome)
+        end
+      end
+    end
+
+    test "caster suppression leaves victim-side procs eligible" do
+      spell = %Spell{proc_type_mask: 0x30000}
+      trigger = %Spell{attributes: MapSet.new([:suppress_caster_procs])}
+      refute Proc.eligible?(spell, trigger, :deal_harmful_spell, :normal)
+      assert Proc.eligible?(spell, trigger, :take_harmful_spell, :normal)
+    end
+
     test "partial blocks match both normal and block rules even when their damage is absorbed" do
       for mask <- [0x41, 0x441] do
         context = %{outcome: :block, proc_ex: mask}

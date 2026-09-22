@@ -13,6 +13,13 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   end
 
   describe "get/1" do
+    test "loads cast-completion restrictions for Elemental Focus and Blue Dragon" do
+      assert %ProcRule{proc_ex: 0x80000, school_mask: 28, spell_family: 11, proc_flags: 0x10000} =
+               SpellProcEvent.get(16_164)
+
+      assert %ProcRule{proc_ex: 0x80000} = SpellProcEvent.get(23_688)
+    end
+
     test "loads Heart of Wyrmthalak physical-school PPM restriction" do
       assert %ProcRule{school_mask: 1, ppm_rate: 1.0} = SpellProcEvent.get(27_656)
     end

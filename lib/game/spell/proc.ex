@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.Spell.Proc do
   end
 
   def eligible?(%Spell{} = proc_spell, %Spell{} = triggering_spell, proc_type, outcome) do
-    proc_flag?(proc_spell, proc_type) and
+    caster_proc_allowed?(triggering_spell, proc_type) and proc_flag?(proc_spell, proc_type) and
       school_allowed?(proc_spell.proc_rule, triggering_spell) and
       family_allowed?(proc_spell.proc_rule, triggering_spell) and
       outcome_allowed?(proc_spell.proc_rule, proc_type, outcome)
@@ -35,6 +35,28 @@ defmodule ThistleTea.Game.Spell.Proc do
   end
 
   def eligible?(_proc_spell, _triggering_spell, _proc_type, _outcome), do: false
+
+  def cast_type(%Spell{} = spell) do
+    cond do
+      Spell.ranged_ability?(spell) -> :deal_ranged_ability
+      Spell.melee_ability?(spell) -> :deal_melee_ability
+      Spell.harmful?(spell) -> :deal_harmful_spell
+      true -> :deal_helpful_spell
+    end
+  end
+
+  defp caster_proc_allowed?(spell, proc_type) do
+    proc_type not in [
+      :deal_melee_swing,
+      :deal_melee_ability,
+      :deal_ranged_attack,
+      :deal_ranged_ability,
+      :deal_harmful_spell,
+      :deal_harmful_periodic,
+      :deal_helpful_spell,
+      :deal_helpful_periodic
+    ] or not Spell.attribute?(spell, :suppress_caster_procs)
+  end
 
   def roll?(spell, attack_time_ms \\ nil, roll \\ &:rand.uniform/0)
 
@@ -104,13 +126,15 @@ defmodule ThistleTea.Game.Spell.Proc do
 
   defp outcome_allowed?(%ProcRule{proc_ex: proc_ex}, proc_type, outcome) when is_integer(proc_ex) and proc_ex > 0 do
     outcome_mask = outcome_mask(outcome) ||| periodic_outcome_mask(proc_type)
-    (proc_ex &&& (@trigger_always ||| @cast_end)) != 0 or (proc_ex &&& outcome_mask) != 0
+
+    (proc_ex &&& @cast_end) == (outcome_mask &&& @cast_end) and
+      ((proc_ex &&& @trigger_always) != 0 or (proc_ex &&& outcome_mask) != 0)
   end
 
   defp outcome_allowed?(_rule, :deal_helpful_periodic, _outcome), do: false
 
   defp outcome_allowed?(_rule, _proc_type, outcome),
-    do: (outcome_mask(outcome) &&& (@normal_hit ||| @critical_hit)) != 0
+    do: (outcome_mask(outcome) &&& @cast_end) == 0 and (outcome_mask(outcome) &&& (@normal_hit ||| @critical_hit)) != 0
 
   defp periodic_outcome_mask(:deal_helpful_periodic), do: @periodic_positive
   defp periodic_outcome_mask(_proc_type), do: 0
@@ -133,6 +157,7 @@ defmodule ThistleTea.Game.Spell.Proc do
   defp outcome_mask(%{outcome: outcome}), do: outcome_mask(outcome)
 
   defp outcome_mask(:normal), do: @normal_hit
+  defp outcome_mask(:cast_end), do: @cast_end
   defp outcome_mask(:crit), do: @critical_hit
   defp outcome_mask(:glancing), do: @normal_hit
   defp outcome_mask(:crushing), do: @normal_hit

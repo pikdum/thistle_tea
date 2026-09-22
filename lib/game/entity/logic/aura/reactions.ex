@@ -48,17 +48,19 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
   def reactions(
         %{object: %{guid: owner_guid}, unit: %Unit{auras: holders}} = entity,
-        :spell_hit_dealt,
+        event,
         %{spell: %Spell{} = triggering_spell, outcome: outcome, proc_type: proc_type} = context
       )
-      when is_list(holders) and outcome in [:normal, :crit] and
+      when is_list(holders) and event in [:spell_hit_dealt, :spell_cast_completed] and
+             outcome in [:normal, :crit, :cast_end] and
              proc_type in [
                :deal_harmful_spell,
                :deal_harmful_periodic,
                :deal_helpful_spell,
                :deal_helpful_periodic,
                :deal_ranged_attack,
-               :deal_ranged_ability
+               :deal_ranged_ability,
+               :deal_melee_ability
              ] do
     {holders, events} =
       Enum.reduce(holders, {holders, []}, fn %Holder{} = holder, {current_holders, events} ->
@@ -69,7 +71,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
           owner_guid,
           triggering_spell,
           proc_type,
-          outcome,
           context
         )
       end)
@@ -220,10 +221,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     end
   end
 
-  defp outgoing_proc_transition(holders, events, holder, owner_guid, triggering_spell, proc_type, outcome, context) do
+  defp outgoing_proc_transition(holders, events, holder, owner_guid, triggering_spell, proc_type, context) do
     proc? =
       not self_proc?(holder, triggering_spell) and proc_ready?(holder, Map.get(context, :now)) and
-        Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and Proc.roll?(holder.spell)
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and Proc.roll?(holder.spell)
 
     if proc? do
       apply_outgoing_proc(holders, events, holder, owner_guid, context)
