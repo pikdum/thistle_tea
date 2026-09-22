@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
 
   defstruct navigation: %Navigation{},
             fear: nil,
+            flee: nil,
             confusion: nil,
             critter: nil,
             combat: %Combat{},
@@ -212,11 +213,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
 
   def start_flee(%__MODULE__{combat: combat} = blackboard, from_guid, duration_ms, now)
       when is_integer(duration_ms) and is_integer(now) do
-    %{blackboard | combat: %{combat | flee_until: now + duration_ms, flee_from: from_guid}}
+    %{blackboard | combat: %{combat | flee_until: now + duration_ms, flee_from: from_guid}, flee: nil}
   end
 
   def clear_flee(%__MODULE__{combat: combat} = blackboard) do
-    %{blackboard | combat: %{combat | flee_until: nil, flee_from: nil}}
+    %{blackboard | combat: %{combat | flee_until: nil, flee_from: nil}, flee: nil}
   end
 
   def clear_attack_started(%__MODULE__{combat: combat} = blackboard) do

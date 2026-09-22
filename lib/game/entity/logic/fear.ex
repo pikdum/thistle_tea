@@ -16,14 +16,17 @@ defmodule ThistleTea.Game.Entity.Logic.Fear do
 
   @search_radius 5.0
 
-  def source_guid(%{unit: %Unit{auras: holders}}) when is_list(holders) do
+  def source_guid(%{unit: %Unit{auras: holders}} = entity) when is_list(holders) do
     case holder(holders) do
       %Holder{caster_guid: guid} -> guid
-      nil -> nil
+      nil -> flee_source(entity)
     end
   end
 
   def source_guid(_entity), do: nil
+
+  defp flee_source(%{internal: %Internal{blackboard: %Blackboard{combat: combat}}}), do: combat.flee_from
+  defp flee_source(_entity), do: nil
 
   def active?(%{unit: %Unit{auras: holders}}) when is_list(holders), do: holder(holders) != nil
   def active?(_entity), do: false
@@ -34,13 +37,19 @@ defmodule ThistleTea.Game.Entity.Logic.Fear do
   end
 
   def ready?(%{unit: %Unit{}, internal: %Internal{} = internal} = mob, now) do
-    memory = Blackboard.ensure(internal.blackboard).fear
+    blackboard = Blackboard.ensure(internal.blackboard)
+    feared? = active?(mob)
+    memory = if feared?, do: blackboard.fear, else: blackboard.flee
 
-    active?(mob) and not blocked?(mob) and not Movement.moving?(mob, now) and
+    (feared? or fleeing?(mob, blackboard, now)) and not blocked?(mob) and not Movement.moving?(mob, now) and
       (is_nil(memory) or (not memory.moving? and now >= memory.next_move_at))
   end
 
   def ready?(_entity, _now), do: false
+
+  defp fleeing?(%{unit: %Unit{auras: holders}}, %Blackboard{combat: %{flee_until: until}}, now) do
+    is_integer(until) and now < until and not Enum.any?(holders, &Holder.has_aura_type?(&1, :prevent_fleeing))
+  end
 
   def destination_request(%{unit: %Unit{}, internal: %Internal{}} = mob, %Perception{} = perception, %Random{} = random) do
     {x, y, z, _orientation} = mob.movement_block.position

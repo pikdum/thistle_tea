@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.CritterTest do
   alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
@@ -23,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.CritterTest do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
+  alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Server.NavigationResolver
@@ -124,7 +126,7 @@ defmodule ThistleTea.Game.Entity.Logic.CritterTest do
       assert mob.internal.navigation_intents == []
       {mob, _events} = Aura.remove_aura_types(mob, [:prevent_fleeing], 2_000)
       assert Bitwise.band(mob.unit.flags, 0x800000) != 0
-      assert {{:running, 1_500, :flee}, _mob} = BT.tick(MobBT.tree(), mob, context(2_000))
+      assert {{:running, 0, :navigation}, _mob} = BT.tick(MobBT.tree(), mob, context(2_000))
     end
 
     test "periodic damage refreshes the owner-held escape deadline", %{mob: mob} do
@@ -151,9 +153,11 @@ defmodule ThistleTea.Game.Entity.Logic.CritterTest do
   end
 
   describe "BehaviorRunner.tick/3" do
-    test "flees away through bounded navigation and never melees", %{mob: mob} do
+    test "uses observed panic destinations without melee", %{mob: mob} do
       mob = Core.take_damage(mob, 1, 1_000, source: 1)
-      assert {{:running, 1_500, :flee}, mob} = BT.tick(MobBT.tree(), mob, context(1_000))
+      assert Fear.source_guid(mob) == 1
+      assert Fear.ready?(mob, 1_000)
+      assert {{:running, 0, :navigation}, mob} = BT.tick(MobBT.tree(), mob, context(1_000))
       assert [%{destination: {x, y, z}, opts: opts}] = mob.internal.navigation_intents
       assert x < 0
       assert_in_delta y, 0, 0.0001
@@ -171,7 +175,32 @@ defmodule ThistleTea.Game.Entity.Logic.CritterTest do
       {_status, mob} = BT.tick(MobBT.tree(), mob, context(1_000))
       mob = NavigationResolver.resolve(mob, 1_000, fn _, _, _, _ -> nil end)
       assert mob.internal.navigation_intents == []
-      assert {{:running, 1_500, :flee}, _mob} = BT.tick(MobBT.tree(), mob, context(2_500))
+      assert {{:running, 800, :flee}, mob} = BT.tick(MobBT.tree(), mob, context(2_500))
+      refute Fear.ready?(mob, 3_299)
+      assert Fear.ready?(mob, 3_300)
+      assert {{:running, 0, :navigation}, _mob} = BT.tick(MobBT.tree(), mob, context(3_300))
+    end
+
+    test "completed runs pause before another destination is requested", %{mob: mob} do
+      mob = Core.take_damage(mob, 1, 1_000, source: 1)
+      {_status, mob} = BT.tick(MobBT.tree(), mob, context(1_000))
+      mob = NavigationResolver.resolve(mob, 1_000, fn _, _, destination, _ -> [destination] end)
+      mob = Movement.sync_position(mob, 4_000)
+      assert {{:running, 800, :flee}, mob} = BT.tick(MobBT.tree(), mob, context(4_000))
+      assert mob.internal.navigation_intents == []
+      refute Fear.ready?(mob, 4_799)
+      assert Fear.ready?(mob, 4_800)
+      assert mob.internal.blackboard.fear == nil
+    end
+
+    test "missing terrain points pause without navigation or retaliation", %{mob: mob} do
+      mob = Core.take_damage(mob, 1, 1_000, source: 1)
+      context = %{context(1_000) | navigation: Navigation.empty()}
+      assert {{:running, 1_000, :flee}, mob} = BT.tick(MobBT.tree(), mob, context)
+      assert mob.internal.navigation_intents == []
+      refute Fear.ready?(mob, 1_999)
+      assert Fear.ready?(mob, 2_000)
+      assert mob.unit.target == 0
     end
 
     test "roots block movement but do not delay escape and reset cleanup", %{mob: mob} do
@@ -258,7 +287,11 @@ defmodule ThistleTea.Game.Entity.Logic.CritterTest do
   defp context(now) do
     world = WorldRef.open(0)
     observation = %Observation{guid: 1, position: {world, 1.0, 0.0, 0.0}, metadata: %{alive?: true}}
-    Context.new(now, perception: Perception.new(now, nil, %{1 => observation}, %{}))
+
+    Context.new(now,
+      perception: Perception.new(now, nil, %{1 => observation}, %{}),
+      navigation: %{Navigation.direct() | fear_point: {-16.0, 0.0, 0.0}}
+    )
   end
 
   defp mob(_context) do
