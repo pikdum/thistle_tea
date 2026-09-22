@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request, as: ObservationRequest
+  alias ThistleTea.Game.Entity.Logic.AI.BT.MiniPet
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
@@ -1188,6 +1189,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp notify_totem_owner(_state), do: :ok
 
   defp behavior_tree(%Mob{internal: %Internal{totem: %Totem{}}}), do: TotemBT.tree()
+
+  defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{kind: :mini_pet}}}), do: MiniPet.tree()
 
   defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{}}}), do: PetBT.tree()
   defp behavior_tree(%Mob{}), do: MobBT.tree()

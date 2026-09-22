@@ -317,6 +317,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
 
   def emit(entity, %Effects.SummonPet{}, _context), do: entity
 
+  def emit(%Character{} = entity, %Effects.SummonMiniPet{} = effect, context) do
+    Context.send(context, effect)
+    entity
+  end
+
+  def emit(entity, %Effects.SummonMiniPet{}, _context), do: entity
+
   def emit(%Mob{} = entity, %Effects.TameCreature{source_guid: owner_guid, entry: entry}, context) do
     case Entity.pid(owner_guid) do
       pid when is_pid(pid) -> send(pid, {:tame_pet, entry, entity.unit.level})

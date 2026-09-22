@@ -5,6 +5,32 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
 
+  describe "attack immunity flags" do
+    test "noncombat pets cannot attack or be attacked by players or creatures" do
+      pet = mob(defias()) |> Map.put(:unit_flags, 0x300)
+
+      for source <- [player(alliance()), mob(alliance())] do
+        refute Hostility.valid_attack_target?(source, pet)
+        refute Hostility.valid_hostile_target?(source, pet)
+        refute Hostility.valid_attack_target?(pet, source)
+      end
+    end
+
+    test "player and creature protection are independent and include controlled pets" do
+      protected = mob(defias()) |> Map.put(:unit_flags, 0x100)
+      player = player(alliance())
+      npc = mob(alliance())
+      controlled = Map.put(npc, :owner_guid, player.object.guid)
+      refute Hostility.valid_attack_target?(player, protected)
+      refute Hostility.valid_attack_target?(controlled, protected)
+      assert Hostility.valid_attack_target?(npc, protected)
+      protected = %{protected | unit_flags: 0x200}
+      assert Hostility.valid_attack_target?(player, protected)
+      assert Hostility.valid_attack_target?(controlled, protected)
+      refute Hostility.valid_attack_target?(npc, protected)
+    end
+  end
+
   describe "hostile?/2" do
     test "uses faction template enemy masks" do
       assert Hostility.hostile?(defias(), alliance())

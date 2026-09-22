@@ -207,7 +207,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
       ) do
     with {^world, x, y, z} <- Perception.projected_position(perception, owner_guid, @follow_prediction_ms),
          %{orientation: orientation} when is_number(orientation) <- Perception.metadata(perception, owner_guid) do
-      destination = follow_position({x, y, z}, orientation)
+      destination = follow_position(state, {x, y, z}, orientation)
       state = Movement.sync_position(state, now)
 
       state =
@@ -252,10 +252,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
     %{state | movement_block: %{movement_block | position: {x, y, z, orientation}}}
   end
 
-  defp follow_position({x, y, z}, orientation) do
-    angle = orientation + @follow_angle
+  defp follow_position(state, {x, y, z}, orientation) do
+    angle = orientation + follow_angle(state)
     {x + :math.cos(angle) * @follow_distance, y + :math.sin(angle) * @follow_distance, z}
   end
+
+  defp follow_angle(%Mob{internal: %{pet: %Pet{kind: :mini_pet}}}), do: :math.pi()
+  defp follow_angle(_state), do: @follow_angle
 
   defp distance_to(%Mob{movement_block: %{position: {x, y, z, _o}}}, {tx, ty, tz}) do
     :math.sqrt(:math.pow(tx - x, 2) + :math.pow(ty - y, 2) + :math.pow(tz - z, 2))

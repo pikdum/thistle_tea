@@ -63,6 +63,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Monitor, as: CompanionMonitor
+  alias ThistleTea.Game.Entity.Server.Player.MiniPetOwner
+  alias ThistleTea.Game.Entity.Server.Player.MiniPetOwner.Monitor, as: MiniPetMonitor
   alias ThistleTea.Game.Entity.Server.Player.PacketSink
   alias ThistleTea.Game.Entity.Server.Player.ServerMovement
   alias ThistleTea.Game.Entity.Server.Player.State
@@ -706,6 +708,17 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:stop, :normal, State.leave_world(state)}
   end
 
+  def handle_info(
+        {:DOWN, token, :process, _pid, _reason},
+        %State{mini_pet_monitor: %MiniPetMonitor{token: token}} = state
+      ) do
+    {:noreply, MiniPetOwner.process_down(state, token)}
+  rescue
+    error ->
+      Logger.error("Mini pet cleanup failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_info({:DOWN, monitor, :process, _pid, _reason}, %State{quest_share_monitor: monitor} = state)
       when is_reference(monitor) do
     {:noreply, QuestSharing.close(state)}
@@ -1130,6 +1143,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     else
       {:noreply, state}
     end
+  end
+
+  def handle_info(%Effects.SummonMiniPet{} = effect, %State{character: %Character{}} = state) do
+    {:noreply, MiniPetOwner.summon(state, effect)}
+  rescue
+    error ->
+      Logger.error("Mini pet summon failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_info(

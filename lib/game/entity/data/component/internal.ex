@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :item_loot,
     :summon,
     :pet,
+    :mini_pet,
     :chair,
     :trap,
     :ritual,

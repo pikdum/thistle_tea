@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
   alias ThistleTea.DBC.CreatureFamily
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
@@ -22,6 +23,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Spell, as: GameSpell
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
@@ -130,6 +132,47 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   end
 
   def build_pet(_entry, _owner), do: nil
+
+  def build_mini_pet(entry, %Character{} = owner, spell_id, duration_ms)
+      when is_integer(entry) and entry > 0 and is_integer(spell_id) and is_integer(duration_ms) do
+    %Mob{} = mob = build(entry, owner.internal.world, owner.movement_block.position, despawn_delay_ms: duration_ms)
+    guid = Guid.from_low_guid(:pet, entry, next_low_guid())
+    spells = mini_pet_spells(entry)
+
+    unit = %{
+      mob.unit
+      | summoned_by: owner.object.guid,
+        created_by: owner.object.guid,
+        created_by_spell: spell_id,
+        faction_template: owner.unit.faction_template,
+        flags: (mob.unit.flags || 0) ||| 0x00000300,
+        pet_number: 0,
+        pet_name_timestamp: 0
+    }
+
+    pet = %Pet{owner_guid: owner.object.guid, profile: :non_combat, kind: :mini_pet, reaction_state: :passive}
+    internal = %{mob.internal | pet: pet, loot: nil, in_combat: false, running: true, spellbook: spells}
+    mob = %{mob | object: %{mob.object | guid: guid}, unit: unit, internal: internal}
+
+    spells
+    |> Map.values()
+    |> Enum.filter(&GameSpell.attribute?(&1, :passive))
+    |> Enum.reduce(mob, &PetSpellModifiers.apply_passive(&2, &1, Time.now()))
+  end
+
+  defp mini_pet_spells(entry) do
+    key = {:mini_pet_spells, entry}
+
+    case :ets.lookup(__MODULE__, key) do
+      [{^key, spells}] ->
+        spells
+
+      _ ->
+        spells = entry |> pet_create_spell_ids() |> SpellLoader.build_spellbook()
+        :ets.insert(__MODULE__, {key, spells})
+        spells
+    end
+  end
 
   defp pet_number(owner, entry, guid) do
     number = if Companion.entry(owner) == entry, do: Companion.relationship(owner).pet_number

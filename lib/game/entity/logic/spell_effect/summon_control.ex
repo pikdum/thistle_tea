@@ -62,6 +62,17 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
   end
 
   def apply(
+        %Character{object: %{guid: guid}} = state,
+        %CastContext{caster_guid: guid},
+        %Spell{id: spell_id, duration_ms: duration},
+        %Effect{type: :summon_mini_pet, misc_value: entry},
+        _now
+      )
+      when is_integer(entry) and entry > 0 do
+    {state, [%Effects.SummonMiniPet{entry: entry, spell_id: spell_id, duration_ms: max(duration || 0, 0)}]}
+  end
+
+  def apply(
         %Character{} = state,
         %CastContext{caster_guid: caster_guid} = context,
         %Spell{id: spell_id} = spell,

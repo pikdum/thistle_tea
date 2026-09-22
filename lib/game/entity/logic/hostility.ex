@@ -15,6 +15,8 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   @unit_flag_non_attackable 0x00000002
   @unit_flag_non_attackable_2 0x00010000
   @unit_flag_not_selectable 0x02000000
+  @unit_flag_immune_to_player 0x00000100
+  @unit_flag_immune_to_npc 0x00000200
 
   def hostile?(source, target) do
     source |> reaction_rank(target) |> rank_reaction() |> Kernel.==(:hostile)
@@ -67,7 +69,8 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   end
 
   def valid_hostile_target?(source, target) do
-    alive?(target) and targetable?(target) and hostile?(source, target) and pvp_attack_allowed?(source, target)
+    alive?(target) and targetable?(target) and attack_flags_allow?(source, target) and hostile?(source, target) and
+      pvp_attack_allowed?(source, target)
   end
 
   def valid_attack_target?(source, target) when is_integer(target) do
@@ -77,7 +80,8 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   end
 
   def valid_attack_target?(source, target) do
-    alive?(target) and targetable?(target) and attack_reaction_allows?(source, target) and
+    alive?(target) and targetable?(target) and attack_flags_allow?(source, target) and
+      attack_reaction_allows?(source, target) and
       pvp_attack_allowed?(source, target)
   end
 
@@ -375,6 +379,19 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   defp targetable?(%{unit_flags: flags}) when is_integer(flags), do: targetable_unit_flags?(flags)
   defp targetable?(%{unit: %Unit{flags: flags}}) when is_integer(flags), do: targetable_unit_flags?(flags)
   defp targetable?(_target), do: true
+
+  defp attack_flags_allow?(source, target) do
+    not immune_to?(source, target) and not immune_to?(target, source)
+  end
+
+  defp immune_to?(entity, other) do
+    flag = if is_integer(player_owner_guid(other)), do: @unit_flag_immune_to_player, else: @unit_flag_immune_to_npc
+    (unit_flags(entity) &&& flag) != 0
+  end
+
+  defp unit_flags(%{unit_flags: flags}) when is_integer(flags), do: flags
+  defp unit_flags(%{unit: %Unit{flags: flags}}) when is_integer(flags), do: flags
+  defp unit_flags(_entity), do: 0
 
   defp targetable_unit_flags?(flags) when is_integer(flags) do
     (flags &&& (@unit_flag_non_attackable ||| @unit_flag_non_attackable_2 ||| @unit_flag_not_selectable)) == 0

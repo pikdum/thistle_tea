@@ -120,6 +120,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
   @summon_control [
     :duel,
     :summon_pet,
+    :summon_mini_pet,
     :revive_pet,
     :dismiss_pet,
     :summon_game_object,

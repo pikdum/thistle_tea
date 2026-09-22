@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Totems
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
+  alias ThistleTea.Game.Entity.Server.Player.MiniPetOwner
   alias ThistleTea.Game.Entity.Server.Player.ServerMovement
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
@@ -67,6 +68,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :active_banker_guid,
     :gossip_menu_guid,
     :companion_monitor,
+    :mini_pet_monitor,
     :pet_unlearn_offer,
     :talent_reset_offer,
     :quest_share,
@@ -86,14 +88,18 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     cell_activator: CellActivator
   ]
 
-  def prepare_worldport(%__MODULE__{} = state, %WorldRef{map_id: map_id, instance_id: instance_id}, %WorldRef{
-        instance_id: nil
-      })
-      when is_integer(instance_id) do
+  def prepare_worldport(%__MODULE__{} = state, destination, origin) do
+    state |> MiniPetOwner.dismiss() |> do_prepare_worldport(destination, origin)
+  end
+
+  defp do_prepare_worldport(%__MODULE__{} = state, %WorldRef{map_id: map_id, instance_id: instance_id}, %WorldRef{
+         instance_id: nil
+       })
+       when is_integer(instance_id) do
     %{state | pending_last_instance_map: map_id, active_banker_guid: nil, pending_repop: nil, pending_worldport?: true}
   end
 
-  def prepare_worldport(%__MODULE__{} = state, %WorldRef{}, %WorldRef{}) do
+  defp do_prepare_worldport(%__MODULE__{} = state, %WorldRef{}, %WorldRef{}) do
     %{state | pending_last_instance_map: nil, active_banker_guid: nil, pending_repop: nil, pending_worldport?: true}
   end
 
@@ -124,6 +130,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     state = state |> Looting.release() |> QuestSharing.disconnect()
     state = disengage(state)
     state = CompanionOwner.suspend(state)
+    state = MiniPetOwner.dismiss(state)
     state = ServerMovement.cancel(state)
     state = Taxi.disconnect(state)
     state = leave_transport(state)

@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Honor.Combat, as: HonorCombat
   alias ThistleTea.Game.Entity.Logic.Intoxication
+  alias ThistleTea.Game.Entity.Logic.MiniPet
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -388,6 +389,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     |> Intoxication.clear()
     |> Effects.enqueue(Effects.movement_stopped())
     |> maybe_release_companion()
+    |> MiniPet.dismiss()
     |> Totems.dismiss_all()
     |> Combat.sync_combat_flag()
   end
