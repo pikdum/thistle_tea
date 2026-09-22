@@ -14,15 +14,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat, as: CombatMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Navigation, as: NavigationMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Confusion
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Critter, as: CritterBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Detection
   alias ThistleTea.Game.Entity.Logic.AI.BT.Fear, as: FearBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Flee
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
@@ -31,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Critter
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
@@ -77,6 +79,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   def tree do
     BT.selector([
+      BT.action(&critter_escape/3),
       BT.sequence([
         BT.condition(&tether_target_set?/2),
         BT.action(&wait_for_tether_arrival/3)
@@ -91,15 +94,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       ]),
       BT.action(&Confusion.tick/3),
       BT.action(&FearBT.tick/3),
+      BT.action(&CritterBT.tick/3),
       BT.sequence([
         BT.condition(&not_in_combat?/2),
         SpellBT.casting_sequence()
       ]),
       BT.action(&eventai_step/3),
-      BT.sequence([
-        BT.condition(&fleeing?/2),
-        BT.action(&flee_step_with_context/3)
-      ]),
+      BT.action(&Flee.tick/3),
       BT.sequence([
         BT.condition(&aggro_check_ready?/3),
         BT.condition(&not_in_combat?/2),
@@ -116,14 +117,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
             BT.condition(&target_dead?/3),
             BT.action(&eventai_target_dead/3),
             BT.action(&set_tether_target/2),
-            BT.action(&clear_combat/2),
+            BT.action(&clear_combat/3),
             BT.action(&move_to_target_with_context/3)
           ]),
           BT.sequence([
             BT.condition(&should_tether?/3),
             BT.action(&eventai_evade/3),
             BT.action(&set_tether_target/2),
-            BT.action(&clear_combat/2),
+            BT.action(&clear_combat/3),
             BT.action(&heal_to_full/2),
             BT.action(&move_to_target_with_context/3)
           ]),
@@ -185,8 +186,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     Core.dead?(state)
   end
 
-  defp dead?(_state, _blackboard) do
-    false
+  defp dead?(_state, _blackboard), do: false
+
+  defp critter_escape(%Mob{} = state, blackboard, %Context{now: now} = context) do
+    if not Core.dead?(state) and Critter.expired?(state, blackboard, now) do
+      state = reset_after_combat(state, blackboard, context)
+      {BT.running(0, :return_home), state, state.internal.blackboard}
+    else
+      {:failure, state, blackboard}
+    end
   end
 
   defp has_waypoints?(%Mob{}, %Blackboard{navigation: %NavigationMemory{movement_override: override}})
@@ -265,86 +273,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {state, blackboard} = EventAI.on_leave_combat(state, blackboard, now, context)
     {state, blackboard} = EventAI.on_evade(state, blackboard, now, context)
     {:success, state, blackboard}
-  end
-
-  @flee_min_distance 12.0
-  @flee_max_distance 20.0
-  @flee_repath_ms 1_500
-
-  defp fleeing?(%Mob{} = state, %Blackboard{} = blackboard) do
-    not AuraLogic.has_aura?(state, :prevent_fleeing) and Blackboard.fleeing?(blackboard)
-  end
-
-  defp fleeing?(_state, _blackboard), do: false
-
-  defp flee_step_with_context(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
-    flee_step(state, blackboard, context)
-  end
-
-  defp flee_step(
-         %Mob{} = state,
-         %Blackboard{combat: %CombatMemory{flee_until: flee_until}} = blackboard,
-         %Context{now: now} = context
-       )
-       when is_integer(flee_until) do
-    cond do
-      now >= flee_until or Core.dead?(state) ->
-        {:failure, state, Blackboard.clear_flee(blackboard)}
-
-      Movement.moving?(state, now) ->
-        {BT.running(flee_wait_delay(state, blackboard, now), :flee), state, blackboard}
-
-      true ->
-        flee_move(state, blackboard, context)
-    end
-  end
-
-  defp flee_step(%Mob{} = state, %Blackboard{} = blackboard, %Context{}) do
-    {:failure, state, Blackboard.clear_flee(blackboard)}
-  end
-
-  defp flee_move(
-         %Mob{movement_block: %MovementBlock{position: {mx, my, mz, _o}}} = state,
-         %Blackboard{} = blackboard,
-         %Context{now: now, perception: perception} = context
-       ) do
-    from_guid = blackboard.combat.flee_from || state.unit.target
-
-    destination =
-      case Perception.position(perception, from_guid) do
-        {world, tx, ty, _tz} when world == state.internal.world ->
-          flee_destination({mx, my, mz}, {tx, ty}, context)
-
-        _ ->
-          flee_destination({mx, my, mz}, nil, context)
-      end
-
-    state =
-      state
-      |> set_running(true)
-      |> move_with_context(destination, [], context)
-
-    {BT.running(flee_wait_delay(state, blackboard, now), :flee), state, blackboard}
-  end
-
-  defp flee_wait_delay(%Mob{} = state, %Blackboard{combat: %CombatMemory{flee_until: flee_until}}, now) do
-    [Movement.remaining_move_duration(state, now), flee_until - now]
-    |> soonest_delay(@flee_repath_ms)
-    |> min(max(flee_until - now, 1))
-  end
-
-  defp flee_destination({mx, my, mz}, {tx, ty}, %Context{random: random}) do
-    away_angle = :math.atan2(my - ty, mx - tx)
-    flee_destination_at({mx, my, mz}, away_angle + (Random.float(random) - 0.5) * :math.pi() / 2.0, random)
-  end
-
-  defp flee_destination({mx, my, mz}, nil, %Context{random: random}) do
-    flee_destination_at({mx, my, mz}, Random.float(random) * 2.0 * :math.pi(), random)
-  end
-
-  defp flee_destination_at({mx, my, mz}, angle, random) do
-    distance = @flee_min_distance + Random.float(random) * (@flee_max_distance - @flee_min_distance)
-    {mx + :math.cos(angle) * distance, my + :math.sin(angle) * distance, mz}
   end
 
   defp in_combat?(%Mob{} = state, %Blackboard{} = blackboard) do
@@ -476,6 +404,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     |> Core.mark_broadcast_update()
     |> maybe_enqueue_call_assistance(target_guid)
   end
+
+  def maybe_enqueue_call_assistance(
+        %Mob{internal: %Internal{creature: %Creature{critter?: true}}} = state,
+        _target_guid
+      ), do: state
 
   def maybe_enqueue_call_assistance(
         %Mob{internal: %Internal{pet: nil, totem: nil, creature: %Creature{call_for_help_range: range}}} = state,
@@ -693,8 +626,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {:failure, state, blackboard}
   end
 
-  defp clear_combat(%Mob{} = state, %Blackboard{} = blackboard) do
+  defp clear_combat(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
     %Engagement.Result{entity: state} = Engagement.leave(state, :evade, blackboard: blackboard)
+    {state, events} = AuraLogic.remove_on_evade(state, now)
+    state = Effects.enqueue(state, events)
     {:success, state, state.internal.blackboard}
   end
 
@@ -728,13 +663,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
     case set_tether_target(state, blackboard) do
       {:success, state, blackboard} ->
-        {:success, state, blackboard} = clear_combat(state, blackboard)
+        {:success, state, blackboard} = clear_combat(state, blackboard, context)
         {:success, state, blackboard} = heal_to_full(state, blackboard)
         {_status, state, blackboard} = move_to_target(state, blackboard, context)
         %{state | internal: %{state.internal | blackboard: blackboard}}
 
       {:failure, state, blackboard} ->
-        {:success, state, blackboard} = clear_combat(state, blackboard)
+        {:success, state, blackboard} = clear_combat(state, blackboard, context)
         %{state | internal: %{state.internal | blackboard: blackboard}}
     end
   end

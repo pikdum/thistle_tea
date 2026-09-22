@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   defstruct navigation: %Navigation{},
             fear: nil,
             confusion: nil,
+            critter: nil,
             combat: %Combat{},
             spells: %Spells{},
             event_ai: %EventAI{},

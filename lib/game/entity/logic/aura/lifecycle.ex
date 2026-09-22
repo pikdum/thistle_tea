@@ -10,12 +10,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Dispel
   alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
 
   @aura_interrupt_damage 0x02
@@ -53,6 +56,22 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   end
 
   def expire_due(entity, _now), do: {entity, []}
+
+  def remove_on_evade(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) do
+    {kept, removed} = Enum.split_with(holders, &keep_on_evade?(&1, entity))
+    if removed == [], do: {entity, []}, else: transition(entity, kept, :removed, now)
+  end
+
+  def remove_on_evade(entity, _now), do: {entity, []}
+
+  defp keep_on_evade?(holder, %{internal: %Internal{creature: %Creature{extra_flags: flags}}})
+       when is_integer(flags) and Bitwise.band(flags, 0x00001000) != 0, do: not holder.negative?
+
+  defp keep_on_evade?(holder, _entity) do
+    Spell.custom?(holder.spell, :not_removed_on_evade) or
+      (not holder.negative? and is_integer(holder.expires_at) and holder.expires_at >= 0 and
+         Guid.entity_type(holder.caster_guid) == :player)
+  end
 
   def remove_with_interrupt_flags(entity, mask, now, preserved_types \\ [])
 

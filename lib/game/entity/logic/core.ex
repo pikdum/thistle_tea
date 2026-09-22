@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.CastPushback
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.Critter
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Durability
@@ -145,6 +146,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
         |> maybe_enter_spirit_of_redemption(health, new_health, now, opts)
         |> mark_broadcast_update()
         |> maybe_dead(now)
+        |> Critter.react(Keyword.get(opts, :source), now)
 
       {entity, damage, absorbed}
     end
@@ -380,6 +382,8 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       internal
       | running: false,
         fall: nil,
+        navigation_intents: [],
+        events: Enum.reject(internal.events, &is_struct(&1, Effects.MonsterMove)),
         diminishing_returns: %{},
         movement_start_time: nil,
         movement_start_position: nil

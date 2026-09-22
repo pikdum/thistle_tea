@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
@@ -104,7 +105,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   def leave(%Mob{} = entity, reason, opts \\ []) when is_atom(reason) do
     previous = entity
     clear_tap? = Keyword.get(opts, :clear_tap?, true)
-    blackboard = Keyword.get(opts, :blackboard, entity.internal.blackboard)
+    blackboard = opts |> Keyword.get(:blackboard, entity.internal.blackboard) |> Blackboard.ensure()
     target = victim(entity)
     entity = Threat.wipe(entity)
     unit = clear_unit(entity.unit, clear_tap?)
@@ -112,6 +113,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
     internal = %{
       entity.internal
       | in_combat: false,
+        running: if(blackboard.critter, do: blackboard.critter.previous_running, else: entity.internal.running),
         loot: clear_tap(entity.internal.loot, clear_tap?),
         blackboard: clear_combat_memory(blackboard)
     }
@@ -120,6 +122,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
       %{entity | unit: unit, internal: internal}
       |> Casting.cancel()
       |> Combat.sync_combat_flag()
+      |> ControlMovement.sync_flags()
       |> Effects.enqueue(leave_effects(entity.object.guid, target, clear_tap?))
       |> mark_broadcast_update()
       |> TemporaryFaction.restore(:combat_stop)
@@ -220,7 +223,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   defp default_selection(%Mob{internal: %Internal{pet: %Pet{command_state: :attack}}, unit: %Unit{target: target_guid}})
        when is_integer(target_guid) and target_guid > 0, do: :preserve
 
-  defp default_selection(%Mob{}), do: []
+  defp default_selection(%Mob{} = mob), do: if(Mob.critter?(mob), do: :preserve, else: [])
 
   defp victim_change_effects(previous, target_guid) when is_integer(previous) do
     [Effects.attacker_lost(previous), Effects.attacker_gained(target_guid)]
@@ -250,6 +253,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
     |> Blackboard.reset_spread()
     |> Blackboard.reset_spells()
     |> Blackboard.clear_flee()
+    |> then(&%{&1 | critter: nil})
   end
 
   defp leave_effects(source_guid, target, clear_tap?) do

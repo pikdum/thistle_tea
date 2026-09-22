@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Creature do
     :script_faction_value,
     :script_faction_flags,
     stationary?: false,
+    critter?: false,
     civilian?: false,
     racial_leader?: false,
     spells: [],

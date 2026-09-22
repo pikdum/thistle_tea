@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatSkills
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Critter
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -88,7 +89,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         spell = %{spell | effects: effects}
         context = %{context | target_guid: target.object.guid, spell: spell}
 
-        receive_unblocked_effects(target, context, now)
+        {target, events} = receive_unblocked_effects(target, context, now)
+
+        target =
+          if successful_hit?(events), do: Critter.spell_hit(target, context.caster_guid, spell, now), else: target
+
+        {target, events}
     end
   end
 

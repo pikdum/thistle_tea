@@ -24,6 +24,27 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   alias ThistleTea.Game.WorldRef
 
   describe "build/1" do
+    test "selects critter reactions while preserving explicit AI" do
+      creature = %Mangos.Creature{
+        guid: 1,
+        id: 721,
+        modelid: 3,
+        curhealth: 10,
+        creature_movement: [],
+        equip_items: [nil, nil, nil],
+        creature_template: %Mangos.CreatureTemplate{entry: 721, name: "Rabbit", creature_type: 8, scale: 1.0}
+      }
+
+      critter = Mob.build(creature)
+      assert Mob.critter?(critter)
+      refute Mob.proximity_aggro?(critter)
+
+      for ai <- ["EventAI", "BasicAI", "NullAI"] do
+        explicit = %{creature | creature_template: %{creature.creature_template | ai_name: ai}}
+        refute Mob.critter?(Mob.build(explicit))
+      end
+    end
+
     test "derives proximity aggro from VMangos creature extra flags" do
       regular = %Mob{internal: %Internal{creature: %Creature{extra_flags: 0}}}
       defensive = %Mob{internal: %Internal{creature: %Creature{extra_flags: 0x00000002}}}

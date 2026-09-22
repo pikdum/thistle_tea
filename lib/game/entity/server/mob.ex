@@ -1472,7 +1472,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp can_assist?(%Mob{} = state) do
-    not Core.dead?(state) and not Corpse.removed?(state) and not no_assist_flag?(state)
+    not Mob.critter?(state) and not Core.dead?(state) and not Corpse.removed?(state) and not no_assist_flag?(state)
   end
 
   defp no_assist_flag?(%Mob{internal: %Internal{creature: %Creature{extra_flags: extra_flags}}})

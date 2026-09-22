@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defdelegate remove_with_interrupt_flags(entity, mask, now), to: Lifecycle
   defdelegate remove_with_interrupt_flags(entity, mask, now, preserved_types), to: Lifecycle
   defdelegate remove_spells(entity, spell_ids, now), to: Lifecycle
+  defdelegate remove_on_evade(entity, now), to: Lifecycle
   defdelegate spend_spell_charges(entity, spell_ids, now), to: Lifecycle
   defdelegate remove_aura_types(entity, aura_types, now), to: Lifecycle
   defdelegate remove_source_spell(entity, spell_id, caster_guid, now), to: Lifecycle

@@ -164,6 +164,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
           family: ct.family,
           type_flags: type_flags(ct),
           creature_type: ct.creature_type,
+          critter?: ct.creature_type == 8 and ct.ai_name in [nil, "", "CritterAI"] and c.ai_events in [nil, []],
           damage_multiplier: ct.damage_multiplier,
           regenerate_stats: regenerate_stats(ct),
           detection_range: detection_range(ct),
@@ -253,6 +254,11 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   end
 
   @npc_flag_spirit_service 0x60
+
+  def critter?(%__MODULE__{internal: %Internal{pet: nil, totem: nil, creature: %Creature{critter?: true}}}), do: true
+  def critter?(_entity), do: false
+
+  def proximity_aggro?(%__MODULE__{internal: %Internal{creature: %Creature{critter?: true}}}), do: false
 
   def proximity_aggro?(%__MODULE__{internal: %Internal{creature: %Creature{extra_flags: flags}}})
       when is_integer(flags) do
