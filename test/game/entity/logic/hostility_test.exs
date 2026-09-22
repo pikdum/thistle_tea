@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
@@ -216,6 +218,24 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
       target = mob(defias()) |> Map.put(:unit_flags, 0x00010000)
 
       refute Hostility.valid_attack_target?(player(alliance()), target)
+    end
+
+    test "taxi passengers reject hostile targeting while retaining helpful targeting" do
+      creature = mob(defias())
+      player = player(alliance())
+      assert Hostility.valid_hostile_target?(creature, player)
+      flying = Map.put(player, :unit_flags, 0x00100000)
+      refute Hostility.valid_hostile_target?(creature, flying)
+      refute Hostility.valid_attack_target?(creature, flying)
+      refute Hostility.can_initiate_attack?(flying)
+      assert Hostility.targetable_by?(creature, flying, true)
+
+      character = %Character{
+        unit: %Unit{health: 100, flags: 0x00100000}
+      }
+
+      refute Hostility.targetable_by?(creature, character)
+      assert Hostility.targetable_by?(creature, character, true)
     end
 
     test "allows player-controlled pets to attack neutral creatures" do

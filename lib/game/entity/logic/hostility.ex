@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   @unit_flag_non_attackable 0x00000002
   @unit_flag_non_attackable_2 0x00010000
   @unit_flag_not_selectable 0x02000000
+  @unit_flag_taxi_flight 0x00100000
   @unit_flag_immune_to_player 0x00000100
   @unit_flag_immune_to_npc 0x00000200
 
@@ -407,7 +408,10 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   defp unit_flags(_entity), do: 0
 
   defp targetable_unit_flags?(flags) when is_integer(flags) do
-    (flags &&& (@unit_flag_non_attackable ||| @unit_flag_non_attackable_2 ||| @unit_flag_not_selectable)) == 0
+    (flags &&&
+       (@unit_flag_non_attackable ||| @unit_flag_non_attackable_2 ||| @unit_flag_not_selectable |||
+          @unit_flag_taxi_flight)) ==
+      0
   end
 
   defp proximity_aggro?(%{proximity_aggro?: false}), do: false
