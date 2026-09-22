@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.World.Loader.WildSummon do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
+  alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon
   alias ThistleTea.Game.World.Metadata
@@ -27,6 +28,8 @@ defmodule ThistleTea.Game.World.Loader.WildSummon do
         stat_model: :creature,
         apply_addon_auras?: false
       )
+
+    mob = %{mob | unit: Stats.recompute(mob.unit)}
 
     spawn = %{
       mob.internal.spawn

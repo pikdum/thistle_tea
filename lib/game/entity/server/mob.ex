@@ -1279,6 +1279,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       else: Core.mark_broadcast_update(%{state | unit: %{state.unit | flags: flags}})
   end
 
+  defp schedule_summon_despawn(
+         %Mob{
+           internal:
+             %Internal{spawn: %Spawn{despawn_type: 11, death_at: nil, despawn_delay_ms: delay} = spawn} = internal
+         } = state
+       )
+       when is_integer(delay) and delay > 0 do
+    %{state | internal: %{internal | spawn: %{spawn | death_at: Time.now() + delay}}}
+  end
+
   defp schedule_summon_despawn(%Mob{internal: %{spawn: %Spawn{despawn_type: type}}} = state) when type in [7, 11],
     do: state
 

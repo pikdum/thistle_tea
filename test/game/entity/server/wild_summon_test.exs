@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Server.WildSummonTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Passive
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
+  alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
@@ -32,6 +33,8 @@ defmodule ThistleTea.Game.Entity.Server.WildSummonTest do
     test "ordinary summons keep their template faction level and independent lifetime", %{caster: caster} do
       mob = WildSummon.build(caster, request(), caster.movement_block.position, 1000)
       assert mob.unit.level == 20
+      assert mob.unit.normal_resistance == 120
+      assert Stats.recompute(mob.unit) == mob.unit
       assert mob.unit.faction_template == 14
       assert mob.unit.summoned_by in [nil, 0]
       assert mob.unit.created_by in [nil, 0]
@@ -86,6 +89,22 @@ defmodule ThistleTea.Game.Entity.Server.WildSummonTest do
   end
 
   describe "temporary corpse lifecycle" do
+    test "scripted timed-death summons initialize the same lifetime", %{caster: caster} do
+      mob =
+        Summon.build(990_212, caster.internal.world, caster.movement_block.position,
+          despawn_type: 11,
+          despawn_delay_ms: 100
+        )
+
+      {:ok, pid} = MobLoader.start_mob(mob)
+      assert is_integer(:sys.get_state(pid).internal.spawn.death_at)
+      Process.sleep(250)
+      dead = :sys.get_state(pid)
+      assert dead.unit.health == 0
+      assert dead.internal.death_finalized?
+      assert dead.internal.spawn.respawn_ref == nil
+    end
+
     test "expiry leaves a lootable corpse and removal stops every projection", %{caster: caster} do
       effect = %{request() | entry: 990_212, duration_ms: 100}
       mob = WildSummon.build(caster, effect, caster.movement_block.position, Time.now())
