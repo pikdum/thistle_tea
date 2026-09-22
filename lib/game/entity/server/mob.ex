@@ -787,7 +787,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         {:controlled_move, payload, opcode},
         %Mob{internal: %Internal{pet: %Pet{possessed?: true}}, movement_block: %MovementBlock{}} = state
       ) do
-    if ControlMovement.active?(state),
+    if Core.dead?(state) or ControlMovement.active?(state),
       do: {:noreply, state},
       else: {:noreply, apply_controlled_move(state, payload, opcode)}
   rescue
@@ -1057,8 +1057,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     sync_orientation_metadata(state)
     state = Visibility.refresh_entity(state)
 
+    observers = World.tracking_players(state)
+
+    recipients =
+      if opcode == Message.MsgMoveKnockBack.opcode(),
+        do: List.delete(observers, owner_guid),
+        else: Enum.uniq([owner_guid | observers])
+
     Message.MsgMove.to_packet(state.object.guid, payload, opcode)
-    |> World.broadcast_packet(state, recipients: Enum.uniq([owner_guid | World.tracking_players(state)]))
+    |> World.broadcast_packet(state, recipients: recipients)
 
     ChaseWatch.notify_moved(state.object.guid, {x, y, z})
     state

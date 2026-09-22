@@ -12,7 +12,9 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Network.Message.MsgMoveKnockBack
   alias ThistleTea.Game.Network.Message.MsgMoveTeleport
   alias ThistleTea.Game.Network.Message.SmsgClientControlUpdate
   alias ThistleTea.Game.Network.Message.SmsgMonsterMove
@@ -239,6 +241,47 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
       impulse = %Effects.Knockback{cos_angle: 1.0, sin_angle: 0.0, horizontal_speed: 10.0, vertical_speed: 10.0}
       EventSink.emit(mob, impulse)
       assert_receive {:"$gen_cast", {:send_packet, %SmsgMoveKnockBack{guid: ^guid, vertical_speed: -10.0}, _}}
+    end
+  end
+
+  describe "handle_info/2 controlled movement" do
+    test "acknowledged possession launches reach observers once and never relaunch the controller" do
+      world = WorldRef.instance(0, unique_low())
+      observers = start_observers(owner: {world, {0.0, 0.0, 0.0}}, nearby: {world, {1.0, 0.0, 0.0}})
+      [{:owner, owner_guid, _} | _] = observers
+      guid = Guid.from_low_guid(:mob, 1, unique_low())
+      entity = mob(guid, world, {0.0, 0.0, 0.0, 0.0})
+      entity = put_in(entity.internal.pet, %Pet{owner_guid: owner_guid, possessed?: true})
+      entity = Visibility.join_entity(entity)
+
+      on_exit(fn ->
+        World.remove_position(entity)
+        Metadata.delete(guid)
+        stop_observers(observers)
+      end)
+
+      movement = %{
+        entity.movement_block
+        | position: {2.0, 0.0, 1.0, 0.0},
+          movement_flags: 0x2000,
+          cos_angle: 1.0,
+          sin_angle: 0.0,
+          xy_speed: 10.0,
+          z_speed: -10.0
+      }
+
+      payload = MovementBlock.movement_info_to_binary(movement)
+      assert {:noreply, moved} = MobServer.handle_info({:controlled_move, payload, 0xF1}, entity)
+      assert moved.movement_block.position == movement.position
+      assert World.position(guid) == {world, 2.0, 0.0, 1.0}
+      assert_receive {:observer, :nearby, {:"$gen_cast", {:send_packet, %MsgMoveKnockBack{guid: ^guid}, _}}}
+      refute_receive {:observer, :owner, {:"$gen_cast", {:send_packet, %MsgMoveKnockBack{}, _}}}
+
+      dead = put_in(entity.unit.health, 0)
+      assert MobServer.handle_info({:controlled_move, payload, 0xF1}, dead) == {:noreply, dead}
+      released = put_in(entity.internal.pet, nil)
+      assert MobServer.handle_info({:controlled_move, payload, 0xF1}, released) == {:noreply, released}
+      Visibility.leave_entity(moved)
     end
   end
 
