@@ -58,6 +58,13 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   def enter(%Mob{} = entity, _target_guid, _now, _opts), do: result(entity, entity, :invalid_target)
 
+  defp enter_active(
+         %Mob{internal: %Internal{blackboard: %Blackboard{navigation: %{returning_home?: true}}}} = entity,
+         _target_guid,
+         _now,
+         _opts
+       ), do: result(entity, entity, :evading)
+
   defp enter_active(%Mob{internal: %Internal{}} = entity, target_guid, now, opts)
        when is_integer(target_guid) and target_guid > 0 and is_integer(now) do
     previous = entity

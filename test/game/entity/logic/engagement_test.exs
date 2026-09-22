@@ -63,6 +63,26 @@ defmodule ThistleTea.Game.Entity.Logic.EngagementTest do
       assert pet.unit.target == commanded_target
       assert pet.internal.threat == %{commanded_target => 0.0, other_attacker => 0.0}
     end
+
+    test "refuses renewed combat until return-home movement finishes" do
+      %{entity: creature} = Engagement.enter(mob(), 20, 1_000, selection())
+      %{entity: creature} = Engagement.leave(creature, :evade)
+      blackboard = creature.internal.blackboard
+      blackboard = %{blackboard | navigation: %{blackboard.navigation | returning_home?: true}}
+      creature = %{creature | internal: %{creature.internal | blackboard: blackboard}}
+
+      assert %Engagement.Result{entity: ^creature, from: :idle, to: :idle, reason: :evading} =
+               Engagement.enter(creature, 30, 2_000, selection())
+
+      blackboard = Blackboard.clear_move_target(blackboard)
+      creature = %{creature | internal: %{creature.internal | blackboard: blackboard}}
+      %{entity: creature, to: :engaged} = Engagement.enter(creature, 30, 3_000, selection())
+
+      assert creature.internal.threat == %{30 => 0.0}
+      assert creature.unit.target == 30
+      assert creature.internal.combat_leash.generation == 2
+      assert creature.internal.combat_leash.last_extended_at == 3_000
+    end
   end
 
   describe "leave/3" do
