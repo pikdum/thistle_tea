@@ -122,6 +122,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Creature-group combat](docs/creature-groups-playtest.md), with shared aggro, evade, respawn, death notifications, scripted membership, and group conditions
 - [Creature formations](docs/creature-formations-playtest.md), with coordinated patrol movement, temporary leaders, inherited waypoint routes, and return-to-formation behavior
 - [Shared creature leashes](docs/creature-leashes-playtest.md), with combat origins, assistance clocks, hostile-contact extensions, and return-home cleanup
+- [Creature-owned summon clocks](docs/creature-owner-leashes-playtest.md), with owner inheritance, idle-owner links, lethal-hit extensions, and independent lifecycle cleanup
 - [Player fear and confusion](docs/player-control-movement-playtest.md), with forced movement, client control restoration, bounded wandering, teleport recovery, and death cleanup
 - [Spell knockback](docs/knockback-playtest.md), with acknowledged launches, observer movement, cast interruption, possession routing, and landing cleanup
 - Priest Fade: temporary threat reduction with target switching and restoration on expiry

@@ -49,4 +49,4 @@ The fixed server log contained no errors or owner crashes. Login emitted the exi
 
 Coverage includes combat origins, strict timeout boundaries, victim position, hard and soft limits, crowd-control maintenance, periodic and channeled damage, shared clock propagation, delayed assistance, stale incarnations and engagements, owner exit, world cleanup, group death, scripted despawn, and return-home re-entry.
 
-Creature-owned summons do not yet inherit the owner's shared clock. `creature_groups_entry_limit` spawn composition and exact VMangos formation walk-hit clipping remain separate work. This increment does not establish full creature-group or vanilla feature parity.
+Creature-owned clock inheritance and lethal-hit extension ordering are covered by the subsequent [owner leash acceptance](creature-owner-leashes-playtest.md). `creature_groups_entry_limit` spawn composition and exact VMangos formation walk-hit clipping remain separate work. This increment does not establish full creature-group or vanilla feature parity.
