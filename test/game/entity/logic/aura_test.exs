@@ -1218,7 +1218,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
                Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :block))
     end
 
-    test "plain damage shields skip avoided attacks" do
+    test "plain damage shields react to blocks but skip dodges" do
       entity = fixture_entity()
 
       spell = %Spell{
@@ -1243,7 +1243,9 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       context = %{attacker_guid: 999, proc_type: :take_melee_swing, now: 1_000}
 
       assert {_entity, []} = Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :dodge))
-      assert {_entity, []} = Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :block))
+
+      assert {_entity, [%Effects.TriggerSpell{spell_id: 6136}]} =
+               Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :block))
 
       assert {_entity, [%Effects.TriggerSpell{spell_id: 6136}]} =
                Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :crit))

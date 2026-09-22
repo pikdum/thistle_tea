@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
+  alias ThistleTea.Game.Spell.Proc
 
   @default_attack_speed_ms 2000
   @default_damage 2
@@ -171,7 +172,10 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
         {entity, 0, 0}
       end
 
-    result = %{result | damage: damage}
+    result =
+      result
+      |> Map.put(:proc_ex, Proc.melee_hit_mask(result.outcome, result.damage, absorbed))
+      |> Map.put(:damage, damage)
 
     attack =
       attack
@@ -224,6 +228,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
             outcome_proc_damage(result, absorbed)
           )
           | hand: attack_hand(attack),
+            proc_ex: result.proc_ex,
             extra_attack?: Map.get(attack, :extra_attack?, false)
         }
       ]
@@ -282,7 +287,9 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
         attacker_position: Map.get(attack, :caster_position),
         proc_type: proc_type,
         outcome: outcome,
+        proc_ex: result.proc_ex,
         damage: result.damage,
+        absorbed: Map.get(attack, :absorb, 0),
         spell: Map.get(attack, :spell),
         triggering_spell_id: Map.get(attack, :spell_id),
         now: now

@@ -6,6 +6,45 @@ defmodule ThistleTea.Game.Spell.ProcTest do
   alias ThistleTea.Game.Spell.ProcRule
 
   describe "eligible?/4" do
+    test "partial blocks match both normal and block rules even when their damage is absorbed" do
+      for mask <- [0x41, 0x441] do
+        context = %{outcome: :block, proc_ex: mask}
+
+        for rule <- [nil, %ProcRule{proc_ex: 1}, %ProcRule{proc_ex: 0x40}] do
+          assert Proc.eligible?(%Spell{proc_type_mask: 4, proc_rule: rule}, nil, :deal_melee_swing, context)
+        end
+
+        refute Proc.eligible?(
+                 %Spell{proc_type_mask: 4, proc_rule: %ProcRule{proc_ex: 2}},
+                 nil,
+                 :deal_melee_swing,
+                 context
+               )
+      end
+
+      full_block = %{outcome: :block, proc_ex: 0x40}
+      refute Proc.eligible?(%Spell{proc_type_mask: 4}, nil, :deal_melee_swing, full_block)
+
+      assert Proc.eligible?(
+               %Spell{proc_type_mask: 4, proc_rule: %ProcRule{proc_ex: 0x40}},
+               nil,
+               :deal_melee_swing,
+               full_block
+             )
+    end
+
+    test "absorb-only rules require absorption independently of hit or block" do
+      spell = %Spell{proc_type_mask: 8, proc_rule: %ProcRule{proc_ex: 0x400}}
+
+      for mask <- [0x401, 0x402, 0x441] do
+        assert Proc.eligible?(spell, nil, :take_melee_swing, %{outcome: :normal, proc_ex: mask})
+      end
+
+      for mask <- [1, 2, 0x40, 0x41] do
+        refute Proc.eligible?(spell, nil, :take_melee_swing, %{outcome: :normal, proc_ex: mask})
+      end
+    end
+
     test "applies VMangos school restrictions to a DBC proc flag" do
       proc_spell = %Spell{
         proc_type_mask: 0x00010000,

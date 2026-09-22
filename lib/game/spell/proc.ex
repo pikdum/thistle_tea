@@ -10,10 +10,17 @@ defmodule ThistleTea.Game.Spell.Proc do
 
   @normal_hit 0x1
   @critical_hit 0x2
+  @block 0x40
+  @absorb 0x400
   @periodic_positive 0x40000
   @trigger_always 0x10000
   @cast_end 0x80000
-  @landed_outcomes [:normal, :crit, :glancing, :crushing]
+
+  def melee_hit_mask(outcome, damage, absorbed) do
+    mask = outcome_mask(outcome)
+    mask = if outcome == :block and damage > 0, do: mask ||| @normal_hit, else: mask
+    if absorbed > 0, do: mask ||| @absorb, else: mask
+  end
 
   def eligible?(%Spell{} = proc_spell, %Spell{} = triggering_spell, proc_type, outcome) do
     proc_flag?(proc_spell, proc_type) and
@@ -101,7 +108,9 @@ defmodule ThistleTea.Game.Spell.Proc do
   end
 
   defp outcome_allowed?(_rule, :deal_helpful_periodic, _outcome), do: false
-  defp outcome_allowed?(_rule, _proc_type, outcome), do: outcome in @landed_outcomes
+
+  defp outcome_allowed?(_rule, _proc_type, outcome),
+    do: (outcome_mask(outcome) &&& (@normal_hit ||| @critical_hit)) != 0
 
   defp periodic_outcome_mask(:deal_helpful_periodic), do: @periodic_positive
   defp periodic_outcome_mask(_proc_type), do: 0
@@ -111,7 +120,17 @@ defmodule ThistleTea.Game.Spell.Proc do
     (proc_ex &&& outcome_mask(outcome)) != 0
   end
 
-  def shield_outcome_allowed?(_spell, outcome), do: outcome in @landed_outcomes
+  def shield_outcome_allowed?(_spell, %{outcome: :block}), do: true
+
+  def shield_outcome_allowed?(_spell, %{damage: damage, absorbed: absorbed} = context) do
+    damage > absorbed and shield_outcome_allowed?(nil, context.outcome)
+  end
+
+  def shield_outcome_allowed?(_spell, %{outcome: outcome}), do: shield_outcome_allowed?(nil, outcome)
+  def shield_outcome_allowed?(_spell, outcome), do: outcome in [:normal, :crit, :glancing, :crushing, :block]
+
+  defp outcome_mask(%{proc_ex: mask}) when is_integer(mask), do: mask
+  defp outcome_mask(%{outcome: outcome}), do: outcome_mask(outcome)
 
   defp outcome_mask(:normal), do: @normal_hit
   defp outcome_mask(:crit), do: @critical_hit
@@ -121,7 +140,11 @@ defmodule ThistleTea.Game.Spell.Proc do
   defp outcome_mask(:resist), do: 0x8
   defp outcome_mask(:dodge), do: 0x10
   defp outcome_mask(:parry), do: 0x20
-  defp outcome_mask(:block), do: 0x40
+  defp outcome_mask(:block), do: @block
+  defp outcome_mask(:evade), do: 0x80
+  defp outcome_mask(:immune), do: 0x100
+  defp outcome_mask(:deflect), do: 0x200
+  defp outcome_mask(:absorb), do: @absorb
   defp outcome_mask(:reflect), do: 0x800
   defp outcome_mask(_outcome), do: 0
 

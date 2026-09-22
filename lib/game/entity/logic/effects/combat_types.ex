@@ -36,7 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
     {:TapClaimed, [:player_guid], [:group_id]},
     {:TapCleared, [], []},
     {:AttackOutcome, [:target_guid, :source_guid, :outcome, :damage, :proc_damage, :spell_id],
-     [hand: :mainhand, extra_attack?: false]},
+     [hand: :mainhand, extra_attack?: false, proc_ex: nil]},
     {:AttackerStateUpdate, [:source_guid, :target_guid, :damage, :attack], []},
     {:CallAssistance, [:target_guid], []},
     {:CallForHelp, [:target_guid], [:radius]}

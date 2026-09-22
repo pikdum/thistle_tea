@@ -112,7 +112,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   end
 
   defp trigger_melee_procs(entity, %{outcome: outcome, victim_guid: victim_guid} = payload, spell, now)
-       when outcome in [:normal, :crit, :glancing, :crushing, :block] and is_integer(victim_guid) and is_integer(now) do
+       when is_atom(outcome) and is_integer(victim_guid) and is_integer(now) do
     proc_type = if match?(%Spell{}, spell), do: :deal_melee_ability, else: :deal_melee_swing
     hand = Map.get(payload, :hand, :mainhand)
 
@@ -120,6 +120,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
       Aura.reactions(entity, :melee_hit_dealt, %{
         victim_guid: victim_guid,
         outcome: outcome,
+        proc_ex: Map.get(payload, :proc_ex),
         proc_type: proc_type,
         spell: spell,
         triggering_spell_id: Map.get(payload, :spell_id),

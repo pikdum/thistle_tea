@@ -120,11 +120,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
     triggering_spell_id = Map.get(context, :triggering_spell_id)
     triggering_spell = Map.get(context, :spell)
     proc_type = Map.get(context, :proc_type)
-    outcome = Map.get(context, :outcome)
 
     proc? =
       is_integer(damage) and damage > 1 and triggering_spell_id not in @sweeping_strikes_loop_spells and
-        Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and Proc.roll?(holder.spell)
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and Proc.roll?(holder.spell)
 
     if proc? do
       radius = if triggering_spell_id == @whirlwind, do: @whirlwind_radius, else: @melee_radius
@@ -141,11 +140,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
       when is_integer(owner_guid) and is_integer(attacker_guid) do
     triggering_spell = Map.get(context, :spell)
     proc_type = Map.get(context, :proc_type)
-    outcome = Map.get(context, :outcome)
 
     proc? =
       attacker_in_front?(entity, Map.get(context, :attacker_position)) and not stunned?(entity) and
-        Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and Proc.roll?(holder.spell)
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and Proc.roll?(holder.spell)
 
     if proc? do
       event = Effects.trigger_spell(owner_guid, holder.caster_level || 1, attacker_guid, @retaliation_strike)

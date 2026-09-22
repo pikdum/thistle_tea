@@ -31,7 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
       )
       when is_list(holders) and is_integer(attacker_guid) and
              proc_type in [:take_melee_swing, :take_melee_ability, :take_ranged_attack, :take_ranged_ability] and
-             outcome in [:normal, :crit, :glancing, :crushing, :block, :dodge, :parry, :miss] do
+             is_atom(outcome) do
     triggering_spell = Map.get(context, :spell)
 
     {holders, events} =
@@ -83,8 +83,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         :melee_hit_dealt,
         %{victim_guid: victim_guid, outcome: outcome, proc_type: proc_type, now: now} = context
       )
-      when is_list(holders) and is_integer(victim_guid) and is_integer(now) and
-             outcome in [:normal, :crit, :glancing, :crushing, :block] and
+      when is_list(holders) and is_integer(victim_guid) and is_integer(now) and is_atom(outcome) and
              proc_type in [:deal_melee_swing, :deal_melee_ability] do
     {holders, events} =
       Enum.map_reduce(holders, [], fn %Holder{} = holder, events ->
@@ -290,16 +289,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     Transition.run(entity, %Change{holders: holders, cause: :consumed, now: now})
   end
 
-  defp spend_hit_charge(%Holder{charges: charges} = holder) when is_integer(charges) do
-    cond do
-      not Holder.has_any_type?(holder, @charge_consuming_on_hit) -> holder
-      charges > 1 -> %{holder | charges: charges - 1}
-      true -> nil
-    end
-  end
-
-  defp spend_hit_charge(holder), do: holder
-
   defp incoming_reaction(
          entity,
          %Holder{} = holder,
@@ -317,19 +306,22 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         {updated_holder, events}
 
       :unhandled ->
-        generic_incoming_reaction(holder, owner_guid, attacker_guid, triggering_spell, proc_type, outcome)
+        generic_incoming_reaction(holder, owner_guid, attacker_guid, context)
     end
   end
 
-  defp generic_incoming_reaction(%Holder{} = holder, owner_guid, attacker_guid, triggering_spell, proc_type, outcome) do
-    proc? =
-      Holder.has_any_type?(holder, @charge_consuming_on_hit) and
-        Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and Proc.roll?(holder.spell)
+  defp generic_incoming_reaction(%Holder{} = holder, owner_guid, attacker_guid, context) do
+    %{spell: triggering_spell, proc_type: proc_type} = context
+    now = Map.get(context, :now, 0)
 
-    shield? = Proc.shield_outcome_allowed?(holder.spell, outcome)
+    proc? =
+      Holder.has_any_type?(holder, @charge_consuming_on_hit) and proc_ready?(holder, now) and
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and Proc.roll?(holder.spell)
+
+    shield? = proc_ready?(holder, now) and Proc.shield_outcome_allowed?(holder.spell, context)
 
     events = Enum.flat_map(holder.auras, &reaction_event(&1, holder, owner_guid, attacker_guid, proc?, shield?))
-    {if(proc?, do: spend_hit_charge(holder), else: holder), events}
+    {if(proc?, do: mark_proc(holder, now), else: holder), events}
   end
 
   defp outgoing_melee_reaction(%Holder{} = holder, owner_guid, victim_guid, context) do
@@ -362,13 +354,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
          %Holder{} = holder,
          owner_guid,
          victim_guid,
-         %{proc_type: proc_type, outcome: outcome, now: now} = context
+         %{proc_type: proc_type, now: now} = context
        ) do
     proc_auras = trigger_auras(holder)
 
     proc? =
       proc_auras != [] and proc_ready?(holder, now) and
-        Proc.eligible?(holder.spell, Map.get(context, :spell), proc_type, outcome) and
+        Proc.eligible?(holder.spell, Map.get(context, :spell), proc_type, context) and
         Proc.roll?(holder.spell, Map.get(context, :attack_time_ms))
 
     if proc? do
