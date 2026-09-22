@@ -125,6 +125,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Detect Magic](docs/detect-magic-playtest.md), with enemy buff revelation, live buff updates, and dispel, expiry, and death cleanup
 - pets
 - [Noncombat critter companions](docs/mini-pet-playtest.md), with separate ownership, following, item toggles, replacement, creation passives, and lifecycle cleanup alongside combat pets
+- [Autonomous guardians](docs/guardian-playtest.md), with multiple summons, Engineering scaling, combat and following, creature stat buffs, and monitored lifetime cleanup alongside combat pets
 - [Hunter pet happiness](docs/pet-happiness-playtest.md): feeding, timed decay, damage tiers, death penalties, and retained state across dismissal and reconnect
 - [Hunter pet experience](docs/pet-experience-playtest.md): kill rewards, level growth, owner-level caps, and retained progress, learned abilities, and reaction stance
 - [Hunter pet loyalty](docs/pet-loyalty-playtest.md): happiness-based bonding, training-point earnings, rank loss, and runaway cleanup, retained through dismissal and reconnect
