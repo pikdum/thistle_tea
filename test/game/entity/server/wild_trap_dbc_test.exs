@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Server.WildTrapDbcTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
@@ -26,7 +27,7 @@ defmodule ThistleTea.Game.Entity.Server.WildTrapDbcTest do
   @moduletag :dbc_db
 
   describe "trap activation" do
-    test "a campfire discovers a nearby player and delivers environmental fire" do
+    test "a world-loaded campfire discovers a nearby player and delivers environmental fire" do
       player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
       Entity.register(player_guid)
 
@@ -41,16 +42,25 @@ defmodule ThistleTea.Game.Entity.Server.WildTrapDbcTest do
       World.update_position(player)
       Metadata.put(player_guid, Map.put(Faction.metadata(1), :alive?, true))
 
-      template = %GameObjectTemplate{
+      template = %Mangos.GameObjectTemplate{
         entry: 2061,
         type: 6,
         size: 1.0,
         faction: 14,
         flags: 0,
-        data: [0, 0, 2, 7897, 0, 3, 0, 0]
+        data2: 2,
+        data3: 7897,
+        data5: 3
       }
 
-      trap = GameObject.build_summoned(template, player.internal.world, {0.0, 0.0, 0.0, 0.0}, level: 0)
+      trap =
+        GameObject.build(%Mangos.GameObject{
+          guid: System.unique_integer([:positive]),
+          id: 2061,
+          map: 999,
+          game_object_template: template
+        })
+
       {:ok, pid} = World.start_entity(trap)
       guid = trap.object.guid
 

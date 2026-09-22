@@ -179,6 +179,8 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   defp spellcaster_party_only?(_template), do: false
 
   def build(%Mangos.GameObject{game_object_template: %Mangos.GameObjectTemplate{} = ot} = o) do
+    template = GameObjectTemplate.build(ot)
+
     event =
       case o.game_event_game_object do
         %Mangos.GameEventGameObject{event: event} -> event
@@ -221,7 +223,8 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
         event: event,
         fishing: fishing_hole(ot),
         loot: chest_loot(ot),
-        gathering: gathering(GameObjectTemplate.build(ot)),
+        gathering: gathering(template),
+        trap: trap(template, nil),
         spawn: chest_spawn(ot, o)
       }
     }
