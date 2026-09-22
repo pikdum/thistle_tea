@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.TaxiTest do
   alias ThistleTea.Game.Entity.Data.Taxi.PathNode
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
+  alias ThistleTea.Game.Entity.Logic.Falling
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.Taxi
   alias ThistleTea.Game.Spell
@@ -63,9 +64,11 @@ defmodule ThistleTea.Game.Entity.Logic.TaxiTest do
       itinerary = itinerary()
 
       pending = ExtraAttacks.grant(character(), 2)
+      pending = put_in(pending.internal.fall, %Falling{height: 100.0, far?: true})
       {character, effects} = Taxi.start(pending, itinerary, destination, 6852, token, 1_000)
 
       refute ExtraAttacks.pending?(character)
+      assert character.internal.fall == nil
       assert character.player.coinage == 75
       assert character.unit.mount_display_id == 6852
       assert (character.unit.flags &&& 0x00100004) == 0x00100004
@@ -104,10 +107,12 @@ defmodule ThistleTea.Game.Entity.Logic.TaxiTest do
   end
 
   describe "finish/2" do
-    test "lands at the taxi node and restores player control" do
+    test "lands at the last spline point and restores player control" do
       token = make_ref()
-      destination = node(4, {64.0, 0.0, 0.0})
+      destination = node(4, {80.0, 0.0, 0.0})
       {character, _effects} = Taxi.start(character(), itinerary(), destination, 6852, token, 1_000)
+      assert character.internal.taxi_flight.destination_position == {64.0, 0.0, 0.0}
+      character = put_in(character.internal.fall, %Falling{height: 100.0, far?: true})
 
       character = Taxi.finish(character, 1_500)
 
@@ -115,6 +120,7 @@ defmodule ThistleTea.Game.Entity.Logic.TaxiTest do
       assert character.movement_block.spline_nodes == []
       assert character.movement_block.movement_flags == 0
       assert character.unit.mount_display_id == 0
+      assert character.internal.fall == nil
       assert (character.unit.flags &&& 0x00100004) == 0
       refute Taxi.active?(character)
       assert character.internal.broadcast_update?

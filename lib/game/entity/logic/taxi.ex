@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Taxi do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
+  alias ThistleTea.Game.Entity.Logic.Falling
   alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.Movement
 
@@ -32,12 +33,12 @@ defmodule ThistleTea.Game.Entity.Logic.Taxi do
       )
       when is_map(itinerary) and is_integer(mount_display_id) and mount_display_id >= 0 and is_reference(token) and
              is_integer(now) do
-    character = character |> prepare_auras(now) |> Mount.dismount(now) |> ExtraAttacks.clear()
+    character = character |> prepare_auras(now) |> Mount.dismount(now) |> ExtraAttacks.clear() |> Falling.reset()
     unit = character.unit
     positions = Enum.map(itinerary.nodes, & &1.position)
     path_ids = Enum.map(itinerary.paths, & &1.id)
     source_node_id = hd(itinerary.paths).source_node_id
-    destination_node_id = List.last(itinerary.paths).destination_node_id
+    destination_node_id = destination.id
 
     character =
       %{
@@ -52,7 +53,7 @@ defmodule ThistleTea.Game.Entity.Logic.Taxi do
       path_ids: path_ids,
       source_node_id: source_node_id,
       destination_node_id: destination_node_id,
-      destination_position: destination.position,
+      destination_position: List.last(positions),
       mount_display_id: mount_display_id,
       started_at: now,
       duration_ms: character.movement_block.duration
@@ -79,6 +80,7 @@ defmodule ThistleTea.Game.Entity.Logic.Taxi do
     internal = %{character.internal | taxi_flight: nil}
 
     %{character | unit: unit, internal: internal, movement_block: movement_block}
+    |> Falling.reset()
     |> Core.mark_broadcast_update()
   end
 
