@@ -366,6 +366,7 @@ defmodule ThistleTea.Game.World do
 
   defp entity_guid(%{object: %{guid: guid}}) when is_integer(guid), do: guid
   defp entity_guid(%{guid: guid}) when is_integer(guid), do: guid
+  defp entity_guid(guid) when is_integer(guid), do: guid
   defp entity_guid(_entity), do: nil
 
   defp broadcast_recipients(opts, entity, range) do

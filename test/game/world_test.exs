@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.WorldTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World
@@ -21,6 +22,29 @@ defmodule ThistleTea.Game.WorldTest do
 
     @impl GenServer
     def init(state), do: {:ok, state}
+  end
+
+  describe "broadcast_packet/3" do
+    test "integer sources retain observer attribution and self-exclusion in their own world" do
+      source = System.unique_integer([:positive])
+      observer = System.unique_integer([:positive])
+      other = System.unique_integer([:positive])
+      world = WorldRef.instance(0, source)
+
+      for {guid, copy} <- [{source, world}, {observer, world}, {other, WorldRef.instance(0, other)}] do
+        Entity.register(guid)
+        SpatialHash.update(:players, guid, copy, 0.0, 0.0, 0.0)
+      end
+
+      on_exit(fn -> Enum.each([source, observer, other], &SpatialHash.remove(:players, &1)) end)
+      World.broadcast_packet(:first, source)
+      assert_receive {:"$gen_cast", {:send_packet, :first}}
+      assert_receive {:"$gen_cast", {:send_packet, :first, [source_guid: ^source]}}
+      refute_receive {:"$gen_cast", _}, 0
+      World.broadcast_packet(:second, source, include_self?: false)
+      assert_receive {:"$gen_cast", {:send_packet, :second, [source_guid: ^source]}}
+      refute_receive {:"$gen_cast", _}, 0
+    end
   end
 
   describe "stop_world_entities/2" do
