@@ -11,4 +11,10 @@ defmodule ThistleTea.Game.Entity.Data.CombatLeash do
     @enforce_keys [:world, :guid, :incarnation, :generation]
     defstruct [:world, :guid, :incarnation, :generation]
   end
+
+  defmodule Owner do
+    @moduledoc false
+    @enforce_keys [:world, :guid, :incarnation, :pid]
+    defstruct [:world, :guid, :incarnation, :pid]
+  end
 end

@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.CombatLeashes do
   """
   use GenServer
 
+  alias ThistleTea.Game.Entity.Data.CombatLeash.Owner
   alias ThistleTea.Game.Entity.Data.CombatLeash.Ref
   alias ThistleTea.Game.Entity.Logic.CombatLeash
 
@@ -65,28 +66,21 @@ defmodule ThistleTea.Game.World.CombatLeashes do
         {:reply, :stale, state}
 
       :new ->
-        state = detach(state, key(ref))
-        {clock, state} = source_clock(state, ref.world, source, now)
-        monitor = Process.monitor(owner)
-        actor = %{ref: ref, owner: owner, monitor: monitor, clock: clock}
-        shared = Map.update!(state.clocks[clock], :members, &MapSet.put(&1, key(ref)))
-
-        state = %{
-          state
-          | actors: Map.put(state.actors, key(ref), actor),
-            monitors: Map.put(state.monitors, monitor, key(ref)),
-            clocks: Map.put(state.clocks, clock, shared)
-        }
-
-        :ets.insert(state.table, {key(ref), ref, shared.time})
-        {:reply, :ok, state}
+        {:reply, :ok, start_fight(state, ref, source, now, owner)}
     end
   end
 
   defp handle_request({:event, %Ref{} = ref, event, owner}, state) do
     case state.actors[key(ref)] do
-      %{ref: ^ref, owner: ^owner} = actor -> {:reply, :ok, transition(state, actor, event)}
-      _stale -> {:reply, :stale, state}
+      %{ref: ^ref, owner: ^owner} = actor ->
+        {:reply, :ok, transition(state, actor, event)}
+
+      %{ref: %{incarnation: incarnation}, owner: ^owner, active?: false} = actor
+      when incarnation == ref.incarnation and event == :stop ->
+        {:reply, :ok, transition(state, actor, event)}
+
+      _stale ->
+        {:reply, :stale, state}
     end
   end
 
@@ -103,6 +97,44 @@ defmodule ThistleTea.Game.World.CombatLeashes do
 
   defp newer_reference?(ref, previous) do
     {ref.incarnation || 0, ref.generation} > {previous.incarnation || 0, previous.generation}
+  end
+
+  defp start_fight(state, ref, nil, now, owner) do
+    case state.actors[key(ref)] do
+      %{ref: %{incarnation: incarnation}, owner: ^owner, active?: false} = actor
+      when incarnation == ref.incarnation ->
+        actor = %{actor | ref: ref, active?: true}
+        state = %{state | actors: Map.put(state.actors, key(ref), actor)}
+        :ets.insert(state.table, {key(ref), ref, state.clocks[actor.clock].time})
+        transition(state, actor, {:extend, now})
+
+      _active ->
+        start_linked_fight(state, ref, nil, now, owner)
+    end
+  end
+
+  defp start_fight(state, ref, source, now, owner), do: start_linked_fight(state, ref, source, now, owner)
+
+  defp start_linked_fight(state, ref, source, now, owner) do
+    state = detach(state, key(ref))
+    {clock, state} = source_clock(state, ref.world, source, now)
+    attach(state, ref, owner, clock, true)
+  end
+
+  defp attach(state, ref, owner, clock, active?) do
+    monitor = Process.monitor(owner)
+    actor = %{ref: ref, owner: owner, monitor: monitor, clock: clock, active?: active?}
+    shared = Map.update!(state.clocks[clock], :members, &MapSet.put(&1, key(ref)))
+
+    state = %{
+      state
+      | actors: Map.put(state.actors, key(ref), actor),
+        monitors: Map.put(state.monitors, monitor, key(ref)),
+        clocks: Map.put(state.clocks, clock, shared)
+    }
+
+    :ets.insert(state.table, {key(ref), ref, shared.time})
+    state
   end
 
   @impl GenServer
@@ -124,7 +156,31 @@ defmodule ThistleTea.Game.World.CombatLeashes do
     end
   end
 
+  defp source_clock(state, world, %Owner{world: world} = source, now) do
+    ref = %Ref{world: world, guid: source.guid, incarnation: source.incarnation, generation: 0}
+
+    case state.actors[key(ref)] do
+      %{ref: %{incarnation: incarnation}, owner: owner, clock: clock}
+      when incarnation == source.incarnation and owner == source.pid ->
+        {clock, state}
+
+      nil ->
+        owner_clock(state, ref, source.pid, now)
+
+      %{ref: %{incarnation: incarnation}} when incarnation < source.incarnation ->
+        state |> detach(key(ref)) |> owner_clock(ref, source.pid, now)
+
+      _stale ->
+        new_clock(state, now)
+    end
+  end
+
   defp source_clock(state, _world, _source, now), do: new_clock(state, now)
+
+  defp owner_clock(state, ref, owner, now) do
+    {clock, state} = new_clock(state, now)
+    {clock, attach(state, ref, owner, clock, false)}
+  end
 
   defp new_clock(state, now) do
     clock = make_ref()

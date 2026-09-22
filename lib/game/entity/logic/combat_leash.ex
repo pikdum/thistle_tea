@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatLeash do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.WorldRef
@@ -33,7 +34,13 @@ defmodule ThistleTea.Game.Entity.Logic.CombatLeash do
     }
 
     entity = %{entity | internal: %{entity.internal | combat_leash: leash}}
-    enqueue(entity, {:start, now, source})
+    source = summon_source(entity, source)
+    entity = enqueue(entity, {:start, now, source})
+
+    case source do
+      {:owner, _guid, nil} -> enqueue(entity, {:extend, now})
+      _source -> entity
+    end
   end
 
   def extend(%Mob{internal: %{combat_leash: %State{active?: true} = leash}} = entity, now) do
@@ -65,20 +72,27 @@ defmodule ThistleTea.Game.Entity.Logic.CombatLeash do
     %{entity | internal: %{entity.internal | combat_leash: leash}}
   end
 
+  def stop(%Mob{} = entity), do: enqueue(entity, :stop)
   def stop(entity), do: entity
 
-  def reference(%Mob{internal: %{combat_leash: %State{active?: true, generation: generation}}} = entity) do
+  def reference(%Mob{internal: %{combat_leash: %State{active?: true}}} = entity), do: identity(entity)
+  def reference(_entity), do: nil
+
+  defp identity(%Mob{} = entity) do
     spawn = entity.internal.spawn
+    leash = entity.internal.combat_leash || %State{}
 
     %Ref{
       world: entity.internal.world,
       guid: entity.object.guid,
       incarnation: spawn && spawn.incarnation_id,
-      generation: generation
+      generation: leash.generation
     }
   end
 
-  def reference(_entity), do: nil
+  defp summon_source(%Mob{object: %{guid: guid}, unit: %{summoned_by: owner}}, source) do
+    if owner != guid and Guid.entity_type(owner) in [:mob, :pet], do: {:owner, owner, source}, else: source
+  end
 
   def maintain(%Mob{internal: %{combat_leash: %State{active?: true} = leash}} = entity, now) do
     if controlled?(entity) and now >= leash.next_control_at do
@@ -153,5 +167,5 @@ defmodule ThistleTea.Game.Entity.Logic.CombatLeash do
   defp controlled?(_entity), do: false
 
   defp enqueue(entity, event),
-    do: Effects.enqueue(entity, %Effects.CombatLeashEvent{ref: reference(entity), event: event})
+    do: Effects.enqueue(entity, %Effects.CombatLeashEvent{ref: identity(entity), event: event})
 end

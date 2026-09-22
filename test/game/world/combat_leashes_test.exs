@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.CombatLeashesTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.CombatLeash.Owner
   alias ThistleTea.Game.Entity.Data.CombatLeash.Ref
   alias ThistleTea.Game.World.CombatLeashes
   alias ThistleTea.Game.WorldRef
@@ -8,6 +9,41 @@ defmodule ThistleTea.Game.World.CombatLeashesTest do
   setup [:leashes]
 
   describe "event/4" do
+    test "retains an idle owner's clock for its later fight and releases idle ownership", %{server: server, a: a, b: b} do
+      owner = %Owner{world: a.world, guid: a.guid, incarnation: a.incarnation, pid: self()}
+      CombatLeashes.event(b, {:start, 1_000, owner}, self(), server)
+      CombatLeashes.event(b, {:extend, 2_000}, self(), server)
+      CombatLeashes.event(a, {:start, 3_000, nil}, self(), server)
+      assert CombatLeashes.last_extended_at(b, server) == 3_000
+      CombatLeashes.event(a, :stop, self(), server)
+      CombatLeashes.event(a, {:start, 4_000, nil}, self(), server)
+      assert CombatLeashes.last_extended_at(b, server) == 3_000
+      CombatLeashes.event(a, :stop, self(), server)
+      CombatLeashes.event(b, :stop, self(), server)
+      CombatLeashes.event(b, {:start, 5_000, owner}, self(), server)
+      CombatLeashes.event(b, :stop, self(), server)
+      assert map_size(:sys.get_state(server).clocks) == 1
+      CombatLeashes.event(%{a | generation: 9}, :stop, self(), server)
+      assert :sys.get_state(server).clocks == %{}
+      assert :sys.get_state(server).monitors == %{}
+    end
+
+    test "does not adopt stale creature ownership or link across world copies", %{server: server, a: a, b: b} do
+      CombatLeashes.event(a, {:start, 1_000, nil}, self(), server)
+      owner = %Owner{world: a.world, guid: a.guid, incarnation: a.incarnation, pid: self()}
+
+      for invalid <- [
+            %{owner | incarnation: 0},
+            %{owner | pid: server},
+            %{owner | world: WorldRef.instance(0, 99)}
+          ] do
+        CombatLeashes.event(b, {:start, 2_000, invalid}, self(), server)
+        CombatLeashes.event(b, {:extend, 3_000}, self(), server)
+        assert CombatLeashes.last_extended_at(a, server) == 1_000
+        CombatLeashes.event(b, :stop, self(), server)
+      end
+    end
+
     test "shares extensions in both directions and retains the clock after its source leaves", %{
       server: server,
       a: a,
