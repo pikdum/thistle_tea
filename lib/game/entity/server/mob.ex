@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.MiniPet
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Passive, as: PassiveBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Totem, as: TotemBT
@@ -106,6 +107,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   def child_spec(%Mob{internal: %Internal{pet: %Pet{}}} = state) do
+    Map.put(super(state), :restart, :temporary)
+  end
+
+  def child_spec(%Mob{internal: %Internal{spawn: %Spawn{temporary?: true}}} = state) do
     Map.put(super(state), :restart, :temporary)
   end
 
@@ -764,7 +769,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_info({:remove_corpse, token}, %Mob{} = state) do
-    {:noreply, Corpse.remove(state, token)}
+    {:noreply, state |> Corpse.remove(token) |> Respawn.after_corpse_removed()}
+  rescue
+    error ->
+      Logger.error("Corpse removal failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   @impl GenServer
@@ -1216,6 +1225,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{kind: :guardian}}}), do: GuardianBT.tree()
 
   defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{}}}), do: PetBT.tree()
+  defp behavior_tree(%Mob{internal: %Internal{creature: %Creature{stationary?: true}}}), do: PassiveBT.tree()
   defp behavior_tree(%Mob{}), do: MobBT.tree()
 
   defp sync_behavior_tree(%Mob{} = state, %Mob{} = previous) do
@@ -1268,6 +1278,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       do: state,
       else: Core.mark_broadcast_update(%{state | unit: %{state.unit | flags: flags}})
   end
+
+  defp schedule_summon_despawn(%Mob{internal: %{spawn: %Spawn{despawn_type: type}}} = state) when type in [7, 11],
+    do: state
 
   defp schedule_summon_despawn(
          %Mob{internal: %Internal{spawn: %Spawn{temporary?: true, despawn_delay_ms: delay}}} = state

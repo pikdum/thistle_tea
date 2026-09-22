@@ -156,7 +156,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         name: ct.name,
         creature: %Creature{
           db_guid: c.guid,
-          experience_multiplier: ct.experience_multiplier,
+          experience_multiplier: experience_multiplier(ct),
           extra_flags: ct.extra_flags,
           rank: ct.rank,
           civilian?: ct.civilian == 1,
@@ -214,6 +214,10 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   end
 
   defp stat_inputs(unit, _template, _stats, _model), do: unit
+
+  defp experience_multiplier(template) do
+    if Bitwise.band(template.creature_type_flags || 0, 0x2) == 0, do: template.experience_multiplier, else: 0.0
+  end
 
   def apply_addon_auras(%__MODULE__{internal: %Internal{creature: %Creature{addon_auras: [_ | _] = spells}}} = mob, now)
       when is_integer(now) do

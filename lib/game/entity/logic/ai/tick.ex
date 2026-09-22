@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Entity.Logic.Rest
+  alias ThistleTea.Game.Entity.Logic.TemporarySummon
   alias ThistleTea.Game.Spell.Cast
 
   @default_tick_ms 100
@@ -63,6 +64,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
     |> schedule_sobering(entity)
     |> schedule_pvp(entity)
     |> schedule_rest(entity)
+    |> schedule_summon_death(entity)
+  end
+
+  defp schedule_summon_death(plan, entity) do
+    case TemporarySummon.next_at(entity, plan.now) do
+      at when is_integer(at) -> TickPlan.schedule_at(plan, :summon_death, at)
+      _ -> plan
+    end
   end
 
   defp schedule_extra_attacks(plan, entity) do

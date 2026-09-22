@@ -8,14 +8,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
   """
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
+  alias ThistleTea.Game.Entity.Logic.TemporarySummon
 
-  def tick(tree, %{internal: %Internal{} = internal} = entity, %Context{now: now} = context) do
-    blackboard = Blackboard.ensure(internal.blackboard)
+  def tick(tree, %{internal: %Internal{}} = entity, %Context{now: now} = context) do
+    entity = TemporarySummon.tick(entity, now)
+    tick_entity(tree, entity, context)
+  end
+
+  defp tick_entity(tree, %Mob{unit: %{health: 0}} = entity, context), do: BT.tick(tree, entity, context)
+
+  defp tick_entity(tree, entity, %Context{now: now} = context) do
+    blackboard = Blackboard.ensure(entity.internal.blackboard)
     {:failure, entity, blackboard} = AuraBT.tick(entity, blackboard, now)
     {:failure, entity, blackboard} = RegenBT.tick(entity, blackboard, now)
     entity = %{entity | internal: %{entity.internal | blackboard: blackboard}}

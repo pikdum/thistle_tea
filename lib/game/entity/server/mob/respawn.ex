@@ -41,6 +41,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   defp ooc_gated_despawn?(%Spawn{despawn_type: despawn_type}), do: despawn_type in @ooc_gated_despawn_types
   defp ooc_gated_despawn?(_spawn), do: false
 
+  def schedule(%Mob{internal: %{spawn: %Spawn{temporary?: true, despawn_type: type}}} = state) when type in [7, 11],
+    do: state
+
   def schedule(%Mob{internal: %Internal{spawn: %Spawn{respawn_ref: ref}}} = state) when is_reference(ref) do
     state
   end
@@ -51,6 +54,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   end
 
   def schedule(%Mob{} = state), do: state
+
+  def after_corpse_removed(%Mob{internal: %{spawn: %Spawn{temporary?: true, despawn_type: type}}} = state)
+      when type in [7, 11] do
+    if Corpse.removed?(state), do: remove_and_stop(state), else: state
+  end
+
+  def after_corpse_removed(%Mob{} = state), do: state
 
   def handle(%Mob{} = state) do
     cond do

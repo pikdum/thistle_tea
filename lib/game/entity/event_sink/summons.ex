@@ -20,12 +20,14 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
+  alias ThistleTea.Game.World.Loader.WildSummon
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpawnPool
@@ -238,6 +240,19 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   end
 
   def emit(entity, %Effects.SummonCreature{}, _context), do: entity
+
+  def emit(%{unit: _unit} = entity, %Effects.SummonWild{} = effect, _context) do
+    now = Time.now()
+
+    for index <- 0..(effect.count - 1) do
+      position = wild_position(entity, effect, index)
+      entity |> WildSummon.build(effect, position, now) |> MobLoader.start_mob()
+    end
+
+    entity
+  end
+
+  def emit(entity, %Effects.SummonWild{}, _context), do: entity
 
   def emit(%{unit: _unit} = entity, %Effects.SummonGuardians{} = effect, context) do
     Context.send(context, effect)
@@ -537,4 +552,16 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   end
 
   defp cast_post_spawn_spells(_entity, _summon_guid, _summon), do: :ok
+
+  defp wild_position(entity, %Effects.SummonWild{scatter?: true, radius_yards: radius} = effect, index)
+       when index > 0 and radius > 0 do
+    {x, y, z, orientation} = effect.position
+
+    case Pathfinding.find_random_point_around_circle(entity.internal.world.map_id, {x, y, z}, radius) do
+      {px, py, pz} -> {px, py, pz, orientation}
+      _ -> effect.position
+    end
+  end
+
+  defp wild_position(_entity, effect, _index), do: effect.position
 end

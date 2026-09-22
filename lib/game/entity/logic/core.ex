@@ -71,6 +71,17 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     entity
   end
 
+  def kill(%Mob{} = entity, now) when is_integer(now) do
+    if dead?(entity) do
+      entity
+    else
+      %{entity | unit: %{entity.unit | health: 0}, internal: %{entity.internal | killed_by: entity.object.guid}}
+      |> Reactive.sync_health()
+      |> prepare_death_state(now)
+      |> mark_broadcast_update()
+    end
+  end
+
   def take_damage_with_absorb(entity, damage, now, opts \\ []) do
     {entity, _damage, absorbed} = take_damage_with_mitigation(entity, damage, now, opts)
     {entity, absorbed}

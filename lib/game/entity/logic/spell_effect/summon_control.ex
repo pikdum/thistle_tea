@@ -127,6 +127,34 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
      ]}
   end
 
+  def apply(
+        %{object: %{guid: guid}, unit: _unit} = state,
+        %CastContext{caster_guid: guid} = context,
+        %Spell{} = spell,
+        %Effect{type: :summon_wild, misc_value: entry} = effect,
+        _now
+      )
+      when is_integer(entry) and entry > 0 do
+    {x, y, z, orientation} = state.movement_block.position
+    radius = max(effect.radius_yards || 0.0, 0.0)
+
+    {x, y, z} =
+      context.destination_position || {x + radius * :math.cos(orientation), y + radius * :math.sin(orientation), z}
+
+    {state,
+     [
+       %Effects.SummonWild{
+         entry: entry,
+         spell_id: spell.id,
+         count: max(Amount.roll(spell, effect, context), 1),
+         duration_ms: max(spell.duration_ms || 0, 0),
+         position: {x, y, z, orientation},
+         radius_yards: radius,
+         scatter?: context.destination_position != nil
+       }
+     ]}
+  end
+
   def apply(%Character{} = state, %CastContext{}, _spell, %Effect{type: :dismiss_pet}, _now) do
     Companion.dismiss(state)
   end
