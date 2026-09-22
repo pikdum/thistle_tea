@@ -98,6 +98,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Melee readiness](docs/melee-readiness-playtest.md), with shared facing and control checks, per-hand retries, dual-wield swing separation, and native error feedback
 - [Blocked-hit procs](docs/blocked-hit-procs-playtest.md), with combined block and absorb outcomes, Retaliation, damage-shield contact rules, and incoming proc cooldowns
 - [Cast-completion procs](docs/cast-completion-procs-playtest.md), with Elemental Focus, separate cast and hit phases, spell/ability classification, and caster-proc suppression
+- [Stacking spell trinkets](docs/stacking-spell-trinkets-playtest.md), with temporary spell-power snapshots, Unstable Power's diminishing bonus, Ascendance's increasing bonus, and linked aura cleanup
 - main-hand disarm: unarmed player combat, armed-creature damage reduction, weapon ability checks, and off-hand preservation
 - rear-hit daze from uncontrolled creatures, with level and defense-skill scaling
 - mechanic resistance for spells and melee abilities, including Orc Hardiness
