@@ -44,9 +44,14 @@ defmodule ThistleTea.Game.Network.MovementControl do
 
   def prepare(%Message.MsgMoveTeleportAck{} = packet, %State{} = state) do
     kind = if packet.preserve_combat?, do: :combat_teleport, else: :teleport
-    pending = Map.reject(state.pending_movement_acks, fn {_counter, kind} -> kind in [:teleport, :combat_teleport] end)
+    pending = Map.reject(state.pending_movement_acks, fn {_counter, kind} -> relocation?(kind) end)
     state = %{state | pending_movement_acks: pending}
     stamp(state, kind, &%{packet | counter: &1})
+  end
+
+  def prepare(%Message.SmsgMoveKnockBack{} = packet, %State{} = state) do
+    impulse = {packet.cos_angle, packet.sin_angle, packet.horizontal_speed, packet.vertical_speed}
+    stamp(state, {:knockback, packet.guid, impulse}, &%{packet | counter: &1})
   end
 
   def prepare(%Message.SmsgMoveWaterWalk{} = packet, %State{} = state) do
@@ -90,6 +95,23 @@ defmodule ThistleTea.Game.Network.MovementControl do
   end
 
   def acknowledge(state, _guid, _counter, _expected), do: {:error, state}
+
+  def acknowledge_knockback(%State{} = state, guid, counter, %MovementBlock{} = movement) do
+    case Map.fetch(state.pending_movement_acks, counter) do
+      {:ok, {:knockback, ^guid, {cos, sin, horizontal, vertical}}} ->
+        valid? =
+          Bitwise.band(movement.movement_flags || 0, 0x2000) != 0 and
+            close?(cos, movement.cos_angle) and close?(sin, movement.sin_angle) and
+            close?(horizontal, movement.xy_speed) and close?(vertical, movement.z_speed)
+
+        if valid?,
+          do: {:ok, %{state | pending_movement_acks: Map.delete(state.pending_movement_acks, counter)}},
+          else: {:error, state}
+
+      _unexpected ->
+        {:error, state}
+    end
+  end
 
   def acknowledge_teleport(%State{} = state, guid, counter) do
     case Map.get(state.pending_movement_acks, counter) do
@@ -194,6 +216,12 @@ defmodule ThistleTea.Game.Network.MovementControl do
 
   defp put_pending(pending, _counter, nil), do: pending
   defp put_pending(pending, counter, change), do: Map.put(pending, counter, change)
+
+  defp relocation?({:knockback, _, _}), do: true
+  defp relocation?(kind), do: kind in [:teleport, :combat_teleport]
+
+  defp close?(expected, actual) when is_number(expected) and is_number(actual), do: abs(expected - actual) < 0.01
+  defp close?(_expected, _actual), do: false
 
   defp matching_ack?({type, sent}, {type, received})
        when type in [:run_speed, :run_back_speed, :swim_speed, :swim_back_speed] do

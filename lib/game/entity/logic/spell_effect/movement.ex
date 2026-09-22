@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
 
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Knockback
+  alias ThistleTea.Game.Entity.Logic.SpellEffect.Amount
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
@@ -34,6 +36,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
 
   def apply(state, %CastContext{destination_position: destination}, _spell, %Effect{type: :distract} = effect, now) do
     Distraction.apply(state, destination, Effect.roll(effect, 0) * 1_000, now)
+  end
+
+  def apply(state, %CastContext{} = context, spell, %Effect{type: :knockback} = effect, now) do
+    vertical_speed = div(Amount.roll(spell, effect, context), 10) * 1.0
+    Knockback.apply(state, context, (effect.misc_value || 0) / 10, vertical_speed, now)
   end
 
   def apply(state, _context, _spell, _effect, _now), do: {state, []}

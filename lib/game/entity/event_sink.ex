@@ -88,6 +88,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.CreatureTeleported,
     Effects.FeatherFallChanged,
     Effects.HoverChanged,
+    Effects.Knockback,
     Effects.MonsterMove,
     Effects.MovementRootChanged,
     Effects.MovementSpeedChanged,

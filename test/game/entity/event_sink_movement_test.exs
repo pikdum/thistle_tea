@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
   alias ThistleTea.Game.Network.Message.MsgMoveTeleport
   alias ThistleTea.Game.Network.Message.SmsgClientControlUpdate
   alias ThistleTea.Game.Network.Message.SmsgMonsterMove
+  alias ThistleTea.Game.Network.Message.SmsgMoveKnockBack
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Metadata
@@ -200,6 +201,14 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
 
       refute_received {:"$gen_cast", {:send_packet, %SmsgClientControlUpdate{}}}
 
+      impulse = %Effects.Knockback{cos_angle: 0.0, sin_angle: 1.0, horizontal_speed: 12.0, vertical_speed: 7.0}
+      EventSink.emit(character, impulse, Context.new(owner_pid))
+
+      assert_receive {:observer, :owner,
+                      {:"$gen_cast", {:send_packet, %SmsgMoveKnockBack{guid: ^guid, vertical_speed: -7.0}}}}
+
+      refute_received {:observer, :nearby, {:"$gen_cast", {:send_packet, %SmsgMoveKnockBack{}, _}}}
+
       character = %{
         character
         | movement_block: %{character.movement_block | spline_nodes: [{7.0, 0.0, 0.0}], duration: 1_000}
@@ -226,6 +235,10 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
       guid = mob.object.guid
       EventSink.emit(mob, Effects.client_control_changed(false))
       assert_receive {:"$gen_cast", {:send_packet, %SmsgClientControlUpdate{guid: ^guid, allow_movement?: false}, _}}
+
+      impulse = %Effects.Knockback{cos_angle: 1.0, sin_angle: 0.0, horizontal_speed: 10.0, vertical_speed: 10.0}
+      EventSink.emit(mob, impulse)
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgMoveKnockBack{guid: ^guid, vertical_speed: -10.0}, _}}
     end
   end
 

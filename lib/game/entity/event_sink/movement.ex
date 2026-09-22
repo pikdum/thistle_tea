@@ -127,6 +127,22 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
 
   def emit(entity, %Effects.HoverChanged{}, _context), do: entity
 
+  def emit(%Character{} = entity, %Effects.Knockback{} = effect, context) do
+    Context.send_packet(context, knockback_packet(entity, effect))
+    entity
+  end
+
+  def emit(
+        %Mob{internal: %{pet: %Pet{possessed?: true, owner_guid: owner}}} = entity,
+        %Effects.Knockback{} = effect,
+        _context
+      ) do
+    World.broadcast_packet(knockback_packet(entity, effect), entity, recipients: [owner])
+    entity
+  end
+
+  def emit(entity, %Effects.Knockback{}, _context), do: entity
+
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.WaterWalkChanged{enabled?: true}, context) do
     Context.send_packet(context, %Message.SmsgMoveWaterWalk{guid: guid})
     entity
@@ -258,5 +274,15 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
 
   defp notify_chasers(%{object: %{guid: guid}, movement_block: %{position: {x, y, z, _o}}}) do
     ChaseWatch.notify_moved(guid, {x, y, z})
+  end
+
+  defp knockback_packet(entity, effect) do
+    %Message.SmsgMoveKnockBack{
+      guid: entity.object.guid,
+      cos_angle: effect.cos_angle,
+      sin_angle: effect.sin_angle,
+      horizontal_speed: effect.horizontal_speed,
+      vertical_speed: -effect.vertical_speed
+    }
   end
 end

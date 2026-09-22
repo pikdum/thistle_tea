@@ -75,9 +75,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.SpellReception
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
-  alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
@@ -1059,9 +1057,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     sync_orientation_metadata(state)
     state = Visibility.refresh_entity(state)
 
-    BinaryUtils.pack_guid(state.object.guid)
-    |> Kernel.<>(payload)
-    |> Packet.build(opcode)
+    Message.MsgMove.to_packet(state.object.guid, payload, opcode)
     |> World.broadcast_packet(state, recipients: Enum.uniq([owner_guid | World.tracking_players(state)]))
 
     ChaseWatch.notify_moved(state.object.guid, {x, y, z})
