@@ -119,6 +119,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - creature and pet fear movement, with bounded panic runs, control cleanup, and Curse of Recklessness suppression
 - [Critter escape behavior](docs/critter-playtest.md), with damage and debuff reactions, timed panic movement, combat recovery, and death cleanup
 - [Creature combat defaults](docs/creature-flags-playtest.md), with template immunity, invincibility, defense rules, stationary behavior, and script overrides
+- [Creature-group combat](docs/creature-groups-playtest.md), with shared aggro, evade, respawn, death notifications, scripted membership, and group conditions
 - [Player fear and confusion](docs/player-control-movement-playtest.md), with forced movement, client control restoration, bounded wandering, teleport recovery, and death cleanup
 - [Spell knockback](docs/knockback-playtest.md), with acknowledged launches, observer movement, cast interruption, possession routing, and landing cleanup
 - Priest Fade: temporary threat reduction with target switching and restoration on expiry
