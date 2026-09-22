@@ -56,6 +56,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.Rest
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
+  alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
   alias ThistleTea.Game.Entity.Server.AIEnvironment
@@ -1484,6 +1485,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         crowd_controlled?: Aura.crowd_controlled?(character),
         dispel_options: Aura.dispel_options(character),
         mechanic_resistance: Aura.misc_amounts(character, :mechanic_resistance),
+        school_resistances: SpellResist.school_resistances(character),
         dispel_resistance: DispelResistance.projection(character),
         attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(character),
         reputation: PlayerReputation.projection(character),

@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Engagement
+  alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Entity.Server.AIEnvironment
@@ -211,6 +212,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       health_pct: Core.health_pct(state),
       orientation: elem(state.movement_block.position, 3),
       mechanic_resistance: Aura.misc_amounts(state, :mechanic_resistance),
+      school_resistances: SpellResist.school_resistances(state),
       attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(state)
     })
 

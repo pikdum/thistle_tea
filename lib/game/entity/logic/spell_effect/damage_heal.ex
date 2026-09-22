@@ -43,7 +43,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   def apply(state, %CastContext{} = context, spell, %Effect{type: :environmental_damage} = effect, now) do
     damage = max(rolled_amount(spell, effect, context), 0)
     school = school_atom(spell)
-    resisted = school_resisted_amount(state, damage, school, context, [])
+    resisted = school_resisted_amount(state, damage, school, context, spell: spell)
     {state, remaining} = Aura.absorb_damage(state, damage - resisted, school, now)
 
     event =
@@ -222,7 +222,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     damage = max(rolled + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
 
     school = school_atom(spell)
-    resisted = school_resisted_amount(state, damage, school, context, opts)
+    resisted = school_resisted_amount(state, damage, school, context, Keyword.put(opts, :spell, spell))
     damage = damage - resisted
 
     {state, damage, absorbed} =
@@ -328,6 +328,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     SpellResist.resisted_amount(damage, resistance, caster_level,
       target_creature?: target_creature?,
       level_diff: level_diff,
+      spell: Keyword.get(opts, :spell),
       dot?: Keyword.get(opts, :periodic?, false)
     )
   end
@@ -456,7 +457,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         do: unmitigated_damage + weapon_crit_bonus(context, spell, unmitigated_damage),
         else: unmitigated_damage
 
-    resisted = school_resisted_amount(state, damage, school, context, [])
+    resisted = school_resisted_amount(state, damage, school, context, spell: spell)
     damage = max(damage - resisted, 0)
 
     {state, damage, absorbed} =

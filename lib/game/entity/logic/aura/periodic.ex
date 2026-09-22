@@ -402,7 +402,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   defp apply_periodic_damage(entity, %Holder{} = holder, amount, now) do
     school = school_atom(holder.spell)
     caster_level = if is_integer(holder.caster_level) and holder.caster_level > 0, do: holder.caster_level, else: 1
-    resisted = periodic_resisted_amount(entity, amount, school, caster_level, holder.resistance_penetration)
+    resisted = periodic_resisted_amount(entity, amount, school, caster_level, holder)
     damage = amount - resisted
 
     {entity, damage, absorbed} =
@@ -421,14 +421,17 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   defp periodic_resisted_amount(_entity, damage, _school, _caster_level, _penetration) when damage <= 0, do: 0
   defp periodic_resisted_amount(_entity, _damage, :physical, _caster_level, _penetration), do: 0
 
-  defp periodic_resisted_amount(%{unit: %Unit{} = unit} = entity, damage, school, caster_level, penetration) do
-    resistance = ResistancePenetration.resistance(Map.get(unit, :"#{school}_resistance"), penetration, school)
+  defp periodic_resisted_amount(%{unit: %Unit{} = unit} = entity, damage, school, caster_level, %Holder{} = holder) do
+    resistance =
+      ResistancePenetration.resistance(Map.get(unit, :"#{school}_resistance"), holder.resistance_penetration, school)
+
     target_creature? = not is_map(Map.get(entity, :player))
     level_diff = (unit.level || 1) - caster_level
 
     SpellResist.resisted_amount(damage, resistance, caster_level,
       target_creature?: target_creature?,
       level_diff: level_diff,
+      spell: holder.spell,
       dot?: true
     )
   end

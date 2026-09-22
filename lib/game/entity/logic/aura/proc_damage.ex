@@ -4,14 +4,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ProcDamage do
   inputs and the original effect's dice and coefficient.
   """
 
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.MechanicResistance
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Coefficient
   alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Semantics
 
   def prepare(carrier, %Spell{} = spell, effect_index, target_guid) do
@@ -48,22 +45,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ProcDamage do
 
   def hit?(carrier, %Spell{dmg_class: 1} = spell, target, target_player?, opts) do
     if Spell.harmful?(spell) do
-      target_bonus = Aura.versus_amount(Map.get(target, :attacker_spell_hit_chance), Spell.school_mask(spell))
-
-      hit_bonus =
-        Aura.flat_amount(carrier, :mod_spell_hit_chance) +
-          Modifiers.value(carrier, spell, :resist_miss_chance, 0) + target_bonus
-
-      SpellResist.magic_hit?(
-        carrier.unit.level || 1,
-        Map.get(target, :level) || 1,
-        target_player?,
-        Keyword.merge(opts,
-          no_spell_defense?: Map.get(target, :no_spell_defense?, false),
-          hit_bonus: hit_bonus,
-          mechanic_resistance: MechanicResistance.chance(Map.get(target, :mechanic_resistance), spell.mechanic)
-        )
-      )
+      SpellResist.spell_hit?(carrier, spell, target, target_player?, opts)
     else
       true
     end

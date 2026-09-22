@@ -79,6 +79,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     proc_damage?: false,
     extra_attack?: false,
     hit_outcome: :hit,
+    spell_hit_bonus: 0,
     dispel_resistance: %{},
     spell_modifiers: [],
     conditional_crit_modifiers: [],
@@ -120,6 +121,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
       resistance_penetration: ResistancePenetration.snapshot(caster),
       spell_threat: SpellThreatLoader.get(spell_id(spell)),
       spell_modifiers: Modifiers.snapshot(caster, spell),
+      spell_hit_bonus:
+        Aura.flat_amount(caster, :mod_spell_hit_chance) + Modifiers.value(caster, spell, :resist_miss_chance, 0),
       conditional_crit_modifiers: Critical.snapshot(caster, spell),
       threat_multiplier: threat_multiplier(caster, spell),
       damage_done_multiplier: WeaponDamage.multiplier(caster, spell.school, attack_weapon(caster, spell)),

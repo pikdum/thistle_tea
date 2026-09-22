@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Spell.Semantics.Rules do
     :melee_spell_crit?
   ]
   defstruct [
+    :binary?,
     :dummy,
     :apply_trigger_spell_id,
     :finish_trigger_spell_id,
@@ -182,6 +183,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
       spell
       | effects: effects,
         semantics: %Rules{
+          binary?: Spell.binary?(%{spell | semantics: nil}),
           dummy: Scripts.dummy_effect(spell),
           apply_trigger_spell_id: Scripts.apply_trigger(spell),
           finish_trigger_spell_id: Scripts.successful_finish_trigger(spell),

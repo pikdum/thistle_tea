@@ -87,6 +87,33 @@ defmodule ThistleTea.Game.Spell do
 
   def reflectable?(_spell), do: false
 
+  def binary?(%__MODULE__{semantics: %{binary?: binary?}}) when is_boolean(binary?), do: binary?
+
+  def binary?(%__MODULE__{dmg_class: 1} = spell) do
+    school_index(spell) != 0 and
+      (spell.id in [26_143, 26_478] or Enum.any?(spell.effects, &binary_effect?/1))
+  end
+
+  def binary?(_spell), do: false
+
+  defp binary_effect?(%Effect{type: type}) when type in [:interrupt_cast, :knockback], do: true
+
+  defp binary_effect?(%Effect{type: :apply_aura, aura: aura}) do
+    aura in [
+      :mod_decrease_speed,
+      :mod_fear,
+      :mod_stun,
+      :mod_pacify,
+      :mod_root,
+      :mod_silence,
+      :mod_disarm,
+      :mod_resistance,
+      :mod_damage_taken
+    ]
+  end
+
+  defp binary_effect?(_effect), do: false
+
   def level_units(%__MODULE__{} = spell, caster_level) when is_integer(caster_level) and caster_level > 0 do
     caster_level
     |> min_level_cap(spell.max_level)

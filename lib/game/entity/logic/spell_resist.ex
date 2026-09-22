@@ -1,13 +1,20 @@
 defmodule ThistleTea.Game.Entity.Logic.SpellResist do
   @moduledoc """
   Vanilla spell hit and resistance rolls ported from vmangos: the level-based
-  binary spell miss (`MagicSpellHitChance`, 96% at even level with a floor of
+  spell miss (`MagicSpellHitChance`, 96% at even level with a floor of
   22% hit) rolled by the caster, and partial school-damage resistance
   (`GetSpellResistChance` + the 0/25/50/75% bucket table from
   `RollMagicResistanceMultiplierOutcomeAgainst`) rolled by the target, with
   DoT ticks a tenth as likely to resist.
   """
+  alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.MechanicResistance
+  alias ThistleTea.Game.Entity.Logic.ResistancePenetration
   alias ThistleTea.Game.Math
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Modifiers
 
   @hit_floor_percent 22
   @resist_cap 0.75
@@ -46,7 +53,74 @@ defmodule ThistleTea.Game.Entity.Logic.SpellResist do
     {75, 25, 55, 16, 3}
   ]
 
-  def magic_hit_chance_bp(caster_level, target_level, target_player?) do
+  def school_resistances(%{unit: %Unit{} = unit}) do
+    %{
+      1 => unit.holy_resistance || 0,
+      2 => unit.fire_resistance || 0,
+      3 => unit.nature_resistance || 0,
+      4 => unit.frost_resistance || 0,
+      5 => unit.shadow_resistance || 0,
+      6 => unit.arcane_resistance || 0
+    }
+  end
+
+  def spell_hit?(caster, %Spell{} = spell, target, target_player?, opts \\ []) do
+    caster_level = max(caster.unit.level || 1, 1)
+
+    hit_bonus =
+      Aura.flat_amount(caster, :mod_spell_hit_chance) +
+        Modifiers.value(caster, spell, :resist_miss_chance, 0)
+
+    context = %CastContext{
+      caster_level: caster_level,
+      spell_hit_bonus: hit_bonus,
+      resistance_penetration: ResistancePenetration.snapshot(caster)
+    }
+
+    context_hit?(context, spell, target, target_player?, opts)
+  end
+
+  def context_hit?(%CastContext{} = context, %Spell{} = spell, target, target_player?, opts \\ []) do
+    caster_level = max(context.caster_level || 1, 1)
+    target_level = max(Map.get(target, :level) || caster_level, 1)
+    target_bonus = Aura.versus_amount(Map.get(target, :attacker_spell_hit_chance), Spell.school_mask(spell))
+
+    magic_hit?(
+      caster_level,
+      target_level,
+      target_player?,
+      Keyword.merge(opts,
+        no_spell_defense?: Map.get(target, :no_spell_defense?, false) or Spell.attribute?(spell, :always_hit),
+        hit_bonus: context.spell_hit_bonus + target_bonus,
+        mechanic_resistance: MechanicResistance.chance(Map.get(target, :mechanic_resistance), spell.mechanic),
+        binary_resistance: binary_resistance(context, spell, target)
+      )
+    )
+  end
+
+  defp binary_resistance(context, spell, target) do
+    if Spell.binary?(spell) do
+      base = Map.get(Map.get(target, :school_resistances) || %{}, Spell.school_index(spell), 0)
+      ResistancePenetration.resistance(base, context.resistance_penetration, spell)
+    else
+      0
+    end
+  end
+
+  def magic_hit_chance_bp(caster_level, target_level, target_player?, opts \\ []) do
+    hit_bonus_bp = Keyword.get(opts, :hit_bonus, 0) * 100
+    mechanic_resistance_bp = Keyword.get(opts, :mechanic_resistance, 0) * 100
+    binary_resistance = Keyword.get(opts, :binary_resistance, 0)
+    school_multiplier = 1 - resist_chance(binary_resistance, caster_level, false, 0)
+
+    ((level_hit_chance(caster_level, target_level, target_player?) * 100 + hit_bonus_bp - mechanic_resistance_bp) *
+       school_multiplier)
+    |> trunc()
+    |> max(100)
+    |> min(9_900)
+  end
+
+  defp level_hit_chance(caster_level, target_level, target_player?) do
     level_diff = target_level - caster_level
     per_level = if target_player?, do: 7, else: 11
 
@@ -57,11 +131,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellResist do
         94 - (level_diff - 2) * per_level
       end
 
-    hit
-    |> max(@hit_floor_percent)
-    |> Kernel.*(100)
-    |> max(100)
-    |> min(9_900)
+    max(hit, @hit_floor_percent)
   end
 
   def magic_hit?(caster_level, target_level, target_player?, opts \\ []) do
@@ -70,15 +140,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellResist do
 
   defp roll_magic_hit?(caster_level, target_level, target_player?, opts) do
     roll = Keyword.get_lazy(opts, :roll, fn -> Math.random_int(0, 9_999) end)
-    hit_bonus_bp = trunc(Keyword.get(opts, :hit_bonus, 0) * 100)
-    mechanic_resistance_bp = trunc(Keyword.get(opts, :mechanic_resistance, 0) * 100)
-
-    chance_bp =
-      (magic_hit_chance_bp(caster_level, target_level, target_player?) + hit_bonus_bp - mechanic_resistance_bp)
-      |> max(100)
-      |> min(9_900)
-
-    roll < chance_bp
+    roll < magic_hit_chance_bp(caster_level, target_level, target_player?, opts)
   end
 
   def resist_chance(resistance, caster_level, target_creature?, level_diff) do
@@ -113,7 +175,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellResist do
   end
 
   def resisted_amount(damage, resistance, caster_level, opts \\ []) when is_integer(damage) do
-    if damage > 0 do
+    if damage > 0 and not Spell.binary?(Keyword.get(opts, :spell)) do
       trunc(damage * resist_fraction(resistance, caster_level, opts))
     else
       0

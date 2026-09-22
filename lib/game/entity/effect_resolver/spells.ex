@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Entity.Logic.Aura.ProcDamage
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
+  alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
@@ -32,6 +33,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
         :level,
         :attacker_spell_hit_chance,
         :mechanic_resistance,
+        :school_resistances,
         :no_spell_defense?
       ])
 
@@ -194,7 +196,28 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
   defp triggered_delivery(entity, %Effects.TriggerSpell{} = effect, spell) do
     context = trigger_context(entity, effect, spell)
+    context = binary_trigger_outcome(context, spell, effect.target_guid)
     resolved_delivery(entity, Effects.deliver_spell(effect.target_guid, context, spell))
+  end
+
+  defp binary_trigger_outcome(%CastContext{caster_guid: guid} = context, _spell, guid), do: context
+
+  defp binary_trigger_outcome(context, spell, target_guid) do
+    if Spell.binary?(spell) and Spell.harmful?(spell) do
+      target =
+        Metadata.query(target_guid, [
+          :level,
+          :attacker_spell_hit_chance,
+          :mechanic_resistance,
+          :school_resistances,
+          :no_spell_defense?
+        ]) || %{}
+
+      hit? = SpellResist.context_hit?(context, spell, target, Guid.entity_type(target_guid) == :player)
+      %{context | hit_outcome: if(hit?, do: :hit, else: :resist)}
+    else
+      context
+    end
   end
 
   defp projectile_delay_ms(%{movement_block: %{position: {x, y, z, _o}}}, %Effects.DeliverSpell{

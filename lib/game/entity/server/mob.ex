@@ -68,6 +68,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
+  alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
@@ -142,6 +143,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> Map.put(:pet_guid, Companion.active_guid(state))
       |> Map.put(:unit_flags, state.unit.flags)
       |> Map.put(:no_spell_defense?, CreatureFlags.has?(state, :no_spell_defense))
+      |> Map.put(:school_resistances, SpellResist.school_resistances(state))
       |> Map.merge(control_metadata(state))
     )
 
@@ -1215,6 +1217,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           crowd_controlled?: Aura.crowd_controlled?(state),
           dispel_options: Aura.dispel_options(state),
           mechanic_resistance: Aura.misc_amounts(state, :mechanic_resistance),
+          school_resistances: SpellResist.school_resistances(state),
           attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(state)
         }
         |> Map.merge(FactionLoader.metadata(state.unit.faction_template))

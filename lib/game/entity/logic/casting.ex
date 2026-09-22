@@ -18,7 +18,6 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.ItemUse
-  alias ThistleTea.Game.Entity.Logic.MechanicResistance
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.OpenLock
@@ -1178,14 +1177,11 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp roll_spell_hits(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, targets) do
     if Spell.harmful?(spell) do
-      caster_level = caster_level(caster)
-      hit_bonus = spell_hit_bonus(caster, spell)
-
       {hits, missed} =
         Enum.split_with(targets, fn target_guid ->
           target_guid == caster_guid or
             not Hostility.valid_attack_target?(caster, target_guid) or
-            spell_hits_target?(caster_level, target_guid, hit_bonus, spell)
+            spell_hits_target?(caster, target_guid, spell)
         end)
 
       {hits, Enum.map(missed, &%{guid: &1, reason: spell_miss_reason(spell)})}
@@ -1196,51 +1192,25 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp roll_spell_hits(_caster, _spell, targets), do: {targets, []}
 
-  defp spell_hit_bonus(caster, %Spell{} = spell) do
-    AuraLogic.flat_amount(caster, :mod_spell_hit_chance) +
-      Modifiers.value(caster, spell, :resist_miss_chance, 0)
-  end
-
-  defp spell_hits_target?(caster_level, target_guid, hit_bonus, %Spell{} = spell) do
+  defp spell_hits_target?(caster, target_guid, %Spell{} = spell) do
     target_player? = Guid.type_id(target_guid) == :player
 
     metadata =
-      Metadata.query(target_guid, [:level, :attacker_spell_hit_chance, :mechanic_resistance, :no_spell_defense?])
+      Metadata.query(target_guid, [
+        :level,
+        :attacker_spell_hit_chance,
+        :mechanic_resistance,
+        :school_resistances,
+        :no_spell_defense?
+      ])
 
-    target_level = target_level(metadata, caster_level)
-
-    target_hit_modifier =
-      case metadata do
-        %{attacker_spell_hit_chance: modifiers} ->
-          AuraLogic.versus_amount(modifiers, Spell.school_mask(spell))
-
-        _ ->
-          0
-      end
-
-    resistance =
-      MechanicResistance.chance(
-        Map.get(metadata || %{}, :mechanic_resistance),
-        spell.mechanic
-      )
-
-    SpellResist.magic_hit?(caster_level, target_level, target_player?,
-      no_spell_defense?: Map.get(metadata || %{}, :no_spell_defense?, false),
-      hit_bonus: hit_bonus + target_hit_modifier,
-      mechanic_resistance: resistance
-    )
+    SpellResist.spell_hit?(caster, spell, metadata || %{}, target_player?)
   end
-
-  defp target_level(%{level: level}, _caster_level) when is_integer(level) and level > 0, do: level
-  defp target_level(_metadata, caster_level), do: caster_level
 
   defp spell_miss_reason(%Spell{dmg_class: 1}), do: @spell_miss_reason_resist
   defp spell_miss_reason(%Spell{school: :physical}), do: @spell_miss_reason_miss
   defp spell_miss_reason(%Spell{school: 0}), do: @spell_miss_reason_miss
   defp spell_miss_reason(_spell), do: @spell_miss_reason_resist
-
-  defp caster_level(%{unit: %{level: level}}) when is_integer(level) and level > 0, do: level
-  defp caster_level(_caster), do: 1
 
   defp apply_initial_impacts(character, %Cast{spell: %Spell{} = spell} = casting, now) do
     effects = Enum.reject(spell.effects, &Spell.channel_ticked_effect?(spell, &1))

@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.CreatureGroup, as: CreatureGroupLoader
@@ -107,6 +108,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         crowd_controlled?: Aura.crowd_controlled?(mob),
         dispel_options: Aura.dispel_options(mob),
         mechanic_resistance: Aura.misc_amounts(mob, :mechanic_resistance),
+        school_resistances: SpellResist.school_resistances(mob),
         attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(mob)
       }
       |> Map.merge(Mob.visibility_metadata(mob))
