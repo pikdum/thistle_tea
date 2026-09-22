@@ -126,6 +126,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Creature-owned combat pets](docs/creature-pets-playtest.md), with a single monitored pet slot, aggressive combat, dead-pet replacement, and cleanup alongside independent guardians
 - [Player fear and confusion](docs/player-control-movement-playtest.md), with forced movement, client control restoration, bounded wandering, teleport recovery, and death cleanup
 - [Spell knockback](docs/knockback-playtest.md), with acknowledged launches, observer movement, cast interruption, possession routing, and landing cleanup
+- [Spell-driven player pulls](docs/player-pull-playtest.md), with ballistic trajectories, height compensation, cast interruption, acknowledged movement, and observer playback
 - Priest Fade: temporary threat reduction with target switching and restoration on expiry
 - Rogue Distract: ground-targeted facing and timed patrol pauses, preserving stealth
 - Hunter Beast Lore: caster-specific beast damage, armor, and resistance information, with expiry and death cleanup
