@@ -106,6 +106,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - aura-state and spell-effect immunities, with partial spell blocking, control purges, and expiry cleanup
 - school-specific damage immunity, with melee and periodic immune feedback and spell bypass attributes
 - [Binary spell resistance](docs/binary-spells-playtest.md), with all-or-nothing control spells, school penetration, full-hit damage, triggered casts, and resistance lifecycle updates
+- [Wounded creature movement](docs/wounded-creatures-playtest.md), with low-health running penalties, pet and boss exemptions, active path retiming, snare composition, and recovery
 - periodic mana drains and life leech, with transfers limited by available mana and actual health lost
 - healing suppression and amplification across direct heals and HoTs, with strongest-effect stacking and live expiry updates
 - stack-aware dispels, with partial cures, Dispel All categories, and client combat-log feedback
