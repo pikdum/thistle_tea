@@ -1204,7 +1204,9 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp spell_hits_target?(caster_level, target_guid, hit_bonus, %Spell{} = spell) do
     target_player? = Guid.type_id(target_guid) == :player
 
-    metadata = Metadata.query(target_guid, [:level, :attacker_spell_hit_chance, :mechanic_resistance])
+    metadata =
+      Metadata.query(target_guid, [:level, :attacker_spell_hit_chance, :mechanic_resistance, :no_spell_defense?])
+
     target_level = target_level(metadata, caster_level)
 
     target_hit_modifier =
@@ -1223,6 +1225,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       )
 
     SpellResist.magic_hit?(caster_level, target_level, target_player?,
+      no_spell_defense?: Map.get(metadata || %{}, :no_spell_defense?, false),
       hit_bonus: hit_bonus + target_hit_modifier,
       mechanic_resistance: resistance
     )

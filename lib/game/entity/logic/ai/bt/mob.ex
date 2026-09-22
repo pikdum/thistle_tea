@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Entity.Logic.Critter
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -702,8 +703,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     chase_ready?(state, blackboard, now)
   end
 
-  def chase_ready?(_state, %Blackboard{} = blackboard, now) when is_integer(now) do
-    Blackboard.combat_movement?(blackboard) and Blackboard.ready_for?(blackboard, :next_chase_at, now)
+  def chase_ready?(state, %Blackboard{} = blackboard, now) when is_integer(now) do
+    Blackboard.combat_movement?(blackboard, state) and Blackboard.ready_for?(blackboard, :next_chase_at, now)
   end
 
   def combat_wait(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
@@ -715,7 +716,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp combat_wait(%Mob{} = state, %Blackboard{} = blackboard, now, %Context{} = context) do
-    attack_delay = CombatBT.next_attack_delay(state, blackboard, now)
+    attack_delay =
+      if Blackboard.melee_enabled?(blackboard, state), do: CombatBT.next_attack_delay(state, blackboard, now)
+
     chase_delay = combat_chase_delay(state, blackboard, attack_delay, now, context)
 
     blackboard =
@@ -736,7 +739,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp melee_attack(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
-    if Blackboard.melee_enabled?(blackboard) do
+    if Blackboard.melee_enabled?(blackboard, state) do
       CombatBT.melee_attack_with_context(state, blackboard, context)
     else
       {:success, state, blackboard}
@@ -844,6 +847,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   def maybe_spread(%Mob{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, %Context{now: now} = context)
       when is_integer(target) and target > 0 do
     cond do
+      not Blackboard.combat_movement?(blackboard, state) ->
+        {:success, state, blackboard}
+
       Movement.moving?(state, now) ->
         {:success, state, blackboard}
 
@@ -1312,6 +1318,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     case blackboard.navigation.target do
       {x, y, z} = target ->
         cond do
+          sessile_home?(state, target) ->
+            navigation = %{blackboard.navigation | move_target: target}
+            {:success, state, %{blackboard | navigation: navigation}}
+
           Movement.blocked?(state) ->
             {BT.running(@blocked_retry_delay, :blocked), state, blackboard}
 
@@ -1328,6 +1338,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         {:failure, state, Blackboard.clear_move_target(blackboard)}
     end
   end
+
+  defp sessile_home?(%Mob{internal: %Internal{spawn: %Spawn{position: target}}} = state, target),
+    do: CreatureFlags.has?(state, :sessile)
+
+  defp sessile_home?(_state, _target), do: false
 
   defp wait_for_arrival_with_context(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
     wait_for_arrival(state, blackboard, context)

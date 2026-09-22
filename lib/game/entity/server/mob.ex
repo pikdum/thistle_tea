@@ -45,6 +45,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
@@ -135,6 +136,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       StealthDetection.target_metadata(state)
       |> Map.put(:incarnation_id, Incarnation.id(state))
       |> Map.put(:unit_flags, state.unit.flags)
+      |> Map.put(:no_spell_defense?, CreatureFlags.has?(state, :no_spell_defense))
       |> Map.merge(control_metadata(state))
     )
 

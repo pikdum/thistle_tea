@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   alias __MODULE__.Maintenance
   alias __MODULE__.Navigation
   alias __MODULE__.Spells
+  alias ThistleTea.Game.Entity.Logic.CreatureFlags
 
   defstruct navigation: %Navigation{},
             fear: nil,
@@ -167,7 +168,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
         auto_attacking: false,
         auto_attack_target: nil,
         last_swing_error: nil,
-        melee_enabled: true
+        melee_enabled: nil
     }
 
     %{blackboard | combat: combat}
@@ -177,9 +178,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
     %{blackboard | spells: %Spells{}}
   end
 
-  def combat_movement?(%__MODULE__{spells: %Spells{combat_movement: enabled}}), do: enabled
+  def combat_movement?(%__MODULE__{spells: %Spells{combat_movement: nil}}, entity),
+    do: not CreatureFlags.has?(entity, :sessile)
 
-  def melee_enabled?(%__MODULE__{combat: %Combat{melee_enabled: enabled}}), do: enabled
+  def combat_movement?(%__MODULE__{spells: %Spells{combat_movement: enabled}}, _entity), do: enabled
+
+  def melee_enabled?(%__MODULE__{combat: %Combat{melee_enabled: nil}}, entity),
+    do: not CreatureFlags.has?(entity, :no_melee)
+
+  def melee_enabled?(%__MODULE__{combat: %Combat{melee_enabled: enabled}}, _entity), do: enabled
 
   def run_mode?(%__MODULE__{navigation: %Navigation{run_mode: enabled}}), do: enabled
 

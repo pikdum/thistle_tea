@@ -207,7 +207,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
 
       assert {{:running, 3_000, :casting}, state, blackboard} = MobSpells.try_cast(state, blackboard, context(state))
 
-      refute Blackboard.combat_movement?(blackboard)
+      refute Blackboard.combat_movement?(blackboard, state)
+      refute Blackboard.melee_enabled?(blackboard, state)
       refute blackboard.combat.attack_started
       assert Enum.any?(state.internal.events, &match?(%Effects.AttackStop{}, &1))
       assert MobSpells.holding_ranged?(state, blackboard)
@@ -228,7 +229,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
 
       assert {:failure, state, blackboard} = MobSpells.try_cast(state, blackboard, context(state))
       assert state.internal.casting == nil
-      assert Blackboard.combat_movement?(blackboard)
+      assert Blackboard.combat_movement?(blackboard, state)
+      assert Blackboard.melee_enabled?(blackboard, state)
       refute MobSpells.holding_ranged?(state, blackboard)
     end
   end

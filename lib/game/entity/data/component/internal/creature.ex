@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Creature do
     :db_guid,
     :experience_multiplier,
     :extra_flags,
+    :static_flags,
     :rank,
     :family,
     :type_flags,

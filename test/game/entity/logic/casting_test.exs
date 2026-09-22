@@ -951,6 +951,49 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
              end)
     end
 
+    test "creatures without spell defense cannot fail the caster hit roll" do
+      caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+      target_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+      caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
+      target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
+
+      Metadata.put(caster_guid, %{alive?: true, faction_template: caster_faction, level: 1})
+
+      Metadata.put(target_guid, %{
+        alive?: true,
+        faction_template: target_faction,
+        level: 60,
+        unit_flags: 0,
+        no_spell_defense?: true,
+        attacker_spell_hit_chance: [{0x7E, -100}]
+      })
+
+      on_exit(fn ->
+        Metadata.delete(caster_guid)
+        Metadata.delete(target_guid)
+      end)
+
+      spell = %Spell{id: 133, school: :fire, effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy}]}
+      casting = %Cast{spell: spell, targets: Target.unit(target_guid), ends_at: Time.now()}
+
+      caster = %Mob{
+        object: %Object{guid: caster_guid},
+        unit: %Unit{level: 1},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0), casting: casting}
+      }
+
+      :rand.seed(:exsss, {1, 1, 66})
+      hit = Casting.complete(caster, casting, 1_000)
+      assert Enum.any?(hit.internal.events, &match?(%Effects.SpellGo{hit_guids: [^target_guid], misses: []}, &1))
+      assert Enum.any?(hit.internal.events, &match?(%Effects.DeliverSpell{cast_context: %{hit_outcome: :hit}}, &1))
+
+      Metadata.update(target_guid, %{no_spell_defense?: false})
+      :rand.seed(:exsss, {1, 1, 66})
+      missed = Casting.complete(caster, casting, 1_000)
+      assert Enum.any?(missed.internal.events, &match?(%Effects.SpellGo{hit_guids: [], misses: [%{reason: 2}]}, &1))
+    end
+
     test "applies matching mechanic resistance from metadata and observes its removal" do
       caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
       target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))

@@ -73,7 +73,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   def has_spells?(_state, _blackboard), do: false
 
   def holding_ranged?(%Mob{} = state, %Blackboard{} = blackboard) do
-    has_spells?(state, blackboard) and not Blackboard.combat_movement?(blackboard)
+    has_spells?(state, blackboard) and not Blackboard.combat_movement?(blackboard, state) and
+      not Blackboard.melee_enabled?(blackboard, state)
   end
 
   def holding_ranged?(_state, _blackboard), do: false
@@ -561,10 +562,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   end
 
   defp maybe_hold_ranged(%Mob{} = state, %Blackboard{} = blackboard, %CreatureSpell{} = entry) do
-    if CreatureSpell.flag?(entry, :main_ranged) and Blackboard.combat_movement?(blackboard) do
+    if CreatureSpell.flag?(entry, :main_ranged) do
       blackboard =
         blackboard
         |> Blackboard.set_combat_movement(false)
+        |> Blackboard.set_melee_enabled(false)
         |> Blackboard.clear_attack_started()
 
       {enqueue_attack_stop(state), blackboard}
@@ -582,7 +584,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   defp maybe_resume_movement(%Blackboard{} = blackboard, %CreatureSpell{} = entry) do
     if CreatureSpell.flag?(entry, :main_ranged) do
-      Blackboard.set_combat_movement(blackboard, true)
+      blackboard |> Blackboard.set_combat_movement(true) |> Blackboard.set_melee_enabled(true)
     else
       blackboard
     end

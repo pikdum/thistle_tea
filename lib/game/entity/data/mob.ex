@@ -15,8 +15,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Entity.Logic.Engagement
-  alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Logic.Skinning
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Time
@@ -154,10 +154,12 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       internal: %Internal{
         world: WorldRef.open(c.map),
         name: ct.name,
+        invincibility_health_threshold: CreatureFlags.invincibility_threshold(ct.creature_type_flags),
         creature: %Creature{
           db_guid: c.guid,
           experience_multiplier: experience_multiplier(ct),
           extra_flags: ct.extra_flags,
+          static_flags: ct.creature_type_flags,
           rank: ct.rank,
           civilian?: ct.civilian == 1,
           racial_leader?: ct.racial_leader == 1,
@@ -294,6 +296,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
     internal = %{
       internal
       | casting: nil,
+        invincibility_health_threshold:
+          CreatureFlags.invincibility_threshold(mob, internal.invincibility_health_threshold),
         rooted?: false,
         running: false,
         killed_by: nil,
@@ -415,8 +419,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   defp percent_value(value, _percent), do: value
 
   defp unit_flags(%Mangos.CreatureTemplate{unit_flags: flags, creature_type_flags: static_flags}) do
-    pvp? = Bitwise.band(static_flags || 0, 0x00400000) != 0
-    Pvp.unit_flags(flags, pvp?)
+    CreatureFlags.unit_flags(flags, static_flags)
   end
 
   defp type_flags(%Mangos.CreatureTemplate{creature_type_flags: flags}) when is_integer(flags) do

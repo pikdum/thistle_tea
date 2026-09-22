@@ -26,7 +26,14 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   end
 
   def resolve(entity, %Effects.ProcDamage{target_guid: target_guid, spell: spell, effect_index: index}) do
-    target = Metadata.query(target_guid, [:alive?, :level, :attacker_spell_hit_chance, :mechanic_resistance])
+    target =
+      Metadata.query(target_guid, [
+        :alive?,
+        :level,
+        :attacker_spell_hit_chance,
+        :mechanic_resistance,
+        :no_spell_defense?
+      ])
 
     with %{alive?: true} <- target,
          {damage_spell, context} <- ProcDamage.prepare(entity, spell, index, target_guid) do

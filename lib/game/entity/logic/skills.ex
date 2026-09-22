@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
   """
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Inventory
 
@@ -57,7 +58,10 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
     max(base + temporary + permanent, 0)
   end
 
-  def defense_value(%{unit: %{level: level}}, _attacker_player?), do: max_for_level(level || 1)
+  def defense_value(%{unit: %{level: level}} = entity, _attacker_player?) do
+    if CreatureFlags.has?(entity, :no_defense), do: 0, else: max_for_level(level || 1)
+  end
+
   def unarmed_skill, do: @unarmed_skill
   def fishing_skill, do: @fishing_skill
 

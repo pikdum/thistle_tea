@@ -65,6 +65,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellResist do
   end
 
   def magic_hit?(caster_level, target_level, target_player?, opts \\ []) do
+    Keyword.get(opts, :no_spell_defense?, false) or roll_magic_hit?(caster_level, target_level, target_player?, opts)
+  end
+
+  defp roll_magic_hit?(caster_level, target_level, target_player?, opts) do
     roll = Keyword.get_lazy(opts, :roll, fn -> Math.random_int(0, 9_999) end)
     hit_bonus_bp = trunc(Keyword.get(opts, :hit_bonus, 0) * 100)
     mechanic_resistance_bp = trunc(Keyword.get(opts, :mechanic_resistance, 0) * 100)

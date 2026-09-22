@@ -141,8 +141,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
       {_mob, blackboard} = Script.run(mob, Blackboard.new(), steps, nil, 0)
 
-      refute Blackboard.melee_enabled?(blackboard)
-      refute Blackboard.combat_movement?(blackboard)
+      refute Blackboard.melee_enabled?(blackboard, mob)
+      refute Blackboard.combat_movement?(blackboard, mob)
     end
 
     test "call_for_help enqueues the scripted radius", %{mob: mob} do

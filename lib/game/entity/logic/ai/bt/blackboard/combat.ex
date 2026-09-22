@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat do
             attack_started: false,
             auto_attacking: false,
             auto_attack_target: nil,
-            melee_enabled: true,
+            melee_enabled: nil,
             last_swing_error: nil,
             spread_attempts: 0,
             spreading: false,

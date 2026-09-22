@@ -59,6 +59,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ProcDamage do
         Map.get(target, :level) || 1,
         target_player?,
         Keyword.merge(opts,
+          no_spell_defense?: Map.get(target, :no_spell_defense?, false),
           hit_bonus: hit_bonus,
           mechanic_resistance: MechanicResistance.chance(Map.get(target, :mechanic_resistance), spell.mechanic)
         )

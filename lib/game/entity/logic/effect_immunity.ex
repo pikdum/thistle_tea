@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunity do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
 
@@ -28,12 +29,17 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunity do
     :periodic_mana_leech
   ]
 
-  def blocked?(%{unit: %Unit{auras: holders}}, %Spell{} = spell, %Effect{} = effect) when is_list(holders) do
+  def blocked?(%{unit: %Unit{auras: holders}} = entity, %Spell{} = spell, %Effect{} = effect) when is_list(holders) do
     not Spell.attribute?(spell, :ignore_caster_and_target_restrictions) and
-      Enum.any?(holders, &blocks?(&1, spell, effect))
+      (sessile_immunity?(entity, effect) or Enum.any?(holders, &blocks?(&1, spell, effect)))
   end
 
   def blocked?(_entity, _spell, _effect), do: false
+
+  defp sessile_immunity?(entity, %Effect{type: type, aura: aura}) do
+    CreatureFlags.has?(entity, :sessile) and
+      (type in [:distract, :pull, :knockback] or aura in [:mod_confuse, :mod_fear, :mod_root])
+  end
 
   def purges_state?(%Spell{} = spell, type) do
     Spell.attribute?(spell, :immunity_purges_effect) and
