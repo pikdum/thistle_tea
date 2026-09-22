@@ -32,11 +32,15 @@ defmodule ThistleTea.Game.World.Loader.CastProcDbcTest do
       assert dragon.proc_chance == 2
       assert Enum.any?(dragon.effects, &(&1.trigger_spell_id == 23_684))
 
-      for id <- [403, 1459, 331] do
+      for id <- [403, 331] do
         spell = SpellLoader.load(id)
         assert Proc.eligible?(dragon, spell, Proc.cast_type(spell), :cast_end)
         refute Proc.eligible?(dragon, spell, Proc.cast_type(spell), :normal)
       end
+
+      intellect = SpellLoader.load(1459)
+      assert Proc.cast_type(intellect) == :deal_helpful_ability
+      refute Proc.eligible?(dragon, intellect, Proc.cast_type(intellect), :cast_end)
 
       for id <- [1130, 2855] do
         spell = SpellLoader.load(id)

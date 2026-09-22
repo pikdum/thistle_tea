@@ -55,8 +55,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
              outcome in [:normal, :crit, :cast_end] and
              proc_type in [
                :deal_harmful_spell,
+               :deal_harmful_ability,
                :deal_harmful_periodic,
                :deal_helpful_spell,
+               :deal_helpful_ability,
                :deal_helpful_periodic,
                :deal_ranged_attack,
                :deal_ranged_ability,

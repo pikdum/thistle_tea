@@ -140,7 +140,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastProcTest do
   end
 
   defp launch_cast do
-    spell = %Spell{id: 116, school: :frost, effects: [%Effect{type: :school_damage, base_points: 10}]}
+    spell = %Spell{id: 116, school: :frost, dmg_class: 1, effects: [%Effect{type: :school_damage, base_points: 10}]}
 
     resolution = %CastResolution{
       hits: [2, 3],

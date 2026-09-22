@@ -40,8 +40,10 @@ defmodule ThistleTea.Game.Spell.Proc do
     cond do
       Spell.ranged_ability?(spell) -> :deal_ranged_ability
       Spell.melee_ability?(spell) -> :deal_melee_ability
-      Spell.harmful?(spell) -> :deal_harmful_spell
-      true -> :deal_helpful_spell
+      Spell.harmful?(spell) and spell.dmg_class == 1 -> :deal_harmful_spell
+      Spell.harmful?(spell) -> :deal_harmful_ability
+      Spell.healing?(spell) -> :deal_helpful_spell
+      true -> :deal_helpful_ability
     end
   end
 
@@ -52,8 +54,10 @@ defmodule ThistleTea.Game.Spell.Proc do
       :deal_ranged_attack,
       :deal_ranged_ability,
       :deal_harmful_spell,
+      :deal_harmful_ability,
       :deal_harmful_periodic,
       :deal_helpful_spell,
+      :deal_helpful_ability,
       :deal_helpful_periodic
     ] or not Spell.attribute?(spell, :suppress_caster_procs)
   end
@@ -82,7 +86,9 @@ defmodule ThistleTea.Game.Spell.Proc do
   defp proc_flag?(_flags, _proc_type), do: false
 
   defp proc_mask(:kill), do: 0x00000002
-  defp proc_mask(:deal_helpful_spell), do: 0x00004400
+  defp proc_mask(:deal_helpful_ability), do: 0x00000400
+  defp proc_mask(:deal_harmful_ability), do: 0x00001000
+  defp proc_mask(:deal_helpful_spell), do: 0x00004000
   defp proc_mask(:deal_harmful_spell), do: 0x00010000
   defp proc_mask(:deal_harmful_periodic), do: 0x00040000
   defp proc_mask(:deal_helpful_periodic), do: 0x00040000
