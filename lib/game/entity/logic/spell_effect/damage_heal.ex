@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   @moduledoc false
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.AttackDamageTaken
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -8,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   alias ThistleTea.Game.Entity.Logic.CreatureType
   alias ThistleTea.Game.Entity.Logic.Druid
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.EnvironmentalDamage
   alias ThistleTea.Game.Entity.Logic.HealingReceived
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Paladin
@@ -32,6 +34,27 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
   @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
   @weapon_effect_types [:weapon_damage, :weapon_damage_noschool, :normalized_weapon_damage, :weapon_percent_damage]
+
+  def apply(%Character{} = state, %CastContext{} = context, spell, %Effect{type: :environmental_damage} = effect, now) do
+    damage = max(rolled_amount(spell, effect, context), 0)
+    {EnvironmentalDamage.apply(state, :fire, damage, now), []}
+  end
+
+  def apply(state, %CastContext{} = context, spell, %Effect{type: :environmental_damage} = effect, now) do
+    damage = max(rolled_amount(spell, effect, context), 0)
+    school = school_atom(spell)
+    resisted = school_resisted_amount(state, damage, school, context, [])
+    {state, remaining} = Aura.absorb_damage(state, damage - resisted, school, now)
+
+    event =
+      Effects.spell_damage(context.caster_guid, state.object.guid, spell, damage - resisted,
+        absorbed: damage - resisted - remaining,
+        resisted: resisted,
+        proc_type: nil
+      )
+
+    {state, [event]}
+  end
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :school_damage} = effect, now) do
     result =

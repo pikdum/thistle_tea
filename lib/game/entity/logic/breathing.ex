@@ -9,10 +9,9 @@ defmodule ThistleTea.Game.Entity.Logic.Breathing do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.EnvironmentalDamage
 
   defstruct [:remaining, :duration, :updated_at, :next_damage_at, scale: -1]
 
@@ -92,14 +91,7 @@ defmodule ThistleTea.Game.Entity.Logic.Breathing do
 
       character = put_timer(character, %{timer | next_damage_at: now + @pulse_ms})
 
-      character =
-        if DamageImmunity.immune?(character, :physical) do
-          character
-        else
-          character
-          |> Effects.enqueue(Effects.environmental_damage(:drowning, damage))
-          |> Core.take_damage(damage, now, environmental?: true)
-        end
+      character = EnvironmentalDamage.apply(character, :drowning, damage, now)
 
       if Death.alive?(character), do: character, else: stop(character)
     else

@@ -534,6 +534,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(76), do: :summon_object_wild
   defp effect_type(104), do: :summon_game_object
   defp effect_type(6), do: :apply_aura
+  defp effect_type(7), do: :environmental_damage
   defp effect_type(8), do: :power_drain
   defp effect_type(9), do: :health_leech
   defp effect_type(10), do: :heal

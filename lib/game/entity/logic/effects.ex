@@ -13,7 +13,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.ScriptedCast{entry: entry, target_guid: target_guid}
   end
 
-  def environmental_damage(type, damage) when type in [:fall, :drowning] and is_integer(damage) and damage > 0 do
+  def environmental_damage(type, damage)
+      when type in [:exhaustion, :drowning, :fall, :lava, :slime, :fire] and is_integer(damage) and damage >= 0 do
     %Effects.EnvironmentalDamage{type: type, damage: damage}
   end
 

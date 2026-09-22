@@ -40,6 +40,50 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   end
 
   describe "emit/2" do
+    test "environmental damage reaches the victim and nearby observers in the same world" do
+      owner_guid = Guid.from_low_guid(:player, unique_guid())
+      observer_guid = Guid.from_low_guid(:player, unique_guid())
+      other_world_guid = Guid.from_low_guid(:player, unique_guid())
+
+      for {guid, map} <- [{owner_guid, 0}, {observer_guid, 0}, {other_world_guid, 1}] do
+        Entity.register(guid)
+        SpatialHash.update(:players, guid, map, 0.0, 0.0, 0.0)
+      end
+
+      on_exit(fn ->
+        for guid <- [owner_guid, observer_guid, other_world_guid] do
+          Entity.unregister(guid)
+          SpatialHash.remove(:players, guid)
+        end
+      end)
+
+      character = %Character{
+        object: %Object{guid: owner_guid},
+        internal: %Internal{world: WorldRef.open(0)},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      for {type, type_id} <- [exhaustion: 0, drowning: 1, fall: 2, lava: 3, slime: 4, fire: 5] do
+        for damage <- [0, 20] do
+          effect = %Effects.EnvironmentalDamage{type: type, damage: damage, absorbed: 30, resisted: 150}
+          EventSink.emit(character, effect)
+
+          packet = %Message.SmsgEnvironmentalDamageLog{
+            guid: owner_guid,
+            damage_type: type_id,
+            damage: damage,
+            absorb: 30,
+            resist: 150
+          }
+
+          assert_receive {:"$gen_cast", {:send_packet, ^packet}}
+          assert_receive {:"$gen_cast", {:send_packet, ^packet, _opts}}
+          refute_received {:"$gen_cast", {:send_packet, ^packet}}
+          refute_received {:"$gen_cast", {:send_packet, ^packet, _opts}}
+        end
+      end
+    end
+
     test "delivers item transformation only to the explicit player owner" do
       character = %Character{object: %Object{guid: unique_guid()}}
       spell = %Spell{id: 21_180}

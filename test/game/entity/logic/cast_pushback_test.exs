@@ -89,6 +89,16 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
   end
 
   describe "take_damage/4 channel pushback" do
+    test "environmental damage behaves as self damage for channels" do
+      caster = channeling_character(channel_spell(@channel_delay), 1000)
+      damaged = Core.take_damage(caster, 10, 2000, environmental?: true)
+      assert damaged.internal.casting.ends_at == 11_000
+      assert effects_of(damaged, Effects.ChannelUpdate) == []
+
+      caster = channeling_character(channel_spell(@channel_cancel), 1000)
+      assert Core.take_damage(caster, 10, 2000, environmental?: true).internal.casting == nil
+    end
+
     test "direct damage shortens the remaining channel and updates the client" do
       caster = channeling_character(channel_spell(@channel_delay), 1_000)
       assert caster.internal.casting.ends_at == 11_000

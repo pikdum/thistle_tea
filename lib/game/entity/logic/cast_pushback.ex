@@ -22,7 +22,8 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushback do
     if Keyword.get(opts, :periodic, false) do
       entity
     else
-      apply_damage_reaction(entity, casting, now, Keyword.get(opts, :source))
+      source = if Keyword.get(opts, :environmental?, false), do: entity.object.guid, else: Keyword.get(opts, :source)
+      apply_damage_reaction(entity, casting, now, source)
     end
   end
 

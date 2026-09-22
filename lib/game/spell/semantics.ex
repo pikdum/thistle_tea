@@ -102,6 +102,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
 
   @damage_heal [
     :school_damage,
+    :environmental_damage,
     :health_leech,
     :instakill,
     :heal,

@@ -9,10 +9,9 @@ defmodule ThistleTea.Game.Entity.Logic.Falling do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.Death
-  alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.EnvironmentalDamage
 
   defstruct [:height, :transport_guid, far?: false]
 
@@ -66,9 +65,7 @@ defmodule ThistleTea.Game.Entity.Logic.Falling do
     damage = damage |> max(0) |> min(max_health)
 
     if damage > 0 do
-      character
-      |> Effects.enqueue(Effects.environmental_damage(:fall, damage))
-      |> Core.take_damage(damage, now, environmental?: true)
+      EnvironmentalDamage.apply(character, :fall, damage, now)
     else
       character
     end

@@ -303,6 +303,7 @@ defmodule ThistleTea.Game.Spell do
 
   @damage_effect_types [
     :school_damage,
+    :environmental_damage,
     :weapon_damage,
     :weapon_damage_noschool,
     :normalized_weapon_damage,
