@@ -254,10 +254,24 @@ defmodule ThistleTea.Game.Spell do
   end
 
   def harmful?(%__MODULE__{} = spell) do
-    targets_hostile_units?(spell) or damage_effects(spell) != []
+    targets_hostile_units?(spell) or damage_effects(spell) != [] or harmful_instakill?(spell)
   end
 
   def harmful?(_spell), do: false
+
+  defp harmful_instakill?(%__MODULE__{effects: effects} = spell) do
+    not custom?(spell, :positive) and not family_flag?(spell, 5, 0x02000000) and
+      Enum.any?(effects, fn
+        %Effect{type: :instakill, implicit_target_a: :caster, implicit_target_b: target} when target in [nil, :none] ->
+          false
+
+        %Effect{type: :instakill} ->
+          true
+
+        _effect ->
+          false
+      end)
+  end
 
   def starts_combat?(spell, outcome \\ :hit)
 

@@ -5,11 +5,19 @@ defmodule ThistleTea.Game.World.Loader.SpellCombatControlDbcTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatControl
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db
 
   describe "load/1" do
+    test "instant kills distinguish Death Touch from Suicide and positive sacrifice overrides" do
+      assert Spell.starts_combat?(SpellLoader.load(5))
+      refute Spell.harmful?(SpellLoader.load(7))
+      sacrifice = SpellLoader.load(18_788)
+      refute Spell.harmful?(%{sacrifice | custom_flags: 4})
+    end
+
     test "Wisp Costume and Web Wrap load combined control" do
       for id <- [24_740, 28_618, 28_619, 28_620, 28_621] do
         spell = SpellLoader.load(id)

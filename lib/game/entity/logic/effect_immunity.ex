@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.EffectImmunity do
   @moduledoc """
-  Aura-state and spell-effect immunity, derived from active holders. Immunity
-  filters individual effects and optionally purges existing matching holders.
+  Aura-state and spell-effect immunity from active holders and creature defaults.
+  Immunity filters individual effects and optionally purges matching holders.
   """
 
   alias ThistleTea.Game.Aura

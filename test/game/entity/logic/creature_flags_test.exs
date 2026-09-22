@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureFlagsTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT
@@ -153,6 +154,19 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureFlagsTest do
 
     test "sessile creatures can still melee in range", %{creature: creature} do
       mob = creature |> build(0x100) |> engage()
+      {_status, updated} = BT.tick(MobBT.tree(), mob, context(1.0))
+      assert Enum.any?(updated.internal.events, &is_struct(&1, Effects.DeliverAttack))
+      assert updated.internal.navigation_intents == []
+    end
+
+    test "a sessile spell list does not suppress ordinary melee", %{creature: creature} do
+      mob = creature |> build(0x100) |> engage()
+
+      mob = %{
+        mob
+        | internal: %{mob.internal | creature: %{mob.internal.creature | spells: [%CreatureSpell{spell_id: 999}]}}
+      }
+
       {_status, updated} = BT.tick(MobBT.tree(), mob, context(1.0))
       assert Enum.any?(updated.internal.events, &is_struct(&1, Effects.DeliverAttack))
       assert updated.internal.navigation_intents == []
