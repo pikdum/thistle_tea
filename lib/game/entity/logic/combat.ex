@@ -149,6 +149,9 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   def receive_attack(entity, attack, now, opts \\ [])
 
+  def receive_attack(%{unit: %Unit{health: health}} = entity, _attack, _now, _opts)
+      when is_integer(health) and health <= 0, do: {entity, []}
+
   def receive_attack(%{object: %{guid: target_guid}} = entity, attack, now, opts)
       when is_map(attack) and is_integer(target_guid) and is_integer(now) do
     result = resolve_attack(entity, attack, opts)
@@ -207,7 +210,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   defp attack_outcome_events(%{object: %{guid: victim_guid}}, %{caster: caster} = attack, result, absorbed)
        when is_integer(caster) do
-    if Guid.entity_type(caster) == :player do
+    if Guid.entity_type(caster) in [:player, :mob] do
       damage = outcome_damage_basis(attack, result, absorbed)
 
       [
@@ -220,7 +223,8 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
             Map.get(attack, :queued_spell_id),
             outcome_proc_damage(result, absorbed)
           )
-          | hand: attack_hand(attack)
+          | hand: attack_hand(attack),
+            extra_attack?: Map.get(attack, :extra_attack?, false)
         }
       ]
     else

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   alias ThistleTea.Game.Entity.Logic.AI.TickPlan
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Breathing
+  alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Entity.Logic.Intoxication
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
@@ -53,6 +54,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   def plan(entity, status, now) when is_integer(now) do
     TickPlan.new(now)
     |> schedule_status(status)
+    |> schedule_extra_attacks(entity)
     |> schedule_aura(entity)
     |> schedule_regen(entity)
     |> schedule_pet_happiness(entity)
@@ -61,6 +63,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
     |> schedule_sobering(entity)
     |> schedule_pvp(entity)
     |> schedule_rest(entity)
+  end
+
+  defp schedule_extra_attacks(plan, entity) do
+    if ExtraAttacks.pending?(entity), do: TickPlan.schedule_in(plan, :extra_attacks, @default_tick_ms), else: plan
   end
 
   defp schedule_rest(plan, entity) do

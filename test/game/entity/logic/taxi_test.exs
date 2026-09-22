@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.TaxiTest do
   alias ThistleTea.Game.Entity.Data.Taxi.Path
   alias ThistleTea.Game.Entity.Data.Taxi.PathNode
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Entity.Logic.Taxi
 
   describe "start/7" do
@@ -20,8 +21,10 @@ defmodule ThistleTea.Game.Entity.Logic.TaxiTest do
       destination = node(4, {64.0, 0.0, 0.0})
       itinerary = itinerary()
 
-      {character, effects} = Taxi.start(character(), itinerary, destination, 6852, token, 1_000)
+      pending = ExtraAttacks.grant(character(), 2)
+      {character, effects} = Taxi.start(pending, itinerary, destination, 6852, token, 1_000)
 
+      refute ExtraAttacks.pending?(character)
       assert character.player.coinage == 75
       assert character.unit.mount_display_id == 6852
       assert (character.unit.flags &&& 0x00100004) == 0x00100004

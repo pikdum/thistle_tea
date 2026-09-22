@@ -710,7 +710,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert events == []
     end
 
-    test "add-extra-attacks effects deliver immediate swings at the current target" do
+    test "add-extra-attacks effects queue a batch for the combat behavior tree" do
       spell = %Spell{
         id: 20_178,
         name: "Reckoning",
@@ -734,10 +734,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       context = %CastContext{caster_guid: 1, caster_level: 10}
 
-      {target, _events} = SpellEffect.receive(target, context, spell, 1_000)
+      {target, events} = SpellEffect.receive(target, context, spell, 1_000)
 
-      assert [%Effects.DeliverAttack{target_guid: 555}] =
-               Enum.filter(target.internal.events, &is_struct(&1, Effects.DeliverAttack))
+      assert target.internal.blackboard.combat.extra_attacks == 1
+      refute Enum.any?(target.internal.events, &is_struct(&1, Effects.DeliverAttack))
+      assert [%Effects.SpellExtraAttacks{spell_id: 20_178, count: 1}] = events
+      {unchanged, events} = SpellEffect.receive(target, context, spell, 1_001)
+      assert unchanged.internal.blackboard.combat.extra_attacks == 1
+      assert events == []
     end
 
     test "heal effects restore health and emit heal threat for the effective gain" do

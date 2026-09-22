@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Taxi do
   alias ThistleTea.Game.Entity.Data.Taxi.Node
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.Movement
 
@@ -30,7 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.Taxi do
       )
       when is_map(itinerary) and is_integer(mount_display_id) and mount_display_id > 0 and is_reference(token) and
              is_integer(now) do
-    character = Mount.dismount(character, now)
+    character = character |> Mount.dismount(now) |> ExtraAttacks.clear()
     unit = character.unit
     positions = Enum.map(itinerary.nodes, & &1.position)
     path_ids = Enum.map(itinerary.paths, & &1.id)

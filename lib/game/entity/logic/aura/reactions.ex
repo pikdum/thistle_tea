@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
@@ -82,8 +83,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         :melee_hit_dealt,
         %{victim_guid: victim_guid, outcome: outcome, proc_type: proc_type, now: now} = context
       )
-      when is_list(holders) and is_integer(victim_guid) and outcome in [:normal, :crit] and
-             proc_type in [:deal_melee_swing, :deal_melee_ability] and is_integer(now) do
+      when is_list(holders) and is_integer(victim_guid) and is_integer(now) and
+             outcome in [:normal, :crit, :glancing, :crushing, :block] and
+             proc_type in [:deal_melee_swing, :deal_melee_ability] do
     {holders, events} =
       Enum.map_reduce(holders, [], fn %Holder{} = holder, events ->
         {holder, holder_events} =
@@ -331,51 +333,43 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   end
 
   defp outgoing_melee_reaction(%Holder{} = holder, owner_guid, victim_guid, context) do
-    triggering_spell = Map.get(context, :spell)
-    proc_type = Map.fetch!(context, :proc_type)
-    outcome = Map.fetch!(context, :outcome)
-    attack_time_ms = Map.get(context, :attack_time_ms)
-    now = Map.fetch!(context, :now)
+    if weapon_allowed?(holder.spell, context) and extra_attack_allowed?(holder.spell, context) do
+      {holder, events} =
+        case Script.outgoing_melee(holder, owner_guid, victim_guid, context) do
+          {:handled, updated_holder, events} -> {updated_holder, events}
+          :unhandled -> generic_outgoing_melee_reaction(holder, owner_guid, victim_guid, context)
+        end
 
-    case Script.outgoing_melee(
-           holder,
-           owner_guid,
-           victim_guid,
-           context
-         ) do
-      {:handled, updated_holder, events} ->
-        {updated_holder, events}
-
-      :unhandled ->
-        generic_outgoing_melee_reaction(
-          holder,
-          owner_guid,
-          victim_guid,
-          triggering_spell,
-          proc_type,
-          outcome,
-          attack_time_ms,
-          now
-        )
+      {holder, Enum.map(events, &extra_attack_origin(&1, context))}
+    else
+      {holder, []}
     end
   end
+
+  defp extra_attack_allowed?(%Spell{spell_icon: 108, spell_visual: 2759}, %{extra_attack?: true}), do: false
+  defp extra_attack_allowed?(_spell, _context), do: true
+
+  defp weapon_allowed?(%Spell{equipped_item_class: class}, _context) when class in [nil, -1], do: true
+  defp weapon_allowed?(%Spell{} = spell, %{weapon: weapon}), do: WeaponDamage.fits?(weapon, spell)
+  defp weapon_allowed?(_spell, _context), do: true
+
+  defp extra_attack_origin(%Effects.TriggerSpell{} = effect, context),
+    do: %{effect | extra_attack?: Map.get(context, :extra_attack?, false)}
+
+  defp extra_attack_origin(effect, _context), do: effect
 
   defp generic_outgoing_melee_reaction(
          %Holder{} = holder,
          owner_guid,
          victim_guid,
-         triggering_spell,
-         proc_type,
-         outcome,
-         attack_time_ms,
-         now
+         %{proc_type: proc_type, outcome: outcome, now: now} = context
        ) do
     proc_auras = trigger_auras(holder)
 
     proc? =
       proc_auras != [] and proc_ready?(holder, now) and
-        Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and
-        Proc.roll?(holder.spell, attack_time_ms)
+        Proc.eligible?(holder.spell, Map.get(context, :spell), proc_type, outcome) and
+        Proc.roll?(holder.spell, Map.get(context, :attack_time_ms))
 
     if proc? do
       events =

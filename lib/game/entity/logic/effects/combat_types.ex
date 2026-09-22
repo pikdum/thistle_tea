@@ -34,7 +34,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
     {:SecondaryMelee, [:target_guid, :damage, :spell_id, :range_yards], []},
     {:TapClaimed, [:player_guid], [:group_id]},
     {:TapCleared, [], []},
-    {:AttackOutcome, [:target_guid, :source_guid, :outcome, :damage, :proc_damage, :spell_id], [hand: :mainhand]},
+    {:AttackOutcome, [:target_guid, :source_guid, :outcome, :damage, :proc_damage, :spell_id],
+     [hand: :mainhand, extra_attack?: false]},
     {:AttackerStateUpdate, [:source_guid, :target_guid, :damage, :attack], []},
     {:CallAssistance, [:target_guid], []},
     {:CallForHelp, [:target_guid], [:radius]}

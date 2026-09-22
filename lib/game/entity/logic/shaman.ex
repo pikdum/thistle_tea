@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
   Enchantment and VMangos PPM data are supplied by the player boundary.
   """
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
@@ -21,13 +22,15 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
 
   def resolve_weapon_enchant(entity, payload, proc, ppm, roll \\ &:rand.uniform/0)
 
-  def resolve_weapon_enchant(entity, %{outcome: outcome, victim_guid: victim_guid}, proc, ppm, roll)
+  def resolve_weapon_enchant(entity, %{outcome: outcome, victim_guid: victim_guid} = payload, proc, ppm, roll)
       when outcome in [:normal, :crit, :glancing, :crushing, :block] and is_map(proc) and is_number(ppm) and
              is_function(roll, 0) do
     chance = modified_proc_chance(entity, proc, ppm)
 
-    if chance > 0 and roll.() <= chance do
-      {trigger_proc(entity, victim_guid, proc), true}
+    extra_attack? = Map.get(payload, :extra_attack?, false)
+
+    if not (extra_attack? and ExtraAttacks.spell?(Map.get(proc, :proc_spell))) and chance > 0 and roll.() <= chance do
+      {trigger_proc(entity, victim_guid, proc, extra_attack?), true}
     else
       {entity, false}
     end
@@ -43,19 +46,27 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
 
   defp modified_proc_chance(_entity, proc, ppm), do: proc_chance(proc, ppm)
 
-  defp trigger_proc(entity, victim_guid, %{proc_spell: %Spell{} = spell} = proc) do
+  defp trigger_proc(entity, victim_guid, %{proc_spell: %Spell{} = spell} = proc, extra_attack?) do
     if flametongue_proc?(spell) do
       trigger_flametongue(entity, victim_guid, spell, proc.attack_time_ms)
     else
       target_guid = if Spell.harmful?(spell), do: victim_guid, else: entity.object.guid
-      Effects.enqueue(entity, Effects.trigger_spell(entity.object.guid, entity.unit.level || 1, target_guid, spell.id))
+
+      Effects.enqueue(
+        entity,
+        Effects.trigger_spell(entity.object.guid, entity.unit.level || 1, target_guid, spell.id,
+          extra_attack?: extra_attack?
+        )
+      )
     end
   end
 
-  defp trigger_proc(entity, victim_guid, proc) do
+  defp trigger_proc(entity, victim_guid, proc, extra_attack?) do
     Effects.enqueue(
       entity,
-      Effects.trigger_spell(entity.object.guid, entity.unit.level || 1, victim_guid, proc.effect.spell_id)
+      Effects.trigger_spell(entity.object.guid, entity.unit.level || 1, victim_guid, proc.effect.spell_id,
+        extra_attack?: extra_attack?
+      )
     )
   end
 

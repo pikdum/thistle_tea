@@ -66,6 +66,17 @@ defmodule ThistleTea.Game.Entity.Logic.ShamanTest do
   end
 
   describe "resolve_weapon_enchant/5" do
+    test "extra swings can proc ordinary enchants but cannot proc another Windfury batch" do
+      spell = %Spell{id: 8233, effects: [%Effect{type: :add_extra_attacks, implicit_target_a: :caster}]}
+      proc = %{effect: %{amount: 100, spell_id: 8233}, proc_spell: spell, attack_time_ms: 2000}
+      payload = %{outcome: :normal, victim_guid: 2, extra_attack?: true}
+      entity = shaman()
+      assert {^entity, false} = Shaman.resolve_weapon_enchant(entity, payload, proc, 0.0, fn -> 0.0 end)
+      proc = %{proc | proc_spell: %Spell{id: 20_007}}
+      assert {triggered, true} = Shaman.resolve_weapon_enchant(entity, payload, proc, 0.0, fn -> 0.0 end)
+      assert [%Effects.TriggerSpell{spell_id: 20_007, extra_attack?: true}] = triggered.internal.events
+    end
+
     test "applies poison chance talents only to the matching spell family" do
       poison = %Spell{id: 8680, spell_family: 8, family_flags_0: 0x1000}
 

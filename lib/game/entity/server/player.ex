@@ -414,7 +414,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     character = apply_incoming_spell(character, caster, spell, now, harmful?, alive?)
 
     state = %{state | character: character}
-    state = if harmful? and alive?, do: TickScheduler.ensure_scheduled(state), else: state
+    state = TickScheduler.ensure_scheduled(state)
     if Spell.starts_combat?(spell) and alive?, do: notify_defensive_pet(character, spell_caster_guid(caster))
 
     {:noreply, state, {:continue, :maybe_broadcast_update}}

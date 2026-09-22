@@ -2,12 +2,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
   @moduledoc false
 
   alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: BTCombat
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Amount
@@ -229,19 +229,26 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
     {Threat.taunt(state, context.caster_guid), []}
   end
 
-  def apply(
-        %{unit: %{target: target}} = state,
-        %CastContext{} = context,
-        spell,
-        %Effect{type: :add_extra_attacks} = effect,
-        _now
-      )
-      when is_integer(target) and target > 0 do
+  def apply(state, %CastContext{} = context, spell, %Effect{type: :add_extra_attacks} = effect, _now) do
     count = max(Amount.roll(spell, effect, context), 1)
-    {BTCombat.extra_attacks(state, target, count), []}
-  end
+    updated = ExtraAttacks.grant(state, count, context.extra_attack?)
 
-  def apply(state, %CastContext{}, _spell, %Effect{type: :add_extra_attacks}, _now), do: {state, []}
+    events =
+      if updated == state do
+        []
+      else
+        [
+          %Effects.SpellExtraAttacks{
+            source_guid: context.caster_guid,
+            target_guid: state.object.guid,
+            spell_id: spell.id,
+            count: count
+          }
+        ]
+      end
+
+    {updated, events}
+  end
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :modify_threat} = effect, _now) do
     {Threat.change(state, context.caster_guid, Amount.roll(spell, effect, context)), []}

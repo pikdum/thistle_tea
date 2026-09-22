@@ -1,7 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat do
   @moduledoc false
 
-  defstruct next_attack_at: 0,
+  defstruct extra_attacks: 0,
+            next_attack_at: 0,
             next_offhand_attack_at: 0,
             next_aggro_at: 0,
             next_call_for_help_at: 0,

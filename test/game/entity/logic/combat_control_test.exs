@@ -170,7 +170,9 @@ defmodule ThistleTea.Game.Entity.Logic.CombatControlTest do
         assert controlled.internal.events == []
         assert controlled.internal.next_swing_spell == queued
         assert updated == blackboard
-        assert Combat.extra_attacks(controlled, 2, 2).internal.events == []
+        pending = %{blackboard | combat: %{blackboard.combat | extra_attacks: 2}}
+        {:failure, controlled, ^pending} = Combat.consume_extra_attacks(controlled, pending, context)
+        assert controlled.internal.events == []
         {released, _} = Aura.remove_spells(controlled, [1], 100)
         released = %{released | internal: %{released.internal | next_swing_spell: nil}}
         {:success, released, _} = Combat.melee_attack_with_context(released, blackboard, context)

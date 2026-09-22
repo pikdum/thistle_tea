@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
   alias ThistleTea.Game.Entity.EffectResolver.Pvp
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
@@ -79,6 +80,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
         base_points: effect.amount,
         effect_index: effect.slot,
         resolve_targets?: true,
+        extra_attack?: effect.extra_attack?,
         triggered_by_spell_id: effect.triggering_spell_id
       )
     ]
@@ -86,7 +88,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
   def resolve(entity, %Effects.TriggerSpell{} = effect) do
     with %Spell{} = loaded <- SpellLoader.load(effect.spell_id),
-         %Spell{} = spell <- loaded |> scripted_proc_spell(effect) |> apply_trigger_override(effect) do
+         %Spell{} = spell <- loaded |> scripted_proc_spell(effect) |> apply_trigger_override(effect),
+         false <- effect.extra_attack? and ExtraAttacks.spell?(spell) do
       resolve_trigger(entity, effect, spell)
     else
       _missing -> []
@@ -105,6 +108,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
           base_points: effect.amount,
           effect_index: effect.slot,
           resolve_targets?: true,
+          extra_attack?: effect.extra_attack?,
           triggered_by_spell_id: effect.triggering_spell_id
         )
       ]
@@ -235,6 +239,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
     %{
       CastContext.from_caster(entity, spell, effect.target_guid)
       | target_hostile?: Spell.requires_hostile_target?(spell),
+        extra_attack?: effect.extra_attack?,
         triggered_by_aura?: is_integer(effect.triggering_spell_id),
         target_role: effect.target_role
     }
@@ -243,6 +248,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   defp trigger_context(_entity, %Effects.TriggerSpell{} = effect, spell) do
     %CastContext{
       caster_guid: effect.source_guid,
+      extra_attack?: effect.extra_attack?,
       triggered_by_aura?: is_integer(effect.triggering_spell_id),
       caster_level: effect.source_level || 1,
       target_guid: effect.target_guid,

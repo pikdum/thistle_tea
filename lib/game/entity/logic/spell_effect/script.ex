@@ -61,7 +61,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
       {state, []}
     else
       target_guid = trigger_target_guid(state, context, effect)
-      event = Effects.trigger_spell(context.caster_guid, context.caster_level, target_guid, spell_id)
+
+      event =
+        Effects.trigger_spell(context.caster_guid, context.caster_level, target_guid, spell_id,
+          extra_attack?: context.extra_attack?
+        )
+
       {state, [event]}
     end
   end

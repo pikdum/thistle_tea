@@ -17,6 +17,17 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
   @spell_hit_type_crit 0x2
 
+  def emit(entity, %Effects.SpellExtraAttacks{} = effect, _context) do
+    %Message.SmsgSpelllogexecute{
+      caster: effect.source_guid,
+      spell_id: effect.spell_id,
+      logs: [{:extra_attacks, effect.target_guid, effect.count}]
+    }
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
   def emit(%Character{} = entity, %Effects.TeachSpell{} = effect, context) do
     Context.send(context, {:teach_spell, effect})
     entity

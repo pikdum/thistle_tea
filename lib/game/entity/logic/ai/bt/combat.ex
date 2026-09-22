@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.CombatControl
   alias ThistleTea.Game.Entity.Logic.CombatSkills
+  alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
@@ -267,16 +268,50 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     end
   end
 
-  def extra_attacks(state, target, count) when is_integer(target) and target > 0 and is_integer(count) and count > 0 do
-    if CombatControl.pacified?(state),
-      do: state,
-      else: Enum.reduce(1..count, state, fn _extra, current -> send_white_swing(current, target) end)
+  def extra_attacks_step, do: BT.action(&consume_extra_attacks/3)
+
+  def consume_extra_attacks(
+        state,
+        %Blackboard{combat: %CombatMemory{extra_attacks: count}} = blackboard,
+        %Context{} = context
+      )
+      when count > 0 do
+    if extra_attack_ready?(state, blackboard, context) do
+      {state, events} = Aura.remove_with_interrupt_flags(state, Aura.interrupt_mask(:attack), context.now)
+      state = state |> Effects.enqueue(events) |> PlayerCombat.mark_initiated(context.now)
+      state = Enum.reduce(1..count, state, fn _attack, entity -> send_white_swing(entity, entity.unit.target, true) end)
+      blackboard = %{blackboard | combat: %{blackboard.combat | extra_attacks: 0}}
+      blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, CombatLogic.attack_speed_ms(state), context.now)
+      {:failure, state, blackboard}
+    else
+      {:failure, state, blackboard}
+    end
   end
 
-  def extra_attacks(state, _target, _count), do: state
+  def consume_extra_attacks(state, blackboard, _context), do: {:failure, state, blackboard}
 
-  defp send_white_swing(state, target) do
-    attack = CombatLogic.finalize_attack(melee_attack_payload(state))
+  defp extra_attack_ready?(state, blackboard, context) do
+    Death.alive?(state) and not CombatControl.pacified?(state) and in_combat?(state, blackboard) and
+      not Enum.any?([:mod_stun, :mod_confuse, :mod_fear], &Aura.has_aura?(state, &1)) and
+      not match?(%{alive?: false}, Perception.metadata(context.perception, state.unit.target)) and
+      target_valid_same_map?(state, blackboard, context) and in_combat_range?(state, blackboard, context) and
+      facing_target?(state, context)
+  end
+
+  defp facing_target?(%{unit: %Unit{target: target}, movement_block: %{position: {x, y, _z, orientation}}}, context) do
+    case Perception.position(context.perception, target) do
+      {_world, tx, ty, _tz} ->
+        dx = tx - x
+        dy = ty - y
+        dx * dx + dy * dy <= 1.4 * 1.4 or :math.cos(:math.atan2(dy, dx) - orientation) >= 0.5
+
+      _ ->
+        false
+    end
+  end
+
+  defp send_white_swing(state, target, extra_attack? \\ false) do
+    attack = state |> melee_attack_payload() |> Map.put(:extra_attack?, extra_attack?) |> CombatLogic.finalize_attack()
 
     Effects.enqueue(state, Effects.deliver_attack(target, attack))
   end

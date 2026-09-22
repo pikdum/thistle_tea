@@ -44,6 +44,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
       BT.sequence([BT.condition(&dead?/2), BT.action(&idle/2)]),
       BT.action(&Confusion.tick/3),
       BT.action(&FearBT.tick/3),
+      CombatBT.extra_attacks_step(),
       SpellBT.casting_sequence(),
       BT.sequence([
         BT.condition(&in_combat?/2),

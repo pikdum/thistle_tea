@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
       BT.action(&reactive_tick/3),
       BT.action(&Confusion.tick/3),
       BT.action(&Fear.tick/3),
+      CombatBT.extra_attacks_step(),
       SpellBT.casting_sequence(),
       RangedBT.sequence(),
       CombatBT.melee_sequence(),

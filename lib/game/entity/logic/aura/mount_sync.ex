@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MountSync do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.ExtraAttacks
 
   def interrupt_holders(previous, desired) do
     case {mounted?(previous), mounted?(desired)} do
@@ -18,6 +19,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MountSync do
   def sync(%{internal: %{taxi_flight: flight}} = entity, _previous, _holders) when not is_nil(flight), do: entity
 
   def sync(%{unit: %Unit{} = unit} = entity, previous, holders) do
+    entity = if not mounted?(previous) and mounted?(holders), do: ExtraAttacks.clear(entity), else: entity
+
     if mounted?(previous) or mounted?(holders) do
       display = holders |> Enum.flat_map(& &1.auras) |> Enum.find_value(0, &mount_display/1)
 

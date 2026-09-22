@@ -160,6 +160,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
     combat = %{
       combat
       | next_attack_at: 0,
+        extra_attacks: 0,
         attack_started: false,
         auto_attacking: false,
         auto_attack_target: nil,
@@ -221,7 +222,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   end
 
   def clear_auto_attack(%__MODULE__{combat: combat} = blackboard) do
-    %{blackboard | combat: %{combat | attack_started: false, auto_attacking: false, auto_attack_target: nil}}
+    %{
+      blackboard
+      | combat: %{combat | attack_started: false, auto_attacking: false, auto_attack_target: nil, extra_attacks: 0}
+    }
   end
 
   def enable_auto_attack(%__MODULE__{combat: combat} = blackboard, target) do

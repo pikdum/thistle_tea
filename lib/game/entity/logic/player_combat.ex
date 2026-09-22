@@ -175,14 +175,19 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
       character = prune_threat_refs(character)
 
       if threat_refs?(character) or within_drop_window?(character, now) do
-        {CombatLogic.sync_combat_flag(character), Blackboard.clear_auto_attack(blackboard)}
+        {CombatLogic.sync_combat_flag(character), clear_inactive_attack(blackboard)}
       else
-        {clear(character), Blackboard.clear_auto_attack(blackboard)}
+        {clear(character), clear_inactive_attack(blackboard)}
       end
     end
   end
 
   def sync(character, %Blackboard{} = blackboard, _now), do: {character, blackboard}
+
+  defp clear_inactive_attack(%Blackboard{combat: %{auto_attacking: true}} = blackboard),
+    do: Blackboard.clear_auto_attack(blackboard)
+
+  defp clear_inactive_attack(%Blackboard{} = blackboard), do: blackboard
 
   defp prune_threat_refs(%Character{internal: %Internal{threat_refs: %MapSet{} = refs} = internal} = character) do
     %{character | internal: %{internal | threat_refs: MapSet.filter(refs, &referencing_mob_active?/1)}}

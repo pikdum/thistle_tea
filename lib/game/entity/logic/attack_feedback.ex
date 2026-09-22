@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   """
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.CombatWeapon
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -111,8 +112,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   end
 
   defp trigger_melee_procs(entity, %{outcome: outcome, victim_guid: victim_guid} = payload, spell, now)
-       when outcome in [:normal, :crit] and is_integer(victim_guid) and is_integer(now) do
+       when outcome in [:normal, :crit, :glancing, :crushing, :block] and is_integer(victim_guid) and is_integer(now) do
     proc_type = if match?(%Spell{}, spell), do: :deal_melee_ability, else: :deal_melee_swing
+    hand = Map.get(payload, :hand, :mainhand)
 
     {entity, events} =
       Aura.reactions(entity, :melee_hit_dealt, %{
@@ -123,7 +125,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
         triggering_spell_id: Map.get(payload, :spell_id),
         damage: Map.get(payload, :damage, 0),
         proc_damage: Map.get(payload, :proc_damage, Map.get(payload, :damage, 0)),
-        attack_time_ms: entity.unit.base_attack_time,
+        attack_time_ms: attack_time_ms(entity, hand),
+        weapon: CombatWeapon.usable(entity, hand),
+        extra_attack?: Map.get(payload, :extra_attack?, false),
         now: now
       })
 
@@ -131,6 +135,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   end
 
   defp trigger_melee_procs(entity, _payload, _spell, _now), do: entity
+
+  defp attack_time_ms(entity, :offhand), do: entity.unit.offhand_attack_time
+  defp attack_time_ms(entity, _hand), do: entity.unit.base_attack_time
 
   defp mark_reactives(entity, %{outcome: :dodge, victim_guid: victim_guid}, now) do
     Reactive.mark_dodging_target(entity, victim_guid, now)

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
 
@@ -113,6 +114,27 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
   end
 
   describe "receive_attack/4" do
+    test "extra creature attacks deliver damage and preserve their origin in owner feedback" do
+      caster = Guid.from_low_guid(:mob, 1, 1)
+
+      {target, events} =
+        Combat.receive_attack(mob(2, 100), %{caster: caster, damage: 12, extra_attack?: true}, 1_000, roll: 9_999)
+
+      assert target.unit.health == 88
+
+      assert [
+               %Effects.AttackerStateUpdate{damage: 12},
+               %Effects.AttackOutcome{target_guid: ^caster, extra_attack?: true, hand: :mainhand}
+             ] = events
+    end
+
+    test "remaining attacks in a lethal batch do not hit or proc on the corpse" do
+      attack = %{caster: 1, damage: 100, extra_attack?: true}
+      {dead, _} = Combat.receive_attack(mob(2, 100), attack, 1_000, roll: 9_999)
+      assert dead.unit.health == 0
+      assert {^dead, []} = Combat.receive_attack(dead, attack, 1_000, roll: 9_999)
+    end
+
     test "applies damage and returns attacker update events" do
       mob = mob(2, 100)
 

@@ -284,6 +284,71 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
                result.internal.events
     end
 
+    test "glancing and crushing attacks can proc and extra swings preserve their origin" do
+      holder = %Holder{
+        spell: %Spell{id: 15_600, proc_type_mask: 0x14, proc_chance: 100},
+        caster_level: 60,
+        auras: [%AuraData{type: :proc_trigger_spell, trigger_spell_id: 15_601}]
+      }
+
+      for outcome <- [:normal, :crit, :glancing, :crushing] do
+        entity =
+          AttackFeedback.receive(
+            rogue_with_auras([holder]),
+            %{outcome: outcome, victim_guid: 77, extra_attack?: true},
+            nil,
+            1_000
+          )
+
+        assert [%Effects.TriggerSpell{spell_id: 15_601, extra_attack?: true}] = entity.internal.events
+      end
+    end
+
+    test "sword specialization requires the weapon that actually landed the hit" do
+      holder = %Holder{
+        spell: %Spell{
+          id: 13_964,
+          proc_type_mask: 0x14,
+          proc_chance: 100,
+          equipped_item_class: 2,
+          equipped_item_subclass_mask: 0x80
+        },
+        auras: [%AuraData{type: :proc_trigger_spell, trigger_spell_id: 16_459}]
+      }
+
+      entity = rogue_with_auras([holder])
+
+      entity = %{
+        entity
+        | unit: %{
+            entity.unit
+            | mainhand_weapon: %{class: 2, subclass: 7, inventory_type: 13},
+              offhand_weapon: %{class: 2, subclass: 15, inventory_type: 13}
+          }
+      }
+
+      payload = %{outcome: :normal, damage: 20, victim_guid: 77}
+
+      assert [%Effects.TriggerSpell{spell_id: 16_459}] =
+               AttackFeedback.receive(entity, payload, nil, 1_000).internal.events
+
+      assert AttackFeedback.receive(entity, Map.put(payload, :hand, :offhand), nil, 1_000).internal.events == []
+    end
+
+    test "extra attacks cannot proc Flurry" do
+      holder = %Holder{
+        spell: %Spell{id: 16_280, spell_icon: 108, spell_visual: 2759, proc_type_mask: 0x14, proc_chance: 100},
+        auras: [%AuraData{type: :proc_trigger_spell, trigger_spell_id: 16_257}]
+      }
+
+      entity = rogue_with_auras([holder])
+      payload = %{outcome: :crit, victim_guid: 77, extra_attack?: true}
+      assert AttackFeedback.receive(entity, payload, nil, 1_000).internal.events == []
+
+      assert [%Effects.TriggerSpell{}] =
+               AttackFeedback.receive(entity, %{payload | extra_attack?: false}, nil, 1_000).internal.events
+    end
+
     test "VMangos proc cooldown prevents another melee trigger until it expires" do
       proc_spell = %Spell{
         id: 16_864,

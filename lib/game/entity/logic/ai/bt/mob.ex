@@ -127,6 +127,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
             BT.action(&heal_to_full/2),
             BT.action(&move_to_target_with_context/3)
           ]),
+          CombatBT.extra_attacks_step(),
           SpellBT.casting_sequence(),
           MobSpells.step(),
           BT.sequence([

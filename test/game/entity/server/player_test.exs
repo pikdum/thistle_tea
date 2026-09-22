@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Entity.Logic.Falling
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Regen
@@ -416,6 +417,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
         character(guid, health: 100, max_health: 100, summon: pet_guid)
         |> PlayerCombat.mark_attacked(1_000)
         |> PlayerCombat.gain_threat_ref(mob_guid, 1)
+        |> ExtraAttacks.grant(2)
         |> then(fn character -> %{character | unit: %{character.unit | target: mob_guid}} end)
 
       state = %State{connection_pid: self(), guid: guid, character: character, ready: true}
@@ -432,6 +434,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
                )
 
       refute teleported.internal.in_combat
+      refute ExtraAttacks.pending?(teleported)
       assert teleported.internal.threat_refs == MapSet.new()
       assert teleported.unit.target == 0
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
