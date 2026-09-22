@@ -73,6 +73,23 @@ defmodule ThistleTea.Game.Network.Message.MovementSpeedTest do
   end
 
   describe "handle/2" do
+    test "settles controlled creature speeds only for the recorded mover and value" do
+      for {type, server, client, _opcode} <- @modes do
+        state = %State{guid: 42}
+        {packet, state} = MovementControl.prepare(struct!(server, guid: 99, speed: 3.25), state)
+        ack = struct!(client, guid: 99, counter: packet.move_event, new_speed: 3.25)
+        assert client.handle(%{ack | guid: 42}, state) == state
+        assert client.handle(%{ack | guid: 100}, state) == state
+        assert client.handle(%{ack | new_speed: 7.0}, state) == state
+        assert client.handle(%{ack | counter: packet.move_event + 1}, state) == state
+        assert MovementControl.acknowledge_speed(state, 99, packet.move_event, :wrong_speed, 3.25) == state
+        updated = client.handle(ack, state)
+        assert updated.pending_movement_acks == %{}
+        assert updated.character == state.character
+        assert state.pending_movement_acks[packet.move_event] == {:controlled_speed, 99, type, 3.25}
+      end
+    end
+
     test "settles a shared sequence without changing authoritative speeds" do
       character = %Character{movement_block: struct!(MovementBlock, MovementBlock.player_speeds())}
       state = %State{guid: 42, character: character}

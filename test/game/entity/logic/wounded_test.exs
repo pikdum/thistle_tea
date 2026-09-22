@@ -63,13 +63,15 @@ defmodule ThistleTea.Game.Entity.Logic.WoundedTest do
     test "exempts pets and world bosses but still slows charmed creatures", %{mob: mob} do
       wounded = %{mob | unit: %{mob.unit | health: 50}}
 
-      for kind <- [:hunter_pet, :summoned, :guardian, :mini_pet, :creature_pet] do
+      for kind <- [:hunter, :summon, :guardian, :mini_pet, :creature_pet] do
         pet = %{wounded | internal: %{wounded.internal | pet: %Pet{kind: kind, owner_guid: 1}}}
         assert MovementStats.recompute(pet).movement_block.run_speed == 8.0
       end
 
-      charmed = %{wounded | internal: %{wounded.internal | pet: %Pet{kind: :charmed, owner_guid: 1}}}
-      assert MovementStats.recompute(charmed).movement_block.run_speed == 4.0
+      for kind <- [:charmed, :possessed] do
+        controlled = %{wounded | internal: %{wounded.internal | pet: %Pet{kind: kind, owner_guid: 1}}}
+        assert MovementStats.recompute(controlled).movement_block.run_speed == 4.0
+      end
 
       for {rank, flags, speed} <- [{0, 0, 4.0}, {1, 0, 4.0}, {3, 0, 8.0}, {1, 0x40, 8.0}] do
         configured = %{wounded | internal: %{wounded.internal | creature: %Creature{rank: rank, static_flags2: flags}}}

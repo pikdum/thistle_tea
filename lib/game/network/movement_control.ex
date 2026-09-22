@@ -26,20 +26,20 @@ defmodule ThistleTea.Game.Network.MovementControl do
     stamp(state, :unroot, &%{packet | move_event: &1})
   end
 
-  def prepare(%Message.SmsgForceRunSpeedChange{speed: speed} = packet, %State{} = state) do
-    stamp(state, {:run_speed, speed}, &%{packet | move_event: &1})
+  def prepare(%Message.SmsgForceRunSpeedChange{} = packet, %State{} = state) do
+    stamp_speed(state, packet, :run_speed)
   end
 
-  def prepare(%Message.SmsgForceRunBackSpeedChange{speed: speed} = packet, %State{} = state) do
-    stamp(state, {:run_back_speed, speed}, &%{packet | move_event: &1})
+  def prepare(%Message.SmsgForceRunBackSpeedChange{} = packet, %State{} = state) do
+    stamp_speed(state, packet, :run_back_speed)
   end
 
-  def prepare(%Message.SmsgForceSwimSpeedChange{speed: speed} = packet, %State{} = state) do
-    stamp(state, {:swim_speed, speed}, &%{packet | move_event: &1})
+  def prepare(%Message.SmsgForceSwimSpeedChange{} = packet, %State{} = state) do
+    stamp_speed(state, packet, :swim_speed)
   end
 
-  def prepare(%Message.SmsgForceSwimBackSpeedChange{speed: speed} = packet, %State{} = state) do
-    stamp(state, {:swim_back_speed, speed}, &%{packet | move_event: &1})
+  def prepare(%Message.SmsgForceSwimBackSpeedChange{} = packet, %State{} = state) do
+    stamp_speed(state, packet, :swim_back_speed)
   end
 
   def prepare(%Message.MsgMoveTeleportAck{} = packet, %State{} = state) do
@@ -127,6 +127,18 @@ defmodule ThistleTea.Game.Network.MovementControl do
   end
 
   def acknowledge_speed(%State{} = state, guid, counter, type, speed) do
+    case Map.get(state.pending_movement_acks, counter) do
+      {:controlled_speed, ^guid, ^type, sent} ->
+        if close?(sent, speed),
+          do: maybe_finish_repop(%{state | pending_movement_acks: Map.delete(state.pending_movement_acks, counter)}),
+          else: state
+
+      _ ->
+        acknowledge_player_speed(state, guid, counter, type, speed)
+    end
+  end
+
+  defp acknowledge_player_speed(state, guid, counter, type, speed) do
     case acknowledge(state, guid, counter, {type, speed}) do
       {:ok, state} -> maybe_finish_repop(state)
       {:error, state} -> state
@@ -212,6 +224,15 @@ defmodule ThistleTea.Game.Network.MovementControl do
     }
 
     {build_packet.(counter), state}
+  end
+
+  defp stamp_speed(state, packet, type) do
+    pending =
+      if packet.guid == state.guid,
+        do: {type, packet.speed},
+        else: {:controlled_speed, packet.guid, type, packet.speed}
+
+    stamp(state, pending, &%{packet | move_event: &1})
   end
 
   defp put_pending(pending, _counter, nil), do: pending

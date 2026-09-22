@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
   alias ThistleTea.Game.Network.Message.MsgMoveKnockBack
   alias ThistleTea.Game.Network.Message.MsgMoveTeleport
   alias ThistleTea.Game.Network.Message.SmsgClientControlUpdate
+  alias ThistleTea.Game.Network.Message.SmsgForceRunSpeedChange
   alias ThistleTea.Game.Network.Message.SmsgMonsterMove
   alias ThistleTea.Game.Network.Message.SmsgMoveKnockBack
   alias ThistleTea.Game.Time
@@ -278,6 +279,9 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
       impulse = %Effects.Knockback{cos_angle: 1.0, sin_angle: 0.0, horizontal_speed: 10.0, vertical_speed: 10.0}
       EventSink.emit(mob, impulse)
       assert_receive {:"$gen_cast", {:send_packet, %SmsgMoveKnockBack{guid: ^guid, vertical_speed: -10.0}, _}}
+
+      EventSink.emit(mob, Effects.movement_speed_changed(4.0))
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgForceRunSpeedChange{guid: ^guid, speed: 4.0}, _}}
     end
   end
 

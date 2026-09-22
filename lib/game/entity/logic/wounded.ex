@@ -14,7 +14,9 @@ defmodule ThistleTea.Game.Entity.Logic.Wounded do
   def aura_state(%Mob{unit: unit}), do: elem(band(unit), 1)
   def aura_state(_entity), do: 0
 
-  def speed_multiplier(%Mob{internal: %Internal{pet: %Pet{kind: kind}}}) when kind != :charmed, do: 1.0
+  def speed_multiplier(%Mob{internal: %Internal{pet: %Pet{kind: kind}}})
+      when kind in [:hunter, :summon, :guardian, :mini_pet, :creature_pet], do: 1.0
+
   def speed_multiplier(%Mob{internal: %Internal{creature: %Creature{rank: 3}}}), do: 1.0
 
   def speed_multiplier(%Mob{unit: unit} = mob) do

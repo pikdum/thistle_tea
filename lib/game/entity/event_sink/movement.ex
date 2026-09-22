@@ -167,7 +167,8 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
     entity
   end
 
-  def emit(%Mob{} = entity, %Effects.MovementSpeedChanged{movement_type: type}, context) do
+  def emit(%Mob{} = entity, %Effects.MovementSpeedChanged{movement_type: type, speed: speed}, context) do
+    controlled_speed(entity, type, speed)
     {entity, events} = MovementLogic.retime(entity, type, Time.now())
     Enum.reduce(events, entity, &emit(&2, &1, context))
   end
@@ -262,11 +263,14 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   defp speed_packet(:swim_speed, guid, speed), do: %Message.SmsgForceSwimSpeedChange{guid: guid, speed: speed}
   defp speed_packet(:swim_back_speed, guid, speed), do: %Message.SmsgForceSwimBackSpeedChange{guid: guid, speed: speed}
 
-  defp broadcast_speed(
-         %Character{object: %{guid: guid}, movement_block: %MovementBlock{} = movement} = entity,
-         type,
-         speed
-       ) do
+  defp controlled_speed(%Mob{internal: %{pet: %Pet{possessed?: true, owner_guid: owner}}} = entity, type, speed) do
+    World.broadcast_packet(speed_packet(type, entity.object.guid, speed), entity, recipients: [owner])
+    broadcast_speed(entity, type, speed)
+  end
+
+  defp controlled_speed(_entity, _type, _speed), do: :ok
+
+  defp broadcast_speed(%{object: %{guid: guid}, movement_block: %MovementBlock{} = movement} = entity, type, speed) do
     packet = struct!(observer_speed_module(type), guid: guid, movement_block: movement, speed: speed)
     World.broadcast_packet(packet, entity, include_self?: false)
   end
