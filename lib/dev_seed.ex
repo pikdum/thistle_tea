@@ -310,6 +310,8 @@ defmodule ThistleTea.DevSeed do
             position_z: z,
             orientation: 0.0,
             spawntimesecs: respawn_secs,
+            spawntimesecsmin: respawn_secs,
+            spawntimesecsmax: respawn_secs,
             spawndist: 0.0,
             movement_type: 0
         }
