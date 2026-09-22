@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Entity.Server.AIEnvironment
+  alias ThistleTea.Game.Entity.Server.FormationEnvironment
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Entity.Server.NavigationResolver
@@ -84,6 +85,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
     if Core.dead?(state) or even_if_alive?, do: respawn(state), else: state
   end
 
+  def force_group_member(%Mob{} = state) do
+    if Core.dead?(state), do: respawn(state, FormationEnvironment.respawn_position(state, Time.now())), else: state
+  end
+
   def despawn(%Mob{} = state, respawn_delay_ms) do
     cond do
       temporary?(state) ->
@@ -137,7 +142,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
 
   def maybe_continue(%Mob{} = _state), do: :ok
 
-  defp respawn(%Mob{} = state) do
+  defp respawn(%Mob{} = state, position \\ nil) do
     now = Time.now()
 
     state =
@@ -145,6 +150,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       |> Corpse.remove()
       |> Incarnation.renew()
       |> Mob.respawn()
+      |> at_position(position)
       |> TemporaryFaction.after_respawn()
       |> Mob.apply_addon_auras(now)
       |> BT.init(MobBT.tree())
@@ -157,6 +163,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
     kick_ai_tick()
     state
   end
+
+  defp at_position(state, nil), do: state
+
+  defp at_position(%Mob{} = state, position),
+    do: %{state | movement_block: %{state.movement_block | position: position}}
 
   defp register_group_respawn(%Mob{} = state) do
     CreatureGroups.respawn(state, self())

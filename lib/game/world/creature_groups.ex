@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.World.CreatureGroups do
   """
   use GenServer
 
+  alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
+  alias ThistleTea.Game.Entity.Data.Formation
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.CreatureGroup
   alias ThistleTea.Game.Entity.Logic.CreatureGroup.Member
@@ -13,6 +15,8 @@ defmodule ThistleTea.Game.World.CreatureGroups do
   alias ThistleTea.Game.WorldRef
 
   require Logger
+
+  @formation_table :creature_group_formations
 
   def start_link(opts \\ []) do
     name = Keyword.get(opts, :name, __MODULE__)
@@ -33,6 +37,8 @@ defmodule ThistleTea.Game.World.CreatureGroups do
     actor = %{
       guid: entity.object.guid,
       entry: entity.object.entry,
+      route: default_route(entity),
+      spawn_position: spawn_position(entity),
       pid: owner,
       alive?: entity.unit.health > 0,
       combat?: entity.internal.in_combat == true
@@ -61,6 +67,14 @@ defmodule ThistleTea.Game.World.CreatureGroups do
     GenServer.call(server, {:valid_command, world, guid, token, owner})
   end
 
+  def formation(world, guid, server \\ __MODULE__)
+
+  def formation(world, guid, __MODULE__) do
+    if :ets.whereis(@formation_table) != :undefined, do: lookup_formation(@formation_table, world, guid)
+  end
+
+  def formation(world, guid, server), do: GenServer.call(server, {:formation, world, guid})
+
   def stop_world(%WorldRef{} = world, server \\ __MODULE__) do
     GenServer.call(server, {:stop_world, world})
   end
@@ -75,6 +89,7 @@ defmodule ThistleTea.Game.World.CreatureGroups do
        actors: %{},
        guids: %{},
        monitors: %{},
+       formation_table: create_formation_table(opts),
        catalog: Keyword.get(opts, :catalog, &Catalog.get/2)
      }}
   end
@@ -103,6 +118,8 @@ defmodule ThistleTea.Game.World.CreatureGroups do
 
     state = ensure_group(state, world, id)
     state = %{state | tokens: Map.put(state.tokens, key, make_ref())}
+    state = update_group_lifecycle(state, key, :respawn)
+    state = publish_group(state, Map.get(state.memberships, key))
     if (respawn? or match?(%{alive?: false}, previous)) and actor.alive?, do: dispatch(state, key, :respawn)
     {:reply, :ok, state}
   end
@@ -117,6 +134,7 @@ defmodule ThistleTea.Game.World.CreatureGroups do
       {_world, id} = key
       group = CreatureGroup.add(group, id, member)
       state = put_group(state, world, group)
+      state = publish_group(state, group_key)
       {:reply, :ok, state}
     else
       _invalid -> {:reply, {:error, :invalid_membership}, state}
@@ -128,6 +146,10 @@ defmodule ThistleTea.Game.World.CreatureGroups do
       {:ok, key, _actor} -> {:reply, :ok, leave_group(state, key)}
       _invalid -> {:reply, {:error, :not_owner}, state}
     end
+  end
+
+  defp handle_request({:formation, world, guid}, state) do
+    {:reply, lookup_formation(state.formation_table, world, guid), state}
   end
 
   defp handle_request({:snapshot, world, guid}, state) do
@@ -166,6 +188,8 @@ defmodule ThistleTea.Game.World.CreatureGroups do
       |> Enum.filter(&(elem(&1, 0) == world))
       |> Enum.reduce(state, &detach_actor(&2, &1))
 
+    :ets.match_delete(state.formation_table, {{world, :_}, :_})
+
     {:reply, :ok,
      %{
        state
@@ -177,10 +201,29 @@ defmodule ThistleTea.Game.World.CreatureGroups do
   end
 
   @impl GenServer
+  def handle_cast({:event, world, guid, owner, {:waypoint, %WaypointRoute{} = route}}, state) do
+    with {:ok, {^world, id} = key, actor} <- owned_actor(state, world, guid, owner),
+         group_key when not is_nil(group_key) <- Map.get(state.memberships, key),
+         %CreatureGroup{} = group <- Map.get(state.groups, group_key) do
+      group = CreatureGroup.reached_waypoint(group, id, route.destination_point)
+      actor = if is_struct(actor.route, WaypointRoute), do: %{actor | route: route}, else: actor
+      state = %{state | groups: Map.put(state.groups, group_key, group), actors: Map.put(state.actors, key, actor)}
+      {:noreply, publish_group(state, group_key)}
+    else
+      _ungrouped -> {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("creature group waypoint crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_cast({:event, world, guid, owner, event}, state) do
     with {:ok, key, actor} <- owned_actor(state, world, guid, owner),
          {:changed, updated} <- transition(actor, event) do
       state = %{state | actors: Map.put(state.actors, key, updated)}
+      state = update_group_lifecycle(state, key, event)
+      state = publish_group(state, Map.get(state.memberships, key))
       dispatch(state, key, event)
       {:noreply, state}
     else
@@ -195,8 +238,12 @@ defmodule ThistleTea.Game.World.CreatureGroups do
   @impl GenServer
   def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
     case Map.get(state.monitors, ref) do
-      nil -> {:noreply, state}
-      key -> {:noreply, state |> detach_actor(key) |> forget_ungrouped_actor(key)}
+      nil ->
+        {:noreply, state}
+
+      key ->
+        state = state |> detach_actor(key) |> forget_ungrouped_actor(key)
+        {:noreply, publish_group(state, Map.get(state.memberships, key))}
     end
   rescue
     error ->
@@ -215,6 +262,12 @@ defmodule ThistleTea.Game.World.CreatureGroups do
   defp identity(%Mob{object: %{guid: guid}, internal: %{spawn: %{temporary?: true}}}), do: {:runtime, guid}
   defp identity(%Mob{internal: %{creature: %{db_guid: id}}}) when is_integer(id) and id > 0, do: id
   defp identity(%Mob{object: %{guid: guid}}), do: {:runtime, guid}
+
+  defp default_route(%Mob{internal: %{spawn: %{movement_type: 2, waypoint_route: %WaypointRoute{} = route}}}), do: route
+  defp default_route(%Mob{}), do: nil
+
+  defp spawn_position(%Mob{internal: %{spawn: %{position: position}}}), do: position
+  defp spawn_position(%Mob{}), do: nil
 
   defp ensure_group(state, world, id) do
     if Map.has_key?(state.memberships, {world, id}) do
@@ -244,14 +297,19 @@ defmodule ThistleTea.Game.World.CreatureGroups do
     with group_key when not is_nil(group_key) <- Map.get(state.memberships, key),
          %CreatureGroup{} = group <- Map.get(state.groups, group_key) do
       if id == group.leader do
+        Enum.each(CreatureGroup.member_ids(group), &clear_formation(state, {world, &1}))
         memberships = Enum.reduce(CreatureGroup.member_ids(group), state.memberships, &Map.put(&2, {world, &1}, nil))
         %{state | memberships: memberships, groups: Map.delete(state.groups, group_key)}
       else
-        %{
+        clear_formation(state, key)
+
+        state = %{
           state
           | memberships: Map.put(state.memberships, key, nil),
             groups: Map.put(state.groups, group_key, CreatureGroup.remove(group, id))
         }
+
+        publish_group(state, group_key)
       end
     else
       _ungrouped -> state
@@ -271,6 +329,7 @@ defmodule ThistleTea.Game.World.CreatureGroups do
     case Map.get(state.actors, key) do
       %{ref: ref, guid: guid} = actor when is_reference(ref) ->
         Process.demonitor(ref, [:flush])
+        :ets.delete(state.formation_table, {elem(key, 0), guid})
         actor = %{actor | ref: nil, pid: nil, present?: false}
 
         %{
@@ -314,6 +373,106 @@ defmodule ThistleTea.Game.World.CreatureGroups do
 
   defp actors(state, world, group) do
     Map.new(CreatureGroup.member_ids(group), &{&1, Map.get(state.actors, {world, &1})})
+  end
+
+  defp update_group_lifecycle(state, {world, id} = key, event) do
+    with group_key when not is_nil(group_key) <- Map.get(state.memberships, key),
+         %CreatureGroup{} = group <- Map.get(state.groups, group_key) do
+      updated =
+        case event do
+          :death -> CreatureGroup.on_death(group, id, actors(state, world, group))
+          :respawn -> CreatureGroup.on_respawn(group, id)
+          _event -> group
+        end
+
+      %{state | groups: Map.put(state.groups, group_key, updated)}
+    else
+      _ungrouped -> state
+    end
+  end
+
+  defp create_formation_table(opts) do
+    options = [:protected, read_concurrency: true]
+    options = if Keyword.get(opts, :name, __MODULE__) == __MODULE__, do: [:named_table | options], else: options
+    :ets.new(@formation_table, options)
+  end
+
+  defp lookup_formation(table, world, guid) do
+    case :ets.lookup(table, {world, guid}) do
+      [{_key, formation}] -> formation
+      [] -> nil
+    end
+  end
+
+  defp publish_group(state, nil), do: state
+
+  defp publish_group(state, {world, _leader} = key) do
+    case Map.get(state.groups, key) do
+      %CreatureGroup{} = group ->
+        if CreatureGroup.formation?(group) do
+          Enum.each(CreatureGroup.member_ids(group), &publish_formation(state, world, group, &1))
+        end
+
+      nil ->
+        :ok
+    end
+
+    state
+  end
+
+  defp publish_formation(state, world, group, id) do
+    case Map.get(state.actors, {world, id}) do
+      %{present?: true} = actor ->
+        leader = Map.get(state.actors, {world, group.active_leader})
+        original = Map.get(state.actors, {world, group.leader})
+        role = if id == group.active_leader, do: :leader, else: :follower
+        route = if role == :leader and id != group.leader and original, do: original.route
+
+        formation = %Formation{
+          token: state.tokens[{world, id}],
+          role: role,
+          leader_guid: present_guid(leader),
+          member: Map.get(group.members, id),
+          route: route,
+          last_waypoint: group.last_waypoint,
+          home_position: waypoint_position(original, group.last_waypoint),
+          original_guid: present_guid(original),
+          original_spawn: if(original, do: original.spawn_position)
+        }
+
+        key = {world, actor.guid}
+
+        if lookup_formation(state.formation_table, world, actor.guid) != formation do
+          :ets.insert(state.formation_table, {key, formation})
+          send(actor.pid, :formation_changed)
+        end
+
+      _absent ->
+        :ok
+    end
+  end
+
+  defp present_guid(%{present?: true, guid: guid}), do: guid
+  defp present_guid(_actor), do: nil
+
+  defp waypoint_position(%{route: %WaypointRoute{points: points}}, point) when point > 0 do
+    case Map.get(points, point) do
+      %{position: {x, y, z, _orientation}} -> {x, y, z}
+      nil -> nil
+    end
+  end
+
+  defp waypoint_position(_actor, _point), do: nil
+
+  defp clear_formation(state, {world, _id} = key) do
+    case Map.get(state.actors, key) do
+      %{present?: true} = actor ->
+        :ets.delete(state.formation_table, {world, actor.guid})
+        send(actor.pid, :formation_changed)
+
+      _absent ->
+        :ok
+    end
   end
 
   defp reject_world(map, world), do: Map.reject(map, fn {{member_world, _id}, _value} -> member_world == world end)

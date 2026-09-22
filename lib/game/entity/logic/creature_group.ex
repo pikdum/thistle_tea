@@ -6,15 +6,17 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureGroup do
 
   import Bitwise
 
+  alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
+
   @enforce_keys [:leader]
-  defstruct [:leader, members: %{}, flags: 0]
+  defstruct [:leader, :active_leader, members: %{}, flags: 0, last_waypoint: 0]
 
   defmodule Member do
     @moduledoc false
     defstruct distance: 0.0, angle: 0.0, flags: 0
   end
 
-  def new(leader), do: %__MODULE__{leader: leader}
+  def new(leader), do: %__MODULE__{leader: leader, active_leader: leader}
 
   def add(%__MODULE__{leader: leader} = group, leader, %Member{}), do: group
 
@@ -22,7 +24,41 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureGroup do
     %{group | members: Map.put(group.members, member, settings), flags: group.flags ||| settings.flags}
   end
 
-  def remove(%__MODULE__{} = group, member), do: %{group | members: Map.delete(group.members, member)}
+  def remove(%__MODULE__{} = group, member) do
+    leader = if group.active_leader == member, do: group.leader, else: group.active_leader
+    %{group | members: Map.delete(group.members, member), active_leader: leader}
+  end
+
+  def formation?(%__MODULE__{} = group), do: flag?(group, 1)
+
+  def on_death(%__MODULE__{active_leader: source} = group, source, actors) do
+    if formation?(group) and match?(%{present?: true, route: %WaypointRoute{}}, actors[group.leader]) do
+      leader =
+        group.members
+        |> Map.keys()
+        |> Enum.sort_by(&actor_guid(actors[&1]))
+        |> Enum.find(group.leader, fn id ->
+          id != source and match?(%{present?: true, alive?: true}, actors[id])
+        end)
+
+      %{group | active_leader: leader}
+    else
+      group
+    end
+  end
+
+  def on_death(%__MODULE__{} = group, _source, _actors), do: group
+
+  defp actor_guid(%{guid: guid}), do: guid
+  defp actor_guid(nil), do: 0
+
+  def on_respawn(%__MODULE__{leader: source} = group, source), do: %{group | active_leader: source}
+  def on_respawn(%__MODULE__{} = group, _source), do: group
+
+  def reached_waypoint(%__MODULE__{active_leader: source} = group, source, point) when is_integer(point),
+    do: %{group | last_waypoint: point}
+
+  def reached_waypoint(%__MODULE__{} = group, _source, _point), do: group
 
   def member_ids(%__MODULE__{} = group), do: [group.leader | Enum.sort(Map.keys(group.members))]
 

@@ -17,6 +17,21 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
   alias ThistleTea.Game.WorldRef
 
   describe "singleton lifecycle" do
+    test "activates a linked member outside the triggering cell and drains it when unobserved" do
+      {guid, group, world, key, _cell} = singleton_fixture()
+      trigger = {world, 100, 100}
+      member = {:game_object, Guid.low_guid(guid)}
+      on_exit(fn -> SpawnPool.stop_world(world) end)
+
+      assert :ok = SpawnPool.activate(group, trigger, game_object(guid), [member])
+      assert is_pid(await_entity(guid))
+      assert :ok = SpawnPool.deactivate_cells(key, [trigger], MapSet.new())
+      await_absent(guid)
+      assert :ok = SpawnPool.activate(group, trigger)
+      assert is_pid(await_entity(guid))
+      stop_pool(key)
+    end
+
     test "retains database identity across instance refreshes and repeated suspension" do
       db_guid = 8_000_000 + System.unique_integer([:positive])
       guid = Guid.from_low_guid(:game_object, 1, db_guid)

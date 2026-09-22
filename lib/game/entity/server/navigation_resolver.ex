@@ -37,10 +37,24 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
     case find_path.(world.map_id, start, destination, allow_steep: allow_steep) do
       path when is_list(path) ->
         path = path |> limit_path(start, max_distance) |> within_radius(start, within_radius)
+        opts = arrival_velocity(opts, [start | path], now)
         Movement.move_along_path(entity, path, opts, now)
 
       _no_path ->
         entity
+    end
+  end
+
+  defp arrival_velocity(opts, path, now) do
+    {deadline, opts} = Keyword.pop(opts, :arrive_at)
+    {maximum, opts} = Keyword.pop(opts, :max_velocity)
+
+    if is_integer(deadline) and is_number(maximum) and maximum > 0 do
+      distance = Math.movement_duration(path, 1.0)
+      velocity = min(distance * 1_000 / max(deadline - now, 1), maximum)
+      if velocity > 0, do: Keyword.put(opts, :velocity, velocity), else: opts
+    else
+      opts
     end
   end
 

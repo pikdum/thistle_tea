@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
             flee: nil,
             confusion: nil,
             critter: nil,
+            formation: nil,
             combat: %Combat{},
             spells: %Spells{},
             event_ai: %EventAI{},
@@ -52,7 +53,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   end
 
   def clear_move_target(%__MODULE__{navigation: navigation} = blackboard) do
-    %{blackboard | navigation: %{navigation | move_target: nil, target: nil}}
+    %{blackboard | navigation: %{navigation | move_target: nil, target: nil, returning_home?: false}}
   end
 
   def clear_waypoint(%__MODULE__{navigation: navigation} = blackboard) do

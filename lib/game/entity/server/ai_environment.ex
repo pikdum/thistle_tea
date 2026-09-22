@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Condition.Requirements
   alias ThistleTea.Game.Entity.Logic.Fear
+  alias ThistleTea.Game.Entity.Server.FormationEnvironment
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Player.Movement, as: PlayerMovement
   alias ThistleTea.Game.Time
@@ -73,7 +74,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       condition_area: condition_area(entity, requirements),
       liquid_surface: liquid_surface(entity),
       body_height: PlayerMovement.body_height(entity),
-      instance_data: instance_data(entity, requirements, options)
+      instance_data: instance_data(entity, requirements, options),
+      formation: FormationEnvironment.snapshot(entity, now)
     }
   end
 

@@ -40,7 +40,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       spawn = %Spawn{position: home, home_orientation: 1.25}
 
       blackboard = %Blackboard{
-        navigation: %Blackboard.Navigation{move_target: home}
+        navigation: %Blackboard.Navigation{move_target: home, returning_home?: true}
       }
 
       mob =

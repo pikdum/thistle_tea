@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.CreatureGroup, as: CreatureGroupLoader
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Mob.Batch
   alias ThistleTea.Game.World.Metadata
@@ -23,15 +24,19 @@ defmodule ThistleTea.Game.World.Loader.Mob do
       |> Mangos.Creature.query_cell(events)
       |> Mangos.Repo.all()
 
+    creatures = include_formation_members(creatures, events)
+
     {pooled, singletons} =
       Enum.split_with(creatures, fn creature ->
         match?({:pool, _pool_id}, Catalog.group_for(:creature, creature.guid))
       end)
 
     pooled
-    |> Enum.map(&Catalog.group_for(:creature, &1.guid))
-    |> Enum.uniq()
-    |> Enum.each(fn group -> :ok = SpawnPool.activate(group, cell) end)
+    |> Enum.group_by(&Catalog.group_for(:creature, &1.guid))
+    |> Enum.each(fn {group, creatures} ->
+      members = Enum.map(creatures, &{:creature, &1.guid})
+      :ok = SpawnPool.activate(group, cell, nil, members)
+    end)
 
     singletons
     |> Batch.load()
@@ -39,6 +44,19 @@ defmodule ThistleTea.Game.World.Loader.Mob do
       group = Catalog.group_for(:creature, creature.guid)
       :ok = SpawnPool.activate(group, cell, Mob.build(creature))
     end)
+  end
+
+  defp include_formation_members([], _events), do: []
+
+  defp include_formation_members([%Mangos.Creature{map: map} | _] = creatures, events) do
+    ids = Enum.map(creatures, & &1.guid)
+    missing = CreatureGroupLoader.formation_members(map, ids) -- ids
+
+    if missing == [] do
+      creatures
+    else
+      creatures ++ (missing |> Mangos.Creature.query_guids(events) |> Mangos.Repo.all())
+    end
   end
 
   def blueprints(guids, events \\ GameEvent.get_events()) when is_list(guids) do

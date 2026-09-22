@@ -807,6 +807,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     |> run_ai_tick()
   end
 
+  def handle_info(:formation_changed, state), do: {:noreply, wake_ai_tick(state)}
+
   def handle_info({:target_moved, target}, %Mob{unit: %Unit{target: target}} = state) when is_integer(target) do
     state
     |> mark_chase_ready()
@@ -1474,7 +1476,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     |> wake_ai_tick()
   end
 
-  defp apply_creature_group_command(%Mob{} = state, :respawn), do: Respawn.force(state, false)
+  defp apply_creature_group_command(%Mob{} = state, :respawn), do: Respawn.force_group_member(state)
 
   defp apply_creature_group_command(%Mob{} = state, {:member_died, guid, entry, leader?}) do
     if Core.dead?(state) do

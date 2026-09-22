@@ -29,6 +29,8 @@ defmodule ThistleTea.Game.World.Loader.CreatureGroupTest do
       assert group == Loader.get(1, 37_567)
       assert CreatureGroup.member_ids(group) |> length() > 2
       assert Loader.get(0, 37_523) == nil
+      assert Loader.formation_members(1, [37_523]) == []
+      assert Enum.sort(Loader.formation_members(0, [4_479])) == [4_479, 4_480, 4_481]
     end
   end
 end

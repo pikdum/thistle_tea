@@ -40,4 +40,16 @@ defmodule ThistleTea.Game.World.Loader.CreatureGroup do
   end
 
   def get(map, id), do: @key |> :persistent_term.get(%{}) |> Map.get({map, id})
+
+  def formation_members(map, ids) do
+    ids
+    |> Enum.flat_map(&formation_ids(get(map, &1)))
+    |> Enum.uniq()
+  end
+
+  defp formation_ids(%CreatureGroup{} = group) do
+    if CreatureGroup.formation?(group), do: CreatureGroup.member_ids(group), else: []
+  end
+
+  defp formation_ids(nil), do: []
 end

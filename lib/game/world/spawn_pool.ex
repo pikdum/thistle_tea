@@ -39,7 +39,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
     %{id: {__MODULE__, key}, start: {__MODULE__, :start_link, [opts]}, restart: :permanent}
   end
 
-  def activate(group, {world, _x, _y} = cell, blueprint \\ nil) do
+  def activate(group, {world, _x, _y} = cell, blueprint \\ nil, linked_members \\ []) do
     world = WorldRef.coerce(world)
     cell = put_elem(cell, 0, world)
 
@@ -47,7 +47,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
       key = {world, group}
 
       with {:ok, pid} <- ensure_started(key, blueprint) do
-        GenServer.call(pid, {:activate, cell, blueprint}, @activation_timeout_ms)
+        GenServer.call(pid, {:activate, cell, blueprint, linked_members}, @activation_timeout_ms)
       end
     else
       :ok
@@ -223,6 +223,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
        blueprints: blueprints,
        selection: selection,
        active_cells: MapSet.new(),
+       member_cells: %{},
        running: %{},
        monitors: %{},
        drain_ref: nil
@@ -235,8 +236,10 @@ defmodule ThistleTea.Game.World.SpawnPool do
   end
 
   @impl GenServer
-  def handle_call({:activate, cell, blueprint}, _from, state) do
+  def handle_call({:activate, cell, blueprint, linked_members}, _from, state) do
     state = maybe_put_blueprint(state, blueprint)
+    state = link_member_cell(state, cell, blueprint)
+    state = Enum.reduce(linked_members, state, &put_member_cell(&2, cell, &1))
     state = %{state | active_cells: MapSet.put(state.active_cells, cell)}
     CellIndex.register(cell, state.key)
     {state, errors} = start_selected_with_errors(state)
@@ -452,9 +455,24 @@ defmodule ThistleTea.Game.World.SpawnPool do
 
   defp selected_cell_active?(state, member) do
     case Map.get(state.blueprints, member) do
-      nil -> false
-      blueprint -> MapSet.member?(state.active_cells, cell(blueprint))
+      nil ->
+        false
+
+      blueprint ->
+        cells = Map.get(state.member_cells, member, MapSet.new()) |> MapSet.put(cell(blueprint))
+        not MapSet.disjoint?(state.active_cells, cells)
     end
+  end
+
+  defp link_member_cell(state, cell, %Mob{} = blueprint) do
+    put_member_cell(state, cell, member_key(blueprint))
+  end
+
+  defp link_member_cell(state, _cell, _blueprint), do: state
+
+  defp put_member_cell(state, cell, member) do
+    cells = state.member_cells |> Map.get(member, MapSet.new()) |> MapSet.put(cell)
+    %{state | member_cells: Map.put(state.member_cells, member, cells)}
   end
 
   defp start_member(state, member, errors) do

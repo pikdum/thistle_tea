@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Formation, as: FormationMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Navigation, as: NavigationMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Confusion
@@ -24,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Detection
   alias ThistleTea.Game.Entity.Logic.AI.BT.Fear, as: FearBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Flee
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Formation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
@@ -80,6 +82,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   def tree do
     BT.selector([
+      BT.action(&Formation.sync/3),
       BT.action(&critter_escape/3),
       BT.sequence([
         BT.condition(&tether_target_set?/2),
@@ -117,14 +120,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
           BT.sequence([
             BT.condition(&target_dead?/3),
             BT.action(&eventai_target_dead/3),
-            BT.action(&set_tether_target/2),
+            BT.action(&set_tether_target/3),
             BT.action(&clear_combat/3),
             BT.action(&move_to_target_with_context/3)
           ]),
           BT.sequence([
             BT.condition(&should_tether?/3),
             BT.action(&eventai_evade/3),
-            BT.action(&set_tether_target/2),
+            BT.action(&set_tether_target/3),
             BT.action(&clear_combat/3),
             BT.action(&heal_to_full/2),
             BT.action(&move_to_target_with_context/3)
@@ -162,6 +165,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         BT.action(&move_to_target_with_context/3),
         BT.action(&wait_for_scripted_home/3)
       ]),
+      BT.action(&Formation.tick/3),
       BT.sequence([
         BT.condition(&has_waypoints?/2),
         BT.action(&wait_until_waypoint_ready/3),
@@ -570,13 +574,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp target_dead_in_perception?(_target, _perception), do: false
 
+  defp tether_target_set?(%Mob{unit: %Unit{health: health}}, _blackboard) when is_number(health) and health <= 0,
+    do: false
+
   defp tether_target_set?(%Mob{}, %Blackboard{navigation: %NavigationMemory{movement_override: :home}}), do: false
 
-  defp tether_target_set?(%Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}}, %Blackboard{
-         navigation: %NavigationMemory{move_target: {x, y, z}}
-       }) do
-    true
-  end
+  defp tether_target_set?(%Mob{}, %Blackboard{navigation: %NavigationMemory{returning_home?: true}}), do: true
 
   defp tether_target_set?(_state, _blackboard), do: false
 
@@ -617,13 +620,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp set_tether_target(
          %Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}} = state,
-         %Blackboard{} = blackboard
+         %Blackboard{} = blackboard,
+         %Context{} = context
        ) do
-    navigation = %{blackboard.navigation | target: {x, y, z}}
+    navigation = %{blackboard.navigation | target: Formation.home_position(context) || {x, y, z}, returning_home?: true}
     {:success, state, %{blackboard | navigation: navigation}}
   end
 
-  defp set_tether_target(%Mob{} = state, %Blackboard{} = blackboard) do
+  defp set_tether_target(%Mob{} = state, %Blackboard{} = blackboard, %Context{}) do
     {:failure, state, blackboard}
   end
 
@@ -662,7 +666,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {state, blackboard} = EventAI.on_leave_combat(state, blackboard, now, context)
     {state, blackboard} = EventAI.on_evade(state, blackboard, now, context)
 
-    case set_tether_target(state, blackboard) do
+    case set_tether_target(state, blackboard, context) do
       {:success, state, blackboard} ->
         {:success, state, blackboard} = clear_combat(state, blackboard, context)
         {:success, state, blackboard} = heal_to_full(state, blackboard)
@@ -1359,6 +1363,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp apply_waypoint(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
     state =
+      case waypoint_route(state, blackboard) do
+        %WaypointRoute{} = route -> Effects.enqueue(state, Effects.creature_group_event({:waypoint, route}))
+        nil -> state
+      end
+
+    state =
       case blackboard.navigation.orientation do
         o when is_number(o) -> set_orientation(state, o)
         _ -> state
@@ -1420,6 +1430,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     route
   end
 
+  defp waypoint_route(%Mob{}, %Blackboard{formation: %FormationMemory{route: %WaypointRoute{} = route}}), do: route
+
   defp waypoint_route(%Mob{internal: %Internal{spawn: %Spawn{waypoint_route: %WaypointRoute{} = route}}}, %Blackboard{}) do
     route
   end
@@ -1433,6 +1445,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
        ) do
     navigation = %{navigation | scripted_waypoint_route: WaypointRoute.increment_waypoint(route)}
     {state, %{blackboard | navigation: navigation}}
+  end
+
+  defp increment_waypoint(
+         %Mob{} = state,
+         %Blackboard{formation: %FormationMemory{route: %WaypointRoute{} = route} = formation} = blackboard
+       ) do
+    {state, %{blackboard | formation: %{formation | route: WaypointRoute.increment_waypoint(route)}}}
   end
 
   defp increment_waypoint(

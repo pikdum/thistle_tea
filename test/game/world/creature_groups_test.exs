@@ -3,6 +3,9 @@ defmodule ThistleTea.Game.World.CreatureGroupsTest do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Waypoint
+  alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
@@ -142,9 +145,63 @@ defmodule ThistleTea.Game.World.CreatureGroupsTest do
     end
   end
 
-  defp groups(_context) do
-    group = CreatureGroup.new(1) |> CreatureGroup.add(2, %Member{flags: 14})
-    catalog = fn _map, id -> if id in [1, 2], do: group end
+  describe "formation/3" do
+    @tag formation?: true
+    test "promotes survivors on the original route and restores the original leader on respawn", %{
+      server: server,
+      world: world
+    } do
+      route = %WaypointRoute{
+        first_point: 4,
+        destination_point: 4,
+        points: %{4 => %Waypoint{position: {0.0, 0.0, 0.0, nil}}, 5 => %Waypoint{position: {10.0, 0.0, 0.0, nil}}}
+      }
+
+      leader = mob(world, 1, 101)
+      leader = %{leader | internal: %{leader.internal | spawn: %Spawn{movement_type: 2, waypoint_route: route}}}
+      second = mob(world, 2, 102)
+      third = mob(world, 3, 103)
+      Enum.each([leader, second, third], &CreatureGroups.register(&1, self(), server))
+      assert %{role: :follower, leader_guid: 101} = CreatureGroups.formation(world, 102, server)
+      CreatureGroups.event(leader, {:waypoint, %{route | destination_point: 5}}, self(), server)
+      CreatureGroups.event(leader, :death, self(), server)
+
+      assert %{role: :leader, leader_guid: 102, route: inherited, last_waypoint: 5} =
+               CreatureGroups.formation(world, 102, server)
+
+      assert inherited.points == route.points
+      assert %{role: :follower, leader_guid: 102} = CreatureGroups.formation(world, 103, server)
+      assert CreatureGroups.snapshot(world, 103, server).leader == 1
+      CreatureGroups.event(second, :death, self(), server)
+      assert %{role: :leader, leader_guid: 103} = CreatureGroups.formation(world, 103, server)
+      CreatureGroups.respawn(leader, self(), server)
+      assert %{role: :leader, leader_guid: 101, route: nil} = CreatureGroups.formation(world, 101, server)
+      assert %{role: :follower, leader_guid: 101} = CreatureGroups.formation(world, 103, server)
+      assert CreatureGroups.formation(WorldRef.instance(world.map_id, 2), 103, server) == nil
+    end
+
+    @tag formation?: true
+    test "leaving and disbanding remove formation snapshots", %{server: server, world: world} do
+      Enum.each(
+        [mob(world, 1, 101), mob(world, 2, 102), mob(world, 3, 103)],
+        &CreatureGroups.register(&1, self(), server)
+      )
+
+      CreatureGroups.leave(world, 102, self(), server)
+      assert CreatureGroups.formation(world, 102, server) == nil
+      assert CreatureGroups.formation(world, 103, server)
+      CreatureGroups.leave(world, 101, self(), server)
+      assert CreatureGroups.formation(world, 101, server) == nil
+      assert CreatureGroups.formation(world, 103, server) == nil
+    end
+  end
+
+  defp groups(context) do
+    flags = if context[:formation?], do: 1, else: 14
+    group = CreatureGroup.new(1) |> CreatureGroup.add(2, %Member{flags: flags})
+    group = if context[:formation?], do: CreatureGroup.add(group, 3, %Member{flags: flags}), else: group
+    ids = CreatureGroup.member_ids(group)
+    catalog = fn _map, id -> if id in ids, do: group end
     server = start_supervised!({CreatureGroups, name: nil, catalog: catalog})
     %{server: server, world: WorldRef.instance(36, 1)}
   end
