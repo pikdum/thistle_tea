@@ -40,6 +40,18 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   end
 
   describe "emit/2" do
+    test "delivers item transformation only to the explicit player owner" do
+      character = %Character{object: %Object{guid: unique_guid()}}
+      spell = %Spell{id: 21_180}
+      effect = %Effects.TransformItem{cast_item_guid: 42, spell: spell, item_id: 17_223}
+      EventSink.emit(character, effect)
+      refute_received {:transform_item, _, _, _}
+      EventSink.emit(character, effect, Context.new(self()))
+      assert_received {:transform_item, 42, ^spell, 17_223}
+      EventSink.emit(%Mob{}, effect, Context.new(self()))
+      refute_received {:transform_item, _, _, _}
+    end
+
     test "delivers scripted casts only through the explicit player owner context" do
       character = %Character{object: %Object{guid: unique_guid()}}
       entry = %CreatureSpell{spell_id: 15_065}

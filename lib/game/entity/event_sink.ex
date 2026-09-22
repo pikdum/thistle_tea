@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.StopMirrorTimer,
     Effects.CancelAutoRepeat,
     Effects.ConsumeCastItem,
+    Effects.TransformItem,
     Effects.ConsumeReagents,
     Effects.LaunchRanged,
     Effects.CreateItem,

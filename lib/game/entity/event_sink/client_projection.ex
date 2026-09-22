@@ -45,6 +45,13 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
 
   def emit(entity, %Effects.ConsumeCastItem{}, _context), do: entity
 
+  def emit(%Character{} = entity, %Effects.TransformItem{} = effect, context) do
+    Context.send(context, {:transform_item, effect.cast_item_guid, effect.spell, effect.item_id})
+    entity
+  end
+
+  def emit(entity, %Effects.TransformItem{}, _context), do: entity
+
   def emit(%Character{} = entity, %Effects.FeedPet{} = effect, context) do
     Context.send(context, {:feed_pet, effect.cast_item_guid, effect.target_guid, effect.spell_id, effect.range_yards})
     entity

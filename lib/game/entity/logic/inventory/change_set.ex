@@ -77,10 +77,13 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory.ChangeSet do
   end
 
   defp put_destroyed(%__MODULE__{} = change_set, %Item{object: %{guid: guid}} = item) do
+    placements = Enum.reject(change_set.placements, &(&1.incoming_guid == guid and &1.status == :placed))
+
     %{
       change_set
       | changed: Map.delete(change_set.changed, guid),
-        destroyed: Map.put(change_set.destroyed, guid, item)
+        destroyed: Map.put(change_set.destroyed, guid, item),
+        placements: placements
     }
   end
 

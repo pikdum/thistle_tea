@@ -1048,6 +1048,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
+  def handle_info({:transform_item, _item_guid, _spell, _entry} = command, state) do
+    {:noreply, ItemCosts.apply(state, command), {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Item transformation failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   @impl GenServer
   def handle_info({:expire_item_enchantment, item_guid, token}, state) do
     state = Enchantments.expire(state, item_guid, token)

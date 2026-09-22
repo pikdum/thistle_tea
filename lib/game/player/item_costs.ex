@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.ItemCosts do
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.Gathering
   alias ThistleTea.Game.Player.Items
+  alias ThistleTea.Game.Player.ItemTransformation
   alias ThistleTea.Game.Player.Teaching
   alias ThistleTea.Game.World.ItemStore
 
@@ -23,6 +24,7 @@ defmodule ThistleTea.Game.Player.ItemCosts do
     :launch_ranged,
     :enchant_item,
     :enchant_item_permanent,
+    :transform_item,
     :disenchant_item,
     :open_lock
   ]
@@ -36,6 +38,8 @@ defmodule ThistleTea.Game.Player.ItemCosts do
   end
 
   def apply(state, {:consume_cast_item, guid}), do: Items.consume_cast_item(state, guid)
+
+  def apply(state, {:transform_item, guid, spell, entry}), do: ItemTransformation.complete(state, guid, spell, entry)
 
   def apply(state, {:teach_spell, effect}), do: Teaching.complete(state, effect)
 

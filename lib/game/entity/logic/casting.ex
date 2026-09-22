@@ -275,6 +275,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> queue_farsight(casting)
       |> queue_summon_objects(casting)
       |> queue_item_enchantments(casting)
+      |> queue_item_transformation(casting)
       |> queue_feed_pet(casting)
       |> queue_open_object(casting)
       |> queue_pickpocket(casting)
@@ -411,7 +412,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp deferred_item_costs?(%Cast{spell: spell, cast_item_guid: item_guid}) do
     Enchantments.item_enchant?(spell) or (is_integer(item_guid) and SpellTeaching.spell?(spell)) or
-      Enum.any?(spell.effects, &(&1.type == :open_lock))
+      Enum.any?(spell.effects, &(&1.type in [:open_lock, :summon_change_item]))
   end
 
   defp power_cost(entity, %Spell{} = spell) do
@@ -611,6 +612,18 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp queue_disenchant(character, _casting), do: character
+
+  defp queue_item_transformation(%Character{} = character, %Cast{spell: spell, cast_item_guid: guid})
+       when is_integer(guid) and guid > 0 do
+    events =
+      for %Spell.Effect{type: :summon_change_item, misc_value: entry} <- spell.effects,
+          is_integer(entry) and entry > 0,
+          do: %Effects.TransformItem{cast_item_guid: guid, spell: spell, item_id: entry}
+
+    Effects.enqueue(character, events)
+  end
+
+  defp queue_item_transformation(character, _casting), do: character
 
   defp queue_item_enchantments(%Character{player: player} = character, %Cast{
          spell: %Spell{} = spell,

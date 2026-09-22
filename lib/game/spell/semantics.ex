@@ -143,6 +143,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
     :skinning,
     :disenchant,
     :create_item,
+    :summon_change_item,
     :open_lock,
     :activate_object,
     :enchant_item,

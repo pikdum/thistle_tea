@@ -120,6 +120,18 @@ defmodule ThistleTea.Game.Entity.Data.Item do
 
   def temporary_enchantment_slot, do: @temporary_enchantment_slot
 
+  def copy_enchantments(%__MODULE__{} = target, %__MODULE__{} = source, now) do
+    {source, _enchantment} = refresh_temporary_enchantment(source, now)
+
+    target =
+      for slot <- 0..@temporary_enchantment_slot, offset <- 0..2, reduce: target do
+        item -> put_enchantment_word(item, slot, offset, enchantment_word(source, slot, offset))
+      end
+
+    enchantments = source.internal |> Map.get(:enchantments, %{}) |> Map.take([@temporary_enchantment_slot])
+    put_internal_enchantments(target, enchantments)
+  end
+
   def put_permanent_enchantment(%__MODULE__{} = item, enchantment_id) do
     item
     |> put_enchantment_word(0, 0, enchantment_id)

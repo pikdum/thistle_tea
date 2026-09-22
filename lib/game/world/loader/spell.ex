@@ -419,7 +419,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   defp effect_type(_row, type_int), do: effect_type(type_int)
 
-  defp effect_misc_value(mod, row, index, :create_item, _aura) do
+  defp effect_misc_value(mod, row, index, type, _aura) when type in [:create_item, :summon_change_item] do
     int_field(mod, :effect_item_type, row, :"effect_item_type_#{index}") || 0
   end
 
@@ -546,6 +546,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(22), do: :parry
   defp effect_type(23), do: :block
   defp effect_type(24), do: :create_item
+  defp effect_type(34), do: :summon_change_item
   defp effect_type(25), do: :weapon
   defp effect_type(29), do: :leap
   defp effect_type(30), do: :energize

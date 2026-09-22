@@ -214,13 +214,49 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     |> Enum.reject(&is_nil/1)
   end
 
-  def plan(%Batch{} = batch, get_item) when is_function(get_item, 1) do
+  def plan(%Batch{} = batch, get_item, opts \\ []) when is_function(get_item, 1) do
     change_set = ChangeSet.new(batch.player)
 
     with {:ok, change_set} <- plan_removals(change_set, Batch.removals(batch), get_item),
+         {:ok, change_set} <- plan_replacements(change_set, Batch.replacements(batch), get_item, opts),
          {:ok, change_set} <- plan_relocations(change_set, Batch.relocations(batch), get_item),
          {:ok, change_set} <- plan_additions(change_set, Batch.additions(batch), get_item) do
       plan_updates(change_set, Batch.updates(batch), get_item)
+    end
+  end
+
+  defp plan_replacements(change_set, [], _get_item, _opts), do: {:ok, change_set}
+
+  defp plan_replacements(change_set, [%Batch.Replacement{guid: guid, item: item} | rest], get_item, opts) do
+    lookup = &ChangeSet.get_item(change_set, &1, get_item)
+    ctx = ctx(change_set.player, opts[:unit], opts[:proficiency], item.item.owner, lookup, opts)
+
+    with %Item{item: %{owner: owner}} = original <- lookup.(guid),
+         true <- owner == item.item.owner and guid != item.object.guid and is_nil(lookup.(item.object.guid)),
+         {_bag, _slot} = position <- find_position(ctx.player, guid, :all_owned, lookup),
+         {:ok, result, placed} <- replace_item(ctx, original, item, position) do
+      change_set = change_set |> ChangeSet.absorb(result) |> ChangeSet.place(item, {:placed, position, placed})
+      plan_replacements(change_set, rest, get_item, opts)
+    else
+      {:error, reason} -> {:error, reason}
+      _ -> {:error, :item_not_found}
+    end
+  end
+
+  defp replace_item(ctx, original, item, position) do
+    with :ok <- validate_bag_empty_if_bag(ctx, original),
+         ctx = put_pos(ctx, position, nil),
+         true <-
+           limit_new_count(ctx.player, Item.template(item), stack_count(item), &get_item(ctx, &1)) >= stack_count(item),
+         {:ok, _position} <- valid_destination(ctx, position),
+         :ok <- validate_placement(ctx, item, position),
+         :ok <- validate_two_hand(ctx, item, position, position, nil) do
+      ctx = ctx |> put_pos(position, item) |> store_offhand_if_two_hand(item, position)
+      {ctx, placed} = pop_changed(ctx, item)
+      {:ok, result(%{ctx | destroyed: [original]}), placed}
+    else
+      false -> {:error, :cant_carry_more_of_this}
+      error -> error
     end
   end
 
@@ -929,6 +965,9 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   end
 
   defp validate_bag_cycle(_ctx, _item, _dst_pos), do: :ok
+
+  defp validate_equipment_placement(%{unit: nil}, _template, _slot), do: {:error, :item_cant_be_equipped}
+  defp validate_equipment_placement(%{prof: nil}, _template, _slot), do: {:error, :item_cant_be_equipped}
 
   defp validate_equipment_placement(ctx, template, slot) do
     with :ok <- can_use(ctx.unit, ctx.prof, template, ctx.player),

@@ -1229,6 +1229,40 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
              )
     end
 
+    test "item transformation replaces only its casting item and defers all inventory costs" do
+      spell = %Spell{
+        id: 21_180,
+        cast_time_ms: 1000,
+        reagents: [{10, 1}],
+        effects: [%Effect{type: :summon_change_item, misc_value: 17_223}]
+      }
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100},
+        player: %Player{},
+        internal: %Internal{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      casting = Casting.start(character, spell, Target.item(42), 1000, 43)
+      cancelled = casting |> Casting.cancel() |> Casting.complete(2000)
+      refute Enum.any?(cancelled.internal.events, &is_struct(&1, Effects.TransformItem))
+      completed = Casting.complete(casting, 2000)
+
+      assert [%Effects.TransformItem{cast_item_guid: 43, spell: ^spell, item_id: 17_223}] =
+               Enum.filter(completed.internal.events, &is_struct(&1, Effects.TransformItem))
+
+      refute Enum.any?(
+               completed.internal.events,
+               &(is_struct(&1, Effects.ConsumeReagents) or is_struct(&1, Effects.ConsumeCastItem))
+             )
+
+      assert Casting.complete(completed, 3000) == completed
+      no_item = character |> Casting.start(spell, Target.item(42), 1000) |> Casting.complete(2000)
+      refute Enum.any?(no_item.internal.events, &is_struct(&1, Effects.TransformItem))
+    end
+
     test "queues self spell hit events after spell go" do
       spell = %Spell{id: 133, school: :fire, effects: [%Effect{type: :school_damage, base_points: 5, die_sides: 0}]}
 
