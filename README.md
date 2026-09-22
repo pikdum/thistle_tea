@@ -151,6 +151,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Passive on-equip item spells](docs/equipment-passives-playtest.md), with crit, hit, dodge, mana regeneration, item procs, durability and reconnect lifecycles, and form restrictions
 - [Learned defensive capabilities](docs/defensive-capabilities-playtest.md), with Shaman Parry talent learning and reset, defense skill projection, weapon requirements, sheath restrictions, and reconnect validation
 - equipment durability, combat and death wear, broken-gear penalties, and vendor repairs with reputation discounts
+- [Spell-driven durability](docs/spell-durability-playtest.md), with exact-slot and carried-gear wear, percentage damage, negative-point repairs, execution logs, and restored equipment effects
 - alcohol intoxication, client drunkenness effects, gradual sobering, and death cleanup
 - looting + group loot
 - Rogue Pick Pocket, with private loot, quest drops, and failed-attempt retaliation
