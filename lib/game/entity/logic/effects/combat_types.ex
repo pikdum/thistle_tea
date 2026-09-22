@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
   @moduledoc false
 
   effects = [
+    {:CombatLeashEvent, [:ref, :event], []},
     {:CreatureGroupEvent, [:event], []},
     {:CreatureGroupCommand, [:command], []},
     {:PlayerDefeated, [:source_guid, :count_death?], []},

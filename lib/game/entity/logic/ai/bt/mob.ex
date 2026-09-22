@@ -553,8 +553,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {:success, state, blackboard}
   end
 
-  def should_tether?(%Mob{} = state, blackboard, %Context{now: now}) do
-    should_tether?(state, blackboard, now)
+  def should_tether?(%Mob{} = state, _blackboard, %Context{now: now, perception: perception} = context) do
+    target = state.unit.target
+
+    Core.should_tether?(state, now,
+      shared_time: context.shared_leash_time,
+      attack_distance: aggro_radius(state, target, perception),
+      victim_position: Perception.position(perception, target)
+    )
   end
 
   def should_tether?(%Mob{} = state, _blackboard, now) when is_integer(now) do

@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.World.CallForHelpTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.CombatLeash
+  alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.CallForHelp
   alias ThistleTea.Game.World.Metadata
@@ -15,13 +17,24 @@ defmodule ThistleTea.Game.World.CallForHelpTest do
   alias ThistleTea.Game.WorldRef
 
   describe "assist/2" do
+    test "captures the caller's current fight reference for initial assistance" do
+      {caller, enemy_guid} = combat_scene()
+      put_helper({5.0, 0.0, 0.0})
+      %{entity: caller} = Engagement.enter(caller, enemy_guid, 1_000)
+      source = CombatLeash.reference(caller)
+      CallForHelp.assist(caller, enemy_guid)
+      assert_receive {:"$gen_cast", {:assist_attack, ^enemy_guid, ^source}}
+      CallForHelp.pulse(caller, enemy_guid)
+      assert_receive {:"$gen_cast", {:assist_attack, ^enemy_guid}}
+    end
+
     test "recruits a same-faction helper in range against the attacker" do
       {caller, enemy_guid} = combat_scene()
       helper_guid = put_helper({5.0, 0.0, 0.0})
 
       CallForHelp.assist(caller, enemy_guid)
 
-      assert_receive {:"$gen_cast", {:assist_attack, ^enemy_guid}}
+      assert_receive {:"$gen_cast", {:assist_attack, ^enemy_guid, nil}}
       _ = helper_guid
     end
 
@@ -31,7 +44,7 @@ defmodule ThistleTea.Game.World.CallForHelpTest do
 
       CallForHelp.assist(caller, enemy_guid)
 
-      refute_receive {:"$gen_cast", {:assist_attack, _target}}
+      refute_receive {:"$gen_cast", {:assist_attack, _target, _source}}
     end
 
     test "skips helpers beyond the assistance radius" do
@@ -40,7 +53,7 @@ defmodule ThistleTea.Game.World.CallForHelpTest do
 
       CallForHelp.assist(caller, enemy_guid)
 
-      refute_receive {:"$gen_cast", {:assist_attack, _target}}
+      refute_receive {:"$gen_cast", {:assist_attack, _target, _source}}
     end
 
     test "skips factions that do not respond to calls for help" do
@@ -49,7 +62,7 @@ defmodule ThistleTea.Game.World.CallForHelpTest do
 
       CallForHelp.assist(caller, enemy_guid)
 
-      refute_receive {:"$gen_cast", {:assist_attack, _target}}
+      refute_receive {:"$gen_cast", {:assist_attack, _target, _source}}
     end
 
     test "skips factions that flee from calls for help" do
@@ -58,7 +71,7 @@ defmodule ThistleTea.Game.World.CallForHelpTest do
 
       CallForHelp.assist(caller, enemy_guid)
 
-      refute_receive {:"$gen_cast", {:assist_attack, _target}}
+      refute_receive {:"$gen_cast", {:assist_attack, _target, _source}}
     end
 
     test "skips dead helpers and pets" do
@@ -68,7 +81,7 @@ defmodule ThistleTea.Game.World.CallForHelpTest do
 
       CallForHelp.assist(caller, enemy_guid)
 
-      refute_receive {:"$gen_cast", {:assist_attack, _target}}
+      refute_receive {:"$gen_cast", {:assist_attack, _target, _source}}
     end
 
     test "skips helpers friendly to the enemy" do
@@ -77,7 +90,7 @@ defmodule ThistleTea.Game.World.CallForHelpTest do
 
       CallForHelp.assist(caller, enemy_guid)
 
-      refute_receive {:"$gen_cast", {:assist_attack, _target}}
+      refute_receive {:"$gen_cast", {:assist_attack, _target, _source}}
     end
   end
 

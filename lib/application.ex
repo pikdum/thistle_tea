@@ -16,6 +16,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Battleground.Supervisor, as: BattlegroundSupervisor
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ChaseWatch
+  alias ThistleTea.Game.World.CombatLeashes
   alias ThistleTea.Game.World.CreatureGroups
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.Groups
@@ -135,6 +136,7 @@ defmodule ThistleTea.Application do
         PartySystem,
         ScriptedEventSystem,
         CreatureGroups,
+        CombatLeashes,
         InstanceSystem,
         DuelSystem,
         {Group, name: Groups, log: false},

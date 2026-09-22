@@ -345,6 +345,7 @@ defmodule ThistleTea.Game.World.CreatureGroups do
   end
 
   defp transition(%{combat?: false, alive?: true} = actor, {:attack, _target}), do: {:changed, %{actor | combat?: true}}
+  defp transition(actor, {:attack, target, _leash}), do: transition(actor, {:attack, target})
   defp transition(%{combat?: true} = actor, :evade), do: {:changed, %{actor | combat?: false}}
   defp transition(%{alive?: true} = actor, :death), do: {:changed, %{actor | alive?: false, combat?: false}}
   defp transition(%{alive?: true} = actor, :despawn), do: {:changed, %{actor | alive?: false, combat?: false}}

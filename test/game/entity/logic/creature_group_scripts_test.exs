@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureGroupScriptsTest do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Condition
@@ -12,11 +13,13 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureGroupScriptsTest do
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.Script
+  alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.Entity.Logic.Condition.Requirements
   alias ThistleTea.Game.Entity.Logic.CreatureGroup.Member
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World.CombatLeashes
   alias ThistleTea.Game.World.CreatureGroups
   alias ThistleTea.Game.World.System.ScriptedEvent
   alias ThistleTea.Game.WorldRef
@@ -50,11 +53,36 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureGroupScriptsTest do
       %{entity: leader} = Engagement.enter(leader, 99, 2, selection: :target)
 
       assert Enum.filter(leader.internal.events, &is_struct(&1, Effects.CreatureGroupEvent)) == [
-               Effects.creature_group_event({:attack, 99})
+               Effects.creature_group_event({:attack, 99, CombatLeash.reference(leader)})
              ]
 
       %{entity: leader} = Engagement.leave(leader, :evade)
       assert List.last(leader.internal.events) == Effects.creature_group_event(:evade)
+    end
+
+    test "group assistance shares the emitted fight clock and releases it through death", %{
+      leader: leader,
+      member: member,
+      world: world
+    } do
+      CreatureGroups.join(world, member.object.guid, leader.object.guid, %Member{flags: 2}, self())
+      %{entity: leader} = Engagement.enter(leader, 99, 1_000, selection: :target)
+      leader = EventSink.emit_pending(leader, Context.new(self()))
+      source = CombatLeash.reference(leader)
+      assert_receive {:creature_group, _, {:attack, 99, ^source}}
+      %{entity: member} = Engagement.enter(member, 99, 2_500, leash_source: source, selection: :target)
+      member = EventSink.emit_pending(member, Context.new(self()))
+      assert CombatLeashes.last_extended_at(member) == 1_000
+      %{entity: leader} = Engagement.enter(leader, 99, 10_000, selection: :target)
+      leader = EventSink.emit_pending(leader, Context.new(self()))
+      assert CombatLeashes.last_extended_at(member) == 10_000
+      %{entity: leader} = Engagement.die(%{leader | unit: %{leader.unit | health: 0}})
+      EventSink.emit_pending(leader, Context.new(self()))
+      assert CombatLeashes.last_extended_at(source) == nil
+      assert CombatLeashes.last_extended_at(member) == 10_000
+      %{entity: member} = Engagement.leave(member, :evade)
+      EventSink.emit_pending(member, Context.new(self()))
+      assert CombatLeashes.last_extended_at(member) == nil
     end
   end
 
@@ -101,7 +129,12 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureGroupScriptsTest do
     leader = mob(world, 1)
     member = mob(world, 2)
     Enum.each([leader, member], &CreatureGroups.register(&1, self()))
-    on_exit(fn -> CreatureGroups.stop_world(world) end)
+
+    on_exit(fn ->
+      CreatureGroups.stop_world(world)
+      CombatLeashes.stop_world(world)
+    end)
+
     %{world: world, leader: leader, member: member}
   end
 
@@ -111,6 +144,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureGroupScriptsTest do
     %Mob{
       object: %Object{guid: guid},
       unit: %Unit{health: 100, flags: 0},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{world: world, creature: %Creature{db_guid: id}}
     }
   end

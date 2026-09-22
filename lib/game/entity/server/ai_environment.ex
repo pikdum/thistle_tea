@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Player.Movement, as: PlayerMovement
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.CombatLeashes
   alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.Loader.Waypoint, as: WaypointLoader
   alias ThistleTea.Game.World.Metadata
@@ -75,7 +76,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       liquid_surface: liquid_surface(entity),
       body_height: PlayerMovement.body_height(entity),
       instance_data: instance_data(entity, requirements, options),
-      formation: FormationEnvironment.snapshot(entity, now)
+      formation: FormationEnvironment.snapshot(entity, now),
+      shared_leash_time: CombatLeashes.last_extended_at(entity)
     }
   end
 

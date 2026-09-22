@@ -34,7 +34,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
     :liquid_surface,
     :body_height,
     :instance_data,
-    :formation
+    :formation,
+    :shared_leash_time
   ]
 
   def new(now, opts \\ []) when is_integer(now) do
@@ -52,7 +53,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
       liquid_surface: Keyword.get(opts, :liquid_surface),
       body_height: Keyword.get(opts, :body_height, 2.0),
       instance_data: Keyword.get(opts, :instance_data),
-      formation: Keyword.get(opts, :formation)
+      formation: Keyword.get(opts, :formation),
+      shared_leash_time: Keyword.get(opts, :shared_leash_time)
     }
   end
 end

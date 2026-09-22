@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.CallForHelp do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
 
@@ -64,7 +65,10 @@ defmodule ThistleTea.Game.World.CallForHelp do
   defp maybe_recruit(state, {helper_guid, _distance}, target_guid, caller_faction, enemy_faction, faction_check) do
     if eligible_helper?(helper_guid, caller_faction, enemy_faction, faction_check) and
          World.line_of_sight?(state, helper_guid) do
-      Entity.assist_attack(helper_guid, target_guid)
+      case faction_check do
+        :same_faction -> Entity.assist_attack(helper_guid, target_guid, CombatLeash.reference(state))
+        :friendly -> Entity.assist_attack(helper_guid, target_guid)
+      end
     end
   end
 

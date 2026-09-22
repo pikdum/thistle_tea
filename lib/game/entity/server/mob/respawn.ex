@@ -10,11 +10,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Entity.Server.AIEnvironment
@@ -98,6 +101,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
         state
 
       true ->
+        %{entity: state} = Engagement.leave(state, :despawn)
+        state = EventSink.emit_pending(state)
         state = %{state | unit: %{state.unit | health: 0}}
         CreatureGroups.event(state, :despawn, self())
         Metadata.update(state.object.guid, %{alive?: false, health_pct: 0.0})
@@ -147,6 +152,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
 
     state =
       state
+      |> CombatLeash.stop()
+      |> EventSink.emit_pending()
       |> Corpse.remove()
       |> Incarnation.renew()
       |> Mob.respawn()

@@ -390,19 +390,19 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
     test "returns true when outside tether range after timeout" do
       entity = entity(position: {100.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000)
 
-      assert Core.should_tether?(entity, 7_000)
+      assert Core.should_tether?(entity, 13_001)
     end
 
     test "returns false inside tether range" do
       entity = entity(position: {10.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000)
 
-      refute Core.should_tether?(entity, 7_000)
+      refute Core.should_tether?(entity, 13_001)
     end
 
     test "returns false before timeout" do
       entity = entity(position: {100.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000)
 
-      refute Core.should_tether?(entity, 6_999)
+      refute Core.should_tether?(entity, 13_000)
     end
 
     test "tethers immediately when outside an explicit leash range" do
@@ -411,10 +411,11 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
       assert Core.should_tether?(entity, 1_500)
     end
 
-    test "stays inside an explicit leash range even beyond the level formula" do
+    test "an explicit hard limit does not disable the ordinary threat-area timeout" do
       entity = entity(position: {100.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000, leash_range: 120.0)
 
       refute Core.should_tether?(entity, 7_000)
+      assert Core.should_tether?(entity, 13_001)
     end
 
     test "does not tether instance mobs outside the default range" do
@@ -425,13 +426,13 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
           world: WorldRef.instance(389, 1)
         )
 
-      refute Core.should_tether?(entity, 7_000)
+      refute Core.should_tether?(entity, 13_001)
     end
 
     test "does not tether mobs with the no-leash evade flag outside the default range" do
       entity = entity(position: {100.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000, extra_flags: 0x1)
 
-      refute Core.should_tether?(entity, 7_000)
+      refute Core.should_tether?(entity, 13_001)
     end
 
     test "explicit leash ranges still tether instance mobs" do
@@ -453,8 +454,8 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
       assert Core.tether_range(entity(leash_range: 120.0)) == 120.0
     end
 
-    test "falls back to the level formula when the leash range is unset" do
-      assert Core.tether_range(entity([])) == 42
+    test "falls back to the reference threat radius when the leash range is unset" do
+      assert Core.tether_range(entity([])) == 50.0
     end
   end
 

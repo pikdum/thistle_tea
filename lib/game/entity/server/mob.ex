@@ -311,15 +311,19 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
+  def handle_cast({:assist_attack, target_guid}, state) do
+    handle_cast({:assist_attack, target_guid, nil}, state)
+  end
+
   def handle_cast(
-        {:assist_attack, target_guid},
+        {:assist_attack, target_guid, source},
         %Mob{internal: %Internal{in_combat: false, pet: nil, totem: nil}} = state
       )
       when is_integer(target_guid) do
     if can_assist?(state) and Hostility.valid_attack_target?(state, target_guid) do
       state =
         state
-        |> engage_combat(target_guid, call_assistance: false)
+        |> engage_combat(target_guid, call_assistance: false, leash_source: source)
         |> wake_ai_tick()
 
       {:noreply, state, {:continue, :maybe_broadcast}}
@@ -328,7 +332,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     end
   end
 
-  def handle_cast({:assist_attack, _target_guid}, state) do
+  def handle_cast({:assist_attack, _target_guid, _source}, state) do
     {:noreply, state}
   end
 
@@ -1459,9 +1463,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp engage_combat(state, caster), do: engage_combat(state, caster, [])
 
-  defp apply_creature_group_command(%Mob{internal: %Internal{in_combat: false}} = state, {:attack, target}) do
+  defp apply_creature_group_command(%Mob{} = state, {:attack, target}),
+    do: apply_creature_group_command(state, {:attack, target, nil})
+
+  defp apply_creature_group_command(%Mob{internal: %Internal{in_combat: false}} = state, {:attack, target, source}) do
     if not Core.dead?(state) and not Corpse.removed?(state) and Hostility.valid_attack_target?(state, target) do
-      state |> engage_combat(target, call_assistance: false) |> wake_ai_tick()
+      state |> engage_combat(target, call_assistance: false, leash_source: source) |> wake_ai_tick()
     else
       state
     end
@@ -1496,7 +1503,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp engage_combat(%Mob{} = state, caster, opts) when is_integer(caster) do
     now = Time.now()
-    %Engagement.Result{entity: state, from: from, to: to} = Engagement.enter(state, caster, now)
+    %Engagement.Result{entity: state, from: from, to: to} = Engagement.enter(state, caster, now, opts)
     was_in_combat = from == :engaged
 
     if to == :engaged do

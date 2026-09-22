@@ -4,12 +4,8 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   payloads, taking damage and dying, healing, mana restoration, and combat
   tether-range checks for mobs.
   """
-  import Bitwise, only: [&&&: 2]
-
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Corpse
@@ -19,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CastPushback
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Critter
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
@@ -41,10 +38,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.WorldRef
 
-  @extra_flag_no_leash_evade 0x00000001
-  @leash_timeout_ms 6_000
   @spirit_of_redemption_talent 20_711
   @spirit_of_redemption_form 27_827
   @spirit_of_redemption_auras [27_827, 27_792, 27_795]
@@ -110,6 +104,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       {entity, damage, damage}
     else
       entity = PlayerCombat.mark_hostile_contact(entity, Keyword.get(opts, :source), now)
+      entity = CombatLeash.on_damage(entity, now, opts)
       school = Keyword.get(opts, :school, :physical)
       {entity, damage, remaining} = mitigate_damage(entity, damage, school, now, opts)
       %{unit: unit} = entity
@@ -293,28 +288,12 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   def mark_broadcast_update(entity), do: entity
 
-  def tether_range(%{internal: %Internal{creature: %Creature{leash_range: leash_range}}})
-      when is_number(leash_range) and leash_range > 0 do
-    leash_range
-  end
+  def tether_range(entity), do: CombatLeash.range(entity)
 
-  def tether_range(%{unit: %Unit{level: level}}) when is_number(level) do
-    40 + 2 * level
-  end
-
-  def tether_range(_entity) do
-    nil
-  end
-
-  def out_of_tether_range?(
-        %{
-          internal: %Internal{spawn: %Spawn{position: {xi, yi, zi}}},
-          movement_block: %MovementBlock{position: {x, y, z, _}}
-        } = entity
-      ) do
-    case tether_range(entity) do
-      range when is_number(range) ->
-        Math.distance({xi, yi, zi}, {x, y, z}) > range
+  def out_of_tether_range?(%{movement_block: %MovementBlock{position: {x, y, z, _}}} = entity) do
+    case CombatLeash.origin(entity) do
+      {xi, yi, zi} ->
+        Math.distance({xi, yi, zi}, {x, y, z}) > tether_range(entity)
 
       _ ->
         false
@@ -325,36 +304,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     false
   end
 
-  def should_tether?(%{internal: %Internal{last_hostile_time: last_hostile_time}} = entity, now)
-      when is_integer(last_hostile_time) and is_integer(now) do
-    out_of_tether_range?(entity) and
-      (hard_leash?(entity) or
-         (threat_area_limited?(entity) and now - last_hostile_time >= @leash_timeout_ms))
-  end
-
-  def should_tether?(_entity, _now) do
-    false
-  end
-
-  defp hard_leash?(%{internal: %Internal{creature: %Creature{leash_range: leash_range}}})
-       when is_number(leash_range) and leash_range > 0 do
-    true
-  end
-
-  defp hard_leash?(_entity), do: false
-
-  defp threat_area_limited?(%{internal: %Internal{world: %WorldRef{} = world}} = entity) do
-    WorldRef.open?(world) and not no_leash_evade?(entity)
-  end
-
-  defp threat_area_limited?(entity), do: not no_leash_evade?(entity)
-
-  defp no_leash_evade?(%{internal: %Internal{creature: %Creature{extra_flags: extra_flags}}})
-       when is_integer(extra_flags) do
-    (extra_flags &&& @extra_flag_no_leash_evade) != 0
-  end
-
-  defp no_leash_evade?(_entity), do: false
+  def should_tether?(entity, now, opts \\ []), do: CombatLeash.should_evade?(entity, now, opts)
 
   defp maybe_dead(%{internal: %Internal{}, unit: %Unit{health: 0}, movement_block: %MovementBlock{}} = entity, now) do
     prepare_death_state(entity, now)

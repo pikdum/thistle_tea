@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Server.Mob.RespawnTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
@@ -9,7 +10,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob.RespawnTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.CombatLeash
+  alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
+  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World.CombatLeashes
   alias ThistleTea.Game.WorldRef
 
   describe "schedule/1" do
@@ -77,6 +83,28 @@ defmodule ThistleTea.Game.Entity.Server.Mob.RespawnTest do
       mob = fixture_mob(despawn_type: 3, pet: %Pet{owner_guid: 5, kind: :summon})
 
       refute Respawn.summon_despawn_blocked?(mob)
+    end
+  end
+
+  describe "despawn/2" do
+    test "ends the engagement and releases its shared clock before hiding the corpse" do
+      mob = fixture_mob(health: 10)
+      guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+      Entity.register(guid)
+      on_exit(fn -> Entity.unregister(guid) end)
+      mob = %{mob | object: %{mob.object | guid: guid}}
+      %{entity: mob} = Engagement.enter(mob, 20, 1_000, selection: :target)
+      mob = EventSink.emit_pending(mob)
+      ref = CombatLeash.reference(mob)
+      assert CombatLeashes.last_extended_at(ref) == 1_000
+      mob = Respawn.despawn(mob, 60_000)
+      refute mob.internal.in_combat
+      assert mob.unit.health == 0
+      assert mob.unit.target == 0
+      assert mob.internal.threat == %{}
+      assert mob.internal.loot.corpse_removed?
+      assert CombatLeashes.last_extended_at(ref) == nil
+      Process.cancel_timer(mob.internal.spawn.respawn_ref)
     end
   end
 

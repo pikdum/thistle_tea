@@ -886,9 +886,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       assert state.internal.last_hostile_time == 1_000
 
       assert [
+               %Effects.CombatLeashEvent{event: {:start, 1_000, nil}},
                %Effects.ThreatRefGained{target_guid: ^target_guid},
                %Effects.AttackerGained{target_guid: ^target_guid},
-               %Effects.CreatureGroupEvent{event: {:attack, ^target_guid}}
+               %Effects.CreatureGroupEvent{event: {:attack, ^target_guid, _leash}}
              ] = state.internal.events
 
       assert Metadata.query(target_guid, [:attacker_count]) == %{attacker_count: 0}

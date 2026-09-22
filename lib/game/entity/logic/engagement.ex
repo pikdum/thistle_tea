@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -57,9 +58,11 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   def enter(%Mob{} = entity, _target_guid, _now, _opts), do: result(entity, entity, :invalid_target)
 
-  defp enter_active(%Mob{internal: %Internal{} = internal} = entity, target_guid, now, opts)
+  defp enter_active(%Mob{internal: %Internal{}} = entity, target_guid, now, opts)
        when is_integer(target_guid) and target_guid > 0 and is_integer(now) do
     previous = entity
+    entity = CombatLeash.enter(entity, now, Keyword.get(opts, :leash_source))
+    internal = entity.internal
     blackboard = internal.blackboard |> Blackboard.ensure() |> Distraction.clear()
     entity = %{entity | internal: %{internal | in_combat: true, last_hostile_time: now, blackboard: blackboard}}
     entity = Threat.add(entity, target_guid, 0)
@@ -73,7 +76,11 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
     entity =
       if previous.internal.in_combat == true or is_nil(victim(entity)),
         do: entity,
-        else: Effects.enqueue(entity, Effects.creature_group_event({:attack, victim(entity)}))
+        else:
+          Effects.enqueue(
+            entity,
+            Effects.creature_group_event({:attack, victim(entity), CombatLeash.reference(entity)})
+          )
 
     result(previous, entity, :enter, decision)
   end
@@ -110,6 +117,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   def leave(%Mob{} = entity, reason, opts \\ []) when is_atom(reason) do
     previous = entity
+    entity = CombatLeash.stop(entity)
     clear_tap? = Keyword.get(opts, :clear_tap?, true)
     blackboard = opts |> Keyword.get(:blackboard, entity.internal.blackboard) |> Blackboard.ensure()
     target = victim(entity)
@@ -145,6 +153,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   def reset(%Mob{} = entity) do
     previous = entity
+    entity = CombatLeash.stop(entity)
     unit = clear_unit(entity.unit, true)
 
     internal = %{

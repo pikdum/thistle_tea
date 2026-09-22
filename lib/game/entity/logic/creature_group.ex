@@ -71,6 +71,12 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureGroup do
     end
   end
 
+  def actions(%__MODULE__{} = group, source, {:attack, target, leash}, actors) do
+    group
+    |> actions(source, {:attack, target}, actors)
+    |> Enum.map(fn {id, {:attack, target}} -> {id, {:attack, target, leash}} end)
+  end
+
   def actions(%__MODULE__{} = group, source, :evade, actors) do
     evade =
       if flag?(group, 0x04) do
