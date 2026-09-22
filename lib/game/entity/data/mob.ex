@@ -114,6 +114,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       auras: []
     }
 
+    unit = stat_inputs(unit, ct, stats, Keyword.get(opts, :stat_model))
+
     movement_block = %MovementBlock{
       update_flag: @update_flag_all ||| @update_flag_living ||| @update_flag_has_position,
       position: {
@@ -198,6 +200,20 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       if Keyword.get(opts, :apply_addon_auras?, true), do: apply_addon_auras(mob, Time.now()), else: mob
     end)
   end
+
+  defp stat_inputs(%Unit{} = unit, template, %Mangos.CreatureClassLevelStats{} = stats, :creature) do
+    %{
+      unit
+      | stat_model: :creature,
+        base_health: multiplied(stats.health, template.health_multiplier),
+        base_mana: multiplied(stats.mana, template.mana_multiplier),
+        base_stamina: stats.stamina,
+        base_intellect: stats.intellect,
+        base_spirit: stats.spirit
+    }
+  end
+
+  defp stat_inputs(unit, _template, _stats, _model), do: unit
 
   def apply_addon_auras(%__MODULE__{internal: %Internal{creature: %Creature{addon_auras: [_ | _] = spells}}} = mob, now)
       when is_integer(now) do

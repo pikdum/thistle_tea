@@ -32,6 +32,38 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
   defp recompute(unit), do: apply(&Stats.recompute/1, [unit])
 
   describe "recompute/1" do
+    test "creature models use stat deltas for resources and agility for armor" do
+      unit = %Unit{
+        stat_model: :creature,
+        base_health: 100,
+        base_mana: 0,
+        base_stamina: 10,
+        base_intellect: 10,
+        base_agility: 10,
+        base_normal_resistance: 100,
+        health: 100,
+        power1: 0,
+        auras: []
+      }
+
+      original = recompute(unit)
+      assert original.max_health == 100
+      assert original.max_power1 == 0
+      assert original.normal_resistance == 110
+      buff = holder([%Aura{type: :mod_stat, amount: 10, misc_value: -1}])
+      buffed = recompute(%{original | auras: [buff]})
+      assert buffed.max_health == 200
+      assert buffed.max_power1 == 150
+      assert buffed.normal_resistance == 120
+      assert recompute(buffed) == buffed
+      assert recompute(%{buffed | auras: []}) == original
+      changed = recompute(%{buffed | base_stamina: 20, base_health: 300})
+      assert changed.max_health == 400
+      assert recompute(%{changed | auras: []}).max_health == 300
+      assert recompute(%{original | base_health: 0}).max_health == 1
+      assert recompute(%{buffed | base_health: 0}).max_health == 100
+    end
+
     test "scales base and item stats before flat auras and total percentages" do
       auras = [
         %Aura{type: :mod_percent_stat, amount: -75, misc_value: -1},

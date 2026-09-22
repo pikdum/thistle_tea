@@ -101,6 +101,9 @@ defmodule ThistleTea.Game.Entity.Server.GuardianOwnerTest do
       unscaled = GuardianLoader.build(owner, request(), position, now)
       assert unscaled.unit.level == 20
       assert unscaled.unit.max_health == 1000
+      assert unscaled.unit.base_health == 1000
+      assert unscaled.unit.base_stamina == 20
+      assert unscaled.unit.normal_resistance == 220
 
       item =
         ItemStore.create(%ItemTemplate{entry: 990_300, required_skill: 202, inventory_type: 12},

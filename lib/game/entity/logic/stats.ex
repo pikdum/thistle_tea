@@ -117,10 +117,13 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
       base = Map.get(acc, base_field) || 0
       base_and_equipment = base + equipment_bonus(acc, bonus_key)
       scaled = trunc(base_and_equipment * aura_base_resistance_multiplier(acc, bit))
-      total = scaled + aura_resistance_bonus(acc, bit) + aura_stat_resistance_bonus(acc, bit)
+      total = scaled + stat_armor(acc, bit) + aura_resistance_bonus(acc, bit) + aura_stat_resistance_bonus(acc, bit)
       Map.put(acc, field, trunc(total * aura_resistance_multiplier(acc, bit)))
     end)
   end
+
+  defp stat_armor(%Unit{stat_model: :creature, agility: agility}, 0x01), do: agility || 0
+  defp stat_armor(_unit, _bit), do: 0
 
   defp aura_stat_resistance_bonus(%Unit{} = unit, bit) do
     intellect = unit.intellect || 0
@@ -137,7 +140,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
 
   defp derive_max_health(%Unit{base_health: base_health} = unit) when is_integer(base_health) do
     flat =
-      base_health + stamina_health_bonus(unit.stamina || 0) + equipment_bonus(unit, :health) +
+      base_health + stamina_health(unit) + equipment_bonus(unit, :health) +
         aura_max_health(unit)
 
     max_health = max(trunc(flat * aura_power_multiplier(unit, :mod_increase_health_percent, -1)), 1)
@@ -147,12 +150,16 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
 
   defp derive_max_health(%Unit{} = unit), do: unit
 
+  defp stamina_health(%Unit{stat_model: :creature} = unit), do: ((unit.stamina || 0) - (unit.base_stamina || 0)) * 10
+  defp stamina_health(%Unit{} = unit), do: stamina_health_bonus(unit.stamina || 0)
+
   @power_type_mana 0
   @power_type_energy 3
 
-  defp derive_max_mana(%Unit{base_mana: base_mana} = unit) when is_integer(base_mana) and base_mana > 0 do
+  defp derive_max_mana(%Unit{base_mana: base_mana, stat_model: model} = unit)
+       when is_integer(base_mana) and (base_mana > 0 or model == :creature) do
     flat =
-      base_mana + mana_bonus(unit.intellect || 0) + equipment_bonus(unit, :mana) +
+      base_mana + intellect_mana(unit) + equipment_bonus(unit, :mana) +
         aura_power_bonus(unit, @power_type_mana)
 
     max_mana = max(trunc(flat * aura_power_multiplier(unit, :mod_increase_energy_percent, @power_type_mana)), 0)
@@ -160,6 +167,11 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   end
 
   defp derive_max_mana(%Unit{} = unit), do: unit
+
+  defp intellect_mana(%Unit{stat_model: :creature} = unit),
+    do: ((unit.intellect || 0) - (unit.base_intellect || 0)) * 15
+
+  defp intellect_mana(%Unit{} = unit), do: mana_bonus(unit.intellect || 0)
 
   @base_max_energy 100
 

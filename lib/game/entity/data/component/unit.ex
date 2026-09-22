@@ -97,6 +97,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Unit do
     base_stamina: :virtual,
     base_intellect: :virtual,
     base_spirit: :virtual,
+    stat_model: :virtual,
     base_normal_resistance: :virtual,
     base_holy_resistance: :virtual,
     base_fire_resistance: :virtual,

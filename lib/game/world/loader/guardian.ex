@@ -27,7 +27,12 @@ defmodule ThistleTea.Game.World.Loader.Guardian do
     level = level(owner, effect, default_level)
 
     mob =
-      Summon.build(effect.entry, owner.internal.world, position, level: level, run?: true, apply_addon_auras?: false)
+      Summon.build(effect.entry, owner.internal.world, position,
+        level: level,
+        run?: true,
+        apply_addon_auras?: false,
+        stat_model: :creature
+      )
 
     guid = Guid.from_low_guid(:pet, effect.entry, Guid.low_guid(mob.object.guid))
 
