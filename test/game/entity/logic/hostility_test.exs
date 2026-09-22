@@ -5,44 +5,6 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
 
-  describe "attack immunity flags" do
-    test "player immunity also blocks helpful spells while NPC immunity does not" do
-      player = player(alliance())
-      npc = mob(alliance())
-      controlled = Map.put(npc, :owner_guid, player.object.guid)
-      protected = Map.put(npc, :unit_flags, 0x300)
-      refute Hostility.can_assist?(player, protected)
-      refute Hostility.can_assist?(controlled, protected)
-      assert Hostility.can_assist?(npc, protected)
-      assert Hostility.can_assist?(player, %{protected | unit_flags: 0x200})
-      assert Hostility.can_assist?(protected, player)
-    end
-
-    test "noncombat pets cannot attack or be attacked by players or creatures" do
-      pet = mob(defias()) |> Map.put(:unit_flags, 0x300)
-
-      for source <- [player(alliance()), mob(alliance())] do
-        refute Hostility.valid_attack_target?(source, pet)
-        refute Hostility.valid_hostile_target?(source, pet)
-        refute Hostility.valid_attack_target?(pet, source)
-      end
-    end
-
-    test "player and creature protection are independent and include controlled pets" do
-      protected = mob(defias()) |> Map.put(:unit_flags, 0x100)
-      player = player(alliance())
-      npc = mob(alliance())
-      controlled = Map.put(npc, :owner_guid, player.object.guid)
-      refute Hostility.valid_attack_target?(player, protected)
-      refute Hostility.valid_attack_target?(controlled, protected)
-      assert Hostility.valid_attack_target?(npc, protected)
-      protected = %{protected | unit_flags: 0x200}
-      assert Hostility.valid_attack_target?(player, protected)
-      assert Hostility.valid_attack_target?(controlled, protected)
-      refute Hostility.valid_attack_target?(npc, protected)
-    end
-  end
-
   describe "hostile?/2" do
     test "uses faction template enemy masks" do
       assert Hostility.hostile?(defias(), alliance())
@@ -161,6 +123,30 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
   end
 
   describe "valid_attack_target?/2" do
+    test "noncombat pets cannot attack or be attacked by players or creatures" do
+      pet = mob(defias()) |> Map.put(:unit_flags, 0x300)
+
+      for source <- [player(alliance()), mob(alliance())] do
+        refute Hostility.valid_attack_target?(source, pet)
+        refute Hostility.valid_hostile_target?(source, pet)
+        refute Hostility.valid_attack_target?(pet, source)
+      end
+    end
+
+    test "player and creature protection are independent and include controlled pets" do
+      protected = mob(defias()) |> Map.put(:unit_flags, 0x100)
+      player = player(alliance())
+      npc = mob(alliance())
+      controlled = Map.put(npc, :owner_guid, player.object.guid)
+      refute Hostility.valid_attack_target?(player, protected)
+      refute Hostility.valid_attack_target?(controlled, protected)
+      assert Hostility.valid_attack_target?(npc, protected)
+      protected = %{protected | unit_flags: 0x200}
+      assert Hostility.valid_attack_target?(player, protected)
+      assert Hostility.valid_attack_target?(controlled, protected)
+      refute Hostility.valid_attack_target?(npc, protected)
+    end
+
     test "opposing players require a flagged target" do
       source = player(alliance()) |> Map.put(:pvp?, false)
       target = player(horde(), 2) |> Map.put(:pvp?, false)
@@ -258,6 +244,18 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
   end
 
   describe "can_assist?/2" do
+    test "player immunity also blocks helpful spells while NPC immunity does not" do
+      player = player(alliance())
+      npc = mob(alliance())
+      controlled = Map.put(npc, :owner_guid, player.object.guid)
+      protected = Map.put(npc, :unit_flags, 0x300)
+      refute Hostility.can_assist?(player, protected)
+      refute Hostility.can_assist?(controlled, protected)
+      assert Hostility.can_assist?(npc, protected)
+      assert Hostility.can_assist?(player, %{protected | unit_flags: 0x200})
+      assert Hostility.can_assist?(protected, player)
+    end
+
     test "dueling players cannot receive outside assistance" do
       caster = player(alliance())
       duelist = player(alliance(), 2) |> Map.put(:duel_started?, true)
