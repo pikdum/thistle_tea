@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.TaxiTest do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Semantics
 
-  describe "start/7" do
+  describe "start/6" do
     test "removes stealth and animal form through the aura lifecycle" do
       shape = %Holder{spell: %Spell{id: 768}, caster_guid: 1, auras: [%AuraData{type: :mod_shapeshift, misc_value: 1}]}
       stealth = %Holder{spell: %Spell{id: 5215}, caster_guid: 1, auras: [%AuraData{type: :mod_stealth}]}

@@ -127,6 +127,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Player fear and confusion](docs/player-control-movement-playtest.md), with forced movement, client control restoration, bounded wandering, teleport recovery, and death cleanup
 - [Spell knockback](docs/knockback-playtest.md), with acknowledged launches, observer movement, cast interruption, possession routing, and landing cleanup
 - [Spell-driven player pulls](docs/player-pull-playtest.md), with ballistic trajectories, height compensation, cast interruption, acknowledged movement, and observer playback
+- [Spell-driven taxi flights](docs/spell-taxi-playtest.md), with validated routes, form cleanup, accurate landing points, protected passengers, and native flight and relog acceptance
 - Priest Fade: temporary threat reduction with target switching and restoration on expiry
 - Rogue Distract: ground-targeted facing and timed patrol pauses, preserving stealth
 - Hunter Beast Lore: caster-specific beast damage, armor, and resistance information, with expiry and death cleanup
