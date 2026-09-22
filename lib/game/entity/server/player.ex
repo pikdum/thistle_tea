@@ -823,11 +823,11 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
-  def handle_info({:send_taxi_path, path_id}, state) do
-    {:noreply, PlayerTaxi.start_path(state, path_id)}
+  def handle_info(%Effects.SendTaxiPath{target_guid: guid} = effect, %State{guid: guid} = state) do
+    {:noreply, PlayerTaxi.start_path(state, effect.path_id, spell_id: effect.spell_id)}
   rescue
     error ->
-      Logger.error("script taxi path crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      Logger.error("taxi path crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, state}
   end
 

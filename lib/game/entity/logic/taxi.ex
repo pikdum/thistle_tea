@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Taxi do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Taxi.Flight
   alias ThistleTea.Game.Entity.Data.Taxi.Node
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
@@ -29,9 +30,9 @@ defmodule ThistleTea.Game.Entity.Logic.Taxi do
         token,
         now
       )
-      when is_map(itinerary) and is_integer(mount_display_id) and mount_display_id > 0 and is_reference(token) and
+      when is_map(itinerary) and is_integer(mount_display_id) and mount_display_id >= 0 and is_reference(token) and
              is_integer(now) do
-    character = character |> Mount.dismount(now) |> ExtraAttacks.clear()
+    character = character |> prepare_auras(now) |> Mount.dismount(now) |> ExtraAttacks.clear()
     unit = character.unit
     positions = Enum.map(itinerary.nodes, & &1.position)
     path_ids = Enum.map(itinerary.paths, & &1.id)
@@ -85,4 +86,12 @@ defmodule ThistleTea.Game.Entity.Logic.Taxi do
 
   def active?(%Character{internal: %Internal{taxi_flight: %Flight{}}}), do: true
   def active?(%Character{}), do: false
+
+  def disallowed_form?(%Character{unit: %Unit{shapeshift_form: form}}), do: form not in [nil, 0, 17, 18, 19, 28, 30]
+
+  defp prepare_auras(character, now) do
+    types = if disallowed_form?(character), do: [:mod_stealth, :mod_shapeshift, :transform], else: [:mod_stealth]
+    {character, effects} = Aura.remove_aura_types(character, types, now)
+    Effects.enqueue(character, effects)
+  end
 end

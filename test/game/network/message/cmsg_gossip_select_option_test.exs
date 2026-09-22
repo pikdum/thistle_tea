@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Data.Taxi.Network
   alias ThistleTea.Game.Entity.Data.Taxi.Node
+  alias ThistleTea.Game.Entity.Logic.Effects.SendTaxiPath
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.CmsgGossipSelectOption
@@ -49,7 +50,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
       message = %CmsgGossipSelectOption{guid: 1, gossip_list_id: 0}
 
       assert %{gossip_menu_options: []} = CmsgGossipSelectOption.handle(message, state)
-      assert_receive {:send_taxi_path, 315}
+      assert_receive %SendTaxiPath{path_id: 315}
       assert_receive {:"$gen_cast", {:send_packet, %SmsgGossipComplete{}}}
     end
 
@@ -218,7 +219,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
       message = %CmsgGossipSelectOption{guid: 2, gossip_list_id: 0}
 
       assert CmsgGossipSelectOption.handle(message, state) == state
-      refute_receive {:send_taxi_path, 315}
+      refute_receive %SendTaxiPath{path_id: 315}
       refute_receive {:"$gen_cast", {:send_packet, _packet}}
     end
   end

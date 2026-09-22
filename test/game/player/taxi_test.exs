@@ -22,6 +22,9 @@ defmodule ThistleTea.Game.Player.TaxiTest do
   alias ThistleTea.Game.Network.Message.SmsgShowtaxinodes
   alias ThistleTea.Game.Network.Message.SmsgTaxinodeStatus
   alias ThistleTea.Game.Player.Taxi
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
@@ -228,7 +231,7 @@ defmodule ThistleTea.Game.Player.TaxiTest do
   end
 
   describe "start_path/3" do
-    test "starts a free scripted path without requiring known nodes", context do
+    test "charges a scripted route without requiring known nodes", context do
       character = context.character
 
       state = %State{
@@ -240,7 +243,7 @@ defmodule ThistleTea.Game.Player.TaxiTest do
 
       state = Taxi.start_path(state, 12, network())
 
-      assert state.character.player.coinage == 100
+      assert state.character.player.coinage == 75
       assert state.character.internal.taxi_flight.path_ids == [12]
       assert_receive {:"$gen_cast", {:send_packet, %SmsgActivatetaxireply{reply: 0}}}
 
@@ -262,8 +265,81 @@ defmodule ThistleTea.Game.Player.TaxiTest do
       }
 
       assert Taxi.start_path(state, 12, network()) == state
-      refute_receive {:"$gen_cast", {:send_packet, %SmsgActivatetaxireply{}}}
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgActivatetaxireply{reply: 4}}}
     end
+  end
+
+  describe "start_path/4" do
+    test "allows a mountless spell route from an unpositioned source", context do
+      network = network()
+
+      source = %{
+        network.nodes[2]
+        | position: {0.0, 0.0, 0.0},
+          map_id: 131_074,
+          mount_display_ids: %{alliance: 0, horde: 0}
+      }
+
+      network = %{network | nodes: Map.put(network.nodes, 2, source)}
+      state = ready_state(context.character)
+
+      assert Taxi.start_path(state, 12, network) == state
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgActivatetaxireply{reply: 2}}}
+      flying = Taxi.start_path(state, 12, network, spell_id: 28_129)
+      assert flying.character.internal.taxi_flight.path_ids == [12]
+      assert flying.character.unit.mount_display_id == 0
+      assert flying.character.player.coinage == 75
+      assert flying.character.player.taxi_nodes == MapSet.new()
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgActivatetaxireply{reply: 0}}}
+      finish_test_flight(flying)
+    end
+
+    test "scripted routes use an opposite-faction mount when needed", context do
+      character = context.character
+      character = put_in(character.unit.race, 2)
+      flying = Taxi.start_path(ready_state(character), 12, network(), spell_id: 27_998)
+      assert flying.character.unit.mount_display_id == 6852
+      finish_test_flight(flying)
+    end
+
+    test "preserves the delivering spell and cancels another cast", context do
+      for {cast_id, retained?} <- [{27_998, true}, {8690, false}] do
+        cast = Cast.new(%Spell{id: cast_id}, Target.self(context.character.object.guid), Time.now())
+        character = context.character
+        character = put_in(character.internal.casting, cast)
+        flying = Taxi.start_path(ready_state(character), 12, network(), spell_id: 27_998)
+        assert flying.character.internal.casting == cast == retained?
+        finish_test_flight(flying)
+      end
+    end
+
+    test "rejects unavailable players and insufficient fares without changing their state", context do
+      state = ready_state(context.character)
+
+      for invalid <- [
+            %{state | logout_timer: make_ref()},
+            put_in(state.character.unit.flags, 0x00000004),
+            put_in(state.character.unit.health, 0),
+            put_in(state.character.internal.in_combat, true)
+          ] do
+        assert Taxi.start_path(invalid, 12, network(), spell_id: 27_998) == invalid
+        assert_receive {:"$gen_cast", {:send_packet, %SmsgActivatetaxireply{reply: 7}}}
+      end
+
+      poor = put_in(state.character.player.coinage, 24)
+      assert Taxi.start_path(poor, 12, network(), spell_id: 27_998) == poor
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgActivatetaxireply{reply: 3}}}
+    end
+  end
+
+  defp ready_state(character) do
+    %State{ready: true, guid: character.object.guid, character: character, visibility_cells: MapSet.new()}
+  end
+
+  defp finish_test_flight(state) do
+    state = Taxi.disconnect(state)
+    if is_reference(state.player_tick_ref), do: Process.cancel_timer(state.player_tick_ref)
+    state
   end
 
   defp character(id) do

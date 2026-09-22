@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
   @moduledoc false
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Knockback
@@ -45,6 +46,17 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
 
   def apply(state, %CastContext{} = context, _spell, %Effect{type: :player_pull} = effect, now) do
     Knockback.pull(state, context, max(effect.misc_value || 0, 1) / 10, now)
+  end
+
+  def apply(
+        %Character{object: %{guid: guid}} = state,
+        _context,
+        %Spell{id: id},
+        %Effect{type: :send_taxi, misc_value: path},
+        _now
+      )
+      when is_integer(path) and path > 0 do
+    {state, [%Effects.SendTaxiPath{target_guid: guid, path_id: path, spell_id: id}]}
   end
 
   def apply(state, _context, _spell, _effect, _now), do: {state, []}

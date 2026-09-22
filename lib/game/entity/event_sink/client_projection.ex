@@ -202,9 +202,14 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
     entity
   end
 
+  def emit(%{object: %{guid: guid}} = entity, %Effects.SendTaxiPath{target_guid: guid} = effect, context) do
+    Context.send(context, effect)
+    entity
+  end
+
   def emit(entity, %Effects.SendTaxiPath{} = effect, _context) do
     case Entity.pid(effect.target_guid) do
-      pid when is_pid(pid) -> send(pid, {:send_taxi_path, effect.path_id})
+      pid when is_pid(pid) -> send(pid, effect)
       _ -> nil
     end
 

@@ -26,12 +26,14 @@ defmodule ThistleTea.Game.Player.Taxi do
   alias ThistleTea.Game.Player.Pvp
   alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.Player.Spellcasting
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Game.World.System.Trade
   alias ThistleTea.Game.World.Visibility
 
   @flightmaster_flag 0x00000008
@@ -41,6 +43,7 @@ defmodule ThistleTea.Game.Player.Taxi do
   @reply_unspecified 1
   @reply_no_such_path 2
   @reply_not_enough_money 3
+  @reply_too_far_away 4
   @reply_no_vendor_nearby 5
   @reply_not_visited 6
   @reply_player_busy 7
@@ -94,7 +97,8 @@ defmodule ThistleTea.Game.Player.Taxi do
         %TaxiNetwork{} = network
       )
       when is_list(node_ids) do
-    with {:ok, %Node{id: source_node_id}} <- flightmaster_node(character, flightmaster_guid, network),
+    with :ok <- validate_start_state(state),
+         {:ok, %Node{id: source_node_id}} <- flightmaster_node(character, flightmaster_guid, network),
          :ok <- validate_activation(character, node_ids, source_node_id),
          {:ok, itinerary} <- TaxiNetwork.itinerary(network, node_ids),
          itinerary = discounted_itinerary(character, flightmaster_guid, itinerary),
@@ -102,7 +106,7 @@ defmodule ThistleTea.Game.Player.Taxi do
          {:ok, mount_display_id} <- mount_display_id(character, source_node_id, network),
          :ok <- validate_fare(character, itinerary.total_cost) do
       send_reply(@reply_ok)
-      start_flight(state, itinerary, mount_display_id, network, true)
+      start_flight(state, itinerary, mount_display_id, network, nil)
     else
       {:error, reason} ->
         send_reply(reply_for(reason))
@@ -114,25 +118,42 @@ defmodule ThistleTea.Game.Player.Taxi do
 
   def start_path(state, path_id), do: start_path(state, path_id, TaxiLoader.get())
 
-  def start_path(%{ready: true, character: %Character{} = character} = state, path_id, %TaxiNetwork{} = network)
+  def start_path(state, path_id, options) when is_list(options),
+    do: start_path(state, path_id, TaxiLoader.get(), options)
+
+  def start_path(state, path_id, network), do: start_path(state, path_id, network, [])
+
+  def start_path(
+        %{ready: true, character: %Character{} = character} = state,
+        path_id,
+        %TaxiNetwork{} = network,
+        options
+      )
       when is_integer(path_id) do
-    with true <- Death.alive?(character),
-         false <- TaxiLogic.active?(character),
-         true <- character.internal.in_combat != true,
+    spell_id = Keyword.get(options, :spell_id)
+
+    with :ok <- validate_start_state(state),
          %Path{} = path <- TaxiNetwork.path(network, path_id),
          %Node{} = source <- TaxiNetwork.node(network, path.source_node_id),
          :ok <- validate_source_position(character, source),
-         itinerary = %{paths: [path], nodes: path.nodes, total_cost: 0},
+         itinerary = %{paths: [path], nodes: path.nodes, total_cost: path.cost},
          :ok <- validate_itinerary(character, itinerary, network),
-         {:ok, mount_display_id} <- mount_display_id(character, path.source_node_id, network) do
+         {:ok, mount_display_id} <- script_mount_display_id(character, source, spell_id),
+         :ok <- validate_fare(character, itinerary.total_cost) do
       send_reply(@reply_ok)
-      start_flight(state, itinerary, mount_display_id, network, false)
+      start_flight(state, itinerary, mount_display_id, network, spell_id)
     else
-      _invalid -> state
+      {:error, reason} ->
+        send_reply(reply_for(reason))
+        state
+
+      _invalid ->
+        send_reply(@reply_no_such_path)
+        state
     end
   end
 
-  def start_path(state, _path_id, _network), do: state
+  def start_path(state, _path_id, _network, _options), do: state
 
   def arrive(%{character: %Character{internal: %{taxi_flight: %{token: token}}}} = state, token)
       when is_reference(token) do
@@ -238,10 +259,22 @@ defmodule ThistleTea.Game.Player.Taxi do
     end
   end
 
+  defp validate_start_state(%{character: %Character{} = character} = state) do
+    if Death.alive?(character) and not TaxiLogic.active?(character) and character.internal.in_combat != true and
+         ((character.unit.flags || 0) &&& 0x00000004) == 0 and not logging_out?(state) do
+      :ok
+    else
+      {:error, :player_busy}
+    end
+  end
+
+  defp logging_out?(%{logout_timer: timer}), do: not is_nil(timer)
+  defp logging_out?(_state), do: false
+
   defp validate_mount_state(character) do
     cond do
       (character.unit.mount_display_id || 0) != 0 -> {:error, :already_mounted}
-      (character.unit.shapeshift_form || 0) != 0 -> {:error, :shapeshifted}
+      TaxiLogic.disallowed_form?(character) -> {:error, :shapeshifted}
       (character.unit.stand_state || 0) != 0 -> {:error, :not_standing}
       true -> :ok
     end
@@ -281,6 +314,8 @@ defmodule ThistleTea.Game.Player.Taxi do
     %{itinerary | total_cost: total_cost}
   end
 
+  defp validate_source_position(%Character{}, %Node{position: {x, y, z}}) when x == 0 and y == 0 and z == 0, do: :ok
+
   defp validate_source_position(%Character{internal: %{world: world}} = character, %Node{
          map_id: map_id,
          position: source_position
@@ -304,10 +339,22 @@ defmodule ThistleTea.Game.Player.Taxi do
     end
   end
 
-  defp start_flight(state, itinerary, mount_display_id, network, charge?) do
+  defp script_mount_display_id(%Character{unit: unit}, %Node{mount_display_ids: mounts}, spell_id) do
+    display =
+      [Map.get(mounts, team_for_race(unit.race), 0), Map.get(mounts, :alliance, 0), Map.get(mounts, :horde, 0)]
+      |> Enum.find(0, &(&1 > 0))
+
+    if display > 0 or (is_integer(spell_id) and spell_id > 0),
+      do: {:ok, display},
+      else: {:error, :no_such_path}
+  end
+
+  defp start_flight(state, itinerary, mount_display_id, network, spell_id) do
+    Trade.cancel(state.guid)
+
     state =
       state
-      |> Spellcasting.cancel()
+      |> cancel_other_cast(spell_id)
       |> Spellcasting.cancel_auto_repeat()
       |> CompanionOwner.suspend()
 
@@ -315,7 +362,6 @@ defmodule ThistleTea.Game.Player.Taxi do
     destination = TaxiNetwork.node(network, destination_node_id)
     token = make_ref()
     now = Time.now()
-    itinerary = if charge?, do: itinerary, else: %{itinerary | total_cost: 0}
     {character, effects} = TaxiLogic.start(state.character, itinerary, destination, mount_display_id, token, now)
 
     state =
@@ -327,6 +373,9 @@ defmodule ThistleTea.Game.Player.Taxi do
     CharacterStore.put(character)
     state
   end
+
+  defp cancel_other_cast(%{character: %{internal: %{casting: %Cast{spell: %{id: id}}}}} = state, id), do: state
+  defp cancel_other_cast(state, _spell_id), do: Spellcasting.cancel(state)
 
   defp schedule_progress(state, token, now) do
     delay = max(Movement.next_spatial_update_delay(state.character, now), 1)
@@ -343,6 +392,7 @@ defmodule ThistleTea.Game.Player.Taxi do
 
   defp reply_for(:no_such_path), do: @reply_no_such_path
   defp reply_for(:not_enough_money), do: @reply_not_enough_money
+  defp reply_for(:too_far_away), do: @reply_too_far_away
   defp reply_for(:invalid_flightmaster), do: @reply_no_vendor_nearby
   defp reply_for(:not_visited), do: @reply_not_visited
   defp reply_for(:player_busy), do: @reply_player_busy

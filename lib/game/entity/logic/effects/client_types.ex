@@ -30,7 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:InstanceCreatureEvent, [:world, :creature_guid, :creature_entry, :event], [db_guid: nil]},
     {:SendScriptEvent, [:owner_guid, :invoker_guid, :event_id, :data], []},
     {:ForwardScriptSteps, [:target_guid, :steps, :source_guid], []},
-    {:SendTaxiPath, [:target_guid, :path_id], []},
+    {:SendTaxiPath, [:target_guid, :path_id], [spell_id: nil]},
     {:PlaySound, [:sound_id], []},
     {:PlayObjectSound, [:sound_id], []},
     {:FactionAtWarChanged, [:index, :enabled], []},

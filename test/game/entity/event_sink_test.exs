@@ -40,6 +40,16 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   end
 
   describe "emit/2" do
+    test "delivers a taxi spell through the explicit player owner context" do
+      guid = unique_guid()
+      character = %Character{object: %Object{guid: guid}}
+      effect = %Effects.SendTaxiPath{target_guid: guid, path_id: 315, spell_id: 27_998}
+      EventSink.emit(character, effect)
+      refute_received ^effect
+      EventSink.emit(character, effect, Context.new(self()))
+      assert_received ^effect
+    end
+
     test "environmental damage reaches the victim and nearby observers in the same world" do
       owner_guid = Guid.from_low_guid(:player, unique_guid())
       observer_guid = Guid.from_low_guid(:player, unique_guid())
