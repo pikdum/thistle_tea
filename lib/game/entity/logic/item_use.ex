@@ -4,7 +4,17 @@ defmodule ThistleTea.Game.Entity.Logic.ItemUse do
   item only when exhausted; positive charges leave an empty item behind.
   """
   alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
+  alias ThistleTea.Game.Entity.Logic.OpenLock
+  alias ThistleTea.Game.Entity.Logic.SpellTeaching
+  alias ThistleTea.Game.Spell
+
+  def deferred_costs?(%Spell{} = spell, cast_item_guid) do
+    Enchantments.item_enchant?(spell) or OpenLock.spell?(spell) or
+      (is_integer(cast_item_guid) and SpellTeaching.spell?(spell)) or
+      Enum.any?(spell.effects, &(&1.type == :summon_change_item))
+  end
 
   def on_use_spell(%Item{} = item) do
     template = Item.template(item)

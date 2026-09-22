@@ -5,12 +5,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.ItemUse
-  alias ThistleTea.Game.Entity.Logic.OpenLock
   alias ThistleTea.Game.Entity.Logic.Proficiency
-  alias ThistleTea.Game.Entity.Logic.SpellTeaching
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Bank
@@ -59,7 +56,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
       Logger.info("CMSG_USE_ITEM: #{template.name} casting #{spell.name}")
 
       case Spellcasting.cast_result(state, spell, message.targets, guid) do
-        {:ok, state} -> handle_consumption(state, guid, consumable? and not deferred_costs?(spell))
+        {:ok, state} -> handle_consumption(state, guid, consumable? and not ItemUse.deferred_costs?(spell, guid))
         {:error, state} -> state
       end
     else
@@ -76,9 +73,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
         state
     end
   end
-
-  defp deferred_costs?(spell),
-    do: Enchantments.item_enchant?(spell) or OpenLock.spell?(spell) or SpellTeaching.spell?(spell)
 
   defp reject_remote_bank(state) do
     InventoryUpdate.send_failure(:too_far_away_from_bank, 0, 0)

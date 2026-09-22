@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.ItemUse
   alias ThistleTea.Game.Entity.Logic.MechanicResistance
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Mount
@@ -30,7 +31,6 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellMagnet
   alias ThistleTea.Game.Entity.Logic.SpellResist
-  alias ThistleTea.Game.Entity.Logic.SpellTeaching
   alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
@@ -411,8 +411,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp cast_item_cost(%Cast{}), do: nil
 
   defp deferred_item_costs?(%Cast{spell: spell, cast_item_guid: item_guid}) do
-    Enchantments.item_enchant?(spell) or (is_integer(item_guid) and SpellTeaching.spell?(spell)) or
-      Enum.any?(spell.effects, &(&1.type in [:open_lock, :summon_change_item]))
+    ItemUse.deferred_costs?(spell, item_guid)
   end
 
   defp power_cost(entity, %Spell{} = spell) do

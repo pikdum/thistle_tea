@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -32,6 +33,39 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
   end
 
   describe "handle/3" do
+    test "instant transformation keeps its charged source until atomic replacement" do
+      player_guid = Guid.from_low_guid(:player, unique_id())
+      Entity.register(player_guid)
+
+      spell = %Spell{
+        id: @spell_id,
+        cast_time_ms: 0,
+        effects: [%Spell.Effect{type: :summon_change_item, misc_value: 21_174}]
+      }
+
+      item = ItemStore.create(%{drink_template() | stackable: 1}, owner: player_guid)
+      on_exit(fn -> ItemStore.delete(item.object.guid) end)
+
+      state =
+        CmsgUseItem.handle(
+          %CmsgUseItem{bag: Inventory.bag_0(), slot: @backpack_start, spell_count: 1, targets: <<0::little-size(16)>>},
+          %{
+            ready: true,
+            guid: player_guid,
+            packed_guid: BinaryUtils.pack_guid(player_guid),
+            character: character(player_guid, item.object.guid),
+            player_tick_ref: nil
+          },
+          fn @spell_id -> spell end
+        )
+
+      guid = item.object.guid
+      assert ItemStore.get(guid) == item
+      assert state.character.player.inv1 == guid
+      assert_receive {:transform_item, ^guid, %Spell{id: @spell_id}, 21_174}
+      refute_received {:consume_cast_item, _}
+    end
+
     test "uses item cooldown overrides for on-use spells" do
       player_guid = Guid.from_low_guid(:player, unique_id())
       spell = %Spell{id: @spell_id, name: "Drink", cast_time_ms: 0, category: 59, category_recovery_time_ms: 60_000}
