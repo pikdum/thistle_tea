@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Player.Durability do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Durability, as: DurabilityLogic
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -21,11 +22,32 @@ defmodule ThistleTea.Game.Player.Durability do
 
   @repair_flag 0x00004000
 
+  def lose(
+        %{character: %Character{object: %{guid: guid}} = character} = state,
+        %Effects.DurabilityLoss{target_guid: guid} = effect
+      ) do
+    case DurabilityLogic.loss(character.player, effect.mode, effect.amount, effect.scope, &ItemStore.get/1) do
+      {:ok, %ChangeSet{}} = result ->
+        state = commit(state, result)
+        if effect.death?, do: Network.send_packet(%Message.SmsgDurabilityDamageDeath{})
+        spell_log(state.character, effect)
+        state
+
+      {:error, _reason} ->
+        state
+    end
+  end
+
+  def lose(state, %Effects.DurabilityLoss{}), do: state
+
   def lose(%{character: %Character{} = character} = state, mode, amount, scope, death? \\ false) do
-    result = DurabilityLogic.loss(character.player, mode, amount, scope, &ItemStore.get/1)
-    state = commit(state, result)
-    if death?, do: Network.send_packet(%Message.SmsgDurabilityDamageDeath{})
-    state
+    lose(state, %Effects.DurabilityLoss{
+      target_guid: character.object.guid,
+      mode: mode,
+      amount: amount,
+      scope: scope,
+      death?: death?
+    })
   end
 
   def repair(%{ready: true, character: %Character{} = character} = state, vendor_guid, item_guid) do
@@ -61,4 +83,20 @@ defmodule ThistleTea.Game.Player.Durability do
   defp commit(state, {:ok, %ChangeSet{changed: changed}}) when map_size(changed) == 0, do: state
   defp commit(state, {:ok, %ChangeSet{}} = result), do: InventoryUpdate.apply(state, result)
   defp commit(state, {:error, _reason}), do: state
+
+  defp spell_log(character, %Effects.DurabilityLoss{mode: :points, caster_guid: caster, spell_id: spell_id} = effect)
+       when is_integer(caster) and is_integer(spell_id) do
+    entry = DurabilityLogic.spell_log_entry(character.player, effect.scope, &ItemStore.get/1)
+
+    if is_integer(entry) do
+      %Message.SmsgSpelllogexecute{
+        caster: caster,
+        spell_id: spell_id,
+        logs: [{:durability_damage, character.object.guid, entry}]
+      }
+      |> World.broadcast_packet(caster)
+    end
+  end
+
+  defp spell_log(_character, _effect), do: :ok
 end

@@ -13,6 +13,25 @@ defmodule ThistleTea.Game.Entity.Logic.DurabilityTest do
   setup [:inventory]
 
   describe "loss/5" do
+    test "spell scopes isolate equipped slots and carried inventory from the bank", %{player: player, get: get} do
+      assert Durability.spell_scope(-1) == :equipped
+      assert Durability.spell_scope(-2) == :carried
+      assert Durability.spell_scope(15) == {:slot, 15}
+      assert Durability.spell_scope(22) == {:slot, 22}
+      assert Durability.spell_scope(23) == nil
+      assert Durability.spell_scope(39) == nil
+      assert Durability.spell_scope(nil) == nil
+      {:ok, changes} = Durability.loss(player, :points, 5, Durability.spell_scope(-2), get)
+      assert Enum.map(ChangeSet.changed_items(changes), & &1.object.guid) == [1, 2, 4]
+      assert ChangeSet.get_item(changes, 3, get).item.durability == 47
+      {:ok, changes} = Durability.loss(player, :percent, 50, Durability.spell_scope(15), get)
+      assert [%Item{object: %{guid: 1}, item: %{durability: 22}}] = ChangeSet.changed_items(changes)
+      assert Durability.spell_log_entry(player, {:slot, 15}, get) == 25
+      assert Durability.spell_log_entry(player, {:slot, 16}, get) == nil
+      assert Durability.spell_log_entry(player, :carried, get) == -1
+      assert Durability.spell_log_entry(player, :equipped, get) == -1
+    end
+
     test "death wear uses maximum durability and leaves carried gear intact", %{player: player, get: get} do
       {:ok, changes} = Durability.loss(player, :percent, 10, :equipped, get)
       assert ChangeSet.get_item(changes, 1, get).item.durability == 42
@@ -38,6 +57,14 @@ defmodule ThistleTea.Game.Entity.Logic.DurabilityTest do
   end
 
   describe "lose/3" do
+    test "negative point damage repairs to the maximum while negative percentages do nothing", %{get: get} do
+      assert Durability.lose(get.(1), :points, -2).item.durability == 49
+      assert Durability.lose(get.(1), :points, -50_000).item.durability == 50
+      assert Durability.lose(get.(1), :percent, -100) == get.(1)
+      indestructible = Item.build(%ItemTemplate{entry: 1, max_durability: 0}, 99)
+      assert Durability.lose(indestructible, :points, -50_000) == indestructible
+    end
+
     test "clamps wear, rounds percentages down, and preserves indestructible items", %{get: get} do
       assert Durability.lose(get.(1), :points, 1000).item.durability == 0
       assert Durability.lose(get.(1), :percent, 1).item.durability == 46

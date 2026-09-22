@@ -153,6 +153,8 @@ defmodule ThistleTea.Game.Spell.Semantics do
     :enchant_item,
     :enchant_item_temporary,
     :enchant_held_item,
+    :durability_damage,
+    :durability_damage_percent,
     :feed_pet
   ]
 

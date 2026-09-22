@@ -1152,6 +1152,50 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
                SpellEffect.receive(target, context, ownership, 21_000)
     end
 
+    test "durability repair remains applicable to dead players" do
+      target = dead_character_fixture()
+
+      spell = %Spell{
+        id: 23_438,
+        effects: [%Effect{index: 0, type: :durability_damage, base_points: -50_000, misc_value: 17}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 60}
+
+      assert {^target, [%Effects.DurabilityLoss{amount: -50_000, mode: :points, scope: {:slot, 17}}]} =
+               SpellEffect.receive(target, context, spell, 1000)
+    end
+
+    test "durability effects still execute after an earlier effect kills the player" do
+      target = character_fixture()
+
+      spell = %Spell{
+        id: 999,
+        effects: [
+          %Effect{index: 0, type: :instakill},
+          %Effect{index: 1, type: :durability_damage_percent, base_points: 5, misc_value: 4}
+        ]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 60}
+      {dead, events} = SpellEffect.receive(target, context, spell, 1000)
+      assert dead.unit.health == 0
+      assert [%Effects.DurabilityLoss{amount: 5, mode: :percent, scope: {:slot, 4}}] = events
+    end
+
+    test "durability spells ignore creatures and invalid inventory slots" do
+      context = %CastContext{caster_guid: 1, caster_level: 60}
+      spell = %Spell{id: 999, effects: [%Effect{type: :durability_damage, base_points: 5, misc_value: 15}]}
+      mob = target_fixture()
+      assert SpellEffect.receive(mob, context, spell, 1000) == {mob, []}
+      target = character_fixture()
+
+      for slot <- [23, 39, 255] do
+        spell = %{spell | effects: [%Effect{type: :durability_damage, base_points: 5, misc_value: slot}]}
+        assert SpellEffect.receive(target, context, spell, 1000) == {target, []}
+      end
+    end
+
     test "NPC pet summons preserve their signed level adjustment" do
       target = target_fixture()
       context = %CastContext{caster_guid: 1, caster_level: 20}

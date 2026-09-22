@@ -36,13 +36,36 @@ defmodule ThistleTea.Game.Entity.Logic.Durability do
   defp no_death_loss?(%Spell{} = spell, _id), do: Spell.attribute?(spell, :no_durability_loss)
   defp no_death_loss?(_spell, _id), do: false
 
-  def lose(%Item{item: component} = item, mode, amount)
+  def lose(%Item{item: component} = item, :percent, amount)
       when is_number(amount) and amount > 0 and is_integer(component.max_durability) and component.max_durability > 0 do
-    points = if mode == :percent, do: max(trunc(component.max_durability * amount / 100), 1), else: trunc(amount)
-    %{item | item: %{component | durability: max(component.durability - points, 0)}}
+    lose(item, :points, max(trunc(component.max_durability * amount / 100), 1))
+  end
+
+  def lose(%Item{item: component} = item, :points, amount)
+      when is_number(amount) and is_integer(component.max_durability) and component.max_durability > 0 do
+    durability = component.durability |> Kernel.-(trunc(amount)) |> max(0) |> min(component.max_durability)
+    %{item | item: %{component | durability: durability}}
   end
 
   def lose(%Item{} = item, _mode, _amount), do: item
+
+  def spell_scope(-1), do: :equipped
+  def spell_scope(slot) when is_integer(slot) and slot < -1, do: :carried
+
+  def spell_scope(slot) when is_integer(slot) do
+    if Inventory.equipment_slot?(slot) or Inventory.bag_slot?(slot), do: {:slot, slot}
+  end
+
+  def spell_scope(_slot), do: nil
+
+  def spell_log_entry(%Player{}, scope, _get_item) when scope in [:equipped, :carried], do: -1
+
+  def spell_log_entry(%Player{} = player, scope, get_item) do
+    case selected_items(player, scope, get_item) do
+      [%Item{object: %{entry: entry}}] -> entry
+      _missing -> nil
+    end
+  end
 
   def loss(%Player{} = player, mode, amount, scope, get_item) do
     player
@@ -116,6 +139,17 @@ defmodule ThistleTea.Game.Entity.Logic.Durability do
 
   defp selected_items(player, slot, get_item) when is_atom(slot) do
     if slot in Inventory.slots(), do: Enum.filter([get_item.(Map.get(player, slot))], &is_struct(&1, Item)), else: []
+  end
+
+  defp selected_items(player, {:slot, slot}, get_item) do
+    with {:slot, ^slot} <- spell_scope(slot),
+         field = Inventory.field_for_position({255, slot}),
+         guid = player |> Map.from_struct() |> Map.fetch!(field),
+         %Item{} = item <- get_item.(guid) do
+      [item]
+    else
+      _missing -> []
+    end
   end
 
   defp prices(items, get_price) do

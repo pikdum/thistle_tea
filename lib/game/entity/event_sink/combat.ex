@@ -40,13 +40,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   def emit(entity, %Effects.PvpFlagsChanged{}, _context), do: entity
 
   def emit(entity, %Effects.DurabilityLoss{} = effect, context) do
-    message = {:durability_loss, effect.mode, effect.amount, effect.scope, effect.death?}
-
     if effect.target_guid == entity.object.guid do
-      Context.send(context, message)
+      Context.send(context, effect)
     else
       case Entity.pid(effect.target_guid) do
-        pid when is_pid(pid) -> send(pid, message)
+        pid when is_pid(pid) -> send(pid, effect)
         _missing -> :ok
       end
     end

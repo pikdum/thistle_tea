@@ -953,8 +953,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
-  def handle_info({:durability_loss, mode, amount, scope, death?}, %{character: %Character{}} = state) do
-    state = Durability.lose(state, mode, amount, scope, death?)
+  def handle_info(%Effects.DurabilityLoss{} = effect, %{character: %Character{}} = state) do
+    state = Durability.lose(state, effect)
     {:noreply, state, {:continue, :maybe_broadcast_update}}
   rescue
     error ->

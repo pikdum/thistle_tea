@@ -34,7 +34,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
 
-  @resurrect_effects [:resurrect, :resurrect_new]
+  @dead_target_effects [:resurrect, :resurrect_new, :durability_damage, :durability_damage_percent]
 
   @weapon_effect_types [:weapon_damage, :weapon_damage_noschool, :normalized_weapon_damage, :weapon_percent_damage]
 
@@ -310,7 +310,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp apply_effects(target, context, effects, events, applied, now) do
     effects =
       if Core.dead?(target) do
-        Enum.filter(effects, &match?(%Effect{type: type} when type in @resurrect_effects, &1))
+        Enum.filter(effects, &match?(%Effect{type: type} when type in @dead_target_effects, &1))
       else
         effects
       end

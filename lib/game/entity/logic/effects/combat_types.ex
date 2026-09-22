@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
     {:HonorCreatureKill, [:source_guid], []},
     {:HonorAward, [:target_guid, :award], []},
     {:DurabilityDamage, [:source_guid, :lethal?, :environmental?], []},
-    {:DurabilityLoss, [:target_guid, :mode, :amount, :scope], [death?: false]},
+    {:DurabilityLoss, [:target_guid, :mode, :amount, :scope], [death?: false, caster_guid: nil, spell_id: nil]},
     {:EnvironmentalDamage, [:type, :damage], [absorbed: 0, resisted: 0]},
     {:DeliverAttack, [:target_guid, :attack], []},
     {:AdvanceCombatSkill, [:target_guid, :skill_id], []},

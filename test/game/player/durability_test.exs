@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
@@ -32,6 +33,7 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.SpiritHealer
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
@@ -48,6 +50,51 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
   @level 997_932
 
   setup [:equipped_character]
+
+  describe "lose/2" do
+    test "spell completion breaks and restores equipment through the owner transaction", %{state: state, item: item} do
+      broken = apply_durability_spell(state, :durability_damage_percent, 100)
+      assert ItemStore.get(item.object.guid).item.durability == 0
+      assert broken.character.unit.max_health == 120
+      assert broken.character.player.broken_equipment == [:mainhand]
+      assert CharacterStore.get(state.guid).player.broken_equipment == [:mainhand]
+      assert Enchantments.weapon_procs(broken.character, :mainhand) == []
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgSpelllogexecute{}}}, 0
+
+      repaired = apply_durability_spell(broken, :durability_damage, -50_000)
+      assert ItemStore.get(item.object.guid).item.durability == 50
+      assert repaired.character.unit.max_health == 150
+      assert repaired.character.player.broken_equipment == []
+      assert repaired.character.player.coinage == state.character.player.coinage
+      assert length(Enchantments.weapon_procs(repaired.character, :mainhand)) == 1
+      guid = state.guid
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet,
+                       %Message.SmsgSpelllogexecute{
+                         caster: ^guid,
+                         spell_id: 999,
+                         logs: [{:durability_damage, ^guid, @entry}]
+                       }}}
+
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgDurabilityDamageDeath{}}}, 0
+    end
+
+    test "a spell addressed to another owner cannot wear items or emit a log", %{state: state, item: item} do
+      effect = %Effects.DurabilityLoss{
+        target_guid: state.guid + 1,
+        caster_guid: state.guid,
+        spell_id: 999,
+        mode: :points,
+        amount: 50,
+        scope: {:slot, 15}
+      }
+
+      assert Durability.lose(state, effect) == state
+      assert ItemStore.get(item.object.guid).item.durability == 50
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgSpelllogexecute{}}}, 0
+    end
+  end
 
   describe "lose/5 and repair/3" do
     test "weapon talents stop at breakage and return with repaired equipment", %{
@@ -242,7 +289,7 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
       assert wear_events(repeated) == []
 
       dead = EventSink.emit_pending(dead, Context.new(self()))
-      assert_receive {:durability_loss, :percent, 10, :equipped, true} = message
+      assert_receive %Effects.DurabilityLoss{mode: :percent, amount: 10, scope: :equipped, death?: true} = message
       assert {:noreply, worn, _continue} = PlayerServer.handle_info(message, %{state | character: dead})
       assert ItemStore.get(item.object.guid).item.durability == 45
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgDurabilityDamageDeath{}}}
@@ -290,6 +337,19 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
   end
 
   defp wear_events(entity), do: Enum.filter(entity.internal.events, &is_struct(&1, Effects.DurabilityDamage))
+
+  defp apply_durability_spell(state, type, amount) do
+    spell = %Spell{id: 999, effects: [%Effect{index: 0, type: type, base_points: amount, misc_value: 15}]}
+    context = %CastContext{caster_guid: state.guid, caster_level: 10}
+    {character, [effect]} = SpellEffect.receive(state.character, context, spell, 1000)
+    parent = self()
+    receiver = spawn(fn -> receive do: (message -> send(parent, {:forwarded, message})) end)
+    assert ^character = EventSink.emit(character, effect, Context.new(receiver))
+    assert_receive {:forwarded, ^effect}
+    refute_receive ^effect, 0
+    assert {:noreply, updated, _continue} = PlayerServer.handle_info(effect, %{state | character: character})
+    updated
+  end
 
   defp equipped_character(_context) do
     guid = System.unique_integer([:positive, :monotonic])
