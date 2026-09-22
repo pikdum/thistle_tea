@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.MsgMoveKnockBack
@@ -19,6 +20,7 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
   alias ThistleTea.Game.Network.Message.SmsgClientControlUpdate
   alias ThistleTea.Game.Network.Message.SmsgMonsterMove
   alias ThistleTea.Game.Network.Message.SmsgMoveKnockBack
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Metadata
@@ -27,6 +29,41 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.WorldRef
+
+  describe "emit/3 MovementSpeedChanged" do
+    test "publishes the retimed spline to observers and spatial consumers" do
+      world = WorldRef.instance(329, unique_low())
+      guid = Guid.from_low_guid(:mob, 10_917, unique_low())
+      observers = start_observers(nearby: {world, {0.0, 0.0, 0.0}})
+      now = Time.now()
+      entity = mob(guid, world, {0.0, 0.0, 0.0, 0.0})
+      entity = %{entity | movement_block: %{entity.movement_block | run_speed: 10.0}}
+      entity = Movement.move_along_path(entity, [{100.0, 0.0, 0.0}], [run?: true, face_target: 1], now - 1_000)
+      entity = %{entity | movement_block: %{entity.movement_block | run_speed: 5.0}}
+
+      on_exit(fn ->
+        SpatialHash.remove(:mobs, guid)
+        stop_observers(observers)
+      end)
+
+      updated = EventSink.emit(entity, Effects.movement_speed_changed(5.0))
+      assert_receive {:observer, :nearby, {:"$gen_cast", {:send_packet, %SmsgMonsterMove{} = packet, _}}}
+      assert packet.guid == guid
+      assert packet.move_type == 3
+      assert packet.target == 1
+      assert packet.duration == updated.movement_block.duration
+      assert packet.duration > 16_000
+      assert packet.spline_id == entity.internal.spline_id + 1
+      assert packet.splines == [{100.0, 0.0, 0.0}]
+      assert %Spline{duration_ms: duration, started_at: started, origin: origin} = Position.projection(guid)
+      assert duration == packet.duration
+      assert origin == packet.spline_point
+      assert started == updated.internal.movement_start_time
+
+      assert EventSink.emit(updated, Effects.movement_speed_changed(5.0)) == updated
+      refute_receive {:observer, :nearby, {:"$gen_cast", {:send_packet, %SmsgMonsterMove{}, _}}}
+    end
+  end
 
   describe "emit/3 CreatureTeleported" do
     test "projects both observer sets and every owner-local position consumer" do

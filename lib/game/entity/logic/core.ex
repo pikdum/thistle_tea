@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Intoxication
   alias ThistleTea.Game.Entity.Logic.MiniPet
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
@@ -71,7 +72,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       entity
     else
       %{entity | unit: %{entity.unit | health: 0}, internal: %{entity.internal | killed_by: entity.object.guid}}
-      |> Reactive.sync_health()
+      |> sync_health()
       |> prepare_death_state(now)
       |> mark_broadcast_update()
     end
@@ -132,7 +133,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       entity =
         entity
         |> gain_taken_rage(remaining, Keyword.get(opts, :source))
-        |> Reactive.sync_health()
+        |> sync_health()
         |> Threat.add_damage(Keyword.get(opts, :source), damage * Keyword.get(opts, :threat_multiplier, 1.0))
         |> Durability.on_damage(health, remaining, new_health, opts)
         |> maybe_enqueue_death_root(health, new_health)
@@ -240,11 +241,16 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       end
 
     %{entity | unit: %{unit | health: new_health}}
-    |> Reactive.sync_health()
+    |> sync_health()
     |> mark_broadcast_update()
   end
 
   def heal(entity, _amount), do: entity
+
+  defp sync_health(entity) do
+    {entity, events} = entity |> Reactive.sync_health() |> MovementStats.sync()
+    Effects.enqueue(entity, events)
+  end
 
   def restore_mana(%{unit: %Unit{power1: power, max_power1: max_power} = unit} = entity, amount)
       when is_number(power) and is_number(max_power) and max_power > 0 and is_number(amount) and amount > 0 do

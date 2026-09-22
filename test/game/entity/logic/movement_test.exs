@@ -116,6 +116,51 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
     end
   end
 
+  describe "retime/3" do
+    test "keeps the interpolated position and remaining corners when speed changes" do
+      entity = build_entity([])
+      entity = %{entity | movement_block: %{entity.movement_block | run_speed: 10.0}}
+      path = [{10.0, 0.0, 0.0}, {10.0, 20.0, 0.0}]
+      moving = Movement.move_along_path(entity, path, [run?: true, face_angle: 1.5], 0)
+      slower = %{moving | movement_block: %{moving.movement_block | run_speed: 5.0}}
+      {retimed, events} = Movement.retime(slower, :run_speed, 1_500)
+      assert retimed.movement_block.position == {10.0, 5.0, 0.0, :math.pi() / 2}
+      assert retimed.movement_block.spline_nodes == [{10.0, 20.0, 0.0}]
+      assert retimed.movement_block.duration == 3_000
+      assert retimed.internal.movement_start_time == 1_500
+      assert retimed.internal.movement_start_position == {10.0, 5.0, 0.0}
+      assert retimed.internal.movement_speed == {:run_speed, 5.0}
+      assert retimed.movement_block.spline_id == moving.movement_block.spline_id + 1
+      assert [%Effects.MonsterMove{move_opts: opts}] = events
+      assert opts[:face_angle] == 1.5
+      assert Movement.retime(retimed, :run_speed, 1_600) == {retimed, []}
+
+      faster = %{retimed | movement_block: %{retimed.movement_block | run_speed: 10.0}}
+      {restored, [_]} = Movement.retime(faster, :run_speed, 2_500)
+      assert restored.movement_block.position == {10.0, 10.0, 0.0, :math.pi() / 2}
+      assert restored.movement_block.duration == 1_000
+    end
+
+    test "does not retime walking, explicit velocity, timed, completed or stopped paths" do
+      entity = build_entity([])
+      entity = %{entity | movement_block: %{entity.movement_block | run_speed: 10.0, walk_speed: 2.5}}
+      path = [{30.0, 0.0, 0.0}]
+      walking = Movement.move_along_path(entity, path, [run?: false], 0)
+      explicit = Movement.move_along_path(entity, path, [run?: true, velocity: 15.0], 0)
+      timed = Movement.start_timed_path(entity, path, 2_000, 0, run?: true)
+      running = Movement.move_along_path(entity, path, [run?: true], 0)
+      stopped = Movement.stop(running, 500)
+
+      for original <- [walking, explicit, timed, stopped] do
+        changed = %{original | movement_block: %{original.movement_block | run_speed: 5.0}}
+        assert Movement.retime(changed, :run_speed, 1_000) == {changed, []}
+      end
+
+      finished = %{running | movement_block: %{running.movement_block | run_speed: 5.0}}
+      assert Movement.retime(finished, :run_speed, 4_000) == {finished, []}
+    end
+  end
+
   describe "next_spatial_update_delay/2" do
     test "returns the delay to the next spatial cell boundary" do
       entity =

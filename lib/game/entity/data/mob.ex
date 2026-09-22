@@ -18,6 +18,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Entity.Logic.Engagement
+  alias ThistleTea.Game.Entity.Logic.MovementStats
+  alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Skinning
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Time
@@ -161,6 +163,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
           experience_multiplier: experience_multiplier(ct),
           extra_flags: ct.extra_flags,
           static_flags: ct.creature_type_flags,
+          static_flags2: ct.static_flags2,
           rank: ct.rank,
           civilian?: ct.civilian == 1,
           racial_leader?: ct.racial_leader == 1,
@@ -200,6 +203,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         spellbook: c.spellbook
       }
     }
+    |> Reactive.sync_health()
+    |> MovementStats.recompute()
     |> then(fn mob ->
       if Keyword.get(opts, :apply_addon_auras?, true), do: apply_addon_auras(mob, Time.now()), else: mob
     end)
@@ -305,6 +310,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         death_finalized?: false,
         movement_start_time: nil,
         movement_start_position: nil,
+        movement_speed: nil,
+        movement_options: nil,
         behavior_tree: nil,
         broadcast_update?: false,
         spawn: %{spawn_state | respawn_ref: nil, respawn_pending?: false},
@@ -314,7 +321,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
     %Engagement.Result{entity: mob} =
       Engagement.reset(%{mob | unit: unit, movement_block: movement_block, internal: internal})
 
-    mob |> Companion.project() |> Skinning.sync()
+    mob |> Reactive.sync_health() |> MovementStats.recompute() |> Companion.project() |> Skinning.sync()
   end
 
   defp effective_scale(%Mangos.CreatureTemplate{scale: scale}, _display_scale) when is_number(scale) and scale > 0,

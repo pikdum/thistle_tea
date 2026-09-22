@@ -35,6 +35,7 @@ defmodule ThistleTea.DB.Mangos.CreatureTemplate do
     field(:dynamic_flags, :integer, virtual: true, default: 0)
     field(:extra_flags, :integer, source: :flags_extra, default: 0)
     field(:creature_type_flags, :integer, source: :static_flags1, default: 0)
+    field(:static_flags2, :integer, default: 0)
     field(:speed_walk, :float, default: 1.0)
     field(:speed_run, :float, default: 1.14286)
     field(:detection_range, :float, default: 18.0)

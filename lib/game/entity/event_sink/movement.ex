@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Movement, as: MovementLogic
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -164,6 +165,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
     Context.send_packet(context, speed_packet(type, guid, speed))
     broadcast_speed(entity, type, speed)
     entity
+  end
+
+  def emit(%Mob{} = entity, %Effects.MovementSpeedChanged{movement_type: type}, context) do
+    {entity, events} = MovementLogic.retime(entity, type, Time.now())
+    Enum.reduce(events, entity, &emit(&2, &1, context))
   end
 
   def emit(entity, %Effects.MovementSpeedChanged{}, _context), do: entity

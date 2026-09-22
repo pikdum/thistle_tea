@@ -5,11 +5,21 @@ defmodule ThistleTea.Game.Entity.Data.CreatureFlagsVmangosTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
+  alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.Skills
 
   @moduletag :vmangos_db
 
   describe "Mob.build/1" do
+    test "loads the separate wounded slowdown exemption" do
+      boss = build(1853)
+      assert boss.internal.creature.rank == 1
+      assert CreatureFlags.no_wounded_slowdown?(boss)
+      wounded = %{boss | unit: %{boss.unit | health: 1, max_health: 1_000}}
+      assert MovementStats.recompute(wounded).movement_block.run_speed == boss.movement_block.base_run_speed
+      refute CreatureFlags.no_wounded_slowdown?(build(1921))
+    end
+
     test "combat dummies retain their distinct player immunity" do
       for entry <- [1921, 4952, 5652] do
         mob = build(entry)

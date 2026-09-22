@@ -685,16 +685,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp heal_to_full(
-         %Mob{unit: %Unit{health: health, max_health: max_health} = unit} = state,
-         %Blackboard{} = blackboard
-       )
+  defp heal_to_full(%Mob{unit: %Unit{health: health, max_health: max_health}} = state, %Blackboard{} = blackboard)
        when is_number(max_health) and is_number(health) and health < max_health do
-    state =
-      %{state | unit: %{unit | health: max_health}}
-      |> Core.mark_broadcast_update()
-
-    {:success, state, blackboard}
+    {:success, Core.heal(state, max_health - health), blackboard}
   end
 
   defp heal_to_full(state, %Blackboard{} = blackboard) do

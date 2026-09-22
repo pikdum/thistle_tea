@@ -1,12 +1,14 @@
 defmodule ThistleTea.Game.Entity.Logic.MovementStats do
   @moduledoc """
   Recomputes the derived movement speeds on `movement_block` from base speed
-  rates and movement-modifying auras; never reads current speeds as input.
+  rates, auras, and creature health; never reads current speeds as input.
   """
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Wounded
 
   @walk_speed_fields [{:walk_speed, :base_walk_speed}]
 
@@ -16,7 +18,10 @@ defmodule ThistleTea.Game.Entity.Logic.MovementStats do
     movement_block =
       movement_block
       |> apply_speed_multiplier(@walk_speed_fields, 1.0)
-      |> apply_speed_multiplier([{:run_speed, :base_run_speed}], run_multiplier(unit) * slow)
+      |> apply_speed_multiplier(
+        [{:run_speed, :base_run_speed}],
+        run_multiplier(unit) * slow * Wounded.speed_multiplier(entity)
+      )
       |> apply_speed_multiplier([{:run_back_speed, :base_run_back_speed}], slow)
       |> apply_speed_multiplier(
         [{:swim_speed, :base_swim_speed}],
@@ -28,6 +33,29 @@ defmodule ThistleTea.Game.Entity.Logic.MovementStats do
   end
 
   def recompute(entity), do: entity
+
+  def sync(entity) do
+    updated = recompute(entity)
+    {updated, speed_change_events(entity, updated)}
+  end
+
+  defp speed_change_events(%{movement_block: %MovementBlock{} = previous}, %{movement_block: %MovementBlock{} = current}) do
+    [
+      {:run_speed, previous.run_speed, current.run_speed},
+      {:run_back_speed, previous.run_back_speed, current.run_back_speed},
+      {:swim_speed, previous.swim_speed, current.swim_speed},
+      {:swim_back_speed, previous.swim_back_speed, current.swim_back_speed}
+    ]
+    |> Enum.flat_map(fn
+      {type, old, new} when is_number(old) and is_number(new) and old != new ->
+        [Effects.movement_speed_changed(new, type)]
+
+      _ ->
+        []
+    end)
+  end
+
+  defp speed_change_events(_previous, _current), do: []
 
   def set_run_speed_rate(%{movement_block: %MovementBlock{} = movement_block} = entity, rate) when is_number(rate) do
     movement_block = %{movement_block | base_run_speed: rate * MovementBlock.default_run_speed()}

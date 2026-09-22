@@ -208,7 +208,9 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     } = entity
 
     running = Keyword.get(opts, :run?, running)
-    speed = movement_speed(Keyword.get(opts, :velocity), running, run_speed, walk_speed)
+    velocity = Keyword.get(opts, :velocity)
+    speed = movement_speed(velocity, running, run_speed, walk_speed)
+    opts = Keyword.put(opts, :run?, running)
 
     duration =
       [position(entity) | path]
@@ -217,9 +219,13 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
       |> trunc()
       |> max(1)
 
-    entity
-    |> increment_spline_id()
-    |> begin_path(path, duration, now, opts)
+    entity = entity |> increment_spline_id() |> begin_path(path, duration, now, opts)
+
+    source =
+      if !(is_number(velocity) and velocity > 0),
+        do: {if(running, do: :run_speed, else: :walk_speed), speed}
+
+    %{entity | internal: %{entity.internal | movement_speed: source}}
   end
 
   defp begin_path(entity, path, duration, now, opts) do
@@ -230,7 +236,16 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
     running = Keyword.get(opts, :run?, default_running)
     flying? = Keyword.get(opts, :flying?, false)
-    internal = %{internal | movement_start_time: now, movement_start_position: {x0, y0, z0}, fall: nil}
+
+    internal = %{
+      internal
+      | movement_start_time: now,
+        movement_start_position: {x0, y0, z0},
+        movement_speed: nil,
+        movement_options: opts,
+        fall: nil
+    }
+
     {_position, orientation} = pose_along_path([{x0, y0, z0} | path], 0.0, orientation)
 
     movement_block = %{
@@ -249,6 +264,40 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   defp position(%{movement_block: %MovementBlock{position: {x, y, z, _orientation}}}), do: {x, y, z}
+
+  def retime(
+        %{internal: %Internal{movement_speed: {source, previous}, movement_options: opts}, movement_block: mb} = entity,
+        type,
+        now
+      )
+      when source == type and is_integer(now) do
+    speed =
+      case type do
+        :run_speed -> mb.run_speed
+        :walk_speed -> mb.walk_speed
+      end
+
+    if speed != previous and is_number(speed) do
+      retime_remaining(entity, speed, now, opts)
+    else
+      {entity, []}
+    end
+  end
+
+  def retime(entity, _type, _now), do: {entity, []}
+
+  defp retime_remaining(entity, speed, now, _opts) when speed <= 0, do: stop_with_effects(entity, now)
+
+  defp retime_remaining(entity, _speed, now, opts) do
+    case resume_spline(entity, now) do
+      nil ->
+        {entity, []}
+
+      remaining ->
+        updated = start_resolved_path(remaining, remaining.movement_block.spline_nodes, now, opts)
+        {updated, [Effects.monster_move(opts)]}
+    end
+  end
 
   defp at_destination?({x0, y0, z0}, {x, y, z}) do
     abs(x0 - x) <= @move_epsilon and abs(y0 - y) <= @move_epsilon and abs(z0 - z) <= @move_epsilon
@@ -373,7 +422,14 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
         movement_flags: MovementBlock.clear_motion_flags(mb.movement_flags)
     }
 
-    internal = %{internal | movement_start_time: nil, movement_start_position: nil}
+    internal = %{
+      internal
+      | movement_start_time: nil,
+        movement_start_position: nil,
+        movement_speed: nil,
+        movement_options: nil
+    }
+
     %{entity | movement_block: movement_block, internal: internal}
   end
 
@@ -494,7 +550,14 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
             spline_start_position: nil
         }
 
-        internal = %{internal | movement_start_time: nil, movement_start_position: nil}
+        internal = %{
+          internal
+          | movement_start_time: nil,
+            movement_start_position: nil,
+            movement_speed: nil,
+            movement_options: nil
+        }
+
         %{entity | movement_block: movement_block, internal: internal}
     end
   end

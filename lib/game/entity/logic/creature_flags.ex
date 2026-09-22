@@ -29,6 +29,11 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureFlags do
   def has?(flags, flag) when is_integer(flags), do: (flags &&& Map.fetch!(@flags, flag)) != 0
   def has?(_entity, _flag), do: false
 
+  def no_wounded_slowdown?(%{internal: %Internal{creature: %Creature{static_flags2: flags}}}) when is_integer(flags),
+    do: (flags &&& 0x40) != 0
+
+  def no_wounded_slowdown?(_entity), do: false
+
   def unit_flags(flags, static_flags) do
     Enum.reduce(@unit_flags, Pvp.unit_flags(flags, has?(static_flags, :pvp_enabling)), fn {flag, mask}, acc ->
       if has?(static_flags, flag), do: acc ||| mask, else: acc &&& bnot(mask)

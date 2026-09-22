@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Creature do
     :experience_multiplier,
     :extra_flags,
     :static_flags,
+    :static_flags2,
     :rank,
     :family,
     :type_flags,

@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.Reactive do
   @moduledoc """
   Reactive combat state following vmangos reactives: the DEFENSE and
-  HEALTHLESS_20 aura-state bits on the unit (which light Revenge and Execute
-  on the client) and the hidden combo point marking a recently dodged target
+  health aura-state bits on the unit (which light Revenge and Execute and
+  describe creature wounds) and the hidden combo point marking a recently dodged target
   (which lights Overpower). Timed windows last 4 seconds and expire on the
   owner's tick; the health bit is re-derived from every health change.
   """
@@ -12,10 +12,12 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Wounded
 
   @defense_bit 1 <<< 0
   @healthless_20_bit 1 <<< 1
-  @reactive_mask @defense_bit ||| @healthless_20_bit
+  @health_mask @healthless_20_bit ||| 0x700
+  @reactive_mask @defense_bit ||| @health_mask
   @window_ms 4_000
   @warrior 1
   @healthless_threshold 0.2
@@ -81,14 +83,18 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
 
   def sync(%{unit: %Unit{} = unit} = entity, now) do
     preserved = (unit.aura_state || 0) &&& bnot(@reactive_mask)
-    put_aura_state(entity, preserved ||| healthless_bit(unit) ||| defense_bit(entity, now))
+
+    put_aura_state(
+      entity,
+      preserved ||| healthless_bit(unit) ||| Wounded.aura_state(entity) ||| defense_bit(entity, now)
+    )
   end
 
   def sync(entity, _now), do: entity
 
   def sync_health(%{unit: %Unit{} = unit} = entity) do
-    current = (unit.aura_state || 0) &&& bnot(@healthless_20_bit)
-    put_aura_state(entity, current ||| healthless_bit(unit))
+    current = (unit.aura_state || 0) &&& bnot(@health_mask)
+    put_aura_state(entity, current ||| healthless_bit(unit) ||| Wounded.aura_state(entity))
   end
 
   def sync_health(entity), do: entity

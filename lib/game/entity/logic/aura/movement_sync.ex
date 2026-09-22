@@ -25,15 +25,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
   @unit_flag_stunned 0x00040000
 
   def sync_movement_state(entity, now) do
-    previous = entity
-    entity = MovementStats.recompute(entity)
+    {entity, speed_events} = MovementStats.sync(entity)
     {entity, events} = sync_movement_flags(entity, now)
     {entity, feather_events} = sync_movement_flag_aura(entity, :feather_fall, @movement_flag_safe_fall)
     {entity, hover_events} = sync_movement_flag_aura(entity, :hover, @movement_flag_hover)
     {entity, water_walk_events} = sync_movement_flag_aura(entity, :water_walk, @movement_flag_water_walk)
     entity = sync_stunned_flag(entity)
     flag_events = feather_events ++ hover_events ++ water_walk_events
-    {entity, speed_change_events(previous, entity) ++ events ++ flag_events}
+    {entity, speed_events ++ events ++ flag_events}
   end
 
   defp sync_movement_flags(%{movement_block: %MovementBlock{} = mb, unit: %Unit{auras: holders}} = entity, now) do
@@ -121,22 +120,4 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
 
   defp corpse_rooted?(%Character{} = character), do: Core.dead?(character)
   defp corpse_rooted?(_entity), do: false
-
-  defp speed_change_events(%{movement_block: %MovementBlock{} = previous}, %{movement_block: %MovementBlock{} = current}) do
-    [
-      {:run_speed, previous.run_speed, current.run_speed},
-      {:run_back_speed, previous.run_back_speed, current.run_back_speed},
-      {:swim_speed, previous.swim_speed, current.swim_speed},
-      {:swim_back_speed, previous.swim_back_speed, current.swim_back_speed}
-    ]
-    |> Enum.flat_map(fn
-      {type, old, new} when is_number(old) and is_number(new) and old != new ->
-        [Effects.movement_speed_changed(new, type)]
-
-      _ ->
-        []
-    end)
-  end
-
-  defp speed_change_events(_previous, _current), do: []
 end

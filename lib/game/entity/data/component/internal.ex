@@ -66,6 +66,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :visibility_cell,
     :movement_start_time,
     :movement_start_position,
+    :movement_speed,
+    :movement_options,
     :fall,
     :breath,
     :pending_resurrect,
