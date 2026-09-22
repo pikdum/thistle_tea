@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   @moduledoc false
 
   alias ThistleTea.Game.Entity.EffectResolver.Pvp
+  alias ThistleTea.Game.Entity.Logic.Aura.ProcDamage
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Entity.Logic.SpellTarget
@@ -14,6 +15,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpellFocus
   alias ThistleTea.Game.World.SpellMagnets
 
@@ -21,6 +23,19 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
   def resolve(entity, %Effects.CheckSpellFocus{cast: cast, now: now}) do
     [%Effects.SpellFocusResolved{cast: cast, now: now, focus: SpellFocus.find(entity, cast.spell)}]
+  end
+
+  def resolve(entity, %Effects.ProcDamage{target_guid: target_guid, spell: spell, effect_index: index}) do
+    target = Metadata.query(target_guid, [:alive?, :level, :attacker_spell_hit_chance, :mechanic_resistance])
+
+    with %{alive?: true} <- target,
+         {damage_spell, context} <- ProcDamage.prepare(entity, spell, index, target_guid) do
+      hit? = ProcDamage.hit?(entity, spell, target, Guid.entity_type(target_guid) == :player)
+      context = %{context | hit_outcome: if(hit?, do: :hit, else: :resist)}
+      resolved_delivery(entity, Effects.deliver_spell(target_guid, context, damage_spell))
+    else
+      _invalid -> []
+    end
   end
 
   def resolve(entity, %Effects.DeliverSpell{delay_ms: nil} = effect) do

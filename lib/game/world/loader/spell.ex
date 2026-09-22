@@ -305,7 +305,12 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   end
 
   defp put_chain(%SpellData{} = spell, %{first_spell: first_spell, rank: rank}) do
-    %{spell | first_in_chain: first_spell, rank: rank}
+    %{
+      spell
+      | first_in_chain: first_spell,
+        rank: rank,
+        proc_rule: spell.proc_rule || SpellProcEventLoader.get(first_spell)
+    }
   end
 
   defp put_chain(spell, _chain), do: spell
@@ -641,7 +646,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(40), do: :damage_immunity
   defp aura_type(41), do: :dispel_immunity
   defp aura_type(42), do: :proc_trigger_spell
-  defp aura_type(43), do: :damage_shield
+  defp aura_type(43), do: :proc_trigger_damage
   defp aura_type(44), do: :track_creatures
   defp aura_type(45), do: :track_resources
   defp aura_type(47), do: :mod_parry_percent

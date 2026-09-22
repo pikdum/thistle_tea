@@ -39,6 +39,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   def receive(target, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
     cond do
+      context.proc_damage? and (target.unit.health || 0) <= 0 ->
+        {target, []}
+
       immune_to_harmful_spell?(target, context, spell) ->
         {target, [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
 
@@ -70,7 +73,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
       context.hit_outcome == :resist ->
         {target, skill_events} = CombatSkills.resolve(target, special_attack(context, spell), :resist)
-        {target, reactions} = receive_outcome(target, context.caster_guid, spell, :resist, now)
+        {target, reactions} = outcome_reactions(target, context, spell, :resist, now)
 
         {target,
          [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :resist) | reactions] ++
@@ -112,6 +115,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   def receive_outcome(target, _caster_guid, _spell, _outcome, _now), do: {target, []}
+
+  defp outcome_reactions(target, %CastContext{proc_damage?: true}, _spell, _outcome, _now), do: {target, []}
+
+  defp outcome_reactions(target, %CastContext{caster_guid: caster_guid}, spell, outcome, now),
+    do: receive_outcome(target, caster_guid, spell, outcome, now)
 
   defp immune_to_harmful_spell?(target, %CastContext{caster_guid: caster_guid}, %Spell{} = spell) do
     target.object.guid != caster_guid and Spell.harmful?(spell) and DamageImmunity.immune?(target, spell.school, spell)
@@ -276,7 +284,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       end)
 
     if effects == [] and spell.effects != [] do
-      {target, reactions} = receive_outcome(target, context.caster_guid, spell, :resist, now)
+      {target, reactions} = outcome_reactions(target, context, spell, :resist, now)
       {target, [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :resist) | reactions]}
     else
       context = %{context | spell: %{spell | effects: effects}}

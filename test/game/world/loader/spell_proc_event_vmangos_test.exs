@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Spell.ProcRule
   alias ThistleTea.Game.World.Loader.SpellProcEvent
 
@@ -13,6 +14,17 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   end
 
   describe "get/1" do
+    test "shield spikes and first-rank Paladin defenses are block-only procs" do
+      for id <- [9782, 9784, 16_624, 20_911, 20_925] do
+        assert %ProcRule{proc_ex: 0x40} = SpellProcEvent.get(id)
+      end
+
+      for {id, first, rank} <- [{20_928, 20_925, 3}, {20_914, 20_911, 4}] do
+        assert %{rank: ^rank} = Mangos.Repo.get_by(Mangos.SpellChain, spell_id: id, first_spell: first)
+        assert Mangos.Repo.get_by(Mangos.SpellProcEvent, entry: id) == nil
+      end
+    end
+
     test "stacking spell trinkets trigger at cast completion" do
       for id <- [24_659, 28_200] do
         assert %ProcRule{proc_ex: 0x80000} = SpellProcEvent.get(id)

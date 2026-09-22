@@ -181,6 +181,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   end
 
   def apply_damage_amount(state, %CastContext{} = context, %Spell{} = spell, amount, now, opts \\ []) do
+    opts = if context.proc_damage?, do: Keyword.put(opts, :proc_type, nil), else: opts
     rolled = amount
 
     rolled =
@@ -223,7 +224,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
       )
 
     {state, reaction_events} =
-      if Keyword.get(opts, :periodic?, false) do
+      if context.proc_damage? or Keyword.get(opts, :periodic?, false) do
         {state, []}
       else
         spell_taken_reactions(state, context, spell, damage - absorbed, crit?, opts, now)

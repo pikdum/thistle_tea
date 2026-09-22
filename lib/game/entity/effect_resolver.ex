@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   @spell_requests [
     Effects.CheckSpellFocus,
     Effects.DeliverSpell,
+    Effects.ProcDamage,
     Effects.DeliverSpellOutcome,
     Effects.DeliverSpellToQuery,
     Effects.HealThreat,

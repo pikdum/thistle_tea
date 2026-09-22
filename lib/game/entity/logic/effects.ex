@@ -248,6 +248,11 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.DeliverSpell{target_guid: target_guid, cast_context: cast_context, spell: spell}
   end
 
+  def proc_damage(target_guid, %Spell{} = spell, effect_index)
+      when is_integer(target_guid) and is_integer(effect_index) do
+    %Effects.ProcDamage{target_guid: target_guid, spell: spell, effect_index: effect_index}
+  end
+
   def deliver_heal_threat(mob_guid, source_guid, target_guid, amount)
       when is_integer(mob_guid) and is_integer(source_guid) and is_integer(target_guid) and is_number(amount) do
     %Effects.DeliverHealThreat{

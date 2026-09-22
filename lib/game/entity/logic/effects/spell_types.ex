@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
     {:SpellDelayed, [:source_guid, :delay_ms], []},
     {:DelayAura, [:source_guid, :target_guid, :spell_id, :delay_ms], []},
     {:DeliverSpell, [:target_guid, :cast_context, :spell], [delay_ms: nil]},
+    {:ProcDamage, [:target_guid, :spell, :effect_index], []},
     {:TriggerSpellRequest, [:source_guid, :target_guid, :spell_id, :opts], []},
     {:ScriptedCast, [:entry, :target_guid], []},
     {:DeliverHealThreat, [:mob_guid, :source_guid, :target_guid, :amount], []},

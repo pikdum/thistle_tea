@@ -420,7 +420,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
          %{source_guid: source_guid, target_guid: target_guid, proc_type: proc_type} = effect,
          absorbed
        )
-       when is_integer(source_guid) and is_atom(proc_type) do
+       when is_integer(source_guid) and is_atom(proc_type) and not is_nil(proc_type) do
     Entity.spell_outcome(source_guid, %{
       victim_guid: target_guid,
       outcome: if(effect.crit?, do: :crit, else: :normal),

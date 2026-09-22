@@ -17,7 +17,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Spell.Proc
   alias ThistleTea.Game.Spell.Scripts
 
-  @charge_consuming_on_hit [:damage_shield, :proc_trigger_spell, :mod_resistance, :mod_resistance_exclusive]
+  @charge_consuming_on_hit [
+    :damage_shield,
+    :proc_trigger_spell,
+    :proc_trigger_damage,
+    :mod_resistance,
+    :mod_resistance_exclusive
+  ]
 
   def reactions(entity, :hit_taken, %{attacker_guid: attacker_guid} = context)
       when is_integer(attacker_guid) and not is_map_key(context, :proc_type) do
@@ -188,11 +194,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         source_guid = holder.caster_guid || owner_guid
 
         proc_events =
-          Enum.map(proc_auras, fn %Aura{trigger_spell_id: spell_id} ->
-            Effects.trigger_spell(source_guid, holder.caster_level || 1, attacker_guid, spell_id,
-              triggered_by_spell_id: holder.spell.id
-            )
-          end)
+          Enum.map(proc_auras, &proc_event(&1, holder, source_guid, attacker_guid))
 
         {replace_or_delete(holders, holder, mark_proc(holder, Map.get(context, :now))), events ++ proc_events}
     end
@@ -254,11 +256,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     cond do
       proc_auras != [] and is_integer(victim_guid) ->
         proc_events =
-          Enum.map(proc_auras, fn %Aura{trigger_spell_id: spell_id} ->
-            Effects.trigger_spell(owner_guid, holder.caster_level || 1, victim_guid, spell_id,
-              triggered_by_spell_id: holder.spell.id
-            )
-          end)
+          Enum.map(proc_auras, &proc_event(&1, holder, owner_guid, victim_guid))
 
         {replace_or_delete(holders, holder, mark_proc(holder, Map.get(context, :now))), events ++ proc_events}
 
@@ -277,8 +275,17 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   defp trigger_auras(%Holder{auras: auras}) do
     Enum.filter(auras, fn
       %Aura{type: :proc_trigger_spell, trigger_spell_id: spell_id} when is_integer(spell_id) and spell_id > 0 -> true
+      %Aura{type: :proc_trigger_damage, index: index} when is_integer(index) -> true
       _aura -> false
     end)
+  end
+
+  defp proc_event(%Aura{type: :proc_trigger_damage, index: index}, %Holder{spell: spell}, _source, target) do
+    Effects.proc_damage(target, spell, index)
+  end
+
+  defp proc_event(%Aura{type: :proc_trigger_spell, trigger_spell_id: spell_id}, %Holder{} = holder, source, target) do
+    Effects.trigger_spell(source, holder.caster_level || 1, target, spell_id, triggered_by_spell_id: holder.spell.id)
   end
 
   defp replace_or_delete(holders, holder, nil), do: List.delete(holders, holder)
@@ -368,11 +375,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
     if proc? do
       events =
-        Enum.map(proc_auras, fn %Aura{trigger_spell_id: spell_id} ->
-          Effects.trigger_spell(owner_guid, holder.caster_level || 1, victim_guid, spell_id,
-            triggered_by_spell_id: holder.spell.id
-          )
-        end)
+        Enum.map(proc_auras, &proc_event(&1, holder, owner_guid, victim_guid))
 
       {mark_proc(holder, now), events}
     else
@@ -395,6 +398,17 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     charges = if is_integer(holder.charges), do: holder.charges - 1, else: holder.charges
     next_proc_at = if cooldown_ms > 0, do: now + cooldown_ms
     %{holder | charges: charges, next_proc_at: next_proc_at}
+  end
+
+  defp reaction_event(
+         %Aura{type: :proc_trigger_damage} = aura,
+         %Holder{} = holder,
+         owner_guid,
+         attacker_guid,
+         true,
+         _shield?
+       ) do
+    [proc_event(aura, holder, owner_guid, attacker_guid)]
   end
 
   defp reaction_event(

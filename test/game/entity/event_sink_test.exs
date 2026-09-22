@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.Metadata
@@ -51,6 +52,46 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     end
 
     setup [:metadata_fixtures]
+
+    test "proc damage resolves from the aura carrier and reaches only a live target" do
+      carrier_guid = Guid.from_low_guid(:player, unique_guid())
+      target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      Entity.register(target_guid)
+      Metadata.put(target_guid, %{alive?: true, level: 60})
+
+      on_exit(fn ->
+        Entity.unregister(target_guid)
+        Metadata.delete(target_guid)
+      end)
+
+      carrier = %Character{
+        object: %Object{guid: carrier_guid},
+        unit: %Unit{level: 60, health: 100, max_health: 100, auras: []},
+        player: %Player{},
+        internal: %Internal{world: WorldRef.open(0)},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      spell = %Spell{
+        id: 90_030,
+        school: :fire,
+        effects: [%Effect{index: 1, type: :apply_aura, aura: :proc_trigger_damage, base_points: 10}]
+      }
+
+      request = Effects.proc_damage(target_guid, spell, 1)
+      EventSink.emit(carrier, request)
+
+      assert_receive {:"$gen_cast",
+                      {:receive_spell, %CastContext{caster_guid: ^carrier_guid, caster_level: 60, proc_damage?: true},
+                       %Spell{effects: [%Effect{type: :school_damage, index: 1}]}}}
+
+      Metadata.update(target_guid, %{alive?: false})
+      EventSink.emit(carrier, request)
+      refute_received {:"$gen_cast", {:receive_spell, _, _}}
+      Metadata.delete(target_guid)
+      EventSink.emit(carrier, request)
+      refute_received {:"$gen_cast", {:receive_spell, _, _}}
+    end
 
     test "direct healing reaches the recipient and observers without duplicating periodic logs" do
       owner_guid = Guid.from_low_guid(:player, unique_guid())
@@ -115,9 +156,16 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      for periodic? <- [false, true], absorbed <- [0, 454, 500] do
+      for periodic? <- [false, true], absorbed <- [0, 454, 500], proc_type <- [:deal_harmful_spell, nil] do
         spell = %Spell{id: 24_619, school: :shadow}
-        effect = Effects.spell_damage(observer_guid, owner_guid, spell, 500, absorbed: absorbed, periodic?: periodic?)
+
+        effect =
+          Effects.spell_damage(observer_guid, owner_guid, spell, 500,
+            absorbed: absorbed,
+            periodic?: periodic?,
+            proc_type: proc_type
+          )
+
         EventSink.emit(character, effect)
         damage = 500 - absorbed
 
@@ -136,6 +184,12 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
                            absorbed: ^absorbed,
                            periodic?: ^periodic?
                          }}}
+
+        if proc_type do
+          assert_receive {:"$gen_cast", {:spell_outcome, %{proc_type: ^proc_type}}}
+        else
+          refute_received {:"$gen_cast", {:spell_outcome, _}}
+        end
       end
     end
 

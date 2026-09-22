@@ -437,7 +437,7 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
     test "defensive and stat blessings load semantic aura types" do
       assert Enum.any?(SpellLoader.load(642).effects, &(&1.aura == :school_immunity))
       assert Enum.any?(SpellLoader.load(20_217).effects, &(&1.aura == :mod_total_stat_percent))
-      assert Enum.any?(SpellLoader.load(20_911).effects, &(&1.aura == :damage_shield))
+      assert Enum.any?(SpellLoader.load(20_911).effects, &(&1.aura == :proc_trigger_damage))
     end
 
     test "creature-family restrictions come from the DBC mask" do
