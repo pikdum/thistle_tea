@@ -16,6 +16,8 @@ defmodule ThistleTea.Game.Player.VendorTest do
   alias ThistleTea.Game.Entity.Registry
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.SmsgBuyFailed
+  alias ThistleTea.Game.Network.Message.SmsgListInventory
+  alias ThistleTea.Game.Player.Gossip
   alias ThistleTea.Game.Player.Vendor
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
@@ -23,6 +25,24 @@ defmodule ThistleTea.Game.Player.VendorTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
+
+  describe "Gossip.hello/2" do
+    test "opens an empty merchant when no gossip menu exists" do
+      entry = System.unique_integer([:positive, :monotonic]) + 900_000
+      guid = Guid.from_low_guid(:mob, entry, entry)
+      publish_vendor(guid)
+      :ets.insert(VendorLoader, {entry, []})
+      on_exit(fn -> :ets.delete(VendorLoader, entry) end)
+      state = %{ready: true, character: character(60)}
+
+      assert Gossip.hello(state, guid) == state
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgListInventory{vendor_guid: ^guid, items: []}}}
+
+      Metadata.update(guid, %{alive?: false})
+      assert Gossip.hello(state, guid) == state
+      refute_received {:"$gen_cast", {:send_packet, %SmsgListInventory{}}}
+    end
+  end
 
   describe "buy/4" do
     test "splits purchases into legal stacks and pays once" do

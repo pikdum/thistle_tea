@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.Player.Gossip do
       case GossipLoader.menu_for_creature(Guid.entry(guid)) do
         %Menu{} = menu -> send_menu(guid, menu, quests, state)
         nil when quests != [] -> send_menu(guid, %Menu{text_id: @default_gossip_text_id, options: []}, quests, state)
-        nil -> state
+        nil -> Vendor.list(state, guid)
       end
     else
       state
