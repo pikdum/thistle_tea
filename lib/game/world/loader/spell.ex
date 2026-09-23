@@ -598,7 +598,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(83), do: :duel
   defp effect_type(84), do: :stuck
   defp effect_type(85), do: :summon_player
-  defp effect_type(type) when type in 87..90, do: :summon_totem
+  defp effect_type(type) when type == 74 or type in 87..90, do: :summon_totem
   defp effect_type(96), do: :charge
   defp effect_type(97), do: :summon_mini_pet
   defp effect_type(41), do: :summon_wild
@@ -909,6 +909,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex3, 0x00000001, :pvp_enabling)
     |> add_if(attrs_ex3, 0x00000020, :no_durability_loss)
     |> add_if(attrs_ex3, 0x00000010, :no_resurrection_timer)
+    |> add_if(attrs_ex3, 0x00000800, :only_battlegrounds)
     |> add_if(attrs_ex3, 0x00100000, :death_persistent)
     |> add_if(attrs_ex3, 0x10000000, :ignore_caster_and_target_restrictions)
     |> add_if(attrs_ex3, 0x20000000, :ignore_caster_modifiers)

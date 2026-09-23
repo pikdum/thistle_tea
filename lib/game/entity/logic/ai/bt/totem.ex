@@ -14,8 +14,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Totem do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
 
   @target_radius 30.0
@@ -23,11 +25,34 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Totem do
 
   def tree do
     BT.selector([
+      BT.action(&lifetime/3),
       SpellBT.casting_sequence(),
       BT.action(&select_hostile_target/3),
       BT.action(&cast/3),
       BT.action(&idle/2)
     ])
+  end
+
+  def lifetime(%Mob{internal: %Internal{totem: %Totem{} = totem}} = state, blackboard, %Context{} = context) do
+    expired? = is_integer(totem.expires_at) and context.now >= totem.expires_at
+
+    if expired? or not owner_present?(state, context) do
+      {:success, Effects.enqueue(state, Effects.despawn_self(0, 0)), blackboard}
+    else
+      {:failure, state, blackboard}
+    end
+  end
+
+  defp owner_present?(%Mob{internal: %{totem: %Totem{owner_guid: owner}, world: world}}, %Context{
+         perception: perception
+       }) do
+    with %{alive?: alive?} <- Perception.metadata(perception, owner),
+         {^world, _, _, _} <- Perception.position(perception, owner),
+         distance when is_number(distance) and distance <= 120.0 <- Perception.distance(perception, owner) do
+      alive? or Guid.entity_type(owner) in [:mob, :pet]
+    else
+      _missing -> false
+    end
   end
 
   def cast(%Mob{internal: %Internal{totem: %Totem{passive_spell_started?: true}}} = state, blackboard, _context) do

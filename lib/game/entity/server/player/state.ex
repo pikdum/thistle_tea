@@ -106,6 +106,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     |> Instances.clear()
     |> MiniPetOwner.dismiss()
     |> dismiss_guardians()
+    |> dismiss_totems()
     |> do_prepare_worldport(origin, destination)
   end
 
@@ -179,6 +180,12 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   end
 
   defp disengage(%__MODULE__{} = state), do: state
+
+  defp dismiss_totems(%__MODULE__{character: nil} = state), do: state
+
+  defp dismiss_totems(%__MODULE__{} = state) do
+    %{state | character: state.character |> Totems.dismiss_all() |> EventSink.emit_pending()}
+  end
 
   defp dismiss_guardians(%__MODULE__{character: nil} = state), do: state
 

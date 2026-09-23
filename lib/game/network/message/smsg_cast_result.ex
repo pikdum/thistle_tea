@@ -42,6 +42,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     not_on_taxi: 0x3A,
     no_mounts_allowed: 0x4B,
     only_abovewater: 0x50,
+    only_battlegrounds: 0x87,
     not_behind: 0x33,
     not_infront: 0x36,
     not_here: 0x35,

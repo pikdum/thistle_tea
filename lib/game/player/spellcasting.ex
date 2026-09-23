@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Player.Teaching
   alias ThistleTea.Game.Player.Trade
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Battleground
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Modifiers
@@ -315,6 +316,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
         ammo_id: character.player.ammo_id,
         ammo_template: ItemLoader.get_template(character.player.ammo_id),
         mount_allowed?: MapTemplateLoader.mount_allowed?(character.internal.world.map_id),
+        battleground: battleground_context(character, spell),
         feed_context: feed_context(character, spell, targets),
         ritual_context: ritual_context(character, spell),
         duel_context: duel_context(character, spell, targets)
@@ -327,6 +329,12 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       validate_party_unit_query(character, SpellTarget.target_query(spell, targets))
     else
       :ok
+    end
+  end
+
+  defp battleground_context(character, spell) do
+    if Battleground.restricted?(spell) do
+      ThistleTea.Game.World.System.Battleground.spell_context(character.internal.world, character.object.guid)
     end
   end
 

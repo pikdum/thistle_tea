@@ -7,13 +7,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Ritual
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
   alias ThistleTea.Game.Entity.Data.DynamicObject, as: DataDynamicObject
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate, as: DataGameObjectTemplate
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Totems
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
+  alias ThistleTea.Game.World.Loader.Totem, as: TotemLoader
   alias ThistleTea.Game.World.Loader.WildSummon
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
@@ -413,38 +414,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
-  def emit(
-        %Character{
-          object: %{guid: owner_guid},
-          internal: %Internal{world: world},
-          movement_block: %{position: position}
-        } = entity,
-        %Effects.SummonTotem{entry: entry, slot: slot, duration_ms: duration_ms},
-        context
-      ) do
+  def emit(%{internal: %Internal{}} = entity, %Effects.SummonTotem{slot: slot} = effect, _context) do
     old_guid = Map.get(entity.internal.totem_guids, slot)
     if is_integer(old_guid), do: World.stop_entity(old_guid)
 
-    with %Mob{} = built <-
-           SummonLoader.build(entry, world, position, despawn_type: 1, despawn_delay_ms: duration_ms),
-         built = SummonLoader.attach_owner(built, owner_guid),
-         unit = %{
-           built.unit
-           | faction_template: entity.unit.faction_template,
-             level: entity.unit.level
-         },
-         totem = %{
-           built
-           | unit: unit,
-             internal: %{
-               built.internal
-               | rooted?: true,
-                 totem: %Totem{owner_guid: owner_guid}
-             }
-         },
+    with %Mob{} = totem <- TotemLoader.build(entity, effect, Time.now()),
          {:ok, _pid} <- MobLoader.start_mob(totem) do
-      Context.send(context, %Commands.TotemStarted{slot: slot, guid: totem.object.guid})
-      entity
+      Totems.started(entity, slot, totem.object.guid)
     else
       _ -> entity
     end

@@ -273,9 +273,21 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
     {state, [Effects.summon_creature(summon, [], nil)]}
   end
 
-  def apply(state, %CastContext{}, spell, %Effect{type: :summon_totem, summon_slot: slot, misc_value: entry}, _now)
-      when slot in 1..4 and is_integer(entry) and entry > 0 do
-    {state, [Effects.summon_totem(entry, slot, max(spell.duration_ms || 0, 0))]}
+  def apply(
+        %{object: %{guid: guid}} = state,
+        %CastContext{caster_guid: guid} = context,
+        spell,
+        %Effect{type: :summon_totem, summon_slot: slot, misc_value: entry} = effect,
+        _now
+      )
+      when (is_nil(slot) or slot in 1..4) and is_integer(entry) and entry > 0 do
+    summon = %{
+      Effects.summon_totem(entry, slot, max(spell.duration_ms || 0, 0))
+      | spell_id: spell.id,
+        health: max(Amount.roll(spell, effect, context), 0)
+    }
+
+    {state, [summon]}
   end
 
   def apply(

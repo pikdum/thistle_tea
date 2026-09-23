@@ -72,6 +72,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
+  alias ThistleTea.Game.World.Loader.Totem, as: TotemLoader
   alias ThistleTea.Game.World.Loader.Trainer, as: TrainerLoader
   alias ThistleTea.Game.World.Loader.Transport, as: TransportLoader
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
@@ -340,6 +341,7 @@ defmodule ThistleTea.Application do
         SpellProcEventLoader.load_all()
         SpellScriptLoader.load_all()
         SpellScriptNameLoader.load_all()
+        TotemLoader.preload()
         SpellThreatLoader.load_all()
         TalentLoader.load_all()
         PetTrainingLoader.load_all()

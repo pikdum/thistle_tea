@@ -1,14 +1,16 @@
 defmodule ThistleTea.Game.Entity.Logic.Totems do
   @moduledoc """
-  Owns player totem slots and releases summons when their owner dies or leaves
-  the world. Late summon results cannot attach to a dead owner.
+  Builds owned totems and tracks elemental slots separately from independent
+  wards. Player death releases summons; creature wards can outlive their caster.
   """
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
@@ -27,11 +29,38 @@ defmodule ThistleTea.Game.Entity.Logic.Totems do
 
   def immune_effect?(_entity, _context, _spell, _effect), do: false
 
-  def started(%Character{internal: %Internal{} = internal} = character, slot, guid) do
-    if Death.alive?(character) do
-      %{character | internal: %{internal | totem_guids: Map.put(internal.totem_guids, slot, guid)}}
+  def prepare(%Mob{} = mob, owner, %Effects.SummonTotem{} = effect, now) do
+    unit = %{
+      mob.unit
+      | faction_template: owner.unit.faction_template,
+        level: owner.unit.level,
+        created_by_spell: effect.spell_id,
+        created_by: owner.object.guid,
+        summoned_by: owner.object.guid,
+        stat_model: :creature,
+        flags: Bitwise.bor(mob.unit.flags || 0, Bitwise.band(owner.unit.flags || 0, 0x1000))
+    }
+
+    unit = if effect.health > 0, do: %{unit | base_health: effect.health}, else: unit
+    unit = Stats.recompute(unit)
+    unit = %{unit | health: unit.max_health}
+    totem = %Totem{owner_guid: owner.object.guid, expires_at: now + effect.duration_ms}
+    internal = %{mob.internal | totem: totem, rooted?: true, loot: nil}
+    %{mob | unit: unit, internal: internal}
+  end
+
+  def position({x, y, z, orientation}, slot) do
+    offset = if slot in 1..4, do: :math.pi() / 4 - (slot - 1) * :math.pi() / 2, else: 0.0
+    angle = orientation + offset
+    {x + 2.0 * :math.cos(angle), y + 2.0 * :math.sin(angle), z, orientation}
+  end
+
+  def started(%{internal: %Internal{} = internal} = entity, slot, guid) do
+    if Death.alive?(entity) or is_struct(entity, Mob) do
+      key = slot || {:unslotted, guid}
+      %{entity | internal: %{internal | totem_guids: Map.put(internal.totem_guids, key, guid)}}
     else
-      Effects.enqueue(character, Effects.despawn_entity(guid))
+      Effects.enqueue(entity, Effects.despawn_entity(guid))
     end
   end
 
@@ -48,7 +77,7 @@ defmodule ThistleTea.Game.Entity.Logic.Totems do
 
   def dismiss_all(entity), do: entity
 
-  def stopped(%Character{internal: %Internal{} = internal} = character, guid) do
+  def stopped(%{internal: %Internal{} = internal} = character, guid) do
     totems = Map.reject(internal.totem_guids, fn {_slot, current} -> current == guid end)
     %{character | internal: %{internal | totem_guids: totems}}
   end

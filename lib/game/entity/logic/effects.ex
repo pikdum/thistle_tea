@@ -673,7 +673,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
   end
 
   def summon_totem(entry, slot, duration_ms)
-      when is_integer(entry) and entry > 0 and slot in 1..4 and is_integer(duration_ms) do
+      when is_integer(entry) and entry > 0 and (is_nil(slot) or slot in 1..4) and is_integer(duration_ms) do
     %Effects.SummonTotem{entry: entry, slot: slot, duration_ms: duration_ms}
   end
 

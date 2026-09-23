@@ -73,6 +73,10 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
                BattlegroundSystem.port(1, 1, return_to, server)
 
       assert %{status: :in_progress, client_instance_id: 1} = BattlegroundSystem.status(1, server)
+      world = WorldRef.instance(489, 1)
+      assert %{map_id: 489, phase: :countdown} = BattlegroundSystem.spell_context(world, 1, server)
+      assert BattlegroundSystem.spell_context(world, 2, server) == nil
+      assert BattlegroundSystem.spell_context(WorldRef.instance(489, 2), 1, server) == nil
     end
 
     test "creates distinct world copies for independently matched teams", %{server: server} do

@@ -72,6 +72,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.Threat
+  alias ThistleTea.Game.Entity.Logic.Totems
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Entity.Server.CreaturePetOwner
@@ -82,6 +83,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
+  alias ThistleTea.Game.Entity.Server.TotemOwner
   alias ThistleTea.Game.Entity.SpellReception
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -1143,6 +1145,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       {:noreply, state}
   end
 
+  def handle_info(%Commands.TotemStopped{guid: guid}, %Mob{} = state) do
+    {:noreply, Totems.stopped(state, guid)}
+  rescue
+    error ->
+      Logger.error("Totem departure failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_info(:totem_stop, %Mob{internal: %Internal{totem: %Totem{}}} = state) do
     {:stop, :normal, state}
   end
@@ -1283,22 +1293,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def terminate(_reason, state) do
     CreaturePetOwner.owner_stopped(state)
     GuardianOwner.owner_stopped(state)
-    notify_totem_owner(state)
+    TotemOwner.stopped(state)
     release_victim(state)
     unwatch_chase(state)
     World.remove_position(state)
     Visibility.leave_entity(state)
     Metadata.delete(state.object.guid)
   end
-
-  defp notify_totem_owner(%Mob{object: %{guid: guid}, internal: %Internal{totem: %Totem{owner_guid: owner}}}) do
-    case Entity.pid(owner) do
-      pid when is_pid(pid) -> send(pid, %Commands.TotemStopped{guid: guid})
-      _ -> :ok
-    end
-  end
-
-  defp notify_totem_owner(_state), do: :ok
 
   defp behavior_tree(%Mob{internal: %Internal{totem: %Totem{}}}), do: TotemBT.tree()
 

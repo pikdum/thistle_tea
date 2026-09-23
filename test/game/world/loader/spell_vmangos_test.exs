@@ -17,6 +17,17 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
 
   @moduletag :dbc_db
 
+  describe "independent totems" do
+    test "loads standards and wards without claiming elemental slots" do
+      for {id, entry, health} <- [{23_034, 14_465, 1500}, {23_035, 14_466, 1500}, {8832, 6386, 5}] do
+        spell = SpellLoader.load(id)
+        assert [%Effect{type: :summon_totem, summon_slot: nil, misc_value: ^entry} = effect] = spell.effects
+        assert Effect.roll(effect, 0) == health
+        assert Spell.attribute?(spell, :only_battlegrounds) == id in [23_034, 23_035]
+      end
+    end
+  end
+
   describe "spell focus requirements" do
     test "loads forge, cooking fire, anvil and quest focus identifiers" do
       for {id, focus} <- [{2657, 3}, {2538, 4}, {15_292, 623}, {4975, 6}] do

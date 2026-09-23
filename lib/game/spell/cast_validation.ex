@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.Skinning
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Battleground
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.CorpseTarget
   alias ThistleTea.Game.Spell.Effect
@@ -51,6 +52,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_spirit_of_redemption(caster, spell),
          :ok <- check_caster_state(caster, spell, now),
          :ok <- check_combat_state(caster, spell),
+         :ok <- Battleground.validate(spell, Keyword.get(opts, :battleground)),
          :ok <- Pickpocket.validate(caster, spell, target_info),
          :ok <- Skinning.validate(caster, spell, target_info, opts),
          :ok <- OpenLock.validate(caster, spell, Keyword.get(opts, :lock_context)),

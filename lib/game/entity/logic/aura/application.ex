@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   """
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.Capacity
   alias ThistleTea.Game.Entity.Logic.Aura.Change
@@ -560,6 +561,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   defp channel_ticked?(_spell, _effect), do: false
 
   defp build_aura(_entity, _spell, %Effect{aura: nil}, _amount_override, _context, _now), do: nil
+
+  defp build_aura(
+         %{internal: %{totem: %Totem{}}},
+         _spell,
+         %Effect{type: :apply_area_aura, index: index},
+         _amount_override,
+         _context,
+         _now
+       ), do: %Aura{index: index, type: :none, amount: 0}
 
   defp build_aura(entity, %Spell{} = spell, %Effect{} = effect, amount_override, %CastContext{} = context, now) do
     amplitude_ms = effective_amplitude(effect)
