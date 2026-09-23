@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride, as: SpellEffectOverrideLoader
+  alias ThistleTea.Game.World.Loader.SpellObjectTarget, as: SpellObjectTargetLoader
   alias ThistleTea.Game.World.Loader.SpellProcEvent, as: SpellProcEventLoader
   alias ThistleTea.Game.World.Loader.SpellScript, as: SpellScriptLoader
   alias ThistleTea.Game.World.Loader.SpellScriptName, as: SpellScriptNameLoader
@@ -216,6 +217,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       base_level: row.base_level || 0,
       max_level: row.max_level || 0,
       custom_flags: SpellEffectOverrideLoader.custom_flags(row.id),
+      object_targets: SpellObjectTargetLoader.get(row.id),
       effects: build_effects(row, radius_lookup),
       script_steps: SpellScriptLoader.get(row.id),
       reagents: build_reagents(row),
@@ -579,7 +581,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(55), do: :tame_creature
   defp effect_type(56), do: :summon_pet
   defp effect_type(57), do: :learn_pet_spell
-  defp effect_type(59), do: :activate_object
+  defp effect_type(59), do: :open_lock_item
+  defp effect_type(86), do: :activate_object
   defp effect_type(62), do: :power_burn
   defp effect_type(63), do: :modify_threat
   defp effect_type(68), do: :interrupt_cast
@@ -808,6 +811,10 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(35), do: :party_member
   defp target_type(37), do: :party_around_target
   defp target_type(39), do: :caster_fishing_spot
+  defp target_type(23), do: :game_object
+  defp target_type(40), do: :game_object_near_caster
+  defp target_type(51), do: :game_objects_at_source
+  defp target_type(52), do: :game_objects_at_destination
   defp target_type(24), do: :aoe_enemy_in_cone
   defp target_type(25), do: :any_unit
   defp target_type(27), do: :caster_master

@@ -5,11 +5,14 @@ defmodule ThistleTea.Game.Entity.Server.GameObjectTest do
   alias ThistleTea.Game.Entity.Data.Component.GameObject, as: GameObjectComponent
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Fishing
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Trap
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.GameObject
+  alias ThistleTea.Game.Entity.Data.GameObjectTemplate
   alias ThistleTea.Game.Entity.Server.GameObject, as: GameObjectServer
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
 
@@ -45,6 +48,31 @@ defmodule ThistleTea.Game.Entity.Server.GameObjectTest do
   end
 
   describe "handle_cast/2" do
+    test "buttons trigger the nearest linked trap in the same copy" do
+      entry = 9_000_000 + rem(System.unique_integer([:positive]), 1_000_000)
+      world = WorldRef.instance(999, entry)
+      button_template = %GameObjectTemplate{entry: entry, type: 1, flags: 0, size: 1.0, data: [0, 0, 0, entry + 1]}
+      TemplateLoader.put(button_template)
+      on_exit(fn -> :ets.delete(TemplateLoader, entry) end)
+      button = GameObject.build_summoned(button_template, world, {0.0, 0.0, 0.0, 0.0})
+      trap_template = %GameObjectTemplate{entry: entry + 1, type: 6, flags: 0, size: 1.0, data: [0, 0, 0, 0]}
+
+      pids =
+        for {copy, x} <- [{world, 0.5}, {world, 2.0}, {WorldRef.instance(999, entry + 1), 0.1}] do
+          object = GameObject.build_summoned(trap_template, copy, {x, 0.0, 0.0, 0.0})
+          pid = start_supervised!({GameObjectServer, object}, id: object.object.guid)
+          {pid, :sys.get_state(pid).internal.trap.ready_at}
+        end
+
+      button_pid = start_supervised!({GameObjectServer, button}, id: button.object.guid)
+      Entity.use_game_object(button.object.guid, 1, 60)
+      assert :sys.get_state(button_pid).game_object.state == 0
+      [{near, ready_at} | untouched] = pids
+      assert %Trap{ready_at: activated_at} = :sys.get_state(near).internal.trap
+      assert activated_at > ready_at
+      for {pid, initial} <- untouched, do: assert(:sys.get_state(pid).internal.trap.ready_at == initial)
+    end
+
     test "projects a destroyed door state and can reset it" do
       guid = Guid.from_low_guid(:game_object, 16_397, System.unique_integer([:positive]))
 

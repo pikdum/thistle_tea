@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   @movement_requests [Effects.Charge, Effects.Leap, Effects.TeleportHome, Effects.TeleportToSpellTarget]
   @spell_requests [
     Effects.CheckCastRequirements,
+    Effects.SpellGameObjectAction,
     Effects.DeliverSpell,
     Effects.ProcDamage,
     Effects.DeliverSpellOutcome,

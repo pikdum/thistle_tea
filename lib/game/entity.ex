@@ -88,6 +88,7 @@ defmodule ThistleTea.Game.Entity do
   end
 
   def hide_game_object(entity), do: dispatch_cast(entity, {:battleground_hide_game_object})
+  def apply_game_object_action(entity, effect), do: dispatch_cast(entity, effect)
 
   def battleground_resurrect(entity, position) do
     dispatch_cast(entity, {:battleground_resurrect, position})

@@ -53,6 +53,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.ResurrectionTarget
   alias ThistleTea.Game.World.SpellFocus
+  alias ThistleTea.Game.World.SpellObjects
   alias ThistleTea.Game.World.SpellRequirements
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -291,6 +292,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
   defp validate_cast(%{character: character} = state, %Spell{} = spell, %Target{} = targets, cast_item_guid) do
     enchant_guid = Enchantments.target_guid(character.player, spell, Target.item_guid(targets))
+    focus = SpellFocus.find(character, spell)
 
     with :ok <- check_party_unit_target(character, spell, targets),
          :ok <- check_object_target(state, spell, targets) do
@@ -302,7 +304,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
         Time.now(),
         count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end,
         equipped_items: equipped_weapon_templates(character),
-        spell_focus: SpellFocus.find(character, spell),
+        spell_focus: focus,
+        spell_objects: SpellObjects.resolve(character, spell, targets, focus),
         spell_corpse: SpellRequirements.corpse(character, spell),
         lock_context: Gathering.context(state, spell, targets, cast_item_guid),
         disenchant_item: Disenchant.owned_item(character, Target.item_guid(targets)),
@@ -326,7 +329,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   end
 
   defp check_object_target(state, %Spell{effects: effects, range_yards: range}, targets) do
-    if Enum.any?(effects, &(&1.type == :activate_object)) do
+    if Enum.any?(effects, &(&1.type == :open_lock_item)) do
       case ObjectTarget.resolve(state, Target.object_guid(targets), range) do
         {:ok, _template} -> :ok
         {:error, reason} -> {:error, reason}

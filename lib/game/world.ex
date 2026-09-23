@@ -76,6 +76,13 @@ defmodule ThistleTea.Game.World do
     SpatialHash.query_cells(table, world, x, y, z, range + SpatialGrid.max_cell_drift())
   end
 
+  def game_objects_in(world) do
+    world
+    |> WorldRef.coerce()
+    |> SpatialHash.guids()
+    |> Enum.filter(&(Guid.entity_type(&1) == :game_object))
+  end
+
   def nearby_players_at(world, {x, y, z}, range \\ 30) do
     nearby_units_exact(:players, world, {x, y, z}, range)
   end

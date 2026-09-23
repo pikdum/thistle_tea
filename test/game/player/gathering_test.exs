@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Player.GatheringTest do
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
@@ -56,12 +57,37 @@ defmodule ThistleTea.Game.Player.GatheringTest do
 
   setup [:gathering_node]
 
+  describe "authorize_use/2" do
+    test "runtime unlock and relock control key checks", %{state: state, node: node} do
+      World.update_position(state.character)
+      on_exit(fn -> World.remove_position(state.character) end)
+      refute Gathering.authorize_use(state, node) == :ok
+
+      for {action, unlocked?} <- [{6, true}, {7, false}] do
+        Entity.apply_game_object_action(node, %Effects.ApplyGameObjectAction{
+          target_guid: node,
+          source_guid: state.guid,
+          world: state.character.internal.world,
+          spell_id: 1,
+          action: action
+        })
+
+        :sys.get_state(Entity.pid(node))
+        assert Gathering.authorize_use(state, node) == :ok == unlocked?
+        assert match?({:ok, %Loot{}}, Entity.call(node, {:loot_view, Looting.actor(state, node)})) == unlocked?
+      end
+
+      Entity.call(node, {:loot_release, Looting.actor(state, node)})
+      assert LootSession.viewers(:sys.get_state(Entity.pid(node)).internal.loot.session) == []
+    end
+  end
+
   describe "object spell targeting" do
     test "accepts a visible nearby object and rejects missing, distant and foreign-world targets", %{
       state: state,
       node: node
     } do
-      spell = %Spell{id: 3366, range_yards: 5.0, effects: [%Effect{type: :activate_object}]}
+      spell = %Spell{id: 3366, range_yards: 5.0, effects: [%Effect{type: :open_lock_item}]}
 
       assert {:ok, %GameObjectTemplate{entry: @entry}} = ObjectTarget.resolve(state, node, 5.0)
       assert :ok = Spellcasting.validate_repeat(state, spell, Target.object(node))

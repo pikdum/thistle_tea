@@ -13,11 +13,13 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Trap
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request, as: ObservationRequest
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.GameObjectActions
   alias ThistleTea.Game.Entity.Logic.GameObjectInteraction
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
@@ -43,6 +45,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
+  alias ThistleTea.Game.World.Loader.GameObjectScript, as: GameObjectScriptLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
@@ -140,10 +143,10 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   def handle_cast(
         {:gameobject_use, user_guid, user_level},
-        %GameObject{internal: %Internal{summon: %Summon{} = summon}} = state
-      ) do
-    with {spell_id, %Spell{} = spell} when is_integer(spell_id) <-
-           {summon.spell_id, SpellLoader.load(summon.spell_id || 0)},
+        %GameObject{internal: %Internal{summon: %Summon{spell_id: spell_id} = summon}} = state
+      )
+      when is_integer(spell_id) do
+    with %Spell{} = spell <- SpellLoader.load(spell_id),
          true <- allowed_user?(summon, user_guid) do
       context = %CastContext{
         caster_guid: summon.owner_guid || user_guid,
@@ -158,6 +161,28 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
       _ ->
         {:noreply, state}
     end
+  end
+
+  def handle_cast({:gameobject_use, user_guid, _level}, %GameObject{} = state) do
+    if GameObjectActions.usable?(state), do: use_object(state, user_guid), else: {:noreply, state}
+  rescue
+    error ->
+      Logger.error("Game object use failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast(
+        %Effects.ApplyGameObjectAction{world: world, source_guid: source, action: action},
+        %GameObject{internal: %{world: world}} = state
+      ) do
+    case World.position(source) do
+      {^world, _, _, _} -> {:noreply, state |> GameObjectActions.apply(action, source) |> flush_actions()}
+      _ -> {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Game object spell action failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast(%Commit{} = command, %GameObject{} = state) do
@@ -293,9 +318,12 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     activate_trap(state, trap, user_guid)
   end
 
+  def handle_info({:script_activate_object, user_guid}, %GameObject{game_object: %{type_id: type}} = state)
+      when type in [0, 1], do: use_object(state, user_guid)
+
   def handle_info({:script_activate_object, _user_guid}, %GameObject{} = state) do
-    state = put_game_object_state(state, if(state.game_object.state == 0, do: 1, else: 0))
-    {:noreply, state}
+    next = if state.game_object.state == 0, do: 1, else: 0
+    {:noreply, state |> GameObjectActions.set_state(next) |> flush_actions()}
   end
 
   def handle_info({:script_remove_object, respawn_delay_ms}, %GameObject{} = state) do
@@ -313,16 +341,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     {:noreply, operate_game_object(state, action, reset_delay_ms)}
   end
 
-  def handle_info(
-        {:script_restore_game_object_state, previous_state, expected_state},
-        %GameObject{game_object: %{state: expected_state}} = state
-      ) do
-    {:noreply, put_game_object_state(state, previous_state)}
-  end
-
-  def handle_info({:script_restore_game_object_state, _previous_state, _expected_state}, %GameObject{} = state) do
-    {:noreply, state}
-  end
+  def handle_info({:restore_game_object, revision, previous}, %GameObject{} = state),
+    do: {:noreply, state |> GameObjectActions.restore(revision, previous) |> flush_actions()}
 
   def handle_info({:ai_script_steps, steps, target_guid}, %GameObject{} = state)
       when is_list(steps) and is_integer(target_guid) do
@@ -440,7 +460,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   defp stop_linked_objects(%GameObject{}), do: :ok
 
-  defp trigger_linked_objects(%GameObject{internal: %{summon: %Summon{linked_guids: guids}}}, user_guid) do
+  defp trigger_linked_objects(%GameObject{internal: %{summon: %Summon{linked_guids: [_ | _] = guids}}}, user_guid) do
     Enum.each(guids, fn guid ->
       case Entity.pid(guid) do
         pid when is_pid(pid) -> send(pid, {:script_activate_object, user_guid})
@@ -449,7 +469,12 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     end)
   end
 
-  defp trigger_linked_objects(%GameObject{}, _user_guid), do: :ok
+  defp trigger_linked_objects(%GameObject{} = state, user_guid) do
+    with guid when is_integer(guid) <- TrapServer.linked_guid(state),
+         pid when is_pid(pid) <- Entity.pid(guid) do
+      send(pid, {:script_activate_object, user_guid})
+    end
+  end
 
   defp schedule_fishing_bite(%GameObject{internal: %Internal{fishing: %{bite_delay_ms: delay}}})
        when is_integer(delay) and delay > 0 do
@@ -460,6 +485,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   defp schedule_fishing_bite(_state), do: nil
 
   defp arm_trap(%GameObject{internal: %Internal{trap: %Trap{start_delay_ms: delay} = trap}} = state) do
+    TrapServer.publish_range(state)
     if trap.radius > 0, do: Process.send_after(self(), :trap_tick, max(delay, 200))
     trap = %{trap | ready_at: Time.now() + delay}
     %{state | internal: %{state.internal | trap: trap}}
@@ -482,33 +508,27 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     state |> EventSink.emit_pending() |> broadcast_if_pending()
   end
 
-  defp door_state(:open, 1), do: 0
-  defp door_state(:destroy, _state), do: 2
-  defp door_state(:open, state), do: state
-  defp door_state(:close, 0), do: 1
-  defp door_state(:close, state), do: state
-  defp door_state(:reset, _state), do: 1
-
   defp operate_game_object(%GameObject{} = state, action, reset_delay_ms) do
-    previous_state = state.game_object.state
-    next_state = door_state(action, previous_state)
-    state = put_game_object_state(state, next_state)
-
-    if action != :reset and next_state != previous_state and reset_delay_ms > 0 do
-      Process.send_after(self(), {:script_restore_game_object_state, previous_state, next_state}, reset_delay_ms)
-    end
-
-    state
+    state |> GameObjectActions.operate(action, reset_delay_ms) |> flush_actions()
   end
 
-  defp put_game_object_state(%GameObject{} = state, game_object_state) do
-    game_object = %{state.game_object | state: game_object_state}
-
-    %{state | game_object: game_object}
+  defp flush_actions(%GameObject{} = state) do
+    state
+    |> EventSink.emit_pending(Context.new(self()))
     |> publish_condition_metadata()
-    |> Core.mark_broadcast_update()
     |> broadcast_if_pending()
   end
+
+  defp use_object(%GameObject{internal: %{trap: %Trap{} = trap}} = state, user_guid),
+    do: activate_trap(state, trap, user_guid)
+
+  defp use_object(%GameObject{game_object: %{type_id: type}} = state, user_guid) when type in [0, 1] do
+    trigger_linked_objects(state, user_guid)
+    Entity.start_script(user_guid, GameObjectScriptLoader.get(condition_db_guid(state)), state.object.guid)
+    {:noreply, state |> GameObjectActions.activate() |> flush_actions()}
+  end
+
+  defp use_object(%GameObject{} = state, _user_guid), do: {:noreply, state}
 
   defp cast_ritual_completion(state, %Ritual{} = ritual, world, {x, y, z, orientation}) do
     with spell_id when is_integer(spell_id) <- ritual.completion_spell_id,
@@ -650,7 +670,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   defp spend_charge(state), do: state
 
   defp broadcast_if_pending(%GameObject{internal: %Internal{broadcast_update?: true} = internal} = state) do
-    publish_geometry(state)
+    publish_condition_metadata(state)
     Core.update_object(state, :values) |> World.broadcast_packet(state)
     %{state | internal: %{internal | broadcast_update?: false}}
   end
@@ -662,10 +682,14 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
       Map.merge(FactionLoader.metadata(state.game_object.faction), %{
         db_guid: condition_db_guid(state),
         go_spawned?: spawned?,
-        go_state: state.game_object.state
+        go_state: state.game_object.state,
+        go_lock_override: state.internal.object_action.lock_override
       })
 
     Metadata.update(state.object.guid, metadata)
+
+    if is_nil(state.internal.loot) and is_nil(state.internal.fishing),
+      do: Metadata.update(state.object.guid, %{loot_state: if(state.internal.object_action.active?, do: 2, else: 1)})
 
     publish_geometry(state)
   end

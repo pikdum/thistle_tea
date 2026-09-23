@@ -4,12 +4,16 @@ defmodule ThistleTea.Game.Spell.Requirements do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CorpseTarget
   alias ThistleTea.Game.Spell.Focus
+  alias ThistleTea.Game.Spell.ObjectTargets
 
-  defstruct [:focus, :corpse]
+  defstruct [:focus, :corpse, :objects]
 
-  def required?(caster, %Spell{} = spell), do: Focus.required?(caster, spell) or CorpseTarget.required?(spell)
+  def required?(caster, %Spell{} = spell),
+    do: Focus.required?(caster, spell) or CorpseTarget.required?(spell) or ObjectTargets.required?(spell)
 
-  def validate(caster, spell, %__MODULE__{focus: focus, corpse: corpse}) do
-    with :ok <- Focus.validate(caster, spell, focus), do: CorpseTarget.validate(spell, corpse)
+  def validate(caster, spell, %__MODULE__{focus: focus, corpse: corpse, objects: objects}) do
+    with :ok <- Focus.validate(caster, spell, focus),
+         :ok <- CorpseTarget.validate(spell, corpse),
+         do: ObjectTargets.validate(spell, objects)
   end
 end

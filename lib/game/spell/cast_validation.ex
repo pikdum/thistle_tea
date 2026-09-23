@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Spell.CorpseTarget
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Focus
+  alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Target
 
@@ -62,6 +63,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
            ),
          :ok <- check_tools(spell, Keyword.get(opts, :count_item)),
          :ok <- Focus.validate(caster, spell, Keyword.get(opts, :spell_focus)),
+         :ok <- ObjectTargets.validate(spell, Keyword.get(opts, :spell_objects)),
          :ok <- Mount.validate(caster, spell, opts),
          :ok <- check_stance(caster, spell),
          :ok <- check_caster_aura_state(caster, spell, now),

@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Focus
+  alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World
@@ -19,16 +20,37 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpellFocus
   alias ThistleTea.Game.World.SpellMagnets
+  alias ThistleTea.Game.World.SpellObjects
   alias ThistleTea.Game.World.SpellRequirements
 
   @heal_threat_radius 100.0
+
+  def resolve(entity, %Effects.SpellGameObjectAction{target_guid: guid} = effect) do
+    world = entity.internal.world
+
+    case World.position(guid) do
+      {^world, _, _, _} ->
+        [
+          %Effects.ApplyGameObjectAction{
+            target_guid: guid,
+            source_guid: entity.object.guid,
+            world: world,
+            spell_id: effect.spell_id,
+            action: effect.action
+          }
+        ]
+
+      _ ->
+        []
+    end
+  end
 
   def resolve(entity, %Effects.CheckCastRequirements{cast: cast, now: now}) do
     [
       %Effects.CastRequirementsResolved{
         cast: cast,
         now: now,
-        requirements: SpellRequirements.resolve(entity, cast.spell)
+        requirements: SpellRequirements.resolve(entity, cast.spell, cast.targets)
       }
     ]
   end
@@ -154,7 +176,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
   defp foreign_owner_required?(entity, effect, spell) do
     is_integer(effect.source_guid) and effect.source_guid != entity.object.guid and
-      (Spell.attribute?(spell, :channeled) or
+      (Spell.attribute?(spell, :channeled) or ObjectTargets.required?(spell) or
          (Focus.required?(spell) and Guid.entity_type(effect.source_guid) == :player))
   end
 
@@ -221,6 +243,20 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   end
 
   defp triggered_cast(entity, effect, spell, targets, selection) do
+    objects = SpellObjects.resolve(entity, spell, selection, SpellFocus.find(entity, spell))
+
+    case ObjectTargets.validate(spell, objects) do
+      :ok -> triggered_cast(entity, effect, spell, targets, selection, objects)
+      {:error, reason} -> [Effects.spell_cast_failed(spell, reason)]
+    end
+  end
+
+  defp triggered_cast(entity, effect, spell, targets, selection, objects) do
+    targets =
+      if ObjectTargets.required?(spell) and Enum.all?(spell.effects, &(&1.type == :activate_object)),
+        do: [],
+        else: targets
+
     contexts =
       Enum.map(targets, fn target_guid ->
         entity
@@ -236,7 +272,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
       Effects.spell_go(
         effect.source_guid || entity.object.guid,
         effect.spell_id,
-        hit_guids,
+        Enum.uniq(hit_guids ++ ObjectTargets.guids(objects)),
         selection,
         effect.cast_item_guid,
         misses
@@ -247,7 +283,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
         resolved_delivery(entity, Effects.deliver_spell(context.target_guid, context, spell))
       end)
 
-    [launch | deliveries]
+    actions = Enum.flat_map(ObjectTargets.actions(spell, objects), &resolve(entity, &1))
+    [launch | deliveries ++ actions]
   end
 
   defp trigger_outcome(%CastContext{caster_guid: guid} = context, _spell, guid), do: context

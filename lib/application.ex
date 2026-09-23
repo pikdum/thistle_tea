@@ -36,6 +36,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Fishing, as: FishingLoader
+  alias ThistleTea.Game.World.Loader.GameObjectScript, as: GameObjectScriptLoader
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Graveyard, as: GraveyardLoader
@@ -58,6 +59,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride, as: SpellEffectOverrideLoader
+  alias ThistleTea.Game.World.Loader.SpellObjectTarget, as: SpellObjectTargetLoader
   alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
   alias ThistleTea.Game.World.Loader.SpellProcEvent, as: SpellProcEventLoader
   alias ThistleTea.Game.World.Loader.SpellScript, as: SpellScriptLoader
@@ -197,11 +199,13 @@ defmodule ThistleTea.Application do
     FactionLoader.init()
     ExplorationLoader.init()
     GameObjectTemplateLoader.init()
+    GameObjectScriptLoader.init()
     FishingLoader.init()
     SpellLoader.init()
     SpellChainLoader.init()
     SpellEffectOverrideLoader.init()
     SpellPetAuraLoader.init()
+    SpellObjectTargetLoader.init()
     SpellProcEventLoader.init()
     SpellScriptLoader.init()
     SpellScriptNameLoader.init()
@@ -316,6 +320,8 @@ defmodule ThistleTea.Application do
         TransportLoader.load_all()
         SpellEffectOverrideLoader.load_all()
         SpellPetAuraLoader.load_all()
+        SpellObjectTargetLoader.load_all()
+        GameObjectScriptLoader.load_all()
         SpellProcEventLoader.load_all()
         SpellScriptLoader.load_all()
         SpellScriptNameLoader.load_all()

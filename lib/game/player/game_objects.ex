@@ -4,11 +4,14 @@ defmodule ThistleTea.Game.Player.GameObjects do
   open-lock spell completion to the chest loot window, and everything else
   to the object's own use handler.
   """
+  import Bitwise, only: [&&&: 2]
+
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.GameObjectInteraction
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Deadmines
@@ -20,6 +23,8 @@ defmodule ThistleTea.Game.Player.GameObjects do
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
@@ -30,10 +35,41 @@ defmodule ThistleTea.Game.Player.GameObjects do
   @go_type_questgiver 2
 
   def use_object(%{character: %Character{}} = state, guid) do
-    case Gathering.authorize_use(state, guid) do
-      :ok -> open_object(state, guid)
-      {:ok, opened} -> Gathering.open_key(state, guid, opened)
-      _ -> state
+    if interactable?(state.character, guid) do
+      case Gathering.authorize_use(state, guid) do
+        :ok -> open_object(state, guid)
+        {:ok, opened} -> Gathering.open_key(state, guid, opened)
+        _ -> state
+      end
+    else
+      state
+    end
+  end
+
+  defp interactable?(character, guid) do
+    metadata = Metadata.get(guid) || %{}
+    enabled? = ((Map.get(metadata, :go_flags) || 0) &&& 0x10) == 0
+
+    case GameObjectTemplateLoader.cached(Guid.entry(guid)) do
+      %GameObjectTemplate{type: type} = template when type in [0, 1] ->
+        enabled? and door_in_range?(character, guid, template, metadata)
+
+      _ ->
+        enabled?
+    end
+  end
+
+  defp door_in_range?(character, guid, template, metadata) do
+    world = character.internal.world
+    {x, y, z, _} = character.movement_block.position
+
+    with true <- character.unit.health > 0,
+         %{go_spawned?: true, go_rotation: rotation, go_scale: scale} <- metadata,
+         {^world, ox, oy, oz} <- World.position(guid),
+         true <- GameObjectInteraction.within?({x, y, z}, {ox, oy, oz}, rotation, scale, template.bounds, 5.55556) do
+      template.display_id != 295 or Pathfinding.line_of_sight?(world, {x, y, z}, {ox, oy, oz})
+    else
+      _ -> false
     end
   end
 

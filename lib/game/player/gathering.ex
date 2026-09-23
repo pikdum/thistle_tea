@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.Player.Gathering do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
   def context(state, spell, targets, cast_item_guid) do
@@ -56,10 +57,20 @@ defmodule ThistleTea.Game.Player.Gathering do
     template = TemplateLoader.cached(Guid.entry(guid))
     id = GameObjectTemplate.lock_id(template)
 
-    if match?(%GameObjectTemplate{type: type} when type in [0, 1, 3], template) and id > 0 do
-      OpenLock.key(LockLoader.get(id), &Inventory.count_entry(character.player, &1, fn guid -> ItemStore.get(guid) end))
-    else
-      :ok
+    unlocked? = match?(%{go_lock_override: false}, Metadata.get(guid))
+
+    cond do
+      match?(%{go_lock_override: true}, Metadata.get(guid)) and id == 0 ->
+        {:error, :locked}
+
+      not unlocked? and match?(%GameObjectTemplate{type: type} when type in [0, 1, 3], template) and id > 0 ->
+        OpenLock.key(
+          LockLoader.get(id),
+          &Inventory.count_entry(character.player, &1, fn guid -> ItemStore.get(guid) end)
+        )
+
+      true ->
+        :ok
     end
   end
 

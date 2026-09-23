@@ -14,6 +14,7 @@ defmodule ThistleTea.DevSeed do
   and Jenova Stoneshield for stabling. A repair
   vendor and spirit healer support equipment wear and resurrection testing.
   Two copies of Plugger Spazzring support limited-stock merchant testing.
+  A door, lever, incantation, mortar, and stink bombs support object use and activation spells.
   """
   import Ecto.Query
 
@@ -22,6 +23,7 @@ defmodule ThistleTea.DevSeed do
   alias ThistleTea.DevSeed.ActionBars
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Companion
@@ -30,9 +32,11 @@ defmodule ThistleTea.DevSeed do
   alias ThistleTea.Game.Network.Message.CmsgCharCreate
   alias ThistleTea.Game.Player.Characters
   alias ThistleTea.Game.Player.Stats
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Character, as: CharacterLoader
   alias ThistleTea.Game.World.Loader.ClassSpell
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
@@ -102,6 +106,7 @@ defmodule ThistleTea.DevSeed do
     seed_account_and_characters()
     seed_trading_accounts()
     seed_mobs()
+    seed_game_objects()
     Logger.info("Debug seed ready: #{@account}/#{@account} on Programmer Isle (.go xyz 16303.2 16318.1 69.44 451)")
   end
 
@@ -294,6 +299,23 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(5515, @base_low_guid + 1100, {x - 2.0, y - 3.0, z}, nil, @respawn_secs)
     spawn_mob(9499, @base_low_guid + 1200, {x + 8.0, y - 4.0, z}, nil, @respawn_secs)
     spawn_mob(9499, @base_low_guid + 1201, {x + 14.0, y - 4.0, z}, nil, @respawn_secs)
+  end
+
+  defp seed_game_objects do
+    {x, y, z} = @spawn_point
+
+    for {entry, dx, dy} <- [
+          {138_493, 20.0, 15.0},
+          {17_156, 20.0, 22.0},
+          {178_965, 25.0, 22.0},
+          {176_557, 25.0, 15.0},
+          {180_449, 30.0, 15.0},
+          {180_450, 30.0, 15.0}
+        ] do
+      template = GameObjectTemplateLoader.cached(entry)
+      {ox, oy, oz} = Pathfinding.snap_to_ground(@map, {x + dx, y + dy, z})
+      template |> GameObject.build_summoned(WorldRef.open(@map), {ox, oy, oz, 0.0}) |> World.start_entity()
+    end
   end
 
   defp spawn_mob(entry, low_guid, {x, y, z}, loot_override, respawn_secs) do

@@ -10,6 +10,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   alias ThistleTea.Game.Spell.Target
 
   def target_query(%Spell{} = spell, %Target{} = targets) do
+    effects = Enum.reject(spell.effects, &(&1.type == :activate_object))
+
+    if effects == [] and spell.effects != [],
+      do: :none,
+      else: unit_target_query(%{spell | effects: effects}, targets)
+  end
+
+  def target_query(_spell, _targets), do: :none
+
+  defp unit_target_query(spell, targets) do
     unit_guid = Target.unit_guid(targets)
 
     cond do
@@ -38,8 +48,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
         :none
     end
   end
-
-  def target_query(_spell, _targets), do: :none
 
   def area_targeted?(%Spell{} = spell) do
     caster_aoe_spell?(spell) or cone_aoe_spell?(spell) or targeted_aoe_spell?(spell) or party_aoe_spell?(spell) or
@@ -163,6 +171,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
       _ -> spell.range_yards || 40.0
     end
   end
+
+  defp effect_targets?(%Effect{type: :activate_object}, _targets), do: false
 
   defp effect_targets?(%Effect{} = effect, targets) do
     effect.implicit_target_a in targets or effect.implicit_target_b in targets

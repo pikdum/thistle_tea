@@ -162,6 +162,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
     :summon_change_item,
     :open_lock,
     :activate_object,
+    :open_lock_item,
     :enchant_item,
     :enchant_item_temporary,
     :enchant_held_item,

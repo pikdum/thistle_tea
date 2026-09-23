@@ -34,11 +34,14 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
     if authorized?(state, actor), do: view_authorized(state, actor), else: {{:error, :locked}, state}
   end
 
+  defp authorized?(%GameObject{internal: %{object_action: %{lock_override: false}}}, _actor), do: true
+
   defp authorized?(%GameObject{internal: %{gathering: %GatheringState{lock_id: id, opened_by: opened}}}, actor)
        when id > 0 do
     Map.has_key?(opened, actor.guid)
   end
 
+  defp authorized?(%GameObject{internal: %{object_action: %{lock_override: true}}}, _actor), do: false
   defp authorized?(_state, _actor), do: true
 
   defp view_authorized(%GameObject{} = state, %Actor{} = actor) do
@@ -98,7 +101,14 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
   end
 
   def release(%GameObject{} = state, %Actor{} = actor) do
-    if authorized?(state, actor), do: release_authorized(state, actor), else: state
+    if authorized?(state, actor) or viewing?(state, actor), do: release_authorized(state, actor), else: state
+  end
+
+  defp viewing?(state, actor) do
+    case session(state) do
+      %LootSession{} = session -> actor.guid in LootSession.viewers(session)
+      _ -> false
+    end
   end
 
   defp release_authorized(state, actor) do

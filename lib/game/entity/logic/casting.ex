@@ -44,6 +44,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Modifiers
+  alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.Proc
   alias ThistleTea.Game.Spell.Requirements
   alias ThistleTea.Game.Spell.Scripts
@@ -296,6 +297,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> queue_item_transformation(casting)
       |> queue_feed_pet(casting)
       |> queue_open_object(casting)
+      |> queue_object_actions(casting)
       |> queue_pickpocket(casting)
       |> queue_skinning(casting)
       |> queue_disenchant(casting)
@@ -337,21 +339,16 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp queue_quest_cast_credit(character, %Cast{triggered?: true}, _resolution), do: character
 
-  defp queue_quest_cast_credit(%Character{} = character, %Cast{spell: %Spell{} = spell}, resolution) do
-    if OpenLock.spell?(spell) or Enum.any?(spell.effects, &(&1.type == :activate_object)),
+  defp queue_quest_cast_credit(%Character{} = character, %Cast{spell: %Spell{} = spell} = cast, resolution) do
+    if OpenLock.spell?(spell) or Enum.any?(spell.effects, &(&1.type == :open_lock_item)),
       do: character,
-      else: Effects.enqueue(character, quest_cast_credit(resolution, spell.id))
+      else: Effects.enqueue(character, quest_cast_credit(resolution, spell.id, object_guids(cast)))
   end
 
   defp queue_quest_cast_credit(entity, _casting, _resolution), do: entity
 
-  defp quest_cast_credit(%CastResolution{hits: hits, followups: %Followups{object_guid: object_guid}}, spell_id) do
-    targets =
-      case object_guid do
-        guid when is_integer(guid) and guid > 0 -> Enum.uniq([guid | hits])
-        _guid -> hits
-      end
-
+  defp quest_cast_credit(%CastResolution{hits: hits, followups: followups}, spell_id, objects \\ []) do
+    targets = Enum.uniq(object_hit(followups.object_guid) ++ hits ++ objects)
     Effects.quest_cast_credit(targets, spell_id)
   end
 
@@ -366,7 +363,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       costs: casting_costs(entity, casting),
       impacts: resolved_impacts(entity, spell, hits, misses),
       followups: %Followups{
-        packet_hits: hits ++ object_hit(object_guid),
+        packet_hits: Enum.uniq(hits ++ object_hit(object_guid) ++ object_guids(casting)),
         selected_unit_guid: selected_unit_guid(entity.object.guid, spell, targets, resolved_targets),
         object_guid: object_guid,
         item_guid: Target.item_guid(targets),
@@ -440,6 +437,9 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp object_hit(guid) when is_integer(guid), do: [guid]
   defp object_hit(_guid), do: []
+
+  defp object_guids(%Cast{requirements: %Requirements{objects: objects}}), do: ObjectTargets.guids(objects)
+  defp object_guids(_cast), do: []
 
   defp cast_item_cost(%Cast{consume_item: true, cast_item_guid: item_guid}) when is_integer(item_guid), do: item_guid
   defp cast_item_cost(%Cast{}), do: nil
@@ -559,7 +559,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     lock_target = object_guid || item_guid
 
     cond do
-      is_integer(object_guid) and Enum.any?(spell.effects, &(&1.type == :activate_object)) ->
+      is_integer(object_guid) and Enum.any?(spell.effects, &(&1.type == :open_lock_item)) ->
         Effects.enqueue(character, %Effects.OpenGameObject{
           target_guid: object_guid,
           spell_id: spell.id,
@@ -593,6 +593,11 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       quest_cast_credit(resolution, spell.id)
     ]
   end
+
+  defp queue_object_actions(entity, %Cast{spell: spell, requirements: %Requirements{objects: objects}}),
+    do: Effects.enqueue(entity, ObjectTargets.actions(spell, objects))
+
+  defp queue_object_actions(entity, _cast), do: entity
 
   defp queue_feed_pet(%Character{} = character, %Cast{
          spell: %Spell{range_yards: range_yards, effects: effects},

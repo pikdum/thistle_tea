@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
   alias ThistleTea.Game.Entity.Data.Transport.Pose
+  alias ThistleTea.Game.Entity.Logic.GameObjectActions
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.WorldRef
 
@@ -68,6 +69,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
       },
       internal: %Internal{
         world: WorldRef.coerce(world),
+        object_action: GameObjectActions.configuration(ot, @go_state_active),
         chair: chair(ot),
         fishing: Keyword.get(opts, :fishing),
         gathering: gathering(ot),
@@ -219,6 +221,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
       },
       internal: %Internal{
         world: WorldRef.open(o.map),
+        object_action: GameObjectActions.configuration(template, o.state),
         chair: chair(ot),
         event: event,
         fishing: fishing_hole(ot),

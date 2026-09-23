@@ -7,13 +7,21 @@ defmodule ThistleTea.Game.World.SpellRequirements do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CorpseTarget
   alias ThistleTea.Game.Spell.Requirements
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpellFocus
+  alias ThistleTea.Game.World.SpellObjects
   alias ThistleTea.Game.World.Visibility
 
-  def resolve(caster, %Spell{} = spell) do
-    %Requirements{focus: SpellFocus.find(caster, spell), corpse: corpse(caster, spell)}
+  def resolve(caster, %Spell{} = spell, targets \\ Target.none()) do
+    focus = SpellFocus.find(caster, spell)
+
+    %Requirements{
+      focus: focus,
+      corpse: corpse(caster, spell),
+      objects: SpellObjects.resolve(caster, spell, targets, focus)
+    }
   end
 
   def corpse(caster, %Spell{} = spell) do

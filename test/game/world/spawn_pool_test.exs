@@ -342,7 +342,7 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
   defp game_object(guid) do
     %GameObject{
       object: %Object{guid: guid, entry: 1},
-      game_object: %GameObjectComponent{state: 0},
+      game_object: %GameObjectComponent{state: 0, type_id: 0},
       movement_block: %MovementBlock{position: {1.0, 1.0, 1.0, 0.0}},
       internal: %Internal{world: %WorldRef{map_id: 0}}
     }

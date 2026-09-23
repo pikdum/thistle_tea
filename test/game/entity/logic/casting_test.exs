@@ -1183,7 +1183,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
     end
 
     test "retains the activating spell for a game object completion" do
-      spell = %Spell{id: 6_250, effects: [%Effect{index: 0, type: :activate_object}]}
+      spell = %Spell{id: 6_250, effects: [%Effect{index: 0, type: :open_lock_item}]}
       casting = %Cast{spell: spell, targets: Target.object(0xF110_0001), ends_at: 1_000}
 
       mob = %Mob{
@@ -1198,7 +1198,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
     end
 
     test "defers object cast credit until live activation succeeds" do
-      spell = %Spell{id: 3366, range_yards: 5.0, effects: [%Effect{index: 0, type: :activate_object}]}
+      spell = %Spell{id: 3366, range_yards: 5.0, effects: [%Effect{index: 0, type: :open_lock_item}]}
       casting = %Cast{spell: spell, targets: Target.object(0xF110_0001), ends_at: 1_000}
 
       character = %Character{

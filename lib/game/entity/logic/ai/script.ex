@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.CreatureGroup.Member
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
+  alias ThistleTea.Game.Entity.Logic.GameObjectActions
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
@@ -976,8 +977,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp execute(%GameObject{} = state, blackboard, %ScriptStep{command: :set_game_object_state} = step, _target, _now) do
-    state = %{state | game_object: %{state.game_object | state: step.datalong}}
-    {Core.mark_broadcast_update(state), blackboard}
+    {GameObjectActions.set_state(state, step.datalong), blackboard}
   end
 
   defp execute(%GameObject{} = state, blackboard, %ScriptStep{command: :play_custom_animation} = step, _target, _now) do
