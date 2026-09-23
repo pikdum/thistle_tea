@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.GameObjectInteraction do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Mount
+  alias ThistleTea.Game.Entity.Logic.Silithyst
 
   def prepare_questgiver_use(%Character{} = character, %GameObjectTemplate{type: 2, data: data}, flags, now) do
     prepare_use(character, flags, Enum.at(data, 5, 0), Enum.at(data, 8, 0), now)
@@ -21,8 +22,10 @@ defmodule ThistleTea.Game.Entity.Logic.GameObjectInteraction do
     prepare_use(character, flags, 0, Enum.at(data, 3, 0), now)
   end
 
-  def prepare_readable_use(%Character{} = character, %GameObjectTemplate{type: 10, data: data}, flags, now) do
-    prepare_use(character, flags, Enum.at(data, 11, 0), Enum.at(data, 17, 0), now)
+  def prepare_readable_use(%Character{} = character, %GameObjectTemplate{type: 10, data: data} = template, flags, now) do
+    if Silithyst.blocks_object?(character, template),
+      do: {:error, :already_carrying},
+      else: prepare_use(character, flags, Enum.at(data, 11, 0), Enum.at(data, 17, 0), now)
   end
 
   defp prepare_use(character, flags, no_damage_immune, allow_mounted, now) do

@@ -27,6 +27,28 @@ defmodule ThistleTea.Game.Entity.Logic.MovementStatsTest do
   end
 
   describe "recompute/1" do
+    test "normal movement caps bonuses before applying snares" do
+      holder = %Holder{
+        spell: %Spell{id: 1},
+        auras: [
+          %Aura{type: :use_normal_movement_speed, amount: 7},
+          %Aura{type: :mod_increase_speed, amount: 100},
+          %Aura{type: :mod_increase_swim_speed, amount: 100},
+          %Aura{type: :mod_decrease_speed, amount: -50}
+        ]
+      }
+
+      original = entity([holder])
+      limited = MovementStats.recompute(original)
+      assert_in_delta limited.movement_block.run_speed, 3.5, 0.000001
+      assert_in_delta limited.movement_block.swim_speed, 3.5, 0.000001
+      assert limited.movement_block.swim_back_speed == original.movement_block.swim_back_speed
+      assert limited.movement_block.walk_speed == original.movement_block.walk_speed
+      assert MovementStats.recompute(limited) == limited
+      restored = MovementStats.recompute(%{limited | unit: %{limited.unit | auras: []}})
+      assert restored.movement_block == entity().movement_block
+    end
+
     test "derives speeds from base values" do
       recomputed = MovementStats.recompute(entity())
 

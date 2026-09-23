@@ -90,6 +90,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.System.Guild, as: GuildSystem
   alias ThistleTea.Game.World.System.Honor, as: HonorSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
+  alias ThistleTea.Game.World.System.OutdoorPvp, as: OutdoorPvpSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.System.Petition, as: PetitionSystem
   alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
@@ -160,6 +161,7 @@ defmodule ThistleTea.Application do
         Repo,
         BattlegroundSupervisor,
         BattlegroundSystem,
+        OutdoorPvpSystem,
         {ChatChannels, load_catalog: !test},
         !test &&
           {ThousandIsland, port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},

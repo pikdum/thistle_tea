@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Priest
+  alias ThistleTea.Game.Entity.Logic.Silithyst
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Proc
@@ -27,7 +28,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   @whirlwind_radius 8.0
 
   def after_remove(entity, holders, cause) when is_list(holders) do
-    Enum.flat_map(holders, &after_remove_holder(entity, &1, cause))
+    Enum.flat_map(holders, fn holder ->
+      after_remove_holder(entity, holder, cause) ++ Silithyst.after_remove(entity, holder, cause)
+    end)
   end
 
   def periodic_events(%{unit: %{health: health}}, %Holder{spell: spell}) when is_integer(health) and health > 0 do

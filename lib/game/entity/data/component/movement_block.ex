@@ -61,6 +61,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
   end
 
   def default_run_speed, do: @player_speeds.run_speed
+  def default_swim_speed, do: @player_speeds.swim_speed
 
   @update_flag_transport 0x02
   @update_flag_melee_attacking 0x04

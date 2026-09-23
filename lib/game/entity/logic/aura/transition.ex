@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
+  alias ThistleTea.Game.Entity.Logic.Silithyst
   alias ThistleTea.Game.Entity.Logic.SpellMagnet
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
@@ -60,6 +61,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     desired = Capacity.retain(desired, entity_guid(entity))
     desired = MountSync.interrupt_holders(previous, desired)
     desired = StealthSync.interrupt_holders(previous, desired)
+    desired = Silithyst.reconcile(desired)
     desired = StackingProc.reconcile(previous, desired)
 
     if desired == previous do
@@ -254,7 +256,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
 
     duration_events = Enum.flat_map(touched, &applied_duration_events(entity, &1, now))
     shapeshift_events = Enum.flat_map(touched, &shapeshift_talent_events(entity, &1))
-    {entity, immediate_events ++ duration_events ++ shapeshift_events ++ StackingProc.after_apply(touched)}
+
+    {entity,
+     immediate_events ++
+       duration_events ++
+       shapeshift_events ++
+       StackingProc.after_apply(touched) ++
+       Silithyst.after_apply(entity, touched)}
   end
 
   defp application_hooks(entity, _touched, _cause, _now), do: {entity, []}

@@ -430,6 +430,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(%Spell{spell_class_set: 10, spell_class_mask_0: mask}, 77)
        when is_integer(mask) and (mask &&& 0x40000000) != 0, do: :heal
 
+  defp effect_type(%Spell{id: 31_247}, 122), do: :reputation
   defp effect_type(_row, type_int), do: effect_type(type_int)
 
   defp effect_misc_value(mod, row, index, type, _aura) when type in [:create_item, :summon_change_item] do
@@ -793,6 +794,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(187), do: :mod_attacker_melee_crit_chance
   defp aura_type(188), do: :mod_attacker_ranged_crit_chance
   defp aura_type(190), do: :mod_faction_reputation_gain
+  defp aura_type(191), do: :use_normal_movement_speed
   defp aura_type(other) when is_integer(other), do: other
 
   defp target_type(0), do: nil

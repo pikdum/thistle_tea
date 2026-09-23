@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Player.AreaTriggers do
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Corpses
   alias ThistleTea.Game.Player.Instances
+  alias ThistleTea.Game.Player.OutdoorPvp
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
@@ -38,8 +39,14 @@ defmodule ThistleTea.Game.Player.AreaTriggers do
              trigger_id,
              character.movement_block.position
            ) do
-        :handled -> state
-        :unhandled -> state |> maybe_explore_quest(trigger_id) |> enter_tavern_or_teleport(trigger_id)
+        :handled ->
+          state
+
+        :unhandled ->
+          state
+          |> OutdoorPvp.area_trigger(trigger_id)
+          |> maybe_explore_quest(trigger_id)
+          |> enter_tavern_or_teleport(trigger_id)
       end
     else
       _out_of_range -> state

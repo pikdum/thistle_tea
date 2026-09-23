@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Player.ItemDurations
   alias ThistleTea.Game.Player.Logout
   alias ThistleTea.Game.Player.Looting
+  alias ThistleTea.Game.Player.OutdoorPvp
   alias ThistleTea.Game.Player.QuestSharing
   alias ThistleTea.Game.Player.Rest
   alias ThistleTea.Game.Player.Resurrection
@@ -139,7 +140,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
         state
       end
 
-    state = state |> Looting.release() |> QuestSharing.disconnect()
+    state = state |> Looting.release() |> QuestSharing.disconnect() |> OutdoorPvp.leave()
     state = disengage(state)
     state = CompanionOwner.suspend(state)
     state = MiniPetOwner.dismiss(state)

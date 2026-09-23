@@ -100,6 +100,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Login
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.Mail
+  alias ThistleTea.Game.Player.OutdoorPvp
   alias ThistleTea.Game.Player.PetExperience
   alias ThistleTea.Game.Player.PetTraining
   alias ThistleTea.Game.Player.Quests
@@ -704,6 +705,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_cast({:start_teleport, x, y, z, orientation, %WorldRef{} = world}, state) do
     state = state |> cancel_authoritative_movement() |> detach_transport()
+    state = OutdoorPvp.leave(state)
     DuelSystem.disconnect(state.guid)
     state = state |> disengage_for_world_transition() |> suspend_companion_for_teleport()
     previous_world = state.character.internal.world
@@ -1402,6 +1404,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   @impl GenServer
+  def handle_info(:refresh_outdoor_pvp, %State{} = state) do
+    {:noreply, state |> OutdoorPvp.refresh() |> maybe_broadcast_update()}
+  rescue
+    error ->
+      Logger.error("Outdoor PvP refresh failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_info(:player_tick, %{character: %Character{}} = state) do
     now = Time.now()
     state = ServerMovement.advance(state, now)
@@ -1947,6 +1957,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     state =
       state
       |> ServerMovement.cancel()
+      |> OutdoorPvp.leave()
       |> prepare_transport_worldport()
       |> disengage_for_world_transition()
       |> suspend_companion_for_teleport()

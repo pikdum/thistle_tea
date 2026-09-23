@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
   alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.Rogue
+  alias ThistleTea.Game.Entity.Logic.Silithyst
   alias ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal
   alias ThistleTea.Game.Entity.Logic.SpellTeaching
   alias ThistleTea.Game.Entity.Logic.Warlock
@@ -103,6 +104,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
   defp apply_class_dummy(state, context, spell, effect, :execute, now) do
     DamageHeal.execute(state, context, spell, effect, now)
   end
+
+  defp apply_class_dummy(state, _context, _spell, _effect, :silithyst_pickup, now), do: Silithyst.pickup(state, now)
+
+  defp apply_class_dummy(state, _context, _spell, _effect, :silithyst_pvp, now),
+    do: {Silithyst.refresh_pvp(state, now), []}
 
   defp apply_class_dummy(
          state,

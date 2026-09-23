@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgZoneupdate do
 
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
+  alias ThistleTea.Game.Player.OutdoorPvp
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Pathfinding
@@ -39,7 +40,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgZoneupdate do
         state
       end
 
-    PlayerExploration.check_current(state)
+    state |> OutdoorPvp.refresh(server_zone) |> PlayerExploration.check_current()
   end
 
   def handle(_message, state), do: state

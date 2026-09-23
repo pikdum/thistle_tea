@@ -61,6 +61,12 @@ defmodule ThistleTea.Game.Entity.Logic.Pvp do
 
   def contact(entity, _role, _other, _now, _combat?), do: entity
 
+  def contest(%Character{} = character, now) do
+    character = tick(character, now)
+    pvp = %{character.internal.pvp | remaining_ms: @pvp_duration_ms, contested_remaining_ms: @contested_duration_ms}
+    put(character, pvp)
+  end
+
   defp refresh_contact(character, role, other, now, combat_allowed?) do
     pvp = character.internal.pvp
     combat? = combat_allowed? and (role != :assist or Map.get(other, :in_combat, false))

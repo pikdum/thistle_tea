@@ -114,6 +114,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def requires_combo_target?(_spell), do: false
 
   def dummy_effect(%Spell{id: @last_stand}), do: :last_stand
+  def dummy_effect(%Spell{id: 29_518}), do: :silithyst_pickup
+  def dummy_effect(%Spell{id: 30_176}), do: :silithyst_pvp
   def dummy_effect(%Spell{id: @tame_beast_completion}), do: :tame_beast_completion
   def dummy_effect(%Spell{id: @preparation}), do: :preparation
 

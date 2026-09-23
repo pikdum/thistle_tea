@@ -20,12 +20,14 @@ defmodule ThistleTea.Game.Entity.Logic.MovementStats do
       |> apply_speed_multiplier(@walk_speed_fields, 1.0)
       |> apply_speed_multiplier(
         [{:run_speed, :base_run_speed}],
-        run_multiplier(unit) * slow * Wounded.speed_multiplier(entity)
+        limited_multiplier(unit, run_multiplier(unit), MovementBlock.default_run_speed()) * slow *
+          Wounded.speed_multiplier(entity)
       )
       |> apply_speed_multiplier([{:run_back_speed, :base_run_back_speed}], slow)
       |> apply_speed_multiplier(
         [{:swim_speed, :base_swim_speed}],
-        buff_multiplier(unit, :mod_increase_swim_speed) * slow
+        limited_multiplier(unit, buff_multiplier(unit, :mod_increase_swim_speed), MovementBlock.default_swim_speed()) *
+          slow
       )
       |> apply_speed_multiplier([{:swim_back_speed, :base_swim_back_speed}], 1.0)
 
@@ -70,6 +72,11 @@ defmodule ThistleTea.Game.Entity.Logic.MovementStats do
       |> Enum.max(fn -> 0 end)
 
     (100 + best) / 100
+  end
+
+  defp limited_multiplier(unit, multiplier, base_speed) do
+    limit = unit |> aura_amounts(:use_normal_movement_speed) |> Enum.max(fn -> 0 end)
+    if limit > 0, do: min(multiplier, limit / base_speed), else: multiplier
   end
 
   defp run_multiplier(%Unit{mount_display_id: display} = unit) when is_integer(display) and display > 0 do

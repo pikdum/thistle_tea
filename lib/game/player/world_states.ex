@@ -10,10 +10,12 @@ defmodule ThistleTea.Game.Player.WorldStates do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
+  alias ThistleTea.Game.World.System.OutdoorPvp, as: OutdoorPvpSystem
   alias ThistleTea.Game.WorldRef
 
   def initialize(%Character{} = character) do
     BattlegroundSystem.reconnect(character.object.guid, character.internal.world)
+    send(self(), :refresh_outdoor_pvp)
 
     character
     |> build()
@@ -33,7 +35,7 @@ defmodule ThistleTea.Game.Player.WorldStates do
         _ -> area || 0
       end
 
-    states = BattlegroundSystem.world_states(character.internal.world)
+    states = BattlegroundSystem.world_states(character.internal.world) ++ OutdoorPvpSystem.world_states(zone)
     %Message.SmsgInitWorldStates{map: map_id, area: zone, states: states}
   end
 end
