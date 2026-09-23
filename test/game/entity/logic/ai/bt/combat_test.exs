@@ -316,6 +316,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
         internal: %Internal{
           world: %WorldRef{map_id: 0},
           in_combat: true,
+          creature: %Internal.Creature{damage_school: 2},
           pet: %Internal.Pet{owner_guid: owner_guid, kind: :charmed}
         },
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
@@ -325,7 +326,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
 
       assert {:success, pet, %Blackboard{}} = melee_attack(pet, blackboard, 1_000)
 
-      assert [%Effects.DeliverAttack{attack: %{caster: 1, caster_owner_guid: ^owner_guid}}] =
+      assert [%Effects.DeliverAttack{attack: %{caster: 1, caster_owner_guid: ^owner_guid, spell_school_mask: 4}}] =
                pet.internal.events
     end
 

@@ -62,6 +62,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   ]
 
   def apply_spell(entity, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
+    if CreatureImmunity.spell?(entity, context, spell),
+      do: {entity, []},
+      else: apply_unblocked_spell(entity, context, spell, now)
+  end
+
+  defp apply_unblocked_spell(entity, context, spell, now) do
     case build_auras(entity, context, spell, now) do
       [] ->
         {entity, []}
@@ -165,9 +171,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp do_apply(%{unit: %Unit{auras: existing}} = entity, %Holder{} = holder, context, now) when is_list(existing) do
     cond do
-      CreatureImmunity.spell?(entity, context, holder.spell) ->
-        {entity, []}
-
       blocked_by_stronger_rank?(existing, holder.spell) ->
         {entity, []}
 

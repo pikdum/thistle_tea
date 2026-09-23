@@ -5,11 +5,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink.Context
+  alias ThistleTea.Game.Entity.Logic.AttackSchool
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CallForHelp
   alias ThistleTea.Game.World.Metadata
@@ -128,7 +130,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
       total_damage: damage,
       damages: [
         %{
-          spell_school_mask: Map.get(attack, :spell_school_mask, 0),
+          school: attack |> Map.get(:spell_school_mask) |> AttackSchool.from_mask() |> Spell.school_index(),
           damage_float: damage * 1.0,
           damage_uint: damage,
           absorb: Map.get(attack, :absorb, 0),

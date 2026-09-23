@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Detection
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
+  alias ThistleTea.Game.Entity.Logic.AttackSchool
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
@@ -374,7 +375,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
       caster_owner_guid: caster_owner_guid(state),
       min_damage: min_damage,
       max_damage: max_damage,
-      threat_multiplier: Aura.percent_multiplier(state, :mod_threat, Spell.school_mask(:physical))
+      threat_multiplier: Aura.percent_multiplier(state, :mod_threat, Spell.school_mask(AttackSchool.melee(state)))
     }
     |> Map.merge(AttackTable.attacker_context(state, hand))
     |> Map.merge(CombatSkills.snapshot(state, hand))

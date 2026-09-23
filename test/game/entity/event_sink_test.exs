@@ -898,16 +898,20 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      EventSink.emit(mob, Effects.attacker_state_update(mob_guid, target_guid, 12, %{}))
+      for {mask, school} <- [{1, 0}, {4, 2}, {16, 4}, {32, 5}] do
+        attack = %{spell_school_mask: mask, absorb: 3, resist: 4}
+        EventSink.emit(mob, Effects.attacker_state_update(mob_guid, target_guid, 12, attack))
 
-      assert_receive {:"$gen_cast",
-                      {:send_packet,
-                       %Message.SmsgAttackerstateupdate{
-                         attacker: ^mob_guid,
-                         target: ^target_guid,
-                         total_damage: 12,
-                         damage_state: 1
-                       }, _opts}}
+        assert_receive {:"$gen_cast",
+                        {:send_packet,
+                         %Message.SmsgAttackerstateupdate{
+                           attacker: ^mob_guid,
+                           target: ^target_guid,
+                           total_damage: 12,
+                           damage_state: 1,
+                           damages: [%{school: ^school, absorb: 3, resist: 4}]
+                         }, _opts}}
+      end
     end
 
     test "periodic_aura_log broadcasts periodic aura log packets", %{target_guid: target_guid} do

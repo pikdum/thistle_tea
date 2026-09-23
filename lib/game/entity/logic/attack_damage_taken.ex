@@ -23,6 +23,16 @@ defmodule ThistleTea.Game.Entity.Logic.AttackDamageTaken do
 
   def amount(_entity, damage, _kind, _coefficient), do: max(damage, 0)
 
+  def swing_amount(entity, damage, kind, school) when damage > 0 and kind in [:melee, :ranged] do
+    {flat_type, percent_type} = types(kind)
+    school_flat = Aura.flat_modifier(entity, :mod_damage_taken, Spell.school_mask(school))
+    school_flat = if school == :physical, do: school_flat, else: max(school_flat, -damage / 2)
+    flat = Aura.flat_amount(entity, flat_type) + school_flat
+    max(trunc((damage + flat) * multiplier(entity, percent_type)), 0)
+  end
+
+  def swing_amount(_entity, damage, _kind, _school), do: max(damage, 0)
+
   def spell_amount(entity, damage, spell, effect \\ nil, damage_type \\ :direct, stacks \\ 1)
 
   def spell_amount(entity, damage, %Spell{dmg_class: class} = spell, effect, damage_type, stacks)

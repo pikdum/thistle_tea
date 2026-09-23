@@ -40,6 +40,30 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       assert Mob.respawn(mob).internal.creature.mechanic_immune_mask == 2304
     end
 
+    test "retains elemental attack and immunity schools through respawn" do
+      creature = %Mangos.Creature{
+        guid: 1,
+        id: 2,
+        modelid: 3,
+        curhealth: 10,
+        creature_movement: [],
+        equip_items: [nil, nil, nil],
+        creature_template: %Mangos.CreatureTemplate{
+          entry: 2,
+          name: "Elemental",
+          damage_school: 2,
+          school_immune_mask: 4
+        }
+      }
+
+      mob = Mob.build(creature)
+      assert mob.internal.creature.damage_school == 2
+      assert mob.internal.creature.school_immune_mask == 4
+      respawned = Mob.respawn(mob)
+      assert respawned.internal.creature.damage_school == 2
+      assert respawned.internal.creature.school_immune_mask == 4
+    end
+
     test "selects critter reactions while preserving explicit AI" do
       creature = %Mangos.Creature{
         guid: 1,

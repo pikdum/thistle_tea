@@ -1,15 +1,17 @@
 defmodule ThistleTea.Game.Entity.Logic.DamageImmunity do
   @moduledoc """
-  School-specific damage protection derived from active damage and school
-  immunity auras, with spell attributes controlling immunity bypass.
+  School-specific damage protection from creature templates and active damage
+  and school immunity auras, with spell attributes controlling immunity bypass.
   """
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.CreatureImmunity
   alias ThistleTea.Game.Spell
 
   def immune?(entity, school, spell \\ nil) do
     not bypasses_immunity?(spell) and
-      (damage_immune?(entity, school) or school_immune?(entity, school, spell))
+      (CreatureImmunity.school?(entity, school) or damage_immune?(entity, school) or
+         school_immune?(entity, school, spell))
   end
 
   defp damage_immune?(entity, school) do

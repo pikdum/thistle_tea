@@ -48,7 +48,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgAttackerstateupdate do
     total_damage = trunc(total_damage)
 
     %{
-      spell_school_mask: 0,
+      school: 0,
       damage_float: total_damage * 1.0,
       damage_uint: total_damage,
       absorb: 0,
@@ -58,7 +58,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgAttackerstateupdate do
 
   defp default_damage(_total_damage) do
     %{
-      spell_school_mask: 0,
+      school: 0,
       damage_float: 0.0,
       damage_uint: 0,
       absorb: 0,
@@ -67,14 +67,14 @@ defmodule ThistleTea.Game.Network.Message.SmsgAttackerstateupdate do
   end
 
   defp damage_binary(damage) do
-    spell_school_mask = Map.get(damage, :spell_school_mask, 0)
+    school = Map.get(damage, :school, 0)
     damage_float = normalize_float(Map.get(damage, :damage_float, 0.0))
     damage_uint = Map.get(damage, :damage_uint, trunc(damage_float))
     absorb = Map.get(damage, :absorb, 0)
     resist = Map.get(damage, :resist, 0)
 
     <<
-      spell_school_mask::little-size(32),
+      school::little-size(32),
       damage_float::little-float-size(32),
       damage_uint::little-size(32),
       absorb::little-size(32),

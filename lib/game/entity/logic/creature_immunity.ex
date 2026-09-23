@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Entity.Logic.CreatureImmunity do
-  @moduledoc "Creature-template mechanic protection for spells, individual effects, and school lockouts."
+  @moduledoc "Creature-template mechanic and school protection for spells, effects, damage, and school lockouts."
 
   import Bitwise, only: [&&&: 2, <<<: 2]
 
@@ -13,9 +13,14 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureImmunity do
 
   def mechanic?(_entity, _mechanic), do: false
 
+  def school?(%{internal: %{creature: %Creature{school_immune_mask: mask}}}, school) when is_integer(mask),
+    do: (mask &&& Spell.school_mask(school)) != 0
+
+  def school?(_entity, _school), do: false
+
   def spell?(entity, %CastContext{} = context, %Spell{} = spell) do
     external_cast?(entity, context, spell) and not Spell.attribute?(spell, :no_immunities) and
-      mechanic?(entity, spell.mechanic)
+      (mechanic?(entity, spell.mechanic) or (Spell.harmful?(spell) and school?(entity, spell.school)))
   end
 
   def effect?(entity, %CastContext{} = context, %Spell{} = spell, %Effect{} = effect) do

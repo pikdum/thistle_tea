@@ -4,10 +4,12 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   rolls from unit damage ranges, and applying an incoming attack to an entity
   along with the events it produces.
   """
-  import Bitwise, only: [band: 2, bnot: 1, bor: 2, &&&: 2, >>>: 2]
+  import Bitwise, only: [band: 2, bnot: 1, bor: 2]
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.AttackSchool
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatSkills
@@ -20,16 +22,19 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Logic.ParryHaste
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.Reactive
+  alias ThistleTea.Game.Entity.Logic.ResistancePenetration
+  alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Proc
 
   @default_attack_speed_ms 2000
   @default_damage 2
   @unit_flag_in_combat 0x00080000
   @hitinfo_absorb 0x20
-  @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
+  @hitinfo_resist 0x40
 
   @base_melee_range_offset 1.333
   @attack_distance 5.0
@@ -115,12 +120,13 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   defp outgoing_damage_range(entity, {min_damage, max_damage}, hand) do
     weapon = CombatWeapon.usable(entity, hand)
-    flat = WeaponDamage.flat_bonus(entity, :physical, weapon)
+    school = AttackSchool.melee(entity)
+    flat = WeaponDamage.flat_bonus(entity, school, weapon)
     happiness = PetHappiness.damage_multiplier(entity)
     flat = if happiness == 1.0, do: flat, else: flat * happiness
 
     {max(min_damage + flat, 0), max(max_damage + flat, 0)}
-    |> scale_damage_range(WeaponDamage.multiplier(entity, :physical, weapon))
+    |> scale_damage_range(WeaponDamage.multiplier(entity, school, weapon))
   end
 
   def attack_damage(%{damage: damage}) when is_number(damage), do: trunc(damage)
@@ -156,6 +162,8 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   def receive_attack(%{object: %{guid: target_guid}} = entity, attack, now, opts)
       when is_map(attack) and is_integer(target_guid) and is_integer(now) do
     result = resolve_attack(entity, attack, opts)
+    resisted = resisted_damage(entity, attack, result.damage, opts)
+    result = %{result | damage: result.damage - resisted}
     skill_opts = Keyword.take(opts, [:skill_roll]) |> Keyword.new(fn {:skill_roll, roll} -> {:roll, roll} end)
     {entity, skill_events} = CombatSkills.resolve(entity, attack, result.outcome, skill_opts)
     entity = ParryHaste.apply(entity, result.outcome, now)
@@ -179,10 +187,11 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
     attack =
       attack
-      |> Map.put(:hit_info, with_absorb_flag(result.hit_info, absorbed))
+      |> Map.put(:hit_info, with_damage_flags(result.hit_info, absorbed, resisted))
       |> Map.put(:damage_state, result.victim_state)
       |> Map.put(:blocked_amount, result.blocked_amount)
       |> Map.put(:absorb, absorbed)
+      |> Map.put(:resist, resisted)
 
     entity = maybe_mark_defense(entity, Map.get(attack, :caster), result.outcome, now)
     event = attacker_state_update(Map.get(attack, :caster, 0), target_guid, max(result.damage - absorbed, 0), attack)
@@ -203,6 +212,30 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
       %{outcome: :immune, damage: 0, pre_armor_damage: 0, hit_info: 0x2, victim_state: 7, blocked_amount: 0}
     else
       AttackTable.resolve(entity, attack, attack_damage(attack), opts)
+    end
+  end
+
+  defp resisted_damage(_entity, _attack, damage, _opts) when damage <= 0, do: 0
+
+  defp resisted_damage(%{unit: %Unit{} = unit} = entity, attack, damage, opts) do
+    school = attack_school(attack)
+
+    if school == :physical do
+      0
+    else
+      resistance =
+        entity
+        |> SpellResist.school_resistances()
+        |> Map.fetch!(Spell.school_index(school))
+        |> ResistancePenetration.resistance(Map.get(attack, :resistance_penetration, []), school)
+
+      caster_level = Map.get(attack, :caster_level) || unit.level || 1
+
+      SpellResist.resisted_amount(damage, resistance, caster_level,
+        target_creature?: not is_struct(entity, Character),
+        level_diff: (unit.level || 1) - caster_level,
+        roll: Keyword.get_lazy(opts, :resist_roll, fn -> Math.random_int(0, 99) end)
+      )
     end
   end
 
@@ -262,18 +295,13 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   defp outcome_proc_damage(_result, _absorbed), do: 0
 
-  defp attack_school(%{spell_school_mask: mask}) when is_integer(mask) and mask > 1 do
-    index = Enum.find(1..6, 0, fn i -> (mask >>> i &&& 1) == 1 end)
-    Enum.at(@schools, index, :physical)
-  end
-
+  defp attack_school(%{spell_school_mask: mask}), do: AttackSchool.from_mask(mask)
   defp attack_school(_attack), do: :physical
 
-  defp with_absorb_flag(hit_info, absorbed) when is_integer(absorbed) and absorbed > 0 do
-    bor(hit_info, @hitinfo_absorb)
+  defp with_damage_flags(hit_info, absorbed, resisted) do
+    hit_info = if absorbed > 0, do: bor(hit_info, @hitinfo_absorb), else: hit_info
+    if resisted > 0, do: bor(hit_info, @hitinfo_resist), else: hit_info
   end
-
-  defp with_absorb_flag(hit_info, _absorbed), do: hit_info
 
   defp attack_reactions(entity, %{caster: attacker_guid} = attack, %{outcome: outcome} = result, now)
        when is_integer(attacker_guid) do
