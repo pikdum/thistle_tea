@@ -10,10 +10,12 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.ResurrectionTarget
   alias ThistleTea.Game.World.SpellMagnets
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
@@ -21,6 +23,24 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   @chain_jump_radius 10.0
 
   def resolve(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, %Target{} = targets) do
+    if Spell.resurrect_spell?(spell) do
+      case resurrection_target(caster, spell, targets) do
+        {:ok, guid} -> [guid]
+        {:error, _reason} -> []
+      end
+    else
+      resolve_targets(caster, caster_guid, spell, targets)
+    end
+  end
+
+  def resolve(_caster, _spell, _targets), do: []
+
+  def resurrection_target(caster, spell, targets) do
+    info = ResurrectionTarget.info(caster, targets)
+    with :ok <- CastValidation.validate_target(caster, spell, targets, info), do: {:ok, info.guid}
+  end
+
+  defp resolve_targets(caster, caster_guid, spell, targets) do
     query = pet_target_query(caster, spell) || SpellTarget.target_query(spell, targets)
 
     initial =
@@ -33,8 +53,6 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     targets = if Spell.harmful?(spell), do: targets, else: Enum.filter(targets, &Hostility.can_assist?(caster, &1))
     append_caster_execution_target(targets, spell, caster_guid)
   end
-
-  def resolve(_caster, _spell, _targets), do: []
 
   defp redirect_initial(caster, spell, {:unit, _guid}, [guid]) do
     [SpellMagnets.redirect(caster, spell, guid)]

@@ -189,6 +189,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - dying + resurrecting
 - [Corpse recovery](docs/corpse-recovery-playtest.md), with escalating repeat-death delays, reconnect countdowns, server-enforced reclaim checks, and battleground recovery rules
 - [Dungeon corpse return](docs/dungeon-corpse-playtest.md), with outdoor entrance markers, ghost portal restrictions, recovery into the original copy, and faction-aware graveyard selection
+- [Spell resurrection](docs/spell-resurrection-playtest.md), with owned-corpse targeting, cross-map offers, instance admission, recovery after travel acknowledgement, and Rebirth countdown bypass
 - Soulstones and Reincarnation, with reagent consumption, cooldowns, and talent modifiers
 - fall damage, Safe Fall, and Slow Fall protection
 - [Environmental fire damage](docs/environmental-fire-playtest.md), with world campfires, resistance, shield depletion, combat-log feedback, and death durability loss

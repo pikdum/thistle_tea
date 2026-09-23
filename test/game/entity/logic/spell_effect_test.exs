@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Data.ResurrectionOffer
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -728,7 +729,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       {target, events} = SpellEffect.receive(dead_character_fixture(), context, spell, 1_000)
 
-      assert target.internal.pending_resurrect == %{
+      assert target.internal.pending_resurrect == %ResurrectionOffer{
                caster_guid: 999,
                position: {0, 1.0, 2.0, 3.0},
                health: 34,

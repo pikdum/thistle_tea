@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
   alias ThistleTea.Game.Entity.Logic.CorpseReclaim
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
+  alias ThistleTea.Game.Entity.Logic.Resurrection
   alias ThistleTea.Game.Spell
 
   @ghost_spell_id 8326
@@ -89,7 +90,7 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
 
     player = %{player | flags: (player.flags || 0) &&& bnot(@player_flag_ghost), self_res_spell: 0}
 
-    character = %{character | unit: unit, player: player} |> CorpseReclaim.clear_release()
+    character = %{character | unit: unit, player: player} |> CorpseReclaim.clear_release() |> Resurrection.clear()
 
     {Core.mark_broadcast_update(character), combat_events ++ events ++ [Effects.movement_root_changed(false)]}
   end
@@ -106,12 +107,13 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
       | health: clamp_restore(health, unit.max_health),
         power1: clamp_restore(mana, unit.max_power1),
         power2: 0,
+        power4: unit.max_power4 || 0,
         vis_flag: 0
     }
 
     player = %{player | flags: (player.flags || 0) &&& bnot(@player_flag_ghost), self_res_spell: 0}
 
-    character = %{character | unit: unit, player: player} |> CorpseReclaim.clear_release()
+    character = %{character | unit: unit, player: player} |> CorpseReclaim.clear_release() |> Resurrection.clear()
 
     {Core.mark_broadcast_update(character), combat_events ++ events ++ [Effects.movement_root_changed(false)]}
   end

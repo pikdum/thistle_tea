@@ -898,6 +898,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex3, @completely_blocked_ex3, :completely_blocked)
     |> add_if(attrs_ex3, 0x00000001, :pvp_enabling)
     |> add_if(attrs_ex3, 0x00000020, :no_durability_loss)
+    |> add_if(attrs_ex3, 0x00000010, :no_resurrection_timer)
     |> add_if(attrs_ex3, 0x00100000, :death_persistent)
     |> add_if(attrs_ex3, 0x10000000, :ignore_caster_and_target_restrictions)
     |> add_if(attrs_ex3, 0x20000000, :ignore_caster_modifiers)

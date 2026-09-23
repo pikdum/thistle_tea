@@ -18,7 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
     {:RemoveAura, [:source_guid, :target_guid, :spell_id], []},
     {:HealEntity, [:target_guid, :amount], []},
     {:HealThreat, [:source_guid, :target_guid, :amount], []},
-    {:ResurrectRequest, [:source_guid, :spell_id, :health, :mana], []},
+    {:ResurrectRequest, [:source_guid, :spell_id, :health, :mana], [delayed?: true]},
     {:SpellCastResult, [:spell_id], []},
     {:SpellCastFailed, [:spell_id, :reason], [required_focus_id: 0]},
     {:CheckSpellFocus, [:cast, :now], []},

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
+  alias ThistleTea.Game.Entity.Logic.Resurrection
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Amount
   alias ThistleTea.Game.Entity.Logic.Threat
@@ -355,7 +356,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
     if resurrectable?(state) do
       health = max(Amount.roll(spell, effect, context), 1)
       mana = max(effect.misc_value || 0, 0)
-      offer_resurrect(state, context, spell, health, mana)
+      Resurrection.offer(state, context, spell, health, mana)
     else
       {state, []}
     end
@@ -366,7 +367,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
       percent = max(Amount.roll(spell, effect, context), 0) / 100
       health = max(trunc((state.unit.max_health || 1) * percent), 1)
       mana = max(trunc((state.unit.max_power1 || 0) * percent), 0)
-      offer_resurrect(state, context, spell, health, mana)
+      Resurrection.offer(state, context, spell, health, mana)
     else
       {state, []}
     end
@@ -483,16 +484,4 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
   end
 
   defp resurrectable?(_state), do: false
-
-  defp offer_resurrect(%{internal: internal} = state, %CastContext{} = context, spell, health, mana) do
-    pending = %{
-      caster_guid: context.caster_guid,
-      position: context.caster_position,
-      health: health,
-      mana: mana
-    }
-
-    state = %{state | internal: %{internal | pending_resurrect: pending}}
-    {state, [Effects.resurrect_request(context.caster_guid, spell.id, health, mana)]}
-  end
 end

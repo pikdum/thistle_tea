@@ -152,7 +152,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   def emit(entity, %Effects.AuraDuration{}, _context), do: entity
 
   def emit(%Character{} = entity, %Effects.ResurrectRequest{} = effect, context) do
-    Context.send_packet(context, %Message.SmsgResurrectRequest{guid: effect.source_guid})
+    Context.send_packet(context, %Message.SmsgResurrectRequest{guid: effect.source_guid, delayed?: effect.delayed?})
     entity
   end
 

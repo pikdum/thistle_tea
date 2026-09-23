@@ -106,6 +106,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.QuestSharing
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
+  alias ThistleTea.Game.Player.Resurrection
   alias ThistleTea.Game.Player.SelfResurrection
   alias ThistleTea.Game.Player.Skinning
   alias ThistleTea.Game.Player.Spellcasting
@@ -632,6 +633,21 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   @impl GenServer
+  def handle_cast({:accept_resurrection, offer}, state) do
+    case Resurrection.start(state, offer) do
+      {:teleport, {world, x, y, z, orientation}, state} ->
+        {:noreply, state} = handle_cast({:start_teleport, x, y, z, orientation, world}, state)
+        {:noreply, Resurrection.transferring(state, offer)}
+
+      {:finished, state} ->
+        {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Resurrection travel failed: #{Exception.message(error)}")
+      {:noreply, Resurrection.clear(state)}
+  end
+
   def handle_cast({:start_teleport, x, y, z, map}, %{character: %Character{} = character} = state) do
     {_current_x, _current_y, _current_z, orientation} = character.movement_block.position
     handle_cast({:start_teleport, x, y, z, orientation, map}, state)
@@ -1894,6 +1910,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp cancel_authoritative_movement(%State{} = state) do
     state
+    |> Resurrection.cancel_transfer()
     |> PlayerTaxi.cancel()
     |> ServerMovement.cancel()
   end

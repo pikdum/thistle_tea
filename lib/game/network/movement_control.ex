@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.MovementControl do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Logic.Resurrection
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Movement, as: PlayerMovement
@@ -15,7 +16,8 @@ defmodule ThistleTea.Game.Network.MovementControl do
   @max_counter 0xFFFFFFFF
 
   def prepare(%Message.SmsgNewWorld{} = packet, %State{} = state) do
-    {packet, %{state | pending_movement_acks: %{}, pending_repop: nil}}
+    character = Resurrection.expect_arrival(state.character, :worldport)
+    {packet, %{state | character: character, pending_movement_acks: %{}, pending_repop: nil}}
   end
 
   def prepare(%Message.SmsgForceMoveRoot{} = packet, %State{} = state) do
@@ -46,7 +48,9 @@ defmodule ThistleTea.Game.Network.MovementControl do
     kind = if packet.preserve_combat?, do: :combat_teleport, else: :teleport
     pending = Map.reject(state.pending_movement_acks, fn {_counter, kind} -> relocation?(kind) end)
     state = %{state | pending_movement_acks: pending}
-    stamp(state, kind, &%{packet | counter: &1})
+    {packet, state} = stamp(state, kind, &%{packet | counter: &1})
+    character = Resurrection.expect_arrival(state.character, {:teleport, packet.counter})
+    {packet, %{state | character: character}}
   end
 
   def prepare(%Message.SmsgMoveKnockBack{} = packet, %State{} = state) do

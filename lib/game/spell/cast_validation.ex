@@ -80,8 +80,13 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- Hunter.validate_companion(caster, spell),
          :ok <- Warlock.validate_ritual(spell, Keyword.get(opts, :ritual_context)),
          :ok <- check_reagents(caster, spell, Keyword.get(opts, :count_item)),
-         :ok <- check_duel(spell, Keyword.get(opts, :duel_context)),
-         :ok <- check_target_flags(caster, spell, target_info),
+         :ok <- check_duel(spell, Keyword.get(opts, :duel_context)) do
+      validate_target(caster, spell, targets, target_info)
+    end
+  end
+
+  def validate_target(caster, %Spell{} = spell, %Target{} = targets, target_info) do
+    with :ok <- check_target_flags(caster, spell, target_info),
          :ok <- check_target(spell, target_info),
          :ok <- check_target_power_type(spell, targets, target_info),
          :ok <- check_dispel_target(caster, spell, targets, target_info),

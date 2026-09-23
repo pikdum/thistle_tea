@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.QuestSharing
   alias ThistleTea.Game.Player.Rest
+  alias ThistleTea.Game.Player.Resurrection
   alias ThistleTea.Game.Player.Taxi
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.AggroProbe
@@ -93,12 +94,13 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     guardian_monitors: %{}
   ]
 
-  def prepare_worldport(%__MODULE__{} = state, destination, origin) do
+  def prepare_worldport(%__MODULE__{} = state, origin, destination) do
     state
+    |> Resurrection.cancel_transfer()
     |> Instances.clear()
     |> MiniPetOwner.dismiss()
     |> dismiss_guardians()
-    |> do_prepare_worldport(destination, origin)
+    |> do_prepare_worldport(origin, destination)
   end
 
   defp do_prepare_worldport(%__MODULE__{} = state, %WorldRef{map_id: map_id, instance_id: instance_id}, %WorldRef{
@@ -120,7 +122,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   def complete_worldport(%__MODULE__{} = state), do: %{state | pending_worldport?: false}
 
   def leave_world(%__MODULE__{} = state) do
-    state = state |> Logout.clear() |> Instances.clear()
+    state = state |> Logout.clear() |> Instances.clear() |> Resurrection.clear()
 
     case state.player_tick_ref do
       ref when is_reference(ref) -> Process.cancel_timer(ref)

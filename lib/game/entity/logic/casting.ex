@@ -205,16 +205,10 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp launch(entity, %Cast{} = casting, now) do
     with :ok <- Disarm.validate(entity, casting.spell),
-         true <- cast_target_visible?(entity, casting) do
+         :ok <- validate_cast_target(entity, casting) do
       prepare_launch(entity, casting, now)
     else
-      failure ->
-        reason =
-          case failure do
-            {:error, reason} -> reason
-            false -> :line_of_sight
-          end
-
+      {:error, reason} ->
         entity =
           entity
           |> Effects.enqueue(Effects.spell_cast_failed(Cast.spell_id(casting), reason))
@@ -1108,6 +1102,17 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     case Metadata.query(guid, [:alive?]) do
       %{alive?: false} -> true
       _ -> false
+    end
+  end
+
+  defp validate_cast_target(character, %Cast{spell: spell, targets: targets} = casting) do
+    if Spell.resurrect_spell?(spell) do
+      case SpellTargetResolver.resurrection_target(character, spell, targets) do
+        {:ok, _guid} -> :ok
+        error -> error
+      end
+    else
+      if cast_target_visible?(character, casting), do: :ok, else: {:error, :line_of_sight}
     end
   end
 

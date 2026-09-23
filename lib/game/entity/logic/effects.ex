@@ -147,9 +147,15 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.HealThreat{source_guid: source_guid, target_guid: target_guid, amount: amount}
   end
 
-  def resurrect_request(source_guid, spell_id, health, mana)
+  def resurrect_request(source_guid, spell_id, health, mana, delayed? \\ true)
       when is_integer(source_guid) and is_integer(spell_id) and is_integer(health) and is_integer(mana) do
-    %Effects.ResurrectRequest{source_guid: source_guid, spell_id: spell_id, health: health, mana: mana}
+    %Effects.ResurrectRequest{
+      source_guid: source_guid,
+      spell_id: spell_id,
+      health: health,
+      mana: mana,
+      delayed?: delayed?
+    }
   end
 
   def monster_move(opts \\ []) when is_list(opts) do

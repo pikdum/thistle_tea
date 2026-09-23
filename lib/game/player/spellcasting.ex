@@ -51,6 +51,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.ResurrectionTarget
   alias ThistleTea.Game.World.SpellFocus
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -410,6 +411,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       end
 
     cond do
+      Spell.resurrect_spell?(spell) -> ResurrectionTarget.info(character, targets)
       is_integer(pet_guid) -> target_info(character, pet_guid)
       is_integer(explicit_guid) -> target_info(character, explicit_guid)
       is_integer(fallback_guid) -> target_info(character, fallback_guid)
