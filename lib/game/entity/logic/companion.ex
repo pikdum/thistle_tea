@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Data.PetName
   alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
@@ -46,6 +47,7 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
       kind: kind,
       status: {:active, entity_ref},
       pet_number: activation_number(character, kind, entity_ref),
+      name: retained_name(character, kind, entity_ref.entry),
       health: retained_health(character, entity_ref.entry),
       autocast: autocast,
       happiness: happiness,
@@ -56,6 +58,16 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
 
   def remember_progress(%Character{} = character, guid, %PetProgress{} = progress) do
     if controls?(character, guid), do: capture_progress(character, progress), else: character
+  end
+
+  def remember_name(%Character{} = character, guid, %PetName{} = name) do
+    case relationship(character) do
+      %Companion{kind: :hunter_pet, status: {:active, %EntityRef{guid: ^guid}}} = companion ->
+        put_relationship(character, %{companion | name: name})
+
+      _ ->
+        character
+    end
   end
 
   def capture_progress(%Character{} = character, %PetProgress{} = progress) do
@@ -323,6 +335,12 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
   defp retained_health(character, entry) do
     if entry(character) == entry, do: relationship(character).health
   end
+
+  defp retained_name(character, :hunter_pet, entry) do
+    if entry(character) == entry and relationship(character).kind == :hunter_pet, do: relationship(character).name
+  end
+
+  defp retained_name(_character, _kind, _entry), do: nil
 
   defp update_autocast(%{action: spell_id, action_type: @act_enabled}, autocast)
        when is_integer(spell_id) and spell_id > 0, do: MapSet.put(autocast, spell_id)

@@ -116,7 +116,7 @@ defmodule ThistleTea.Game.Player.PetStable do
       pet_number: companion.pet_number,
       entry: entry,
       level: companion.progress.level,
-      name: template.name,
+      name: if(companion.name, do: companion.name.name, else: template.name),
       loyalty: companion.progress.loyalty,
       slot: slot
     }

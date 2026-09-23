@@ -61,6 +61,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
+  alias ThistleTea.Game.Entity.Logic.PetNaming
   alias ThistleTea.Game.Entity.Logic.PetProgression
   alias ThistleTea.Game.Entity.Logic.PetSpellModifiers
   alias ThistleTea.Game.Entity.Logic.PetTraining
@@ -641,6 +642,21 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_call({:debug_pet, _owner_guid, _adjustment}, _from, %Mob{} = state) do
     {:reply, {:error, :not_hunter_pet}, state}
+  end
+
+  def handle_call({:rename_pet, owner_guid, name}, _from, %Mob{} = state) do
+    case PetNaming.rename(state, owner_guid, name, System.system_time(:second)) do
+      {:ok, updated, identity} ->
+        Metadata.update(updated.object.guid, %{name: identity.name, pet_name_timestamp: identity.timestamp})
+        {:reply, {:ok, identity}, updated, {:continue, :maybe_broadcast}}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  rescue
+    error ->
+      Logger.error("rename_pet crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:reply, {:error, :unavailable}, state}
   end
 
   def handle_call(:feed_info, _from, %Mob{internal: %Internal{pet: %Pet{} = pet}} = state) do

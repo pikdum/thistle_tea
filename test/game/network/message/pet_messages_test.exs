@@ -5,6 +5,8 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Logic.Companion
@@ -13,6 +15,8 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.WorldRef
 
   describe "SMSG_PET_BROKEN" do
     test "encodes the empty vanilla notification" do
@@ -24,6 +28,8 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   test "pet client messages are registered for dispatch" do
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_ACTION))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_NAME_QUERY))
+    assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_RENAME))
+    assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_ABANDON))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_SET_ACTION))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_REQUEST_PET_INFO))
   end
@@ -220,11 +226,26 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   end
 
   describe "pet name messages" do
+    test "decodes a vanilla rename and encodes the empty invalid-name reply" do
+      assert Message.CmsgPetRename.from_binary(<<123::little-size(64), "Fang", 0>>) ==
+               %Message.CmsgPetRename{pet_guid: 123, name: "Fang"}
+
+      assert Message.SmsgPetNameInvalid.to_binary(%Message.SmsgPetNameInvalid{}) == <<>>
+      assert Message.SmsgPetNameInvalid.opcode() == Opcodes.get(:SMSG_PET_NAME_INVALID)
+      assert Message.CmsgPetAbandon.from_binary(<<123::little-size(64)>>) == %Message.CmsgPetAbandon{pet_guid: 123}
+    end
+
     test "responds with the published name timestamp and validates the pet number" do
       pet_guid = 123
       Metadata.put(pet_guid, %{name: "Wolf", owner_guid: 7, pet_number: 77, pet_name_timestamp: 99})
-      on_exit(fn -> Metadata.delete(pet_guid) end)
-      state = %{guid: 7, character: companion(:hunter_pet, pet_guid)}
+      SpatialHash.update(:players, pet_guid, WorldRef.open(0), 0.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        Metadata.delete(pet_guid)
+        SpatialHash.remove(:players, pet_guid)
+      end)
+
+      state = %{ready: true, guid: 7, character: companion(:hunter_pet, pet_guid)}
       query = %Message.CmsgPetNameQuery{pet_number: 77, pet_guid: pet_guid}
       assert Message.CmsgPetNameQuery.handle(query, state) == state
 
@@ -232,6 +253,15 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
                       {:send_packet, %Message.SmsgPetNameQueryResponse{pet_number: 77, name: "Wolf", timestamp: 99}}}
 
       assert Message.CmsgPetNameQuery.handle(%{query | pet_number: 78}, state) == state
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetNameQueryResponse{}}}
+
+      observer = %{state | guid: 8, character: Companion.clear(state.character)}
+      observer = put_in(observer.character.object.guid, 8)
+      assert Message.CmsgPetNameQuery.handle(query, observer) == observer
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetNameQueryResponse{name: "Wolf"}}}
+
+      SpatialHash.update(:players, pet_guid, WorldRef.instance(0, 1), 0.0, 0.0, 0.0)
+      assert Message.CmsgPetNameQuery.handle(query, observer) == observer
       refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetNameQueryResponse{}}}
     end
 
@@ -258,7 +288,12 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   end
 
   defp companion(kind, guid) do
-    %Character{unit: %Unit{}, internal: %Internal{}}
+    %Character{
+      object: %Object{guid: 7},
+      unit: %Unit{},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+      internal: %Internal{}
+    }
     |> Companion.activate(kind, %EntityRef{guid: guid, entry: 1, spell_id: 1})
   end
 end

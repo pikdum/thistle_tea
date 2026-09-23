@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Data.Companion do
   """
 
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
+  alias ThistleTea.Game.Entity.Data.PetName
   alias ThistleTea.Game.Entity.Data.PetProgress
 
   @type kind :: :hunter_pet | :guardian | :enslaved | :charm | :possession
@@ -30,6 +31,7 @@ defmodule ThistleTea.Game.Entity.Data.Companion do
     :kind,
     :status,
     :pet_number,
+    :name,
     :health,
     :happiness,
     :progress,
@@ -43,6 +45,7 @@ defmodule ThistleTea.Game.Entity.Data.Companion do
           kind: kind() | nil,
           status: status(),
           pet_number: pos_integer() | nil,
+          name: PetName.t() | nil,
           health: non_neg_integer() | nil,
           happiness: non_neg_integer() | nil,
           progress: PetProgress.t() | nil,

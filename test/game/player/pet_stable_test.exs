@@ -16,12 +16,14 @@ defmodule ThistleTea.Game.Player.PetStableTest do
   alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.PetNaming
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Player.Pets
   alias ThistleTea.Game.Player.PetStable
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
@@ -70,6 +72,38 @@ defmodule ThistleTea.Game.Player.PetStableTest do
   end
 
   describe "transfer/4" do
+    test "retains a committed name through live suspension and stable storage", %{
+      state: state,
+      master: master,
+      pet: pet
+    } do
+      pet = PetNaming.initialize(pet, nil)
+      {:ok, pid} = World.start_entity(pet)
+      state = CompanionOwner.attach(state, attachment(pet, pid))
+      state = put_in(state.character.internal.pet_stable.slots, 1)
+      guid = pet.object.guid
+
+      assert Pets.rename(%{state | ready: false}, guid, "Fang") == %{state | ready: false}
+      assert Pets.rename(state, guid + 1, "Fang") == state
+      assert Entity.call(guid, {:rename_pet, state.guid + 1, "Fang"}) == {:error, :unavailable}
+      assert Pets.rename(state, guid, "Bad Name") == state
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetNameInvalid{}}}
+
+      named = Pets.rename(state, guid, "Fang")
+      identity = named.character.internal.companion.name
+      assert identity.name == "Fang"
+      assert CharacterStore.get(state.character.id).internal.companion.name == identity
+      assert %{name: "Fang", pet_name_timestamp: timestamp} = Metadata.get(guid)
+      assert timestamp == identity.timestamp
+      assert Pets.rename(named, guid, "Claw") == named
+      assert Entity.call(guid, {:rename_pet, state.guid, "Claw"}) == {:error, :unavailable}
+
+      stored = PetStable.transfer(named, master, :store)
+      assert stored.character.internal.pet_stable.pets[1].name == identity
+      assert CharacterStore.get(state.character.id).internal.pet_stable.pets[1].name == identity
+      refute Entity.online?(guid)
+    end
+
     test "captures final live state and rejects late updates and attachments", %{state: state, master: master, pet: pet} do
       {:ok, pid} = World.start_entity(pet)
       attachment = attachment(pet, pid)
@@ -168,6 +202,32 @@ defmodule ThistleTea.Game.Player.PetStableTest do
       assert stored.character.internal.pet_stable.pets[1].pet_number == 77
       refute Entity.online?(pet.object.guid)
       assert PlayerServer.handle_info(pending, stored) == {:noreply, stored}
+    end
+  end
+
+  describe "Pets.abandon/2" do
+    test "removes only the current bond, process, metadata, and client controls", %{state: state, pet: pet} do
+      {:ok, pid} = World.start_entity(PetNaming.initialize(pet, nil))
+      state = state |> CompanionOwner.attach(attachment(pet, pid)) |> with_stabled_pet(77)
+      state = Pets.rename(state, pet.object.guid, "Fang")
+      guid = pet.object.guid
+      ref = Process.monitor(pid)
+      assert Pets.abandon(state, guid + 1) == state
+      assert Pets.abandon(%{state | ready: false}, guid) == %{state | ready: false}
+
+      abandoned = Pets.abandon(state, guid)
+      assert abandoned.character.internal.companion.status == :none
+      assert abandoned.character.internal.companion.name == nil
+      assert abandoned.character.internal.pet_stable == state.character.internal.pet_stable
+      assert abandoned.companion_monitor == nil
+      assert abandoned.character.unit.summon == 0
+      assert CharacterStore.get(state.character.id).internal.companion.status == :none
+      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
+      assert Metadata.get(guid) == nil
+      assert World.position(guid) == nil
+      assert Pets.abandon(abandoned, guid) == abandoned
+      assert PlayerServer.handle_info(attachment(pet, pid), abandoned) == {:noreply, abandoned}
     end
   end
 

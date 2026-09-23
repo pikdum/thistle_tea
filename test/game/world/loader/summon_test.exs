@@ -4,11 +4,13 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.PetLevel
+  alias ThistleTea.Game.Entity.Data.PetName
   alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Companion
@@ -53,6 +55,33 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
   end
 
   describe "build_pet/2" do
+    test "restores the chosen name and consumes rename permission across a new summon" do
+      owner = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{level: 50, faction_template: 1},
+        internal: %Internal{world: WorldRef.open(0)},
+        movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}}
+      }
+
+      pet = Summon.build_pet(2960, owner)
+      assert (pet.unit.flags &&& 0x10) == 0x10
+      identity = %PetName{name: "Fang", timestamp: 123}
+
+      owner =
+        owner
+        |> Companion.activate(:hunter_pet, %EntityRef{guid: pet.object.guid, entry: 2960, spell_id: 1515})
+        |> Companion.remember_name(pet.object.guid, identity)
+        |> Companion.suspend()
+
+      restored = Summon.build_pet(2960, owner)
+      assert restored.object.guid != pet.object.guid
+      assert restored.internal.name == "Fang"
+      assert restored.unit.pet_name_timestamp == 123
+      assert restored.unit.pet_number == pet.unit.pet_number
+      assert (restored.unit.flags &&& 0x10) == 0
+      assert (Summon.build_pet(416, owner).unit.flags &&& 0x10) == 0
+    end
+
     test "restores only family passives after untraining and retains the reset price history" do
       previous = :ets.lookup(PetTraining, {:family_passives, 1})
       family = SpellLoader.build_spellbook([17_223])

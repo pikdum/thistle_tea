@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.PetNaming
   alias ThistleTea.Game.Entity.Logic.PetProgression
   alias ThistleTea.Game.Entity.Logic.PetSpellModifiers
   alias ThistleTea.Game.Entity.Logic.PetTraining
@@ -142,6 +143,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       }
 
       %{mob | object: %{mob.object | guid: guid}, unit: unit, internal: internal}
+      |> PetNaming.initialize(if(Companion.entry(owner) == entry, do: Companion.relationship(owner).name))
       |> PetProgression.initialize(progress, PetLevelLoader.levels())
       |> restore_happiness(owner, entry)
       |> attach_owner(owner_guid)
