@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.Player.Buyback
+  alias ThistleTea.Game.Player.Guilds
   alias ThistleTea.Game.Player.ItemDurations
   alias ThistleTea.Game.Player.Logout
   alias ThistleTea.Game.Player.Looting
@@ -149,6 +150,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     if state.character, do: CharacterStore.put(Rest.logout(state).character)
 
     if state.guid do
+      Guilds.signed_off(state)
       leave_world_presence(state)
     end
 

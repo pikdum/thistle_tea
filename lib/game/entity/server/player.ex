@@ -89,6 +89,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.GameObjects, as: PlayerGameObjects
+  alias ThistleTea.Game.Player.Guilds
   alias ThistleTea.Game.Player.HomeBind
   alias ThistleTea.Game.Player.Honor
   alias ThistleTea.Game.Player.ItemCosts
@@ -1346,6 +1347,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def handle_info({:group, events, _info}, state) do
     state = Visibility.handle_events(state, events)
     {:noreply, state}
+  end
+
+  def handle_info(:sync_guild_membership, state) do
+    {:noreply, Guilds.sync_membership(state)}
+  rescue
+    error ->
+      Logger.error("guild membership sync crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
   end
 
   @impl GenServer

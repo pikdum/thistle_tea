@@ -56,6 +56,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Player.Buyback
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Enchantments
+  alias ThistleTea.Game.Player.Guilds
   alias ThistleTea.Game.Player.HomeBind
   alias ThistleTea.Game.Player.Honor
   alias ThistleTea.Game.Player.ItemDurations
@@ -127,6 +128,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> PlayerRest.restore()
       |> evaluate_login_rest()
       |> Honor.sync()
+      |> Guilds.attach()
       |> BT.init(PlayerBT.tree())
       |> ControlMovement.restore(Time.now())
 
@@ -183,6 +185,7 @@ defmodule ThistleTea.Game.Player.Login do
     send_init_packets(c)
     Social.send_lists(c)
     Enchantments.send_active_timers(c)
+    Guilds.signed_on(c)
 
     case PartySystem.group_of(character_guid) do
       %Party.Group{} = group -> Notifier.send_group_list(group)

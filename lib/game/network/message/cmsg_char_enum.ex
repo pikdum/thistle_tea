@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharEnum do
   alias ThistleTea.Game.Network.Message.SmsgCharEnum.CharacterGear
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.System.Guild, as: GuildSystem
 
   require Logger
 
@@ -81,7 +82,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharEnum do
           area: c.internal.area,
           map: c.internal.world.map_id,
           position: {x, y, z},
-          guild_id: 0,
+          guild_id: guild_id(c.object.guid),
           flags: 0,
           first_login: 0,
           pet_display_id: 0,
@@ -104,5 +105,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharEnum do
   @impl ClientMessage
   def from_binary(_payload) do
     %__MODULE__{}
+  end
+
+  defp guild_id(guid) do
+    case GuildSystem.group_of(guid) do
+      %{id: id} -> id
+      nil -> 0
+    end
   end
 end

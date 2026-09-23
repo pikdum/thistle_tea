@@ -84,6 +84,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.System.ChatChannels
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
+  alias ThistleTea.Game.World.System.Guild, as: GuildSystem
   alias ThistleTea.Game.World.System.Honor, as: HonorSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -134,6 +135,7 @@ defmodule ThistleTea.Application do
         {Phoenix.PubSub, name: ThistleTea.PubSub},
         ThistleTea.Telemetry,
         PartySystem,
+        GuildSystem,
         ScriptedEventSystem,
         CreatureGroups,
         CombatLeashes,

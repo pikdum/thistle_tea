@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Chat do
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
   alias ThistleTea.Game.Player.ChatStatus, as: PlayerStatus
   alias ThistleTea.Game.Player.DevCommands
+  alias ThistleTea.Game.Player.Guilds
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.ChatChannels
@@ -132,10 +133,8 @@ defmodule ThistleTea.Game.Chat do
     state
   end
 
-  defp route(state, chat_type, _language, _message, _target_name) when chat_type in [@guild, @officer] do
-    Logger.warning("Unsupported chat audience: #{chat_type}")
-    state
-  end
+  defp route(state, chat_type, language, message, _target_name) when chat_type in [@guild, @officer],
+    do: Guilds.chat(state, chat_type, language, message)
 
   defp route(state, chat_type, _language, _message, _target_name) do
     Logger.warning("Unknown chat type: #{chat_type}")
