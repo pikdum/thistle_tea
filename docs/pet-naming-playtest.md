@@ -72,3 +72,40 @@ queries, world isolation, and loader restoration.
 Final validation passed: `mix test.all` (4,951 tests),
 `mix compile --warnings-as-errors`, `mix credo --strict`,
 `mix format --check-formatted`, and `git diff --check`.
+
+## Rapid map transfer regression
+
+Instance-admission playtesting exposed an unnamed pet becoming "Unknown" when
+a teleport landed directly on an instance portal. The client queried the pet
+created at the outside entrance after the next world transfer had already
+removed it. A process trace captured the request with `ready: false`, no pet
+metadata, and no spatial position. The client retained the unresolved name
+until reconnect.
+
+The mob now includes its current name response in the companion attachment.
+The owner publishes it after creating the pet and sending the pet bar. Every
+attachment therefore fills the name cache even when a previous request was
+lost during loading. Stable retrieval uses this same projection instead of
+sending a separate early name response. The regression test verifies the
+name response follows the pet bar without requiring another client query.
+
+On a fresh build-5875 GPU client, teleporting directly to Ragefire Chasm's
+open-world entrance and entering through its area trigger retained "Prairie
+Wolf Alpha" in both the pet frame and tooltip. Server state agreed on the
+template name and retained pet number; the chosen name remained nil.
+Repeating the exit and portal entry kept the name visible, retained pet number
+4194326, and replaced the live GUID. The previous process, metadata, and spatial
+position were all absent. The WoW process's amdgpu graphics counter increased
+from 1.82 to 3.51 billion ns. There were no error-level server logs.
+
+The failing trace is `/tmp/thistle-pet-transfer-race.txt`; the before screenshots
+are under `/home/pikdum/.cache/thistle-wow-playtest.X43Cwv/`. Fixed screenshots
+are under `/home/pikdum/.cache/thistle-wow-playtest.m6DkMC/`, with state evidence
+in `/tmp/thistle-pet-transfer-fixed-*.txt` and server logs in
+`/tmp/thistle-pet-transfer-fixed-server.log`.
+
+Final follow-up validation passed: `mix test.all` (4,965 tests),
+`mix compile --warnings-as-errors`, `mix credo --strict`,
+`mix format --check-formatted`, and `git diff --check`. All four client services
+used for instance admission and this regression are inactive, no WoW processes
+remain, and the server's authentication, world, and HTTP listeners are closed.

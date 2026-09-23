@@ -21,9 +21,11 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Network.Message.SmsgPetNameQueryResponse
   alias ThistleTea.Game.Network.Message.SmsgPetSpells
   alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.PetExperience
+  alias ThistleTea.Game.Player.Pets
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
 
   setup [:build_reward_context]
@@ -86,6 +88,32 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
   end
 
   describe "companion restoration" do
+    test "publishes the current name after a query for the previous pet was lost during loading", %{
+      character: character,
+      pet: pet
+    } do
+      number = Companion.relationship(character).pet_number
+      state = %State{ready: false, character: character}
+      assert Pets.query(state, pet.object.guid + 1, number) == state
+      refute_receive {:"$gen_cast", {:send_packet, %SmsgPetNameQueryResponse{}}}
+
+      pet = %{
+        pet
+        | unit: %{pet.unit | pet_number: number, pet_name_timestamp: 123},
+          internal: %{pet.internal | name: "Boar"}
+      }
+
+      assert {:noreply, ^pet} = MobServer.handle_info({:attach_pet, self(), 1515, []}, pet)
+      assert_receive %Attachment{} = attachment
+      ready = %{state | ready: true}
+      assert CompanionVisibility.finish_attachment(ready, attachment) == ready
+      assert_receive {:pet_restore_autocast, _}
+      assert_receive {:"$gen_cast", {:send_packet, first}}
+      assert %SmsgPetSpells{} = first
+      assert_receive {:"$gen_cast", {:send_packet, second}}
+      assert %SmsgPetNameQueryResponse{pet_number: ^number, name: "Boar", timestamp: 123} = second
+    end
+
     test "projects the retained passive stance on the client pet bar", %{character: character} do
       character = Companion.capture_reaction(character, :passive)
       entity_ref = Companion.active_ref(character)

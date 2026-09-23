@@ -2,16 +2,18 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment do
   @moduledoc false
 
   alias ThistleTea.Game.Entity.Data.Companion
+  alias ThistleTea.Game.Network.Message.SmsgPetNameQueryResponse
 
   @enforce_keys [:kind, :entity_ref, :pid, :spells]
-  defstruct [:kind, :entity_ref, :pid, :spells, :create, :progress]
+  defstruct [:kind, :entity_ref, :pid, :spells, :create, :progress, :name_response]
 
   @type t :: %__MODULE__{
           kind: Companion.kind(),
           entity_ref: Companion.EntityRef.t(),
           pid: pid(),
           spells: list(),
-          create: term()
+          create: term(),
+          name_response: %SmsgPetNameQueryResponse{} | nil
         }
 end
 

@@ -1052,7 +1052,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       pid: self(),
       spells: pet_spells,
       create: Core.update_object(state),
-      progress: PetProgression.snapshot(state)
+      progress: PetProgression.snapshot(state),
+      name_response: %Message.SmsgPetNameQueryResponse{
+        pet_number: state.unit.pet_number,
+        name: state.internal.name,
+        timestamp: state.unit.pet_name_timestamp
+      }
     }
 
     send(owner_pid, attachment)

@@ -196,8 +196,7 @@ defmodule ThistleTea.Game.Player.PetStableTest do
       assert Companion.active_guid(retrieved.character) == pet.object.guid
       assert retrieved.character.internal.companion.pet_number == 77
       assert retrieved.companion_monitor.pid == Entity.pid(pet.object.guid)
-      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetNameQueryResponse{pet_number: 77, name: "Boar"}}}
-      assert_receive %Attachment{} = pending
+      assert_receive %Attachment{name_response: %Message.SmsgPetNameQueryResponse{name: "Boar"}} = pending
       stored = PetStable.transfer(retrieved, master, :store)
       assert stored.character.internal.pet_stable.pets[1].pet_number == 77
       refute Entity.online?(pet.object.guid)
