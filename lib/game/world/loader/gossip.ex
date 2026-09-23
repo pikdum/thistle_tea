@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   @option_innkeeper 8
   @option_banker 9
   @option_petitioner 10
+  @option_tabard_designer 11
   @option_auctioneer 13
   @option_stable 14
   @option_battlefield 12
@@ -34,6 +35,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
     @option_innkeeper,
     @option_banker,
     @option_petitioner,
+    @option_tabard_designer,
     @option_auctioneer,
     @option_stable,
     @option_battlefield,
@@ -220,6 +222,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   def option_innkeeper, do: @option_innkeeper
   def option_banker, do: @option_banker
   def option_petitioner, do: @option_petitioner
+  def option_tabard_designer, do: @option_tabard_designer
   def option_auctioneer, do: @option_auctioneer
   def option_stable, do: @option_stable
   def option_battlefield, do: @option_battlefield

@@ -4,24 +4,33 @@ defmodule ThistleTea.Game.Player.Guilds do
   membership; this boundary resolves names and publishes accepted changes.
   """
 
+  import Bitwise, only: [&&&: 2]
+
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.ChatStatus, as: StatusLogic
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Guild
   alias ThistleTea.Game.Guild.Group
   alias ThistleTea.Game.Guild.Member
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgGuildCommandResult, as: CommandResult
   alias ThistleTea.Game.Network.Message.SmsgGuildRoster.Entry
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.World.System.Guild, as: GuildSystem
   alias ThistleTea.Game.World.System.Petition, as: PetitionSystem
+
+  @tabard_designer_flag 0x400
+  @tabard_cost 100_000
+  @interaction_distance 5.0
 
   def create(%{ready: true, character: %Character{} = character} = state, name) do
     case GuildSystem.create(member(character), name) do
@@ -37,6 +46,72 @@ defmodule ThistleTea.Game.Player.Guilds do
   end
 
   def create(state, _name), do: state
+
+  def activate_tabard(%{ready: true, character: %Character{} = character} = state, vendor_guid) do
+    if tabard_vendor?(character, vendor_guid) do
+      Network.send_packet(%Message.MsgTabardvendorActivateServer{vendor_guid: vendor_guid})
+    end
+
+    state
+  end
+
+  def activate_tabard(state, _vendor_guid), do: state
+
+  def save_emblem(%{ready: true, guid: guid, character: %Character{} = character} = state, vendor_guid, emblem) do
+    group = GuildSystem.group_of(guid)
+
+    cond do
+      not tabard_vendor?(character, vendor_guid) -> emblem_result(state, :invalid_vendor)
+      group == nil -> emblem_result(state, :not_in_guild)
+      group.leader != guid -> emblem_result(state, :not_leader)
+      character.player.coinage < @tabard_cost -> emblem_result(state, :not_enough_money)
+      true -> save_authorized_emblem(state, emblem)
+    end
+  end
+
+  def save_emblem(state, _vendor_guid, _emblem), do: state
+
+  defp save_authorized_emblem(state, emblem) do
+    case GuildSystem.set_emblem(state.guid, emblem) do
+      {:ok, group} ->
+        player = %{state.character.player | coinage: state.character.player.coinage - @tabard_cost}
+        state = InventoryUpdate.apply(state, {:ok, player})
+        emblem_result(state, :ok)
+        Network.send_packet(%Message.SmsgGuildQueryResponse{guild: group})
+        state
+
+      {:error, reason} ->
+        result =
+          case reason do
+            :invalid_emblem -> :invalid_emblem
+            :not_in_guild -> :not_in_guild
+            _ -> :not_leader
+          end
+
+        emblem_result(state, result)
+    end
+  end
+
+  defp emblem_result(state, result) do
+    Network.send_packet(%Message.MsgSaveGuildEmblemServer{result: result})
+    state
+  end
+
+  defp tabard_vendor?(%Character{} = character, vendor_guid) do
+    with false <- Core.dead?(character),
+         :mob <- Guid.entity_type(vendor_guid),
+         %{alive?: true, npc_flags: flags} when is_integer(flags) <- Metadata.query(vendor_guid, [:alive?, :npc_flags]),
+         true <- (flags &&& @tabard_designer_flag) != 0,
+         true <- Reputation.can_interact?(character, vendor_guid),
+         world = character.internal.world,
+         {^world, _x, _y, _z} <- World.position(vendor_guid),
+         distance when is_number(distance) and distance <= @interaction_distance <-
+           World.distance_between(character, vendor_guid) do
+      true
+    else
+      _invalid -> false
+    end
+  end
 
   def invite(%{ready: true, guid: guid, character: %Character{} = character} = state, name) do
     target = CharacterStore.get_by_name(String.capitalize(name))

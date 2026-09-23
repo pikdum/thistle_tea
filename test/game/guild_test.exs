@@ -80,6 +80,19 @@ defmodule ThistleTea.Game.GuildTest do
     end
   end
 
+  describe "set_emblem/3" do
+    test "only the guild leader can set valid tabard colors" do
+      guilds = guild_with_members()
+      emblem = {3, 4, 5, 6, 7}
+
+      assert {:error, :permissions} = Guild.set_emblem(guilds, 2, emblem)
+      assert {:error, :invalid_emblem} = Guild.set_emblem(guilds, 1, {256, 4, 5, 6, 7})
+      assert {:ok, group, updated} = Guild.set_emblem(guilds, 1, emblem)
+      assert group.emblem == emblem
+      assert Guild.group_of(updated, 2).emblem == emblem
+    end
+  end
+
   describe "disband/2" do
     test "clears membership, names, and pending invitations together" do
       guilds = guild_with_members()

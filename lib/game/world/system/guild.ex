@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.World.System.Guild do
   def demote(actor_guid, target_guid), do: change(:demote, [actor_guid, target_guid])
   def set_motd(actor_guid, motd), do: change(:set_motd, [actor_guid, motd])
   def set_info(actor_guid, info), do: change(:set_info, [actor_guid, info])
+  def set_emblem(actor_guid, emblem), do: change(:set_emblem, [actor_guid, emblem])
   def set_note(actor_guid, target_guid, kind, note), do: change(:set_note, [actor_guid, target_guid, kind, note])
   def edit_rank(actor_guid, rank_id, rights, name), do: change(:edit_rank, [actor_guid, rank_id, rights, name])
   def add_rank(actor_guid, name), do: change(:add_rank, [actor_guid, name])

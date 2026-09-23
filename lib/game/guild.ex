@@ -327,6 +327,27 @@ defmodule ThistleTea.Game.Guild do
     update_text(guilds, actor_guid, :edit_info, :info, info)
   end
 
+  def set_emblem(%__MODULE__{} = guilds, actor_guid, {style, color, border, border_color, background} = emblem)
+      when is_integer(style) and is_integer(color) and is_integer(border) and is_integer(border_color) and
+             is_integer(background) do
+    case group_of(guilds, actor_guid) do
+      nil ->
+        {:error, :not_in_guild}
+
+      %Group{leader: leader} when leader != actor_guid ->
+        {:error, :permissions}
+
+      %Group{} = group ->
+        if Enum.all?(Tuple.to_list(emblem), &(&1 in 0..255)) do
+          updated(guilds, %{group | emblem: emblem})
+        else
+          {:error, :invalid_emblem}
+        end
+    end
+  end
+
+  def set_emblem(%__MODULE__{}, _actor_guid, _emblem), do: {:error, :invalid_emblem}
+
   defp update_text(guilds, actor_guid, permission, field, value) do
     case group_of(guilds, actor_guid) do
       nil ->

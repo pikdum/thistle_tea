@@ -72,6 +72,8 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_GUILD_RANK: Message.CmsgGuildRank,
               CMSG_GUILD_ADD_RANK: Message.CmsgGuildAddRank,
               CMSG_GUILD_DEL_RANK: Message.CmsgGuildDelRank,
+              MSG_TABARDVENDOR_ACTIVATE: Message.MsgTabardvendorActivateClient,
+              MSG_SAVE_GUILD_EMBLEM: Message.MsgSaveGuildEmblemClient,
               CMSG_PETITION_SHOWLIST: Message.CmsgPetitionShowlist,
               CMSG_PETITION_BUY: Message.CmsgPetitionBuy,
               CMSG_PETITION_SHOW_SIGNATURES: Message.CmsgPetitionShowSignatures,
