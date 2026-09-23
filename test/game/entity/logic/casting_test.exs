@@ -825,6 +825,8 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
       spell = %Spell{
         id: 116,
         school: :frost,
+        dmg_class: 1,
+        attributes: MapSet.new([:no_reflection]),
         effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy}]
       }
 
@@ -855,7 +857,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
                }
              ] = mob.internal.events
 
-      spell = %{spell | dmg_class: 1}
+      spell = %{spell | attributes: MapSet.new()}
       casting = %{casting | spell: spell}
       mob = %{mob | internal: %{mob.internal | events: [], casting: casting}}
       :rand.seed(:exsss, {1, 2, 3})
@@ -883,6 +885,18 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
 
       {_target, [%Effects.SpellLogMiss{reason: :reflect}, %Effects.DeliverSpell{}]} =
         SpellEffect.receive(target, context, spell, 1_000)
+
+      spell = %{spell | dmg_class: 0}
+      casting = %{casting | spell: spell}
+      mob = %{mob | internal: %{mob.internal | events: [], casting: casting}}
+      :rand.seed(:exsss, {1, 2, 3})
+      mob = Casting.complete(mob, casting, 1_000)
+
+      assert [
+               %Effects.SpellCastResult{},
+               %Effects.SpellGo{hit_guids: [^target_guid], misses: []},
+               %Effects.DeliverSpell{cast_context: %{hit_outcome: :hit}, target_guid: ^target_guid}
+             ] = mob.internal.events
     end
 
     test "applies the victim's school-masked spell hit modifier from metadata" do
@@ -916,6 +930,8 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
       spell = %Spell{
         id: 133,
         school: :fire,
+        dmg_class: 1,
+        attributes: MapSet.new([:no_reflection]),
         effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy}]
       }
 
@@ -973,7 +989,14 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
         Metadata.delete(target_guid)
       end)
 
-      spell = %Spell{id: 133, school: :fire, effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy}]}
+      spell = %Spell{
+        id: 133,
+        school: :fire,
+        dmg_class: 1,
+        attributes: MapSet.new([:no_reflection]),
+        effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy}]
+      }
+
       casting = %Cast{spell: spell, targets: Target.unit(target_guid), ends_at: Time.now()}
 
       caster = %Mob{

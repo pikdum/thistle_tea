@@ -1172,8 +1172,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp queue_spell_miss_outcomes(character, _casting, _misses), do: character
 
-  defp roll_spell_hits(_caster, %Spell{dmg_class: 2}, targets), do: {targets, []}
-  defp roll_spell_hits(_caster, %Spell{dmg_class: 3}, targets), do: {targets, []}
+  defp roll_spell_hits(_caster, %Spell{dmg_class: class}, targets) when class in [0, 2, 3], do: {targets, []}
 
   defp roll_spell_hits(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, targets) do
     if Spell.harmful?(spell) do
@@ -1197,6 +1196,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
     metadata =
       Metadata.query(target_guid, [
+        :alive?,
         :level,
         :attacker_spell_hit_chance,
         :mechanic_resistance,

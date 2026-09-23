@@ -329,9 +329,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     cond do
       channel_ticked_trigger?(context.spell, effect) ->
         spell_id = Scripts.channel_trigger_spell_id(context.spell, effect.trigger_spell_id)
+        target_guid = channel_trigger_target(target, context)
 
         event =
-          Effects.trigger_spell(context.caster_guid, context.caster_level, target.object.guid, spell_id)
+          Effects.trigger_spell(context.caster_guid, context.caster_level, target_guid, spell_id, hit_context: context)
 
         {target, events ++ [event], applied}
 
@@ -363,6 +364,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp channel_ticked_trigger?(spell, %Effect{} = effect), do: Spell.channel_ticked_effect?(spell, effect)
   defp channel_ticked_trigger?(_spell, _effect), do: false
+
+  defp channel_trigger_target(%{object: %{guid: caster}, unit: %{channel_object: guid}}, %CastContext{
+         caster_guid: caster
+       })
+       when is_integer(guid) and guid > 0 and guid != caster, do: guid
+
+  defp channel_trigger_target(target, _context), do: target.object.guid
 
   defp apply_effect(state, context, spell, %Effect{} = effect, now) do
     case Semantics.effect_rule(effect) do

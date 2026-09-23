@@ -53,6 +53,19 @@ defmodule ThistleTea.Game.Entity.Logic.SpellResist do
     {75, 25, 55, 16, 3}
   ]
 
+  def hit_snapshot(caster) do
+    modifiers =
+      Enum.filter(Modifiers.snapshot_all(caster), fn {_family, aura} ->
+        Modifiers.operation(aura.misc_value) == :resist_miss_chance
+      end)
+
+    %{base: Aura.flat_amount(caster, :mod_spell_hit_chance), modifiers: modifiers}
+  end
+
+  def hit_bonus(%{base: base, modifiers: modifiers}, spell) do
+    base + Modifiers.value(Modifiers.for_spell(modifiers, spell), :resist_miss_chance, 0)
+  end
+
   def school_resistances(%{unit: %Unit{} = unit}) do
     %{
       1 => unit.holy_resistance || 0,
@@ -67,9 +80,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellResist do
   def spell_hit?(caster, %Spell{} = spell, target, target_player?, opts \\ []) do
     caster_level = max(caster.unit.level || 1, 1)
 
-    hit_bonus =
-      Aura.flat_amount(caster, :mod_spell_hit_chance) +
-        Modifiers.value(caster, spell, :resist_miss_chance, 0)
+    hit_bonus = hit_bonus(hit_snapshot(caster), spell)
 
     context = %CastContext{
       caster_level: caster_level,
@@ -90,7 +101,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellResist do
       target_level,
       target_player?,
       Keyword.merge(opts,
-        no_spell_defense?: Map.get(target, :no_spell_defense?, false) or Spell.attribute?(spell, :always_hit),
+        no_spell_defense?:
+          Map.get(target, :alive?) == false or Map.get(target, :no_spell_defense?, false) or
+            Spell.attribute?(spell, :always_hit),
         hit_bonus: context.spell_hit_bonus + target_bonus,
         mechanic_resistance: MechanicResistance.chance(Map.get(target, :mechanic_resistance), spell.mechanic),
         binary_resistance: binary_resistance(context, spell, target)

@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   @regen_tick_ms 5000
   @percent_regen_tick_ms 2000
   @regen_auras [:mod_regen, :mod_power_regen, :mod_power_regen_percent]
+  @context_auras [:periodic_power_burn, :periodic_trigger_spell, :proc_trigger_spell, :damage_shield]
   @periodic_auras [
     :periodic_power_burn,
     :periodic_damage_percent,
@@ -75,7 +76,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
           caster_level: context.caster_level,
           caster_faction_template: context.caster_faction_template,
           resistance_penetration: context.resistance_penetration,
-          cast_context: if(Enum.any?(auras, &(&1.type == :periodic_power_burn)), do: context),
+          cast_context: if(Enum.any?(auras, &(&1.type in @context_auras)), do: context),
           applied_at: now,
           expires_at: expires_at(now, effective_duration(spell, context)),
           charges: holder_charges(spell),

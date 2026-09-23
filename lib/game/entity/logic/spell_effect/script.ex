@@ -64,7 +64,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
 
       event =
         Effects.trigger_spell(context.caster_guid, context.caster_level, target_guid, spell_id,
-          extra_attack?: context.extra_attack?
+          extra_attack?: context.extra_attack?,
+          hit_context: context
         )
 
       {state, [event]}
@@ -162,14 +163,25 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
 
   defp apply_class_dummy(state, context, _spell, _effect, {:holy_shock, spell_ids}, _now) do
     spell_id = if context.target_hostile?, do: spell_ids.damage, else: spell_ids.heal
-    {state, [Effects.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
+
+    {state,
+     [
+       Effects.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id,
+         hit_context: context
+       )
+     ]}
   end
 
   defp apply_class_dummy(state, context, _spell, effect, :judgement_of_command, _now) do
     spell_id = Effect.damage_roll(effect)
 
     if spell_id > 1 do
-      {state, [Effects.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
+      {state,
+       [
+         Effects.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id,
+           hit_context: context
+         )
+       ]}
     else
       {state, []}
     end

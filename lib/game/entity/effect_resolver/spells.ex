@@ -106,7 +106,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
         effect_index: effect.slot,
         resolve_targets?: true,
         extra_attack?: effect.extra_attack?,
-        triggered_by_spell_id: effect.triggering_spell_id
+        triggered_by_spell_id: effect.triggering_spell_id,
+        hit_context: effect.hit_context
       )
     ]
   end
@@ -135,7 +136,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
           effect_index: effect.slot,
           resolve_targets?: true,
           extra_attack?: effect.extra_attack?,
-          triggered_by_spell_id: effect.triggering_spell_id
+          triggered_by_spell_id: effect.triggering_spell_id,
+          hit_context: effect.hit_context
         )
       ]
     else
@@ -172,40 +174,53 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
         effect = %{effect | target_guid: target_guid}
         target = Target.unit(target_guid)
 
-        [
-          Effects.spell_go(effect.source_guid || entity.object.guid, effect.spell_id, [target_guid], target)
-        ] ++ triggered_delivery(entity, effect, spell)
+        triggered_cast(entity, effect, spell, [target_guid], target)
     end
   end
 
   defp resolve_area_trigger(entity, effect, spell) do
     targets = SpellTargetResolver.resolve(entity, spell, Target.unit(effect.target_guid))
 
-    [
+    triggered_cast(entity, effect, spell, targets, Target.unit(effect.target_guid))
+  end
+
+  defp triggered_cast(entity, effect, spell, targets, selection) do
+    contexts =
+      Enum.map(targets, fn target_guid ->
+        entity
+        |> trigger_context(%{effect | target_guid: target_guid}, spell)
+        |> trigger_outcome(spell, target_guid)
+      end)
+
+    {hits, misses} = Enum.split_with(contexts, &(&1.hit_outcome == :hit))
+    hit_guids = Enum.map(hits, & &1.target_guid)
+    misses = Enum.map(misses, &%{guid: &1.target_guid, reason: 2})
+
+    launch =
       Effects.spell_go(
         effect.source_guid || entity.object.guid,
         effect.spell_id,
-        targets,
-        Target.unit(effect.target_guid)
+        hit_guids,
+        selection,
+        effect.cast_item_guid,
+        misses
       )
-      | Enum.flat_map(targets, fn target_guid ->
-          triggered_delivery(entity, %{effect | target_guid: target_guid}, spell)
-        end)
-    ]
+
+    deliveries =
+      Enum.flat_map(contexts, fn context ->
+        resolved_delivery(entity, Effects.deliver_spell(context.target_guid, context, spell))
+      end)
+
+    [launch | deliveries]
   end
 
-  defp triggered_delivery(entity, %Effects.TriggerSpell{} = effect, spell) do
-    context = trigger_context(entity, effect, spell)
-    context = binary_trigger_outcome(context, spell, effect.target_guid)
-    resolved_delivery(entity, Effects.deliver_spell(effect.target_guid, context, spell))
-  end
+  defp trigger_outcome(%CastContext{caster_guid: guid} = context, _spell, guid), do: context
 
-  defp binary_trigger_outcome(%CastContext{caster_guid: guid} = context, _spell, guid), do: context
-
-  defp binary_trigger_outcome(context, spell, target_guid) do
-    if Spell.binary?(spell) and Spell.harmful?(spell) do
+  defp trigger_outcome(context, %Spell{dmg_class: 1} = spell, target_guid) do
+    if Spell.harmful?(spell) do
       target =
         Metadata.query(target_guid, [
+          :alive?,
           :level,
           :attacker_spell_hit_chance,
           :mechanic_resistance,
@@ -219,6 +234,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
       context
     end
   end
+
+  defp trigger_outcome(context, _spell, _target_guid), do: context
 
   defp projectile_delay_ms(%{movement_block: %{position: {x, y, z, _o}}}, %Effects.DeliverSpell{
          spell: %Spell{speed: speed},
@@ -307,5 +324,23 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
       target_hostile?: Spell.requires_hostile_target?(spell),
       spell: spell
     }
+    |> inherit_hit_context(effect.hit_context, spell)
   end
+
+  defp inherit_hit_context(%CastContext{caster_guid: guid} = context, %CastContext{caster_guid: guid} = source, spell) do
+    bonus =
+      if source.spell_hit_snapshot,
+        do: SpellResist.hit_bonus(source.spell_hit_snapshot, spell),
+        else: source.spell_hit_bonus
+
+    %{
+      context
+      | caster_level: source.caster_level || context.caster_level,
+        spell_hit_bonus: bonus,
+        spell_hit_snapshot: source.spell_hit_snapshot,
+        resistance_penetration: source.resistance_penetration
+    }
+  end
+
+  defp inherit_hit_context(context, _source, _spell), do: context
 end

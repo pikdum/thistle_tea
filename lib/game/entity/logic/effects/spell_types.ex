@@ -53,6 +53,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
        slot: nil,
        amount: nil,
        duration_ms: nil,
+       hit_context: nil,
        resolve_targets?: false
      ]}
   ]

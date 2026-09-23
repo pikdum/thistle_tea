@@ -102,6 +102,7 @@ defmodule ThistleTea.Game.Entity.Logic.BinarySpellTest do
 
       assert SpellResist.spell_hit?(entity(1), %{spell | effects: [hd(spell.effects)]}, target, false, roll: 9_599)
       assert SpellResist.spell_hit?(entity(1), spell, Map.put(target, :no_spell_defense?, true), false, roll: 9_999)
+      assert SpellResist.spell_hit?(entity(1), spell, Map.put(target, :alive?, false), false, roll: 9_999)
 
       assert SpellResist.spell_hit?(
                entity(1),

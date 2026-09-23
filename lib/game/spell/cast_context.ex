@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.ResistancePenetration
+  alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
   alias ThistleTea.Game.Entity.Logic.TargetDamage
   alias ThistleTea.Game.Entity.Logic.TargetSpellPower
@@ -74,6 +75,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :caster_max_health,
     :combo_points,
     :spell_threat,
+    :spell_hit_snapshot,
     triggered_by_aura?: false,
     triggered?: false,
     proc_damage?: false,
@@ -103,6 +105,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   def from_caster(%{object: %{guid: guid}, unit: %{level: level}} = caster, spell, target_guid)
       when is_integer(guid) and is_integer(level) do
     spell = WeaponDamage.prepare_spell(caster, spell)
+    hit_snapshot = SpellResist.hit_snapshot(caster)
 
     %__MODULE__{
       caster_guid: guid,
@@ -121,8 +124,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
       resistance_penetration: ResistancePenetration.snapshot(caster),
       spell_threat: SpellThreatLoader.get(spell_id(spell)),
       spell_modifiers: Modifiers.snapshot(caster, spell),
-      spell_hit_bonus:
-        Aura.flat_amount(caster, :mod_spell_hit_chance) + Modifiers.value(caster, spell, :resist_miss_chance, 0),
+      spell_hit_snapshot: hit_snapshot,
+      spell_hit_bonus: SpellResist.hit_bonus(hit_snapshot, spell),
       conditional_crit_modifiers: Critical.snapshot(caster, spell),
       threat_multiplier: threat_multiplier(caster, spell),
       damage_done_multiplier: WeaponDamage.multiplier(caster, spell.school, attack_weapon(caster, spell)),

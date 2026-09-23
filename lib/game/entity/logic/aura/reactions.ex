@@ -465,7 +465,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     if is_integer(trigger_spell_id) do
       [
         Effects.trigger_spell(source_guid, holder.caster_level || 1, target_guid, trigger_spell_id,
-          triggered_by_spell_id: holder.spell.id
+          triggered_by_spell_id: holder.spell.id,
+          hit_context: holder.cast_context
         )
       ]
     else

@@ -72,7 +72,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Aura do
   defp script_trigger_events(target, %CastContext{spell: spell} = context) do
     with trigger_id when is_integer(trigger_id) <- Semantics.rules(spell).apply_trigger_spell_id,
          true <- Aura.has_spell?(target, spell.id) do
-      [Effects.trigger_spell(context.caster_guid, context.caster_level, target.object.guid, trigger_id)]
+      [
+        Effects.trigger_spell(context.caster_guid, context.caster_level, target.object.guid, trigger_id,
+          hit_context: context
+        )
+      ]
     else
       _ -> []
     end

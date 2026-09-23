@@ -61,17 +61,25 @@ defmodule ThistleTea.Game.Spell.Modifiers do
 
   def value(_modifiers, _operation, base), do: base
 
-  def snapshot(%{unit: %{auras: holders}} = entity, %Spell{} = spell) when is_list(holders) do
-    for %Holder{} = holder <- holders ++ inherited_holders(entity),
-        modifier_applies?(holder.spell, spell),
-        %Aura{type: type, amount: amount, class_mask: class_mask} = aura <- holder.auras,
+  def snapshot(entity, %Spell{} = spell), do: entity |> snapshot_all() |> for_spell(spell)
+  def snapshot(_entity, _spell), do: []
+
+  def snapshot_all(%{unit: %{auras: holders}} = entity) when is_list(holders) do
+    for %Holder{spell: %Spell{spell_family: family}} = holder <- holders ++ inherited_holders(entity),
+        is_integer(family) and family > 0,
+        %Aura{type: type, amount: amount} = aura <- holder.auras,
         type in @modifier_types,
         is_number(amount),
-        class_mask_applies?(class_mask, spell),
-        do: %{aura | amount: amount * holder_stacks(holder)}
+        do: {family, %{aura | amount: amount * holder_stacks(holder)}}
   end
 
-  def snapshot(_entity, _spell), do: []
+  def snapshot_all(_entity), do: []
+
+  def for_spell(snapshot, %Spell{spell_family: family} = spell) when is_list(snapshot) do
+    for {^family, %Aura{} = aura} <- snapshot, class_mask_applies?(aura.class_mask, spell), do: aura
+  end
+
+  def for_spell(_snapshot, _spell), do: []
 
   def holders(%{unit: %{auras: holders}}), do: holders(holders)
 

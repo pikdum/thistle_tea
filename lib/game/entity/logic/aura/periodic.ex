@@ -325,7 +325,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
           []
 
         {true, spell_id} when is_integer(spell_id) and spell_id > 0 ->
-          [Effects.trigger_spell(holder.caster_guid, holder.caster_level, entity.object.guid, spell_id)]
+          [
+            Effects.trigger_spell(holder.caster_guid, holder.caster_level, entity.object.guid, spell_id,
+              hit_context: holder.cast_context
+            )
+          ]
 
         _ ->
           []
