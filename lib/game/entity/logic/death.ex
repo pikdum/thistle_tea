@@ -6,12 +6,14 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
   """
   import Bitwise, only: [&&&: 2, |||: 2, bnot: 1]
 
+  alias ThistleTea.Game.Battleground.Resurrection, as: BattlegroundResurrection
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.CorpseReclaim
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Resurrection
   alias ThistleTea.Game.Spell
@@ -68,6 +70,7 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
         player: %{player | flags: (player.flags || 0) ||| @player_flag_ghost, self_res_spell: 0}
     }
 
+    character = Insignia.clear(character)
     {character, events} = apply_ghost_spells(character, ghost_spells, now)
 
     {Core.mark_broadcast_update(character), combat_events ++ events ++ [Effects.movement_root_changed(false)]}
@@ -75,7 +78,9 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
 
   def resurrect(%{unit: %Unit{}} = character, restore_percent, now) when restore_percent > 0 do
     {character, combat_events} = PlayerCombat.disengage(character)
-    {character, events} = Aura.remove_spells(character, [@ghost_spell_id, @wisp_spell_id], now)
+
+    {character, events} =
+      Aura.remove_spells(character, [@ghost_spell_id, @wisp_spell_id, BattlegroundResurrection.spell_id()], now)
 
     %{unit: unit, player: player} = character
 
@@ -90,7 +95,11 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
 
     player = %{player | flags: (player.flags || 0) &&& bnot(@player_flag_ghost), self_res_spell: 0}
 
-    character = %{character | unit: unit, player: player} |> CorpseReclaim.clear_release() |> Resurrection.clear()
+    character =
+      %{character | unit: unit, player: player}
+      |> CorpseReclaim.clear_release()
+      |> Resurrection.clear()
+      |> Insignia.clear()
 
     {Core.mark_broadcast_update(character), combat_events ++ events ++ [Effects.movement_root_changed(false)]}
   end
@@ -98,7 +107,9 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
   def resurrect_with(%{unit: %Unit{}} = character, health, mana, now)
       when is_integer(health) and health > 0 and is_integer(mana) do
     {character, combat_events} = PlayerCombat.disengage(character)
-    {character, events} = Aura.remove_spells(character, [@ghost_spell_id, @wisp_spell_id], now)
+
+    {character, events} =
+      Aura.remove_spells(character, [@ghost_spell_id, @wisp_spell_id, BattlegroundResurrection.spell_id()], now)
 
     %{unit: unit, player: player} = character
 
@@ -113,7 +124,11 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
 
     player = %{player | flags: (player.flags || 0) &&& bnot(@player_flag_ghost), self_res_spell: 0}
 
-    character = %{character | unit: unit, player: player} |> CorpseReclaim.clear_release() |> Resurrection.clear()
+    character =
+      %{character | unit: unit, player: player}
+      |> CorpseReclaim.clear_release()
+      |> Resurrection.clear()
+      |> Insignia.clear()
 
     {Core.mark_broadcast_update(character), combat_events ++ events ++ [Effects.movement_root_changed(false)]}
   end

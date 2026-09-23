@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Player.Corpses do
   @moduledoc "Spirit release, corpse admission checks, and recovery countdown projection."
 
+  alias ThistleTea.Game.Battleground.Resurrection, as: BattlegroundResurrection
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.Data.Dungeon
@@ -26,6 +27,18 @@ defmodule ThistleTea.Game.Player.Corpses do
   alias ThistleTea.Game.World.System.Battleground
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.WorldRef
+
+  def restore(%Character{} = character) do
+    missing_body? = is_nil(World.position(Corpse.guid_for(character.object.guid)))
+    battleground? = MapTemplate.battleground?(character.internal.world.map_id)
+
+    if Death.ghost?(character) and missing_body? and not battleground? do
+      {character, _events} = Death.resurrect(character, 0.5, Time.now())
+      %{character | internal: %{character.internal | broadcast_update?: false}}
+    else
+      character
+    end
+  end
 
   def query(%{ready: true, character: %Character{} = character} = state) do
     Network.send_packet(location(character))
@@ -126,7 +139,13 @@ defmodule ThistleTea.Game.Player.Corpses do
   defp release_spirit(%{character: character} = state, now) do
     character = CorpseReclaim.release(character, now)
     spawn_corpse(character)
-    ghost_spells = character |> Death.ghost_spell_ids() |> Enum.map(&SpellLoader.load/1) |> Enum.reject(&is_nil/1)
+
+    waiting_spells =
+      if MapTemplate.battleground?(character.internal.world.map_id), do: [BattlegroundResurrection.spell_id()], else: []
+
+    ghost_spells =
+      (Death.ghost_spell_ids(character) ++ waiting_spells) |> Enum.map(&SpellLoader.load/1) |> Enum.reject(&is_nil/1)
+
     {character, events} = Death.release_spirit(character, ghost_spells, now)
     character = EventSink.emit(character, events)
     state = PlayerServer.maybe_broadcast_update(%{state | character: character})

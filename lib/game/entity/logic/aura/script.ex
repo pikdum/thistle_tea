@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   """
 
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Battleground.Resurrection, as: BattlegroundResurrection
   alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Paladin
@@ -29,7 +30,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
 
   def after_remove(entity, holders, cause) when is_list(holders) do
     Enum.flat_map(holders, fn holder ->
-      after_remove_holder(entity, holder, cause) ++ Silithyst.after_remove(entity, holder, cause)
+      after_remove_holder(entity, holder, cause) ++
+        Silithyst.after_remove(entity, holder, cause) ++ BattlegroundResurrection.after_remove(entity, holder)
     end)
   end
 

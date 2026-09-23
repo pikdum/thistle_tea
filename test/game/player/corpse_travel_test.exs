@@ -30,6 +30,27 @@ defmodule ThistleTea.Game.Player.CorpseTravelTest do
 
   setup [:build_spirit_run]
 
+  describe "restore/1" do
+    test "keeps ghosts with bodies and recovers missing bodies outside battlegrounds", %{state: state} do
+      assert Corpses.restore(state.character) == state.character
+      World.stop_entity(Corpse.guid_for(state.guid))
+      restored = Corpses.restore(state.character)
+      assert Death.alive?(restored)
+      assert restored.unit.health == 50
+      refute restored.internal.broadcast_update?
+    end
+
+    test "keeps a battleground ghost after its insignia was removed", %{state: state} do
+      World.stop_entity(Corpse.guid_for(state.guid))
+      :ets.insert(MapTemplate, {@other, 3, nil})
+      ghost = %{state.character | internal: %{state.character.internal | world: WorldRef.instance(@other, 1)}}
+      ghost = put_in(ghost.internal.corpse_reclaim.released_at, nil)
+      assert Corpses.restore(ghost) == ghost
+      assert Death.ghost?(ghost)
+      refute Death.alive?(ghost)
+    end
+  end
+
   describe "location/2" do
     test "shows the entrance outside and the body inside", %{state: state} do
       height = fn 0, {10.0, 20.0} -> 42.0 end

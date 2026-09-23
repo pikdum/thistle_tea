@@ -13,6 +13,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:OpenLock, [:target_guid, :spell], [cast_item_guid: nil, success_events: []]},
     {:PickPocket, [:target_guid, :spell_id], []},
     {:SkinCorpse, [:target_guid, :spell_id], []},
+    {:RemoveInsignia, [:targets, :spell_id], []},
+    {:CancelBattlegroundResurrection, [:world, :guid], []},
     {:DisenchantItem, [:target_guid, :spell_id], []},
     {:CreateItem, [:item_id, :count], [spell_id: nil]},
     {:GiveItem, [:target_guid, :item_id, :count], []},

@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.SpellTarget
@@ -46,6 +47,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Spell.TargetCodec
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.InsigniaTarget
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
@@ -426,6 +428,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       end
 
     cond do
+      Insignia.spell?(spell) -> InsigniaTarget.info(character, targets)
       Spell.resurrect_spell?(spell) -> ResurrectionTarget.info(character, targets)
       is_integer(pet_guid) -> target_info(character, pet_guid)
       is_integer(explicit_guid) -> target_info(character, explicit_guid)

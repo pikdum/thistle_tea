@@ -268,6 +268,11 @@ defmodule ThistleTea.Game.Entity do
     :exit, _ -> {:error, :not_found}
   end
 
+  def remove_insignia(entity, looter_guid, death_id),
+    do: dispatch_cast(entity, {:remove_insignia, looter_guid, death_id})
+
+  def insignia_loot(entity, bones_guid), do: dispatch_cast(entity, {:insignia_loot, bones_guid})
+
   defp dispatch_cast(target, message) do
     case resolve_pid(target) do
       {:ok, pid} -> GenServer.cast(pid, message)

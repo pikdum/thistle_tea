@@ -166,6 +166,7 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
   def player_died(%__MODULE__{} = match, %Defeat{}, _dropped_guid), do: %Result{match: match}
 
   defdelegate queue_resurrection(match, guid), to: Roster
+  defdelegate cancel_resurrection(match, guid), to: Roster
 
   def handle_timer(%__MODULE__{phase: :countdown} = match, :start_one_minute, _now) do
     %Result{match: match, effects: [announce(10_015, :neutral)]}

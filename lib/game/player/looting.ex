@@ -107,9 +107,10 @@ defmodule ThistleTea.Game.Player.Looting do
   defp open_entity(state, character, guid, opts) do
     state = release(state)
     actor = actor(state, guid)
+    command = if Keyword.get(opts, :insignia?, false), do: :insignia_view, else: :loot_view
 
     with false <- Core.dead?(character),
-         {:ok, %Loot{} = loot} <- Entity.call(guid, {:loot_view, actor}) do
+         {:ok, %Loot{} = loot} <- Entity.call(guid, {command, actor}) do
       if Guid.entity_type(guid) == :game_object do
         InstanceSystem.game_object_used(character.internal.world, Guid.entry(guid))
       end

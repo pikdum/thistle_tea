@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.ItemUse
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Mount
@@ -300,6 +301,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> queue_object_actions(casting)
       |> queue_pickpocket(casting)
       |> queue_skinning(casting)
+      |> queue_remove_insignia(casting)
       |> queue_disenchant(casting)
       |> queue_charge(casting)
       |> release_paladin_seal(casting, resolution.hits, now)
@@ -400,6 +402,10 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp selected_unit_guid(_caster, _spell, targets, _resolved), do: Target.unit_guid(targets)
 
   defp resolved_impacts(entity, spell, hits, misses) do
+    if Insignia.spell?(spell), do: [], else: unit_impacts(entity, spell, hits, misses)
+  end
+
+  defp unit_impacts(entity, spell, hits, misses) do
     impacts = Enum.map(hits, &%Impact{target_guid: &1, target_role: target_role(entity, &1)})
 
     if Spell.reflectable?(spell) do
@@ -642,6 +648,14 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp queue_skinning(character, _casting), do: character
+
+  defp queue_remove_insignia(%Character{} = character, %Cast{spell: spell, targets: targets}) do
+    if Insignia.spell?(spell),
+      do: Effects.enqueue(character, %Effects.RemoveInsignia{targets: targets, spell_id: spell.id}),
+      else: character
+  end
+
+  defp queue_remove_insignia(entity, _casting), do: entity
 
   defp queue_disenchant(%Character{} = character, %Cast{
          spell: spell,
@@ -1206,13 +1220,21 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp validate_cast_target(character, %Cast{spell: spell, targets: targets} = casting) do
-    if Spell.resurrect_spell?(spell) do
-      case SpellTargetResolver.resurrection_target(character, spell, targets) do
-        {:ok, _guid} -> :ok
-        error -> error
-      end
-    else
-      if cast_target_visible?(character, casting), do: :ok, else: {:error, :line_of_sight}
+    cond do
+      Insignia.spell?(spell) ->
+        case SpellTargetResolver.insignia_target(character, spell, targets) do
+          {:ok, _guid} -> :ok
+          error -> error
+        end
+
+      Spell.resurrect_spell?(spell) ->
+        case SpellTargetResolver.resurrection_target(character, spell, targets) do
+          {:ok, _guid} -> :ok
+          error -> error
+        end
+
+      true ->
+        if cast_target_visible?(character, casting), do: :ok, else: {:error, :line_of_sight}
     end
   end
 

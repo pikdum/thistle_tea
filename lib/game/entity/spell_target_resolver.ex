@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Guid
@@ -14,6 +15,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.InsigniaTarget
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.ResurrectionTarget
   alias ThistleTea.Game.World.SpellMagnets
@@ -23,17 +25,30 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   @chain_jump_radius 10.0
 
   def resolve(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, %Target{} = targets) do
-    if Spell.resurrect_spell?(spell) do
-      case resurrection_target(caster, spell, targets) do
-        {:ok, guid} -> [guid]
-        {:error, _reason} -> []
-      end
-    else
-      resolve_targets(caster, caster_guid, spell, targets)
+    cond do
+      Insignia.spell?(spell) ->
+        case insignia_target(caster, spell, targets) do
+          {:ok, guid} -> [guid]
+          {:error, _reason} -> []
+        end
+
+      Spell.resurrect_spell?(spell) ->
+        case resurrection_target(caster, spell, targets) do
+          {:ok, guid} -> [guid]
+          {:error, _reason} -> []
+        end
+
+      true ->
+        resolve_targets(caster, caster_guid, spell, targets)
     end
   end
 
   def resolve(_caster, _spell, _targets), do: []
+
+  def insignia_target(caster, spell, targets) do
+    info = InsigniaTarget.info(caster, targets)
+    with :ok <- CastValidation.validate_target(caster, spell, targets, info), do: {:ok, info.body_guid}
+  end
 
   def resurrection_target(caster, spell, targets) do
     info = ResurrectionTarget.info(caster, targets)

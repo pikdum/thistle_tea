@@ -157,6 +157,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
   @inventory [
     :pickpocket,
     :skinning,
+    :remove_insignia,
     :disenchant,
     :create_item,
     :summon_change_item,

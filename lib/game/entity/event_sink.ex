@@ -44,6 +44,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.OpenLock,
     Effects.PickPocket,
     Effects.SkinCorpse,
+    Effects.RemoveInsignia,
     Effects.PlayObjectSound,
     Effects.PlaySound,
     Effects.QuestCastCredit,
@@ -212,6 +213,11 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   defp emit_resolved(entity, %Effects.BattlegroundDeath{world: world, defeat: defeat}, _context) do
     Battleground.player_died(world, defeat)
+    entity
+  end
+
+  defp emit_resolved(entity, %Effects.CancelBattlegroundResurrection{world: world, guid: guid}, _context) do
+    Battleground.cancel_resurrection(world, guid)
     entity
   end
 

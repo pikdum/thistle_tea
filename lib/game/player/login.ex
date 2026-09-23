@@ -15,7 +15,6 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.Data.Honor.Damage, as: HonorDamage
   alias ThistleTea.Game.Entity.Data.Reputation
   alias ThistleTea.Game.Entity.Data.Taxi.Flight
@@ -75,7 +74,6 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Player.WorldStates
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
@@ -118,7 +116,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> normalize_combat_stats()
       |> normalize_faction_template()
       |> normalize_reputation()
-      |> normalize_death_state(character_guid)
+      |> Corpses.restore()
       |> Dueling.abandon(Time.now())
       |> Pvp.reconnect(Time.now())
       |> build_spellbook()
@@ -499,15 +497,6 @@ defmodule ThistleTea.Game.Player.Login do
       )
 
     %{character | player: %{player | reputation: reputation}}
-  end
-
-  defp normalize_death_state(%Character{} = character, character_guid) do
-    if Death.ghost?(character) and is_nil(World.position(Corpse.guid_for(character_guid))) do
-      {character, _events} = Death.resurrect(character, 0.5, Time.now())
-      %{character | internal: %{character.internal | broadcast_update?: false}}
-    else
-      character
-    end
   end
 
   defp party_leader?(guid) do

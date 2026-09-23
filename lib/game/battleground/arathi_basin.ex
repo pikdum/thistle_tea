@@ -71,6 +71,7 @@ defmodule ThistleTea.Game.Battleground.ArathiBasin do
   defdelegate reserve(match, reservations), to: Roster
   defdelegate reconnect(match, guid), to: Roster
   defdelegate queue_resurrection(match, guid), to: Roster
+  defdelegate cancel_resurrection(match, guid), to: Roster
   defdelegate auto_leave_ms(match, now), to: Lifecycle
   defdelegate next_resurrection_ms(match, now), to: Lifecycle
 

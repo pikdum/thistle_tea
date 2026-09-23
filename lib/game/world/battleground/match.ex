@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.World.Battleground.Match do
   end
 
   def queue_resurrection(server, guid), do: GenServer.cast(server, {:queue_resurrection, guid})
+  def cancel_resurrection(server, guid), do: GenServer.cast(server, {:cancel_resurrection, guid})
   def start_now(server), do: GenServer.call(server, :start_now)
   def snapshot(server), do: GenServer.call(server, :snapshot)
   def world_states(server), do: GenServer.call(server, :world_states)
@@ -165,6 +166,10 @@ defmodule ThistleTea.Game.World.Battleground.Match do
 
   def handle_cast({:queue_resurrection, guid}, state) do
     {:noreply, apply_result(state, state.rules.queue_resurrection(state.match, guid))}
+  end
+
+  def handle_cast({:cancel_resurrection, guid}, state) do
+    {:noreply, apply_result(state, state.rules.cancel_resurrection(state.match, guid))}
   end
 
   @impl GenServer

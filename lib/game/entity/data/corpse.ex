@@ -5,12 +5,15 @@ defmodule ThistleTea.Game.Entity.Data.Corpse do
   """
   import Bitwise, only: [|||: 2, <<<: 2]
 
+  alias ThistleTea.Game.Battleground
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Corpse, as: CorpseComponent
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Corpse, as: Body
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.UpdateObject
 
@@ -49,7 +52,7 @@ defmodule ThistleTea.Game.Entity.Data.Corpse do
         bytes_1: bytes_1(unit, player),
         bytes_2: bytes_2(player),
         guild_id: 0,
-        flags: @corpse_flag_unk2,
+        flags: @corpse_flag_unk2 ||| if(Insignia.available?(character), do: 0x20, else: 0),
         dynamic_flags: 0
       },
       movement_block: %MovementBlock{
@@ -59,6 +62,7 @@ defmodule ThistleTea.Game.Entity.Data.Corpse do
       internal: %Internal{
         world: internal.world,
         corpse_reclaim: internal.corpse_reclaim,
+        corpse: %Body{level: unit.level, team: Battleground.team_for_race(unit.race)},
         area: internal.area,
         name: internal.name
       }

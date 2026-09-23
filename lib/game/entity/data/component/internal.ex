@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :channel_game_object_owned?,
     :next_swing_spell,
     :creature,
+    :corpse,
     :spawn,
     :loot,
     :item_loot,

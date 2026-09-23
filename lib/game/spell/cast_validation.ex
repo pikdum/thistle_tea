@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Hunter
+  alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.OpenLock
   alias ThistleTea.Game.Entity.Logic.Paladin
@@ -90,6 +91,12 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   def validate_target(caster, %Spell{} = spell, %Target{} = targets, target_info) do
+    if Insignia.spell?(spell),
+      do: Insignia.validate(caster, target_info),
+      else: validate_unit_target(caster, spell, targets, target_info)
+  end
+
+  defp validate_unit_target(caster, spell, targets, target_info) do
     with :ok <- check_target_flags(caster, spell, target_info),
          :ok <- check_target(spell, target_info),
          :ok <- check_target_power_type(spell, targets, target_info),

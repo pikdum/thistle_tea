@@ -80,6 +80,10 @@ defmodule ThistleTea.Game.World.System.Battleground do
     GenServer.cast(server, {:queue_resurrection, world, guid})
   end
 
+  def cancel_resurrection(%WorldRef{} = world, guid, server \\ __MODULE__) do
+    GenServer.cast(server, {:cancel_resurrection, world, guid})
+  end
+
   def spirit_healer_time(%WorldRef{} = world, server \\ __MODULE__) do
     GenServer.call(server, {:spirit_healer_time, world})
   end
@@ -354,6 +358,11 @@ defmodule ThistleTea.Game.World.System.Battleground do
 
   def handle_cast({:queue_resurrection, world, guid}, state) do
     if pid = Map.get(state.worlds, world), do: Match.queue_resurrection(pid, guid)
+    {:noreply, state}
+  end
+
+  def handle_cast({:cancel_resurrection, world, guid}, state) do
+    if pid = Map.get(state.worlds, world), do: Match.cancel_resurrection(pid, guid)
     {:noreply, state}
   end
 

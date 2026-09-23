@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   import Bitwise, only: [|||: 2]
 
+  alias ThistleTea.Game.Battleground.Resurrection, as: BattlegroundResurrection
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Commands
   alias ThistleTea.Game.Entity.Data.Character
@@ -45,6 +46,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.HealingReceived
   alias ThistleTea.Game.Entity.Logic.Hunter
+  alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Logic.Loot.Reservation
@@ -93,6 +95,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Guilds
   alias ThistleTea.Game.Player.HomeBind
   alias ThistleTea.Game.Player.Honor
+  alias ThistleTea.Game.Player.Insignia, as: PlayerInsignia
   alias ThistleTea.Game.Player.Instances
   alias ThistleTea.Game.Player.ItemCosts
   alias ThistleTea.Game.Player.ItemDurations
@@ -124,6 +127,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
   alias ThistleTea.Game.World.Metadata
@@ -626,20 +630,36 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def handle_cast({:battleground_resurrect, position}, %{character: %Character{} = character} = state) do
-    if Death.alive?(character) do
-      {:noreply, state}
-    else
+    if BattlegroundResurrection.ready?(character) do
       World.stop_entity(Corpse.guid_for(state.guid))
       {character, events} = Death.resurrect(character, 1.0, Time.now())
       state = maybe_broadcast_update(%{state | character: EventSink.emit(character, events)})
       Visibility.notify_visibility_changed(state.character)
       {x, y, z, orientation} = position
       handle_cast({:start_teleport, x, y, z, orientation, character.internal.world}, state)
+    else
+      {:noreply, state}
     end
   end
 
   def handle_cast({:battleground_reputation, faction_id, amount}, state) do
     {:noreply, PlayerReputation.reward_spell(state, faction_id, amount)}
+  end
+
+  def handle_cast({:remove_insignia, looter_guid, death_id}, state) do
+    {:noreply, PlayerInsignia.remove(state, looter_guid, death_id), {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Player insignia removal failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:insignia_loot, guid}, state) do
+    {:noreply, Looting.open(state, guid, loot_type: 2, insignia?: true)}
+  rescue
+    error ->
+      Logger.error("Insignia loot failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   @impl GenServer
@@ -1017,6 +1037,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   rescue
     error ->
       Logger.error("Skinning failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:remove_insignia, targets, spell_id}, state) do
+    {:noreply, PlayerInsignia.complete(state, targets, spell_id)}
+  rescue
+    error ->
+      Logger.error("Remove Insignia failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 
@@ -1500,6 +1528,13 @@ defmodule ThistleTea.Game.Entity.Server.Player do
        ) do
     if Core.dead?(character) do
       character = SelfResurrection.prepare(character, Time.now())
+
+      character =
+        Insignia.prepare(
+          character,
+          MapTemplate.battleground?(character.internal.world.map_id)
+        )
+
       %{state | character: %{character | internal: %{internal | death_finalized?: true}}}
     else
       state
@@ -1576,6 +1611,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         level: character.unit.level,
         alive?: Death.alive?(character),
         ghost?: Death.ghost?(character),
+        insignia: Insignia.projection(character),
         in_combat: character.internal.in_combat == true,
         rooted?: character.internal.rooted? == true,
         health_pct: Core.health_pct(character),

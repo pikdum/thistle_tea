@@ -91,6 +91,10 @@ defmodule ThistleTea.Game.Battleground.Roster do
     end
   end
 
+  def cancel_resurrection(match, guid) do
+    %Result{match: %{match | resurrection_queue: MapSet.delete(match.resurrection_queue, guid)}}
+  end
+
   def update_death_scores(match, %Defeat{} = defeat) do
     match =
       if defeat.count_death?,

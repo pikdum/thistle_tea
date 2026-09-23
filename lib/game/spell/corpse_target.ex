@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Spell.CorpseTarget do
 
   def eligible?(_kind, _metadata), do: false
 
+  defp body?(:corpse, %{bones?: true}), do: false
   defp body?(:corpse, %{owner: owner}) when is_integer(owner) and owner > 0, do: true
   defp body?(:player, %{alive?: false, ghost?: false}), do: true
   defp body?(kind, %{alive?: false, creature_type: type}) when kind in [:mob, :pet], do: type in [6, 7]

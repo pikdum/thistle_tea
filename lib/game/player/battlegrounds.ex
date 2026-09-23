@@ -4,9 +4,13 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
   """
 
   alias ThistleTea.Game.Battleground
+  alias ThistleTea.Game.Battleground.Resurrection, as: BattlegroundResurrection
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
@@ -16,6 +20,7 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Battleground.Match
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -162,10 +167,14 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
 
   def queue_resurrection(%{ready: true, character: %Character{} = character} = state, healer_guid) do
     if not Death.alive?(character) and spirit_guide?(character, healer_guid) do
+      spell = SpellLoader.load(BattlegroundResurrection.spell_id())
+      {character, events} = Aura.apply_spell(character, state.guid, character.unit.level, spell, Time.now())
+      state = PlayerServer.maybe_broadcast_update(%{state | character: EventSink.emit(character, events)})
       BattlegroundSystem.queue_resurrection(character.internal.world, state.guid)
+      state
+    else
+      state
     end
-
-    state
   end
 
   def queue_resurrection(state, _healer_guid), do: state

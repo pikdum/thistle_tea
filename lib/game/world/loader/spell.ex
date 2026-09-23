@@ -614,6 +614,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(109), do: :revive_pet
   defp effect_type(111), do: :durability_damage
   defp effect_type(115), do: :durability_damage_percent
+  defp effect_type(116), do: :remove_insignia
   defp effect_type(112), do: :summon_demon
   defp effect_type(92), do: :enchant_held_item
   defp effect_type(17), do: :weapon_damage_noschool
