@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Spell.TargetCodecTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Spell.TargetCodec
@@ -75,6 +76,18 @@ defmodule ThistleTea.Game.Spell.TargetCodecTest do
   end
 
   describe "encode/1" do
+    test "round trips enemy and allied corpses before location fields" do
+      guid = Guid.from_low_guid(:corpse, 42)
+      location = <<1.0::little-float-size(32), 2.0::little-float-size(32), 3.0::little-float-size(32)>>
+
+      for {type, flags} <- [{:enemy, 0x0240}, {:ally, 0x8040}] do
+        payload = <<flags::little-size(16)>> <> BinaryUtils.pack_guid(guid) <> location
+        target = %{Target.corpse(guid, 42, type) | destination_location: {1.0, 2.0, 3.0}}
+        assert TargetCodec.parse(payload, 1) == target
+        assert TargetCodec.encode(target) == payload
+      end
+    end
+
     test "round trips combined semantic targets" do
       target = %Target{selection: {:unit, 0xAABBCC}, destination_location: {1.0, 2.0, 3.0}}
 

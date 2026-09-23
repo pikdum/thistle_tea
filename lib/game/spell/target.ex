@@ -18,12 +18,13 @@ defmodule ThistleTea.Game.Spell.Target do
           | {:corpse, guid(), guid()}
 
   @enforce_keys [:selection]
-  defstruct [:selection, :source_location, :destination_location]
+  defstruct [:selection, :source_location, :destination_location, corpse_type: :ally]
 
   @type t :: %__MODULE__{
           selection: selection(),
           source_location: location() | nil,
-          destination_location: location() | nil
+          destination_location: location() | nil,
+          corpse_type: :ally | :enemy
         }
 
   def none, do: %__MODULE__{selection: :none}
@@ -46,9 +47,10 @@ defmodule ThistleTea.Game.Spell.Target do
     %__MODULE__{selection: {:object, guid, access}}
   end
 
-  def corpse(corpse_guid, player_guid)
-      when is_integer(corpse_guid) and corpse_guid > 0 and is_integer(player_guid) and player_guid > 0 do
-    %__MODULE__{selection: {:corpse, corpse_guid, player_guid}}
+  def corpse(corpse_guid, player_guid, type \\ :ally)
+      when is_integer(corpse_guid) and corpse_guid > 0 and is_integer(player_guid) and player_guid > 0 and
+             type in [:ally, :enemy] do
+    %__MODULE__{selection: {:corpse, corpse_guid, player_guid}, corpse_type: type}
   end
 
   def at(location) when is_tuple(location) do
