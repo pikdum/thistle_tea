@@ -1821,20 +1821,9 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     %{state | character: Core.mark_broadcast_update(character)}
   end
 
-  defp project_companion_detachment(%State{character: %Character{} = character} = state, %EntityRef{} = entity_ref) do
-    possession? = state.active_mover_guid == entity_ref.guid
-
-    if possession? do
-      Network.send_packet(%Message.SmsgClientControlUpdate{guid: entity_ref.guid, allow_movement?: false})
-    end
-
-    character =
-      if possession? do
-        %{character | player: %{character.player | farsight: 0}}
-      else
-        character
-      end
-
+  defp project_companion_detachment(%State{} = state, %EntityRef{} = entity_ref) do
+    state = CompanionVisibility.release_control(state, entity_ref.guid)
+    character = state.character
     {character, aura_events} = Aura.remove_spells(character, Enum.uniq([25_228, entity_ref.spell_id]), Time.now())
 
     character =
@@ -1843,13 +1832,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       |> EventSink.emit(aura_events)
       |> Core.mark_broadcast_update()
 
-    state = %{
-      state
-      | character: character,
-        active_mover_guid: if(possession?, do: state.guid, else: state.active_mover_guid)
-    }
-
-    state = if possession?, do: Visibility.reset_viewpoint(state), else: state
+    state = %{state | character: character}
 
     if Companion.active_guid(state.character) == entity_ref.guid,
       do: Login.refresh_companion(state),

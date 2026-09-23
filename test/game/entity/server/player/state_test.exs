@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
   alias ThistleTea.Game.Entity.Data.Companion
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player, as: PlayerComponent
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
@@ -96,6 +98,30 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
   end
 
   describe "suspend_companion/1" do
+    test "clears the possession camera and mover before retaining the character" do
+      guid = System.unique_integer([:positive, :monotonic])
+      target = System.unique_integer([:positive, :monotonic])
+      Entity.register(target)
+
+      character =
+        %Character{
+          object: %Object{guid: guid},
+          unit: %Unit{},
+          player: %PlayerComponent{farsight: target},
+          internal: %Internal{}
+        }
+        |> CompanionLogic.activate(:possession, %EntityRef{guid: target, entry: 0, spell_id: 605})
+
+      state = CompanionOwner.suspend(%State{guid: guid, character: character, active_mover_guid: target})
+      assert state.character.player.farsight == 0
+      assert state.active_mover_guid == guid
+      assert CompanionLogic.active_guid(state.character) == nil
+      assert_receive {:release_control, ^guid, 605}
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgClientControlUpdate{guid: ^target, allow_movement?: false}}}
+    end
+
     test "ignores pet updates queued before logout completed" do
       state = %State{}
 

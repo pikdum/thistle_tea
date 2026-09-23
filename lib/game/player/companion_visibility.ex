@@ -7,12 +7,14 @@ defmodule ThistleTea.Game.Player.CompanionVisibility do
   """
 
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.PacketSink
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World.Visibility
 
   def prepare_attachment(%State{} = state, %Attachment{create: %UpdateObject{} = create}) do
     PacketSink.ensure_created(state, create)
@@ -39,6 +41,18 @@ defmodule ThistleTea.Game.Player.CompanionVisibility do
     Network.send_packet(Message.SmsgPetSpells.clear())
     state
   end
+
+  def release_control(%State{active_mover_guid: guid} = state, guid)
+      when is_integer(guid) and guid > 0 and guid != state.guid do
+    Network.send_packet(%Message.SmsgClientControlUpdate{guid: guid, allow_movement?: false})
+    character = state.character
+    character = %{character | player: %{character.player | farsight: 0}} |> Core.mark_broadcast_update()
+
+    %{state | character: character, active_mover_guid: state.guid}
+    |> Visibility.reset_viewpoint()
+  end
+
+  def release_control(%State{} = state, _guid), do: state
 
   def defer_restoration(%State{} = state) do
     send(self(), :restore_companion)

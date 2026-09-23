@@ -49,6 +49,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner do
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Monitor
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.World
 
   def attach(%State{} = state, %Attachment{pid: pid, entity_ref: %EntityRef{} = entity_ref} = attachment) do
@@ -96,6 +97,8 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner do
   def process_down(%State{}, _token), do: :stale
 
   def suspend(%State{character: %Character{}} = state) do
+    state = CompanionVisibility.release_control(state, CompanionLogic.possession_guid(state.character))
+
     case CompanionLogic.relationship(state.character) do
       %Companion{kind: kind, status: {:active, %EntityRef{guid: guid}}}
       when kind in [:hunter_pet, :guardian] ->
