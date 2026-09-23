@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.AttackSchool
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
@@ -39,7 +40,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   end
 
   def emit(%Character{} = entity, %Effects.PvpFlagsChanged{enabled?: enabled}, _context) do
-    guids = [Character.controlled_guid(entity) | Map.values(entity.internal.totem_guids)]
+    guids = [Companion.creature_guid(entity) | Map.values(entity.internal.totem_guids)]
 
     guids
     |> Enum.filter(&is_integer/1)

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Player.Talents do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Casting
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Talents, as: LogicTalents
@@ -84,7 +85,7 @@ defmodule ThistleTea.Game.Player.Talents do
   end
 
   defp sync_pet_aura_links(%Character{} = previous, %Character{} = character, now) do
-    case Character.controlled_guid(character) do
+    case Companion.creature_guid(character) do
       pet_guid when is_integer(pet_guid) ->
         pet_entry = Guid.entry(pet_guid)
         previous_ids = pet_aura_ids(previous, pet_entry)

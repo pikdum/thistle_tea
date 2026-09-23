@@ -276,6 +276,11 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
     end
   end
 
+  def creature_guid(%Character{} = character) do
+    guid = active_guid(character)
+    if Guid.entity_type(guid) == :mob, do: guid
+  end
+
   def suspended(%Character{} = character) do
     case relationship(character) do
       %Companion{kind: kind, status: {:suspended, entry, spell_id}} -> {kind, entry, spell_id}

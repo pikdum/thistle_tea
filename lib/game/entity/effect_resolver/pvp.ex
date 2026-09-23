@@ -98,7 +98,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Pvp do
 
   defp contact(_player, _role, _other, _now, _opts), do: []
 
-  defp profile(guid, %Character{object: %{guid: guid}} = entity, _get_metadata) do
+  defp profile(guid, %Character{object: %{guid: guid}, internal: %{possession: nil}} = entity, _get_metadata) do
     %{
       player_guid: guid,
       pvp?: PvpLogic.active?(entity),

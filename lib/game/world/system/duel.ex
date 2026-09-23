@@ -336,15 +336,17 @@ defmodule ThistleTea.Game.World.System.Duel do
   end
 
   defp participant_pets(match) do
-    Map.new(Duel.participants(match), fn guid ->
-      controlled_guid =
-        case Metadata.query(guid, [:controlled_guid]) do
-          %{controlled_guid: controlled_guid} when is_integer(controlled_guid) -> controlled_guid
-          _ -> nil
-        end
+    Map.new(Duel.participants(match), fn guid -> {guid, creature_companion(guid)} end)
+  end
 
-      {guid, controlled_guid}
-    end)
+  defp creature_companion(guid) do
+    case Metadata.query(guid, [:controlled_guid]) do
+      %{controlled_guid: controlled_guid} ->
+        if Guid.entity_type(controlled_guid) == :mob, do: controlled_guid
+
+      _ ->
+        nil
+    end
   end
 
   defp stop_participant_pets(state, match, participant_pets) do

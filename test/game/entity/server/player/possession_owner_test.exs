@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.PossessionOwnerTest do
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.PossessionOwner
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Network.Packet
@@ -84,6 +85,22 @@ defmodule ThistleTea.Game.Entity.Server.Player.PossessionOwnerTest do
   end
 
   describe "emit/3" do
+    test "PvP flags only dispatch creature commands to creature companions", %{state: state, caster: caster} do
+      controller = %{state.character | object: %Object{guid: caster}}
+
+      controlled_player =
+        Companion.activate(controller, :possession, %EntityRef{guid: state.guid, entry: 0, spell_id: 605})
+
+      EventSink.emit(controlled_player, %Effects.PvpFlagsChanged{enabled?: true}, Context.new(self()))
+      refute_received {:"$gen_cast", {:sync_pvp, _, _}}
+
+      pet = Guid.from_low_guid(:mob, 1, state.guid)
+      Entity.register(pet)
+      controlled_creature = Companion.activate(controller, :possession, %EntityRef{guid: pet, entry: 1, spell_id: 605})
+      EventSink.emit(controlled_creature, %Effects.PvpFlagsChanged{enabled?: true}, Context.new(self()))
+      assert_receive {:"$gen_cast", {:sync_pvp, ^caster, true}}
+    end
+
     test "root and speed instructions go to the controller", %{state: state} do
       guid = state.guid
 

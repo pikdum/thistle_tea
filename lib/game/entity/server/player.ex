@@ -1926,7 +1926,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   defp notify_defensive_pet(%Character{} = character, attacker_guid) when is_integer(attacker_guid) do
     GuardianOwner.defend(character, attacker_guid)
 
-    case Entity.pid(Character.controlled_guid(character)) do
+    case Entity.pid(Companion.creature_guid(character)) do
       pid when is_pid(pid) -> send(pid, {:owner_attacked, attacker_guid})
       _ -> :ok
     end

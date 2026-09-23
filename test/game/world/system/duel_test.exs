@@ -2,9 +2,30 @@ defmodule ThistleTea.Game.World.System.DuelTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Duel.Admission
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.WorldRef
+
+  describe "disconnect/2 with controlled units" do
+    setup [:controlled_duel]
+
+    test "does not send creature cleanup to a possessed player", %{server: server, caster: caster, victim: victim} do
+      Metadata.put(caster, %{controlled_guid: victim})
+      assert :ok = DuelSystem.disconnect(caster, server)
+      assert_receive {:finished, ^victim, %{opponent_pet_guid: nil}}
+      refute_received {:stop_pet, _, _}
+    end
+
+    test "still stops a creature pet's attacks", %{server: server, caster: caster, victim: victim} do
+      pet = Guid.from_low_guid(:mob, 1, caster)
+      Metadata.put(caster, %{controlled_guid: pet})
+      assert :ok = DuelSystem.disconnect(caster, server)
+      assert_receive {:finished, ^victim, %{opponent_pet_guid: ^pet}}
+      assert_receive {:stop_pet, ^pet, ^victim}
+    end
+  end
 
   describe "challenge lifecycle" do
     setup do
@@ -108,5 +129,47 @@ defmodule ThistleTea.Game.World.System.DuelTest do
       assert %Admission{initiator_busy?: true, opponent_busy?: true} =
                DuelSystem.challenge_admission(1, 2, attrs.world, server)
     end
+  end
+
+  defp controlled_duel(_context) do
+    parent = self()
+    caster = System.unique_integer([:positive, :monotonic])
+    victim = System.unique_integer([:positive, :monotonic])
+    world = WorldRef.open(0)
+    table = :ets.new(:controlled_duel_test, [:set, :public])
+
+    server =
+      start_supervised!(
+        {DuelSystem,
+         name: nil,
+         table: table,
+         countdown_ms: 10,
+         bounds_tick_ms: 60_000,
+         online?: fn _ -> true end,
+         dueling_allowed?: fn _ -> true end,
+         position: fn _ -> {world, 0.0, 0.0, 0.0} end,
+         spawn_flag: fn _ -> {:ok, 3} end,
+         despawn_flag: fn _ -> :ok end,
+         send_packet: fn _, _ -> :ok end,
+         broadcast_winner: fn _, _ -> :ok end,
+         sync_player: fn guid, {event, payload} -> send(parent, {event, guid, payload}) end,
+         stop_pet: fn pet, target -> send(parent, {:stop_pet, pet, target}) end}
+      )
+
+    attrs = %{
+      initiator_guid: caster,
+      initiator_level: 60,
+      opponent_guid: victim,
+      entry: 21_680,
+      world: world,
+      flag_position: {0.0, 0.0, 0.0},
+      orientation: 0.0
+    }
+
+    assert {:ok, _match} = DuelSystem.challenge(attrs, server)
+    assert :ok = DuelSystem.accept(victim, server)
+    assert_receive {:started, ^caster, _}, 100
+    on_exit(fn -> Metadata.delete(caster) end)
+    %{server: server, caster: caster, victim: victim}
   end
 end

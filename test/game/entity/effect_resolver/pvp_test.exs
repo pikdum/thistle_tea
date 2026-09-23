@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.PvpTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Possession
   alias ThistleTea.Game.Entity.EffectResolver.Pvp
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -102,6 +103,18 @@ defmodule ThistleTea.Game.Entity.EffectResolver.PvpTest do
   end
 
   describe "contacts/5" do
+    test "a possessed player's combat flags the controller" do
+      possession = %Possession{caster_guid: 3, spell_id: 605, original_faction_template: 1}
+      victim = put_in(character(1).internal.possession, possession)
+      rows = %{1 => %{owner_guid: 3}, 2 => %{pvp?: true}, 3 => %{pvp?: false}}
+
+      assert [
+               %Effects.PvpContact{target_guid: 3, role: :attack},
+               %Effects.PvpContact{target_guid: 2, role: :attacked}
+             ] =
+               Pvp.contacts(victim, 1, 2, :attack, metadata: &Map.get(rows, &1), now: 0)
+    end
+
     test "resolves a pet attack to both players and applies the owner's flags" do
       pet = Guid.from_low_guid(:pet, 1, 7)
       rows = %{pet => %{owner_guid: 1}, 1 => %{pvp?: false}, 2 => %{pvp?: true}}
