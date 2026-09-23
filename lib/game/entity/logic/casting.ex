@@ -301,13 +301,13 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     end
   end
 
-  defp finish(entity, %Cast{resolution: %CastResolution{} = resolution} = casting, _now) do
+  defp finish(entity, %Cast{resolution: %CastResolution{} = resolution} = casting, now) do
     entity =
       entity
       |> queue_successful_finish_trigger(casting)
       |> queue_quest_cast_credit(casting, resolution)
       |> stop_breakable_control_attack(casting, resolution.hits)
-      |> consume_unavoidable_finisher(casting)
+      |> consume_unavoidable_finisher(casting, now)
 
     if Cast.channeled?(casting) do
       stop_channel(entity, casting, :completed)
@@ -503,9 +503,9 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     end
   end
 
-  defp consume_unavoidable_finisher(character, %Cast{spell: %Spell{} = spell}) do
+  defp consume_unavoidable_finisher(character, %Cast{spell: %Spell{} = spell}, now) do
     if Scripts.finisher?(spell) and not Spell.melee_ability?(spell) do
-      Reactive.consume_combo(character)
+      Reactive.consume_combo(character, now)
     else
       character
     end

@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   def receive(entity, payload, spell \\ nil, now) do
     entity
     |> apply_power_feedback(payload, spell)
-    |> apply_rogue_combo_feedback(payload, spell)
+    |> apply_finisher_feedback(payload, spell, now)
     |> trigger_blade_flurry(payload, spell)
     |> Paladin.trigger_seal(payload)
     |> trigger_melee_procs(payload, spell, now)
@@ -61,23 +61,11 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
 
   defp apply_power_feedback(entity, _payload, _spell), do: entity
 
-  defp apply_rogue_combo_feedback(entity, %{outcome: outcome, victim_guid: victim_guid}, %Spell{} = spell)
-       when outcome in [:normal, :crit] do
-    amount =
-      Enum.reduce(spell.effects, 0, fn
-        %Effect{type: :add_combo_points} = effect, acc -> acc + max(Effect.damage_roll(effect), 0)
-        _effect, acc -> acc
-      end)
-
-    cond do
-      Scripts.finisher?(spell) and not Aura.has_aura?(entity, :retain_combo_points) -> Reactive.consume_combo(entity)
-      Scripts.finisher?(spell) -> entity
-      amount > 0 -> Reactive.add_combo_points(entity, victim_guid, amount)
-      true -> entity
-    end
+  defp apply_finisher_feedback(entity, %{outcome: outcome}, %Spell{} = spell, now) when outcome in [:normal, :crit] do
+    if Scripts.finisher?(spell), do: Reactive.consume_combo(entity, now), else: entity
   end
 
-  defp apply_rogue_combo_feedback(entity, _payload, _spell), do: entity
+  defp apply_finisher_feedback(entity, _payload, _spell, _now), do: entity
 
   defp trigger_blade_flurry(entity, %{victim_guid: victim_guid, damage: damage} = payload, spell)
        when is_integer(damage) do

@@ -40,6 +40,20 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   end
 
   describe "emit/2" do
+    test "routes combo point awards to their caster and uses the explicit local owner" do
+      caster_guid = unique_guid()
+      award = %Effects.AddComboPoints{source_guid: caster_guid, target_guid: 99, amount: 2}
+      caster = %Character{object: %Object{guid: caster_guid}}
+      EventSink.emit(caster, award)
+      refute_received {:"$gen_cast", {:add_combo_points, _award}}
+      EventSink.emit(caster, award, Context.new(self()))
+      assert_received {:"$gen_cast", {:add_combo_points, ^award}}
+      Entity.register(caster_guid)
+      on_exit(fn -> Entity.unregister(caster_guid) end)
+      EventSink.emit(%Mob{object: %Object{guid: 99}}, award)
+      assert_received {:"$gen_cast", {:add_combo_points, ^award}}
+    end
+
     test "delivers a taxi spell through the explicit player owner context" do
       guid = unique_guid()
       character = %Character{object: %Object{guid: guid}}

@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatSkills
+  alias ThistleTea.Game.Entity.Logic.ComboPoints
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Critter
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
@@ -81,10 +82,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
            skill_events}
 
       true ->
+        context = %{context | combo_retention_spell: ComboPoints.retention_spell(spell)}
+
         effects =
           target
           |> applicable_effects(context, spell.effects)
           |> Warrior.filter_target_effects(target.object.guid, context, spell)
+          |> defer_combo_retention(context)
 
         spell = %{spell | effects: effects}
         context = %{context | target_guid: target.object.guid, spell: spell}
@@ -103,6 +107,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   def receive(target, _context, _spell, _now), do: {target, []}
+
+  defp defer_combo_retention(effects, %CastContext{combo_retention_spell: nil}), do: effects
+  defp defer_combo_retention(effects, _context), do: Enum.reject(effects, &ComboPoints.retention_effect?/1)
 
   def successful_hit?(events) when is_list(events) do
     Enum.all?(events, &(not is_struct(&1, Effects.SpellLogMiss)))

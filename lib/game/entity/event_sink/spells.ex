@@ -379,6 +379,16 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
     entity
   end
 
+  def emit(%Character{object: %{guid: guid}} = entity, %Effects.AddComboPoints{source_guid: guid} = effect, context) do
+    Context.cast(context, {:add_combo_points, effect})
+    entity
+  end
+
+  def emit(entity, %Effects.AddComboPoints{} = effect, _context) do
+    Entity.add_combo_points(effect.source_guid, effect)
+    entity
+  end
+
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.SpellDelayed{} = effect, context) do
     Context.send_packet(context, %Message.SmsgSpellDelayed{caster: guid, delay_ms: effect.delay_ms})
     entity

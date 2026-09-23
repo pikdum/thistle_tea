@@ -74,6 +74,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :caster_power,
     :caster_max_health,
     :combo_points,
+    :combo_retention_spell,
     :spell_threat,
     :spell_hit_snapshot,
     triggered_by_aura?: false,

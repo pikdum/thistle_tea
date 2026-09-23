@@ -115,15 +115,15 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
       assert entity.player.combo_points == 1
     end
 
-    test "rogue builders grant points only after landing" do
-      entity = rogue()
+    test "builder feedback does not duplicate the resolved effect award" do
+      entity = Reactive.add_combo_points(rogue(), 77, 1)
       spell = %Spell{id: 1757, effects: [%Effect{type: :add_combo_points, base_points: 0, die_sides: 1, base_dice: 1}]}
 
       landed = AttackFeedback.receive(entity, %{outcome: :normal, damage: 20, victim_guid: 77}, spell, 1_000)
       avoided = AttackFeedback.receive(entity, %{outcome: :dodge, damage: 0, victim_guid: 77}, spell, 1_000)
 
       assert landed.player.combo_points == 1
-      assert avoided.player.combo_points in [nil, 0]
+      assert avoided.player.combo_points == 1
     end
 
     test "finishers consume points on hit but retain them on avoidance" do

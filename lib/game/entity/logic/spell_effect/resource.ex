@@ -15,7 +15,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Resource do
 
   @power_fields %{0 => :power1, 1 => :power2, 2 => :power3, 3 => :power4, 4 => :power5}
 
-  def apply(state, %CastContext{}, _spell, %Effect{type: :add_combo_points}, _now), do: {state, []}
+  def apply(state, %CastContext{caster_type: :player} = context, spell, %Effect{type: :add_combo_points} = effect, _now) do
+    retention = if context.combo_retention_spell, do: {context.combo_retention_spell, context}
+
+    award = %Effects.AddComboPoints{
+      source_guid: context.caster_guid,
+      target_guid: state.object.guid,
+      amount: Amount.roll(spell, effect, context),
+      retention: retention
+    }
+
+    {state, [award]}
+  end
 
   def apply(
         %{internal: %Internal{pet: %Pet{}}, unit: %{power5: happiness}} = state,

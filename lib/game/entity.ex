@@ -136,6 +136,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:grant_power, power_type, amount})
   end
 
+  def add_combo_points(entity, award) do
+    dispatch_cast(entity, {:add_combo_points, award})
+  end
+
   def receive_heal(entity, amount) do
     dispatch_cast(entity, {:receive_heal, amount})
   end

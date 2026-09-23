@@ -102,6 +102,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.WaterWalkChanged
   ]
   @spell_effects [
+    Effects.AddComboPoints,
     Effects.TeachSpell,
     Effects.SpellFocusResolved,
     Effects.ScriptedCast,

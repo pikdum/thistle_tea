@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.CombatSkills
+  alias ThistleTea.Game.Entity.Logic.ComboPoints
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
@@ -321,6 +322,19 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def handle_cast({:grant_power, power_type, amount}, %{character: %Character{} = character} = state) do
     character = Resources.gain_power(character, power_type, amount)
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast(
+        {:add_combo_points, %Effects.AddComboPoints{} = award},
+        %{character: %Character{} = character} = state
+      ) do
+    character = ComboPoints.award(character, award, Time.now())
+    state = TickScheduler.ensure_scheduled(%{state | character: character})
+    {:noreply, state, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Combo point award failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast(

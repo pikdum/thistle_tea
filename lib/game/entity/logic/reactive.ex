@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.ComboPoints
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Wounded
 
@@ -58,19 +59,7 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
 
   def mark_dodging_target(entity, _victim_guid, _now), do: entity
 
-  def add_combo_points(%Character{player: player, internal: %Internal{} = internal} = entity, target_guid, amount)
-      when is_integer(target_guid) and target_guid > 0 and is_integer(amount) and amount > 0 do
-    current = if internal.combo_target_guid == target_guid, do: player.combo_points || 0, else: 0
-
-    %{
-      entity
-      | player: %{player | field_combo_target: target_guid, combo_points: min(current + amount, 5)},
-        internal: %{internal | combo_expires_at: nil, combo_target_guid: target_guid}
-    }
-    |> Core.mark_broadcast_update()
-  end
-
-  def add_combo_points(entity, _target_guid, _amount), do: entity
+  defdelegate add_combo_points(entity, target_guid, amount), to: ComboPoints, as: :add
 
   def tick(entity, now) when is_integer(now) do
     entity
@@ -131,20 +120,8 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
 
   def combo_active?(_entity, _target_guid, _now), do: false
 
-  def consume_combo(%Character{player: player, internal: %Internal{} = internal} = entity) do
-    if is_integer(player.combo_points) and player.combo_points > 0 do
-      %{
-        entity
-        | player: %{player | combo_points: 0},
-          internal: %{internal | combo_expires_at: nil, combo_target_guid: nil}
-      }
-      |> Core.mark_broadcast_update()
-    else
-      entity
-    end
-  end
-
-  def consume_combo(entity), do: entity
+  defdelegate consume_combo(entity), to: ComboPoints, as: :consume
+  defdelegate consume_combo(entity, now), to: ComboPoints, as: :consume
 
   def clear_combo_target(%Character{internal: %Internal{combo_target_guid: target_guid}} = entity, target_guid)
       when is_integer(target_guid) do
