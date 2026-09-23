@@ -5,10 +5,15 @@ defmodule ThistleTea.Game.World.System.Instance do
   """
   use GenServer
 
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Instance
+  alias ThistleTea.Game.Instance.Admission.Actor
   alias ThistleTea.Game.InstanceScript.Effects
   alias ThistleTea.Game.Party
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.InstanceEffectSink
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
@@ -22,6 +27,7 @@ defmodule ThistleTea.Game.World.System.Instance do
   require Logger
 
   @empty_timeout_ms 300_000
+  @history_cleanup_ms 60_000
 
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: Keyword.get(opts, :name, __MODULE__))
@@ -83,6 +89,8 @@ defmodule ThistleTea.Game.World.System.Instance do
 
   @impl GenServer
   def init(opts) do
+    Process.send_after(self(), :prune_entry_history, @history_cleanup_ms)
+
     {:ok,
      %{
        instances: %Instance{},
@@ -92,6 +100,9 @@ defmodule ThistleTea.Game.World.System.Instance do
        cleanup: Keyword.get(opts, :cleanup, &cleanup_world/1),
        owner: Keyword.get(opts, :owner, &owner/1),
        reset_owner: Keyword.get(opts, :reset_owner, &reset_owner/1),
+       admission_actor: Keyword.get(opts, :admission_actor, &admission_actor/1),
+       admission_policy: Keyword.get(opts, :admission_policy, &MapTemplateLoader.admission_policy/1),
+       clock: Keyword.get(opts, :clock, &Time.now/0),
        script_name: Keyword.get(opts, :script_name, &MapTemplateLoader.instance_script_name/1),
        projection: Keyword.get(opts, :projection, InstanceData),
        projection_table: Keyword.get(opts, :projection_table, InstanceData),
@@ -104,18 +115,25 @@ defmodule ThistleTea.Game.World.System.Instance do
     owner = state.owner.(guid)
     script_name = state.script_name.(map_id)
     previous = state.instances
-    {world, emptied, instances} = Instance.enter(previous, map_id, owner, guid, script_name)
+    actor = state.admission_actor.(guid)
+    policy = state.admission_policy.(map_id)
 
-    if is_nil(Instance.copy(previous, world)) do
-      state.projection.publish(state.projection_table, Instance.copy(instances, world))
+    case Instance.admit(previous, map_id, owner, actor, policy, state.clock.(), script_name) do
+      {:ok, world, emptied, instances} ->
+        if is_nil(Instance.copy(previous, world)) do
+          state.projection.publish(state.projection_table, Instance.copy(instances, world))
+        end
+
+        state =
+          %{state | instances: instances}
+          |> cancel_cleanup(world)
+          |> schedule_cleanup(emptied)
+
+        {:reply, {:ok, world}, state}
+
+      {:error, _reason} = error ->
+        {:reply, error, state}
     end
-
-    state =
-      %{state | instances: instances}
-      |> cancel_cleanup(world)
-      |> schedule_cleanup(emptied)
-
-    {:reply, {:ok, world}, state}
   rescue
     error ->
       Logger.warning("Instance admission failed: #{Exception.message(error)}")
@@ -202,7 +220,10 @@ defmodule ThistleTea.Game.World.System.Instance do
   end
 
   def handle_call({:switch, guid, world}, _from, state) do
-    case Instance.join_copy(state.instances, guid, world) do
+    actor = state.admission_actor.(guid)
+    policy = state.admission_policy.(world.map_id)
+
+    case Instance.admit_copy(state.instances, actor, world, policy, state.clock.()) do
       {:ok, emptied, instances} ->
         state =
           %{state | instances: instances}
@@ -214,6 +235,10 @@ defmodule ThistleTea.Game.World.System.Instance do
       {:error, _reason} = error ->
         {:reply, error, state}
     end
+  rescue
+    error ->
+      Logger.warning("Instance switch failed: #{Exception.message(error)}")
+      {:reply, {:error, :instance_unavailable}, state}
   end
 
   @impl GenServer
@@ -252,6 +277,12 @@ defmodule ThistleTea.Game.World.System.Instance do
   end
 
   @impl GenServer
+  def handle_info(:prune_entry_history, state) do
+    instances = Instance.prune_entry_history(state.instances, state.clock.())
+    Process.send_after(self(), :prune_entry_history, @history_cleanup_ms)
+    {:noreply, %{state | instances: instances}}
+  end
+
   def handle_info({:cleanup, %WorldRef{} = world, token}, state) do
     case Map.get(state.cleanup_refs, world) do
       {_timer_ref, ^token} -> cleanup_if_empty(state, world)
@@ -271,6 +302,16 @@ defmodule ThistleTea.Game.World.System.Instance do
       %Party.Group{id: id} -> {:party, id}
       _solo -> {:player, guid}
     end
+  end
+
+  defp admission_actor(guid) do
+    account =
+      case CharacterStore.get(Guid.low_guid(guid)) do
+        %Character{account_id: account_id} when is_integer(account_id) -> {:account, account_id}
+        _missing -> {:player, guid}
+      end
+
+    %Actor{guid: guid, account: account, raid?: match?(%Party.Group{raid?: true}, PartySystem.group_of(guid))}
   end
 
   defp reset_owner(guid) do

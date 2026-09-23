@@ -93,6 +93,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Guilds
   alias ThistleTea.Game.Player.HomeBind
   alias ThistleTea.Game.Player.Honor
+  alias ThistleTea.Game.Player.Instances
   alias ThistleTea.Game.Player.ItemCosts
   alias ThistleTea.Game.Player.ItemDurations
   alias ThistleTea.Game.Player.Items
@@ -624,8 +625,18 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def handle_cast({:start_teleport, x, y, z, orientation, map_id}, state) when is_integer(map_id) do
-    {:ok, world} = InstanceSystem.destination(map_id, state.guid)
-    handle_cast({:start_teleport, x, y, z, orientation, world}, state)
+    case InstanceSystem.destination(map_id, state.guid) do
+      {:ok, world} ->
+        handle_cast({:start_teleport, x, y, z, orientation, world}, state)
+
+      {:error, reason} ->
+        Instances.reject(reason)
+        {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Teleport admission failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast(

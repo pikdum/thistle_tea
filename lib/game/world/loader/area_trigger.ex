@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
 
     Mangos.Repo.all(from(m in Mangos.MapTemplate, where: m.patch <= @supported_patch))
     |> latest_by(& &1.entry, & &1.patch)
-    |> Enum.filter(&(&1.map_type == 1))
+    |> Enum.filter(&(&1.map_type in [1, 2]))
     |> Enum.each(&:ets.insert(__MODULE__, {{:instance_map, &1.entry}, true}))
 
     :ets.insert(__MODULE__, {:loaded, true})
@@ -196,7 +196,7 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
         )
       )
 
-    match?(%Mangos.MapTemplate{map_type: 1}, row)
+    match?(%Mangos.MapTemplate{map_type: type} when type in [1, 2], row)
   end
 
   defp trigger(t) do

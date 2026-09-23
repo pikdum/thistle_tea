@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.Loader.MapTemplate do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Instance.Admission.Policy
 
   @table_options [:named_table, :public, read_concurrency: true]
   @supported_patch 10
@@ -31,6 +32,7 @@ defmodule ThistleTea.Game.World.Loader.MapTemplate do
     |> Enum.map(fn {_entry, versions} -> Enum.max_by(versions, & &1.patch) end)
     |> Enum.each(fn row ->
       :ets.insert(table, {row.entry, row.map_type, normalize_script_name(row.script_name)})
+      :ets.insert(table, {{:player_limit, row.entry}, Map.get(row, :player_limit)})
     end)
   end
 
@@ -40,6 +42,16 @@ defmodule ThistleTea.Game.World.Loader.MapTemplate do
   def battleground?(map_id), do: battleground?(__MODULE__, map_id)
   def battleground?(table, map_id), do: map_type(table, map_id) == @battleground_type
   def instance_script_name(map_id), do: instance_script_name(__MODULE__, map_id)
+
+  def admission_policy(map_id, table \\ __MODULE__) do
+    limit =
+      case :ets.lookup(table, {:player_limit, map_id}) do
+        [{_key, value}] -> value
+        _missing -> nil
+      end
+
+    %Policy{raid?: map_type(table, map_id) == 2, player_limit: limit}
+  end
 
   def instance_script_name(table, map_id) when is_integer(map_id) do
     case :ets.lookup(table, map_id) do

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Player.AreaTriggers do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.ConditionContext
+  alias ThistleTea.Game.Player.Instances
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
@@ -97,8 +98,8 @@ defmodule ThistleTea.Game.Player.AreaTriggers do
           {:start_teleport, teleport.x, teleport.y, teleport.z, teleport.orientation, world}
         )
 
-      _error ->
-        :ok
+      {:error, reason} ->
+        Instances.reject(reason)
     end
 
     state

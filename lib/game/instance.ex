@@ -5,6 +5,9 @@ defmodule ThistleTea.Game.Instance do
 
   import Bitwise
 
+  alias ThistleTea.Game.Instance.Admission
+  alias ThistleTea.Game.Instance.Admission.Actor
+  alias ThistleTea.Game.Instance.Admission.Policy
   alias ThistleTea.Game.InstanceScript
   alias ThistleTea.Game.WorldRef
 
@@ -15,7 +18,33 @@ defmodule ThistleTea.Game.Instance do
     defstruct [:world, :owner, :script_name, members: MapSet.new(), data: %{}, script_state: %{}]
   end
 
-  defstruct copies: %{}, owner_index: %{}, member_index: %{}, bindings: %{}, next_id: 1
+  defstruct copies: %{}, owner_index: %{}, member_index: %{}, bindings: %{}, entry_history: %{}, next_id: 1
+
+  def admit(%__MODULE__{} = instances, map_id, owner, %Actor{} = actor, %Policy{} = policy, now, script_name) do
+    {world, emptied, proposed} = enter(instances, map_id, owner, actor.guid, script_name)
+    previous = copy(instances, world) || %Copy{world: world}
+
+    with :ok <- Admission.check(instances.entry_history, policy, actor, previous, now) do
+      history = Admission.record(instances.entry_history, actor, world, now)
+      {:ok, world, emptied, %{proposed | entry_history: history}}
+    end
+  end
+
+  def admit_copy(%__MODULE__{} = instances, %Actor{} = actor, %WorldRef{} = world, %Policy{} = policy, now) do
+    with %Copy{} = copy <- copy(instances, world),
+         :ok <- Admission.check(instances.entry_history, policy, actor, copy, now),
+         {:ok, emptied, proposed} <- join_copy(instances, actor.guid, world) do
+      history = Admission.record(instances.entry_history, actor, world, now)
+      {:ok, emptied, %{proposed | entry_history: history}}
+    else
+      nil -> {:error, :not_found}
+      error -> error
+    end
+  end
+
+  def prune_entry_history(%__MODULE__{} = instances, now) do
+    %{instances | entry_history: Admission.prune(instances.entry_history, now)}
+  end
 
   def enter(instances, map_id, owner, guid, script_name \\ nil)
 

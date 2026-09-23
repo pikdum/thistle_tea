@@ -59,6 +59,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Player.Guilds
   alias ThistleTea.Game.Player.HomeBind
   alias ThistleTea.Game.Player.Honor
+  alias ThistleTea.Game.Player.Instances
   alias ThistleTea.Game.Player.ItemDurations
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Quests
@@ -80,9 +81,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Presence
-  alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
-  alias ThistleTea.Game.WorldRef
 
   # @update_flag_none 0x00
   @update_flag_self 0x01
@@ -112,7 +111,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> ChatStatus.reset()
       |> Logout.cancel(Time.now())
       |> Emote.reset()
-      |> restore_instance_world(character_guid)
+      |> Instances.restore(character_guid)
       |> normalize_movement_state()
       |> normalize_combat_stats()
       |> normalize_faction_template()
@@ -277,20 +276,6 @@ defmodule ThistleTea.Game.Player.Login do
   end
 
   def refresh_companion(state), do: state
-
-  defp restore_instance_world(
-         %Character{internal: %Internal{world: %WorldRef{map_id: map_id, instance_id: instance_id}} = internal} =
-           character,
-         guid
-       )
-       when is_integer(instance_id) do
-    case InstanceSystem.enter(map_id, guid) do
-      {:ok, world} -> %{character | internal: %{internal | world: world}}
-      _error -> character
-    end
-  end
-
-  defp restore_instance_world(%Character{} = character, _guid), do: character
 
   def send_init_packets(c, opts \\ []) do
     WorldStates.initialize(c)

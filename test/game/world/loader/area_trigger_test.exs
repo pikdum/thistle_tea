@@ -76,6 +76,9 @@ defmodule ThistleTea.Game.World.Loader.AreaTriggerTest do
       refute AreaTrigger.instance_map?(1)
       refute AreaTrigger.spawnable_world?(WorldRef.open(389))
       assert AreaTrigger.spawnable_world?(WorldRef.instance(389, 1))
+      assert AreaTrigger.instance_map?(309)
+      refute AreaTrigger.spawnable_world?(WorldRef.open(309))
+      assert AreaTrigger.spawnable_world?(WorldRef.instance(309, 1))
     end
   end
 end

@@ -183,7 +183,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Game-object questgivers](docs/game-object-quests-playtest.md), with per-player activation, native quest chains, conditioned gossip, and scripted player casts
 - xp, leveling, and exploration
 - [Rested experience and logout](docs/rest-logout-playtest.md), with offline inn and wilderness gains, idle rest updates, native logout countdowns, and cancellation cleanup
-- isolated dungeon instances (Ragefire Chasm)
+- [Dungeon and raid admission](docs/instance-admission-playtest.md), with isolated copies, raid-group requirements, map player caps, account-wide hourly entry limits, and safe login recovery
 - Deadmines boss doors and gunpowder cannon breach, with Smite's alarms and pirate response
 - dying + resurrecting
 - Soulstones and Reincarnation, with reagent consumption, cooldowns, and talent modifiers

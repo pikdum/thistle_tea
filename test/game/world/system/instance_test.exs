@@ -1,13 +1,73 @@
 defmodule ThistleTea.Game.World.System.InstanceTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
+  alias ThistleTea.Game.Instance.Admission.Policy
   alias ThistleTea.Game.InstanceScript.Effects.CastPlayerSpell
   alias ThistleTea.Game.InstanceScript.Effects.MonsterTalk
   alias ThistleTea.Game.InstanceScript.Effects.OperateGameObject
   alias ThistleTea.Game.InstanceScript.Effects.SummonCreature
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
+
+  describe "admission" do
+    test "serializes concurrent entrants without exceeding the copy capacity" do
+      name = unique_name()
+
+      start_instance_system(
+        name: name,
+        owner: fn _ -> {:party, 1} end,
+        admission_policy: fn _ -> %Policy{player_limit: 2} end,
+        cleanup: fn _ -> :ok end
+      )
+
+      guids = Enum.map(1..5, fn _ -> System.unique_integer([:positive]) end)
+
+      results =
+        guids
+        |> Task.async_stream(fn guid -> {guid, InstanceSystem.enter(389, guid, name)} end, max_concurrency: 5)
+        |> Enum.map(fn {:ok, result} -> result end)
+
+      accepted = for {guid, {:ok, world}} <- results, do: {guid, world}
+      rejected = for {guid, {:error, :instance_full}} <- results, do: guid
+      assert length(accepted) == 2
+      assert length(rejected) == 3
+      assert InstanceSystem.count(name) == 1
+      [{guid, world} | _] = accepted
+      assert {:ok, ^world} = InstanceSystem.enter(389, guid, name)
+      assert length(hd(InstanceSystem.info(guid, name).copies).members) == 2
+      assert Enum.all?(rejected, &(InstanceSystem.info(&1, name).current == nil))
+      assert map_size(:sys.get_state(name).instances.entry_history) == 2
+    end
+
+    test "resolves the shared account quota from CharacterStore and expires it by the supplied clock" do
+      name = unique_name()
+      {:ok, clock} = start_supervised({Agent, fn -> 0 end})
+      account = System.unique_integer([:positive])
+      guids = Enum.map(1..3, fn _ -> System.unique_integer([:positive]) + 10_000_000 end)
+      [first, second, other] = guids
+      Enum.each([first, second], &CharacterStore.put(%Character{id: &1, account_id: account}))
+      CharacterStore.put(%Character{id: other, account_id: account + 1})
+      on_exit(fn -> Enum.each(guids, &:ets.delete(CharacterStore, &1)) end)
+
+      start_instance_system(name: name, clock: fn -> Agent.get(clock, & &1) end, cleanup: fn _ -> :ok end)
+
+      for _ <- 1..5 do
+        assert {:ok, world} = InstanceSystem.enter(389, first, name)
+        InstanceSystem.leave(first, world, name)
+        assert {:ok, %{reset: [^world], failed: []}} = InstanceSystem.reset(first, name)
+      end
+
+      assert {:error, :too_many_instances} = InstanceSystem.enter(389, second, name)
+      assert {:ok, _world} = InstanceSystem.enter(389, other, name)
+      Agent.update(clock, fn _ -> 3_600_001 end)
+      send(Process.whereis(name), :prune_entry_history)
+      assert :sys.get_state(name).instances.entry_history == %{}
+      assert {:ok, _world} = InstanceSystem.enter(389, second, name)
+    end
+  end
 
   describe "instance lifecycle" do
     test "cleans up an empty copy after its timeout" do

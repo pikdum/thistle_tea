@@ -8,9 +8,9 @@ defmodule ThistleTea.Game.World.Loader.MapTemplateTest do
 
     rows = [
       %{entry: 0, patch: 10, map_type: 0, script_name: ""},
-      %{entry: 33, patch: 10, map_type: 1, script_name: "instance_shadowfang_keep"},
+      %{entry: 33, patch: 10, map_type: 1, script_name: "instance_shadowfang_keep", player_limit: 10},
       %{entry: 249, patch: 9, map_type: 1, script_name: "old_onyxia"},
-      %{entry: 249, patch: 10, map_type: 2, script_name: "instance_onyxias_lair"},
+      %{entry: 249, patch: 10, map_type: 2, script_name: "instance_onyxias_lair", player_limit: 40},
       %{entry: 30, patch: 10, map_type: 3, script_name: nil}
     ]
 
@@ -25,6 +25,10 @@ defmodule ThistleTea.Game.World.Loader.MapTemplateTest do
       assert MapTemplate.dungeon?(table, 249)
       refute MapTemplate.battleground?(table, 249)
       assert MapTemplate.battleground?(table, 30)
+      assert MapTemplate.admission_policy(249, table).raid?
+      assert MapTemplate.admission_policy(249, table).player_limit == 40
+      assert MapTemplate.admission_policy(33, table).player_limit == 10
+      refute MapTemplate.admission_policy(33, table).raid?
     end
 
     test "retains the selected script name and normalizes empty names", %{table: table} do
