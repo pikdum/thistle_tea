@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Player.Gossip do
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.GossipCondition
   alias ThistleTea.Game.Player.HomeBind
+  alias ThistleTea.Game.Player.Petitions
   alias ThistleTea.Game.Player.PetStable
   alias ThistleTea.Game.Player.PetUntraining
   alias ThistleTea.Game.Player.QuestGiver
@@ -207,6 +208,9 @@ defmodule ThistleTea.Game.Player.Gossip do
   defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{trainer: option_id}),
     do: CmsgTrainerList.send_list(state, guid)
 
+  defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{petitioner: option_id}),
+    do: Petitions.show_list(state, guid)
+
   defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{banker: option_id}),
     do: Bank.activate(state, guid)
 
@@ -339,6 +343,7 @@ defmodule ThistleTea.Game.Player.Gossip do
       spirit_healer: GossipLoader.option_spirit_healer(),
       innkeeper: GossipLoader.option_innkeeper(),
       banker: GossipLoader.option_banker(),
+      petitioner: GossipLoader.option_petitioner(),
       auctioneer: GossipLoader.option_auctioneer(),
       stable: GossipLoader.option_stable(),
       battlefield: GossipLoader.option_battlefield(),

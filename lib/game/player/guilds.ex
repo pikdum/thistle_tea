@@ -21,10 +21,12 @@ defmodule ThistleTea.Game.Player.Guilds do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.World.System.Guild, as: GuildSystem
+  alias ThistleTea.Game.World.System.Petition, as: PetitionSystem
 
   def create(%{ready: true, character: %Character{} = character} = state, name) do
     case GuildSystem.create(member(character), name) do
       {:ok, group} ->
+        PetitionSystem.revoke_signer(character.object.guid)
         send_result(:create, name, :ok)
         state |> sync_membership() |> notify(group, :joined, [character.internal.name])
 
@@ -68,6 +70,7 @@ defmodule ThistleTea.Game.Player.Guilds do
   def accept(%{ready: true, character: %Character{} = character} = state) do
     case GuildSystem.accept(member(character)) do
       {:ok, group} ->
+        PetitionSystem.revoke_signer(character.object.guid)
         Network.send_packet(%Message.SmsgGuildEvent{event: :motd, descriptions: [group.motd]})
         state |> sync_membership() |> notify(group, :joined, [character.internal.name])
 
@@ -363,6 +366,15 @@ defmodule ThistleTea.Game.Player.Guilds do
     %{character | player: %{character.player | guild_id: guild_id, guild_rank: rank}}
   end
 
+  def charter_created(state, %Group{} = group) do
+    Enum.each(group.members, fn {guid, _member} ->
+      PetitionSystem.revoke_signer(guid)
+      if guid != state.guid, do: notify_member(guid)
+    end)
+
+    state |> sync_membership() |> notify(group, :joined, [state.character.internal.name])
+  end
+
   def signed_on(%Character{} = character) do
     case GuildSystem.group_of(character.object.guid) do
       %Group{} = group ->
@@ -493,7 +505,7 @@ defmodule ThistleTea.Game.Player.Guilds do
     with %Group{} = group <- GuildSystem.group_of(guid), do: Guild.member_by_name(group, name)
   end
 
-  defp member(%Character{} = character) do
+  def member(%Character{} = character) do
     %Member{
       guid: character.object.guid,
       name: character.internal.name,

@@ -80,6 +80,8 @@ defmodule ThistleTea.Game.Guild do
     end
   end
 
+  def invited?(%__MODULE__{} = guilds, guid), do: Map.has_key?(guilds.invites, guid)
+
   def group_by_name(%__MODULE__{} = guilds, name) when is_binary(name) do
     case Map.fetch(guilds.name_index, String.downcase(name)) do
       {:ok, id} -> Map.get(guilds.groups, id)
@@ -111,34 +113,59 @@ defmodule ThistleTea.Game.Guild do
     key = String.downcase(name)
 
     cond do
-      invalid_name?(name) -> {:error, :invalid_name}
+      not valid_name?(name) -> {:error, :invalid_name}
       Map.has_key?(guilds.member_index, founder.guid) -> {:error, :already_in_guild}
       Map.has_key?(guilds.name_index, key) -> {:error, :name_exists}
       true -> create_group(guilds, founder, name, key, created_date)
     end
   end
 
-  defp create_group(guilds, founder, name, key, created_date) do
+  def create_from_petition(%__MODULE__{} = guilds, %Member{} = founder, signers, name, created_date)
+      when is_list(signers) and is_binary(name) do
+    name = String.trim(name)
+    key = String.downcase(name)
+
+    cond do
+      not valid_name?(name) -> {:error, :invalid_name}
+      Map.has_key?(guilds.member_index, founder.guid) -> {:error, :already_in_guild}
+      Map.has_key?(guilds.name_index, key) -> {:error, :name_exists}
+      not valid_petition_signers?(guilds, founder, signers) -> {:error, :need_more}
+      true -> create_group(guilds, founder, name, key, created_date, signers)
+    end
+  end
+
+  defp create_group(guilds, founder, name, key, created_date, signers \\ []) do
     founder = %{founder | rank: 0}
+    members = [founder | Enum.map(signers, &%{&1 | rank: 4})]
+    member_map = Map.new(members, &{&1.guid, &1})
 
     group = %Group{
       id: guilds.next_id,
       name: name,
       created_date: created_date,
       leader: founder.guid,
-      members: %{founder.guid => founder},
+      members: member_map,
       ranks: default_ranks()
     }
 
     updated = %{
       guilds
       | groups: Map.put(guilds.groups, group.id, group),
-        member_index: Map.put(guilds.member_index, founder.guid, group.id),
+        member_index: Enum.reduce(members, guilds.member_index, &Map.put(&2, &1.guid, group.id)),
         name_index: Map.put(guilds.name_index, key, group.id),
         next_id: group.id + 1
     }
 
     {:ok, group, updated}
+  end
+
+  defp valid_petition_signers?(guilds, founder, signers) do
+    length(signers) == 9 and
+      length(Enum.uniq_by(signers, & &1.guid)) == length(signers) and
+      Enum.all?(signers, fn signer ->
+        signer.guid != founder.guid and not Map.has_key?(guilds.member_index, signer.guid) and
+          Party.same_team?(founder.race, signer.race)
+      end)
   end
 
   def invite(%__MODULE__{} = guilds, inviter_guid, %Member{} = invitee) do
@@ -420,9 +447,9 @@ defmodule ThistleTea.Game.Guild do
 
   defp updated(guilds, group), do: {:ok, group, %{guilds | groups: Map.put(guilds.groups, group.id, group)}}
 
-  defp invalid_name?(name) do
-    String.length(name) < 2 or String.length(name) > @max_name_length or
-      String.match?(name, ~r/[[:cntrl:]]/) or String.contains?(name, "  ")
+  def valid_name?(name) when is_binary(name) do
+    String.length(name) >= 2 and String.length(name) <= @max_name_length and
+      not String.match?(name, ~r/[[:cntrl:]]/) and not String.contains?(name, "  ")
   end
 
   defp invalid_rank_name?(name) do

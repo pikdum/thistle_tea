@@ -27,8 +27,10 @@ defmodule ThistleTea.Game.GuildTest do
 
       assert {:error, :wrong_faction} = Guild.invite(guilds, 1, enemy)
       assert {:ok, _group, guilds} = Guild.invite(guilds, 1, ally)
+      assert Guild.invited?(guilds, ally.guid)
       assert {:error, :already_invited} = Guild.invite(guilds, 1, ally)
       assert {:ok, group, guilds} = Guild.accept(guilds, ally)
+      refute Guild.invited?(guilds, ally.guid)
       assert Guild.member(group, 2).rank == 4
       assert {:error, :permissions} = Guild.invite(guilds, 2, member(4, "Third", 1))
       assert {:error, :already_in_guild} = Guild.invite(guilds, 1, ally)

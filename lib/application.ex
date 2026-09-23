@@ -88,6 +88,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.System.Honor, as: HonorSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.System.Petition, as: PetitionSystem
   alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
   alias ThistleTea.Game.World.System.Trade, as: TradeSystem
   alias ThistleTea.Game.World.System.VendorStock
@@ -136,6 +137,7 @@ defmodule ThistleTea.Application do
         ThistleTea.Telemetry,
         PartySystem,
         GuildSystem,
+        PetitionSystem,
         ScriptedEventSystem,
         CreatureGroups,
         CombatLeashes,

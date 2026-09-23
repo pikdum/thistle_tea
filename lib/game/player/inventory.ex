@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Player.Inventory do
   alias ThistleTea.Game.Player.Bank
   alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.System.Petition, as: PetitionSystem
 
   def auto_store_in_bag(%State{} = state, source_position, destination_bag) do
     case Bank.authorize_positions(state, [source_position, {destination_bag, 0}]) do
@@ -93,13 +94,22 @@ defmodule ThistleTea.Game.Player.Inventory do
     case Bank.authorize_positions(state, [position]) do
       {:ok, state} ->
         case Inventory.destroy(state.character.player, position, &ItemStore.get/1) do
-          {:ok, result, item} -> InventoryUpdate.apply(state, {:ok, %{result | destroyed: [item]}})
-          error -> InventoryUpdate.apply(state, error)
+          {:ok, result, item} ->
+            finish_destroy(state, result, item)
+
+          error ->
+            InventoryUpdate.apply(state, error)
         end
 
       {:error, state} ->
         reject_remote_bank(state)
     end
+  end
+
+  defp finish_destroy(state, result, item) do
+    state = InventoryUpdate.apply(state, {:ok, %{result | destroyed: [item]}})
+    if item.object.entry == 5863, do: PetitionSystem.delete(item.object.guid)
+    state
   end
 
   defp commit_split(state, source_position, destination_position, new_item) do
