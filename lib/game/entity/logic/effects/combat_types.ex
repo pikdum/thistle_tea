@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
     {:CombatLeashEvent, [:ref, :event], []},
     {:CreatureGroupEvent, [:event], []},
     {:CreatureGroupCommand, [:command], []},
+    {:EnterEvade, [:target_guid], []},
     {:PlayerDefeated, [:source_guid, :count_death?], []},
     {:BattlegroundDeath, [:world, :defeat], []},
     {:HonorDamage, [:source_guid, :damage, :now, :lethal?, :honorless?], []},

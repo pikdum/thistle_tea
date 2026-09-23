@@ -331,6 +331,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       {:noreply, state}
   end
 
+  def handle_cast(:enter_evade, %Mob{} = state) do
+    state = state |> enter_evade() |> EventSink.emit_pending()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("scripted evade crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   @impl GenServer
   def handle_cast({:move_to, x, y, z}, state) do
     handle_cast({:move_to, x, y, z, []}, state)
@@ -1445,6 +1454,19 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     if Core.dead?(state), do: deactivate_ai(state), else: schedule_ai_tick(state, 0)
   end
 
+  defp enter_evade(%Mob{} = state) do
+    if Core.dead?(state) do
+      state
+    else
+      now = Time.now()
+
+      state
+      |> MobBT.reset_after_combat(AIEnvironment.context(state, now))
+      |> NavigationResolver.resolve(now)
+      |> wake_ai_tick()
+    end
+  end
+
   defp spellbook_spell(%Mob{internal: %Internal{spellbook: spellbook}}, spell_id)
        when is_map(spellbook) and is_integer(spell_id) do
     Map.get(spellbook, spell_id)
@@ -1494,7 +1516,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
       resumed ->
         resumed
-        |> Message.SmsgMonsterMove.build()
+        |> Message.SmsgMonsterMove.build(resumed.internal.movement_options || [])
         |> Network.send_packet(pid)
     end
   end
@@ -1593,12 +1615,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp apply_creature_group_command(%Mob{internal: %Internal{in_combat: true}} = state, :evade) do
-    now = Time.now()
-
-    state
-    |> MobBT.reset_after_combat(AIEnvironment.context(state, now))
-    |> NavigationResolver.resolve(now)
-    |> wake_ai_tick()
+    enter_evade(state)
   end
 
   defp apply_creature_group_command(%Mob{} = state, :respawn), do: Respawn.force_group_member(state)

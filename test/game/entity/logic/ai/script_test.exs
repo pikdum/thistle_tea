@@ -92,6 +92,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   end
 
   describe "run/5" do
+    test "enter_evade selects a living creature source or falls back to the creature target", %{mob: mob} do
+      step = %ScriptStep{command: :enter_evade}
+      {requested, _} = Script.run(mob, Blackboard.new(), [step], 2, 0)
+      assert [%Effects.EnterEvade{target_guid: guid}] = requested.internal.events
+      assert guid == mob.object.guid
+      dead = %{mob | unit: %{mob.unit | health: 0}}
+      {unchanged, _} = Script.run(dead, Blackboard.new(), [step], 2, 0)
+      assert unchanged == dead
+      character = %Character{object: %Object{guid: 2}, internal: %Internal{}}
+      {requested, _} = Script.run(character, Blackboard.new(), [step], guid, 0)
+      assert [%Effects.EnterEvade{target_guid: ^guid}] = requested.internal.events
+      {unchanged, _} = Script.run(character, Blackboard.new(), [step], 3, 0)
+      assert unchanged == character
+    end
+
     test "normal player casts request the owner spellcasting path" do
       character = %Character{object: %Object{guid: 2}, unit: %Unit{level: 50}, internal: %Internal{}}
       step = %ScriptStep{command: :cast_spell, datalong: 15_065, target_self?: true}

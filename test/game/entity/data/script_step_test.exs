@@ -95,6 +95,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.build(row(5)).command == :interrupt_casts
       assert ScriptStep.build(row(31)).command == :terminate_script
       assert ScriptStep.build(row(32)).command == :terminate_condition
+      assert ScriptStep.build(row(33)).command == :enter_evade
       assert ScriptStep.build(row(22)).command == :set_faction
       assert ScriptStep.build(row(29)).command == :modify_threat
       assert ScriptStep.build(row(34)).command == :set_home_position

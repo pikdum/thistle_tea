@@ -1058,6 +1058,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {set_stand_state(state, step.datalong), blackboard}
   end
 
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :enter_evade}, _target, _now) do
+    state =
+      if Core.dead?(state), do: state, else: Effects.enqueue(state, %Effects.EnterEvade{target_guid: state.object.guid})
+
+    {state, blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :enter_evade}, target, _now) do
+    state =
+      if is_integer(target) and target > 0 and Guid.entity_type(target) in [:mob, :pet],
+        do: Effects.enqueue(state, %Effects.EnterEvade{target_guid: target}),
+        else: state
+
+    {state, blackboard}
+  end
+
   defp execute(%{unit: %Unit{} = unit} = state, blackboard, %ScriptStep{command: :set_sheath} = step, _target, _now) do
     state = %{state | unit: %{unit | sheath_state: step.datalong}} |> Core.mark_broadcast_update()
     {state, blackboard}

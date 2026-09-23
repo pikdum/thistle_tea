@@ -19,6 +19,16 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
 
   @victimstate_normal 1
 
+  def emit(%Mob{object: %{guid: guid}} = entity, %Effects.EnterEvade{target_guid: guid}, context) do
+    Context.cast(context, :enter_evade)
+    entity
+  end
+
+  def emit(entity, %Effects.EnterEvade{target_guid: guid}, _context) do
+    Entity.enter_evade(guid)
+    entity
+  end
+
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.PvpContact{target_guid: guid} = effect, _context) do
     Pvp.contact(entity, effect.role, effect.other, effect.now, effect.combat?)
   end

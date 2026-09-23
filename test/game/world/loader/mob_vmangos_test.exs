@@ -20,6 +20,8 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
       assert [[%ScriptStep{command: :stand_state, datalong: 7}]] = arrival.actions
       retreat = events |> Enum.find(&(&1.event_type == :hp)) |> Map.fetch!(:actions) |> List.flatten()
       assert %ScriptStep{datalong3: 68, datalong4: 3, dataint: 1} = Enum.find(retreat, &(&1.command == :move_to))
+      cleanup = Enum.find(events, &(&1.event_type == :timer_in_combat))
+      assert [[%ScriptStep{command: :enter_evade}]] = cleanup.actions
     end
 
     test "loads Defias Pillager spell list and derived stats" do

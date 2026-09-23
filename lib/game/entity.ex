@@ -224,6 +224,8 @@ defmodule ThistleTea.Game.Entity do
 
   def summon_event(entity, %SummonEvent{} = event), do: dispatch_cast(entity, event)
 
+  def enter_evade(entity), do: dispatch_cast(entity, :enter_evade)
+
   def loot_roll_vote(entity, voter_guid, slot, vote) do
     dispatch_cast(entity, {:loot_roll_vote, voter_guid, slot, vote})
   end
