@@ -31,7 +31,7 @@ defmodule ThistleTea.Game.World.Loader.SpellEffectOverride do
 
   defp load_spell_mods do
     SpellMod
-    |> where([s], not is_nil(s.aura_interrupt_flags))
+    |> where([s], s.aura_interrupt_flags >= 0)
     |> select([s], {s.id, s.aura_interrupt_flags})
     |> Mangos.Repo.all()
     |> Enum.each(fn {spell_id, flags} -> :ets.insert(__MODULE__, {{:aura_interrupt_flags, spell_id}, flags}) end)

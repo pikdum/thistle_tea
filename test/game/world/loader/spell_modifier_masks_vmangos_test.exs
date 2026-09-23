@@ -12,6 +12,18 @@ defmodule ThistleTea.Game.World.Loader.SpellModifierMasksVmangosTest do
       assert SpellEffectOverride.aura_interrupt_flags(999_999, 16) == 16
     end
 
+    test "keeps original aura interrupt flags for sentinel overrides" do
+      SpellEffectOverride.load_all()
+
+      assert SpellEffectOverride.aura_interrupt_flags(543, 16) == 16
+      assert :ets.lookup(SpellEffectOverride, {:aura_interrupt_flags, 543}) == []
+    end
+
+    test "retains explicit zero aura interrupt flags" do
+      SpellEffectOverride.load_all()
+      assert SpellEffectOverride.aura_interrupt_flags(24_322, 16) == 0
+    end
+
     test "loads vanilla Vile Poisons masks from the latest supported build" do
       SpellEffectOverride.load_all()
 
