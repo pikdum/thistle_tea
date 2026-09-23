@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -241,6 +243,70 @@ find_path_native(ErlNifEnv *, MapResource map, double start_x, double start_y,
 FINE_NIF(find_path_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
 
 std::optional<Point3>
+walk_hit_position_native(ErlNifEnv *, MapResource map, double start_x,
+                         double start_y, double start_z, double stop_x,
+                         double stop_y, double stop_z) {
+  auto lock = map->acquire_shared();
+  try {
+    auto &query = query_for(*map->get());
+    dtQueryFilter filter;
+    filter.setExcludeFlags(PolyFlags::Steep);
+    constexpr float extents[] = {5.0f, 20.0f, 5.0f};
+    float start[3], end[3], closest[3];
+    math::Convert::VertexToRecast({f(start_x), f(start_y), f(start_z)}, start);
+    math::Convert::VertexToRecast({f(stop_x), f(stop_y), f(stop_z)}, end);
+
+    dtPolyRef start_ref = 0;
+    if (dtStatusFailed(query.findNearestPoly(start, extents, &filter,
+                                             &start_ref, closest)) ||
+        !start_ref || closest[1] > start[1] + 3.0f) {
+      return std::nullopt;
+    }
+
+    constexpr int max_polygons = 256;
+    dtPolyRef visited[max_polygons];
+    int visited_count = 0;
+    float fraction = 0.0f;
+    float normal[3];
+    auto status = query.raycast(start_ref, closest, end, &filter, &fraction,
+                                normal, visited, &visited_count, max_polygons);
+
+    if (dtStatusFailed(status) || (status & DT_BUFFER_TOO_SMALL) ||
+        visited_count == 0 || fraction <= 0.0f) {
+      return std::nullopt;
+    }
+
+    fraction = std::min(fraction, 1.0f);
+    for (int i = 0; i < 3; ++i) {
+      end[i] = closest[i] + (end[i] - closest[i]) * fraction;
+    }
+
+    if (dtStatusFailed(query.closestPointOnPoly(visited[visited_count - 1],
+                                               end, end, nullptr))) {
+      return std::nullopt;
+    }
+
+    math::Vertex point;
+    math::Convert::VertexToWow(end, point);
+    std::vector<float> heights;
+    if (map->get()->FindHeights(point.X, point.Y, heights)) {
+      auto nearest = std::min_element(
+          heights.begin(), heights.end(), [&point](float a, float b) {
+            return std::abs(a - point.Z) < std::abs(b - point.Z);
+          });
+      if (nearest != heights.end() && std::abs(*nearest - point.Z) < 1.5f) {
+        point.Z = *nearest;
+      }
+    }
+
+    return Point3(point.X, point.Y, point.Z);
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+FINE_NIF(walk_hit_position_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
+
+std::optional<Point3>
 find_point_between_points_native(ErlNifEnv *, MapResource map, double start_x,
                                  double start_y, double start_z, double stop_x,
                                  double stop_y, double stop_z,
@@ -302,12 +368,13 @@ FINE_NIF(query_liquid_surface_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
 std::optional<bool> line_of_sight_native(ErlNifEnv *, MapResource map,
                                          double start_x, double start_y,
                                          double start_z, double stop_x,
-                                         double stop_y, double stop_z) {
+                                         double stop_y, double stop_z,
+                                         bool doodads) {
   auto lock = map->acquire_shared();
   uint8_t los = 0;
   auto result =
       pathfind_line_of_sight(map->get(), f(start_x), f(start_y), f(start_z),
-                             f(stop_x), f(stop_y), f(stop_z), &los, 0);
+                             f(stop_x), f(stop_y), f(stop_z), &los, doodads ? 1 : 0);
 
   if (!ok(result)) {
     return std::nullopt;

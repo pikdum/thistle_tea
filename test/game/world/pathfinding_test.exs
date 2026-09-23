@@ -9,6 +9,39 @@ defmodule ThistleTea.Game.World.PathfindingTest do
 
   @human_start {-8949.95, -132.49, 83.53}
 
+  describe "walk_hit_position/3" do
+    test "stops at the abbey instead of routing around it" do
+      origin = {-8930.0, -150.0, 82.0}
+      destination = {-8910.0, -150.0, 82.0}
+      assert {x, y, _z} = position = Pathfinding.walk_hit_position(0, origin, destination)
+      assert_in_delta y, -150.0, 0.05
+      assert x > elem(origin, 0)
+      assert x < elem(destination, 0) - 1.0
+      assert Pathfinding.line_of_sight?(0, origin, position)
+    end
+
+    test "retains the forward line where a detour would reverse direction" do
+      origin = {-8930.0, -150.0, 82.0}
+      angle = 13 * :math.pi() / 8
+      destination = {-8930.0 + 20 * :math.cos(angle), -150.0 + 20 * :math.sin(angle), 82.0}
+      assert {x, y, _z} = Pathfinding.walk_hit_position(0, origin, destination)
+      assert (x + 8930.0) * :math.cos(angle) + (y + 150.0) * :math.sin(angle) > 0
+      assert abs((x + 8930.0) * :math.sin(angle) - (y + 150.0) * :math.cos(angle)) < 0.05
+    end
+
+    test "covers the full distance on open ground" do
+      assert {x, y, z} = Pathfinding.walk_hit_position(0, @human_start, {-8969.95, -132.49, 83.53})
+      assert_in_delta x, -8969.95, 0.01
+      assert_in_delta y, -132.49, 0.01
+      assert abs(z - 83.53) < 2.0
+    end
+
+    test "rejects missing mesh and positions far above a floor" do
+      assert Pathfinding.walk_hit_position(999, @human_start, {-8969.95, -132.49, 83.53}) == nil
+      assert Pathfinding.walk_hit_position(0, {-8949.95, -132.49, 133.53}, {-8969.95, -132.49, 133.53}) == nil
+    end
+  end
+
   describe "first_collision_position/3" do
     test "clips a forward destination at the abbey wall" do
       destination = {-8914.0, -164.0, 82.0}
@@ -23,6 +56,21 @@ defmodule ThistleTea.Game.World.PathfindingTest do
       assert {x, y} == {-8955.0, -140.0}
       assert abs(z - 84.0) < 2.0
       assert Pathfinding.first_collision_position(999, {0.0, 0.0, 0.0}, {5.0, 0.0, 0.0}) == {5.0, 0.0, 0.0}
+    end
+  end
+
+  describe "collision_position/3" do
+    test "clips the collision ray without snapping its height to the ground" do
+      origin = {-8930.0, -150.0, 84.0}
+      assert {x, y, z} = Pathfinding.collision_position(0, origin, {-8910.0, -150.0, 84.0})
+      assert x > -8930.0 and x < -8911.0
+      assert y == -150.0
+      assert z == 84.0
+    end
+
+    test "retains an unobstructed airborne destination" do
+      destination = {-8969.95, -132.49, 100.0}
+      assert Pathfinding.collision_position(0, {-8949.95, -132.49, 100.0}, destination) == destination
     end
   end
 

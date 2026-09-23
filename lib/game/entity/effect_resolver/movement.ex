@@ -3,13 +3,15 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Movement do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.HomeBind
   alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.SpellMovement
 
   @charge_speed 25.0
 
@@ -36,7 +38,9 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Movement do
 
   def resolve(_entity, %Effects.Charge{}), do: []
 
-  def resolve(%Character{internal: %Internal{world: world}} = entity, %Effects.Leap{position: {x, y, z, _o}}) do
+  def resolve(%{unit: %Unit{}, internal: %Internal{world: world, taxi_flight: nil}} = entity, %Effects.Leap{
+        position: {x, y, z, _o}
+      }) do
     case clamp_leap_destination(entity, world.map_id, {x, y, z}) do
       {nx, ny, nz} -> [Effects.teleport_to_world(world, {nx, ny, nz}, preserve_combat?: true)]
       nil -> []
@@ -114,27 +118,15 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Movement do
 
   defp charge_facing(_from, _to), do: 0.0
 
-  defp clamp_leap_destination(%{movement_block: %{position: {cx, cy, cz, _o}}}, map, {x, y, z}) do
-    z = snap_to_terrain_height(map, {x, y}, z, cz)
-    requested = :math.sqrt(:math.pow(x - cx, 2) + :math.pow(y - cy, 2))
-
-    with path when is_list(path) and path != [] <- Pathfinding.find_path(map, {cx, cy, cz}, {x, y, z}),
-         total when total > 0 <- Math.movement_duration([{cx, cy, cz} | path], 1.0) do
-      walked = min(requested, total)
-      Movement.position_at({cx, cy, cz}, path, round(total * 1_000), round(walked * 1_000))
-    else
-      _missing -> nil
-    end
+  defp clamp_leap_destination(
+         %{movement_block: %MovementBlock{position: {cx, cy, cz, _o}} = movement},
+         map,
+         destination
+       ) do
+    SpellMovement.leap_position(map, {cx, cy, cz}, destination, MovementBlock.falling_far?(movement))
   rescue
     _error -> nil
   end
 
   defp clamp_leap_destination(_entity, _map, _position), do: nil
-
-  defp snap_to_terrain_height(map, {x, y}, fallback_z, reference_z) do
-    case Pathfinding.find_heights(map, {x, y}) do
-      [] -> fallback_z
-      heights -> Enum.min_by(heights, &abs(&1 - reference_z))
-    end
-  end
 end

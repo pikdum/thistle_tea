@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.Pathfinding do
   Navigation-mesh queries over the namigator NIF: pathfinding, random points,
   terrain and liquid heights, and zone/area lookup.
   """
+  alias ThistleTea.Game.Math
   alias ThistleTea.Native.Namigator
 
   @area_floor_tolerance 0.1
@@ -54,6 +55,12 @@ defmodule ThistleTea.Game.World.Pathfinding do
       heights when is_list(heights) -> heights
       _ -> []
     end
+  end
+
+  def walk_hit_position(map_id, {sx, sy, sz}, {dx, dy, dz}) do
+    load_adt_at(map_id, {sx, sy})
+    load_adt_at(map_id, {dx, dy})
+    Namigator.walk_hit_position(map_id, sx, sy, sz, dx, dy, dz)
   end
 
   def snap_to_ground(map_id, {x, y, z}) do
@@ -118,6 +125,32 @@ defmodule ThistleTea.Game.World.Pathfinding do
       clear_segment(map_id, origin, destination, 0.0, 1.0, 10)
     end
   end
+
+  def collision_position(map_id, {sx, sy, _sz} = origin, {dx, dy, _dz} = destination) do
+    load_adt_at(map_id, {sx, sy})
+    load_adt_at(map_id, {dx, dy})
+
+    if collision_clear?(map_id, origin, destination) do
+      destination
+    else
+      fraction = collision_fraction(map_id, origin, destination, 0.0, 1.0, 14)
+      distance = Math.distance(origin, destination)
+      interpolate(origin, destination, max(0.0, fraction - 0.5 / max(distance, 0.001)))
+    end
+  end
+
+  defp collision_fraction(_map_id, _origin, _destination, clear, _blocked, 0), do: clear
+
+  defp collision_fraction(map_id, origin, destination, clear, blocked, steps) do
+    fraction = (clear + blocked) / 2
+
+    if collision_clear?(map_id, origin, interpolate(origin, destination, fraction)),
+      do: collision_fraction(map_id, origin, destination, fraction, blocked, steps - 1),
+      else: collision_fraction(map_id, origin, destination, clear, fraction, steps - 1)
+  end
+
+  defp collision_clear?(map_id, {sx, sy, sz}, {dx, dy, dz}),
+    do: Namigator.line_of_sight(map_id, sx, sy, sz, dx, dy, dz, true) != false
 
   defp clear_segment(map_id, origin, destination, clear, _blocked, 0),
     do: nearest_ground(map_id, interpolate(origin, destination, clear))

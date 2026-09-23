@@ -40,6 +40,7 @@ defmodule ThistleTea.Native.NamigatorConcurrencyTest do
       {map, {x, y, _}, _} = query = hd(@queries)
       {adt_x, adt_y} = Namigator.load_adt_at(map, x, y)
       assert [_ | _] = expected = path(query, true)
+      assert {_, _, _} = expected_hit = walk_hit(query)
 
       on_exit(fn -> Namigator.load_adt_at(map, x, y) end)
 
@@ -49,6 +50,8 @@ defmodule ThistleTea.Native.NamigatorConcurrencyTest do
             for _ <- 1..200 do
               result = path(query, true)
               assert is_nil(result) or result == expected
+              hit = walk_hit(query)
+              assert is_nil(hit) or hit == expected_hit
             end
           end)
         end
@@ -56,6 +59,7 @@ defmodule ThistleTea.Native.NamigatorConcurrencyTest do
       for _ <- 1..4 do
         assert Namigator.unload_adt(map, trunc(adt_x), trunc(adt_y))
         assert is_nil(path(query, true))
+        assert is_nil(walk_hit(query))
         assert {^adt_x, ^adt_y} = Namigator.load_adt_at(map, x, y)
       end
 
@@ -66,6 +70,10 @@ defmodule ThistleTea.Native.NamigatorConcurrencyTest do
 
   defp path({map, {sx, sy, sz}, {gx, gy, gz}}, steep) do
     Namigator.find_path(map, sx, sy, sz, gx, gy, gz, steep)
+  end
+
+  defp walk_hit({map, {sx, sy, sz}, {gx, gy, gz}}) do
+    Namigator.walk_hit_position(map, sx, sy, sz, gx, gy, gz)
   end
 
   defp observation({map, {sx, sy, sz}, {gx, gy, gz}} = query) do
@@ -79,6 +87,7 @@ defmodule ThistleTea.Native.NamigatorConcurrencyTest do
       Namigator.get_zone_and_area(map, sx, sy, sz),
       Namigator.query_liquid_surface(map, sx, sy, sz),
       Namigator.line_of_sight(map, sx, sy, sz, gx, gy, gz),
+      walk_hit(query),
       Namigator.find_point_between_points(map, sx, sy, sz, gx, gy, gz, 1.0)
     }
   end
