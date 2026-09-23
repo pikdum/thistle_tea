@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.System.Instance do
   """
   use GenServer
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Instance
@@ -36,6 +37,14 @@ defmodule ThistleTea.Game.World.System.Instance do
   def enter(map_id, guid, server \\ __MODULE__) when is_integer(map_id) and is_integer(guid) do
     GenServer.call(server, {:enter, map_id, guid})
   end
+
+  def resume(%WorldRef{} = world, guid, server \\ __MODULE__), do: GenServer.call(server, {:resume, world, guid})
+
+  def valid_member?(%WorldRef{} = world, guid, server \\ __MODULE__),
+    do: GenServer.call(server, {:valid_member, world, guid})
+
+  def group_changed(previous, current, server \\ __MODULE__),
+    do: GenServer.call(server, {:group_changed, previous, current})
 
   def leave(guid, world, server \\ __MODULE__)
 
@@ -173,11 +182,50 @@ defmodule ThistleTea.Game.World.System.Instance do
   end
 
   def handle_call({:world_for, map_id, guid}, _from, state) do
-    world =
-      Instance.world_for_guid(state.instances, map_id, guid) ||
-        Instance.world_for(state.instances, map_id, state.owner.(guid))
-
+    world = Instance.world_for(state.instances, map_id, state.owner.(guid))
     {:reply, world, state}
+  end
+
+  def handle_call({:group_changed, previous, current}, _from, state) do
+    instances = Instance.group_changed(state.instances, previous, current)
+    Enum.each(instances.member_index, fn {guid, world} -> Entity.instance_membership_changed(guid, world) end)
+    {:reply, :ok, %{state | instances: instances}}
+  rescue
+    error ->
+      Logger.error("Instance group transition failed: #{Exception.message(error)}")
+      {:reply, {:error, :instance_unavailable}, state}
+  end
+
+  def handle_call({:valid_member, world, guid}, _from, state) do
+    valid? =
+      Instance.valid_member?(
+        state.instances,
+        world,
+        state.owner.(guid),
+        state.admission_actor.(guid),
+        state.admission_policy.(world.map_id)
+      )
+
+    {:reply, valid?, state}
+  rescue
+    error ->
+      Logger.warning("Instance membership validation failed: #{Exception.message(error)}")
+      {:reply, false, state}
+  end
+
+  def handle_call({:resume, world, guid}, _from, state) do
+    if Instance.owned_by?(state.instances, world, state.owner.(guid)) do
+      case admit_existing(state, guid, world) do
+        {:ok, state} -> {:reply, {:ok, world}, state}
+        {:error, reason} -> {:reply, {:error, reason}, state}
+      end
+    else
+      {:reply, {:error, :instance_unavailable}, state}
+    end
+  rescue
+    error ->
+      Logger.warning("Instance restoration failed: #{Exception.message(error)}")
+      {:reply, {:error, :instance_unavailable}, state}
   end
 
   def handle_call(:count, _from, state) do
@@ -220,16 +268,8 @@ defmodule ThistleTea.Game.World.System.Instance do
   end
 
   def handle_call({:switch, guid, world}, _from, state) do
-    actor = state.admission_actor.(guid)
-    policy = state.admission_policy.(world.map_id)
-
-    case Instance.admit_copy(state.instances, actor, world, policy, state.clock.()) do
-      {:ok, emptied, instances} ->
-        state =
-          %{state | instances: instances}
-          |> cancel_cleanup(world)
-          |> schedule_cleanup(emptied)
-
+    case admit_existing(state, guid, world) do
+      {:ok, state} ->
         {:reply, :ok, state}
 
       {:error, _reason} = error ->
@@ -239,6 +279,20 @@ defmodule ThistleTea.Game.World.System.Instance do
     error ->
       Logger.warning("Instance switch failed: #{Exception.message(error)}")
       {:reply, {:error, :instance_unavailable}, state}
+  end
+
+  defp admit_existing(state, guid, world) do
+    actor = state.admission_actor.(guid)
+    policy = state.admission_policy.(world.map_id)
+
+    case Instance.admit_copy(state.instances, actor, world, policy, state.clock.()) do
+      {:ok, emptied, instances} ->
+        state = %{state | instances: instances} |> cancel_cleanup(world) |> schedule_cleanup(emptied)
+        {:ok, state}
+
+      {:error, _reason} = error ->
+        error
+    end
   end
 
   @impl GenServer

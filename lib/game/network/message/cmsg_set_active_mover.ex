@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
+  alias ThistleTea.Game.Player.Instances
   alias ThistleTea.Game.Player.ItemLoot
   alias ThistleTea.Game.Player.Taxi
   alias ThistleTea.Game.World.Visibility
@@ -39,6 +40,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
     state = Visibility.enter_player(%{state | ready: true})
 
     state
+    |> Instances.refresh()
     |> Taxi.resume()
     |> CompanionVisibility.defer_restoration()
     |> PlayerExploration.check_current()

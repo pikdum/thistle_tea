@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.Entity do
   end
 
   def pvp_contact(entity, effect), do: dispatch_cast(entity, {:pvp_contact, effect})
+  def instance_membership_changed(entity, world), do: dispatch_cast(entity, {:instance_membership_changed, world})
   def sync_pvp(entity, owner, enabled), do: dispatch_cast(entity, {:sync_pvp, owner, enabled})
 
   def sync_pet_spell_modifiers(entity, owner, holders) do

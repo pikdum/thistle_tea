@@ -31,13 +31,13 @@ defmodule ThistleTea.Game.InstanceTest do
       assert Instance.empty?(instances, first)
     end
 
-    test "keeps a player's copy binding when party membership changes" do
+    test "does not reuse a former party's copy for solo entry" do
       {world, nil, instances} = Instance.enter(%Instance{}, 389, {:party, 7}, 100)
       {instances, ^world} = Instance.leave(instances, 100, world)
       {reentered, nil, instances} = Instance.enter(instances, 389, {:player, 100}, 100)
 
-      assert reentered == world
-      assert Instance.world_for_guid(instances, 389, 100) == world
+      refute reentered == world
+      assert Instance.world_for_guid(instances, 389, 100) == reentered
     end
   end
 

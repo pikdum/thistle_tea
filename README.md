@@ -184,6 +184,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - xp, leveling, and exploration
 - [Rested experience and logout](docs/rest-logout-playtest.md), with offline inn and wilderness gains, idle rest updates, native logout countdowns, and cancellation cleanup
 - [Dungeon and raid admission](docs/instance-admission-playtest.md), with isolated copies, raid-group requirements, map player caps, account-wide hourly entry limits, and safe login recovery
+- [Instance group membership](docs/instance-membership-playtest.md), with group copy adoption, removal countdowns, reinvite cancellation, home transfers, and safe regrouping
 - Deadmines boss doors and gunpowder cannon breach, with Smite's alarms and pirate response
 - dying + resurrecting
 - Soulstones and Reincarnation, with reagent consumption, cooldowns, and talent modifiers

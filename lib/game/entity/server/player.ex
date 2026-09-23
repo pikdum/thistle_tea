@@ -562,6 +562,19 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, state}
   end
 
+  def handle_cast(
+        {:instance_membership_changed, world},
+        %State{character: %Character{internal: %{world: world}}} = state
+      ) do
+    {:noreply, Instances.refresh(state)}
+  rescue
+    error ->
+      Logger.error("Instance membership refresh failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:instance_membership_changed, _world}, state), do: {:noreply, state}
+
   @impl GenServer
   def handle_cast({:destroy_object, guid}, state) do
     Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
@@ -824,6 +837,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_info(:restore_companion, state) do
     {:noreply, Login.restore_companion(state)}
+  end
+
+  def handle_info({:instance_eviction, token}, state) do
+    {:noreply, Instances.expire(state, token)}
+  rescue
+    error ->
+      Logger.error("Instance eviction failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_info({:taxi_arrived, token}, state) do

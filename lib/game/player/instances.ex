@@ -1,10 +1,15 @@
 defmodule ThistleTea.Game.Player.Instances do
-  @moduledoc "Instance admission feedback and safe login recovery when a saved location is unavailable."
+  @moduledoc "Instance admission, membership grace periods, and safe recovery to the player's home bind."
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.HomeBind
+  alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Instance.Eviction
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.WorldRef
 
@@ -13,17 +18,84 @@ defmodule ThistleTea.Game.Player.Instances do
 
   def restore(character, guid, opts \\ [])
 
-  def restore(%Character{internal: %{world: %WorldRef{instance_id: id, map_id: map}}} = character, guid, opts)
+  def restore(%Character{internal: %{world: %WorldRef{instance_id: id} = world}} = character, guid, opts)
       when is_integer(id) do
-    enter = Keyword.get(opts, :enter, &InstanceSystem.enter/2)
+    resume = Keyword.get(opts, :resume, &InstanceSystem.resume/2)
 
-    case enter.(map, guid) do
+    case resume.(world, guid) do
       {:ok, world} -> %{character | internal: %{character.internal | world: world}}
       {:error, _reason} -> return_home(character)
     end
   end
 
   def restore(%Character{} = character, _guid, _opts), do: character
+
+  def refresh(state, opts \\ [])
+
+  def refresh(%State{ready: true, character: %Character{internal: %{world: world}}} = state, opts) do
+    valid? = valid_member?(state, opts)
+    previous = if state.instance_eviction, do: state.instance_eviction.countdown
+    current = Eviction.refresh(previous, world, valid?, now(opts))
+
+    cond do
+      current == previous -> state
+      is_nil(current) -> clear(state)
+      true -> start(clear(state), current)
+    end
+  end
+
+  def refresh(%State{} = state, _opts), do: state
+
+  def expire(state, token, opts \\ [])
+
+  def expire(
+        %State{instance_eviction: %{token: token, countdown: countdown}, character: %Character{} = character} = state,
+        token,
+        opts
+      ) do
+    cond do
+      character.internal.world != countdown.world ->
+        clear(state)
+
+      valid_member?(state, opts) ->
+        clear(state)
+
+      Eviction.due?(countdown, character.internal.world, now(opts)) ->
+        home = character.internal.home_bind
+        {x, y, z} = home.position
+        Entity.teleport(self(), WorldRef.open(home.map_id), {x, y, z, 0.0})
+        clear(state)
+
+      true ->
+        state
+    end
+  end
+
+  def expire(%State{} = state, _token, _opts), do: state
+
+  def clear(%State{instance_eviction: %{ref: ref}} = state) do
+    Process.cancel_timer(ref)
+    Network.send_packet(%Message.SmsgRaidGroupOnly{delay_ms: 0})
+    %{state | instance_eviction: nil}
+  end
+
+  def clear(%State{} = state), do: state
+
+  defp start(state, %Eviction{} = countdown) do
+    token = make_ref()
+    ref = Process.send_after(self(), {:instance_eviction, token}, Eviction.delay_ms())
+    Network.send_packet(%Message.SmsgRaidGroupOnly{delay_ms: Eviction.delay_ms()})
+    %{state | instance_eviction: %{ref: ref, token: token, countdown: countdown}}
+  end
+
+  defp valid_member?(%State{character: %Character{internal: %{world: %WorldRef{instance_id: nil}}}}, _opts), do: true
+
+  defp valid_member?(%State{guid: guid, character: %Character{internal: %{world: world}}}, opts) do
+    valid? = Keyword.get(opts, :valid?, &InstanceSystem.valid_member?/2)
+    not MapTemplate.dungeon?(world.map_id) or valid?.(world, guid)
+  end
+
+  defp now(opts), do: Keyword.get_lazy(opts, :now, &Time.now/0)
 
   defp return_home(%Character{internal: %{home_bind: %HomeBind{} = home}} = character) do
     {x, y, z} = home.position

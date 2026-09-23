@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Player.Travel do
   alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.Exploration
+  alias ThistleTea.Game.Player.Instances
   alias ThistleTea.Game.Player.ItemLoot
   alias ThistleTea.Game.Player.Login
   alias ThistleTea.Game.Player.Pvp
@@ -19,6 +20,7 @@ defmodule ThistleTea.Game.Player.Travel do
     state = Visibility.enter_player(%{state | ready: true})
 
     state
+    |> Instances.refresh()
     |> CompanionVisibility.defer_restoration()
     |> Exploration.check_current()
     |> Pvp.arrive()

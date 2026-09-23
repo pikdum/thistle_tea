@@ -153,7 +153,7 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
       refute first_world == second_world
     end
 
-    test "uses the captured copy after the owner resolver changes" do
+    test "stops selecting a former group's copy after membership changes" do
       name = unique_name()
       guid = System.unique_integer([:positive])
       {:ok, owner} = start_supervised({Agent, fn -> {:party, 7} end})
@@ -168,9 +168,10 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
       InstanceSystem.leave(guid, world, name)
       Agent.update(owner, fn _owner -> {:player, guid} end)
 
-      assert InstanceSystem.world_for(389, guid, name) == world
-      assert {:ok, ^world} = InstanceSystem.enter(389, guid, name)
-      assert InstanceSystem.info(guid, name).copies |> Enum.any?(&(&1.world == world))
+      assert InstanceSystem.world_for(389, guid, name) == nil
+      assert {:error, :instance_unavailable} = InstanceSystem.resume(world, guid, name)
+      assert {:ok, next_world} = InstanceSystem.enter(389, guid, name)
+      refute next_world == world
     end
 
     test "captures the map script only when a copy is created" do

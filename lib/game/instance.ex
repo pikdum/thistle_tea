@@ -9,13 +9,14 @@ defmodule ThistleTea.Game.Instance do
   alias ThistleTea.Game.Instance.Admission.Actor
   alias ThistleTea.Game.Instance.Admission.Policy
   alias ThistleTea.Game.InstanceScript
+  alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.WorldRef
 
   @uint32_max 0xFFFFFFFF
 
   defmodule Copy do
     @moduledoc false
-    defstruct [:world, :owner, :script_name, members: MapSet.new(), data: %{}, script_state: %{}]
+    defstruct [:world, :owner, :script_name, orphaned?: false, members: MapSet.new(), data: %{}, script_state: %{}]
   end
 
   defstruct copies: %{}, owner_index: %{}, member_index: %{}, bindings: %{}, entry_history: %{}, next_id: 1
@@ -46,11 +47,48 @@ defmodule ThistleTea.Game.Instance do
     %{instances | entry_history: Admission.prune(instances.entry_history, now)}
   end
 
+  def group_changed(%__MODULE__{} = instances, nil, %Group{id: id, leader: leader}) do
+    instances
+    |> copies_for_guid(leader)
+    |> Enum.filter(&(&1.owner == {:player, leader} or &1.orphaned?))
+    |> Enum.reduce(instances, &transfer_owner(&2, &1, {:party, id}))
+  end
+
+  def group_changed(%__MODULE__{} = instances, %Group{id: id}, nil) do
+    copies =
+      Map.new(instances.copies, fn {world, copy} ->
+        {world, if(copy.owner == {:party, id}, do: %{copy | orphaned?: true}, else: copy)}
+      end)
+
+    %{instances | copies: copies}
+  end
+
+  def group_changed(%__MODULE__{} = instances, _previous, _current), do: instances
+
+  def owned_by?(%__MODULE__{} = instances, %WorldRef{} = world, owner) do
+    match?(%Copy{owner: ^owner, orphaned?: false}, copy(instances, world))
+  end
+
+  def valid_member?(%__MODULE__{} = instances, world, owner, %Actor{} = actor, %Policy{} = policy) do
+    member_world(instances, actor.guid) == world and owned_by?(instances, world, owner) and
+      (not policy.raid? or actor.raid?)
+  end
+
+  defp transfer_owner(instances, %Copy{} = copy, owner) do
+    index =
+      instances.owner_index
+      |> Map.delete({copy.world.map_id, copy.owner})
+      |> Map.put({copy.world.map_id, owner}, copy.world)
+
+    copy = %{copy | owner: owner, orphaned?: false}
+    %{instances | copies: Map.put(instances.copies, copy.world, copy), owner_index: index}
+  end
+
   def enter(instances, map_id, owner, guid, script_name \\ nil)
 
   def enter(%__MODULE__{} = instances, map_id, owner, guid, script_name) when is_integer(map_id) and is_integer(guid) do
     {instances, emptied} = remove_member(instances, guid)
-    {world, instances} = find_bound_or_create(instances, map_id, owner, guid, script_name)
+    {world, instances} = find_or_create(instances, {map_id, owner}, script_name)
     copy = Map.fetch!(instances.copies, world)
     copy = %{copy | members: MapSet.put(copy.members, guid)}
 
@@ -232,13 +270,6 @@ defmodule ThistleTea.Game.Instance do
 
       _occupied_or_missing ->
         instances
-    end
-  end
-
-  defp find_bound_or_create(%__MODULE__{} = instances, map_id, owner, guid, script_name) do
-    case world_for_guid(instances, map_id, guid) do
-      %WorldRef{} = world -> {world, instances}
-      nil -> find_or_create(instances, {map_id, owner}, script_name)
     end
   end
 

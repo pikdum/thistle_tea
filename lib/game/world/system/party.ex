@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.System.Party do
   use GenServer
 
   alias ThistleTea.Game.Party
+  alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
   @table_options [:named_table, :public, read_concurrency: true]
 
@@ -182,17 +183,24 @@ defmodule ThistleTea.Game.World.System.Party do
   end
 
   defp index_group(group) do
+    previous = group(group.id)
     :ets.insert(__MODULE__, {{:group, group.id}, group})
     Enum.each(group.members, fn member -> :ets.insert(__MODULE__, {member.guid, group.id}) end)
+
+    if membership(previous) != membership(group), do: InstanceSystem.group_changed(previous, group)
   end
 
   defp index_removal({:disbanded, group}, _removed_guid) do
     :ets.delete(__MODULE__, {:group, group.id})
     Enum.each(group.members, fn member -> :ets.delete(__MODULE__, member.guid) end)
+    InstanceSystem.group_changed(group, nil)
   end
 
   defp index_removal({:removed, group, _leader_changed?}, removed_guid) do
     :ets.delete(__MODULE__, removed_guid)
     index_group(group)
   end
+
+  defp membership(%Party.Group{} = group), do: {group.leader, group.raid?, Enum.map(group.members, & &1.guid)}
+  defp membership(nil), do: nil
 end

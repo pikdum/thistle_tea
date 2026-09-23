@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.Player.Buyback
   alias ThistleTea.Game.Player.Guilds
+  alias ThistleTea.Game.Player.Instances
   alias ThistleTea.Game.Player.ItemDurations
   alias ThistleTea.Game.Player.Logout
   alias ThistleTea.Game.Player.Looting
@@ -76,6 +77,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :quest_share,
     :quest_share_monitor,
     :item_duration_timer,
+    :instance_eviction,
     item_durations_active?: false,
     ready: false,
     pending_worldport?: false,
@@ -92,7 +94,11 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   ]
 
   def prepare_worldport(%__MODULE__{} = state, destination, origin) do
-    state |> MiniPetOwner.dismiss() |> dismiss_guardians() |> do_prepare_worldport(destination, origin)
+    state
+    |> Instances.clear()
+    |> MiniPetOwner.dismiss()
+    |> dismiss_guardians()
+    |> do_prepare_worldport(destination, origin)
   end
 
   defp do_prepare_worldport(%__MODULE__{} = state, %WorldRef{map_id: map_id, instance_id: instance_id}, %WorldRef{
@@ -114,7 +120,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   def complete_worldport(%__MODULE__{} = state), do: %{state | pending_worldport?: false}
 
   def leave_world(%__MODULE__{} = state) do
-    state = Logout.clear(state)
+    state = state |> Logout.clear() |> Instances.clear()
 
     case state.player_tick_ref do
       ref when is_reference(ref) -> Process.cancel_timer(ref)
