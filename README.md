@@ -146,6 +146,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Hunter pet loyalty](docs/pet-loyalty-playtest.md): happiness-based bonding, training-point earnings, rank loss, and runaway cleanup, retained through dismissal and reconnect
 - [Hunter pet training](docs/pet-training-playtest.md): ability purchases, rank-upgrade credits, passive stat bonuses, family and level checks, and retained learned spells
 - [Hunter pet stables](docs/pet-stable-playtest.md): two purchased slots, storage and swaps, persistent pet identity, and retained health and progression
+- [Hunter pet naming](docs/pet-naming-playtest.md): one-time names, observer updates, retained identity across pet lifecycles, and abandonment cleanup
 - typed invisibility and detection, with observer visibility, creature aggro, and action interruption
 - observer-specific stealth detection, with Perception, Paranoia, Track Hidden, facing, line of sight, and caster-specific Hunter's Mark
 - items, bags, equipment, and vendors
