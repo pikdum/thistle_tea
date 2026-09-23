@@ -15,6 +15,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ModifierSync do
   @modifier_types %{add_flat_modifier: :flat, add_pct_modifier: :pct}
   @effect_indexes 0..63
 
+  def restore(%Character{unit: %{auras: holders}} = character) do
+    Effects.enqueue(character, events([], holders))
+  end
+
   def events(previous_holders, holders) when is_list(previous_holders) and is_list(holders) do
     previous = totals(previous_holders)
     current = totals(holders)

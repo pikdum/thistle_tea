@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Aura.Holder do
     :caster_level,
     :caster_faction_template,
     :cast_context,
+    :cooldown_started_at,
     :slot,
     :applied_at,
     :expires_at,

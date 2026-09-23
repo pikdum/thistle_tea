@@ -115,6 +115,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Trade
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -1227,6 +1228,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     else
       {:noreply, state}
     end
+  end
+
+  def handle_info(%Effects.ActivateCooldown{} = event, %State{character: %Character{} = character} = state) do
+    {character, events} = Cooldowns.handle_event(character, event, Time.now())
+    {:noreply, %{state | character: EventSink.emit(character, events)}}
+  rescue
+    error ->
+      Logger.error("Cooldown event failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_info(%Effects.SummonMiniPet{} = effect, %State{character: %Character{}} = state) do

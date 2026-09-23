@@ -88,6 +88,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CallForHelp
@@ -797,6 +798,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_info({:DOWN, token, :process, _pid, _reason}, %Mob{} = state) when is_reference(token) do
     owner = if Pockets.owns_reservation?(state, token), do: Pockets, else: Corpse
     {:noreply, owner.reservation_lost(state, token)}
+  end
+
+  def handle_info(%Effects.ActivateCooldown{} = event, %Mob{} = state) do
+    {state, events} = Cooldowns.handle_event(state, event, Time.now())
+    {:noreply, EventSink.emit(state, events)}
+  rescue
+    error ->
+      Logger.error("Cooldown event failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_info(%Effects.SummonGuardians{} = effect, %Mob{} = state) do

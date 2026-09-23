@@ -191,6 +191,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Dungeon corpse return](docs/dungeon-corpse-playtest.md), with outdoor entrance markers, ghost portal restrictions, recovery into the original copy, and faction-aware graveyard selection
 - [Spell resurrection](docs/spell-resurrection-playtest.md), with owned-corpse targeting, cross-map offers, instance admission, recovery after travel acknowledgement, and Rebirth countdown bypass
 - Soulstones and Reincarnation, with reagent consumption, cooldowns, and talent modifiers
+- [Deferred spell cooldowns](docs/deferred-cooldowns-playtest.md), with aura and owned-object events, retained item overrides, ritual cancellation, and reconnect restoration
 - fall damage, Safe Fall, and Slow Fall protection
 - [Environmental fire damage](docs/environmental-fire-playtest.md), with world campfires, resistance, shield depletion, combat-log feedback, and death durability loss
 - underwater breath timers, drowning, water-breathing effects, and extended breath reserves

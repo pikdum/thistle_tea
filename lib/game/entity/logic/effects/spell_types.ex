@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
     {:SpellModifier, [:modifier_type, :effect_index, :operation, :amount], []},
     {:PetSpellModifiers, [:source_guid, :target_guid, :holders], []},
     {:CooldownEvent, [:source_guid, :spell_id], []},
+    {:ActivateCooldown, [:target_guid, :spell_id], [started_at: nil, cancel?: false]},
     {:ClearCooldown, [:target_guid, :spell_id], []},
     {:StandState, [:stand_state], []},
     {:SpellStart, [:source_guid, :spell_id, :duration_ms, :targets], []},

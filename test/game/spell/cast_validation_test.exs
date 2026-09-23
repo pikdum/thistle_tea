@@ -450,6 +450,20 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(caster, spell, Target.unit(7), hostile_target(), @now + 8_000)
     end
 
+    test "deferred spells reject cooldowns without disturbing the client's disabled state" do
+      spell = harmful_spell(recovery_time_ms: 8_000, gcd_ms: 1_500, attributes: MapSet.new([:cooldown_on_event]))
+      pending = Cooldowns.start(caster(), spell, @now)
+      {active, [_]} = Cooldowns.activate(pending, spell.id, @now + 1_000)
+      on_gcd = Cooldowns.trigger_gcd(caster(), spell, @now)
+
+      for blocked <- [pending, active, on_gcd] do
+        assert {:error, :dont_report} =
+                 CastValidation.validate(blocked, spell, Target.unit(7), hostile_target(), @now + 1_001)
+      end
+
+      assert :ok = CastValidation.validate(active, spell, Target.unit(7), hostile_target(), @now + 9_000)
+    end
+
     test "rejects missing reagents and passes when they are on hand" do
       spell = helpful_spell(reagents: [{17_056, 1}])
 

@@ -299,10 +299,14 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   defp check_cooldown(caster, spell, now) do
     cond do
       godmode?(caster) -> :ok
-      Cooldowns.on_cooldown?(caster, spell, now) -> {:error, :not_ready}
-      Cooldowns.on_gcd?(caster, spell, now) -> {:error, :not_ready}
+      Cooldowns.on_cooldown?(caster, spell, now) -> cooldown_error(spell)
+      Cooldowns.on_gcd?(caster, spell, now) -> cooldown_error(spell)
       true -> :ok
     end
+  end
+
+  defp cooldown_error(%Spell{} = spell) do
+    {:error, if(Spell.attribute?(spell, :cooldown_on_event), do: :dont_report, else: :not_ready)}
   end
 
   @mechanic_fear 5

@@ -163,7 +163,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
 
   def apply(state, %CastContext{}, spell, %Effect{type: :summon_game_object, misc_value: entry}, _now)
       when is_integer(entry) and entry > 0 do
-    {state, [Effects.summon_game_object(entry, max(spell.duration_ms || 0, 0))]}
+    {state, [Effects.summon_game_object(entry, max(spell.duration_ms || 0, 0), spell_id: spell.id)]}
   end
 
   def apply(

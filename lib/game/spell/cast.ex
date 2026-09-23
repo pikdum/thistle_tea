@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Spell.Cast do
     :channel_tick_ms,
     :next_channel_tick_at,
     :cast_item_guid,
+    cast_item_id: 0,
     phase: :preparing,
     ammunition: :unpaid,
     spell_focus: :unchecked,

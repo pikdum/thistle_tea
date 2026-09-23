@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Aura.ModifierSync
   alias ThistleTea.Game.Entity.Logic.ChatStatus
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
@@ -131,6 +132,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> Guilds.attach()
       |> BT.init(PlayerBT.tree())
       |> ControlMovement.restore(Time.now())
+      |> ModifierSync.restore()
 
     c = PlayerFlags.set_group_leader(c, party_leader?(character_guid))
 
@@ -307,7 +309,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> Enum.map(fn cooldown ->
         %CooldownSpell{
           spell_id: cooldown.spell_id,
-          item_id: 0,
+          item_id: cooldown.item_id,
           spell_category: cooldown.category,
           cooldown: cooldown.spell_ms,
           category_cooldown: cooldown.category_ms

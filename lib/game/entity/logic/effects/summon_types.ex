@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SummonTypes do
     {:LoadGameObjectSpawn, [:blueprint], []},
     {:OperateGameObject, [:action, :reset_delay_ms], [blueprint: nil]},
     {:LeaveRitual, [:target_guid, :source_guid], []},
-    {:SummonGameObject, [:entry, :duration_ms], [target_guid: nil, position: nil, owned?: true]},
+    {:SummonGameObject, [:entry, :duration_ms], [spell_id: nil, target_guid: nil, position: nil, owned?: true]},
     {:SummonRequest, [:source_guid, :target_guid, :amount, :position], []},
     {:SummonCreature, [:summon, :steps, :target_guid], []},
     {:ControlGranted, [:source_guid, :target_guid, :spell_id, :spells, :kind], []},

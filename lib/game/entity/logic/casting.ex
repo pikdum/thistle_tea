@@ -53,19 +53,26 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
 
-  def start(entity, spell, targets, now, cast_item_guid \\ nil)
+  def start(entity, spell, targets, now, cast_item_guid \\ nil, cast_item_id \\ 0)
 
-  def start(%{internal: %Internal{}} = character, %Spell{} = spell, %Target{} = targets, now, cast_item_guid)
+  def start(
+        %{internal: %Internal{}} = character,
+        %Spell{} = spell,
+        %Target{} = targets,
+        now,
+        cast_item_guid,
+        cast_item_id
+      )
       when is_integer(now) do
     case Disarm.validate(character, spell) do
-      :ok -> start_available_spell(character, spell, targets, now, cast_item_guid)
+      :ok -> start_available_spell(character, spell, targets, now, cast_item_guid, cast_item_id)
       {:error, reason} -> Effects.enqueue(character, Effects.spell_cast_failed(spell.id, reason))
     end
   end
 
-  def start(entity, _spell, _targets, _now, _cast_item_guid), do: entity
+  def start(entity, _spell, _targets, _now, _cast_item_guid, _cast_item_id), do: entity
 
-  defp start_available_spell(character, spell, targets, now, cast_item_guid) do
+  defp start_available_spell(character, spell, targets, now, cast_item_guid, cast_item_id) do
     character = character |> Mount.prepare_cast(spell, now) |> interrupt_action_auras(:action, spell, now)
     character = AutoRepeat.interrupt(character, now)
     spell = WeaponDamage.prepare_spell(character, spell)
@@ -78,17 +85,17 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         MeleeSpell.queue_next_swing(character, spell)
 
       true ->
-        do_start(character, character.internal, spell, targets, now, cast_item_guid)
+        do_start(character, spell, targets, now, cast_item_guid, cast_item_id)
     end
   end
 
   defp do_start(
          %{internal: %Internal{} = internal} = character,
-         %Internal{},
          %Spell{} = spell,
          %Target{} = targets,
          now,
-         cast_item_guid
+         cast_item_guid,
+         cast_item_id
        ) do
     modifier_holder_ids = Modifiers.consumable_holder_ids(character, spell)
     spell = %{spell | cast_time_ms: Modifiers.integer_value(character, spell, :casting_time, spell.cast_time_ms || 0)}
@@ -97,7 +104,9 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       spell
       |> Cast.new(targets, now)
       |> Cast.apply_speed_modifier(AuraLogic.flat_amount(character, :mod_casting_speed))
-      |> then(&%{&1 | cast_item_guid: cast_item_guid, modifier_holder_ids: modifier_holder_ids})
+      |> then(
+        &%{&1 | cast_item_guid: cast_item_guid, cast_item_id: cast_item_id, modifier_holder_ids: modifier_holder_ids}
+      )
 
     character = %{character | internal: %{internal | casting: casting}}
     character = Cooldowns.trigger_gcd(character, spell, now)
@@ -814,6 +823,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     channel_game_object_guid = internal.channel_game_object_guid
     channel_game_object_owned? = internal.channel_game_object_owned?
     {character, aura_events} = channel_aura_events(character, casting, reason, now)
+    {character, cooldown_events} = cancel_ritual_cooldown(character, casting, reason, now)
 
     character = %{
       character
@@ -839,12 +849,31 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
     character
     |> Core.mark_broadcast_update()
-    |> Effects.enqueue(aura_events ++ object_events ++ events)
+    |> Effects.enqueue(aura_events ++ cooldown_events ++ object_events ++ events)
   end
 
   defp stop_channel(%{internal: %Internal{} = internal} = character, %Cast{}, _reason, _now) do
     %{character | internal: %{internal | casting: nil}}
   end
+
+  defp cancel_ritual_cooldown(character, %Cast{spell: spell}, :cancelled, now) do
+    entry = Cooldowns.pending(character, spell.id)
+
+    if entry && Enum.any?(spell.effects, &(&1.type == :trans_door)) do
+      event = %Effects.ActivateCooldown{
+        target_guid: character.object.guid,
+        spell_id: spell.id,
+        started_at: entry.started_at,
+        cancel?: true
+      }
+
+      Cooldowns.handle_event(character, event, now)
+    else
+      {character, []}
+    end
+  end
+
+  defp cancel_ritual_cooldown(character, _casting, _reason, _now), do: {character, []}
 
   defp channel_object_events(_guid, _owned?, _user_guid, :completed), do: []
 
@@ -959,7 +988,10 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     events =
       for %Spell.Effect{type: :trans_door, misc_value: entry} <- spell.effects,
           is_integer(entry) and entry > 0 do
-        Effects.summon_game_object(entry, area_duration(casting, spell), ritual_target_guid: target_guid)
+        Effects.summon_game_object(entry, area_duration(casting, spell),
+          ritual_target_guid: target_guid,
+          spell_id: spell.id
+        )
       end
 
     Effects.enqueue(character, events)
@@ -983,8 +1015,8 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp queue_cast_item(character, _item_guid), do: character
 
-  defp start_cooldown(character, %Cast{spell: %Spell{} = spell}, now) do
-    Cooldowns.start(character, spell, now)
+  defp start_cooldown(character, %Cast{spell: %Spell{} = spell, cast_item_id: item_id}, now) do
+    Cooldowns.start(character, spell, now, item_id)
   end
 
   defp start_cooldown(character, _casting, _now), do: character
@@ -1254,6 +1286,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       context = %{
         CastContext.from_caster(caster, spell, target_guid)
         | cast_item_guid: casting.cast_item_guid,
+          cooldown_started_at: cooldown_started_at(caster, spell.id),
           selected_target_guid: casting.resolution.followups.selected_unit_guid,
           destination_position: Target.ground_location(casting.targets),
           target_hostile?: target_guid != caster_guid and Hostility.valid_attack_target?(caster, target_guid),
@@ -1266,6 +1299,13 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp apply_impacts(character, _casting, _impacts, _now), do: character
+
+  defp cooldown_started_at(caster, spell_id) do
+    case Cooldowns.pending(caster, spell_id) do
+      nil -> nil
+      entry -> entry.started_at
+    end
+  end
 
   defp target_role(%{object: %{guid: guid}}, guid), do: :caster
 

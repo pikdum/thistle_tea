@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Totems
@@ -166,6 +167,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   end
 
   defp disengage(%__MODULE__{character: %Character{} = character} = state) do
+    character = Casting.cancel(character)
     {character, effects} = PlayerCombat.disengage(character)
     character = character |> Totems.dismiss_all() |> EventSink.emit_pending()
     %{state | character: EventSink.emit(character, effects)}

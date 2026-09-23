@@ -113,6 +113,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.ChannelUpdate,
     Effects.ClearCooldown,
     Effects.CooldownEvent,
+    Effects.ActivateCooldown,
     Effects.DelayAura,
     Effects.DeliverHealThreat,
     Effects.DeliverSpell,

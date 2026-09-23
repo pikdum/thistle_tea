@@ -5,8 +5,24 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ModifierSyncTest do
 
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.ModifierSync
   alias ThistleTea.Game.Entity.Logic.Effects
+
+  describe "restore/1" do
+    test "resends retained aura totals after pending login changes" do
+      modifier = holder(:add_flat_modifier, -5_000, 11, 1)
+      stale = Effects.spell_modifier(:flat, 0, 11, -1_000)
+      character = %Character{unit: %Unit{auras: [modifier]}, internal: %Internal{}}
+      character = character |> Effects.enqueue(stale) |> ModifierSync.restore()
+      {restored, events} = Effects.drain(character)
+
+      assert events == [stale, Effects.spell_modifier(:flat, 0, 11, -5_000)]
+      assert restored.unit.auras == [modifier]
+    end
+  end
 
   describe "events/2" do
     test "emits absolute totals for changed mask bits" do

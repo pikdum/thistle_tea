@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AreaEffects
@@ -180,17 +181,15 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
 
         game_object = GameObject.build_summoned(template, world, position, opts)
         linked = summon_linked_object(template, world, position, opts)
-        summon = %{game_object.internal.summon | linked_guids: linked}
+        cooldown_event = object_cooldown_event(entity, effect)
+        summon = %{game_object.internal.summon | linked_guids: linked, cooldown_event: cooldown_event}
         game_object = %{game_object | internal: %{game_object.internal | summon: summon}}
 
-        case World.start_entity(game_object) do
-          {:ok, _pid} -> maybe_track_channel_game_object(game_object, context)
-          _failure -> Enum.each(linked, &World.stop_entity/1)
-        end
-
+        start_summoned_game_object(game_object, context)
         entity
 
       _ ->
+        cancel_object_cooldown(object_cooldown_event(entity, effect), context)
         entity
     end
   end
@@ -569,4 +568,30 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   end
 
   defp wild_position(_entity, effect, _index), do: effect.position
+
+  defp object_cooldown_event(entity, %Effects.SummonGameObject{owned?: true, spell_id: spell_id}) do
+    case Cooldowns.pending(entity, spell_id) do
+      nil ->
+        nil
+
+      entry ->
+        %Effects.ActivateCooldown{target_guid: entity.object.guid, spell_id: spell_id, started_at: entry.started_at}
+    end
+  end
+
+  defp object_cooldown_event(_entity, _effect), do: nil
+
+  defp start_summoned_game_object(game_object, context) do
+    case World.start_entity(game_object) do
+      {:ok, _pid} ->
+        maybe_track_channel_game_object(game_object, context)
+
+      _failure ->
+        Enum.each(game_object.internal.summon.linked_guids, &World.stop_entity/1)
+        cancel_object_cooldown(game_object.internal.summon.cooldown_event, context)
+    end
+  end
+
+  defp cancel_object_cooldown(nil, _context), do: :ok
+  defp cancel_object_cooldown(event, context), do: Context.send(context, %{event | cancel?: true})
 end

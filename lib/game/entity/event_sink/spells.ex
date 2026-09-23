@@ -284,6 +284,19 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
   def emit(entity, %Effects.CooldownEvent{}, _context), do: entity
 
+  def emit(entity, %Effects.ActivateCooldown{target_guid: guid} = effect, context) do
+    if entity.object.guid == guid do
+      Context.send(context, effect)
+    else
+      case Entity.pid(guid) do
+        pid when is_pid(pid) -> send(pid, effect)
+        _ -> :ok
+      end
+    end
+
+    entity
+  end
+
   def emit(%Character{} = entity, %Effects.ClearCooldown{} = effect, context) do
     Context.send_packet(context, %Message.SmsgClearCooldown{
       spell_id: effect.spell_id,

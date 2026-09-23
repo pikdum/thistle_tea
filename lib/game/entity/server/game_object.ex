@@ -123,6 +123,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     if result == :complete do
       cast_ritual_completion(state, ritual, world, position)
       cast_ritual_participant_spell(state, ritual)
+      release_cooldown(state)
       Entity.finish_game_object_channel(ritual.owner_guid, state.object.guid)
       if not ritual.persistent?, do: send(self(), :despawn)
     end
@@ -385,12 +386,26 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   @impl GenServer
   def terminate(_reason, state) do
+    release_cooldown(state)
     finish_ritual_channels(state)
     stop_linked_objects(state)
     World.remove_position(state)
     Visibility.leave_entity(state)
     Metadata.delete(state.object.guid)
   end
+
+  defp release_cooldown(
+         %GameObject{internal: %{summon: %Summon{cooldown_event: %Effects.ActivateCooldown{} = event}}} = state
+       ) do
+    cancel? = match?(%Ritual{completed?: false}, state.internal.ritual)
+
+    case Entity.pid(event.target_guid) do
+      pid when is_pid(pid) -> send(pid, %{event | cancel?: cancel?})
+      _ -> :ok
+    end
+  end
+
+  defp release_cooldown(_state), do: :ok
 
   defp despawn(state) do
     pid = self()

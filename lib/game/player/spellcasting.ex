@@ -265,7 +265,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     }
     |> World.broadcast_packet(state.character)
 
-    character = Casting.start(state.character, spell, targets, Time.now(), cast_item_guid)
+    item_id = cast_item_id(cast_item_guid)
+    character = Casting.start(state.character, spell, targets, Time.now(), cast_item_guid, item_id)
     state = %{state | character: character} |> Fishing.start_cast(spell)
 
     cond do
@@ -275,6 +276,15 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       true -> TickScheduler.schedule_now(state)
     end
   end
+
+  defp cast_item_id(guid) when is_integer(guid) do
+    case ItemStore.get(guid) do
+      %DataItem{object: %{entry: entry}} -> entry
+      _ -> 0
+    end
+  end
+
+  defp cast_item_id(_guid), do: 0
 
   def validate_repeat(state, spell, targets), do: validate_cast(state, spell, targets, nil)
 

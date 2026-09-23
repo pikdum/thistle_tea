@@ -87,7 +87,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
           fn @spell_id -> spell end
         )
 
-      ready_at = state.character.internal.cooldowns[{:category, 59}]
+      ready_at = Cooldowns.ready_at(state.character, %{spell | category: 59})
 
       assert is_integer(ready_at)
       assert ready_at - started_at <= 1_250
