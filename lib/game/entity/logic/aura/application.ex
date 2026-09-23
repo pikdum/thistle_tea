@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura.Capacity
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
@@ -78,6 +79,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         holder = %Holder{
           spell: modified_holder_spell(spell, context),
           caster_guid: context.caster_guid,
+          caster_totem?: context.caster_totem?,
+          cast_item_guid: context.cast_item_guid,
+          triggered?: context.triggered?,
           cooldown_started_at: context.cooldown_started_at,
           caster_owner_guid: context.caster_owner_guid,
           reflected_by_guid: context.reflected_by_guid,
@@ -181,32 +185,38 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         {entity, []}
 
       true ->
-        apply_diminished(entity, existing, holder, context, now)
+        apply_unblocked(entity, existing, holder, context, now)
     end
   end
 
   defp do_apply(entity, %Holder{} = holder, context, now) do
-    apply_diminished(entity, [], holder, context, now)
+    apply_unblocked(entity, [], holder, context, now)
   end
 
-  defp apply_diminished(entity, existing, holder, context, now) do
+  defp apply_diminished(entity, holders, holder, context, now) do
     case DiminishingReturns.apply(entity, holder, context, now) do
-      {:ok, entity, holder} ->
-        do_apply_unblocked(entity, existing, holder, now)
+      {:ok, entity, diminished} ->
+        holders =
+          Enum.map(holders, fn
+            ^holder -> diminished
+            current -> current
+          end)
+
+        Transition.run(entity, %Change{holders: holders, cause: :applied, now: now})
 
       {:immune, entity} ->
         {entity, [Effects.spell_log_miss(context.caster_guid, entity.object.guid, holder.spell.id, :immune)]}
     end
   end
 
-  defp do_apply_unblocked(entity, existing, %Holder{} = holder, now) do
+  defp apply_unblocked(entity, existing, %Holder{} = holder, context, now) do
     case StackingProc.prepare(holder, existing) do
       nil -> {entity, []}
-      holder -> upsert_unblocked(entity, existing, holder, now)
+      holder -> upsert_unblocked(entity, existing, holder, context, now)
     end
   end
 
-  defp upsert_unblocked(entity, existing, %Holder{} = holder, now) do
+  defp upsert_unblocked(entity, existing, %Holder{} = holder, context, now) do
     existing =
       existing
       |> remove_immune_mechanics(holder)
@@ -221,7 +231,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         |> upsert_holder(holder)
       end
 
-    Transition.run(entity, %Change{holders: holders, cause: :applied, now: now})
+    holders = Capacity.retain(holders, entity.object.guid)
+
+    case Enum.find(holders, &Holder.same_source?(&1, holder.spell.id, holder.caster_guid)) do
+      nil -> Transition.run(entity, %Change{holders: holders, cause: :applied, now: now})
+      applied -> apply_diminished(entity, holders, applied, context, now)
+    end
   end
 
   defp remove_non_stacking(holders, %Holder{} = incoming) do

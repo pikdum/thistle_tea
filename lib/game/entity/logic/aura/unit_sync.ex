@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   alias ThistleTea.Game.Entity.Logic.Empathy
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
 
   @max_slots 48
   @max_positive_slots 32
@@ -45,15 +46,40 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
     |> sync_aura_fields()
   end
 
-  def display_slot(holders, %Holder{spell: %Spell{} = spell, negative?: negative?}) do
-    if visible?(spell), do: next_free_slot(holders, negative?)
+  def display_slot(holders, %Holder{negative?: negative?}), do: next_free_slot(holders, negative?)
+
+  def visible?(%Holder{spell: %Spell{} = spell} = holder, target_guid) do
+    cond do
+      hidden_area_damage?(spell) ->
+        false
+
+      Enum.any?(spell.effects, &(&1.type == :apply_area_aura)) ->
+        holder.caster_guid != target_guid or holder.caster_totem? or not Spell.attribute?(spell, :passive)
+
+      holder.caster_totem? ->
+        true
+
+      true ->
+        visible?(spell)
+    end
   end
 
   def visible?(%Spell{spell_visual: visual} = spell) do
-    not Spell.attribute?(spell, :passive) or (is_integer(visual) and visual > 0)
+    not hidden_area_damage?(spell) and
+      (not Spell.attribute?(spell, :passive) or (is_integer(visual) and visual > 0))
   end
 
   def visible?(_spell), do: false
+
+  defp hidden_area_damage?(%Spell{hidden_aura?: true}), do: true
+
+  defp hidden_area_damage?(%Spell{effects: [%Effect{type: :persistent_area_aura} | _] = effects}) do
+    effects
+    |> Enum.filter(&(&1.type == :persistent_area_aura))
+    |> Enum.all?(&(&1.aura == :periodic_damage))
+  end
+
+  defp hidden_area_damage?(_spell), do: false
 
   defp next_free_slot(holders, negative?) do
     used = MapSet.new(holders, & &1.slot)

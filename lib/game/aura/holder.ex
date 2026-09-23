@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Aura.Holder do
     :caster_level,
     :caster_faction_template,
     :cast_context,
+    :cast_item_guid,
     :cooldown_started_at,
     :slot,
     :applied_at,
@@ -31,6 +32,8 @@ defmodule ThistleTea.Game.Aura.Holder do
     auras: [],
     resistance_penetration: [],
     stacks: 1,
+    triggered?: false,
+    caster_totem?: false,
     negative?: false
   ]
 

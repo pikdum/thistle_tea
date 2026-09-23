@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.DynamicObject
+  alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.SpellTargetResolver
@@ -105,7 +106,12 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
     {x, y, z, _o} = entity.movement_block.position
     radius = entity.dynamic_object.radius
 
-    tick_spell = %{spell | cast_time_ms: 0, effects: [%{effect | type: :apply_aura}]}
+    tick_spell = %{
+      spell
+      | cast_time_ms: 0,
+        hidden_aura?: not UnitSync.visible?(spell),
+        effects: [%{effect | type: :apply_aura}]
+    }
 
     caster
     |> SpellTargetResolver.resolve_query({:targeted_aoe, {x, y, z}, radius})

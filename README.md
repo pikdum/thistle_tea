@@ -195,6 +195,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Cannibalize](docs/cannibalize-playtest.md), with nearby corpse eligibility, triggered healing channels, damage interruption, and animation cleanup
 - [Spell interrupts](docs/spell-interrupts-playtest.md), with channel cleanup, school lockouts, native cooldowns and combat logs, reconnect restoration, and creature mechanic immunity
 - [Creature elemental combat](docs/elemental-combat-playtest.md), with template school immunity, elemental melee, resistance and wards, Dampen Magic, and native damage-school feedback
+- [Buff and debuff capacity](docs/aura-capacity-playtest.md), with priority-based replacement, separate 32-buff and 16-debuff limits, hidden aura exemptions, and shared lifecycle cleanup
 - fall damage, Safe Fall, and Slow Fall protection
 - [Environmental fire damage](docs/environmental-fire-playtest.md), with world campfires, resistance, shield depletion, combat-log feedback, and death durability loss
 - underwater breath timers, drowning, water-breathing effects, and extended breath reserves

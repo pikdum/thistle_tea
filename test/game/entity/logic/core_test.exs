@@ -269,7 +269,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
 
       {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000)
 
-      assert entity.unit.auras == [passive]
+      assert entity.unit.auras == [%{passive | slot: nil}]
 
       assert Enum.any?(
                entity.internal.events,

@@ -79,6 +79,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :spell_threat,
     :spell_hit_snapshot,
     triggered_by_aura?: false,
+    caster_totem?: false,
     triggered?: false,
     proc_damage?: false,
     extra_attack?: false,
@@ -114,6 +115,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_owner_guid: caster_owner_guid(caster),
       caster_level: level,
       caster_type: caster_type(caster),
+      caster_totem?: caster_totem?(caster),
       caster_faction_template: caster_faction_template(caster),
       caster_position: caster_position(caster),
       caster_bounding_radius: caster_bounding_radius(caster),
@@ -153,6 +155,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_owner_guid: caster_owner_guid(caster),
       caster_level: 1,
       caster_type: caster_type(caster),
+      caster_totem?: caster_totem?(caster),
       caster_faction_template: caster_faction_template(caster),
       caster_position: caster_position(caster),
       caster_bounding_radius: caster_bounding_radius(caster),
@@ -170,6 +173,9 @@ defmodule ThistleTea.Game.Spell.CastContext do
   defp caster_type(%Character{}), do: :player
   defp caster_type(%Mob{}), do: :mob
   defp caster_type(_), do: nil
+
+  defp caster_totem?(%{internal: %{totem: totem}}), do: not is_nil(totem)
+  defp caster_totem?(_caster), do: false
 
   defp caster_owner_guid(%{internal: %{pet: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid
   defp caster_owner_guid(%{object: %{guid: guid}}) when is_integer(guid), do: guid

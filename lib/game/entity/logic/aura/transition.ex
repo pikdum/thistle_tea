@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura.Capacity
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.ControlSync
   alias ThistleTea.Game.Entity.Logic.Aura.ModifierSync
@@ -56,6 +57,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   def run(%{unit: %Unit{} = unit} = entity, %Change{holders: desired, cause: cause, now: now})
       when is_list(desired) and cause in @causes and is_integer(now) do
     previous = if is_list(unit.auras), do: unit.auras, else: []
+    desired = Capacity.retain(desired, entity_guid(entity))
     desired = MountSync.interrupt_holders(previous, desired)
     desired = StealthSync.interrupt_holders(previous, desired)
     desired = StackingProc.reconcile(previous, desired)
@@ -63,7 +65,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     if desired == previous do
       {entity, []}
     else
-      holders = assign_slots(previous, desired)
+      holders = assign_slots(previous, desired, entity_guid(entity))
       reconcile(entity, previous, holders, cause, now)
     end
   end
@@ -161,18 +163,17 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     %{entity | unit: UnitSync.sync_unit(%{unit | auras: holders})}
   end
 
-  defp assign_slots(previous, desired) do
+  defp assign_slots(previous, desired, target_guid) do
     desired
-    |> Enum.map(&normalize_visibility/1)
     |> Enum.map_reduce([], fn %Holder{} = holder, assigned ->
-      holder = assign_slot(holder, previous, assigned)
+      holder =
+        if UnitSync.visible?(holder, target_guid),
+          do: assign_slot(holder, previous, assigned),
+          else: %{holder | slot: nil}
+
       {holder, [holder | assigned]}
     end)
     |> elem(0)
-  end
-
-  defp normalize_visibility(%Holder{spell: %Spell{} = spell} = holder) do
-    if UnitSync.visible?(spell), do: holder, else: %{holder | slot: nil}
   end
 
   defp assign_slot(%Holder{} = holder, previous, assigned) do
