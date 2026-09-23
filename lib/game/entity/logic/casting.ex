@@ -317,7 +317,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp queue_quest_cast_credit(%Character{} = character, %Cast{spell: %Spell{} = spell}, resolution) do
-    if OpenLock.spell?(spell),
+    if OpenLock.spell?(spell) or Enum.any?(spell.effects, &(&1.type == :activate_object)),
       do: character,
       else: Effects.enqueue(character, quest_cast_credit(resolution, spell.id))
   end
@@ -523,7 +523,11 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
     cond do
       is_integer(object_guid) and Enum.any?(spell.effects, &(&1.type == :activate_object)) ->
-        Effects.enqueue(character, %Effects.OpenGameObject{target_guid: object_guid, spell_id: spell.id})
+        Effects.enqueue(character, %Effects.OpenGameObject{
+          target_guid: object_guid,
+          spell_id: spell.id,
+          range_yards: spell.range_yards
+        })
 
       is_integer(lock_target) and OpenLock.spell?(spell) ->
         Effects.enqueue(character, %Effects.OpenLock{

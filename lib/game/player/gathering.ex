@@ -28,16 +28,14 @@ defmodule ThistleTea.Game.Player.Gathering do
   alias ThistleTea.Game.Player.Disenchant
   alias ThistleTea.Game.Player.GameObjects
   alias ThistleTea.Game.Player.Looting
+  alias ThistleTea.Game.Player.ObjectTarget
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Target
-  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
-  alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
-  alias ThistleTea.Game.World.Visibility
 
   def context(state, spell, targets, cast_item_guid) do
     if OpenLock.spell?(spell) do
@@ -227,21 +225,8 @@ defmodule ThistleTea.Game.Player.Gathering do
 
   defp target_lock(_state, _guid), do: {:error, :bad_targets}
 
-  defp target(%{character: %Character{} = character} = state, guid) when is_integer(guid) do
-    with false <- Core.dead?(character),
-         :game_object <- Guid.entity_type(guid),
-         true <- Entity.online?(guid) and Visibility.can_see?(state, guid),
-         world = character.internal.world,
-         {^world, x, y, z} <- World.position(guid),
-         distance when is_number(distance) and distance <= 5.0 <- World.distance_between(character, guid),
-         {cx, cy, cz, _o} = character.movement_block.position,
-         true <- Pathfinding.line_of_sight?(world, {cx, cy, cz}, {x, y, z}),
-         %GameObjectTemplate{} = template <- TemplateLoader.cached(Guid.entry(guid)) do
-      {:ok, template}
-    else
-      distance when is_number(distance) -> {:error, :out_of_range}
-      _ -> {:error, :bad_targets}
-    end
+  defp target(%{character: %Character{}} = state, guid) when is_integer(guid) do
+    ObjectTarget.resolve(state, guid, 5.0)
   end
 
   defp target(_state, _guid), do: {:error, :bad_targets}

@@ -31,6 +31,8 @@ defmodule ThistleTea.Game.Player.GatheringTest do
   alias ThistleTea.Game.Player.GameObjects
   alias ThistleTea.Game.Player.Gathering
   alias ThistleTea.Game.Player.Looting
+  alias ThistleTea.Game.Player.ObjectTarget
+  alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
@@ -53,6 +55,36 @@ defmodule ThistleTea.Game.Player.GatheringTest do
   @spell 999_885
 
   setup [:gathering_node]
+
+  describe "object spell targeting" do
+    test "accepts a visible nearby object and rejects missing, distant and foreign-world targets", %{
+      state: state,
+      node: node
+    } do
+      spell = %Spell{id: 3366, range_yards: 5.0, effects: [%Effect{type: :activate_object}]}
+
+      assert {:ok, %GameObjectTemplate{entry: @entry}} = ObjectTarget.resolve(state, node, 5.0)
+      assert :ok = Spellcasting.validate_repeat(state, spell, Target.object(node))
+      assert {:error, :bad_targets} = Spellcasting.validate_repeat(state, spell, Target.none())
+
+      moved = %{state.character | movement_block: %MovementBlock{position: {-8940.0, -132.493, 83.53, 0.0}}}
+      moved_state = %{state | character: moved}
+      assert {:error, :out_of_range} = Spellcasting.validate_repeat(moved_state, spell, Target.object(node))
+
+      foreign = %{state.character | internal: %{state.character.internal | world: WorldRef.open(1)}}
+
+      assert {:error, :bad_targets} =
+               Spellcasting.validate_repeat(%{state | character: foreign}, spell, Target.object(node))
+    end
+
+    test "rejects a live object that leaves spell range before activation", %{state: state, node: node} do
+      moved = %{state.character | movement_block: %MovementBlock{position: {-8940.0, -132.493, 83.53, 0.0}}}
+      moved_state = %{state | character: moved}
+
+      assert GameObjects.activate_object(moved_state, node, 3366, 5.0) == moved_state
+      assert ObjectTarget.resolve(moved_state, node, 5.0) == {:error, :out_of_range}
+    end
+  end
 
   describe "complete/4" do
     test "settles an earlier item-loot window before planning the new inventory", %{

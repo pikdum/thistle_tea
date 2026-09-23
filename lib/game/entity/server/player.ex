@@ -904,8 +904,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   @impl GenServer
-  def handle_info({:activate_spell_object, object_guid, spell_id}, state) do
-    {:noreply, PlayerGameObjects.activate_object(state, object_guid, spell_id)}
+  def handle_info({:activate_spell_object, object_guid, spell_id, range_yards}, state) do
+    {:noreply, PlayerGameObjects.activate_object(state, object_guid, spell_id, range_yards)}
   rescue
     error ->
       Logger.error("activate_spell_object crashed: #{Exception.format(:error, error, __STACKTRACE__)}")

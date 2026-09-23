@@ -81,9 +81,13 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
 
   def emit(entity, %Effects.EnchantItem{}, _context), do: entity
 
-  def emit(%Character{} = entity, %Effects.OpenGameObject{target_guid: object_guid, spell_id: spell_id}, context)
+  def emit(
+        %Character{} = entity,
+        %Effects.OpenGameObject{target_guid: object_guid, spell_id: spell_id, range_yards: range_yards},
+        context
+      )
       when is_integer(object_guid) and is_integer(spell_id) do
-    Context.send(context, {:activate_spell_object, object_guid, spell_id})
+    Context.send(context, {:activate_spell_object, object_guid, spell_id, range_yards})
     entity
   end
 

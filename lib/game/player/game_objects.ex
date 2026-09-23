@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Player.GameObjects do
   alias ThistleTea.Game.Player.Gathering
   alias ThistleTea.Game.Player.Gossip
   alias ThistleTea.Game.Player.Looting
+  alias ThistleTea.Game.Player.ObjectTarget
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
@@ -117,8 +118,15 @@ defmodule ThistleTea.Game.Player.GameObjects do
 
   def open_chest(state, guid), do: Looting.open(state, guid)
 
-  def activate_object(state, guid, 6_250), do: Deadmines.fire(state, guid, false)
-  def activate_object(state, guid, _spell_id), do: open_object(state, guid)
+  def activate_object(state, guid, spell_id, range_yards) do
+    case ObjectTarget.resolve(state, guid, range_yards) do
+      {:ok, _template} -> state |> activate_valid_object(guid, spell_id) |> Quests.credit_cast([guid], spell_id)
+      {:error, _reason} -> state
+    end
+  end
+
+  defp activate_valid_object(state, guid, 6_250), do: Deadmines.fire(state, guid, false)
+  defp activate_valid_object(state, guid, _spell_id), do: open_object(state, guid)
 
   def chest?(guid) do
     Guid.entity_type(guid) == :game_object and

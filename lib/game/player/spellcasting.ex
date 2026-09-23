@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Player.Gathering
   alias ThistleTea.Game.Player.ItemLoot
   alias ThistleTea.Game.Player.Looting
+  alias ThistleTea.Game.Player.ObjectTarget
   alias ThistleTea.Game.Player.PetTraining
   alias ThistleTea.Game.Player.Projectile
   alias ThistleTea.Game.Player.Teaching
@@ -279,7 +280,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp validate_cast(%{character: character} = state, %Spell{} = spell, %Target{} = targets, cast_item_guid) do
     enchant_guid = Enchantments.target_guid(character.player, spell, Target.item_guid(targets))
 
-    with :ok <- check_party_unit_target(character, spell, targets) do
+    with :ok <- check_party_unit_target(character, spell, targets),
+         :ok <- check_object_target(state, spell, targets) do
       CastValidation.validate(
         character,
         spell,
@@ -305,6 +307,17 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp check_party_unit_target(character, spell, targets) do
     if SpellTarget.party_member_spell?(spell) do
       validate_party_unit_query(character, SpellTarget.target_query(spell, targets))
+    else
+      :ok
+    end
+  end
+
+  defp check_object_target(state, %Spell{effects: effects, range_yards: range}, targets) do
+    if Enum.any?(effects, &(&1.type == :activate_object)) do
+      case ObjectTarget.resolve(state, Target.object_guid(targets), range) do
+        {:ok, _template} -> :ok
+        {:error, reason} -> {:error, reason}
+      end
     else
       :ok
     end
