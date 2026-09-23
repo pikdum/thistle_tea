@@ -58,7 +58,7 @@ defmodule ThistleTea.Game.World do
   def nearby_units_exact(table, world, {x, y, z} = origin, range, now \\ Time.now()) do
     world = WorldRef.coerce(world)
 
-    SpatialHash.query_cells(table, world, x, y, z, range + SpatialGrid.max_cell_drift())
+    nearby_candidates(table, world, {x, y, z}, range)
     |> Enum.flat_map(fn guid ->
       case position(guid, now) do
         {^world, tx, ty, tz} ->
@@ -70,6 +70,10 @@ defmodule ThistleTea.Game.World do
           []
       end
     end)
+  end
+
+  def nearby_candidates(table, world, {x, y, z}, range) do
+    SpatialHash.query_cells(table, world, x, y, z, range + SpatialGrid.max_cell_drift())
   end
 
   def nearby_players_at(world, {x, y, z}, range \\ 30) do

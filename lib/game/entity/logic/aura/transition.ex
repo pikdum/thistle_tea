@@ -106,6 +106,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
         viewpoint_events ++
         release_events ++ movement_events ++ control_movement_events ++ forced_reaction_events ++ threat_events
 
+    entity = Casting.reconcile_channel_auras(entity, removed, now)
     {Core.mark_broadcast_update(entity), events}
   end
 

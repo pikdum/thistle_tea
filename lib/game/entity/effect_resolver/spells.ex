@@ -19,11 +19,18 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpellFocus
   alias ThistleTea.Game.World.SpellMagnets
+  alias ThistleTea.Game.World.SpellRequirements
 
   @heal_threat_radius 100.0
 
-  def resolve(entity, %Effects.CheckSpellFocus{cast: cast, now: now}) do
-    [%Effects.SpellFocusResolved{cast: cast, now: now, focus: SpellFocus.find(entity, cast.spell)}]
+  def resolve(entity, %Effects.CheckCastRequirements{cast: cast, now: now}) do
+    [
+      %Effects.CastRequirementsResolved{
+        cast: cast,
+        now: now,
+        requirements: SpellRequirements.resolve(entity, cast.spell)
+      }
+    ]
   end
 
   def resolve(entity, %Effects.ProcDamage{target_guid: target_guid, spell: spell, effect_index: index}) do
@@ -128,7 +135,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   end
 
   defp resolve_trigger(entity, effect, spell) do
-    if foreign_player_focus?(entity, effect, spell) do
+    if foreign_owner_required?(entity, effect, spell) do
       [
         Effects.trigger_spell_request(effect.source_guid, effect.spell_id, effect.target_guid,
           base_points: effect.amount,
@@ -145,22 +152,51 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
     end
   end
 
-  defp foreign_player_focus?(entity, effect, spell) do
-    Focus.required?(spell) and is_integer(effect.source_guid) and
-      effect.source_guid != entity.object.guid and Guid.entity_type(effect.source_guid) == :player
+  defp foreign_owner_required?(entity, effect, spell) do
+    is_integer(effect.source_guid) and effect.source_guid != entity.object.guid and
+      (Spell.attribute?(spell, :channeled) or
+         (Focus.required?(spell) and Guid.entity_type(effect.source_guid) == :player))
   end
 
   defp validate_trigger_focus(entity, effect, spell) do
     case Focus.validate(entity, spell, SpellFocus.find(entity, spell)) do
       :ok ->
-        if effect.resolve_targets? or SpellTarget.area_targeted?(spell) do
-          resolve_area_trigger(entity, effect, spell)
-        else
-          resolve_single_trigger(entity, effect, spell)
-        end
+        resolve_trigger_delivery(entity, effect, spell)
 
       {:error, reason} ->
         [Effects.spell_cast_failed(spell, reason)]
+    end
+  end
+
+  defp resolve_trigger_delivery(entity, effect, spell) do
+    cond do
+      Spell.attribute?(spell, :channeled) ->
+        resolve_triggered_channel(entity, effect, spell)
+
+      effect.resolve_targets? or SpellTarget.area_targeted?(spell) ->
+        resolve_area_trigger(entity, effect, spell)
+
+      true ->
+        resolve_single_trigger(entity, effect, spell)
+    end
+  end
+
+  defp resolve_triggered_channel(entity, effect, spell) do
+    case triggered_target(entity, effect, spell) do
+      nil ->
+        []
+
+      guid ->
+        selected_guid = if guid == entity.object.guid, do: effect.target_guid || guid, else: guid
+
+        [
+          %Effects.StartTriggeredChannel{
+            spell: spell,
+            targets: Target.unit(selected_guid),
+            context: trigger_context(entity, %{effect | target_guid: guid}, spell),
+            cast_item_guid: effect.cast_item_guid
+          }
+        ]
     end
   end
 

@@ -53,6 +53,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.ResurrectionTarget
   alias ThistleTea.Game.World.SpellFocus
+  alias ThistleTea.Game.World.SpellRequirements
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
@@ -136,11 +137,11 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       {:ok, do_cast(state, spell, targets, cast_item_guid)}
     else
       {:error, reason, state} ->
-        fail_cast(spell, reason)
+        fail_cast(state, spell, reason)
         {:error, state}
 
       {:error, reason} ->
-        fail_cast(spell, reason)
+        fail_cast(state, spell, reason)
         state = if reason == :already_open, do: state |> Looting.release() |> ItemLoot.open(), else: state
         {:error, state}
     end
@@ -302,6 +303,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
         count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end,
         equipped_items: equipped_weapon_templates(character),
         spell_focus: SpellFocus.find(character, spell),
+        spell_corpse: SpellRequirements.corpse(character, spell),
         lock_context: Gathering.context(state, spell, targets, cast_item_guid),
         disenchant_item: Disenchant.owned_item(character, Target.item_guid(targets)),
         enchant_item: Disenchant.owned_item(character, enchant_guid),
@@ -526,8 +528,12 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp selected_target(%{unit: %Unit{target: target}}), do: target
   defp selected_target(_character), do: nil
 
-  defp fail_cast(%Spell{id: spell_id} = spell, reason) do
+  defp fail_cast(state, %Spell{id: spell_id} = spell, reason) do
     Logger.warning("Spell #{spell_id} failed validation: #{reason}")
+
+    if reason == :no_edible_corpses,
+      do: Network.send_packet(%Message.SmsgClearCooldown{spell_id: spell_id, target_guid: state.guid})
+
     Network.send_packet(Message.SmsgCastResult.failure(spell, reason))
   end
 

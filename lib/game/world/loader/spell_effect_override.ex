@@ -1,14 +1,15 @@
 defmodule ThistleTea.Game.World.Loader.SpellEffectOverride do
   @moduledoc """
-  Preloads VMangos's per-effect spell fix data: `spell_effect_mod` field
-  overrides and `spell_template` bonus coefficients for the supported
-  client build, so the spell loader can correct DBC rows the way VMangos
+  Preloads VMangos's spell fix data: `spell_mod` aura interrupt flags,
+  `spell_effect_mod` field overrides and `spell_template` bonus coefficients
+  for the supported client build, so the spell loader can correct DBC rows the way VMangos
   does instead of hardcoding the same fixes.
   """
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.SpellEffectMod
+  alias ThistleTea.DB.Mangos.SpellMod
   alias ThistleTea.DB.Mangos.SpellTemplate
 
   @client_build 5875
@@ -22,9 +23,27 @@ defmodule ThistleTea.Game.World.Loader.SpellEffectOverride do
   end
 
   def load_all do
+    load_spell_mods()
     load_effect_mods()
     load_spell_template_fixes()
     :ok
+  end
+
+  defp load_spell_mods do
+    SpellMod
+    |> where([s], not is_nil(s.aura_interrupt_flags))
+    |> select([s], {s.id, s.aura_interrupt_flags})
+    |> Mangos.Repo.all()
+    |> Enum.each(fn {spell_id, flags} -> :ets.insert(__MODULE__, {{:aura_interrupt_flags, spell_id}, flags}) end)
+  end
+
+  def aura_interrupt_flags(spell_id, default) when is_integer(spell_id) do
+    case :ets.lookup(__MODULE__, {:aura_interrupt_flags, spell_id}) do
+      [{_key, flags}] -> flags
+      _ -> default
+    end
+  rescue
+    ArgumentError -> default
   end
 
   defp load_effect_mods do

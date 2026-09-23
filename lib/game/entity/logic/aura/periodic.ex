@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
   alias ThistleTea.Game.Entity.Logic.Aura.Reactions
+  alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
@@ -251,7 +252,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     proc_event =
       Effects.spell_heal(holder.caster_guid, entity.object.guid, holder.spell, amount, false, periodic?: true)
 
-    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event, proc_event | threat_events]}
+    events = [event, proc_event | threat_events] ++ Script.periodic_events(entity, holder)
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
   end
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :obs_mod_mana, next_tick_at: at} = aura, now)

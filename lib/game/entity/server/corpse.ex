@@ -21,10 +21,19 @@ defmodule ThistleTea.Game.Entity.Server.Corpse do
   def init(%Corpse{} = state) do
     Process.flag(:trap_exit, true)
 
-    Metadata.put(state.object.guid, %{
-      owner: state.corpse.owner,
-      ghost_time: state.internal.corpse_reclaim.released_at
-    })
+    metadata =
+      state.corpse.owner
+      |> Metadata.get()
+      |> Kernel.||(%{})
+      |> Map.take([:faction_template, :faction_template_id, :faction_can_have_reputation?])
+
+    Metadata.put(
+      state.object.guid,
+      Map.merge(metadata, %{
+        owner: state.corpse.owner,
+        ghost_time: state.internal.corpse_reclaim.released_at
+      })
+    )
 
     World.update_position(state)
     state = Visibility.join_entity(state)

@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Projectile
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.SpellMagnets
 
@@ -185,9 +186,15 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
   def emit(entity, %Effects.SpellCastResult{}, _context), do: entity
 
-  def emit(entity, %Effects.SpellFocusResolved{cast: cast, focus: focus, now: now}, context) do
+  def emit(entity, %Effects.CastRequirementsResolved{cast: cast, requirements: requirements, now: now}, context) do
     entity
-    |> Casting.resolve_focus(cast, focus, now)
+    |> Casting.resolve_requirements(cast, requirements, now)
+    |> EventSink.emit_pending(context)
+  end
+
+  def emit(entity, %Effects.StartTriggeredChannel{} = effect, context) do
+    entity
+    |> Casting.start_triggered(effect.spell, effect.targets, Time.now(), effect.cast_item_guid, effect.context)
     |> EventSink.emit_pending(context)
   end
 

@@ -6,6 +6,12 @@ defmodule ThistleTea.Game.World.Loader.SpellModifierMasksVmangosTest do
   @moduletag :vmangos_db
 
   describe "load_all/0" do
+    test "loads Cannibalize damage interruption from spell_mod" do
+      SpellEffectOverride.load_all()
+      assert SpellEffectOverride.aura_interrupt_flags(20_578, 0) == 2
+      assert SpellEffectOverride.aura_interrupt_flags(999_999, 16) == 16
+    end
+
     test "loads vanilla Vile Poisons masks from the latest supported build" do
       SpellEffectOverride.load_all()
 

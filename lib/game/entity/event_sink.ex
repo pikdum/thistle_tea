@@ -104,7 +104,8 @@ defmodule ThistleTea.Game.Entity.EventSink do
   @spell_effects [
     Effects.AddComboPoints,
     Effects.TeachSpell,
-    Effects.SpellFocusResolved,
+    Effects.CastRequirementsResolved,
+    Effects.StartTriggeredChannel,
     Effects.ScriptedCast,
     Effects.PetSpellModifiers,
     Effects.SpellMagnetsChanged,

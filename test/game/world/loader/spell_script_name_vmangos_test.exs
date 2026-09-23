@@ -16,6 +16,8 @@ defmodule ThistleTea.Game.World.Loader.SpellScriptNameVmangosTest do
       assert SpellScriptName.get(2098) == "spell_rogue_eviscerate"
       assert SpellScriptName.get(23_989) == "spell_hunter_readiness"
       assert SpellScriptName.get(1122) == "spell_warlock_inferno"
+      assert SpellScriptName.get(20_577) == "spell_cannibalize"
+      assert SpellScriptName.get(20_578) == "spell_cannibalize_aura"
       assert SpellScriptName.get(19_503) == nil
     end
   end

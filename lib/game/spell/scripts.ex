@@ -81,7 +81,10 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def channel_trigger_spell_id(%Spell{id: 1515}, @tame_beast_completion), do: @tame_beast_ownership
   def channel_trigger_spell_id(_spell, trigger_spell_id), do: trigger_spell_id
 
-  def successful_finish_trigger(%Spell{} = spell), do: Priest.holy_nova_heal_id(spell)
+  def successful_finish_trigger(%Spell{} = spell) do
+    if Spell.vmangos_script?(spell, "spell_cannibalize"), do: 20_578, else: Priest.holy_nova_heal_id(spell)
+  end
+
   def successful_finish_trigger(_spell), do: nil
 
   def proc_trigger_spell_id(%Spell{} = spell, triggering_spell_id) do

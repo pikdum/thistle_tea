@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.World.SpellFocusTest do
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Focus
+  alias ThistleTea.Game.Spell.Requirements
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
@@ -114,7 +115,7 @@ defmodule ThistleTea.Game.World.SpellFocusTest do
       spawn_object(focus, caster.internal.world, {1.0, 0.0, 0.0, 0.0})
       started = Casting.start(caster, spell, Target.self(caster.object.guid), 1_000)
       ready = Casting.complete(started, 2_000)
-      assert [%Effects.CheckSpellFocus{}] = ready.internal.events
+      assert [%Effects.CheckCastRequirements{}] = ready.internal.events
       completed = EventSink.emit_pending(ready, Context.new(self()))
       assert completed.internal.casting == nil
       assert completed.unit.power1 == 90
@@ -124,15 +125,15 @@ defmodule ThistleTea.Game.World.SpellFocusTest do
     end
   end
 
-  describe "resolve_focus/4" do
+  describe "resolve_requirements/4" do
     test "ignores a result belonging to a cancelled or replaced cast", %{caster: caster, spell: spell} do
       started = Casting.start(caster, spell, Target.self(caster.object.guid), 1_000)
       pending = Casting.complete(started, 2_000)
       cast = pending.internal.casting
       cancelled = Casting.cancel(pending, 2_000)
-      assert Casting.resolve_focus(cancelled, cast, %Focus{id: 50_001}, 2_000) == cancelled
+      assert Casting.resolve_requirements(cancelled, cast, %Requirements{focus: %Focus{id: 50_001}}, 2_000) == cancelled
       replacement = %{cancelled | internal: %{cancelled.internal | casting: Cast.new(spell, Target.none(), 3_000)}}
-      assert Casting.resolve_focus(replacement, cast, nil, 3_000) == replacement
+      assert Casting.resolve_requirements(replacement, cast, %Requirements{}, 3_000) == replacement
     end
   end
 

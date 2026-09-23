@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.TriggeredHitDbcTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EffectResolver.Spells
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Guid
@@ -122,11 +123,20 @@ defmodule ThistleTea.Game.Entity.EffectResolver.TriggeredHitDbcTest do
     end
 
     test "beneficial, unclassified and weapon spells bypass the magic roll", %{caster: caster, target: target} do
-      for id <- [139, 2050, 5143, 78] do
+      for id <- [139, 2050, 78] do
         events = resolve(caster, target.object.guid, id)
         assert [%Effects.SpellGo{misses: []} | _] = events
         assert Enum.any?(events, &match?(%Effects.DeliverSpell{cast_context: %{hit_outcome: :hit}}, &1))
       end
+    end
+
+    test "caster channels retain their selected enemy without a wrapper hit roll", %{caster: caster, target: target} do
+      assert [%Effects.StartTriggeredChannel{} = event] = resolve(caster, target.object.guid, 5143)
+      entity = Casting.start_triggered(caster, event.spell, event.targets, 1_000, nil, event.context)
+      assert Enum.sort(entity.internal.casting.resolution.hits) == Enum.sort([caster.object.guid, target.object.guid])
+      assert entity.internal.casting.resolution.misses == []
+      assert entity.internal.casting.resolution.followups.selected_unit_guid == target.object.guid
+      assert entity.unit.channel_object == target.object.guid
     end
 
     test "a saved resist still allows reflection to resolve first", %{caster: caster, target: target} do

@@ -200,7 +200,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       dispel_type: row.dispel_type || 0,
       required_focus_id: row.requires_spell_focus || 0,
       speed: row.speed || 0.0,
-      aura_interrupt_flags: row.aura_interrupt_flags || 0,
+      aura_interrupt_flags: SpellEffectOverrideLoader.aura_interrupt_flags(row.id, row.aura_interrupt_flags || 0),
       interrupt_flags: row.interrupt_flags || 0,
       channel_interrupt_flags: row.channel_interrupt_flags || 0,
       mechanic: row.mechanic || 0,

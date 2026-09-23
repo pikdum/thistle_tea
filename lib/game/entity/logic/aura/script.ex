@@ -30,6 +30,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
     Enum.flat_map(holders, &after_remove_holder(entity, &1, cause))
   end
 
+  def periodic_events(%{unit: %{health: health}}, %Holder{spell: spell}) when is_integer(health) and health > 0 do
+    if Spell.vmangos_script?(spell, "spell_cannibalize_aura"), do: [%Effects.EmoteState{emote_id: 398}], else: []
+  end
+
+  def periodic_events(_entity, _holder), do: []
+
   @ignite_pct %{11_119 => 4, 11_120 => 8, 12_846 => 12, 12_847 => 16, 12_848 => 20}
   @ignite_dot 12_654
   @master_of_elements [29_074, 29_075, 29_076]
@@ -260,10 +266,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
          cause
        )
        when is_integer(caster_guid) and is_integer(target_guid) do
-    if wyvern_sting_removal?(spell, cause) do
-      wyvern_sting_events(spell_id, caster_guid, caster_level, target_guid)
-    else
-      shapeshift_after_remove(entity, spell)
+    cond do
+      wyvern_sting_removal?(spell, cause) -> wyvern_sting_events(spell_id, caster_guid, caster_level, target_guid)
+      Spell.vmangos_script?(spell, "spell_cannibalize_aura") -> [%Effects.EmoteState{emote_id: 0}]
+      true -> shapeshift_after_remove(entity, spell)
     end
   end
 

@@ -192,6 +192,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Spell resurrection](docs/spell-resurrection-playtest.md), with owned-corpse targeting, cross-map offers, instance admission, recovery after travel acknowledgement, and Rebirth countdown bypass
 - Soulstones and Reincarnation, with reagent consumption, cooldowns, and talent modifiers
 - [Deferred spell cooldowns](docs/deferred-cooldowns-playtest.md), with aura and owned-object events, retained item overrides, ritual cancellation, and reconnect restoration
+- [Cannibalize](docs/cannibalize-playtest.md), with nearby corpse eligibility, triggered healing channels, damage interruption, and animation cleanup
 - fall damage, Safe Fall, and Slow Fall protection
 - [Environmental fire damage](docs/environmental-fire-playtest.md), with world campfires, resistance, shield depletion, combat-log feedback, and death durability loss
 - underwater breath timers, drowning, water-breathing effects, and extended breath reserves
