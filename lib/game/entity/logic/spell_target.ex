@@ -25,6 +25,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
       query = party_query(spell, unit_guid) ->
         query
 
+      query = master_query(spell, unit_guid) ->
+        query
+
       raid_class_aoe_spell?(spell) ->
         {:party_class_aoe, unit_guid, raid_class_radius(spell)}
 
@@ -122,6 +125,22 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
 
   defp target_party_aoe_spell?(%Spell{effects: effects}) do
     Enum.any?(effects, &effect_targets?(&1, [:party_around_target]))
+  end
+
+  defp caster_master_spell?(%Spell{effects: effects}) do
+    Enum.any?(effects, &effect_targets?(&1, [:caster_master]))
+  end
+
+  defp master_query(spell, unit_guid) do
+    cond do
+      enemy_and_master_spell?(spell) and is_integer(unit_guid) -> {:unit_and_master, unit_guid}
+      caster_master_spell?(spell) -> :caster_master
+      true -> nil
+    end
+  end
+
+  defp enemy_and_master_spell?(%Spell{effects: effects} = spell) do
+    caster_master_spell?(spell) and Enum.any?(effects, &effect_targets?(&1, [:target_enemy]))
   end
 
   def party_member_spell?(%Spell{effects: effects}) do

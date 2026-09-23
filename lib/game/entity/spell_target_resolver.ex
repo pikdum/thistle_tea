@@ -145,6 +145,17 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
 
   defp resolve_query(caster, caster_guid, {:party_unit, guid}), do: party_unit_guids(caster, caster_guid, guid)
 
+  defp resolve_query(caster, caster_guid, :caster_master) do
+    case party_owner_guid(caster, caster_guid) do
+      owner_guid when is_integer(owner_guid) and owner_guid != caster_guid -> [owner_guid]
+      _ -> []
+    end
+  end
+
+  defp resolve_query(caster, caster_guid, {:unit_and_master, unit_guid}) do
+    resolve_query(caster, caster_guid, :caster_master) ++ [unit_guid]
+  end
+
   defp resolve_query(caster, caster_guid, query) do
     case query do
       {:caster_aoe, radius} ->

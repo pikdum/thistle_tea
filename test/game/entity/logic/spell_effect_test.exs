@@ -149,6 +149,73 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   end
 
   describe "receive/4" do
+    test "master-targeted auras stay on the owner while caster effects stay on the pet" do
+      spell = %Spell{
+        id: 99_027,
+        duration_ms: 10_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :mod_stat,
+            base_points: 10,
+            misc_value: 3,
+            implicit_target_a: :caster_master
+          },
+          %Effect{
+            index: 1,
+            type: :apply_aura,
+            aura: :mod_damage_done,
+            base_points: 5,
+            misc_value: 1,
+            implicit_target_a: :caster
+          }
+        ]
+      }
+
+      owner_context = %CastContext{caster_guid: 2, caster_level: 50, target_role: :other}
+      pet_context = %CastContext{caster_guid: 2, caster_level: 50, target_role: :caster}
+      {owner, _events} = SpellEffect.receive(character_fixture(), owner_context, spell, 1_000)
+      pet = %{target_fixture() | object: %Object{guid: 2}}
+      {pet, _events} = SpellEffect.receive(pet, pet_context, spell, 1_000)
+
+      assert Aura.flat_amount(owner, :mod_stat) == 10
+      assert Aura.flat_amount(owner, :mod_damage_done) == 0
+      assert Aura.flat_amount(pet, :mod_stat) == 0
+      assert Aura.flat_amount(pet, :mod_damage_done) == 5
+    end
+
+    test "mixed enemy and master effects do not damage the owner" do
+      spell = %Spell{
+        id: 99_028,
+        school: :fire,
+        duration_ms: 10_000,
+        effects: [
+          %Effect{index: 0, type: :school_damage, base_points: 50, implicit_target_a: :target_enemy},
+          %Effect{
+            index: 1,
+            type: :apply_aura,
+            aura: :mod_stat,
+            base_points: 10,
+            misc_value: 3,
+            implicit_target_a: :target_enemy,
+            implicit_target_b: :caster_master
+          }
+        ]
+      }
+
+      owner_context = %CastContext{caster_guid: 2, caster_level: 50, target_role: :other, target_hostile?: false}
+      enemy_context = %CastContext{caster_guid: 2, caster_level: 50, target_role: :other, target_hostile?: true}
+      {owner, _events} = SpellEffect.receive(character_fixture(), owner_context, spell, 1_000)
+      enemy = %{target_fixture() | unit: %Unit{health: 100, max_health: 100, level: 50, auras: []}}
+      {enemy, _events} = SpellEffect.receive(enemy, enemy_context, spell, 1_000)
+
+      assert owner.unit.health == 100
+      assert Aura.flat_amount(owner, :mod_stat) == 10
+      assert enemy.unit.health < 100
+      assert Aura.flat_amount(enemy, :mod_stat) == 10
+    end
+
     test "positive melee-class buffs cannot be dodged by their recipient" do
       spell = %Spell{
         id: 24_604,

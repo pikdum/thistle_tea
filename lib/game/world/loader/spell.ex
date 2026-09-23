@@ -798,6 +798,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(39), do: :caster_fishing_spot
   defp target_type(24), do: :aoe_enemy_in_cone
   defp target_type(25), do: :any_unit
+  defp target_type(27), do: :caster_master
   defp target_type(28), do: :aoe_enemy_at_channel
   defp target_type(32), do: :minion_position
   defp target_type(5), do: :pet

@@ -61,6 +61,29 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
       assert Spell.requires_friendly_target?(spell)
     end
 
+    test "master-targeted pet spells ignore an explicit selected unit" do
+      spell = %Spell{
+        effects: [
+          %Effect{type: :apply_aura, implicit_target_a: :caster_master},
+          %Effect{type: :instakill, implicit_target_a: :caster}
+        ]
+      }
+
+      assert SpellTarget.target_query(spell, Target.none()) == :caster_master
+      assert SpellTarget.target_query(spell, Target.unit(7)) == :caster_master
+    end
+
+    test "mixed enemy and master spells retain both recipients" do
+      spell = %Spell{
+        effects: [
+          %Effect{type: :school_damage, implicit_target_a: :target_enemy},
+          %Effect{type: :apply_aura, implicit_target_a: :target_enemy, implicit_target_b: :caster_master}
+        ]
+      }
+
+      assert SpellTarget.target_query(spell, Target.unit(7)) == {:unit_and_master, 7}
+    end
+
     test "returns none without matching target data" do
       spell = aoe_spell(:aoe_enemy_at_dest)
 

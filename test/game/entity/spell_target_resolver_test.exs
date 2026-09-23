@@ -184,6 +184,51 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
       assert SpellTargetResolver.resolve(pet_caster, spell, Target.unit(stranger)) == []
     end
 
+    test "pet spells reach their master and preserve a separate caster effect" do
+      owner = player_guid()
+      stranger = player_guid()
+      pet = Guid.runtime(:pet, 2960)
+      put_spatial_target(:players, owner, {0.0, 0.0, 0.0})
+      put_spatial_target(:players, stranger, {0.0, 0.0, 0.0})
+      put_spatial_target(:mobs, pet, {0.0, 0.0, 0.0})
+      Metadata.update(pet, %{owner_guid: owner})
+
+      spell = %Spell{
+        id: 7812,
+        custom_flags: 4,
+        effects: [
+          %Effect{type: :apply_aura, implicit_target_a: :caster_master},
+          %Effect{type: :instakill, implicit_target_a: :caster}
+        ]
+      }
+
+      pet_caster = Map.put(caster(pet, {0.0, 0.0, 0.0}), :unit, %Unit{created_by: owner})
+      assert SpellTargetResolver.resolve(pet_caster, spell, Target.none()) == [owner, pet]
+      assert SpellTargetResolver.resolve(pet_caster, spell, Target.unit(stranger)) == [owner, pet]
+      assert SpellTargetResolver.resolve(caster(owner, {0.0, 0.0, 0.0}), spell, Target.none()) == [owner]
+    end
+
+    test "mixed enemy and master effects reach both recipients" do
+      owner = player_guid()
+      enemy = player_guid()
+      pet = Guid.runtime(:pet, 2961)
+      put_spatial_target(:players, owner, {0.0, 0.0, 0.0})
+      put_spatial_target(:players, enemy, {0.0, 0.0, 0.0})
+      put_spatial_target(:mobs, pet, {0.0, 0.0, 0.0})
+      Metadata.update(pet, %{owner_guid: owner})
+
+      spell = %Spell{
+        id: 24_826,
+        effects: [
+          %Effect{type: :school_damage, implicit_target_a: :target_enemy},
+          %Effect{type: :apply_aura, implicit_target_a: :target_enemy, implicit_target_b: :caster_master}
+        ]
+      }
+
+      pet_caster = Map.put(caster(pet, {0.0, 0.0, 0.0}), :unit, %Unit{created_by: owner})
+      assert SpellTargetResolver.resolve(pet_caster, spell, Target.unit(enemy)) == [owner, enemy]
+    end
+
     test "returns direct unit targets without world lookup" do
       caster = %{object: %{guid: 1}}
       spell = %Spell{id: 133, effects: []}
