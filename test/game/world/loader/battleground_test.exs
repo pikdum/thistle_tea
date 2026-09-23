@@ -46,10 +46,10 @@ defmodule ThistleTea.Game.World.Loader.BattlegroundTest do
 
       assert BattlegroundLoader.base_flag_db_guid(:alliance, table) == 90_000
       assert BattlegroundLoader.base_flag_db_guid(:horde, table) == 90_001
-      assert BattlegroundLoader.gate_entries(table) == [179_918]
-      assert BattlegroundLoader.ghost_gate_db_guids(table) == [90_064]
-      assert BattlegroundLoader.ghost_gate_entries(table) == [180_322]
-      assert BattlegroundLoader.spirit_guide_entries(table) == [13_116]
+      assert BattlegroundLoader.gate_entries(489, table) == [179_918]
+      assert BattlegroundLoader.ghost_gate_db_guids(489, table) == [90_064]
+      assert BattlegroundLoader.ghost_gate_entries(489, table) == [180_322]
+      assert BattlegroundLoader.spirit_guide_entries(489, table) == [13_116, 13_117]
     end
   end
 

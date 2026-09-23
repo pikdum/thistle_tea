@@ -7,10 +7,12 @@ defmodule ThistleTea.Game.World.System.Battleground do
   alias ThistleTea.Game.Battleground
   alias ThistleTea.Game.Battleground.Defeat
   alias ThistleTea.Game.Battleground.Effects.Scoreboard
+  alias ThistleTea.Game.Battleground.Lifecycle
+  alias ThistleTea.Game.Battleground.Rules
   alias ThistleTea.Game.Battleground.WarsongGulch
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World.Battleground.EffectSink
+  alias ThistleTea.Game.World.Battleground.Graveyard
   alias ThistleTea.Game.World.Battleground.Match
   alias ThistleTea.Game.World.Battleground.Supervisor, as: MatchSupervisor
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
@@ -118,7 +120,7 @@ defmodule ThistleTea.Game.World.System.Battleground do
        catalog: Keyword.get(opts, :catalog, BattlegroundLoader),
        match_supervisor: Keyword.get(opts, :match_supervisor, MatchSupervisor),
        match_options: Keyword.get(opts, :match_options, []),
-       effect_sink: Keyword.get(opts, :effect_sink, &EffectSink.emit/2)
+       effect_sink: Keyword.get(opts, :effect_sink)
      }}
   end
 
@@ -288,12 +290,13 @@ defmodule ThistleTea.Game.World.System.Battleground do
 
   def handle_call({:graveyard, world, guid}, _from, state) do
     reply =
-      with pid when is_pid(pid) <- Map.get(state.worlds, world),
-           match = Match.snapshot(pid),
-           %{team: team} <- Map.get(match.players, guid) do
-        team_graveyard(match.template, team)
-      else
-        _missing -> nil
+      case Map.get(state.worlds, world) do
+        pid when is_pid(pid) ->
+          match = Match.snapshot(pid)
+          Graveyard.for_player(match, guid)
+
+        _missing ->
+          nil
       end
 
     {:reply, reply, state}
@@ -305,7 +308,7 @@ defmodule ThistleTea.Game.World.System.Battleground do
     allowed? =
       with pid when is_pid(pid) <- Map.get(state.worlds, world),
            {:inside, ^pid, _team} <- Map.get(state.players, guid),
-           %WarsongGulch{phase: :active} <- Match.snapshot(pid) do
+           %{phase: :active} <- Match.snapshot(pid) do
         true
       else
         _inactive -> false
@@ -429,9 +432,11 @@ defmodule ThistleTea.Game.World.System.Battleground do
   end
 
   defp validate_group(state, players, map_id) do
-    case state.catalog.template_for_map(map_id) do
-      nil -> {:error, :unsupported_battleground}
-      template -> validate_roster(state, players, template)
+    with rules when not is_nil(rules) <- Rules.for_map(map_id),
+         template when not is_nil(template) <- state.catalog.template_for_map(map_id) do
+      validate_roster(state, players, template)
+    else
+      _unsupported -> {:error, :unsupported_battleground}
     end
   end
 
@@ -586,7 +591,7 @@ defmodule ThistleTea.Game.World.System.Battleground do
         info = Map.fetch!(state.matches, pid)
         match = Match.snapshot(pid)
 
-        auto_leave_ms = WarsongGulch.auto_leave_ms(match, Time.now())
+        auto_leave_ms = Lifecycle.auto_leave_ms(match, Time.now())
 
         %{
           status: :in_progress,
@@ -615,7 +620,7 @@ defmodule ThistleTea.Game.World.System.Battleground do
           world: info.world,
           phase: match.phase,
           scores: match.team_scores,
-          flags: Map.new(match.flags, fn {team, flag} -> {team, flag.state} end),
+          objectives: Rules.fetch!(match.world.map_id).objectives(match),
           players: %{
             alliance: Map.get(team_counts, :alliance, 0),
             horde: Map.get(team_counts, :horde, 0),
@@ -641,8 +646,6 @@ defmodule ThistleTea.Game.World.System.Battleground do
 
   defp team_destination(template, :alliance), do: template.alliance_start
   defp team_destination(template, :horde), do: template.horde_start
-  defp team_graveyard(template, :alliance), do: template.alliance_graveyard || template.alliance_start
-  defp team_graveyard(template, :horde), do: template.horde_graveyard || template.horde_start
 
   defp match_pid({:invited, pid, _team}), do: pid
   defp match_pid({:inside, pid, _team}), do: pid
@@ -656,22 +659,24 @@ defmodule ThistleTea.Game.World.System.Battleground do
     match = Match.snapshot(pid)
 
     cond do
-      entry in catalog.gate_entries() ->
+      entry in catalog.gate_entries(match.world.map_id) ->
         reconcile_gate(match.phase, guid)
 
-      entry in catalog.ghost_gate_entries() ->
+      entry in catalog.ghost_gate_entries(match.world.map_id) ->
         reconcile_ghost_gate(match.phase, guid)
 
-      entry == 179_830 and match.flags.alliance.state != :base ->
-        Entity.hide_game_object(guid)
-
-      entry == 179_831 and match.flags.horde.state != :base ->
-        Entity.hide_game_object(guid)
-
       true ->
-        :ok
+        reconcile_flag(match, guid, entry)
     end
   end
+
+  defp reconcile_flag(%WarsongGulch{flags: %{alliance: %{state: state}}}, guid, 179_830) when state != :base,
+    do: Entity.hide_game_object(guid)
+
+  defp reconcile_flag(%WarsongGulch{flags: %{horde: %{state: state}}}, guid, 179_831) when state != :base,
+    do: Entity.hide_game_object(guid)
+
+  defp reconcile_flag(_match, _guid, _entry), do: :ok
 
   defp reconcile_gate(:countdown, guid), do: Entity.operate_game_object(guid, :close)
   defp reconcile_gate(_phase, guid), do: Entity.operate_game_object(guid, :open)

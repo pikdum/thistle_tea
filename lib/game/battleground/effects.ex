@@ -1,6 +1,41 @@
 defmodule ThistleTea.Game.Battleground.Effects do
   @moduledoc false
 
+  defmodule StartBuffs do
+    @moduledoc false
+    @enforce_keys [:positions]
+    defstruct [:positions]
+  end
+
+  defmodule StopBuffs do
+    @moduledoc false
+    defstruct []
+  end
+
+  defmodule SetEvent do
+    @moduledoc false
+    @enforce_keys [:event, :state]
+    defstruct [:event, :state]
+  end
+
+  defmodule NodeAnnouncement do
+    @moduledoc false
+    @enforce_keys [:node, :team, :action]
+    defstruct [:node, :team, :action, :actor_guid]
+  end
+
+  defmodule QuestKillCredit do
+    @moduledoc false
+    @enforce_keys [:guid, :entry]
+    defstruct [:guid, :entry]
+  end
+
+  defmodule TeamSpell do
+    @moduledoc false
+    @enforce_keys [:team, :spell_id]
+    defstruct [:team, :spell_id]
+  end
+
   defmodule OperateGates do
     @moduledoc false
     @enforce_keys [:action]

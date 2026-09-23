@@ -13,6 +13,8 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.AreaEffects
+  alias ThistleTea.Game.World.Battleground.BuffRegistry
+  alias ThistleTea.Game.World.Battleground.Spawns
   alias ThistleTea.Game.World.Battleground.Supervisor, as: BattlegroundSupervisor
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ChaseWatch
@@ -160,6 +162,7 @@ defmodule ThistleTea.Application do
         ThistleTea.DBC,
         Repo,
         BattlegroundSupervisor,
+        {Registry, keys: :unique, name: BuffRegistry},
         BattlegroundSystem,
         OutdoorPvpSystem,
         {ChatChannels, load_catalog: !test},
@@ -229,6 +232,7 @@ defmodule ThistleTea.Application do
     BankBagSlotPriceLoader.init()
     StableSlotPriceLoader.init()
     BattlegroundLoader.init()
+    Spawns.init()
     BroadcastTextLoader.init()
     SummonLoader.init()
     PetLevelLoader.init()

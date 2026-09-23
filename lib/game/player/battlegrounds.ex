@@ -345,14 +345,16 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
     end
   end
 
-  defp carrier_positions(match, world, team) do
+  defp carrier_positions(%{flags: flags}, world, team) do
     flag_team = if team == :alliance, do: :horde, else: :alliance
 
-    case Map.fetch!(match.flags, flag_team) do
+    case Map.fetch!(flags, flag_team) do
       %{state: :carried, carrier: guid} -> position_entry(world, guid)
       _flag -> []
     end
   end
+
+  defp carrier_positions(_match, _world, _team), do: []
 
   defp position_entry(world, guid) do
     case World.position(guid) do
@@ -367,6 +369,7 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
   end
 
   defp spirit_guide?(character, guid) do
-    Guid.entry(guid) in BattlegroundLoader.spirit_guide_entries() and nearby?(character, guid)
+    Guid.entry(guid) in BattlegroundLoader.spirit_guide_entries(character.internal.world.map_id) and
+      nearby?(character, guid)
   end
 end

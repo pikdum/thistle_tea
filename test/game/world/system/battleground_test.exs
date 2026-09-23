@@ -35,8 +35,8 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
     end
 
     def template_for_map(_map), do: nil
-    def gate_entries, do: []
-    def ghost_gate_entries, do: [180_322]
+    def gate_entries(_map_id), do: []
+    def ghost_gate_entries(_map_id), do: [180_322]
   end
 
   setup do
@@ -215,7 +215,7 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
                status: :wait_join,
                phase: :countdown,
                scores: %{alliance: 0, horde: 0},
-               flags: %{alliance: :base, horde: :base},
+               objectives: %{alliance: :base, horde: :base},
                players: %{alliance: 1, horde: 0, inside: 0}
              } = BattlegroundSystem.debug_info(1, server)
 

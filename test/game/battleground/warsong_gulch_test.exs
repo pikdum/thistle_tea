@@ -3,9 +3,9 @@ defmodule ThistleTea.Game.Battleground.WarsongGulchTest do
 
   alias ThistleTea.Game.Battleground.Defeat
   alias ThistleTea.Game.Battleground.Effects
+  alias ThistleTea.Game.Battleground.Result
   alias ThistleTea.Game.Battleground.Template
   alias ThistleTea.Game.Battleground.WarsongGulch
-  alias ThistleTea.Game.Battleground.WarsongGulch.Result
   alias ThistleTea.Game.WorldRef
 
   @alliance 1

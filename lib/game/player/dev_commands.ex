@@ -830,10 +830,12 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
   defp battleground_command(state, ["join"]), do: battleground_command(state, ["join", "warsong"])
 
-  defp battleground_command(state, ["join", "warsong"]) do
-    case PlayerBattlegrounds.debug_join_solo(state, @warsong_gulch_map_id) do
+  defp battleground_command(state, ["join", name]) when name in ["warsong", "arathi"] do
+    map_id = if name == "warsong", do: @warsong_gulch_map_id, else: 529
+
+    case PlayerBattlegrounds.debug_join_solo(state, map_id) do
       {:ok, state} ->
-        system_message(state, "Solo Warsong Gulch invitation created. Click Enter Battle.")
+        system_message(state, "Solo battleground invitation created. Click Enter Battle.")
 
       {:error, reason, state} ->
         system_message(state, battleground_error(reason))
@@ -842,7 +844,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
   defp battleground_command(state, ["start"]) do
     case PlayerBattlegrounds.debug_start_now(state) do
-      {:ok, state} -> system_message(state, "Warsong Gulch started; gates opened.")
+      {:ok, state} -> system_message(state, "Battleground started; gates opened.")
       {:error, reason, state} -> system_message(state, battleground_error(reason))
     end
   end
@@ -862,7 +864,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   end
 
   defp battleground_command(state, _params) do
-    system_message(state, "Invalid command. Use: .battleground <join [warsong]|start|info|leave>")
+    system_message(state, "Invalid command. Use: .battleground <join [warsong|arathi]|start|info|leave>")
   end
 
   defp battleground_info_message(%{status: :none}), do: "Battleground: none."
@@ -874,14 +876,14 @@ defmodule ThistleTea.Game.Player.DevCommands do
   defp battleground_info_message(info) do
     scores = "#{info.scores.alliance}-#{info.scores.horde}"
     teams = "#{info.players.alliance} Alliance / #{info.players.horde} Horde / #{info.players.inside} inside"
-    flags = "Alliance #{info.flags.alliance}, Horde #{info.flags.horde}"
+    objectives = inspect(info.objectives)
 
-    "Battleground: #{info.status}, #{world_label(info.world)}, phase #{info.phase}, score #{scores}, players #{teams}, flags #{flags}."
+    "Battleground: #{info.status}, #{world_label(info.world)}, phase #{inspect(info.phase)}, score #{scores}, players #{teams}, objectives #{objectives}."
   end
 
   defp battleground_error(:already_queued), do: "You are already queued or matched."
-  defp battleground_error(:level_restricted), do: "Your level is outside the Warsong Gulch range."
-  defp battleground_error(:unsupported_battleground), do: "Warsong Gulch data is not loaded."
+  defp battleground_error(:level_restricted), do: "Your level is outside this battleground's range."
+  defp battleground_error(:unsupported_battleground), do: "This battleground is unavailable."
   defp battleground_error(:not_counting_down), do: "The battleground is not counting down."
   defp battleground_error(:not_in_battleground), do: "You are not in a battleground."
   defp battleground_error(:not_ready), do: "Your player session is not ready."

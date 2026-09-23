@@ -2,9 +2,9 @@ defmodule ThistleTea.Game.World.BattlegroundEffectSinkTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Battleground.Effects
+  alias ThistleTea.Game.Battleground.Player
   alias ThistleTea.Game.Battleground.Template
   alias ThistleTea.Game.Battleground.WarsongGulch
-  alias ThistleTea.Game.Battleground.WarsongGulch.Player
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message

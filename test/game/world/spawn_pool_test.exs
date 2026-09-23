@@ -11,6 +11,8 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Battleground.Spawns, as: BattlegroundSpawns
+  alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool
@@ -18,6 +20,43 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
   alias ThistleTea.Game.WorldRef
 
   describe "singleton lifecycle" do
+    test "battleground ownership gates first activation, refresh, and delayed reactivation" do
+      db_guid = 8_000_000 + System.unique_integer([:positive])
+      guid = Guid.from_low_guid(:game_object, 1, db_guid)
+      world = WorldRef.instance(529, System.unique_integer([:positive]))
+      group = {:singleton, :game_object, db_guid}
+      key = {world, group}
+      member = {:game_object, db_guid}
+      binding = %{map: 529, event1: 0, event2: 3, kind: :game_object, db_guid: db_guid, entry: 1}
+      binding_key = {:bindings, 529, :game_object, db_guid}
+      event_key = {:event_member, 529, 0, 3, :game_object, db_guid}
+      :ets.insert(BattlegroundLoader, [{binding_key, [binding]}, {event_key, binding}])
+      BattlegroundSpawns.open(world)
+
+      on_exit(fn ->
+        SpawnPool.stop_world(world)
+        BattlegroundSpawns.close(world)
+        :ets.delete(BattlegroundLoader, binding_key)
+        :ets.delete(BattlegroundLoader, event_key)
+      end)
+
+      :ok = SpawnPool.activate(group, {world, 0, 0}, game_object(guid))
+      assert SpawnPool.status(key).running == []
+      BattlegroundSpawns.set_event(world, 0, 3)
+      await_pool_running(key, [member])
+      [{pool, _value}] = Registry.lookup(SpawnPool.Registry, key)
+      {first, _ref} = :sys.get_state(pool).running[member]
+      runtime_guid = :sys.get_state(first).object.guid
+      BattlegroundSpawns.set_event(world, 0, 4)
+      await_absent(runtime_guid)
+      send(pool, {:reactivate, member})
+      GenServer.cast(pool, {:refresh, []})
+      assert SpawnPool.status(key).running == []
+      BattlegroundSpawns.set_event(world, 0, 3)
+      await_pool_running(key, [member])
+      assert :sys.get_state(pool).running[member] |> elem(0) != first
+    end
+
     test "consumed quest objects disappear and respawn with fresh use state" do
       {guid, group, world, key, cell} = singleton_fixture()
       blueprint = game_object(guid)

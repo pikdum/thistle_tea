@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Battleground.Template do
     :alliance_win_spell,
     :alliance_lose_spell,
     :horde_win_spell,
-    :horde_lose_spell
+    :horde_lose_spell,
+    node_graveyards: %{}
   ]
 end

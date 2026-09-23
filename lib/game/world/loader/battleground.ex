@@ -42,7 +42,7 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
     templates = Mangos.Repo.all(from(row in Mangos.BattlegroundTemplate, where: row.patch <= @supported_patch))
     battlemasters = Mangos.Repo.all(Mangos.BattlemasterEntry)
     safe_locs = load_safe_locs(templates)
-    event_members = load_event_members(Battleground.warsong_gulch_map())
+    event_members = Enum.flat_map([489, 529], &load_event_members/1)
     load(templates, safe_locs, battlemasters, event_members)
   end
 
@@ -73,7 +73,14 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
       )
     end)
 
+    event_members
+    |> Enum.group_by(&{&1.map, &1.kind, &1.db_guid})
+    |> Enum.each(fn {{map, kind, guid}, bindings} ->
+      :ets.insert(table, {{:bindings, map, kind, guid}, bindings})
+    end)
+
     :ets.insert(table, {:loaded, true})
+
     :ok
   end
 
@@ -104,24 +111,24 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
   def base_flag_db_guid(:alliance, table), do: first_game_object_guid(0, table)
   def base_flag_db_guid(:horde, table), do: first_game_object_guid(1, table)
 
-  def gate_entries(table \\ __MODULE__) do
-    Battleground.warsong_gulch_map()
+  def gate_entries(map_id, table \\ __MODULE__) do
+    map_id
     |> event_members(254, table)
     |> Enum.map(& &1.entry)
     |> Enum.uniq()
     |> Enum.sort()
   end
 
-  def ghost_gate_db_guids(table \\ __MODULE__) do
-    Battleground.warsong_gulch_map()
+  def ghost_gate_db_guids(map_id, table \\ __MODULE__) do
+    map_id
     |> event_members(253, table)
     |> Enum.filter(&(&1.kind == :game_object))
     |> Enum.map(& &1.db_guid)
     |> Enum.sort()
   end
 
-  def ghost_gate_entries(table \\ __MODULE__) do
-    Battleground.warsong_gulch_map()
+  def ghost_gate_entries(map_id, table \\ __MODULE__) do
+    map_id
     |> event_members(253, table)
     |> Enum.filter(&(&1.kind == :game_object))
     |> Enum.map(& &1.entry)
@@ -129,16 +136,13 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
     |> Enum.sort()
   end
 
-  def spirit_guide_entries(table \\ __MODULE__) do
-    Battleground.warsong_gulch_map()
-    |> event_members(2, table)
-    |> Enum.filter(&(&1.kind == :creature))
-    |> Enum.map(& &1.entry)
-    |> Enum.uniq()
-    |> Enum.sort()
+  def spirit_guide_entries(_map_id, _table \\ __MODULE__), do: [13_116, 13_117]
+
+  def bindings(map_id, kind, db_guid, table \\ __MODULE__) do
+    lookup(table, {:bindings, map_id, kind, db_guid}) || []
   end
 
-  def broadcast_text_ids, do: @warsong_broadcast_text_ids
+  def broadcast_text_ids, do: @warsong_broadcast_text_ids ++ [10_477, 10_478, 10_479, 10_598, 10_599, 10_633, 10_634]
 
   defp template(row, safe_locs) do
     %Template{
@@ -155,7 +159,8 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
       alliance_win_spell: row.alliance_win_spell,
       alliance_lose_spell: row.alliance_lose_spell,
       horde_win_spell: row.horde_win_spell,
-      horde_lose_spell: row.horde_lose_spell
+      horde_lose_spell: row.horde_lose_spell,
+      node_graveyards: node_graveyards(safe_locs, row.id)
     }
   end
 
@@ -174,7 +179,7 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
     ids =
       templates
       |> Enum.flat_map(&[&1.alliance_start_location, &1.horde_start_location])
-      |> Kernel.++([771, 772])
+      |> Kernel.++([771, 772, 893, 894, 895, 896, 897, 898, 899])
       |> Enum.uniq()
 
     DBC.all(from(loc in WorldSafeLocs, where: loc.id in ^ids))
@@ -183,7 +188,17 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
 
   defp graveyard(safe_locs, :alliance, 2), do: safe_location(safe_locs, 771)
   defp graveyard(safe_locs, :horde, 2), do: safe_location(safe_locs, 772)
+  defp graveyard(safe_locs, :alliance, 3), do: safe_location(safe_locs, 898)
+  defp graveyard(safe_locs, :horde, 3), do: safe_location(safe_locs, 899)
   defp graveyard(_safe_locs, _team, _type_id), do: nil
+
+  defp node_graveyards(safe_locs, 3) do
+    [895, 894, 893, 897, 896]
+    |> Enum.with_index()
+    |> Map.new(fn {id, node} -> {node, safe_location(safe_locs, id)} end)
+  end
+
+  defp node_graveyards(_safe_locs, _type_id), do: %{}
 
   defp load_event_members(map_id) do
     game_objects =

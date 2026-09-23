@@ -5,36 +5,16 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
 
   alias ThistleTea.Game.Battleground.Defeat
   alias ThistleTea.Game.Battleground.Effects
+  alias ThistleTea.Game.Battleground.Lifecycle
+  alias ThistleTea.Game.Battleground.Player
+  alias ThistleTea.Game.Battleground.Result
+  alias ThistleTea.Game.Battleground.Roster
   alias ThistleTea.Game.Battleground.Template
   alias ThistleTea.Game.WorldRef
-
-  defmodule Player do
-    @moduledoc false
-    @enforce_keys [:guid, :name, :team]
-    defstruct [
-      :guid,
-      :name,
-      :team,
-      :return_to,
-      status: :invited,
-      killing_blows: 0,
-      honorable_kills: 0,
-      deaths: 0,
-      bonus_honor: 0,
-      flag_captures: 0,
-      flag_returns: 0
-    ]
-  end
 
   defmodule Flag do
     @moduledoc false
     defstruct state: :base, carrier: nil, dropped_guid: nil, generation: 0
-  end
-
-  defmodule Result do
-    @moduledoc false
-    @enforce_keys [:match]
-    defstruct [:match, effects: [], timers: []]
   end
 
   @enforce_keys [:world, :client_instance_id, :bracket, :template]
@@ -65,8 +45,6 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
   @start_delay_ms 120_000
   @flag_respawn_ms 23_000
   @flag_drop_ms 10_000
-  @resurrection_wave_ms 30_000
-  @auto_leave_ms 120_000
   @flag_capture_honor [48, 82, 136, 226, 378, 396]
   @win_honor [24, 41, 68, 113, 189, 198]
 
@@ -88,11 +66,7 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
   def new(%WorldRef{} = world, client_instance_id, bracket, %Template{} = template, reservations, now, opts \\ []) do
     start_delay_ms = Keyword.get(opts, :start_delay_ms, @start_delay_ms)
 
-    players =
-      Map.new(reservations, fn reservation ->
-        player = struct(Player, reservation)
-        {player.guid, player}
-      end)
+    players = Roster.new(reservations)
 
     match = %__MODULE__{
       world: world,
@@ -108,49 +82,18 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
     %Result{
       match: match,
       effects: [%Effects.OperateGates{action: :close}],
-      timers: start_timers(start_delay_ms) ++ [resurrection_timer(start_delay_ms)]
+      timers: Lifecycle.start_timers(start_delay_ms)
     }
   end
 
-  def enter(%__MODULE__{} = match, guid, return_to) do
-    case Map.get(match.players, guid) do
-      %Player{} = player ->
-        player = %{player | status: :inside, return_to: return_to}
-        match = put_player(match, player)
-        %Result{match: match, effects: [%Effects.PlayerJoined{guid: guid}]}
-
-      nil ->
-        %Result{match: match}
-    end
-  end
-
-  def reserve(%__MODULE__{phase: phase} = match, reservations) when phase in [:countdown, :active] do
-    players =
-      Enum.reduce(reservations, match.players, fn reservation, players ->
-        player = struct(Player, reservation)
-        Map.put_new(players, player.guid, player)
-      end)
-
-    %Result{match: %{match | players: players}}
-  end
-
-  def reserve(%__MODULE__{} = match, _reservations), do: %Result{match: match}
-
-  def reconnect(%__MODULE__{} = match, guid) do
-    case Map.get(match.players, guid) do
-      %Player{} = player ->
-        player = %{player | status: :inside}
-        %Result{match: put_player(match, player), effects: [%Effects.PlayerJoined{guid: guid}]}
-
-      nil ->
-        %Result{match: match}
-    end
-  end
+  defdelegate enter(match, guid, return_to), to: Roster
+  defdelegate reserve(match, reservations), to: Roster
+  defdelegate reconnect(match, guid), to: Roster
 
   def disconnect(%__MODULE__{} = match, guid, position, dropped_guid) do
     case Map.get(match.players, guid) do
       %Player{} = player ->
-        match = put_player(match, %{player | status: :offline})
+        match = Roster.put_player(match, %{player | status: :offline})
         drop_carried_flag(match, guid, position, dropped_guid)
 
       nil ->
@@ -171,7 +114,9 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
     end
   end
 
-  def use_game_object(%__MODULE__{phase: :active} = match, guid, object_guid, entry, position, now) do
+  def use_game_object(match, guid, object_guid, entry, position, now, events \\ [])
+
+  def use_game_object(%__MODULE__{phase: :active} = match, guid, object_guid, entry, position, now, _events) do
     with %Player{status: :inside} = player <- Map.get(match.players, guid),
          {:ok, flag_team, source} <- flag_source(match, object_guid, entry) do
       interact_with_flag(match, player, flag_team, source, object_guid, position, now)
@@ -180,12 +125,12 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
     end
   end
 
-  def use_game_object(%__MODULE__{} = match, _guid, _object_guid, entry, _position, _now)
+  def use_game_object(%__MODULE__{} = match, _guid, _object_guid, entry, _position, _now, _events)
       when entry in [@alliance_flag_base, @horde_flag_base, @alliance_flag_ground, @horde_flag_ground] do
     {:handled, %Result{match: match}}
   end
 
-  def use_game_object(%__MODULE__{} = match, _guid, _object_guid, _entry, _position, _now) do
+  def use_game_object(%__MODULE__{} = match, _guid, _object_guid, _entry, _position, _now, _events) do
     {:unhandled, %Result{match: match}}
   end
 
@@ -210,7 +155,7 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
   def player_died(%__MODULE__{phase: :active} = match, %Defeat{} = defeat, dropped_guid) do
     case Map.get(match.players, defeat.victim_guid) do
       %Player{status: :inside} ->
-        match = update_death_scores(match, defeat)
+        match = Roster.update_death_scores(match, defeat)
         drop_carried_flag(match, defeat.victim_guid, defeat.position, dropped_guid)
 
       _absent ->
@@ -220,15 +165,7 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
 
   def player_died(%__MODULE__{} = match, %Defeat{}, _dropped_guid), do: %Result{match: match}
 
-  def queue_resurrection(%__MODULE__{} = match, guid) do
-    case Map.get(match.players, guid) do
-      %Player{status: :inside} ->
-        %Result{match: %{match | resurrection_queue: MapSet.put(match.resurrection_queue, guid)}}
-
-      _ ->
-        %Result{match: match}
-    end
-  end
+  defdelegate queue_resurrection(match, guid), to: Roster
 
   def handle_timer(%__MODULE__{phase: :countdown} = match, :start_one_minute, _now) do
     %Result{match: match, effects: [announce(10_015, :neutral)]}
@@ -253,16 +190,6 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
     }
   end
 
-  def handle_timer(%__MODULE__{phase: :active} = match, :status_refresh, _now) do
-    %Result{
-      match: match,
-      effects: [
-        %Effects.UpdateStatus{},
-        scoreboard_snapshot(match)
-      ]
-    }
-  end
-
   def handle_timer(%__MODULE__{} = match, {:flag_return, team, generation}, _now) do
     case Map.fetch!(match.flags, team) do
       %Flag{state: :ground, generation: ^generation, dropped_guid: guid} -> return_flag(match, team, guid, nil)
@@ -277,28 +204,9 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
     end
   end
 
-  def handle_timer(%__MODULE__{phase: phase} = match, :resurrection_wave, now) when phase in [:countdown, :active] do
-    guids = MapSet.to_list(match.resurrection_queue)
-    effects = if guids == [], do: [], else: [%Effects.ResurrectPlayers{guids: guids}]
-
-    %Result{
-      match: %{match | resurrection_queue: MapSet.new(), next_resurrection_at: now + @resurrection_wave_ms},
-      effects: effects,
-      timers: [resurrection_timer(@resurrection_wave_ms)]
-    }
+  def handle_timer(%__MODULE__{} = match, key, now) do
+    Lifecycle.handle_timer(match, key, now, scoreboard_snapshot(match))
   end
-
-  def handle_timer(%__MODULE__{phase: {:ended, _winner}} = match, :auto_leave, _now) do
-    destinations =
-      match.players
-      |> Map.values()
-      |> Enum.filter(&(&1.status in [:inside, :offline] and not is_nil(&1.return_to)))
-      |> Map.new(&{&1.guid, &1.return_to})
-
-    %Result{match: match, effects: [%Effects.ExitPlayers{destinations: destinations}]}
-  end
-
-  def handle_timer(%__MODULE__{} = match, _key, _now), do: %Result{match: match}
 
   def world_states(%__MODULE__{} = match) do
     alliance = Map.fetch!(match.flags, :alliance)
@@ -315,34 +223,14 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
     ]
   end
 
-  def scoreboard_snapshot(%__MODULE__{} = match) do
-    case match.phase do
-      {:ended, winner} -> %Effects.Scoreboard{ended?: true, winner: winner, players: scoreboard(match)}
-      _active -> %Effects.Scoreboard{ended?: false, players: scoreboard(match)}
-    end
-  end
+  def scoreboard_snapshot(%__MODULE__{} = match), do: Lifecycle.scoreboard_snapshot(match, scoreboard(match))
+  defdelegate auto_leave_ms(match, now), to: Lifecycle
 
-  def auto_leave_ms(%__MODULE__{ended_at: ended_at}, now) when is_integer(ended_at),
-    do: max(ended_at + @auto_leave_ms - now, 0)
+  def scoreboard(%__MODULE__{} = match), do: Roster.scoreboard(match, &[&1.flag_captures, &1.flag_returns])
 
-  def auto_leave_ms(%__MODULE__{}, _now), do: 0
+  def graveyard(%__MODULE__{} = match, team, _position), do: Lifecycle.team_graveyard(match.template, team)
 
-  def scoreboard(%__MODULE__{} = match) do
-    match.players
-    |> Map.values()
-    |> Enum.sort_by(& &1.guid)
-    |> Enum.map(fn player ->
-      %{
-        guid: player.guid,
-        rank: 4,
-        killing_blows: player.killing_blows,
-        honorable_kills: player.honorable_kills,
-        deaths: player.deaths,
-        bonus_honor: player.bonus_honor,
-        fields: [player.flag_captures, player.flag_returns]
-      }
-    end)
-  end
+  def objectives(%__MODULE__{} = match), do: Map.new(match.flags, fn {team, flag} -> {team, flag.state} end)
 
   def carried_flag(%__MODULE__{} = match, guid) do
     Enum.find_value(match.flags, fn
@@ -358,12 +246,7 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
     |> Enum.map(& &1.guid)
   end
 
-  def next_resurrection_ms(%__MODULE__{} = match, now) do
-    case match.next_resurrection_at do
-      at when is_integer(at) -> max(at - now, 0)
-      _ -> @resurrection_wave_ms
-    end
-  end
+  defdelegate next_resurrection_ms(match, now), to: Lifecycle
 
   defp interact_with_flag(match, %Player{} = player, flag_team, :base, object_guid, _position, _now) do
     flag = Map.fetch!(match.flags, flag_team)
@@ -431,7 +314,7 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
 
     match =
       if is_integer(actor_guid),
-        do: update_player(match, actor_guid, &%{&1 | flag_returns: &1.flag_returns + 1}),
+        do: Roster.update_player(match, actor_guid, &%{&1 | flag_returns: &1.flag_returns + 1}),
         else: match
 
     announcement =
@@ -470,8 +353,10 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
       captured_flag = %{captured_flag | state: :waiting, carrier: nil, dropped_guid: nil, generation: generation}
       match = put_flag(match, captured_flag_team, captured_flag)
       match = put_team_score(match, scoring_team, Map.fetch!(match.team_scores, scoring_team) + 1)
-      match = update_player(match, player.guid, &%{&1 | flag_captures: &1.flag_captures + 1})
-      {match, honor_reward} = reward_team_bonus(match, scoring_team, Enum.at(@flag_capture_honor, match.bracket, 0))
+      match = Roster.update_player(match, player.guid, &%{&1 | flag_captures: &1.flag_captures + 1})
+
+      {match, honor_reward} =
+        Roster.reward_team_bonus(match, scoring_team, Enum.at(@flag_capture_honor, match.bracket, 0))
 
       effects = [
         honor_reward,
@@ -544,55 +429,9 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
   end
 
   defp end_match(match, winner, now, prior_effects) do
-    {match, honor_reward} = reward_team_bonus(match, winner, Enum.at(@win_honor, match.bracket, 0))
-    match = %{match | phase: {:ended, winner}, ended_at: now}
-    aura_effects = carried_aura_effects(match)
-
-    %Result{
-      match: match,
-      effects:
-        prior_effects ++
-          aura_effects ++
-          [
-            honor_reward,
-            announce(win_text(winner), :neutral),
-            %Effects.UpdateStatus{},
-            scoreboard_snapshot(match),
-            %Effects.RewardPlayers{winner: winner, players: Map.values(match.players)}
-          ],
-      timers: [{:auto_leave, @auto_leave_ms}]
-    }
-  end
-
-  defp update_death_scores(match, %Defeat{} = defeat) do
-    match =
-      if defeat.count_death?,
-        do: update_player(match, defeat.victim_guid, &%{&1 | deaths: &1.deaths + 1}),
-        else: match
-
-    victim = Map.fetch!(match.players, defeat.victim_guid)
-
-    case Map.get(match.players, defeat.killer_guid) do
-      %Player{status: :inside, team: team} when team != victim.team ->
-        match = update_player(match, defeat.killer_guid, &%{&1 | killing_blows: &1.killing_blows + 1})
-
-        [defeat.killer_guid | defeat.nearby_guids]
-        |> Enum.uniq()
-        |> Enum.reduce(match, &credit_team_kill(&2, &1, team))
-
-      _ineligible ->
-        match
-    end
-  end
-
-  defp credit_team_kill(match, guid, team) do
-    case Map.get(match.players, guid) do
-      %Player{status: :inside, team: ^team} ->
-        update_player(match, guid, &%{&1 | honorable_kills: &1.honorable_kills + 1})
-
-      _ineligible ->
-        match
-    end
+    {match, honor_reward} = Roster.reward_team_bonus(match, winner, Enum.at(@win_honor, match.bracket, 0))
+    effects = prior_effects ++ carried_aura_effects(match) ++ [honor_reward, announce(win_text(winner), :neutral)]
+    Lifecycle.finish(match, winner, now, effects, scoreboard(match))
   end
 
   defp flag_source(match, _object_guid, @alliance_flag_base) do
@@ -615,17 +454,6 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
 
   defp flag_source(_match, _object_guid, _entry), do: :error
 
-  defp start_timers(delay) do
-    [{:start, delay}]
-    |> maybe_add_start_timer(:start_one_minute, delay - 60_000)
-    |> maybe_add_start_timer(:start_half_minute, delay - 30_000)
-  end
-
-  defp maybe_add_start_timer(timers, _key, delay) when delay <= 0, do: timers
-  defp maybe_add_start_timer(timers, key, delay), do: [{key, delay} | timers]
-
-  defp resurrection_timer(delay), do: {:resurrection_wave, max(delay, 0)}
-
   defp taken_world_state(%Flag{state: :ground}), do: 0xFFFFFFFF
   defp taken_world_state(%Flag{state: :carried}), do: 1
   defp taken_world_state(%Flag{}), do: 0
@@ -633,33 +461,8 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
   defp carrier_world_state(%Flag{state: :carried}), do: 2
   defp carrier_world_state(%Flag{}), do: 1
 
-  defp put_player(match, %Player{} = player), do: %{match | players: Map.put(match.players, player.guid, player)}
-
-  defp update_player(match, guid, update) do
-    case Map.get(match.players, guid) do
-      %Player{} = player -> put_player(match, update.(player))
-      nil -> match
-    end
-  end
-
   defp put_flag(match, team, %Flag{} = flag), do: %{match | flags: Map.put(match.flags, team, flag)}
   defp put_team_score(match, team, score), do: %{match | team_scores: Map.put(match.team_scores, team, score)}
-
-  defp reward_team_bonus(match, team, amount) do
-    guids =
-      match.players
-      |> Map.values()
-      |> Enum.filter(&(&1.team == team and &1.status == :inside))
-      |> Enum.map(& &1.guid)
-      |> Enum.sort()
-
-    players =
-      Enum.reduce(guids, match.players, fn guid, players ->
-        Map.update!(players, guid, &%{&1 | bonus_honor: &1.bonus_honor + amount})
-      end)
-
-    {%{match | players: players}, %Effects.RewardHonor{guids: guids, amount: amount}}
-  end
 
   defp carried_aura_effects(match) do
     Enum.flat_map(match.flags, fn

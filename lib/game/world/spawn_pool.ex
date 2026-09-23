@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.SpatialGrid
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Battleground.Spawns, as: BattlegroundSpawns
   alias ThistleTea.Game.World.CombatLeashes
   alias ThistleTea.Game.World.CreatureGroups
   alias ThistleTea.Game.World.InstanceSpawn
@@ -102,8 +103,15 @@ defmodule ThistleTea.Game.World.SpawnPool do
   end
 
   def resume_game_object(%WorldRef{} = world, db_guid) when is_integer(db_guid) do
-    group = Catalog.group_for(:game_object, db_guid)
-    member = {:game_object, db_guid}
+    resume(world, {:game_object, db_guid})
+  end
+
+  def suspend_spawn(%WorldRef{} = world, {kind, db_guid} = member) do
+    suspend_member({world, Catalog.group_for(kind, db_guid)}, member, nil)
+  end
+
+  def resume(%WorldRef{} = world, {kind, db_guid} = member) do
+    group = Catalog.group_for(kind, db_guid)
 
     case GenServer.whereis(via({world, group})) do
       nil -> :ok
@@ -450,6 +458,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
       cond do
         Map.has_key?(acc.running, member) -> {acc, errors}
         not selected_cell_active?(acc, member) -> {acc, errors}
+        not BattlegroundSpawns.allowed?(acc.world, member) -> {acc, errors}
         true -> start_member(acc, member, errors)
       end
     end)

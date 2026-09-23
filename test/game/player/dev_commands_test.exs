@@ -480,7 +480,7 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
       assert_receive {:"$gen_cast",
                       {:send_packet,
                        %Message.SmsgMessagechat{
-                         message: "Invalid command. Use: .battleground <join [warsong]|start|info|leave>"
+                         message: "Invalid command. Use: .battleground <join [warsong|arathi]|start|info|leave>"
                        }}}
     end
   end

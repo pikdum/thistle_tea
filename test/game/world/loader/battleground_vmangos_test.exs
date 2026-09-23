@@ -79,10 +79,10 @@ defmodule ThistleTea.Game.World.Loader.BattlegroundVMangosTest do
     assert length(battlemasters) == 8
     assert BattlegroundLoader.base_flag_db_guid(:alliance, table) == 90_000
     assert BattlegroundLoader.base_flag_db_guid(:horde, table) == 90_001
-    assert length(BattlegroundLoader.gate_entries(table)) == 6
-    assert BattlegroundLoader.ghost_gate_db_guids(table) == [90_064, 90_065, 90_066, 90_067]
-    assert BattlegroundLoader.ghost_gate_entries(table) == [180_322]
-    assert BattlegroundLoader.spirit_guide_entries(table) == [13_116, 13_117]
+    assert length(BattlegroundLoader.gate_entries(489, table)) == 6
+    assert BattlegroundLoader.ghost_gate_db_guids(489, table) == [90_064, 90_065, 90_066, 90_067]
+    assert BattlegroundLoader.ghost_gate_entries(489, table) == [180_322]
+    assert BattlegroundLoader.spirit_guide_entries(489, table) == [13_116, 13_117]
     assert Enum.map(spirit_guides, & &1.entry) |> Enum.sort() == [13_116, 13_117]
     assert Enum.all?(spirit_guides, &(Bitwise.band(&1.extra_flags, 0x00000002) != 0))
   end

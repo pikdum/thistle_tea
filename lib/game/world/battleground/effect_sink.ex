@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
   """
 
   alias ThistleTea.Game.Battleground.Effects
-  alias ThistleTea.Game.Battleground.WarsongGulch
+  alias ThistleTea.Game.Battleground.Lifecycle
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Honor.Award
@@ -13,6 +13,9 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Battleground.Buffs
+  alias ThistleTea.Game.World.Battleground.Graveyard
+  alias ThistleTea.Game.World.Battleground.Spawns
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Loader.BroadcastText, as: BroadcastTextLoader
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
@@ -23,13 +26,18 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
   @alliance_flag_aura 23_335
   @horde_flag_aura 23_333
 
-  def emit(%WarsongGulch{} = match, effects) when is_list(effects) do
-    Enum.each(effects, &emit_effect(match, &1))
+  def emit(%{world: _world, players: _players} = match, effects, opts \\ []) when is_list(effects) do
+    Enum.each(effects, fn
+      %Effects.StartBuffs{positions: positions} -> Buffs.start(match.world, Keyword.fetch!(opts, :owner), positions)
+      %Effects.StopBuffs{} -> Buffs.stop(match.world)
+      effect -> emit_effect(match, effect)
+    end)
+
     :ok
   end
 
   defp emit_effect(match, %Effects.OperateGates{action: action}) do
-    gate_entries = MapSet.new(BattlegroundLoader.gate_entries())
+    gate_entries = MapSet.new(BattlegroundLoader.gate_entries(match.world.map_id))
 
     match.world
     |> World.guids()
@@ -38,7 +46,37 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
   end
 
   defp emit_effect(match, %Effects.DespawnGhostGates{}) do
-    Enum.each(BattlegroundLoader.ghost_gate_db_guids(), &SpawnPool.suspend_game_object(match.world, &1, nil))
+    Spawns.set_event(match.world, 253, nil)
+  end
+
+  defp emit_effect(match, %Effects.SetEvent{event: event, state: state}) do
+    Spawns.set_event(match.world, event, state)
+  end
+
+  defp emit_effect(match, %Effects.NodeAnnouncement{} = effect) do
+    node = Enum.at(["Stables", "Blacksmith", "Farm", "Lumber Mill", "Gold Mine"], effect.node)
+    faction = if effect.team == :alliance, do: "Alliance", else: "Horde"
+
+    text =
+      case effect.action do
+        :claimed -> "$n claims the #{node}! If left unchallenged, the #{faction} will control it in 1 minute!"
+        :assaulted -> "$n has assaulted the #{node}!"
+        :defended -> "$n has defended the #{node}!"
+        :captured -> "The #{faction} has taken the #{node}!"
+      end
+
+    packet = battleground_message(replace_actor(text, effect.actor_guid), effect.team, effect.actor_guid)
+    send_to(match, :all, packet)
+  end
+
+  defp emit_effect(_match, %Effects.QuestKillCredit{guid: guid, entry: entry}),
+    do: Entity.quest_kill_credit(guid, entry)
+
+  defp emit_effect(match, %Effects.TeamSpell{team: team, spell_id: spell_id}) do
+    match.players
+    |> Map.values()
+    |> Enum.filter(&(&1.team == team and &1.status == :inside))
+    |> Enum.each(&Entity.trigger_spell(&1.guid, spell_id, &1.guid, triggered: true))
   end
 
   defp emit_effect(match, %Effects.UpdateStatus{}) do
@@ -50,7 +88,7 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
       bracket: match.bracket,
       client_instance_id: match.client_instance_id,
       status: :in_progress,
-      time_one_ms: WarsongGulch.auto_leave_ms(match, now),
+      time_one_ms: Lifecycle.auto_leave_ms(match, now),
       time_two_ms: elapsed_ms
     }
 
@@ -129,7 +167,7 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
   defp emit_effect(match, %Effects.ResurrectPlayers{guids: guids}) do
     Enum.each(guids, fn guid ->
       case Map.get(match.players, guid) do
-        %{team: team} -> Entity.battleground_resurrect(guid, graveyard(match, team))
+        %{team: _team} -> Entity.battleground_resurrect(guid, Graveyard.for_player(match, guid))
         _missing -> :ok
       end
     end)
@@ -209,9 +247,6 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
 
     String.replace(text, "$n", name)
   end
-
-  defp graveyard(match, :alliance), do: match.template.alliance_graveyard || match.template.alliance_start
-  defp graveyard(match, :horde), do: match.template.horde_graveyard || match.template.horde_start
 
   defp reward_spell(match, winner, :alliance) do
     if winner == :alliance, do: match.template.alliance_win_spell, else: match.template.alliance_lose_spell
