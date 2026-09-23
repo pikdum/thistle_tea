@@ -58,6 +58,7 @@ defmodule ThistleTea.Game.Entity.Data.Corpse do
       },
       internal: %Internal{
         world: internal.world,
+        corpse_reclaim: internal.corpse_reclaim,
         area: internal.area,
         name: internal.name
       }

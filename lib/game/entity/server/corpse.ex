@@ -9,7 +9,6 @@ defmodule ThistleTea.Game.Entity.Server.Corpse do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Network
-  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Visibility
@@ -24,7 +23,7 @@ defmodule ThistleTea.Game.Entity.Server.Corpse do
 
     Metadata.put(state.object.guid, %{
       owner: state.corpse.owner,
-      ghost_time: Time.now()
+      ghost_time: state.internal.corpse_reclaim.released_at
     })
 
     World.update_position(state)

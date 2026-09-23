@@ -87,6 +87,9 @@ defmodule ThistleTea.Game.World.System.Battleground do
   def graveyard(%WorldRef{} = world, guid, server \\ __MODULE__), do: GenServer.call(server, {:graveyard, world, guid})
   def match_for_world(%WorldRef{} = world, server \\ __MODULE__), do: GenServer.call(server, {:match_for_world, world})
 
+  def corpse_recovery_allowed?(%WorldRef{} = world, guid, server \\ __MODULE__),
+    do: GenServer.call(server, {:corpse_recovery_allowed, world, guid})
+
   def reconnect(guid, %WorldRef{} = world, server \\ __MODULE__) do
     GenServer.call(server, {:reconnect, guid, world})
   end
@@ -297,6 +300,21 @@ defmodule ThistleTea.Game.World.System.Battleground do
   end
 
   def handle_call({:match_for_world, world}, _from, state), do: {:reply, Map.get(state.worlds, world), state}
+
+  def handle_call({:corpse_recovery_allowed, world, guid}, _from, state) do
+    allowed? =
+      with pid when is_pid(pid) <- Map.get(state.worlds, world),
+           {:inside, ^pid, _team} <- Map.get(state.players, guid),
+           %WarsongGulch{phase: :active} <- Match.snapshot(pid) do
+        true
+      else
+        _inactive -> false
+      end
+
+    {:reply, allowed?, state}
+  rescue
+    _error -> {:reply, false, state}
+  end
 
   def handle_call({:participants, world}, _from, state) do
     players =

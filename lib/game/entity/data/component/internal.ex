@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
   alias ThistleTea.Game.Entity.Data.Buyback
   alias ThistleTea.Game.Entity.Data.ChatStatus
   alias ThistleTea.Game.Entity.Data.Companion
+  alias ThistleTea.Game.Entity.Data.CorpseReclaim
   alias ThistleTea.Game.Entity.Data.Honor.Damage, as: HonorDamage
   alias ThistleTea.Game.Entity.Data.PetStable
   alias ThistleTea.Game.Entity.Data.Pvp
@@ -91,6 +92,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     temporary_threat: %{},
     diminishing_returns: %{},
     companion: Companion.none(),
+    corpse_reclaim: %CorpseReclaim{},
     guardians: %{},
     guardian_monitors: %{},
     pet_stable: %PetStable{},

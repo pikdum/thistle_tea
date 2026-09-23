@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.CorpseReclaim
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Spell
@@ -23,7 +24,6 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
   @player_flag_ghost 0x10
   @unit_byte1_always_stand 0x01
 
-  @reclaim_delay_ms 30_000
   @corpse_reclaim_radius 39.0
   @resurrection_sickness_level 11
   @resurrection_sickness_max_ms 600_000
@@ -31,7 +31,6 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
   def ghost_spell_id, do: @ghost_spell_id
   def wisp_spell_id, do: @wisp_spell_id
   def resurrection_sickness_spell_id, do: @resurrection_sickness_spell_id
-  def reclaim_delay_ms, do: @reclaim_delay_ms
   def corpse_reclaim_radius, do: @corpse_reclaim_radius
 
   def ghost_spell_ids(%{unit: %Unit{race: @night_elf_race}}), do: [@ghost_spell_id, @wisp_spell_id]
@@ -90,7 +89,7 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
 
     player = %{player | flags: (player.flags || 0) &&& bnot(@player_flag_ghost), self_res_spell: 0}
 
-    character = %{character | unit: unit, player: player}
+    character = %{character | unit: unit, player: player} |> CorpseReclaim.clear_release()
 
     {Core.mark_broadcast_update(character), combat_events ++ events ++ [Effects.movement_root_changed(false)]}
   end
@@ -112,7 +111,7 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
 
     player = %{player | flags: (player.flags || 0) &&& bnot(@player_flag_ghost), self_res_spell: 0}
 
-    character = %{character | unit: unit, player: player}
+    character = %{character | unit: unit, player: player} |> CorpseReclaim.clear_release()
 
     {Core.mark_broadcast_update(character), combat_events ++ events ++ [Effects.movement_root_changed(false)]}
   end

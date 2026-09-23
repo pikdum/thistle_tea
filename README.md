@@ -187,6 +187,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Instance group membership](docs/instance-membership-playtest.md), with group copy adoption, removal countdowns, reinvite cancellation, home transfers, and safe regrouping
 - Deadmines boss doors and gunpowder cannon breach, with Smite's alarms and pirate response
 - dying + resurrecting
+- [Corpse recovery](docs/corpse-recovery-playtest.md), with escalating repeat-death delays, reconnect countdowns, server-enforced reclaim checks, and battleground recovery rules
 - Soulstones and Reincarnation, with reagent consumption, cooldowns, and talent modifiers
 - fall damage, Safe Fall, and Slow Fall protection
 - [Environmental fire damage](docs/environmental-fire-playtest.md), with world campfires, resistance, shield depletion, combat-log feedback, and death durability loss

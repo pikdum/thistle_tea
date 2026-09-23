@@ -131,6 +131,23 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
     end
   end
 
+  describe "corpse_recovery_allowed?/3" do
+    test "permits only admitted players after preparation ends", %{server: server} do
+      :ok = BattlegroundSystem.join(alliance(1), 489, server)
+      :ok = BattlegroundSystem.join(horde(2), 489, server)
+      world = WorldRef.instance(489, 1)
+      return_to = {WorldRef.open(0), {0.0, 0.0, 0.0, 0.0}}
+      {:ok, ^world, _position} = BattlegroundSystem.port(1, 1, return_to, server)
+      refute BattlegroundSystem.corpse_recovery_allowed?(world, 1, server)
+      :ok = BattlegroundSystem.debug_start_now(world, server)
+      assert BattlegroundSystem.corpse_recovery_allowed?(world, 1, server)
+      refute BattlegroundSystem.corpse_recovery_allowed?(world, 2, server)
+      refute BattlegroundSystem.corpse_recovery_allowed?(WorldRef.instance(489, 999), 1, server)
+      BattlegroundSystem.leave(1, {0.0, 0.0, 0.0, 0.0}, server)
+      refute BattlegroundSystem.corpse_recovery_allowed?(world, 1, server)
+    end
+  end
+
   describe "player_died/3" do
     test "routes defeat credit and exposes only the admitted roster", %{server: server} do
       assert :ok = BattlegroundSystem.join(alliance(1), 489, server)

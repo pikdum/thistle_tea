@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.CorpseReclaim
   alias ThistleTea.Game.Entity.Logic.Critter
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.Dueling
@@ -140,6 +141,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
         |> maybe_prepare_self_res(health, new_health, now)
         |> maybe_record_killer(health, new_health, Keyword.get(opts, :source))
         |> maybe_enter_spirit_of_redemption(health, new_health, now, opts)
+        |> CorpseReclaim.on_damage(health, now)
         |> mark_broadcast_update()
         |> maybe_dead(now)
         |> Critter.react(Keyword.get(opts, :source), now)

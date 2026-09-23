@@ -2,104 +2,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgRepopRequest do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_REPOP_REQUEST
 
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Corpse
-  alias ThistleTea.Game.Entity.Data.Item, as: DataItem
-  alias ThistleTea.Game.Entity.EventSink
-  alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Death
-  alias ThistleTea.Game.Entity.Logic.Inventory
-  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
-  alias ThistleTea.Game.Network.MovementControl
-  alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World.ItemStore
-  alias ThistleTea.Game.World.Loader.Graveyard, as: GraveyardLoader
-  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
-  alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
-  alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Game.Player.Corpses
 
   defstruct []
 
   @impl ClientMessage
-  def handle(%__MODULE__{}, %{ready: true, character: %Character{} = character} = state) do
-    if Core.dead?(character) and not Death.ghost?(character) do
-      release_spirit(state, character)
-    else
-      state
-    end
-  end
-
-  def handle(_message, state), do: state
+  def handle(%__MODULE__{}, state), do: Corpses.release(state)
 
   @impl ClientMessage
-  def from_binary(_payload) do
-    %__MODULE__{}
-  end
-
-  defp release_spirit(state, character) do
-    now = Time.now()
-    spawn_corpse(character)
-
-    ghost_spells =
-      character
-      |> Death.ghost_spell_ids()
-      |> Enum.map(&SpellLoader.load/1)
-      |> Enum.reject(&is_nil/1)
-
-    {character, events} = Death.release_spirit(character, ghost_spells, now)
-    character = EventSink.emit(character, events)
-
-    state = PlayerServer.maybe_broadcast_update(%{state | character: character})
-
-    Network.send_packet(%Message.SmsgCorpseReclaimDelay{delay_ms: Death.reclaim_delay_ms()})
-
-    Visibility.notify_visibility_changed(state.character)
-    state = Visibility.resync_player(state)
-
-    defer_graveyard_teleport(state, state.character)
-  end
-
-  def spawn_corpse(character) do
-    corpse_guid = Corpse.guid_for(character.object.guid)
-    World.stop_entity(corpse_guid)
-
-    character
-    |> Corpse.build(equipped_templates(character))
-    |> World.start_entity()
-  end
-
-  defp equipped_templates(character) do
-    Inventory.slots()
-    |> Enum.map(fn field ->
-      with guid when is_integer(guid) and guid > 0 <- Map.get(character.player, field),
-           %DataItem{} = item <- ItemStore.get(guid) do
-        DataItem.template(item)
-      else
-        _ -> nil
-      end
-    end)
-  end
-
-  defp defer_graveyard_teleport(state, character) do
-    %{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x, y, z, _o}}} = character
-    team = GraveyardLoader.team_for_race(character.unit.race)
-
-    case BattlegroundSystem.graveyard(world, character.object.guid) do
-      {gx, gy, gz, _orientation} ->
-        MovementControl.defer_repop(state, {gx, gy, gz, world})
-
-      nil ->
-        defer_open_world_graveyard(state, world.map_id, {x, y, z}, team)
-    end
-  end
-
-  defp defer_open_world_graveyard(state, map_id, position, team) do
-    case GraveyardLoader.closest(map_id, position, team) do
-      %{map: graveyard_map, position: {gx, gy, gz}} ->
-        MovementControl.defer_repop(state, {gx, gy, gz, graveyard_map})
-
-      _missing ->
-        state
-    end
-  end
+  def from_binary(_payload), do: %__MODULE__{}
 end

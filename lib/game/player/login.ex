@@ -55,6 +55,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Player.Auction
   alias ThistleTea.Game.Player.Buyback
   alias ThistleTea.Game.Player.ConditionContext
+  alias ThistleTea.Game.Player.Corpses
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.Guilds
   alias ThistleTea.Game.Player.HomeBind
@@ -279,6 +280,7 @@ defmodule ThistleTea.Game.Player.Login do
 
   def send_init_packets(c, opts \\ []) do
     WorldStates.initialize(c)
+    Corpses.send_reclaim_delay(c)
 
     # needed for no white chatbox + keybinds
     Network.send_packet(%Message.SmsgAccountDataTimes{})
