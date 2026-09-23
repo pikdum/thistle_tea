@@ -18,9 +18,11 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
+  alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
+  alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
@@ -277,26 +279,42 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp validate_cast(%{character: character} = state, %Spell{} = spell, %Target{} = targets, cast_item_guid) do
     enchant_guid = Enchantments.target_guid(character.player, spell, Target.item_guid(targets))
 
-    CastValidation.validate(
-      character,
-      spell,
-      targets,
-      build_target_info(state, spell, targets),
-      Time.now(),
-      count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end,
-      equipped_items: equipped_weapon_templates(character),
-      spell_focus: SpellFocus.find(character, spell),
-      lock_context: Gathering.context(state, spell, targets, cast_item_guid),
-      disenchant_item: Disenchant.owned_item(character, Target.item_guid(targets)),
-      enchant_item: Disenchant.owned_item(character, enchant_guid),
-      ammo_id: character.player.ammo_id,
-      ammo_template: ItemLoader.get_template(character.player.ammo_id),
-      mount_allowed?: MapTemplateLoader.mount_allowed?(character.internal.world.map_id),
-      feed_context: feed_context(character, spell, targets),
-      ritual_context: ritual_context(character, spell),
-      duel_context: duel_context(character, spell, targets)
-    )
+    with :ok <- check_party_unit_target(character, spell, targets) do
+      CastValidation.validate(
+        character,
+        spell,
+        targets,
+        build_target_info(state, spell, targets),
+        Time.now(),
+        count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end,
+        equipped_items: equipped_weapon_templates(character),
+        spell_focus: SpellFocus.find(character, spell),
+        lock_context: Gathering.context(state, spell, targets, cast_item_guid),
+        disenchant_item: Disenchant.owned_item(character, Target.item_guid(targets)),
+        enchant_item: Disenchant.owned_item(character, enchant_guid),
+        ammo_id: character.player.ammo_id,
+        ammo_template: ItemLoader.get_template(character.player.ammo_id),
+        mount_allowed?: MapTemplateLoader.mount_allowed?(character.internal.world.map_id),
+        feed_context: feed_context(character, spell, targets),
+        ritual_context: ritual_context(character, spell),
+        duel_context: duel_context(character, spell, targets)
+      )
+    end
   end
+
+  defp check_party_unit_target(character, spell, targets) do
+    if SpellTarget.party_member_spell?(spell) do
+      validate_party_unit_query(character, SpellTarget.target_query(spell, targets))
+    else
+      :ok
+    end
+  end
+
+  defp validate_party_unit_query(character, {:party_unit, _guid} = query) do
+    if SpellTargetResolver.resolve_query(character, query) == [], do: {:error, :bad_targets}, else: :ok
+  end
+
+  defp validate_party_unit_query(_character, _query), do: {:error, :bad_targets}
 
   defp ritual_context(
          %Character{object: %{guid: caster_guid}, unit: unit, internal: %{world: caster_world}},

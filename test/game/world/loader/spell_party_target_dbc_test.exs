@@ -13,7 +13,18 @@ defmodule ThistleTea.Game.World.Loader.SpellPartyTargetDbcTest do
         spell = SpellLoader.load(spell_id)
 
         assert Enum.all?(spell.effects, &(&1.implicit_target_a == :party_around_target))
-        assert SpellTarget.target_query(spell, Target.unit(7)) == {:target_party_aoe, 7, 100.0}
+
+        assert SpellTarget.target_query(spell, Target.unit(7)) ==
+                 {:target_party_aoe, 7, 100.0, max(spell.spell_level - 10, 0)}
+      end
+    end
+
+    test "imp Fire Shield retains its party-only target" do
+      for spell_id <- [2947, 8316, 8317, 11_770, 11_771] do
+        spell = SpellLoader.load(spell_id)
+
+        assert hd(spell.effects).implicit_target_a == :party_member
+        assert SpellTarget.target_query(spell, Target.unit(7)) == {:party_unit, 7}
       end
     end
   end

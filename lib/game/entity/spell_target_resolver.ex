@@ -143,6 +143,8 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
 
   def resolve_query(_caster, _query), do: []
 
+  defp resolve_query(caster, caster_guid, {:party_unit, guid}), do: party_unit_guids(caster, caster_guid, guid)
+
   defp resolve_query(caster, caster_guid, query) do
     case query do
       {:caster_aoe, radius} ->
@@ -157,8 +159,8 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
       {:party_aoe, radius} ->
         nearby_party_guids(caster, caster_guid, radius)
 
-      {:target_party_aoe, target_guid, radius} ->
-        target_party_guids(target_guid, radius)
+      {:target_party_aoe, target_guid, radius, minimum_level} ->
+        target_party_guids(target_guid, radius, minimum_level)
 
       {:party_class_aoe, class_guid, radius} ->
         party_class_guids(caster, caster_guid, class_guid, radius)
@@ -288,13 +290,19 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
 
   defp nearby_party_guids(_caster, caster_guid, _radius, _scope), do: [caster_guid]
 
-  defp target_party_guids(target_guid, radius) when is_number(radius) and radius > 0 do
+  defp target_party_guids(target_guid, radius, minimum_level) when is_number(radius) and radius > 0 do
     with owner_guid when is_integer(owner_guid) <- target_party_owner(target_guid),
          {world, x, y, z} <- World.position(owner_guid) do
       members =
         case PartySystem.group_of(owner_guid) do
-          %Party.Group{} = group -> group |> Party.subgroup_members(owner_guid) |> MapSet.new(& &1.guid)
-          _ -> MapSet.new([owner_guid])
+          %Party.Group{} = group ->
+            group
+            |> Party.subgroup_members(owner_guid)
+            |> Enum.filter(&eligible_party_member?(&1.guid, minimum_level))
+            |> MapSet.new(& &1.guid)
+
+          _ ->
+            MapSet.new([owner_guid])
         end
 
       world
@@ -308,7 +316,44 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     end
   end
 
-  defp target_party_guids(_target_guid, _radius), do: []
+  defp target_party_guids(_target_guid, _radius, _minimum_level), do: []
+
+  defp eligible_party_member?(_guid, minimum_level) when minimum_level <= 0, do: true
+
+  defp eligible_party_member?(guid, minimum_level) do
+    case Metadata.query(guid, [:level]) do
+      %{level: level} when is_integer(level) -> level >= minimum_level
+      _ -> false
+    end
+  end
+
+  defp party_unit_guids(caster, caster_guid, target_guid) do
+    owner_guid = party_owner_guid(caster, caster_guid)
+    target_owner_guid = target_party_owner(target_guid)
+
+    if alive?(target_guid) and party_unit_allowed?(caster_guid, target_guid, owner_guid, target_owner_guid),
+      do: [target_guid],
+      else: []
+  end
+
+  defp party_unit_allowed?(caster_guid, target_guid, _owner_guid, _target_owner_guid) when caster_guid == target_guid,
+    do: false
+
+  defp party_unit_allowed?(_caster_guid, _target_guid, _owner_guid, target_owner_guid)
+       when not is_integer(target_owner_guid), do: false
+
+  defp party_unit_allowed?(caster_guid, target_guid, owner_guid, target_owner_guid) do
+    target_guid == owner_guid or
+      (owner_guid == caster_guid and owner_guid == target_owner_guid) or
+      group_member?(owner_guid, target_owner_guid)
+  end
+
+  defp group_member?(owner_guid, target_owner_guid) do
+    case PartySystem.group_of(owner_guid) do
+      %Party.Group{} = group -> Party.member(group, target_owner_guid) != nil
+      _ -> false
+    end
+  end
 
   defp target_party_owner(guid) do
     cond do

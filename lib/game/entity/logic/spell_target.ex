@@ -28,8 +28,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
       raid_class_aoe_spell?(spell) ->
         {:party_class_aoe, unit_guid, raid_class_radius(spell)}
 
-      is_integer(unit_guid) ->
-        {:unit, unit_guid}
+      query = direct_unit_query(spell, unit_guid) ->
+        query
 
       true ->
         :none
@@ -109,15 +109,30 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
 
   defp party_query(spell, unit_guid) do
     cond do
-      party_aoe_spell?(spell) -> {:party_aoe, max_aoe_radius(spell)}
-      target_party_aoe_spell?(spell) and is_integer(unit_guid) -> {:target_party_aoe, unit_guid, max_aoe_radius(spell)}
-      true -> nil
+      party_aoe_spell?(spell) ->
+        {:party_aoe, max_aoe_radius(spell)}
+
+      target_party_aoe_spell?(spell) and is_integer(unit_guid) ->
+        {:target_party_aoe, unit_guid, max_aoe_radius(spell), max((spell.spell_level || 0) - 10, 0)}
+
+      true ->
+        nil
     end
   end
 
   defp target_party_aoe_spell?(%Spell{effects: effects}) do
     Enum.any?(effects, &effect_targets?(&1, [:party_around_target]))
   end
+
+  def party_member_spell?(%Spell{effects: effects}) do
+    Enum.any?(effects, &effect_targets?(&1, [:party_member]))
+  end
+
+  defp direct_unit_query(spell, unit_guid) when is_integer(unit_guid) do
+    if party_member_spell?(spell), do: {:party_unit, unit_guid}, else: {:unit, unit_guid}
+  end
+
+  defp direct_unit_query(_spell, _unit_guid), do: nil
 
   defp raid_class_aoe_spell?(%Spell{effects: effects}) do
     Enum.any?(effects, &effect_targets?(&1, [:raid_and_class]))

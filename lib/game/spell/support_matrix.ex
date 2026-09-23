@@ -32,7 +32,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
     23 => :gameobject,
     26 => :locked_object,
     27 => :unit_master,
-    35 => :party_member,
     38 => :script_near_caster,
     40 => :gameobject_script,
     41 => :front_left_totem,
