@@ -3,12 +3,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.Tick
+  alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Spell.Cast
 
   describe "mob_delay/3" do
+    test "wakes for a scripted arrival before a long behavior sleep" do
+      entity = %{fixture() | movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}}
+      event = %Effects.MovementInform{motion_type: 9, point_id: 1}
+      entity = Movement.move_along_path(entity, [{1.0, 0.0, 0.0}], [velocity: 10.0, movement_inform: event], 1_000)
+      assert Tick.mob_delay(entity, {:running, 30_000}, 1_000) == 100
+    end
+
     test "uses the tree's running delay" do
       assert Tick.mob_delay(fixture(), {:running, 250}, 1_000) == 250
     end

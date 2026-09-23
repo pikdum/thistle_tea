@@ -56,7 +56,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     :group_member_died,
     :summoned_unit,
     :summoned_just_died,
-    :summoned_just_despawn
+    :summoned_just_despawn,
+    :movement_inform
   ]
 
   def tick_ms, do: @tick_ms
@@ -328,6 +329,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end
 
     fire_edges(state, blackboard, matcher, summon.observation.guid, now, context)
+  end
+
+  def on_movement_inform(state, %Blackboard{} = blackboard, motion_type, point_id, %Context{now: now} = context) do
+    matcher = fn %AIEvent{} = event ->
+      event.event_type == :movement_inform and event.param1 == motion_type and event.param2 == point_id
+    end
+
+    if Core.dead?(state),
+      do: {state, blackboard},
+      else: fire_edges(state, blackboard, matcher, nil, now, context)
   end
 
   def ooc_timer_delay(state, %Blackboard{} = blackboard, now) when is_integer(now) do
@@ -702,6 +713,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
               :friendly_missing_buff,
               :hit_by_spell,
               :spell_hit_target,
+              :movement_inform,
               :aura,
               :target_aura,
               :missing_aura,

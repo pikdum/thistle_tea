@@ -445,6 +445,42 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   end
 
   describe "scripted waypoint routes" do
+    test "arrival reports the original point once and failed paths cannot advance it" do
+      route = %WaypointRoute{
+        first_point: 37,
+        destination_point: 37,
+        points: %{37 => %Waypoint{position: {10.0, 0.0, 0.0, nil}, wait_time: 0}},
+        repeat?: false
+      }
+
+      blackboard = %Blackboard{navigation: %Blackboard.Navigation{scripted_waypoint_route: route}}
+      state = fixture_mob(spline_nodes: []) |> BT.init(MobBT.tree(), blackboard)
+      {_, requested} = BehaviorRunner.tick(MobBT.tree(), state, Context.new(1_000))
+      failed = NavigationResolver.resolve(requested, 1_000, fn _, _, _, _ -> nil end)
+      {{:running, _, :blocked}, failed} = BehaviorRunner.tick(MobBT.tree(), failed, Context.new(1_001))
+      assert failed.internal.blackboard.navigation.scripted_waypoint_route.destination_point == 37
+      refute Enum.any?(failed.internal.events, &is_struct(&1, Effects.MovementInform))
+
+      moving = NavigationResolver.resolve(requested, 1_000, fn _, _, to, _ -> [to] end)
+      arrived = Movement.sync_position(moving, 5_000)
+      {_, finished} = BehaviorRunner.tick(MobBT.tree(), arrived, Context.new(5_000))
+      assert %Effects.MovementInform{motion_type: 2, point_id: 37} in finished.internal.events
+      assert finished.internal.blackboard.navigation.scripted_waypoint_route.destination_point == nil
+      {_, later} = BehaviorRunner.tick(MobBT.tree(), finished, Context.new(6_000))
+      assert Enum.count(later.internal.events, &is_struct(&1, Effects.MovementInform)) == 1
+    end
+
+    test "a point movement suspends idle waypoint navigation until arrival" do
+      route = %WaypointRoute{destination_point: 1, points: %{1 => %Waypoint{position: {20.0, 0.0, 0.0, nil}}}}
+      blackboard = %Blackboard{navigation: %Blackboard.Navigation{scripted_waypoint_route: route}}
+      event = %Effects.MovementInform{motion_type: 9, point_id: 1}
+      state = fixture_mob(spline_nodes: []) |> BT.init(MobBT.tree(), blackboard)
+      moving = Movement.move_along_path(state, [{10.0, 0.0, 0.0}], [velocity: 10.0, movement_inform: event], 0)
+      {{:running, _, :movement}, ticked} = BehaviorRunner.tick(MobBT.tree(), moving, Context.new(500))
+      assert ticked.internal.navigation_intents == []
+      assert ticked.internal.movement_options[:movement_inform] == event
+    end
+
     test "the behavior tree prioritizes the runtime route over spawn movement" do
       route = %WaypointRoute{
         first_point: 1,

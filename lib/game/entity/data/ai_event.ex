@@ -109,6 +109,7 @@ defmodule ThistleTea.Game.Entity.Data.AIEvent do
   defp event_type(26), do: :summoned_just_despawn
   defp event_type(27), do: :missing_aura
   defp event_type(28), do: :target_missing_aura
+  defp event_type(29), do: :movement_inform
   defp event_type(30), do: :leave_combat
   defp event_type(31), do: :script_event
   defp event_type(32), do: :group_member_died

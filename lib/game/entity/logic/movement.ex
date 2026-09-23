@@ -52,6 +52,13 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   def remaining_move_duration(_entity, _now), do: 0
 
+  def completion_at(%{internal: %Internal{movement_start_time: started, movement_options: opts}, movement_block: mb})
+      when is_integer(started) and is_list(opts) do
+    if Keyword.has_key?(opts, :movement_inform), do: started + mb.duration
+  end
+
+  def completion_at(_entity), do: nil
+
   def next_spatial_update_delay(
         %{
           internal: %Internal{world: world, movement_start_time: start_time, movement_start_position: start_position},
@@ -194,7 +201,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     entity = sync_position(entity, now)
     %{movement_block: %MovementBlock{position: {x0, y0, z0, _o}}} = entity
 
-    if path == [] or at_destination?({x0, y0, z0}, List.last(path)) do
+    if path == [] or (at_destination?({x0, y0, z0}, List.last(path)) and not Keyword.has_key?(opts, :movement_inform)) do
       entity
     else
       start_resolved_path(entity, path, now, opts)
@@ -407,8 +414,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
      }}
   end
 
-  defp halt(%{movement_block: %MovementBlock{} = mb, internal: %Internal{} = internal} = entity, now)
-       when is_integer(now) do
+  defp halt(%{movement_block: %MovementBlock{} = mb, internal: %Internal{}} = entity, now) when is_integer(now) do
     entity = sync_position(entity, now)
 
     movement_block = %{
@@ -423,7 +429,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     }
 
     internal = %{
-      internal
+      entity.internal
       | movement_start_time: nil,
         movement_start_position: nil,
         movement_speed: nil,
@@ -538,6 +544,8 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
         {x, y, z} = List.last(spline_nodes)
         path = if is_tuple(start_position), do: [start_position | spline_nodes], else: spline_nodes
         {_position, orientation} = pose_along_path(path, path_length(path), orientation)
+        opts = internal.movement_options || []
+        orientation = Keyword.get(opts, :face_angle, orientation)
 
         movement_block = %{
           mb
@@ -558,7 +566,12 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
             movement_options: nil
         }
 
-        %{entity | movement_block: movement_block, internal: internal}
+        entity = %{entity | movement_block: movement_block, internal: internal}
+
+        case Keyword.get(opts, :movement_inform) do
+          %Effects.MovementInform{} = event -> Effects.enqueue(entity, event)
+          nil -> entity
+        end
     end
   end
 

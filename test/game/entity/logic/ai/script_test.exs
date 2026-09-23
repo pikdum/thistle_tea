@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Waypoints
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -31,6 +32,64 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   alias ThistleTea.Game.WorldRef
 
   setup [:mob]
+
+  describe "MOVE_TO completion" do
+    test "preserves point identity, run mode, travel time, and facing", %{mob: mob} do
+      mob = %{mob | movement_block: %{mob.movement_block | position: {0.0, 0.0, 0.0, 0.0}, run_speed: 7.0}}
+
+      step = %ScriptStep{
+        command: :move_to,
+        datalong3: 68,
+        datalong4: 3,
+        datalong2: 2_000,
+        dataint: 1,
+        position: {10.0, 0.0, 0.0, 3.6}
+      }
+
+      {requested, _} = Script.run(mob, Blackboard.new(), [step], nil, 100)
+
+      moved =
+        NavigationResolver.resolve(requested, 100, fn _, _, _, _ -> flunk("direct movement must not pathfind") end)
+
+      assert moved.movement_block.duration == 2_000
+      assert moved.internal.movement_options[:run?]
+      assert [%Effects.MonsterMove{move_opts: opts}] = moved.internal.events
+      assert opts[:face_angle] == 3.6
+      completed = Movement.sync_position(moved, 2_100)
+      assert completed.movement_block.position == {10.0, 0.0, 0.0, 3.6}
+      assert %Effects.MovementInform{motion_type: 9, point_id: 1} in completed.internal.events
+    end
+
+    test "raw movement has no point callback and roots reject point movement", %{mob: mob} do
+      mob = %{mob | movement_block: %{mob.movement_block | position: {0.0, 0.0, 0.0, 0.0}, walk_speed: 2.5}}
+      step = %ScriptStep{command: :move_to, dataint: 1, position: {10.0, 0.0, 0.0, 0.0}}
+      {raw, _} = Script.run(mob, Blackboard.new(), [step], nil, 0)
+      moved = NavigationResolver.resolve(raw, 0)
+      assert moved.internal.movement_options[:movement_inform] == nil
+      rooted = %{mob | movement_block: %{mob.movement_block | movement_flags: 0x08000000}}
+      {blocked, _} = Script.run(rooted, Blackboard.new(), [%{step | datalong4: 2}], nil, 0)
+      assert blocked.internal.navigation_intents == []
+    end
+
+    test "failed replacement and partial paths never report the requested point", %{mob: mob} do
+      mob = %{mob | movement_block: %{mob.movement_block | position: {0.0, 0.0, 0.0, 0.0}, walk_speed: 2.5}}
+      step = %ScriptStep{command: :move_to, datalong3: 1, datalong4: 2, dataint: 1, position: {10.0, 0.0, 0.0, 0.0}}
+      {requested, _} = Script.run(mob, Blackboard.new(), [step], nil, 0)
+      moving = NavigationResolver.resolve(requested, 0, fn _, _, to, _ -> [to] end)
+      replacement = %{step | dataint: 2, position: {20.0, 0.0, 0.0, 0.0}}
+      {requested, _} = Script.run(moving, Blackboard.new(), [replacement], nil, 100)
+
+      for path <- [nil, [], [{5.0, 0.0, 0.0}], [{20.0, 0.0, 5.0}]] do
+        moved = NavigationResolver.resolve(requested, 100, fn _, _, _, _ -> path end)
+        completed = Movement.sync_position(moved, 10_000)
+        refute Enum.any?(completed.internal.events, &is_struct(&1, Effects.MovementInform))
+      end
+
+      refined = NavigationResolver.resolve(requested, 100, fn _, _, _, _ -> [{20.0, 0.0, 0.75}] end)
+      completed = Movement.sync_position(refined, 10_000)
+      assert %Effects.MovementInform{motion_type: 9, point_id: 2} in completed.internal.events
+    end
+  end
 
   describe "run/5" do
     test "normal player casts request the owner spellcasting path" do

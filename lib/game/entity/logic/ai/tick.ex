@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   alias ThistleTea.Game.Entity.Logic.Breathing
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Entity.Logic.Intoxication
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
   alias ThistleTea.Game.Entity.Logic.Pvp
@@ -65,6 +66,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
     |> schedule_pvp(entity)
     |> schedule_rest(entity)
     |> schedule_summon_death(entity)
+    |> schedule_movement(entity)
+  end
+
+  defp schedule_movement(plan, entity) do
+    case Movement.completion_at(entity) do
+      at when is_integer(at) -> TickPlan.schedule_at(plan, :movement, at)
+      _ -> plan
+    end
   end
 
   defp schedule_summon_death(plan, entity) do

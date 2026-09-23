@@ -57,6 +57,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Navigation do
     end
   end
 
+  def wait_for_point_movement(entity, %Blackboard{} = blackboard, %Context{now: now}) do
+    cond do
+      Enum.any?(entity.internal.navigation_intents, &Keyword.has_key?(&1.opts, :movement_inform)) ->
+        {BT.running(0, :navigation), entity, blackboard}
+
+      is_integer(Movement.completion_at(entity)) ->
+        {BT.running(Movement.next_spatial_update_delay(entity, now), :movement), entity, blackboard}
+
+      true ->
+        {:failure, entity, blackboard}
+    end
+  end
+
   defp dead?(%{alive?: false}), do: true
   defp dead?(_metadata), do: false
 

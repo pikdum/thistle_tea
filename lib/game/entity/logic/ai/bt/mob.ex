@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
+  alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
@@ -159,6 +160,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
           BT.action(&clear_chase_and_idle/3)
         ])
       ]),
+      BT.action(&Navigation.wait_for_point_movement/3),
       BT.action(&Distraction.tick/3),
       BT.sequence([
         BT.condition(&scripted_home?/2),
@@ -171,7 +173,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         BT.action(&wait_until_waypoint_ready/3),
         BT.action(&pick_waypoint/3),
         BT.action(&move_to_target_with_context/3),
-        BT.action(&wait_for_arrival_with_context/3),
+        BT.action(&wait_for_waypoint_arrival/3),
         BT.action(&apply_waypoint/3),
         BT.action(&set_next_waypoint_wait/3)
       ]),
@@ -754,7 +756,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         perception: perception
       })
       when is_integer(target) and target > 0 do
-    if Blackboard.spreading?(blackboard) and Movement.moving?(state, now) do
+    if not Blackboard.combat_movement?(blackboard, state) or
+         (Blackboard.spreading?(blackboard) and Movement.moving?(state, now)) do
       {:success, state, blackboard}
     else
       maybe_halt_at_contact(state, Blackboard.clear_spreading(blackboard), target, now, perception)
@@ -765,7 +768,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   def halt_at_contact(%Mob{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, now)
       when is_integer(target) and target > 0 and is_integer(now) do
-    if Blackboard.spreading?(blackboard) and Movement.moving?(state, now) do
+    if not Blackboard.combat_movement?(blackboard, state) or
+         (Blackboard.spreading?(blackboard) and Movement.moving?(state, now)) do
       {:success, state, blackboard}
     else
       maybe_halt_at_contact(state, Blackboard.clear_spreading(blackboard), target, now)
@@ -1351,6 +1355,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     wait_for_arrival(state, blackboard, context)
   end
 
+  defp wait_for_waypoint_arrival(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
+    target = blackboard.navigation.target
+
+    case wait_for_arrival(state, blackboard, context) do
+      {:success, state, blackboard} ->
+        {x, y, z, _orientation} = state.movement_block.position
+
+        if NavigationIntent.reached?({x, y, z}, target),
+          do: {:success, state, blackboard},
+          else: {BT.running(@blocked_retry_delay, :blocked), state, blackboard}
+
+      result ->
+        result
+    end
+  end
+
   def wait_for_arrival(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
     wait_for_arrival(state, blackboard, Context.new(now))
   end
@@ -1363,8 +1383,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp apply_waypoint(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
     state =
       case waypoint_route(state, blackboard) do
-        %WaypointRoute{} = route -> Effects.enqueue(state, Effects.creature_group_event({:waypoint, route}))
-        nil -> state
+        %WaypointRoute{} = route ->
+          Effects.enqueue(state, [
+            Effects.creature_group_event({:waypoint, route}),
+            %Effects.MovementInform{motion_type: 2, point_id: route.destination_point}
+          ])
+
+        nil ->
+          state
       end
 
     state =

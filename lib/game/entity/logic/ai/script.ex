@@ -29,7 +29,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Waypoints
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionEvaluator
@@ -281,15 +280,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     end
   end
 
-  defp execute(
-         state,
-         blackboard,
-         %ScriptStep{command: :move_to, datalong: 0, position: {x, y, z, _o}},
-         _target,
-         _now,
-         %Context{} = context
-       ) do
-    {Navigation.move_to(state, {x, y, z}, [], context), blackboard}
+  defp execute(state, blackboard, %ScriptStep{command: :move_to, datalong: 0} = step, _target, _now, %Context{}) do
+    {__MODULE__.MoveTo.apply(state, step), blackboard}
   end
 
   defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :teleport_to} = step, _target_guid, now, %Context{}) do

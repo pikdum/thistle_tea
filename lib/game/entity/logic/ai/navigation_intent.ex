@@ -5,9 +5,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.NavigationIntent do
   """
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Math
+
+  @horizontal_tolerance 0.1
+  @floor_tolerance 1.5
 
   @enforce_keys [:destination]
   defstruct [:destination, opts: []]
+
+  @doc "Accepts navigation floor refinement without treating a different floor or a short path as arrival."
+  def reached?({x, y, z}, {tx, ty, tz}) do
+    Math.distance({x, y, 0.0}, {tx, ty, 0.0}) <= @horizontal_tolerance and abs(z - tz) <= @floor_tolerance
+  end
 
   def enqueue(%{internal: %Internal{navigation_intents: intents} = internal} = entity, {_x, _y, _z} = destination, opts)
       when is_list(intents) and is_list(opts) do

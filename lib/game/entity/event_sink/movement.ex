@@ -19,6 +19,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.Visibility
 
+  def emit(%Mob{} = entity, %Effects.MovementInform{motion_type: type, point_id: point}, context) do
+    Context.cast(context, {:movement_inform, type, point})
+    entity
+  end
+
+  def emit(entity, %Effects.MovementInform{}, _context), do: entity
+
   def emit(%Mob{} = entity, %Effects.MovementStopped{}, _context) do
     World.update_position(entity)
 

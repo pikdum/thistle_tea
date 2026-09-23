@@ -32,17 +32,48 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
     {allow_steep, opts} = Keyword.pop(opts, :allow_steep, true)
     {max_distance, opts} = Keyword.pop(opts, :max_distance)
     {within_radius, opts} = Keyword.pop(opts, :within_radius)
+    {pathfind?, opts} = Keyword.pop(opts, :pathfind?, true)
     start = {start_x, start_y, start_z}
+    opts = travel_velocity(opts, start, destination)
+    entity = replace_point_movement(entity, opts, now)
 
-    case find_path.(world.map_id, start, destination, allow_steep: allow_steep) do
+    path =
+      if pathfind?,
+        do: find_path.(world.map_id, start, destination, allow_steep: allow_steep),
+        else: [destination]
+
+    case path do
       path when is_list(path) ->
         path = path |> limit_path(start, max_distance) |> within_radius(start, within_radius)
         opts = arrival_velocity(opts, [start | path], now)
+        opts = completion_options(opts, path, destination)
         Movement.move_along_path(entity, path, opts, now)
 
       _no_path ->
         entity
     end
+  end
+
+  defp replace_point_movement(entity, opts, now) do
+    if Keyword.has_key?(opts, :movement_inform), do: Movement.stop(entity, now), else: entity
+  end
+
+  defp completion_options(opts, path, destination) do
+    case List.last(path) do
+      {_, _, _} = endpoint ->
+        if NavigationIntent.reached?(endpoint, destination), do: opts, else: Keyword.delete(opts, :movement_inform)
+
+      nil ->
+        Keyword.delete(opts, :movement_inform)
+    end
+  end
+
+  defp travel_velocity(opts, start, destination) do
+    {duration, opts} = Keyword.pop(opts, :travel_time)
+
+    if is_integer(duration) and duration > 0,
+      do: Keyword.put(opts, :velocity, Math.distance(start, destination) * 1_000 / duration),
+      else: opts
   end
 
   defp arrival_velocity(opts, path, now) do

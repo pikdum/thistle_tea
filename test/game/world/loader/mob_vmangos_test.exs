@@ -13,6 +13,15 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
   @moduletag :dbc_db
 
   describe "load_creature/1" do
+    test "loads Vincent's point movement and arrival callback" do
+      events = mob(4444).internal.creature.ai_events
+      arrival = Enum.find(events, &(&1.event_type == :movement_inform))
+      assert {arrival.param1, arrival.param2} == {9, 1}
+      assert [[%ScriptStep{command: :stand_state, datalong: 7}]] = arrival.actions
+      retreat = events |> Enum.find(&(&1.event_type == :hp)) |> Map.fetch!(:actions) |> List.flatten()
+      assert %ScriptStep{datalong3: 68, datalong4: 3, dataint: 1} = Enum.find(retreat, &(&1.command == :move_to))
+    end
+
     test "loads Defias Pillager spell list and derived stats" do
       mob = mob(589)
 

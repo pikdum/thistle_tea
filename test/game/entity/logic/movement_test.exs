@@ -10,6 +10,67 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.WorldRef
 
+  describe "movement completion" do
+    test "reports arrival once at the deadline and retains final facing" do
+      event = %Effects.MovementInform{motion_type: 9, point_id: 7}
+
+      moving =
+        Movement.move_along_path(
+          build_entity([]),
+          [{10.0, 0.0, 0.0}],
+          [velocity: 10.0, movement_inform: event, face_angle: 1.5],
+          100
+        )
+
+      assert Movement.completion_at(moving) == 1_100
+      refute event in Movement.sync_position(moving, 1_099).internal.events
+      arrived = Movement.sync_position(moving, 1_100)
+      assert arrived.movement_block.position == {10.0, 0.0, 0.0, 1.5}
+      assert event in arrived.internal.events
+      assert Movement.completion_at(arrived) == nil
+      assert Movement.sync_position(arrived, 2_000) == arrived
+      assert Movement.stop(moving, 1_100).internal.events |> Enum.count(&(&1 == event)) == 1
+    end
+
+    test "stops, teleports, and replacement paths discard unfinished callbacks" do
+      event = %Effects.MovementInform{motion_type: 9, point_id: 7}
+
+      moving =
+        Movement.move_along_path(build_entity([]), [{10.0, 0.0, 0.0}], [velocity: 10.0, movement_inform: event], 0)
+
+      stopped = Movement.stop(moving, 500)
+      {teleported, _} = Movement.teleport(moving, {20.0, 0.0, 0.0, 0.0}, 500)
+      replaced = Movement.move_along_path(moving, [{0.0, 10.0, 0.0}], [velocity: 10.0], 500)
+
+      for entity <- [stopped, teleported, replaced] do
+        refute event in Movement.sync_position(entity, 10_000).internal.events
+        assert Movement.completion_at(entity) == nil
+      end
+    end
+
+    test "retiming retains identity and moves the completion deadline" do
+      event = %Effects.MovementInform{motion_type: 9, point_id: 7}
+      entity = build_entity([])
+      entity = %{entity | movement_block: %{entity.movement_block | run_speed: 10.0}}
+      moving = Movement.move_along_path(entity, [{20.0, 0.0, 0.0}], [run?: true, movement_inform: event], 0)
+      slower = %{moving | movement_block: %{moving.movement_block | run_speed: 5.0}}
+      {retimed, _} = Movement.retime(slower, :run_speed, 1_000)
+      assert Movement.completion_at(retimed) == 3_000
+      refute event in Movement.sync_position(retimed, 2_999).internal.events
+      assert event in Movement.sync_position(retimed, 3_000).internal.events
+    end
+
+    test "an already reached point completes on the next update" do
+      event = %Effects.MovementInform{motion_type: 9, point_id: 0}
+
+      moving =
+        Movement.move_along_path(build_entity([]), [{0.0, 0.0, 0.0}], [velocity: 10.0, movement_inform: event], 0)
+
+      refute event in moving.internal.events
+      assert event in Movement.sync_position(moving, 1).internal.events
+    end
+  end
+
   defp build_entity(opts) do
     internal = %Internal{
       world: Keyword.get(opts, :world, %WorldRef{map_id: 0}),

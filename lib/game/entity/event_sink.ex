@@ -97,6 +97,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.MovementRootChanged,
     Effects.MovementSpeedChanged,
     Effects.MovementStopped,
+    Effects.MovementInform,
     Effects.SetFacing,
     Effects.Teleport,
     Effects.TeleportToWorld,

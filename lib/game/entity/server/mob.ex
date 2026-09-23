@@ -313,6 +313,24 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       {:noreply, state}
   end
 
+  def handle_cast({:movement_inform, motion_type, point_id}, %Mob{} = state) do
+    now = Time.now()
+    context = AIEnvironment.context(state, now)
+
+    state =
+      state
+      |> EventAI.with_blackboard(&EventAI.on_movement_inform(&1, &2, motion_type, point_id, context))
+      |> NavigationResolver.resolve(now)
+      |> EventSink.emit_pending()
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("movement inform crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   @impl GenServer
   def handle_cast({:move_to, x, y, z}, state) do
     handle_cast({:move_to, x, y, z, []}, state)
@@ -1255,6 +1273,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> maybe_finalize_death()
       |> broadcast_if_pending()
       |> sync_orientation_metadata()
+      |> schedule_movement_completion()
 
     {:noreply, state}
   end
@@ -1435,6 +1454,22 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp schedule_next_ai_tick(%Mob{} = state, %TickPlan{} = plan) do
     if Core.dead?(state), do: deactivate_ai(state), else: schedule_ai_tick(state, TickPlan.delay(plan))
+  end
+
+  defp schedule_movement_completion(%Mob{} = state) do
+    case Movement.completion_at(state) do
+      at when is_integer(at) ->
+        delay = max(at - Time.now(), 0)
+        ref = state.internal.ai_tick_ref
+        remaining = if is_reference(ref), do: Process.read_timer(ref)
+
+        if Core.dead?(state) or (is_integer(remaining) and remaining <= delay),
+          do: state,
+          else: schedule_ai_tick(state, delay)
+
+      nil ->
+        state
+    end
   end
 
   defp emit_ai_tick_telemetry(%Mob{object: %{guid: guid}}, status, duration, %TickPlan{} = plan) do

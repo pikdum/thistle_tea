@@ -25,6 +25,35 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
   @talk_step %ScriptStep{command: :talk, texts: [%{text: "!", chat_type: :say, language: 0, emote_id: 0}]}
 
+  describe "on_movement_inform/5" do
+    test "requires exact motion type and point, including zero" do
+      mob = mob(events: [event(:movement_inform, param1: 9, param2: 0)])
+
+      for {type, point} <- [{2, 0}, {9, 1}] do
+        {unchanged, _} = EventAI.on_movement_inform(mob, Blackboard.new(), type, point, Context.new(0))
+        assert unchanged.internal.events == []
+      end
+
+      {fired, blackboard} = EventAI.on_movement_inform(mob, Blackboard.new(), 9, 0, Context.new(0))
+      assert [%Effects.MonsterTalk{}] = fired.internal.events
+      {disabled, _} = EventAI.on_movement_inform(mob, blackboard, 9, 0, Context.new(1_000))
+      assert disabled.internal.events == []
+    end
+
+    test "uses the third and fourth parameters for repeats and ignores dead creatures" do
+      mob = mob(events: [event(:movement_inform, param1: 2, param2: 37, param3: 100, param4: 100, repeatable?: true)])
+      dead = %{mob | unit: %{mob.unit | health: 0}}
+      {unchanged, _} = EventAI.on_movement_inform(dead, Blackboard.new(), 2, 37, Context.new(0))
+      assert unchanged.internal.events == []
+      {fired, blackboard} = EventAI.on_movement_inform(mob, Blackboard.new(), 2, 37, Context.new(0))
+      assert [%Effects.MonsterTalk{}] = fired.internal.events
+      {early, _} = EventAI.on_movement_inform(mob, blackboard, 2, 37, Context.new(99))
+      assert early.internal.events == []
+      {fired, _} = EventAI.on_movement_inform(mob, blackboard, 2, 37, Context.new(100))
+      assert [%Effects.MonsterTalk{}] = fired.internal.events
+    end
+  end
+
   describe "on_summon_event/4" do
     test "matches exact creature entries and preserves the summon as action invoker" do
       for type <- [:summoned_unit, :summoned_just_died, :summoned_just_despawn] do
