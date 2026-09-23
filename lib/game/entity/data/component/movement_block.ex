@@ -124,6 +124,11 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
 
   def airborne?(_movement_block), do: false
 
+  def falling_far?(%__MODULE__{movement_flags: flags}) when is_integer(flags),
+    do: (flags &&& @movement_flag_falling_far) != 0
+
+  def falling_far?(_movement_block), do: false
+
   def on_transport?(%__MODULE__{transport_guid: guid, transport_position: position}) do
     is_integer(guid) and guid > 0 and is_tuple(position)
   end

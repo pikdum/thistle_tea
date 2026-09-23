@@ -18,7 +18,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
     47 => :tradeskill,
     49 => :detect,
     78 => :attack,
-    84 => :stuck,
     86 => :holiday_gift,
     116 => :remove_insignia
   }

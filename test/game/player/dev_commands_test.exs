@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
   alias ThistleTea.Game.Entity.Data.Taxi.Network
   alias ThistleTea.Game.Entity.Data.Taxi.Node
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
+  alias ThistleTea.Game.Entity.Logic.SafePosition
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
   alias ThistleTea.Game.Entity.Server.Transport, as: TransportServer
@@ -36,6 +37,32 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
   alias ThistleTea.Game.World.System.Honor, as: HonorSystem
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.WorldRef
+
+  describe ".start" do
+    test "requires a safe anchor and rejects combat and taxi flight" do
+      character = %{debug_character() | unit: %Unit{health: 100, max_health: 100}, player: %Player{}}
+      state = %{guid: 1, character: character}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".start")
+
+      assert_received {:"$gen_cast",
+                       {:send_packet,
+                        %Message.SmsgMessagechat{message: "No safe ground position has been recorded yet."}}}
+
+      anchored = %{state | character: SafePosition.remember(character)}
+
+      for internal <- [
+            %{anchored.character.internal | in_combat: true},
+            %{anchored.character.internal | taxi_flight: :active}
+          ] do
+        unavailable = %{anchored | character: %{anchored.character | internal: internal}}
+        assert {:handled, ^unavailable} = DevCommands.run(unavailable, ".start")
+
+        assert_received {:"$gen_cast",
+                         {:send_packet, %Message.SmsgMessagechat{message: "Stuck recovery is unavailable right now."}}}
+      end
+    end
+  end
 
   describe ".debug skill" do
     test "sets only known skills within their cap and refreshes defense fields" do

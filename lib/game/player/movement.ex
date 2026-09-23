@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Emote
   alias ThistleTea.Game.Entity.Logic.Falling
+  alias ThistleTea.Game.Entity.Logic.SafePosition
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.Network.Message
@@ -28,6 +29,8 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.Spellcasting
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AggroProbe
@@ -39,6 +42,7 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.World.Visibility
 
   @spell_failed_moving 0x2E
+  @stuck_spell 7355
   @client_projection_ms 750
 
   def handle(%Message.MsgMove{} = message, %{character: %Character{} = character} = state) do
@@ -142,7 +146,7 @@ defmodule ThistleTea.Game.Player.Movement do
          %MovementBlock{} = movement_block
        ) do
     character = state.character
-    character = %{character | movement_block: movement_block}
+    character = %{character | movement_block: movement_block} |> remember_safe_position()
     %{internal: %{world: world}} = character
     %MovementBlock{position: {x1, y1, z1, orientation}} = movement_block
     now = Time.now()
@@ -181,7 +185,7 @@ defmodule ThistleTea.Game.Player.Movement do
         ChaseWatch.notify_moved(state.guid, {x1, y1, z1})
 
         %{state | character: character}
-        |> Spellcasting.cancel(@spell_failed_moving)
+        |> cancel_moving_cast(movement_block)
         |> PlayerRest.check_tavern_exit()
         |> PlayerExploration.check_movement(now)
       else
@@ -193,6 +197,25 @@ defmodule ThistleTea.Game.Player.Movement do
     |> broadcast(message)
     |> publish_changes()
   end
+
+  defp remember_safe_position(%Character{} = character) do
+    if SafePosition.needs_update?(character) do
+      {x, y, _z, _orientation} = character.movement_block.position
+      heights = Pathfinding.find_heights(character.internal.world.map_id, {x, y})
+      SafePosition.remember(character, heights)
+    else
+      character
+    end
+  end
+
+  defp cancel_moving_cast(
+         %{character: %Character{internal: %Internal{casting: %Cast{spell: %Spell{id: @stuck_spell}}}}} = state,
+         movement
+       ) do
+    if MovementBlock.falling_far?(movement), do: state, else: Spellcasting.cancel(state, @spell_failed_moving)
+  end
+
+  defp cancel_moving_cast(state, _movement), do: Spellcasting.cancel(state, @spell_failed_moving)
 
   defp broadcast(state, message) do
     Message.MsgMove.to_packet(state.guid, message.payload, message.opcode)

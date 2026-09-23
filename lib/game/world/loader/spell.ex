@@ -41,6 +41,17 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   def load(_), do: nil
 
+  def cached(spell_id) when is_integer(spell_id) and spell_id > 0 do
+    key = {:spell, spell_id}
+
+    case :ets.lookup(__MODULE__, key) do
+      [{^key, spell}] -> spell
+      _ -> cache(key, load(spell_id))
+    end
+  end
+
+  def cached(_spell_id), do: nil
+
   def chain(spell_id) when is_integer(spell_id) and spell_id > 0 do
     SpellChainLoader.get(spell_id) || TalentLoader.chain(spell_id)
   end
@@ -581,6 +592,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(79), do: :clear_threat
   defp effect_type(80), do: :add_combo_points
   defp effect_type(83), do: :duel
+  defp effect_type(84), do: :stuck
   defp effect_type(85), do: :summon_player
   defp effect_type(type) when type in 87..90, do: :summon_totem
   defp effect_type(96), do: :charge

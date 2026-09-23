@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Data.Reputation.Definition
@@ -26,6 +27,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Entity.Logic.Rest
+  alias ThistleTea.Game.Entity.Logic.SafePosition
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Guid
@@ -41,10 +43,12 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
+  alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.Spells
   alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.Player.Talents
   alias ThistleTea.Game.Player.Taxi, as: PlayerTaxi
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
@@ -55,6 +59,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
@@ -112,6 +117,26 @@ defmodule ThistleTea.Game.Player.DevCommands do
     |> handled()
   end
 
+  def run(%{character: %Character{} = character} = state, ".start") do
+    cond do
+      not Death.alive?(character) or character.internal.in_combat == true or not is_nil(character.internal.taxi_flight) ->
+        system_message(state, "Stuck recovery is unavailable right now.")
+
+      is_nil(SafePosition.destination(character)) ->
+        system_message(state, "No safe ground position has been recorded yet.")
+
+      true ->
+        case SpellLoader.cached(7355) do
+          %Spell{} = spell ->
+            Spellcasting.scripted_cast(state, spell, %CreatureSpell{spell_id: 7355}, character.object.guid)
+
+          nil ->
+            system_message(state, "Stuck recovery is unavailable right now.")
+        end
+    end
+    |> handled()
+  end
+
   def run(state, ".help" <> _) do
     commands = [
       ".additem <item_id> [count] - add an item to your inventory",
@@ -160,6 +185,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".pos - show current position",
       ".talents reset - unlearn all talents and refund points",
       ".rested [amount] - add rested xp",
+      ".start - return to your last safe ground position",
       ".speed <rate> - modify player speed from 0.1 to 10",
       ".tgm - toggle god mode (no damage taken)",
       ".threat - show the targeted mob's threat table"

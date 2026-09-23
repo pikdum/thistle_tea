@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Knockback
+  alias ThistleTea.Game.Entity.Logic.SafePosition
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Amount
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -33,6 +34,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
         else: Effects.teleport_to_spell_target(spell_id)
 
     {state, [request]}
+  end
+
+  def apply(%Character{} = state, %CastContext{}, _spell, %Effect{type: :stuck}, _now) do
+    case SafePosition.destination(state) do
+      {_x, _y, _z, _orientation} = position -> {state, [Effects.teleport(position)]}
+      nil -> {state, []}
+    end
   end
 
   def apply(state, %CastContext{destination_position: destination}, _spell, %Effect{type: :distract} = effect, now) do

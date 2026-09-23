@@ -65,6 +65,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   defp caster_execution_effect?(%{implicit_target_a: :caster}), do: true
   defp caster_execution_effect?(%{implicit_target_b: :caster}), do: true
   defp caster_execution_effect?(%{type: :dismiss_pet}), do: true
+  defp caster_execution_effect?(%{type: :stuck}), do: true
   defp caster_execution_effect?(%{type: :summon_object_wild}), do: true
   defp caster_execution_effect?(%{type: :summon_mini_pet}), do: true
   defp caster_execution_effect?(%{type: :summon_guardian}), do: true

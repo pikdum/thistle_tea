@@ -396,6 +396,13 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
     end
   end
 
+  describe "falling_far?/1" do
+    test "distinguishes a long fall from a jump", context do
+      assert MovementBlock.falling_far?(%{context.base_movement_block | movement_flags: 0x4000})
+      refute MovementBlock.falling_far?(%{context.base_movement_block | movement_flags: 0x2000})
+    end
+  end
+
   describe "position_changed?/2" do
     test "uses deck-local coordinates while attached to the same transport" do
       previous = %MovementBlock{
