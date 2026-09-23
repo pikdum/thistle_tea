@@ -190,6 +190,17 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     resolve_query(caster, caster_guid, :caster_master) ++ [unit_guid]
   end
 
+  defp resolve_query(caster, _caster_guid, {:caster_friendly_aoe, radius}) do
+    case caster_position(caster, Time.now()) do
+      {_world, x, y, z} -> nearby_friendly_guids_at(caster, {x, y, z}, radius)
+      nil -> []
+    end
+  end
+
+  defp resolve_query(caster, _caster_guid, {:targeted_friendly_aoe, position, radius}) do
+    nearby_friendly_guids_at(caster, position, radius)
+  end
+
   defp resolve_query(caster, caster_guid, query) do
     case query do
       {:caster_aoe, radius} ->
@@ -274,6 +285,21 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   end
 
   defp nearby_enemy_guids_at(_caster, _caster_guid, _position, _radius), do: []
+
+  defp nearby_friendly_guids_at(%{internal: %{world: world}} = caster, position, radius)
+       when is_number(radius) and radius > 0 do
+    world
+    |> nearby_units_at(position, radius)
+    |> Enum.filter(fn {guid, _distance} ->
+      case Metadata.get(guid) do
+        %{alive?: true} = metadata -> Hostility.friendly?(caster, Map.put(metadata, :guid, guid))
+        _ -> false
+      end
+    end)
+    |> Enum.map(&elem(&1, 0))
+  end
+
+  defp nearby_friendly_guids_at(_caster, _position, _radius), do: []
 
   defp nearby_units(%{object: %{guid: self_guid}} = caster, radius) do
     now = Time.now()

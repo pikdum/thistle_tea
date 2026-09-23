@@ -568,9 +568,16 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   defp validate_creature_type(%Spell{}, _target_info), do: {:error, :bad_targets}
 
   defp area_target_spell?(%Spell{effects: effects}) do
+    area_targets = [
+      :aoe_enemy_at_caster,
+      :aoe_enemy_in_cone,
+      :aoe_enemy_at_dest,
+      :aoe_ally_at_source,
+      :aoe_ally_at_dest
+    ]
+
     Enum.any?(effects, fn effect ->
-      effect.implicit_target_a in [:aoe_enemy_at_caster, :aoe_enemy_in_cone, :aoe_enemy_at_dest] or
-        effect.implicit_target_b in [:aoe_enemy_at_caster, :aoe_enemy_in_cone, :aoe_enemy_at_dest]
+      effect.implicit_target_a in area_targets or effect.implicit_target_b in area_targets
     end)
   end
 

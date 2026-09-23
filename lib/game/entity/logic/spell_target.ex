@@ -23,13 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
     unit_guid = Target.unit_guid(targets)
 
     cond do
-      caster_aoe_spell?(spell) ->
-        {:caster_aoe, max_aoe_radius(spell)}
-
-      cone_aoe_spell?(spell) ->
-        {:caster_cone, max_aoe_radius(spell)}
-
-      query = targeted_aoe_query(spell, targets) ->
+      query = area_query(spell, targets) ->
         query
 
       query = party_query(spell, unit_guid) ->
@@ -49,9 +43,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
     end
   end
 
+  defp area_query(spell, targets) do
+    cond do
+      caster_aoe_spell?(spell) -> {:caster_aoe, max_aoe_radius(spell)}
+      cone_aoe_spell?(spell) -> {:caster_cone, max_aoe_radius(spell)}
+      query = targeted_aoe_query(spell, targets) -> query
+      true -> friendly_aoe_query(spell, targets)
+    end
+  end
+
   def area_targeted?(%Spell{} = spell) do
     caster_aoe_spell?(spell) or cone_aoe_spell?(spell) or targeted_aoe_spell?(spell) or party_aoe_spell?(spell) or
-      target_party_aoe_spell?(spell)
+      target_party_aoe_spell?(spell) or friendly_aoe_spell?(spell)
   end
 
   def area_targeted?(_spell), do: false
@@ -113,6 +116,38 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   defp caster_destination_spell?(%Spell{effects: effects}) do
     Enum.any?(effects, &effect_targets?(&1, [:caster_destination]))
   end
+
+  defp friendly_aoe_spell?(%Spell{effects: effects}) do
+    Enum.any?(effects, &effect_targets?(&1, [:aoe_ally_at_source, :aoe_ally_at_dest]))
+  end
+
+  defp friendly_aoe_query(%Spell{effects: effects} = spell, %Target{} = targets) do
+    cond do
+      Enum.any?(effects, &effect_targets?(&1, [:aoe_ally_at_source])) ->
+        source =
+          if !Enum.any?(effects, &effect_targets?(&1, [:caster_source])), do: targets.source_location
+
+        friendly_area_query(source, max_aoe_radius(spell))
+
+      Enum.any?(effects, &effect_targets?(&1, [:aoe_ally_at_dest])) ->
+        cond do
+          is_tuple(targets.destination_location) ->
+            friendly_area_query(targets.destination_location, max_aoe_radius(spell))
+
+          caster_destination_spell?(spell) ->
+            friendly_area_query(nil, max_aoe_radius(spell))
+
+          true ->
+            :none
+        end
+
+      true ->
+        nil
+    end
+  end
+
+  defp friendly_area_query(nil, radius), do: {:caster_friendly_aoe, radius}
+  defp friendly_area_query(position, radius), do: {:targeted_friendly_aoe, position, radius}
 
   defp party_aoe_spell?(%Spell{effects: effects}) do
     Enum.any?(effects, &effect_targets?(&1, [:party_around_caster]))

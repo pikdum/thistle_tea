@@ -7,6 +7,35 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
   alias ThistleTea.Game.Spell.Target
 
   describe "target_query/2" do
+    test "friendly source areas ignore an enemy selection and distinguish explicit source positions" do
+      effect = %Effect{
+        type: :heal,
+        implicit_target_a: :caster_source,
+        implicit_target_b: :aoe_ally_at_source,
+        radius_yards: 10.0
+      }
+
+      spell = %Spell{effects: [effect]}
+      targets = %{Target.unit(2) | source_location: {100.0, 0.0, 0.0}}
+      assert SpellTarget.target_query(spell, targets) == {:caster_friendly_aoe, 10.0}
+      assert SpellTarget.area_targeted?(spell)
+      refute Spell.harmful?(spell)
+      spell = %{spell | effects: [%{effect | implicit_target_a: nil}]}
+      assert SpellTarget.target_query(spell, targets) == {:targeted_friendly_aoe, {100.0, 0.0, 0.0}, 10.0}
+    end
+
+    test "friendly destination areas require a destination or an explicit caster destination" do
+      effect = %Effect{type: :heal, implicit_target_a: :aoe_ally_at_dest, radius_yards: 10.0}
+      spell = %Spell{effects: [effect]}
+      assert SpellTarget.target_query(spell, Target.unit(2)) == :none
+
+      assert SpellTarget.target_query(spell, Target.at({20.0, 0.0, 0.0})) ==
+               {:targeted_friendly_aoe, {20.0, 0.0, 0.0}, 10.0}
+
+      spell = %{spell | effects: [%{effect | implicit_target_b: :caster_destination}]}
+      assert SpellTarget.target_query(spell, Target.none()) == {:caster_friendly_aoe, 10.0}
+    end
+
     test "returns caster aoe query for caster aoe spells" do
       spell = aoe_spell(:aoe_enemy_at_caster)
 

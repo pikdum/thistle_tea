@@ -19,6 +19,53 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   alias ThistleTea.Game.WorldRef
 
   describe "resolve/3" do
+    test "friendly areas include allies and self but exclude enemies dead actors and other copies" do
+      [source, ally, dead, distant, foreign] = for _ <- 1..5, do: mob_guid()
+      enemy = player_guid()
+
+      for {guid, position} <- [
+            {source, {0.0, 0.0, 0.0}},
+            {ally, {3.0, 0.0, 0.0}},
+            {dead, {2.0, 0.0, 0.0}},
+            {distant, {11.0, 0.0, 0.0}},
+            {foreign, {3.0, 0.0, 0.0}}
+          ] do
+        put_spatial_target(:mobs, guid, position)
+      end
+
+      put_spatial_target(:players, enemy, {1.0, 0.0, 0.0})
+      Metadata.update(dead, %{alive?: false})
+      SpatialHash.update(:mobs, foreign, WorldRef.instance(0, 77), 3.0, 0.0, 0.0)
+
+      spell = %Spell{
+        effects: [
+          %Effect{
+            type: :heal,
+            implicit_target_a: :caster_source,
+            implicit_target_b: :aoe_ally_at_source,
+            radius_yards: 10.0
+          }
+        ]
+      }
+
+      assert Enum.sort(SpellTargetResolver.resolve(caster(source, {0.0, 0.0, 0.0}), spell, Target.unit(enemy))) ==
+               Enum.sort([source, ally])
+    end
+
+    test "friendly destination areas use the ground center instead of the caster or selected enemy" do
+      source = mob_guid()
+      friend = mob_guid()
+      enemy = player_guid()
+      put_spatial_target(:mobs, source, {0.0, 0.0, 0.0})
+      put_spatial_target(:mobs, friend, {25.0, 0.0, 0.0})
+      put_spatial_target(:players, enemy, {25.0, 0.0, 0.0})
+      spell = %Spell{effects: [%Effect{type: :heal, implicit_target_a: :aoe_ally_at_dest, radius_yards: 5.0}]}
+
+      assert SpellTargetResolver.resolve(caster(source, {0.0, 0.0, 0.0}), spell, Target.at({25.0, 0.0, 0.0})) == [
+               friend
+             ]
+    end
+
     test "party buffs follow subgroups while class-wide blessings cross the raid" do
       [leader, moved, other] = guids = for _ <- 1..3, do: player_guid()
       pet = Guid.runtime(:pet, 2960)

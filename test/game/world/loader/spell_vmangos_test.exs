@@ -505,7 +505,8 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert Enum.any?(SpellLoader.load(20_882).effects, &(&1.aura == :mod_charm))
 
       assert Enum.any?(SpellLoader.load(22_703).effects, fn effect ->
-               effect.type == :school_damage and effect.implicit_target_a == :aoe_enemy_at_caster
+               effect.type == :school_damage and effect.implicit_target_a == :caster_source and
+                 effect.implicit_target_b == :aoe_enemy_at_caster
              end)
 
       assert Enum.any?(SpellLoader.load(22_707).effects, &(&1.aura == :mod_root))
