@@ -276,7 +276,7 @@ defmodule ThistleTea.Game.Spell do
 
   def requires_friendly_target?(%__MODULE__{effects: effects}) do
     Enum.any?(effects, fn %Effect{implicit_target_a: a, implicit_target_b: b} ->
-      a == :target_ally or b == :target_ally
+      a in [:target_ally, :party_around_target] or b in [:target_ally, :party_around_target]
     end)
   end
 

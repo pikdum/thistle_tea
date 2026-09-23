@@ -75,6 +75,18 @@ defmodule ThistleTea.Game.Entity.EffectResolver.PvpTest do
       refute PvpLogic.contested?(caster)
     end
 
+    test "party assistance in the second implicit target slot flags a PvP caster" do
+      spell = %Spell{
+        effects: [%Effect{type: :apply_aura, implicit_target_a: :any_unit, implicit_target_b: :party_around_target}],
+        attributes: MapSet.new([:no_threat])
+      }
+
+      rows = %{2 => %{pvp?: true}}
+
+      assert [%Effects.PvpContact{target_guid: 1, role: :assist}] =
+               Pvp.spell_contacts(character(1), 1, 2, spell, :hit, metadata: &Map.get(rows, &1), now: 0)
+    end
+
     test "no-threat assistance does not flag for a PvP creature" do
       mob = Guid.from_low_guid(:mob, 1, 1)
 

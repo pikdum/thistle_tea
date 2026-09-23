@@ -22,8 +22,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
       query = targeted_aoe_query(spell, targets) ->
         query
 
-      party_aoe_spell?(spell) ->
-        {:party_aoe, max_aoe_radius(spell)}
+      query = party_query(spell, unit_guid) ->
+        query
 
       raid_class_aoe_spell?(spell) ->
         {:party_class_aoe, unit_guid, raid_class_radius(spell)}
@@ -39,7 +39,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   def target_query(_spell, _targets), do: :none
 
   def area_targeted?(%Spell{} = spell) do
-    caster_aoe_spell?(spell) or cone_aoe_spell?(spell) or targeted_aoe_spell?(spell) or party_aoe_spell?(spell)
+    caster_aoe_spell?(spell) or cone_aoe_spell?(spell) or targeted_aoe_spell?(spell) or party_aoe_spell?(spell) or
+      target_party_aoe_spell?(spell)
   end
 
   def area_targeted?(_spell), do: false
@@ -104,6 +105,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
 
   defp party_aoe_spell?(%Spell{effects: effects}) do
     Enum.any?(effects, &effect_targets?(&1, [:party_around_caster]))
+  end
+
+  defp party_query(spell, unit_guid) do
+    cond do
+      party_aoe_spell?(spell) -> {:party_aoe, max_aoe_radius(spell)}
+      target_party_aoe_spell?(spell) and is_integer(unit_guid) -> {:target_party_aoe, unit_guid, max_aoe_radius(spell)}
+      true -> nil
+    end
+  end
+
+  defp target_party_aoe_spell?(%Spell{effects: effects}) do
+    Enum.any?(effects, &effect_targets?(&1, [:party_around_target]))
   end
 
   defp raid_class_aoe_spell?(%Spell{effects: effects}) do

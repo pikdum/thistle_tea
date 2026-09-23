@@ -72,6 +72,58 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
       assert SpellTargetResolver.resolve(caster(owner, {0.0, 0.0, 0.0}), spell, Target.none()) == [owner]
     end
 
+    test "targeted party buffs follow the selected member's subgroup and position" do
+      [caster_guid, selected, nearby, other_subgroup] = guids = for _ <- 1..4, do: player_guid()
+      pet = Guid.runtime(:pet, 2960)
+      :ok = PartySystem.invite(caster_guid, "Caster", selected)
+      {:ok, _} = PartySystem.accept(selected, "Selected")
+      :ok = PartySystem.invite(caster_guid, "Caster", nearby)
+      {:ok, _} = PartySystem.accept(nearby, "Nearby")
+      :ok = PartySystem.invite(caster_guid, "Caster", other_subgroup)
+      {:ok, _} = PartySystem.accept(other_subgroup, "Other")
+      {:ok, _} = PartySystem.convert_raid(caster_guid)
+      {:ok, _} = PartySystem.change_subgroup(caster_guid, selected, 1)
+      {:ok, _} = PartySystem.change_subgroup(caster_guid, nearby, 1)
+      on_exit(fn -> Enum.each(guids, &PartySystem.leave/1) end)
+
+      put_spatial_target(:players, caster_guid, {0.0, 0.0, 0.0})
+      put_spatial_target(:players, selected, {30.0, 0.0, 0.0})
+      put_spatial_target(:players, nearby, {35.0, 0.0, 0.0})
+      put_spatial_target(:players, other_subgroup, {32.0, 0.0, 0.0})
+      put_spatial_target(:mobs, pet, {34.0, 0.0, 0.0})
+      Metadata.update(pet, %{owner_guid: selected})
+
+      spell = aoe_spell(:party_around_target)
+      casting_player = caster(caster_guid, {0.0, 0.0, 0.0})
+
+      assert Enum.sort(SpellTargetResolver.resolve(casting_player, spell, Target.unit(selected))) ==
+               Enum.sort([selected, nearby, pet])
+
+      assert Enum.sort(SpellTargetResolver.resolve(casting_player, spell, Target.unit(pet))) ==
+               Enum.sort([selected, nearby, pet])
+
+      assert SpellTargetResolver.resolve(casting_player, spell, Target.unit(other_subgroup)) ==
+               [other_subgroup]
+    end
+
+    test "targeted party buffs include an ungrouped friend and its nearby pet" do
+      caster_guid = player_guid()
+      friend = player_guid()
+      pet = Guid.runtime(:pet, 2960)
+      put_spatial_target(:players, caster_guid, {0.0, 0.0, 0.0})
+      put_spatial_target(:players, friend, {5.0, 0.0, 0.0})
+      put_spatial_target(:mobs, pet, {7.0, 0.0, 0.0})
+      Metadata.update(pet, %{owner_guid: friend})
+
+      spell = aoe_spell(:party_around_target)
+      casting_player = caster(caster_guid, {0.0, 0.0, 0.0})
+
+      assert Enum.sort(SpellTargetResolver.resolve(casting_player, spell, Target.unit(friend))) ==
+               Enum.sort([friend, pet])
+
+      assert SpellTargetResolver.resolve(casting_player, spell, Target.unit(mob_guid())) == []
+    end
+
     test "returns direct unit targets without world lookup" do
       caster = %{object: %{guid: 1}}
       spell = %Spell{id: 133, effects: []}

@@ -44,6 +44,15 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
       assert SpellTarget.target_query(spell, Target.unit(2)) == {:party_aoe, 10.0}
     end
 
+    test "targeted party buffs use the selected unit as their center" do
+      spell = aoe_spell(:party_around_target)
+
+      assert SpellTarget.target_query(spell, Target.unit(2)) == {:target_party_aoe, 2, 10.0}
+      assert SpellTarget.target_query(spell, Target.none()) == :none
+      assert SpellTarget.area_targeted?(spell)
+      assert Spell.requires_friendly_target?(spell)
+    end
+
     test "returns none without matching target data" do
       spell = aoe_spell(:aoe_enemy_at_dest)
 

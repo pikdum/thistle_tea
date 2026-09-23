@@ -157,6 +157,9 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
       {:party_aoe, radius} ->
         nearby_party_guids(caster, caster_guid, radius)
 
+      {:target_party_aoe, target_guid, radius} ->
+        target_party_guids(target_guid, radius)
+
       {:party_class_aoe, class_guid, radius} ->
         party_class_guids(caster, caster_guid, class_guid, radius)
 
@@ -284,6 +287,44 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   end
 
   defp nearby_party_guids(_caster, caster_guid, _radius, _scope), do: [caster_guid]
+
+  defp target_party_guids(target_guid, radius) when is_number(radius) and radius > 0 do
+    with owner_guid when is_integer(owner_guid) <- target_party_owner(target_guid),
+         {world, x, y, z} <- World.position(owner_guid) do
+      members =
+        case PartySystem.group_of(owner_guid) do
+          %Party.Group{} = group -> group |> Party.subgroup_members(owner_guid) |> MapSet.new(& &1.guid)
+          _ -> MapSet.new([owner_guid])
+        end
+
+      world
+      |> nearby_units_at({x, y, z}, radius)
+      |> Enum.map(&elem(&1, 0))
+      |> then(&[owner_guid | &1])
+      |> Enum.uniq()
+      |> Enum.filter(&(alive?(&1) and (MapSet.member?(members, &1) or party_pet?(&1, members))))
+    else
+      _ -> []
+    end
+  end
+
+  defp target_party_guids(_target_guid, _radius), do: []
+
+  defp target_party_owner(guid) do
+    cond do
+      Guid.high_guid(guid) == Guid.high_guid(:player) ->
+        guid
+
+      Guid.high_guid(guid) == Guid.high_guid(:pet) ->
+        case Metadata.query(guid, [:owner_guid]) do
+          %{owner_guid: owner_guid} when is_integer(owner_guid) -> owner_guid
+          _ -> nil
+        end
+
+      true ->
+        nil
+    end
+  end
 
   defp party_pet?(guid, members) do
     Guid.high_guid(guid) == Guid.high_guid(:pet) and
