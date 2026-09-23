@@ -323,13 +323,23 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
       assert [{first_pid, _value}] = Registry.lookup(SpawnPool.Registry, first_key)
       assert [{second_pid, _value}] = Registry.lookup(SpawnPool.Registry, second_key)
       refute first_pid == second_pid
+      [{first_member, _monitor}] = Map.values(:sys.get_state(first_pid).running)
+      [{second_member, _monitor}] = Map.values(:sys.get_state(second_pid).running)
+      first_entity = :sys.get_state(first_member)
+      second_entity = :sys.get_state(second_member)
+      World.remove_position(first_entity)
+      refute first_entity.object.guid in World.guids(first_world)
 
       SpawnPool.stop_world(first_world)
 
       await_pool_absent(first_key)
+      await_absent(first_entity.object.guid)
+      refute Process.alive?(first_member)
+      assert Entity.pid(second_entity.object.guid) == second_member
       assert [{^second_pid, _value}] = Registry.lookup(SpawnPool.Registry, second_key)
 
       SpawnPoolSupervisor.terminate_child(second_pid)
+      await_absent(second_entity.object.guid)
     end
   end
 

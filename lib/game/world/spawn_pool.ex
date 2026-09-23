@@ -220,6 +220,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
 
   @impl GenServer
   def init(opts) do
+    Process.flag(:trap_exit, true)
     {world, group} = key = Keyword.fetch!(opts, :key)
     blueprint = Keyword.get(opts, :blueprint)
     {catalog, blueprints, selection} = initialize(world, group, blueprint)
