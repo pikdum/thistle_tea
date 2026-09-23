@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.Loader.SpellComboPointsDbcTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.ComboPoints
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -19,6 +20,39 @@ defmodule ThistleTea.Game.World.Loader.SpellComboPointsDbcTest do
   setup [:entities]
 
   describe "load/1" do
+    test "critical builders produce one talent proc through one melee outcome", %{caster: caster, target: target} do
+      for {builder_id, talent_id, trigger_id} <- [{1752, 14_195, 14_189}, {1082, 16_954, 16_953}] do
+        spell = SpellLoader.load(builder_id)
+        talent = SpellLoader.load(talent_id)
+        {caster, _events} = Aura.apply_spell(caster, caster.object.guid, 60, talent, 0)
+        context = melee_context(caster, spell)
+        {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
+        assert [%Effects.AddComboPoints{amount: 1} = award] = awards(events)
+
+        assert [%Effects.AttackOutcome{outcome: :crit} = outcome] =
+                 Enum.filter(events, &is_struct(&1, Effects.AttackOutcome))
+
+        assert Enum.all?(Enum.filter(events, &is_struct(&1, Effects.SpellDamage)), &is_nil(&1.proc_type))
+
+        caster =
+          caster
+          |> ComboPoints.award(award, 1_000)
+          |> AttackFeedback.receive(feedback(outcome), spell, 1_000)
+
+        triggers = Enum.filter(caster.internal.events, &is_struct(&1, Effects.TriggerSpell))
+        assert [%Effects.TriggerSpell{spell_id: ^trigger_id}] = triggers
+      end
+    end
+
+    test "druid finishers consume points through their melee outcome", %{caster: caster, target: target} do
+      spell = SpellLoader.load(1079)
+      caster = ComboPoints.add(caster, target.object.guid, 3, 0)
+      context = %{melee_context(caster, spell) | combo_points: 3}
+      {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
+      assert [outcome] = Enum.filter(events, &is_struct(&1, Effects.AttackOutcome))
+      assert AttackFeedback.receive(caster, feedback(outcome), spell, 1_000).player.combo_points == 0
+    end
+
     test "Premeditation grants two points for ten seconds", %{caster: caster, target: target} do
       spell = SpellLoader.load(14_183)
       assert spell.dmg_class == 0
@@ -47,6 +81,24 @@ defmodule ThistleTea.Game.World.Loader.SpellComboPointsDbcTest do
 
   defp awards(events), do: Enum.filter(events, &is_struct(&1, Effects.AddComboPoints))
 
+  defp feedback(outcome) do
+    %{outcome: outcome.outcome, victim_guid: outcome.source_guid, spell_id: outcome.spell_id, damage: outcome.damage}
+  end
+
+  defp melee_context(caster, spell) do
+    %{
+      context(caster, spell)
+      | hit_chance_bonus: 100,
+        attack_skill: 300,
+        melee_crit_chance: 100,
+        weapon_base_min: 1,
+        weapon_base_max: 1,
+        attack_time_ms: 2_000,
+        normalized_speed: 2.4,
+        attack_power: 0
+    }
+  end
+
   defp context(caster, spell) do
     %CastContext{
       caster_guid: caster.object.guid,
@@ -65,7 +117,7 @@ defmodule ThistleTea.Game.World.Loader.SpellComboPointsDbcTest do
       internal: %Internal{}
     }
 
-    target = %Mob{object: %Object{guid: 9}, unit: %Unit{health: 100, max_health: 100, auras: []}}
+    target = %Mob{object: %Object{guid: 9}, unit: %Unit{level: 1, health: 10_000, max_health: 10_000, auras: []}}
     %{caster: caster, target: target}
   end
 end

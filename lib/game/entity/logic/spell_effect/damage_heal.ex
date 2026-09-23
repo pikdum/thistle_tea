@@ -530,6 +530,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     cond do
       Spell.auto_repeat?(spell) or Hunter.auto_shot?(spell) -> :deal_ranged_attack
       Spell.ranged_ability?(spell) -> :deal_ranged_ability
+      Spell.melee_ability?(spell) -> nil
       true -> :deal_melee_ability
     end
   end

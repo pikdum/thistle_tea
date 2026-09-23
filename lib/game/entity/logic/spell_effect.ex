@@ -15,7 +15,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.MechanicResistance
   alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.Reactive
-  alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Aura, as: AuraEffects
   alias ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Honor, as: HonorEffects
@@ -242,7 +241,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         {target, events} = apply_resisted_effects(target, context, now)
 
         events =
-          if rogue_feedback_spell?(spell) do
+          if Spell.melee_ability?(spell) do
             events ++
               [
                 Effects.attack_outcome(
@@ -449,10 +448,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       _event, acc ->
         acc
     end)
-  end
-
-  defp rogue_feedback_spell?(%Spell{} = spell) do
-    Rogue.rogue_spell?(spell)
   end
 
   defp special_attack(%CastContext{} = context, spell) do

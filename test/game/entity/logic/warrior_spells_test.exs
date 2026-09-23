@@ -266,7 +266,11 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
       {target, events} = SpellEffect.receive(target, melee_context(spell), spell, 1_000)
 
-      assert [%Effects.SpellDamage{damage: 41, crit?: false}] = events
+      assert [
+               %Effects.SpellDamage{damage: 41, crit?: false, proc_type: nil},
+               %Effects.AttackOutcome{damage: 41, outcome: :normal}
+             ] = events
+
       assert target.unit.health == 159
     end
 
@@ -285,7 +289,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
       {_target, events} = SpellEffect.receive(target, melee_context(spell), spell, 1_000)
 
-      assert [%Effects.SpellDamage{damage: 39}] = events
+      assert [%Effects.SpellDamage{damage: 39, proc_type: nil}, %Effects.AttackOutcome{damage: 39}] = events
     end
 
     test "melee-class school damage can be avoided and reports the miss" do
@@ -891,7 +895,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
       {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
 
-      assert [%Effects.SpellDamage{damage: 63}] = events
+      assert [%Effects.SpellDamage{damage: 63, proc_type: nil}, %Effects.AttackOutcome{damage: 63}] = events
     end
 
     test "last stand triggers its health buff on the caster" do
