@@ -48,10 +48,9 @@ defmodule ThistleTea.Game.Entity.KillReward do
   end
 
   def controlling_player(guid, metadata) when is_integer(guid) and guid > 0 do
-    if Guid.entity_type(guid) == :player do
-      guid
-    else
-      player_owner(metadata.(guid))
+    case player_owner(metadata.(guid)) do
+      owner when is_integer(owner) -> owner
+      nil -> if Guid.entity_type(guid) == :player, do: guid
     end
   end
 

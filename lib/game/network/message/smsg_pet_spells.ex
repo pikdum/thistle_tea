@@ -62,6 +62,18 @@ defmodule ThistleTea.Game.Network.Message.SmsgPetSpells do
     }
   end
 
+  def for_possession(guid, spells, duration \\ 0) do
+    buttons = spells |> Enum.reject(&passive?/1) |> Enum.take(9) |> Enum.map(&button(spell_id(&1), @act_passive))
+
+    %__MODULE__{
+      pet_guid: guid,
+      duration: duration,
+      reaction_state: 0,
+      command_state: 0,
+      action_bars: [button(2, @act_command)] ++ buttons ++ List.duplicate(button(0, @act_passive), 9 - length(buttons))
+    }
+  end
+
   def clear, do: %__MODULE__{pet_guid: 0}
 
   @impl ServerMessage

@@ -112,7 +112,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
       message = %MsgMove{opcode: :MSG_MOVE_HEARTBEAT, payload: <<1, 2, 3>>}
 
       assert MsgMove.handle(message, session) == session
-      assert_receive {:controlled_move, <<1, 2, 3>>, :MSG_MOVE_HEARTBEAT}
+      assert_receive {:controlled_move, 23, <<1, 2, 3>>, :MSG_MOVE_HEARTBEAT}
     end
 
     test "rejects a mover that is not the character's charm" do
@@ -129,7 +129,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
       message = %MsgMove{opcode: :MSG_MOVE_HEARTBEAT, payload: <<1, 2, 3>>}
 
       assert MsgMove.handle(message, session) == session
-      refute_receive {:controlled_move, _, _}
+      refute_receive {:controlled_move, _, _, _}
     end
 
     test "ignores client movement during a taxi flight" do

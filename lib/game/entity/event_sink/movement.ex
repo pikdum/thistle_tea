@@ -82,7 +82,19 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
         context
       ) do
     Presence.relocate(entity, %{movement_velocity: {0.0, 0.0, 0.0}, moving_until: nil, airborne?: false})
-    Context.send_packet(context, %Message.SmsgClientControlUpdate{guid: guid, allow_movement?: allowed?})
+
+    case entity.internal.possession do
+      %{caster_guid: controller} ->
+        Context.send_packet(context, %Message.SmsgClientControlUpdate{guid: guid, allow_movement?: false})
+
+        World.broadcast_packet(%Message.SmsgClientControlUpdate{guid: guid, allow_movement?: allowed?}, entity,
+          recipients: [controller]
+        )
+
+      nil ->
+        Context.send_packet(context, %Message.SmsgClientControlUpdate{guid: guid, allow_movement?: allowed?})
+    end
+
     entity
   end
 
@@ -101,43 +113,43 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   def emit(entity, %Effects.ClientControlChanged{}, _context), do: entity
 
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.MovementRootChanged{rooted?: true}, context) do
-    Context.send_packet(context, %Message.SmsgForceMoveRoot{guid: guid})
+    send_control_packet(entity, %Message.SmsgForceMoveRoot{guid: guid}, context)
     entity
   end
 
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.MovementRootChanged{rooted?: false}, context) do
-    Context.send_packet(context, %Message.SmsgForceMoveUnroot{guid: guid})
+    send_control_packet(entity, %Message.SmsgForceMoveUnroot{guid: guid}, context)
     entity
   end
 
   def emit(entity, %Effects.MovementRootChanged{}, _context), do: entity
 
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.FeatherFallChanged{enabled?: true}, context) do
-    Context.send_packet(context, %Message.SmsgMoveFeatherFall{guid: guid})
+    send_control_packet(entity, %Message.SmsgMoveFeatherFall{guid: guid}, context)
     entity
   end
 
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.FeatherFallChanged{enabled?: false}, context) do
-    Context.send_packet(context, %Message.SmsgMoveNormalFall{guid: guid})
+    send_control_packet(entity, %Message.SmsgMoveNormalFall{guid: guid}, context)
     entity
   end
 
   def emit(entity, %Effects.FeatherFallChanged{}, _context), do: entity
 
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.HoverChanged{enabled?: true}, context) do
-    Context.send_packet(context, %Message.SmsgMoveSetHover{guid: guid})
+    send_control_packet(entity, %Message.SmsgMoveSetHover{guid: guid}, context)
     entity
   end
 
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.HoverChanged{enabled?: false}, context) do
-    Context.send_packet(context, %Message.SmsgMoveUnsetHover{guid: guid})
+    send_control_packet(entity, %Message.SmsgMoveUnsetHover{guid: guid}, context)
     entity
   end
 
   def emit(entity, %Effects.HoverChanged{}, _context), do: entity
 
   def emit(%Character{} = entity, %Effects.Knockback{} = effect, context) do
-    Context.send_packet(context, knockback_packet(entity, effect))
+    send_control_packet(entity, knockback_packet(entity, effect), context)
     entity
   end
 
@@ -153,12 +165,12 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   def emit(entity, %Effects.Knockback{}, _context), do: entity
 
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.WaterWalkChanged{enabled?: true}, context) do
-    Context.send_packet(context, %Message.SmsgMoveWaterWalk{guid: guid})
+    send_control_packet(entity, %Message.SmsgMoveWaterWalk{guid: guid}, context)
     entity
   end
 
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.WaterWalkChanged{enabled?: false}, context) do
-    Context.send_packet(context, %Message.SmsgMoveLandWalk{guid: guid})
+    send_control_packet(entity, %Message.SmsgMoveLandWalk{guid: guid}, context)
     entity
   end
 
@@ -170,7 +182,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
         context
       )
       when is_number(speed) do
-    Context.send_packet(context, speed_packet(type, guid, speed))
+    send_control_packet(entity, speed_packet(type, guid, speed), context)
     broadcast_speed(entity, type, speed)
     entity
   end
@@ -296,6 +308,12 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
 
     entity
   end
+
+  defp send_control_packet(%Character{internal: %{possession: %{caster_guid: controller}}} = entity, packet, _context) do
+    World.broadcast_packet(packet, entity, recipients: [controller])
+  end
+
+  defp send_control_packet(_entity, packet, context), do: Context.send_packet(context, packet)
 
   defp speed_packet(:run_speed, guid, speed), do: %Message.SmsgForceRunSpeedChange{guid: guid, speed: speed}
   defp speed_packet(:run_back_speed, guid, speed), do: %Message.SmsgForceRunBackSpeedChange{guid: guid, speed: speed}

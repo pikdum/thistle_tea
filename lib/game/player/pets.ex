@@ -37,6 +37,26 @@ defmodule ThistleTea.Game.Player.Pets do
 
   def rename(state, _guid, _name), do: state
 
+  def abandon(
+        %State{
+          ready: true,
+          character:
+            %Character{
+              internal: %{
+                companion: %CompanionData{kind: :possession, status: {:active, %EntityRef{guid: guid, spell_id: spell}}}
+              }
+            } = character
+        } = state,
+        guid
+      ) do
+    case Entity.pid(guid) do
+      pid when is_pid(pid) -> send(pid, {:release_control, character.object.guid, spell})
+      _missing -> :ok
+    end
+
+    state
+  end
+
   def abandon(%State{ready: true, character: %Character{} = character} = state, guid) do
     if Companion.controls?(character, guid) do
       state = state |> CompanionOwner.suspend() |> CompanionVisibility.clear()

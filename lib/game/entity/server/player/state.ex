@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Entity.Server.GuardianOwner
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.MiniPetOwner
+  alias ThistleTea.Game.Entity.Server.Player.PossessionOwner
   alias ThistleTea.Game.Entity.Server.Player.ServerMovement
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
@@ -75,6 +76,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :active_banker_guid,
     :gossip_menu_guid,
     :companion_monitor,
+    :possession_monitor,
     :mini_pet_monitor,
     :pet_unlearn_offer,
     :talent_reset_offer,
@@ -146,7 +148,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
       end
 
     state = state |> Looting.release() |> QuestSharing.disconnect() |> OutdoorPvp.leave() |> Weather.leave()
-    state = disengage(state)
+    state = state |> PossessionOwner.release() |> disengage()
     state = CompanionOwner.suspend(state)
     state = MiniPetOwner.dismiss(state)
     state = dismiss_guardians(state)

@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
 
   @cast_failure_reasons %{
     affecting_combat: 0x00,
+    already_have_charm: 0x04,
     already_have_summon: 0x05,
     already_open: 0x06,
     cant_be_disenchanted: 0x0C,
@@ -20,6 +21,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     bad_targets: 0x0A,
     cant_do_that_yet: 0x12,
     caster_dead: 0x13,
+    charmed: 0x14,
     chest_in_use: 0x15,
     equipped_item: 0x18,
     equipped_item_class: @cast_failure_reason_equipped_item_class,
@@ -28,6 +30,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     fizzle: 0x1D,
     fleeing: 0x1E,
     food_lowlevel: 0x1F,
+    highlevel: 0x20,
     immune: 0x22,
     interrupted: 0x23,
     item_not_ready: 0x28,

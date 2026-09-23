@@ -34,6 +34,14 @@ defmodule ThistleTea.Game.Entity.KillRewardTest do
     end
   end
 
+  describe "controlling_player/2" do
+    test "credits a possessed player's controller until control ends" do
+      assert KillReward.controlling_player(1, fn 1 -> %{owner_guid: 2} end) == 2
+      assert KillReward.controlling_player(1, fn 1 -> %{owner_guid: nil} end) == 1
+      assert KillReward.controlling_player(1, fn 1 -> nil end) == 1
+    end
+  end
+
   describe "eligible_members/3" do
     test "requires a living nearby member of the selected group" do
       mob = %Mob{}

@@ -353,16 +353,16 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
       }
 
       payload = MovementBlock.movement_info_to_binary(movement)
-      assert {:noreply, moved} = MobServer.handle_info({:controlled_move, payload, 0xF1}, entity)
+      assert {:noreply, moved} = MobServer.handle_info({:controlled_move, owner_guid, payload, 0xF1}, entity)
       assert moved.movement_block.position == movement.position
       assert World.position(guid) == {world, 2.0, 0.0, 1.0}
       assert_receive {:observer, :nearby, {:"$gen_cast", {:send_packet, %MsgMoveKnockBack{guid: ^guid}, _}}}
       refute_receive {:observer, :owner, {:"$gen_cast", {:send_packet, %MsgMoveKnockBack{}, _}}}
 
       dead = put_in(entity.unit.health, 0)
-      assert MobServer.handle_info({:controlled_move, payload, 0xF1}, dead) == {:noreply, dead}
+      assert MobServer.handle_info({:controlled_move, owner_guid, payload, 0xF1}, dead) == {:noreply, dead}
       released = put_in(entity.internal.pet, nil)
-      assert MobServer.handle_info({:controlled_move, payload, 0xF1}, released) == {:noreply, released}
+      assert MobServer.handle_info({:controlled_move, owner_guid, payload, 0xF1}, released) == {:noreply, released}
       Visibility.leave_entity(moved)
     end
   end

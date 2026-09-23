@@ -20,6 +20,11 @@ defmodule ThistleTea.Game.Player.CompanionVisibility do
 
   def prepare_attachment(%State{} = state, %Attachment{}), do: state
 
+  def finish_attachment(%State{} = state, %Attachment{kind: :possession, entity_ref: ref, spells: spells}) do
+    Network.send_packet(Message.SmsgPetSpells.for_possession(ref.guid, spells))
+    state
+  end
+
   def finish_attachment(%State{} = state, %Attachment{entity_ref: entity_ref, pid: pid, spells: spells} = attachment) do
     autocast = Companion.autocast(state.character)
     send(pid, {:pet_restore_autocast, autocast})

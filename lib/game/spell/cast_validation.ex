@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.OpenLock
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Pickpocket
+  alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Skinning
@@ -107,6 +108,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_position(caster, spell, target_info),
          :ok <- check_target_aura_state(spell, target_info),
          :ok <- check_warlock_target(caster, spell, target_info),
+         :ok <- PlayerPossession.validate(caster, spell, target_info),
          :ok <- Hunter.validate_tame(caster, spell, target_info),
          :ok <- check_range(caster, spell, target_info) do
       check_line_of_sight(spell, target_info)

@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.MovementControl do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Resurrection
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message
@@ -21,11 +22,11 @@ defmodule ThistleTea.Game.Network.MovementControl do
   end
 
   def prepare(%Message.SmsgForceMoveRoot{} = packet, %State{} = state) do
-    stamp(state, :root, &%{packet | move_event: &1})
+    stamp(state, controlled_change(state, packet.guid, :root), &%{packet | move_event: &1})
   end
 
   def prepare(%Message.SmsgForceMoveUnroot{} = packet, %State{} = state) do
-    stamp(state, :unroot, &%{packet | move_event: &1})
+    stamp(state, controlled_change(state, packet.guid, :unroot), &%{packet | move_event: &1})
   end
 
   def prepare(%Message.SmsgForceRunSpeedChange{} = packet, %State{} = state) do
@@ -67,11 +68,11 @@ defmodule ThistleTea.Game.Network.MovementControl do
   end
 
   def prepare(%Message.SmsgMoveFeatherFall{} = packet, %State{} = state) do
-    stamp(state, {:feather_fall, true}, &%{packet | counter: &1})
+    stamp(state, controlled_change(state, packet.guid, {:feather_fall, true}), &%{packet | counter: &1})
   end
 
   def prepare(%Message.SmsgMoveNormalFall{} = packet, %State{} = state) do
-    stamp(state, {:feather_fall, false}, &%{packet | counter: &1})
+    stamp(state, controlled_change(state, packet.guid, {:feather_fall, false}), &%{packet | counter: &1})
   end
 
   def prepare(%Message.SmsgMoveSetHover{} = packet, %State{} = state) do
@@ -95,6 +96,15 @@ defmodule ThistleTea.Game.Network.MovementControl do
 
       :error ->
         {:error, state}
+    end
+  end
+
+  def acknowledge(%State{character: %Character{}} = state, guid, counter, expected) do
+    if Companion.control_guid(state.character) == guid and
+         Map.get(state.pending_movement_acks, counter) == {:controlled, guid, expected} do
+      {:ok, %{state | pending_movement_acks: Map.delete(state.pending_movement_acks, counter)}}
+    else
+      {:error, state}
     end
   end
 
@@ -148,6 +158,9 @@ defmodule ThistleTea.Game.Network.MovementControl do
       {:error, state} -> state
     end
   end
+
+  def reconcile_movement(%State{guid: guid} = state, payload, guid), do: reconcile_movement(state, payload)
+  def reconcile_movement(state, _payload, _guid), do: state
 
   def reconcile_movement(%State{ready: false} = state, _payload), do: state
 
@@ -216,6 +229,9 @@ defmodule ThistleTea.Game.Network.MovementControl do
   end
 
   def maybe_finish_repop(state), do: state
+
+  defp controlled_change(%State{guid: guid}, guid, change), do: change
+  defp controlled_change(_state, guid, change), do: {:controlled, guid, change}
 
   defp stamp(%State{} = state, pending_change, build_packet) do
     counter = state.movement_counter

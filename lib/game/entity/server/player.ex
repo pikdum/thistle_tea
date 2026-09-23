@@ -71,6 +71,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Server.Player.MiniPetOwner
   alias ThistleTea.Game.Entity.Server.Player.MiniPetOwner.Monitor, as: MiniPetMonitor
   alias ThistleTea.Game.Entity.Server.Player.PacketSink
+  alias ThistleTea.Game.Entity.Server.Player.PossessionOwner
+  alias ThistleTea.Game.Entity.Server.Player.PossessionOwner.Monitor, as: PossessionMonitor
   alias ThistleTea.Game.Entity.Server.Player.ServerMovement
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
@@ -95,6 +97,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Guilds
   alias ThistleTea.Game.Player.HomeBind
   alias ThistleTea.Game.Player.Honor
+  alias ThistleTea.Game.Player.Input
   alias ThistleTea.Game.Player.Insignia, as: PlayerInsignia
   alias ThistleTea.Game.Player.Instances
   alias ThistleTea.Game.Player.ItemCosts
@@ -119,6 +122,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Trade
   alias ThistleTea.Game.Player.Weather
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Modifiers
@@ -192,7 +196,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   @impl GenServer
   def handle_call({:client_message, message}, _from, state) do
-    state = message |> Message.handle(state) |> maybe_broadcast_update()
+    state = message |> Input.handle(state) |> maybe_broadcast_update()
     {:reply, :ok, state}
   end
 
@@ -813,6 +817,41 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_info({:DOWN, _monitor, :process, connection_pid, _reason}, %State{connection_pid: connection_pid} = state) do
     {:stop, :normal, State.leave_world(state)}
+  end
+
+  def handle_info(
+        {:DOWN, token, :process, _pid, _reason},
+        %State{possession_monitor: %PossessionMonitor{token: token}} = state
+      ) do
+    {:noreply, PossessionOwner.release(state), {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Possession cleanup failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:release_control, caster, spell}, %State{} = state) do
+    {:noreply, PossessionOwner.release(state, caster, spell), {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Possession release failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:controlled_move, caster, payload, opcode}, %State{} = state) do
+    {:noreply, PossessionOwner.move(state, caster, payload, opcode)}
+  rescue
+    error ->
+      Logger.error("Controlled player movement failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:controlled_command, caster, command, target}, %State{} = state) do
+    {:noreply, PossessionOwner.command(state, caster, command, target), {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Controlled player command failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_info(
@@ -1525,6 +1564,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     |> ServerMovement.reconcile()
     |> cancel_cast_if_dead()
     |> finalize_death()
+    |> PossessionOwner.reconcile()
     |> Looting.close_unavailable()
     |> sync_equipment_requirements()
     |> sync_character_metadata()
@@ -1769,6 +1809,10 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
     Network.send_packet(%Message.SmsgClientControlUpdate{guid: guid, allow_movement?: true})
 
+    if match?(%{rooted?: true}, Metadata.query(guid, [:rooted?])) do
+      Network.send_packet(%Message.SmsgForceMoveRoot{guid: guid})
+    end
+
     %{state | character: character, active_mover_guid: guid}
     |> Visibility.set_viewpoint(guid)
   end
@@ -1795,6 +1839,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
     character =
       character
+      |> cancel_released_channel(entity_ref.spell_id)
       |> EventSink.emit(aura_events)
       |> Core.mark_broadcast_update()
 
@@ -1810,6 +1855,11 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       do: Login.refresh_companion(state),
       else: CompanionVisibility.clear(state)
   end
+
+  defp cancel_released_channel(%Character{internal: %{casting: %Cast{spell: %Spell{id: id}}}} = character, id),
+    do: Casting.cancel(character, Time.now())
+
+  defp cancel_released_channel(character, _spell_id), do: character
 
   defp trigger_kill_procs(state, victim) do
     {character, events} = Aura.reactions(state.character, :kill, %{victim_guid: victim.object.guid, now: Time.now()})
@@ -1932,7 +1982,9 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     end
   end
 
-  defp disengage_for_world_transition(%State{character: %Character{} = character} = state) do
+  defp disengage_for_world_transition(%State{character: %Character{}} = state) do
+    state = PossessionOwner.release(state)
+    character = Casting.cancel(state.character, Time.now())
     {character, effects} = PlayerCombat.disengage(character)
     %{state | character: EventSink.emit(character, effects)}
   end
@@ -2010,6 +2062,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp cancel_authoritative_movement(%State{} = state) do
     state
+    |> PossessionOwner.release()
     |> Resurrection.cancel_transfer()
     |> PlayerTaxi.cancel()
     |> ServerMovement.cancel()

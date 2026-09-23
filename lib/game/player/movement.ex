@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Emote
   alias ThistleTea.Game.Entity.Logic.Falling
+  alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Logic.SafePosition
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
@@ -62,9 +63,9 @@ defmodule ThistleTea.Game.Player.Movement do
          %{ready: true, guid: player_guid, active_mover_guid: mover_guid, character: %Character{} = character} = state
        )
        when is_integer(mover_guid) and mover_guid > 0 and mover_guid != player_guid do
-    if Companion.control_guid(character) == mover_guid do
+    if Companion.possession_guid(character) == mover_guid do
       case Entity.pid(mover_guid) do
-        pid when is_pid(pid) -> send(pid, {:controlled_move, payload, opcode})
+        pid when is_pid(pid) -> send(pid, {:controlled_move, player_guid, payload, opcode})
         _ -> nil
       end
     end
@@ -73,7 +74,7 @@ defmodule ThistleTea.Game.Player.Movement do
   end
 
   defp handle_movement(
-         %Message.MsgMove{payload: payload} = message,
+         %Message.MsgMove{} = message,
          %{
            ready: true,
            guid: player_guid,
@@ -82,24 +83,46 @@ defmodule ThistleTea.Game.Player.Movement do
          } = state
        )
        when mover_guid in [nil, player_guid] do
-    movement_block = MovementBlock.from_binary(payload, movement_block)
+    if is_integer(Companion.possession_guid(character)) do
+      state
+    else
+      reconcile_movement(message, state, movement_block)
+    end
+  end
+
+  defp handle_movement(_message, state), do: state
+
+  def handle_controlled(%{character: %Character{} = character, server_movement: nil} = state, caster, payload, opcode) do
+    if PlayerPossession.controlled_by?(character, caster) and can_move?(character) do
+      message = %Message.MsgMove{payload: payload, opcode: opcode}
+      reconcile_movement(message, state, character.movement_block, caster)
+    else
+      state
+    end
+  end
+
+  def handle_controlled(state, _caster, _payload, _opcode), do: state
+
+  defp reconcile_movement(message, state, movement_block, controller \\ nil) do
+    character = state.character
+    movement_block = MovementBlock.from_binary(message.payload, movement_block)
 
     case Transports.reconcile(character, movement_block) do
       {:ok, movement_block} ->
         state = MovementControl.track_transport_boarding(state, character.movement_block, movement_block)
-        handle_player_movement(message, state, movement_block)
+        handle_player_movement(message, state, movement_block, controller)
 
       {:error, _reason} ->
         state
     end
   end
 
-  defp handle_movement(_message, state), do: state
-
-  def accepts_input?(%Character{internal: %Internal{movement_start_time: started}}) when is_integer(started), do: false
-  def accepts_input?(%Character{internal: %Internal{logout: :rooted}}), do: false
-  def accepts_input?(%Character{} = character), do: not Core.dead?(character) and not ControlMovement.active?(character)
+  def accepts_input?(%Character{} = character), do: not PlayerPossession.active?(character) and can_move?(character)
   def accepts_input?(_character), do: true
+
+  defp can_move?(%Character{internal: %Internal{movement_start_time: started}}) when is_integer(started), do: false
+  defp can_move?(%Character{internal: %Internal{logout: :rooted}}), do: false
+  defp can_move?(%Character{} = character), do: not Core.dead?(character) and not ControlMovement.active?(character)
 
   def apply_environment(%Character{} = character, opcode, now) do
     character
@@ -143,7 +166,8 @@ defmodule ThistleTea.Game.Player.Movement do
   defp handle_player_movement(
          message,
          %{character: %Character{movement_block: %MovementBlock{} = previous_movement_block}} = state,
-         %MovementBlock{} = movement_block
+         %MovementBlock{} = movement_block,
+         controller
        ) do
     character = state.character
     character = %{character | movement_block: movement_block} |> remember_safe_position()
@@ -194,7 +218,7 @@ defmodule ThistleTea.Game.Player.Movement do
 
     new_state
     |> Visibility.refresh_player()
-    |> broadcast(message)
+    |> broadcast(message, controller)
     |> publish_changes()
   end
 
@@ -217,9 +241,14 @@ defmodule ThistleTea.Game.Player.Movement do
 
   defp cancel_moving_cast(state, _movement), do: Spellcasting.cancel(state, @spell_failed_moving)
 
-  defp broadcast(state, message) do
+  defp broadcast(state, message, controller) do
+    recipients =
+      if is_integer(controller),
+        do: Enum.uniq([state.guid | Map.get(state, :player_guids, [])]) |> List.delete(controller),
+        else: Map.get(state, :player_guids)
+
     Message.MsgMove.to_packet(state.guid, message.payload, message.opcode)
-    |> World.broadcast_packet(state.character, include_self?: false, recipients: Map.get(state, :player_guids))
+    |> World.broadcast_packet(state.character, include_self?: is_integer(controller), recipients: recipients)
 
     state
   end

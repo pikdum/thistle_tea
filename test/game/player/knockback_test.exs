@@ -75,12 +75,12 @@ defmodule ThistleTea.Game.Player.KnockbackTest do
       payload = MovementBlock.movement_info_to_binary(movement)
       updated = Knockback.acknowledge(state, mover, packet.counter, payload)
       assert updated.character.movement_block == state.character.movement_block
-      assert_receive {:controlled_move, ^payload, 0xF1}
+      assert_receive {:controlled_move, _, ^payload, 0xF1}
 
       released = %{state | active_mover_guid: state.guid}
       settled = Knockback.acknowledge(released, mover, packet.counter, payload)
       refute Map.has_key?(settled.pending_movement_acks, packet.counter)
-      refute_receive {:controlled_move, _, _}
+      refute_receive {:controlled_move, _, _, _}
     end
   end
 

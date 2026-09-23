@@ -126,8 +126,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Pvp do
 
   defp controlling_player(guid, metadata) do
     cond do
-      player_guid?(guid) -> guid
       player_guid?(Map.get(metadata, :owner_guid)) -> metadata.owner_guid
+      player_guid?(guid) -> guid
       true -> nil
     end
   end

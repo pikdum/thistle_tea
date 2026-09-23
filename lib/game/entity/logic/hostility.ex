@@ -179,11 +179,14 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
     player_projection(source, :free_for_all?) == true and player_projection(target, :free_for_all?) == true
   end
 
-  defp player_pvp?(%Character{} = character), do: Pvp.active?(character)
+  defp player_pvp?(%Character{internal: %{possession: nil}} = character), do: Pvp.active?(character)
   defp player_pvp?(entity), do: player_projection(entity, :pvp?) == true
 
-  defp player_projection(%Character{} = character, :free_for_all?), do: Pvp.free_for_all?(character)
-  defp player_projection(%Character{} = character, :duel_started?), do: Dueling.active?(character)
+  defp player_projection(%Character{internal: %{possession: nil}} = character, :free_for_all?),
+    do: Pvp.free_for_all?(character)
+
+  defp player_projection(%Character{internal: %{possession: nil}} = character, :duel_started?),
+    do: Dueling.active?(character)
 
   defp player_projection(entity, key) do
     owner = player_owner_guid(entity)
@@ -232,6 +235,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   end
 
   defp owner_guid(%{owner_guid: owner_guid}) when is_integer(owner_guid), do: owner_guid
+  defp owner_guid(%{internal: %{possession: %{caster_guid: owner_guid}}}), do: owner_guid
   defp owner_guid(%{internal: %{pet: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid
   defp owner_guid(%{internal: %{totem: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid
   defp owner_guid(_entity), do: nil
@@ -342,6 +346,9 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
     |> Map.get(faction_id)
   end
 
+  defp reputation_projection(%{owner_guid: owner}) when is_integer(owner) and owner > 0,
+    do: (Metadata.query(owner, [:reputation]) || %{}) |> Map.get(:reputation, %{})
+
   defp reputation_projection(%{reputation: reputation}) when is_map(reputation), do: reputation
 
   defp reputation_projection(entity) do
@@ -359,8 +366,8 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
 
   defp player_owner_guid(entity) do
     cond do
-      player_guid?(guid(entity)) -> guid(entity)
       player_guid?(owner_guid(entity)) -> owner_guid(entity)
+      player_guid?(guid(entity)) -> guid(entity)
       true -> nil
     end
   end

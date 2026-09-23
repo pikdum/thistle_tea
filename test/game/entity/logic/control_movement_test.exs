@@ -213,7 +213,7 @@ defmodule ThistleTea.Game.Entity.Logic.ControlMovementTest do
       for type <- [:mod_fear, :mod_confuse] do
         {mob, events} = change(mob, [holder(9, :mod_possess), holder(1, type)], 0)
         assert [%Effects.ClientControlChanged{allow_movement?: false}] = controls(events)
-        assert MobServer.handle_info({:controlled_move, <<1>>, 0xEE}, mob) == {:noreply, mob}
+        assert MobServer.handle_info({:controlled_move, 2, <<1>>, 0xEE}, mob) == {:noreply, mob}
         {_, events} = change(mob, [holder(9, :mod_possess)], 100)
         assert [%Effects.ClientControlChanged{allow_movement?: true}] = controls(events)
       end

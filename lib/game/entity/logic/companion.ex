@@ -268,6 +268,14 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
     end
   end
 
+  def possession_guid(%Character{} = character) do
+    case relationship(character) do
+      %Companion{kind: :possession, status: {:active, %EntityRef{guid: guid}}} -> guid
+      %Companion{possession_spell_id: spell, status: {:active, %EntityRef{guid: guid}}} when is_integer(spell) -> guid
+      _ -> nil
+    end
+  end
+
   def suspended(%Character{} = character) do
     case relationship(character) do
       %Companion{kind: kind, status: {:suspended, entry, spell_id}} -> {kind, entry, spell_id}

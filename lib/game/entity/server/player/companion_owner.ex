@@ -116,7 +116,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner do
 
   def suspend(%State{} = state), do: clear_monitor(state)
 
-  def refresh(%State{character: %Character{} = character} = state) do
+  def refresh(%State{character: %Character{internal: %{companion: %{kind: :hunter_pet}}} = character} = state) do
     case Entity.call(CompanionLogic.active_guid(character), :hunter_pet_snapshot) do
       {:ok, happiness, dead?, progress, reaction, health} ->
         character =
@@ -133,6 +133,8 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner do
         state
     end
   end
+
+  def refresh(%State{} = state), do: state
 
   def suspend_hunter_pet(%Character{} = character, guid) do
     if CompanionLogic.entry(character) == Guid.entry(guid) do

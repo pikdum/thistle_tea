@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
@@ -36,7 +37,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
 
   describe "CMSG_REQUEST_PET_INFO" do
     test "decodes the empty request and reuses the active companion attachment handshake" do
-      pet_guid = 123
+      pet_guid = Guid.from_low_guid(:mob, 1, 123)
       Entity.register(pet_guid)
       on_exit(fn -> Entity.unregister(pet_guid) end)
 
@@ -64,7 +65,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
 
   describe "CMSG_PET_SET_ACTION" do
     test "decodes and dispatches an autocast toggle for an owned pet" do
-      pet_guid = 123
+      pet_guid = Guid.from_low_guid(:mob, 1, 123)
       Entity.register(pet_guid)
       on_exit(fn -> Entity.unregister(pet_guid) end)
       data = 11_778 + Bitwise.bsl(0xC1, 24)
@@ -80,7 +81,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
     end
 
     test "dispatches action-bar changes to a charmed unit" do
-      controlled_guid = 124
+      controlled_guid = Guid.from_low_guid(:mob, 1, 124)
       Entity.register(controlled_guid)
       on_exit(fn -> Entity.unregister(controlled_guid) end)
 
@@ -98,7 +99,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
 
   describe "CMSG_PET_ACTION" do
     test "decodes and dispatches an owned pet follow command" do
-      pet_guid = 123
+      pet_guid = Guid.from_low_guid(:mob, 1, 123)
       target_guid = 0
       Entity.register(pet_guid)
       on_exit(fn -> Entity.unregister(pet_guid) end)
@@ -117,7 +118,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
     end
 
     test "dispatches commands to a charmed unit" do
-      controlled_guid = 124
+      controlled_guid = Guid.from_low_guid(:mob, 1, 124)
       Entity.register(controlled_guid)
       on_exit(fn -> Entity.unregister(controlled_guid) end)
 
@@ -236,7 +237,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
     end
 
     test "responds with the published name timestamp and validates the pet number" do
-      pet_guid = 123
+      pet_guid = Guid.from_low_guid(:mob, 1, 123)
       Metadata.put(pet_guid, %{name: "Wolf", owner_guid: 7, pet_number: 77, pet_name_timestamp: 99})
       SpatialHash.update(:players, pet_guid, WorldRef.open(0), 0.0, 0.0, 0.0)
 

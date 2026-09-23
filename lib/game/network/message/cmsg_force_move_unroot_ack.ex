@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveUnrootAck do
     case MovementControl.acknowledge(state, guid, counter, :unroot) do
       {:ok, state} ->
         state
-        |> MovementControl.reconcile_movement(movement_payload)
+        |> MovementControl.reconcile_movement(movement_payload, guid)
         |> MovementControl.maybe_finish_repop()
 
       {:error, state} ->

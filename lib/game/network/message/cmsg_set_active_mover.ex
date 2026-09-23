@@ -24,7 +24,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
 
   def handle(%__MODULE__{guid: guid}, %{ready: true, character: %Character{} = character} = state)
       when is_integer(guid) and guid > 0 do
-    if Companion.control_guid(character) == guid, do: set_active_mover(state, guid), else: state
+    if Companion.possession_guid(character) == guid, do: set_active_mover(state, guid), else: state
   end
 
   def handle(%__MODULE__{}, state), do: state

@@ -926,8 +926,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   def handle_info(
-        {:controlled_move, payload, opcode},
-        %Mob{internal: %Internal{pet: %Pet{possessed?: true}}, movement_block: %MovementBlock{}} = state
+        {:controlled_move, owner_guid, payload, opcode},
+        %Mob{internal: %Internal{pet: %Pet{possessed?: true, owner_guid: owner_guid}}} = state
       ) do
     if Core.dead?(state) or ControlMovement.active?(state),
       do: {:noreply, state},
@@ -938,7 +938,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       {:noreply, state}
   end
 
-  def handle_info({:controlled_move, _payload, _opcode}, state), do: {:noreply, state}
+  def handle_info({:controlled_move, _owner_guid, _payload, _opcode}, state), do: {:noreply, state}
 
   def handle_info(
         {:release_control, owner_guid, spell_id},

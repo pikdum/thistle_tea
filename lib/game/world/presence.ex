@@ -6,8 +6,11 @@ defmodule ThistleTea.Game.World.Presence do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Social.Notifier, as: SocialNotifier
+  alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.System.Party
@@ -68,7 +71,12 @@ defmodule ThistleTea.Game.World.Presence do
       contested_pvp?: Pvp.contested?(character),
       group_id: group_id(character.object.guid)
     }
+    |> Map.put(:owner_guid, PlayerPossession.controller(character))
+    |> Map.merge(faction_metadata(character))
   end
+
+  defp faction_metadata(%Character{unit: %Unit{faction_template: faction}}), do: FactionLoader.metadata(faction)
+  defp faction_metadata(%Character{}), do: %{}
 
   defp honor_rank(%Character{player: %{honor_rank: rank}}), do: rank || 0
   defp honor_rank(%Character{}), do: 0

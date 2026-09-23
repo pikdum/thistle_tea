@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
   """
 
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -14,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -37,6 +39,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
     end
   end
 
+  def sync(%Character{} = character, now), do: PlayerPossession.sync(character, now)
   def sync(entity, _now), do: {entity, []}
 
   defp sync_charm(
