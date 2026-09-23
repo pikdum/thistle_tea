@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Player.AreaTriggers do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.ConditionContext
+  alias ThistleTea.Game.Player.Corpses
   alias ThistleTea.Game.Player.Instances
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
@@ -68,6 +69,13 @@ defmodule ThistleTea.Game.Player.AreaTriggers do
   defp maybe_teleport(state, nil), do: state
 
   defp maybe_teleport(%{character: %Character{} = character} = state, teleport) do
+    case Corpses.portal_destination(state, teleport) do
+      {:ok, destination} -> validate_teleport(state, character, destination)
+      {:error, message} -> reject_teleport(state, %{message: message})
+    end
+  end
+
+  defp validate_teleport(state, character, teleport) do
     level_met? = character.unit.level >= teleport.required_level
     condition_met? = teleport_condition_met?(character, teleport.condition)
 
@@ -91,6 +99,8 @@ defmodule ThistleTea.Game.Player.AreaTriggers do
   defp reject_teleport(state, _teleport), do: state
 
   defp start_teleport(state, teleport) do
+    state = Corpses.revive_for_map(state, teleport.target_map)
+
     case destination_world(teleport.target_map, state.guid) do
       {:ok, world} ->
         GenServer.cast(

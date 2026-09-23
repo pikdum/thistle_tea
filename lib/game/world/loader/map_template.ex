@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.Loader.MapTemplate do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Entity.Data.Dungeon
   alias ThistleTea.Game.Instance.Admission.Policy
 
   @table_options [:named_table, :public, read_concurrency: true]
@@ -27,14 +28,38 @@ defmodule ThistleTea.Game.World.Loader.MapTemplate do
   end
 
   def load(rows, table \\ __MODULE__) do
-    rows
-    |> Enum.group_by(& &1.entry)
-    |> Enum.map(fn {_entry, versions} -> Enum.max_by(versions, & &1.patch) end)
-    |> Enum.each(fn row ->
+    rows = rows |> Enum.group_by(& &1.entry) |> Enum.map(fn {_entry, versions} -> Enum.max_by(versions, & &1.patch) end)
+
+    Enum.each(rows, fn row ->
       :ets.insert(table, {row.entry, row.map_type, normalize_script_name(row.script_name)})
       :ets.insert(table, {{:player_limit, row.entry}, Map.get(row, :player_limit)})
     end)
+
+    dungeons = rows |> Enum.filter(&(&1.map_type in @dungeon_types)) |> Map.new(&{&1.entry, dungeon(&1)})
+    :ets.insert(table, {:dungeons, dungeons})
   end
+
+  def dungeons(table \\ __MODULE__) do
+    case :ets.lookup(table, :dungeons) do
+      [{:dungeons, dungeons}] -> dungeons
+      _missing -> %{}
+    end
+  end
+
+  defp dungeon(row) do
+    %Dungeon{
+      map_id: row.entry,
+      name: Map.get(row, :map_name),
+      parent_map: Map.get(row, :parent),
+      zone_id: Map.get(row, :linked_zone),
+      ghost_entrance: ghost_entrance(row)
+    }
+  end
+
+  defp ghost_entrance(%{ghost_entrance_map: map, ghost_entrance_x: x, ghost_entrance_y: y})
+       when is_integer(map) and map >= 0 and is_number(x) and is_number(y), do: {map, x, y}
+
+  defp ghost_entrance(_row), do: nil
 
   def dungeon?(map_id), do: dungeon?(__MODULE__, map_id)
   def mount_allowed?(map_id), do: not dungeon?(map_id) or map_id in [209, 269, 309, 509]

@@ -59,4 +59,30 @@ defmodule ThistleTea.Game.World.Loader.GraveyardTest do
       assert Graveyard.closest_of(graveyards, 0, {0.0, 0.0, 0.0}, @alliance) == nil
     end
   end
+
+  describe "closest_of/5" do
+    test "prefers the nearest entrance-map graveyard using horizontal distance" do
+      graveyards = [
+        graveyard(1, 0, {100.0, 0.0, 0.0}),
+        graveyard(2, 0, {11.0, 20.0, 1000.0}),
+        graveyard(3, 1, {0.0, 0.0, 0.0}),
+        graveyard(4, 0, {10.0, 20.0, 0.0}, @horde)
+      ]
+
+      assert %{id: 2} = Graveyard.closest_of(graveyards, 36, {0.0, 0.0, 0.0}, @alliance, {0, 10.0, 20.0})
+      nearby = graveyard(5, 36, {900.0, 900.0, 900.0})
+      assert %{id: 5} = Graveyard.closest_of([nearby | graveyards], 36, {0.0, 0.0, 0.0}, @alliance, {0, 10.0, 20.0})
+    end
+  end
+
+  describe "load/3" do
+    test "caches faction-specific links and skips missing safe locations" do
+      table = :ets.new(:graveyard_cache, [:set])
+      links = [%{id: 1, ghost_zone: 100, faction: 469}, %{id: 2, ghost_zone: 100, faction: 0}]
+      locations = [%{id: 1, map: 0, location_x: 1.0, location_y: 2.0, location_z: 3.0}]
+      Graveyard.load(links, locations, table)
+      assert Graveyard.for_area(100, table) == [graveyard(1, 0, {1.0, 2.0, 3.0}, 469)]
+      assert Graveyard.for_area(999, table) == []
+    end
+  end
 end

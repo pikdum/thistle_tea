@@ -311,6 +311,7 @@ defmodule ThistleTea.Application do
         LootLoader.load_all()
         MailLoader.load_all()
         MapTemplateLoader.load_all()
+        GraveyardLoader.load_all()
         ModelGeometryLoader.load_all()
         TransportLoader.load_all()
         SpellEffectOverrideLoader.load_all()

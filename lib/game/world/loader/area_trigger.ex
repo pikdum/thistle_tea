@@ -43,6 +43,12 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
     conditions = teleports |> Enum.map(& &1.required_condition) |> ConditionLoader.load_by_ids()
     Enum.each(teleports, &:ets.insert(__MODULE__, {{:teleport, &1.id}, teleport(&1, conditions)}))
 
+    teleports
+    |> Enum.sort_by(& &1.id)
+    |> Enum.filter(&(not is_nil(get(&1.id))))
+    |> Enum.group_by(& &1.target_map)
+    |> Enum.each(fn {map, [first | _]} -> :ets.insert(__MODULE__, {{:entrance, map}, teleport(first, conditions)}) end)
+
     Mangos.Repo.all(from(m in Mangos.MapTemplate, where: m.patch <= @supported_patch))
     |> latest_by(& &1.entry, & &1.patch)
     |> Enum.filter(&(&1.map_type in [1, 2]))
@@ -75,6 +81,13 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
   end
 
   def teleport(_id), do: nil
+
+  def entrance(map_id) do
+    case :ets.lookup(__MODULE__, {:entrance, map_id}) do
+      [{{:entrance, ^map_id}, teleport}] -> teleport
+      _missing -> nil
+    end
+  end
 
   def instance_map?(map_id) when is_integer(map_id) and map_id >= 0 do
     lookup({:instance_map, map_id}, fn -> load_instance_map?(map_id) end)

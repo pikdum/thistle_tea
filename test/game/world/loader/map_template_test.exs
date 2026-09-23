@@ -38,4 +38,41 @@ defmodule ThistleTea.Game.World.Loader.MapTemplateTest do
       assert MapTemplate.instance_script_name(table, 30) == nil
     end
   end
+
+  describe "dungeons/1" do
+    test "retains parent and entrance metadata from the selected patch", %{table: table} do
+      rows = [
+        %{
+          entry: 409,
+          patch: 0,
+          map_type: 2,
+          script_name: nil,
+          parent: 230,
+          map_name: "Molten Core",
+          ghost_entrance_map: 0,
+          ghost_entrance_x: 1.0,
+          ghost_entrance_y: 2.0
+        },
+        %{
+          entry: 409,
+          patch: 1,
+          map_type: 2,
+          linked_zone: 2717,
+          script_name: nil,
+          parent: 230,
+          map_name: "Molten Core",
+          ghost_entrance_map: 0,
+          ghost_entrance_x: 3.0,
+          ghost_entrance_y: 4.0
+        }
+      ]
+
+      MapTemplate.load(rows, table)
+      dungeon = Map.fetch!(MapTemplate.dungeons(table), 409)
+      assert dungeon.parent_map == 230
+      assert dungeon.name == "Molten Core"
+      assert dungeon.zone_id == 2717
+      assert dungeon.ghost_entrance == {0, 3.0, 4.0}
+    end
+  end
 end

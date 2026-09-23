@@ -3,10 +3,12 @@ defmodule ThistleTea.Game.Player.Corpses do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Corpse
+  alias ThistleTea.Game.Entity.Data.Dungeon
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.CorpseReclaim
+  alias ThistleTea.Game.Entity.Logic.CorpseTravel
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
@@ -16,11 +18,79 @@ defmodule ThistleTea.Game.Player.Corpses do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.AreaTrigger
   alias ThistleTea.Game.World.Loader.Graveyard
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.System.Battleground
   alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Game.WorldRef
+
+  def query(%{ready: true, character: %Character{} = character} = state) do
+    Network.send_packet(location(character))
+    state
+  end
+
+  def query(state), do: state
+
+  def location(%Character{} = character, height \\ &entrance_height/2) do
+    case World.position(Corpse.guid_for(character.object.guid)) do
+      {%WorldRef{map_id: corpse_map}, x, y, z} ->
+        {map, position} =
+          case CorpseTravel.entrance(corpse_map, character.internal.world.map_id, MapTemplate.dungeons()) do
+            {map, ex, ey} -> {map, {ex, ey, height.(map, {ex, ey})}}
+            nil -> {corpse_map, {x, y, z}}
+          end
+
+        %Message.MsgCorpseQueryResponse{map: map, position: position, corpse_map: corpse_map}
+
+      _missing ->
+        %Message.MsgCorpseQueryResponse{}
+    end
+  end
+
+  def portal_destination(%{character: %Character{} = character}, teleport) do
+    if not Death.alive?(character) and MapTemplate.dungeon?(teleport.target_map) do
+      ghost_destination(character, teleport)
+    else
+      {:ok, teleport}
+    end
+  end
+
+  def revive_for_map(%{character: %Character{} = character} = state, map_id) do
+    with true <- Death.ghost?(character) and MapTemplate.dungeon?(map_id),
+         true <- character.internal.world.map_id != map_id,
+         corpse_guid = Corpse.guid_for(character.object.guid),
+         {%WorldRef{map_id: ^map_id}, _, _, _} <- World.position(corpse_guid) do
+      resurrect(state, corpse_guid, 0.5, Time.now())
+    else
+      _unrelated -> state
+    end
+  end
+
+  defp ghost_destination(character, teleport) do
+    dungeons = MapTemplate.dungeons()
+
+    with {%WorldRef{map_id: corpse_map}, _, _, _} <- World.position(Corpse.guid_for(character.object.guid)),
+         {:ok, ^corpse_map} <- CorpseTravel.destination(corpse_map, teleport.target_map, dungeons) do
+      destination =
+        if corpse_map == teleport.target_map, do: teleport, else: AreaTrigger.entrance(corpse_map) || teleport
+
+      {:ok, destination}
+    else
+      _missing ->
+        name =
+          case Map.get(dungeons, teleport.target_map) do
+            %Dungeon{name: name} when is_binary(name) -> name
+            _missing -> "this dungeon"
+          end
+
+        {:error, "You cannot enter #{name} while in ghost form."}
+    end
+  end
+
+  defp entrance_height(map, position), do: map |> Pathfinding.find_heights(position) |> Enum.max(fn -> 0.0 end)
 
   def release(%{ready: true, character: %Character{} = character} = state) do
     if Core.dead?(character) and not Death.ghost?(character), do: release_spirit(state, Time.now()), else: state
