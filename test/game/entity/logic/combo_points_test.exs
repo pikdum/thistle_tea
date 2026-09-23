@@ -133,14 +133,17 @@ defmodule ThistleTea.Game.Entity.Logic.ComboPointsTest do
           effects: [%Effect{index: 1, type: :school_damage, base_points: 1} | builder().effects]
       }
 
-      context = %{context(rogue, spell) | hit_chance_bonus: 100, attack_skill: 10_000, melee_crit_chance: 0}
+      context = %{context(rogue, spell) | hit_chance_bonus: 100, attack_skill: 300, melee_crit_chance: 0}
 
-      no_dodge = %Spell{
+      no_avoidance = %Spell{
         id: 99_002,
-        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_dodge, base_points: -1_000}]
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :mod_dodge, base_points: -1_000},
+          %Effect{index: 1, type: :apply_aura, aura: :mod_parry_percent, base_points: -1_000}
+        ]
       }
 
-      {exposed, _events} = Aura.apply_spell(target, target.object.guid, 60, no_dodge, 1_000)
+      {exposed, _events} = Aura.apply_spell(target, target.object.guid, 60, no_avoidance, 1_000)
       {_target, events} = SpellEffect.receive(exposed, context, spell, 1_000)
       assert [%Effects.AddComboPoints{amount: 1}] = awards(events)
       dodge = %Spell{id: 99_001, effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_dodge, base_points: 1_000}]}
