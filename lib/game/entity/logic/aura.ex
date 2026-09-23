@@ -50,6 +50,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defdelegate enqueue_death_item_rewards(entity, old_health, new_health), to: DeathItem, as: :enqueue_rewards
 
   defdelegate tick(entity, now), to: Periodic
+  defdelegate tick(entity, now, contexts), to: Periodic
   defdelegate next_event_at(entity), to: Periodic
 
   defdelegate reactions(entity, event, context), to: Reactions

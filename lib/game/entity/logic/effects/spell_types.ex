@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
     {:PeriodicAuraLog, [:source_guid, :target_guid, :spell_id, :aura_type, :amount], [misc_value: 0]},
     {:AuraDuration, [:aura_slot, :duration_ms], []},
     {:RemoveAura, [:source_guid, :target_guid, :spell_id], []},
-    {:HealEntity, [:target_guid, :amount], []},
+    {:HealEntity, [:target_guid, :amount], [source_guid: nil, spell: nil]},
     {:HealThreat, [:source_guid, :target_guid, :amount], []},
     {:ResurrectRequest, [:source_guid, :spell_id, :health, :mana], [delayed?: true]},
     {:SpellCastResult, [:spell_id], []},

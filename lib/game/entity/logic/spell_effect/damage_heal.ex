@@ -16,10 +16,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   alias ThistleTea.Game.Entity.Logic.ResistancePenetration
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellResist
+  alias ThistleTea.Game.Entity.Logic.SpellThreat
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
   alias ThistleTea.Game.Entity.Logic.TargetDamage
   alias ThistleTea.Game.Entity.Logic.TargetSpellPower
-  alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Entity.Logic.Warrior
   alias ThistleTea.Game.Math
@@ -80,7 +80,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     {state, events} = apply_damage_effect(state, context, spell, effect, now)
     damage = min(dealt_damage(events), health_before)
     healed = trunc(damage * leech_multiplier(effect))
-    {state, events ++ if(healed > 0, do: [Effects.heal_entity(context.caster_guid, healed)], else: [])}
+
+    heal_events =
+      if healed > 0,
+        do: [Effects.heal_entity(context.caster_guid, healed, source_guid: context.caster_guid, spell: spell)],
+        else: []
+
+    {state, events ++ heal_events}
   end
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :instakill}, now) do
@@ -116,7 +122,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     healing = HealingReceived.amount(state, healing)
     crit? = heal_crit?(context, spell)
     healing = if crit?, do: healing + div(healing, 2), else: healing
-    events = Threat.heal_threat_events(state, context.caster_guid, healing)
+    events = SpellThreat.heal_events(state, context, spell, healing)
     heal_event = Effects.spell_heal(context.caster_guid, state.object.guid, spell, healing, crit?)
 
     {Core.heal(state, healing), swiftmend_events ++ events ++ [heal_event]}
@@ -124,7 +130,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :heal_max_health}, _now) do
     healing = HealingReceived.amount(state, context.caster_max_health || state.unit.max_health || 0)
-    events = Threat.heal_threat_events(state, context.caster_guid, healing)
+    events = SpellThreat.heal_events(state, context, spell, healing)
     heal_event = Effects.spell_heal(context.caster_guid, state.object.guid, spell, healing, false)
     {Core.heal(state, healing), events ++ [heal_event]}
   end
@@ -233,7 +239,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         source_owner: context.caster_owner_guid,
         reflected_by: context.reflected_by_guid,
         periodic: Keyword.get(opts, :periodic?, false),
-        threat_multiplier: damage_threat_multiplier(context)
+        threat_multiplier: SpellThreat.multiplier(context, crit?)
       )
 
     event =
@@ -467,7 +473,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         source: context.caster_guid,
         source_owner: context.caster_owner_guid,
         reflected_by: context.reflected_by_guid,
-        threat_multiplier: damage_threat_multiplier(context)
+        threat_multiplier: SpellThreat.multiplier(context, context.melee_crit?)
       )
 
     event =
@@ -550,15 +556,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   end
 
   defp mitigate_physical(_state, _context, _school, damage), do: damage
-
-  defp damage_threat_multiplier(%CastContext{} = context) do
-    base = context.threat_multiplier || 1.0
-
-    case context.spell_threat do
-      %{multiplier: multiplier} when is_number(multiplier) -> base * multiplier
-      _no_entry -> base
-    end
-  end
 
   defp attack_position({_map, x, y, z}), do: {x, y, z}
   defp attack_position(_position), do: nil

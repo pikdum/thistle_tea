@@ -6,6 +6,11 @@ defmodule ThistleTea.Game.World.Loader.SpellModifierMasksVmangosTest do
   @moduletag :vmangos_db
 
   describe "load_all/0" do
+    test "loads Plagueheart's periodic threat mask including its high bit" do
+      SpellEffectOverride.load_all()
+      assert SpellEffectOverride.class_mask(28_746, 1) == 4_294_968_326
+    end
+
     test "loads Cannibalize damage interruption from spell_mod" do
       SpellEffectOverride.load_all()
       assert SpellEffectOverride.aura_interrupt_flags(20_578, 0) == 2

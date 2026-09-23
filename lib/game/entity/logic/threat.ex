@@ -23,6 +23,14 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
 
   def heal_threat_ratio, do: @heal_threat_ratio
 
+  def heal_threat_events(entity, healer_guid, healing, multiplier) when is_number(multiplier) and multiplier > 0 do
+    entity
+    |> heal_threat_events(healer_guid, healing)
+    |> Enum.map(fn %Effects.HealThreat{} = event -> %{event | amount: event.amount * multiplier} end)
+  end
+
+  def heal_threat_events(_entity, _healer_guid, _healing, _multiplier), do: []
+
   def heal_threat_events(entity, healer_guid, healing)
 
   def heal_threat_events(

@@ -109,6 +109,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       entity = CombatLeash.on_damage(entity, now, opts)
       school = Keyword.get(opts, :school, :physical)
       {entity, damage, remaining} = mitigate_damage(entity, damage, school, now, opts)
+      damage_threat = remaining * Keyword.get(opts, :threat_multiplier, 1.0)
       %{unit: unit} = entity
       duel_outcome = duel_lethal_outcome(entity, health, remaining, opts)
       remaining = duel_remaining_damage(health, remaining, duel_outcome)
@@ -135,7 +136,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
         entity
         |> gain_taken_rage(remaining, Keyword.get(opts, :source))
         |> sync_health()
-        |> Threat.add_damage(Keyword.get(opts, :source), damage * Keyword.get(opts, :threat_multiplier, 1.0))
+        |> Threat.add_damage(Keyword.get(opts, :source), damage_threat)
         |> Durability.on_damage(health, remaining, new_health, opts)
         |> maybe_enqueue_death_root(health, new_health)
         |> maybe_prepare_self_res(health, new_health, now)

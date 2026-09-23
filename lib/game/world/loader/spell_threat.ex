@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.SpellThreat do
   @moduledoc """
   Per-spell bonus threat from the vmangos `spell_threat` table: a flat amount
-  added when the spell lands and a multiplier scaling its damage threat.
+  added when the spell lands and a multiplier scaling its damage and healing threat.
   Preloaded into ETS at boot, filtered to the 1.12 client build.
   """
   import Ecto.Query

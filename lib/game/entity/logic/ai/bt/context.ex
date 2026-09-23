@@ -35,7 +35,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
     :body_height,
     :instance_data,
     :formation,
-    :shared_leash_time
+    :shared_leash_time,
+    aura_contexts: %{}
   ]
 
   def new(now, opts \\ []) when is_integer(now) do
@@ -54,7 +55,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
       body_height: Keyword.get(opts, :body_height, 2.0),
       instance_data: Keyword.get(opts, :instance_data),
       formation: Keyword.get(opts, :formation),
-      shared_leash_time: Keyword.get(opts, :shared_leash_time)
+      shared_leash_time: Keyword.get(opts, :shared_leash_time),
+      aura_contexts: Keyword.get(opts, :aura_contexts, %{})
     }
   end
 end

@@ -44,7 +44,6 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Experience
-  alias ThistleTea.Game.Entity.Logic.HealingReceived
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.Inventory
@@ -60,6 +59,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.SpellResist
+  alias ThistleTea.Game.Entity.Logic.SpellThreat
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
   alias ThistleTea.Game.Entity.Server.AIEnvironment
@@ -309,7 +309,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def handle_cast({:receive_heal, amount}, %{character: %Character{} = character} = state) do
-    character = HealingReceived.heal(character, amount)
+    character = SpellReception.heal(character, amount)
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   end
 
@@ -1647,6 +1647,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         dispel_options: Aura.dispel_options(character),
         mechanic_resistance: Aura.misc_amounts(character, :mechanic_resistance),
         school_resistances: SpellResist.school_resistances(character),
+        spell_threat: SpellThreat.projection(character),
         dispel_resistance: DispelResistance.projection(character),
         attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(character),
         reputation: PlayerReputation.projection(character),

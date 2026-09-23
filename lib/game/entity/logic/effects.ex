@@ -138,8 +138,13 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.WaterWalkChanged{enabled?: enabled?}
   end
 
-  def heal_entity(target_guid, amount) when is_integer(target_guid) and is_integer(amount) do
-    %Effects.HealEntity{target_guid: target_guid, amount: amount}
+  def heal_entity(target_guid, amount, opts \\ []) when is_integer(target_guid) and is_integer(amount) do
+    %Effects.HealEntity{
+      target_guid: target_guid,
+      amount: amount,
+      source_guid: Keyword.get(opts, :source_guid),
+      spell: Keyword.get(opts, :spell)
+    }
   end
 
   def heal_threat(source_guid, target_guid, amount)

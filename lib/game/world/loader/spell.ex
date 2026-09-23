@@ -211,7 +211,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       proc_chance: row.proc_chance || 0,
       proc_charges: row.proc_charges || 0,
       proc_type_mask: row.proc_type_mask || 0,
-      attributes: attributes(row.attributes, row.attributes_ex1, row.attributes_ex2, row.attributes_ex3),
+      attributes:
+        attributes(row.attributes, row.attributes_ex1, row.attributes_ex2, row.attributes_ex3, row.attributes_ex4),
       exclusive_category: Scripts.exclusive_category(row),
       spell_family: row.spell_class_set || 0,
       family_flags_0: row.spell_class_mask_0 || 0,
@@ -793,6 +794,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(179), do: :mod_attacker_spell_crit_chance
   defp aura_type(180), do: :mod_flat_spell_damage_versus
   defp aura_type(182), do: :mod_resistance_of_stat_percent
+  defp aura_type(183), do: :mod_critical_threat
   defp aura_type(184), do: :mod_attacker_melee_hit_chance
   defp aura_type(185), do: :mod_attacker_ranged_hit_chance
   defp aura_type(186), do: :mod_attacker_spell_hit_chance
@@ -859,9 +861,10 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   @from_behind_ex1 0x00000200
   @completely_blocked_ex3 0x00000008
 
-  defp attributes(attrs, attrs_ex1, attrs_ex2, attrs_ex3) when is_integer(attrs) and is_integer(attrs_ex1) do
+  defp attributes(attrs, attrs_ex1, attrs_ex2, attrs_ex3, attrs_ex4) when is_integer(attrs) and is_integer(attrs_ex1) do
     attrs_ex2 = if is_integer(attrs_ex2), do: attrs_ex2, else: 0
     attrs_ex3 = if is_integer(attrs_ex3), do: attrs_ex3, else: 0
+    attrs_ex4 = if is_integer(attrs_ex4), do: attrs_ex4, else: 0
 
     base =
       MapSet.new()
@@ -918,9 +921,10 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex3, 0x10000000, :ignore_caster_and_target_restrictions)
     |> add_if(attrs_ex3, 0x20000000, :ignore_caster_modifiers)
     |> add_if(attrs_ex3, @dot_stacking_rule_ex3, :dot_stacking_rule)
+    |> add_if(attrs_ex4, 0x00000008, :no_helpful_threat)
   end
 
-  defp attributes(_, _, _, _), do: MapSet.new()
+  defp attributes(_, _, _, _, _), do: MapSet.new()
 
   defp from_behind?(attrs_ex1, attrs_ex2) do
     attrs_ex2 == @from_behind_ex2 and (attrs_ex1 &&& @from_behind_ex1) != 0

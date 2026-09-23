@@ -599,7 +599,12 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
         {entity, events} = Aura.tick(entity, 2_000)
         assert entity.unit.health == health - healed
         heals = Enum.filter(events, &match?(%Effects.HealEntity{}, &1))
-        assert heals == if(healed > 0, do: [%Effects.HealEntity{target_guid: 999, amount: healed}], else: [])
+
+        assert heals ==
+                 if(healed > 0,
+                   do: [%Effects.HealEntity{target_guid: 999, amount: healed, source_guid: 999, spell: spell}],
+                   else: []
+                 )
       end
     end
 
@@ -728,7 +733,8 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
                  aura_type: :periodic_energize,
                  amount: 10,
                  misc_value: 1
-               }
+               },
+               %Effects.HealThreat{source_guid: 999, target_guid: 1, amount: 5.0}
              ] = events
     end
   end

@@ -12,20 +12,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Aura do
   alias ThistleTea.Game.Entity.Logic.Effects
 
   def tick_step do
-    BT.action(&tick_with_context/3)
+    BT.action(&tick/3)
   end
 
-  def tick(%{unit: %Unit{auras: [_ | _]}} = entity, %Blackboard{} = blackboard, now) when is_integer(now) do
+  def tick(entity, %Blackboard{} = blackboard, now) when is_integer(now) do
+    tick(entity, blackboard, Context.new(now))
+  end
+
+  def tick(%{unit: %Unit{auras: [_ | _]}} = entity, %Blackboard{} = blackboard, %Context{} = context) do
     entity = put_blackboard(entity, blackboard)
-    {entity, events} = AuraLogic.tick(entity, now)
+    {entity, events} = AuraLogic.tick(entity, context.now, context.aura_contexts)
     {:failure, Effects.enqueue(entity, events), updated_blackboard(entity, blackboard)}
   end
 
   def tick(entity, %Blackboard{} = blackboard, _now), do: {:failure, entity, blackboard}
-
-  defp tick_with_context(entity, %Blackboard{} = blackboard, %Context{now: now}) do
-    tick(entity, blackboard, now)
-  end
 
   defp put_blackboard(%{internal: %Internal{} = internal} = entity, blackboard) do
     %{entity | internal: %{internal | blackboard: blackboard}}

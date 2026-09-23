@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   Snapshot of the caster taken at cast time — guid, level, spell
   damage/healing bonuses, and for melee abilities the weapon/attack-power
   numbers — so effects apply consistently even after the caster's state
-  changes.
+  changes. The receiving owner refreshes threat modifiers when the spell lands.
   """
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.ResistancePenetration
   alias ThistleTea.Game.Entity.Logic.SpellResist
+  alias ThistleTea.Game.Entity.Logic.SpellThreat
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
   alias ThistleTea.Game.Entity.Logic.TargetDamage
   alias ThistleTea.Game.Entity.Logic.TargetSpellPower
@@ -97,6 +98,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
     healing_bonus: 0,
     resistance_penetration: [],
     threat_multiplier: 1.0,
+    critical_threat_multiplier: 1.0,
+    healing_threat_ratio: 0.5,
     damage_done_multiplier: 1.0,
     happiness_multiplier: 1.0,
     effect_damage_multiplier: 1.0,
@@ -131,7 +134,6 @@ defmodule ThistleTea.Game.Spell.CastContext do
       spell_hit_snapshot: hit_snapshot,
       spell_hit_bonus: SpellResist.hit_bonus(hit_snapshot, spell),
       conditional_crit_modifiers: Critical.snapshot(caster, spell),
-      threat_multiplier: threat_multiplier(caster, spell),
       damage_done_multiplier: WeaponDamage.multiplier(caster, spell.school, attack_weapon(caster, spell)),
       happiness_multiplier: PetHappiness.damage_multiplier(caster),
       damage_done_versus: Aura.misc_amounts(caster, :mod_damage_done_versus),
@@ -147,6 +149,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     }
     |> put_melee_snapshot(caster, spell)
     |> put_combo_points(caster)
+    |> SpellThreat.put_context(spell, SpellThreat.projection(caster))
   end
 
   def from_caster(%{object: %{guid: guid}} = caster, spell, target_guid) when is_integer(guid) do
@@ -168,6 +171,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     }
     |> put_melee_snapshot(caster, spell)
     |> put_combo_points(caster)
+    |> SpellThreat.put_context(spell, SpellThreat.projection(caster))
   end
 
   defp caster_type(%Character{}), do: :player
@@ -378,11 +382,6 @@ defmodule ThistleTea.Game.Spell.CastContext do
     spirit = unit.spirit || 0
 
     if percent > 0, do: trunc(spirit * percent / 100), else: 0
-  end
-
-  defp threat_multiplier(caster, %Spell{} = spell) do
-    base = Aura.percent_multiplier(caster, :mod_threat, Spell.school_mask(spell))
-    base * Modifiers.value(caster, spell, :threat, 100) / 100
   end
 
   defp healing_done_multiplier(caster, %Spell{} = spell) do

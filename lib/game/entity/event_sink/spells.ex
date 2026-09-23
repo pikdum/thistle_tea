@@ -179,7 +179,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   def emit(entity, %Effects.ResurrectRequest{}, _context), do: entity
 
   def emit(entity, %Effects.HealEntity{} = effect, _context) do
-    Entity.receive_heal(effect.target_guid, effect.amount)
+    Entity.receive_heal(effect.target_guid, effect)
     entity
   end
 

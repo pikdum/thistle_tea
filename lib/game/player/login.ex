@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Entity.Logic.SpellResist
+  alias ThistleTea.Game.Entity.Logic.SpellThreat
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.Talents, as: LogicTalents
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
@@ -162,6 +163,7 @@ defmodule ThistleTea.Game.Player.Login do
         crowd_controlled?: AuraLogic.crowd_controlled?(c),
         mechanic_resistance: AuraLogic.misc_amounts(c, :mechanic_resistance),
         school_resistances: SpellResist.school_resistances(c),
+        spell_threat: SpellThreat.projection(c),
         dispel_resistance: DispelResistance.projection(c),
         attacker_spell_hit_chance: AuraLogic.attacker_spell_hit_chance(c),
         needed_quest_items: Quests.needed_items(c),

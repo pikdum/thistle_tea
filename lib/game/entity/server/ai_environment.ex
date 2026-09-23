@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Server.FormationEnvironment
   alias ThistleTea.Game.Entity.Server.NavigationResolver
+  alias ThistleTea.Game.Entity.SpellReception
   alias ThistleTea.Game.Player.Movement, as: PlayerMovement
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -77,7 +78,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       body_height: PlayerMovement.body_height(entity),
       instance_data: instance_data(entity, requirements, options),
       formation: FormationEnvironment.snapshot(entity, now),
-      shared_leash_time: CombatLeashes.last_extended_at(entity)
+      shared_leash_time: CombatLeashes.last_extended_at(entity),
+      aura_contexts: SpellReception.aura_contexts(entity, now)
     }
   end
 

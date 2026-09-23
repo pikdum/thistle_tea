@@ -290,4 +290,11 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
   end
 
   def gain_power(entity, _power_type, _amount), do: entity
+
+  def current_power(%{unit: %Unit{power1: power}}, 0), do: power || 0
+  def current_power(%{unit: %Unit{power2: power}}, 1), do: power || 0
+  def current_power(%{unit: %Unit{power3: power}}, 2), do: power || 0
+  def current_power(%{unit: %Unit{power4: power}}, 3), do: power || 0
+  def current_power(%{unit: %Unit{power5: power}}, 4), do: power || 0
+  def current_power(_entity, _power_type), do: 0
 end

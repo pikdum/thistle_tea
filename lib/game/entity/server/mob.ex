@@ -52,7 +52,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
   alias ThistleTea.Game.Entity.Logic.Experience
-  alias ThistleTea.Game.Entity.Logic.HealingReceived
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
@@ -70,6 +69,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.SpellResist
+  alias ThistleTea.Game.Entity.Logic.SpellThreat
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Logic.Totems
@@ -148,6 +148,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> Map.put(:unit_flags, state.unit.flags)
       |> Map.put(:no_spell_defense?, CreatureFlags.has?(state, :no_spell_defense))
       |> Map.put(:school_resistances, SpellResist.school_resistances(state))
+      |> Map.put(:spell_threat, SpellThreat.projection(state))
       |> Map.merge(control_metadata(state))
     )
 
@@ -442,7 +443,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:receive_heal, amount}, state) do
-    state = HealingReceived.heal(state, amount)
+    state = SpellReception.heal(state, amount)
     {:noreply, state, {:continue, :maybe_broadcast}}
   end
 
@@ -1259,6 +1260,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           dispel_options: Aura.dispel_options(state),
           mechanic_resistance: Aura.misc_amounts(state, :mechanic_resistance),
           school_resistances: SpellResist.school_resistances(state),
+          spell_threat: SpellThreat.projection(state),
           attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(state)
         }
         |> Map.merge(FactionLoader.metadata(state.unit.faction_template))

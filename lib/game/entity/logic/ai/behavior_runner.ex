@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
 
   defp tick_entity(tree, entity, %Context{now: now} = context) do
     blackboard = Blackboard.ensure(entity.internal.blackboard)
-    {:failure, entity, blackboard} = AuraBT.tick(entity, blackboard, now)
+    {:failure, entity, blackboard} = AuraBT.tick(entity, blackboard, context)
     {:failure, entity, blackboard} = RegenBT.tick(entity, blackboard, now)
     entity = %{entity | internal: %{entity.internal | blackboard: blackboard}}
     entity = CombatLeash.maintain(entity, now)
