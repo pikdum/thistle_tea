@@ -109,6 +109,36 @@ defmodule ThistleTea.Game.World.Pathfinding do
     )
   end
 
+  def first_collision_position(map_id, origin, destination) do
+    destination = nearest_ground(map_id, destination)
+
+    if line_of_sight?(map_id, origin, destination) do
+      destination
+    else
+      clear_segment(map_id, origin, destination, 0.0, 1.0, 10)
+    end
+  end
+
+  defp clear_segment(map_id, origin, destination, clear, _blocked, 0),
+    do: nearest_ground(map_id, interpolate(origin, destination, clear))
+
+  defp clear_segment(map_id, origin, destination, clear, blocked, steps) do
+    fraction = (clear + blocked) / 2
+    candidate = nearest_ground(map_id, interpolate(origin, destination, fraction))
+
+    if line_of_sight?(map_id, origin, candidate),
+      do: clear_segment(map_id, origin, destination, fraction, blocked, steps - 1),
+      else: clear_segment(map_id, origin, destination, clear, fraction, steps - 1)
+  end
+
+  defp nearest_ground(map_id, {x, y, z}) do
+    height = map_id |> find_heights({x, y}) |> Enum.min_by(&abs(&1 - z), fn -> z end)
+    {x, y, height}
+  end
+
+  defp interpolate({x, y, z}, {dx, dy, dz}, fraction),
+    do: {x + (dx - x) * fraction, y + (dy - y) * fraction, z + (dz - z) * fraction}
+
   defp load_adt_at(map_id, {x, y}) do
     # TODO: store in :ets or similar, maybe with last access time, and unload periodically?
     Namigator.load_adt_at(map_id, x, y)

@@ -62,20 +62,23 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   def target_position(spell_id) when is_integer(spell_id) and spell_id > 0 do
     case :ets.lookup(__MODULE__, {:target_position, spell_id}) do
       [{_key, position}] -> position
-      _ -> cache({:target_position, spell_id}, load_target_position(spell_id))
+      _missing -> nil
     end
   end
 
   def target_position(_spell_id), do: nil
 
-  defp load_target_position(spell_id) do
-    case Mangos.Repo.get(Mangos.SpellTargetPosition, spell_id) do
-      %Mangos.SpellTargetPosition{} = row ->
-        %{map: row.target_map, x: row.target_position_x, y: row.target_position_y, z: row.target_position_z}
+  def load_target_positions do
+    rows = Mangos.Repo.all(Mangos.SpellTargetPosition)
 
-      _ ->
-        nil
-    end
+    entries =
+      Enum.map(rows, fn row ->
+        position = %{map: row.target_map, x: row.target_position_x, y: row.target_position_y, z: row.target_position_z}
+        {{:target_position, row.id}, position}
+      end)
+
+    :ets.insert(__MODULE__, entries)
+    :ok
   end
 
   defp cache(key, value) do
@@ -543,6 +546,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(2), do: :school_damage
   defp effect_type(3), do: :dummy
   defp effect_type(5), do: :teleport_units
+  defp effect_type(43), do: :teleport_units_face_caster
   defp effect_type(31), do: :weapon_percent_damage
   defp effect_type(121), do: :normalized_weapon_damage
   defp effect_type(76), do: :summon_object_wild

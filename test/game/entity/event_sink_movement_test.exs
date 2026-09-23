@@ -67,6 +67,47 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
   end
 
   describe "emit/3 CreatureTeleported" do
+    test "spell teleports halt creature splines without clearing engagement" do
+      world = WorldRef.instance(529, unique_low())
+      guid = Guid.from_low_guid(:mob, 10_917, unique_low())
+      observers = start_observers(nearby: {world, {0.0, 0.0, 0.0}})
+      entity = mob(guid, world, {0.0, 0.0, 0.0, 0.0})
+
+      entity = %{
+        entity
+        | unit: %{entity.unit | target: 7},
+          internal: %{entity.internal | in_combat: true, threat: %{7 => 15.0}, running: true},
+          movement_block: %{entity.movement_block | run_speed: 7.0}
+      }
+
+      entity = Movement.move_along_path(entity, [{100.0, 0.0, 0.0}], [], Time.now())
+      World.update_position(entity)
+
+      on_exit(fn ->
+        World.remove_position(entity)
+        Metadata.delete(guid)
+        stop_observers(observers)
+      end)
+
+      request = %Effects.TeleportNearCaster{
+        caster_position: {world, 10.0, 0.0, 0.0},
+        caster_orientation: 0.0,
+        destination: {:position, {15.0, 0.0, 0.0}}
+      }
+
+      moved = EventSink.emit(entity, request)
+      assert moved.movement_block.position == {15.0, 0.0, 0.0, 0.0}
+      assert moved.movement_block.spline_nodes == []
+      assert moved.internal.movement_start_time == nil
+      assert moved.internal.in_combat
+      assert moved.internal.threat == %{7 => 15.0}
+      assert moved.unit.target == 7
+      assert World.position(guid) == {world, 15.0, 0.0, 0.0}
+      assert Position.projection(guid) == nil
+      assert_receive {:observer, :nearby, {:"$gen_cast", {:send_packet, %MsgMoveTeleport{guid: ^guid}, _}}}
+      Visibility.leave_entity(moved)
+    end
+
     test "projects both observer sets and every owner-local position consumer" do
       world = WorldRef.instance(329, unique_low())
       other_world = WorldRef.instance(329, world.instance_id + 1)

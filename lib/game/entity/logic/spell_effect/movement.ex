@@ -2,6 +2,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
   @moduledoc false
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Knockback
@@ -32,6 +34,23 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
       if :home_bind in [effect.implicit_target_a, effect.implicit_target_b],
         do: %Effects.TeleportHome{},
         else: Effects.teleport_to_spell_target(spell_id)
+
+    {state, [request]}
+  end
+
+  def apply(
+        %{unit: %Unit{}, internal: %Internal{world: world, taxi_flight: nil}} = state,
+        %CastContext{caster_position: {world, _x, _y, _z}, caster_orientation: orientation} = context,
+        %Spell{id: id},
+        %Effect{type: :teleport_units_face_caster} = effect,
+        _now
+      )
+      when is_number(orientation) do
+    request = %Effects.TeleportNearCaster{
+      caster_position: context.caster_position,
+      caster_orientation: orientation,
+      destination: teleport_destination(state, context, effect, id)
+    }
 
     {state, [request]}
   end
@@ -68,4 +87,28 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
   end
 
   def apply(state, _context, _spell, _effect, _now), do: {state, []}
+
+  defp teleport_destination(_state, %CastContext{destination_position: {x, y, z}}, _effect, _id),
+    do: {:position, {x, y, z}}
+
+  defp teleport_destination(state, context, effect, id) do
+    selectors = [effect.implicit_target_a, effect.implicit_target_b]
+    radius = max(effect.radius_yards || 0.0, 0.0)
+    size = (state.unit.bounding_radius || Unit.default_bounding_radius()) + (context.caster_bounding_radius || 0.0)
+
+    cond do
+      17 in selectors ->
+        {:database, id, radius + size}
+
+      :caster_destination in selectors ->
+        {_world, x, y, z} = context.caster_position
+        {:position, {x, y, z}}
+
+      47 in selectors ->
+        {:forward, radius}
+
+      true ->
+        {:forward, radius + size}
+    end
+  end
 end

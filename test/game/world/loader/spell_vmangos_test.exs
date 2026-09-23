@@ -17,6 +17,15 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
 
   @moduletag :dbc_db
 
+  describe "caster-relative teleports" do
+    test "loads live summon and database banishment spells" do
+      for {id, selector, radius} <- [{15_734, 47, 5.0}, {21_150, :caster_destination, nil}, {24_466, 17, nil}] do
+        assert [%Effect{type: :teleport_units_face_caster, implicit_target_b: ^selector, radius_yards: ^radius}] =
+                 SpellLoader.load(id).effects
+      end
+    end
+  end
+
   describe "independent totems" do
     test "loads standards and wards without claiming elemental slots" do
       for {id, entry, health} <- [{23_034, 14_465, 1500}, {23_035, 14_466, 1500}, {8832, 6386, 5}] do

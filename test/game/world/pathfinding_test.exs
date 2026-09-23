@@ -9,6 +9,23 @@ defmodule ThistleTea.Game.World.PathfindingTest do
 
   @human_start {-8949.95, -132.49, 83.53}
 
+  describe "first_collision_position/3" do
+    test "clips a forward destination at the abbey wall" do
+      destination = {-8914.0, -164.0, 82.0}
+      position = Pathfinding.first_collision_position(0, @human_start, destination)
+      assert Pathfinding.line_of_sight?(0, @human_start, position)
+      assert distance(position, destination) > 5.0
+      assert distance(position, @human_start) > 1.0
+    end
+
+    test "retains unobstructed horizontal coordinates and tolerates missing geometry" do
+      assert {x, y, z} = Pathfinding.first_collision_position(0, @human_start, {-8955.0, -140.0, 84.0})
+      assert {x, y} == {-8955.0, -140.0}
+      assert abs(z - 84.0) < 2.0
+      assert Pathfinding.first_collision_position(999, {0.0, 0.0, 0.0}, {5.0, 0.0, 0.0}) == {5.0, 0.0, 0.0}
+    end
+  end
+
   describe "get_zone_and_area/2" do
     test "resolves Goldshire across the inn's unlabelled floor surface" do
       for z <- [56.96, 56.96255874633789, 57.05, 59.0] do

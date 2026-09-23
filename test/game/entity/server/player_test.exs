@@ -472,6 +472,19 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       assert_receive {:"$gen_cast", {:send_packet, %Message.MsgMoveTeleportAck{preserve_combat?: true}}}
       refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
       assert PlayerServer.handle_cast({:combat_teleport, 1.0, 2.0, 3.0, WorldRef.open(1)}, state) == {:noreply, state}
+
+      assert {:noreply, turned} =
+               PlayerServer.handle_cast({:combat_teleport, -8_949.95, -132.493, 83.5312, 1.25, WorldRef.open(0)}, moved)
+
+      assert turned.character.movement_block.position == {-8_949.95, -132.493, 83.5312, 1.25}
+      assert turned.character.internal.threat_refs == character.internal.threat_refs
+      assert turned.character.unit.summon == pet_guid
+      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgMoveTeleportAck{position: {_, _, _, 1.25}}}}
+
+      flying = %{state | character: %{character | internal: %{character.internal | taxi_flight: %{}}}}
+
+      assert PlayerServer.handle_cast({:combat_teleport, 1.0, 2.0, 3.0, 1.25, WorldRef.open(0)}, flying) ==
+               {:noreply, flying}
     end
 
     test "ordinary teleports detach from a transport" do

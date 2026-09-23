@@ -120,6 +120,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
     :bind,
     :leap,
     :teleport_units,
+    :teleport_units_face_caster,
     :charge,
     :knockback,
     :player_pull,

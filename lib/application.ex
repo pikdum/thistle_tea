@@ -333,6 +333,7 @@ defmodule ThistleTea.Application do
         ModelGeometryLoader.load_all()
         TransportLoader.load_all()
         SpellEffectOverrideLoader.load_all()
+        SpellLoader.load_target_positions()
         SpellPetAuraLoader.load_all()
         SpellObjectTargetLoader.load_all()
         GameObjectScriptLoader.load_all()

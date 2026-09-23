@@ -399,6 +399,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.TeleportToWorld{
       world: world,
       position: position,
+      orientation: Keyword.get(opts, :orientation),
       preserve_combat?: Keyword.get(opts, :preserve_combat?, false)
     }
   end

@@ -63,6 +63,45 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Movement do
 
   def resolve(_entity, %Effects.TeleportToSpellTarget{}), do: []
 
+  def resolve(
+        %{internal: %Internal{world: world, taxi_flight: nil}},
+        %Effects.TeleportNearCaster{caster_position: {world, _x, _y, _z}, caster_orientation: angle} = effect
+      ) do
+    case summon_destination(effect) do
+      {x, y, z} ->
+        orientation = :math.fmod(:math.fmod(-angle, 2 * :math.pi()) + 2 * :math.pi(), 2 * :math.pi())
+        [Effects.teleport_to_world(world, {x, y, z}, preserve_combat?: true, orientation: orientation)]
+
+      nil ->
+        []
+    end
+  end
+
+  def resolve(_entity, %Effects.TeleportNearCaster{}), do: []
+
+  defp summon_destination(%Effects.TeleportNearCaster{destination: {:position, position}}), do: position
+
+  defp summon_destination(
+         %Effects.TeleportNearCaster{
+           caster_position: {%{map_id: map}, _, _, _},
+           destination: {:database, id, fallback_distance}
+         } = effect
+       ) do
+    case SpellLoader.target_position(id) do
+      %{map: ^map, x: x, y: y, z: z} -> {x, y, z}
+      _missing -> summon_destination(%{effect | destination: {:forward, fallback_distance}})
+    end
+  end
+
+  defp summon_destination(%Effects.TeleportNearCaster{
+         caster_position: {%{map_id: map}, x, y, z},
+         caster_orientation: angle,
+         destination: {:forward, distance}
+       }) do
+    destination = {x + distance * :math.cos(angle), y + distance * :math.sin(angle), z}
+    Pathfinding.first_collision_position(map, {x, y, z}, destination)
+  end
+
   defp charge_path(map, from, to) do
     Pathfinding.find_path(map, from, to, allow_steep: true)
   rescue

@@ -715,6 +715,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         %State{character: %Character{internal: %Internal{world: world}} = character} = state
       ) do
     {_x, _y, _z, orientation} = character.movement_block.position
+    handle_cast({:combat_teleport, x, y, z, orientation, world}, state)
+  end
+
+  def handle_cast({:combat_teleport, _x, _y, _z, _world}, state), do: {:noreply, state}
+
+  def handle_cast(
+        {:combat_teleport, x, y, z, orientation, world},
+        %State{character: %Character{internal: %Internal{world: world, taxi_flight: nil}}} = state
+      ) do
     {:noreply, teleport_within_world(state, {x, y, z, orientation}, true)}
   rescue
     error ->
@@ -722,7 +731,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
-  def handle_cast({:combat_teleport, _x, _y, _z, _world}, state), do: {:noreply, state}
+  def handle_cast({:combat_teleport, _x, _y, _z, _orientation, _world}, state), do: {:noreply, state}
 
   def handle_cast({:start_teleport, x, y, z, orientation, %WorldRef{} = world}, state) do
     state = state |> cancel_authoritative_movement() |> detach_transport()

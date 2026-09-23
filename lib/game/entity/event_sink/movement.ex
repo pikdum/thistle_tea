@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement, as: MovementLogic
   alias ThistleTea.Game.Network.Message
@@ -237,11 +238,42 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
 
   def emit(
         %Character{} = entity,
-        %Effects.TeleportToWorld{world: world, position: {x, y, z}, preserve_combat?: true},
+        %Effects.TeleportToWorld{world: world, position: {x, y, z}, orientation: orientation, preserve_combat?: true},
         context
       ) do
-    Context.cast(context, {:combat_teleport, x, y, z, world})
+    orientation = orientation || elem(entity.movement_block.position, 3)
+    Context.cast(context, {:combat_teleport, x, y, z, orientation, world})
     entity
+  end
+
+  def emit(
+        %Mob{internal: %Internal{world: world}} = entity,
+        %Effects.TeleportToWorld{world: world, position: {x, y, z}, orientation: orientation, preserve_combat?: true},
+        context
+      ) do
+    orientation = orientation || elem(entity.movement_block.position, 3)
+    {entity, transition} = MovementLogic.teleport(entity, {x, y, z, orientation}, Time.now())
+
+    entity = %{
+      entity
+      | internal: %{
+          entity.internal
+          | blackboard: entity.internal.blackboard |> Blackboard.ensure() |> Blackboard.clear_move_target()
+        }
+    }
+
+    effect =
+      Effects.creature_teleported(
+        world,
+        transition.from_position,
+        transition.position,
+        transition.movement_block,
+        0,
+        world.map_id,
+        0
+      )
+
+    emit(entity, effect, context)
   end
 
   def emit(%Character{} = entity, %Effects.TeleportToWorld{world: world, position: {x, y, z}}, context) do
