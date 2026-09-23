@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
+  alias ThistleTea.Game.Entity.Logic.CreatureImmunity
   alias ThistleTea.Game.Entity.Logic.DiminishingReturns
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -164,6 +165,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp do_apply(%{unit: %Unit{auras: existing}} = entity, %Holder{} = holder, context, now) when is_list(existing) do
     cond do
+      CreatureImmunity.spell?(entity, context, holder.spell) ->
+        {entity, []}
+
       blocked_by_stronger_rank?(existing, holder.spell) ->
         {entity, []}
 
@@ -518,7 +522,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
     spell
     |> Spell.aura_effects()
-    |> Enum.reject(&(EffectImmunity.blocked?(entity, spell, &1) or channel_ticked?(spell, &1)))
+    |> Enum.reject(
+      &(EffectImmunity.blocked?(entity, spell, &1) or CreatureImmunity.effect?(entity, context, spell, &1) or
+          channel_ticked?(spell, &1))
+    )
     |> Enum.reduce([], fn effect, acc ->
       case build_aura(entity, spell, effect, amount_override, context, now) do
         nil -> acc

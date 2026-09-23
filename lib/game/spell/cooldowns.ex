@@ -61,8 +61,11 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
 
   def on_gcd?(_entity, _spell, _now), do: false
 
-  def lock_schools(%{internal: internal} = entity, school_mask, until_ms)
-      when is_integer(school_mask) and school_mask > 0 and is_integer(until_ms) do
+  def lock_schools(%{internal: internal} = entity, school_mask, duration_ms, now)
+      when is_integer(school_mask) and school_mask > 0 and is_integer(duration_ms) and duration_ms > 0 and
+             is_integer(now) do
+    until_ms = now + duration_ms
+
     cooldowns =
       Enum.reduce(0..6, stored(internal), fn index, acc ->
         if (school_mask &&& 1 <<< index) == 0 do
@@ -72,10 +75,33 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
         end
       end)
 
-    %{entity | internal: %{internal | cooldowns: cooldowns}}
+    entity = %{entity | internal: %{internal | cooldowns: cooldowns}}
+
+    case school_cooldowns(entity, now) do
+      [] ->
+        entity
+
+      cooldowns ->
+        Effects.enqueue(entity, %Effects.SpellSchoolLockout{source_guid: entity.object.guid, cooldowns: cooldowns})
+    end
   end
 
-  def lock_schools(entity, _school_mask, _until_ms), do: entity
+  def lock_schools(entity, _school_mask, _duration_ms, _now), do: entity
+
+  def school_cooldowns(%{internal: %{spellbook: spellbook} = internal} = entity, now) when is_map(spellbook) do
+    spellbook
+    |> Map.values()
+    |> Enum.flat_map(fn spell ->
+      remaining = school_remaining(stored(internal), spell, now)
+
+      if remaining > 0 and remaining > remaining_ms(ready_at(entity, spell), now) and is_nil(pending(entity, spell.id)),
+        do: [{spell.id, remaining}],
+        else: []
+    end)
+    |> Enum.sort()
+  end
+
+  def school_cooldowns(_entity, _now), do: []
 
   def school_locked?(%{internal: internal}, school_mask, now)
       when is_integer(school_mask) and school_mask > 0 and is_integer(now) do
@@ -187,7 +213,7 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
       |> Map.values()
       |> Enum.filter(&is_struct(&1, Entry))
       |> Map.new(&{&1.spell.id, &1.spell})
-      |> then(&Map.merge(Map.filter(spellbook, fn {id, _spell} -> is_integer(Map.get(cooldowns, id)) end), &1))
+      |> then(&Map.merge(spellbook, &1))
 
     sources
     |> Map.values()
@@ -298,13 +324,15 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
   defp deadlines(_entry, _spell), do: []
 
   defp initial_entry(cooldowns, spell, now) do
+    school_ms = school_remaining(cooldowns, spell, now)
+
     case Map.get(cooldowns, spell.id) do
       %Entry{} = entry ->
         %{
           spell_id: spell.id,
           item_id: entry.item_id,
           category: entry.category,
-          spell_ms: if(entry.pending?, do: 1, else: remaining_ms(entry.ready_at, now)),
+          spell_ms: if(entry.pending?, do: 1, else: max(remaining_ms(entry.ready_at, now), school_ms)),
           category_ms: if(entry.pending?, do: 0x80000000, else: remaining_ms(entry.category_ready_at, now))
         }
 
@@ -313,9 +341,22 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
           spell_id: spell.id,
           item_id: 0,
           category: spell.category || 0,
-          spell_ms: remaining_ms(deadline, now),
+          spell_ms: max(remaining_ms(deadline, now), school_ms),
           category_ms: remaining_ms(Map.get(cooldowns, {:category, spell.category}), now)
         }
+    end
+  end
+
+  defp school_remaining(cooldowns, %Spell{} = spell, now) do
+    if Spell.attribute?(spell, :cooldown_on_event) do
+      0
+    else
+      mask = Spell.school_mask(spell)
+
+      0..6
+      |> Enum.filter(&((mask &&& 1 <<< &1) != 0))
+      |> Enum.map(&remaining_ms(Map.get(cooldowns, {:school, &1}), now))
+      |> Enum.max(fn -> 0 end)
     end
   end
 

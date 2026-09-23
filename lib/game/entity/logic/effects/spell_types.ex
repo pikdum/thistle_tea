@@ -25,6 +25,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
     {:CastRequirementsResolved, [:cast, :requirements, :now], []},
     {:StartTriggeredChannel, [:spell, :targets, :context], [cast_item_guid: nil]},
     {:SpellCooldown, [:source_guid, :spell_id, :duration_ms], []},
+    {:SpellSchoolLockout, [:source_guid, :cooldowns], []},
+    {:SpellInterrupted, [:source_guid, :target_guid, :spell_id, :interrupted_spell_id], []},
     {:SpellModifier, [:modifier_type, :effect_index, :operation, :amount], []},
     {:PetSpellModifiers, [:source_guid, :target_guid, :holders], []},
     {:CooldownEvent, [:source_guid, :spell_id], []},

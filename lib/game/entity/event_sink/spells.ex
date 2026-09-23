@@ -12,11 +12,30 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Projectile
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.SpellMagnets
 
   @spell_hit_type_crit 0x2
+
+  def emit(entity, %Effects.SpellInterrupted{} = effect, _context) do
+    %Message.SmsgSpelllogexecute{
+      caster: effect.source_guid,
+      spell_id: effect.spell_id,
+      logs: [{:interrupt_cast, effect.target_guid, effect.interrupted_spell_id}]
+    }
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
+  def emit(%Character{} = entity, %Effects.SpellSchoolLockout{} = effect, context) do
+    Context.send_packet(context, %Message.SmsgSpellCooldown{guid: effect.source_guid, cooldowns: effect.cooldowns})
+    entity
+  end
+
+  def emit(entity, %Effects.SpellSchoolLockout{}, _context), do: entity
 
   def emit(entity, %Effects.SpellExtraAttacks{} = effect, _context) do
     %Message.SmsgSpelllogexecute{
@@ -309,6 +328,14 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
       spell_id: effect.spell_id,
       target_guid: effect.target_guid
     })
+
+    case List.keyfind(Cooldowns.school_cooldowns(entity, Time.now()), effect.spell_id, 0) do
+      nil ->
+        :ok
+
+      cooldown ->
+        Context.send_packet(context, %Message.SmsgSpellCooldown{guid: effect.target_guid, cooldowns: [cooldown]})
+    end
 
     entity
   end

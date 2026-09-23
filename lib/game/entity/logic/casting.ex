@@ -758,6 +758,14 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   def cancel(character, _now), do: character
 
+  def interrupt(%{internal: %Internal{casting: %Cast{spell: spell}}} = entity, now) do
+    entity
+    |> cancel(now)
+    |> Effects.enqueue(Effects.spell_cast_failed(spell, :interrupted))
+  end
+
+  def interrupt(entity, _now), do: entity
+
   def reconcile_channel_auras(
         %{
           object: %{guid: guid},

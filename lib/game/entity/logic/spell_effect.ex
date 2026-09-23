@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.CombatSkills
   alias ThistleTea.Game.Entity.Logic.ComboPoints
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.CreatureImmunity
   alias ThistleTea.Game.Entity.Logic.Critter
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
@@ -43,7 +44,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       context.proc_damage? and (target.unit.health || 0) <= 0 ->
         {target, []}
 
-      immune_to_harmful_spell?(target, context, spell) ->
+      immune_to_spell?(target, context, spell) ->
         {target, [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
 
       reflect_harmful_spell?(target, context, spell) ->
@@ -133,8 +134,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp outcome_reactions(target, %CastContext{caster_guid: caster_guid}, spell, outcome, now),
     do: receive_outcome(target, caster_guid, spell, outcome, now)
 
-  defp immune_to_harmful_spell?(target, %CastContext{caster_guid: caster_guid}, %Spell{} = spell) do
-    target.object.guid != caster_guid and Spell.harmful?(spell) and DamageImmunity.immune?(target, spell.school, spell)
+  defp immune_to_spell?(target, %CastContext{caster_guid: caster_guid} = context, %Spell{} = spell) do
+    CreatureImmunity.spell?(target, context, spell) or
+      (target.object.guid != caster_guid and Spell.harmful?(spell) and
+         DamageImmunity.immune?(target, spell.school, spell))
   end
 
   defp reflect_harmful_spell?(target, %CastContext{caster_guid: caster_guid, reflected_by_guid: nil}, %Spell{} = spell) do
@@ -279,7 +282,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     effects =
       Enum.reject(
         spell.effects,
-        &(EffectImmunity.blocked?(target, spell, &1) or Totems.immune_effect?(target, context, spell, &1))
+        &(EffectImmunity.blocked?(target, spell, &1) or CreatureImmunity.effect?(target, context, spell, &1) or
+            Totems.immune_effect?(target, context, spell, &1))
       )
 
     if effects == [] and spell.effects != [] do

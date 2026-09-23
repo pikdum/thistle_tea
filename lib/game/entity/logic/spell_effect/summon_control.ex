@@ -12,11 +12,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
   alias ThistleTea.Game.Entity.Logic.Resurrection
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Amount
+  alias ThistleTea.Game.Entity.Logic.SpellInterrupt
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
 
   def apply(
@@ -331,26 +331,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
     {Threat.change(state, context.caster_guid, Amount.roll(spell, effect, context)), []}
   end
 
-  def apply(state, %CastContext{}, spell, %Effect{type: :interrupt_cast}, now) do
-    case state do
-      %{internal: %{casting: casting} = internal, unit: unit} when not is_nil(casting) ->
-        if interruptible_cast?(casting) do
-          state = %{
-            state
-            | internal: %{internal | casting: nil},
-              unit: %{unit | channel_spell: 0, channel_object: 0}
-          }
-
-          state = lock_interrupted_school(state, casting, spell, now)
-          {Core.mark_broadcast_update(state), []}
-        else
-          {state, []}
-        end
-
-      _ ->
-        {state, []}
-    end
-  end
+  def apply(state, %CastContext{} = context, spell, %Effect{type: :interrupt_cast}, now),
+    do: SpellInterrupt.apply(state, context, spell, now)
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :resurrect_new} = effect, _now) do
     if resurrectable?(state) do
@@ -374,21 +356,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
   end
 
   def apply(state, _context, _spell, _effect, _now), do: {state, []}
-
-  defp interruptible_cast?(%{spell: %Spell{prevention_type: 1}}), do: true
-  defp interruptible_cast?(_casting), do: false
-
-  defp lock_interrupted_school(state, %{spell: %Spell{} = interrupted}, %Spell{} = interrupt, now) do
-    duration = max(interrupt.duration_ms || 0, 0)
-
-    if duration > 0 do
-      Cooldowns.lock_schools(state, Spell.school_mask(interrupted), now + duration)
-    else
-      state
-    end
-  end
-
-  defp lock_interrupted_school(state, _casting, _interrupt, _now), do: state
 
   defp summon_duration(%Spell{duration_ms: duration_ms}) when is_integer(duration_ms) and duration_ms > 0,
     do: duration_ms

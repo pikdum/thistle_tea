@@ -24,6 +24,22 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   alias ThistleTea.Game.WorldRef
 
   describe "build/1" do
+    test "retains template mechanic immunity through respawn" do
+      creature = %Mangos.Creature{
+        guid: 1,
+        id: 2,
+        modelid: 3,
+        curhealth: 10,
+        creature_movement: [],
+        equip_items: [nil, nil, nil],
+        creature_template: %Mangos.CreatureTemplate{entry: 2, name: "Protected", scale: 1.0, mechanic_immune_mask: 2304}
+      }
+
+      mob = Mob.build(creature)
+      assert mob.internal.creature.mechanic_immune_mask == 2304
+      assert Mob.respawn(mob).internal.creature.mechanic_immune_mask == 2304
+    end
+
     test "selects critter reactions while preserving explicit AI" do
       creature = %Mangos.Creature{
         guid: 1,

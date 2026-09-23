@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Creature do
     :extra_flags,
     :static_flags,
     :static_flags2,
+    :mechanic_immune_mask,
     :rank,
     :family,
     :type_flags,

@@ -1089,9 +1089,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       context = %CastContext{caster_guid: 999, caster_level: 10}
 
-      fireball = %Spell{id: 133, school: :fire, prevention_type: 1}
+      fireball = %Spell{id: 133, school: :fire, prevention_type: 1, interrupt_flags: 2}
       target = target_fixture()
-      target = %{target | internal: %{target.internal | casting: %Cast{spell: fireball}}}
+      target = %{target | internal: %{target.internal | casting: %Cast{spell: fireball, cast_time_ms: 3_000}}}
 
       {target, _events} = SpellEffect.receive(target, context, spell, 1_000)
 

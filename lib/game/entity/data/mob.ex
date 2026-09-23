@@ -164,6 +164,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
           extra_flags: ct.extra_flags,
           static_flags: ct.creature_type_flags,
           static_flags2: ct.static_flags2,
+          mechanic_immune_mask: ct.mechanic_immune_mask,
           rank: ct.rank,
           civilian?: ct.civilian == 1,
           racial_leader?: ct.racial_leader == 1,

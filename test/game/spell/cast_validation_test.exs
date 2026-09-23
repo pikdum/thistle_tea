@@ -229,7 +229,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
     end
 
     test "an interrupt school lockout blocks same-school casts until it expires" do
-      locked = Cooldowns.lock_schools(caster(), Spell.school_mask(:fire), @now + 5_000)
+      locked = Cooldowns.lock_schools(caster(), Spell.school_mask(:fire), 5_000, @now)
       fire = harmful_spell(school: :fire, prevention_type: 1)
       frost = harmful_spell(id: 116, school: :frost, prevention_type: 1)
 
