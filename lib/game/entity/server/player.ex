@@ -591,6 +591,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_cast({:instance_membership_changed, _world}, state), do: {:noreply, state}
 
+  def handle_cast({:instance_lockout_changed, reason}, %State{guid: guid} = state) do
+    Instances.lockout_changed(guid, reason)
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.warning("Instance lockout update failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   @impl GenServer
   def handle_cast({:destroy_object, guid}, state) do
     Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
@@ -773,7 +782,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       orientation: orientation
     })
 
-    Network.send_packet(%Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: false})
+    Instances.send_saved_instances(state.guid)
 
     # The client responds with a MSG_MOVE_WORLDPORT_ACK message which
     # is handled in the login handler as they share the same init process
@@ -2055,7 +2064,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       orientation: transport_orientation
     })
 
-    Network.send_packet(%Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: false})
+    Instances.send_saved_instances(state.guid)
     state
   end
 

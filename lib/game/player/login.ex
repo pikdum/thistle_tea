@@ -281,6 +281,7 @@ defmodule ThistleTea.Game.Player.Login do
   def refresh_companion(state), do: state
 
   def send_init_packets(c, opts \\ []) do
+    Instances.send_saved_instances(c.object.guid)
     WorldStates.initialize(c)
     Corpses.send_reclaim_delay(c)
 

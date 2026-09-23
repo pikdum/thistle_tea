@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   alias ThistleTea.Game.Entity.Data.AIEvent
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
@@ -31,7 +32,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionEvaluator
   alias ThistleTea.Game.Entity.Logic.Condition.EntityContext
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Engagement.Tap
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.WorldRef
@@ -175,7 +178,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   end
 
   def on_death(state, %Blackboard{} = blackboard, killer_guid, now, %Context{} = context) do
-    state |> enqueue_instance_event(:death) |> fire_edges(blackboard, :death, killer_guid, now, context)
+    state
+    |> enqueue_instance_event(:death, raid_killer(state, killer_guid, context))
+    |> fire_edges(blackboard, :death, killer_guid, now, context)
   end
 
   def on_kill(state, %Blackboard{} = blackboard, victim_guid, now) do
@@ -204,6 +209,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     {state, reset_ooc(blackboard, events(state), now, context)}
   end
 
+  defp enqueue_instance_event(state, event, bind_player \\ nil)
+
   defp enqueue_instance_event(
          %Mob{
            object: %{guid: creature_guid, entry: creature_entry},
@@ -212,13 +219,34 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
              creature: %Creature{db_guid: db_guid}
            }
          } = state,
-         event
+         event,
+         bind_player
        )
        when is_integer(instance_id) do
-    Effects.enqueue(state, Effects.instance_creature_event(world, creature_guid, creature_entry, event, db_guid))
+    effect = Effects.instance_creature_event(world, creature_guid, creature_entry, event, db_guid)
+    Effects.enqueue(state, %{effect | bind_player: bind_player})
   end
 
-  defp enqueue_instance_event(state, _event), do: state
+  defp enqueue_instance_event(state, _event, _bind_player), do: state
+
+  defp raid_killer(state, killer, context) when is_integer(killer) do
+    actor = Perception.actor(context.perception, killer)
+    player = raid_killer_guid(state, killer, actor)
+
+    if CreatureFlags.locks_raid?(state) and is_integer(player) and player > 0 and Guid.entity_type(player) == :player,
+      do: player
+  end
+
+  defp raid_killer(_state, _killer, _context), do: nil
+
+  defp raid_killer_guid(
+         %Mob{object: %{guid: guid}, internal: %{loot: %Loot{tapped_by: %Tap{player: player}}}},
+         guid,
+         _actor
+       ), do: player
+
+  defp raid_killer_guid(_state, _killer, %{owner_guid: owner}) when is_integer(owner) and owner > 0, do: owner
+  defp raid_killer_guid(_state, killer, _actor), do: killer
 
   def on_reached_home(state, %Blackboard{} = blackboard, now) do
     on_reached_home(state, blackboard, now, Context.new(now))

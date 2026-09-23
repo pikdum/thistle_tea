@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.World.Loader.MapTemplate do
     Enum.each(rows, fn row ->
       :ets.insert(table, {row.entry, row.map_type, normalize_script_name(row.script_name)})
       :ets.insert(table, {{:player_limit, row.entry}, Map.get(row, :player_limit)})
+      :ets.insert(table, {{:reset_delay, row.entry}, Map.get(row, :reset_delay, 0)})
     end)
 
     dungeons = rows |> Enum.filter(&(&1.map_type in @dungeon_types)) |> Map.new(&{&1.entry, dungeon(&1)})
@@ -76,6 +77,13 @@ defmodule ThistleTea.Game.World.Loader.MapTemplate do
       end
 
     %Policy{raid?: map_type(table, map_id) == 2, player_limit: limit}
+  end
+
+  def reset_days(map_id, table \\ __MODULE__) do
+    case :ets.lookup(table, {:reset_delay, map_id}) do
+      [{_key, days}] when is_integer(days) and days > 0 -> days
+      _ -> 0
+    end
   end
 
   def instance_script_name(table, map_id) when is_integer(map_id) do

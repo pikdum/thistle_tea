@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.World.Loader.MapTemplateTest do
       %{entry: 0, patch: 10, map_type: 0, script_name: ""},
       %{entry: 33, patch: 10, map_type: 1, script_name: "instance_shadowfang_keep", player_limit: 10},
       %{entry: 249, patch: 9, map_type: 1, script_name: "old_onyxia"},
-      %{entry: 249, patch: 10, map_type: 2, script_name: "instance_onyxias_lair", player_limit: 40},
+      %{entry: 249, patch: 10, map_type: 2, script_name: "instance_onyxias_lair", player_limit: 40, reset_delay: 5},
       %{entry: 30, patch: 10, map_type: 3, script_name: nil}
     ]
 
@@ -29,6 +29,9 @@ defmodule ThistleTea.Game.World.Loader.MapTemplateTest do
       assert MapTemplate.admission_policy(249, table).player_limit == 40
       assert MapTemplate.admission_policy(33, table).player_limit == 10
       refute MapTemplate.admission_policy(33, table).raid?
+      assert MapTemplate.reset_days(249, table) == 5
+      assert MapTemplate.reset_days(33, table) == 0
+      assert MapTemplate.reset_days(999, table) == 0
     end
 
     test "retains the selected script name and normalizes empty names", %{table: table} do

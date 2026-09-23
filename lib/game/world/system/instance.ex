@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.System.Instance do
   @moduledoc """
-  Serializes dungeon-copy admission and tears down copies after they become
-  empty.
+  Owns instance membership, permanent raid saves, scheduled resets, and
+  empty-copy cleanup.
   """
   use GenServer
 
@@ -10,6 +10,8 @@ defmodule ThistleTea.Game.World.System.Instance do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Instance
   alias ThistleTea.Game.Instance.Admission.Actor
+  alias ThistleTea.Game.Instance.Lockouts
+  alias ThistleTea.Game.Instance.ResetSchedule
   alias ThistleTea.Game.InstanceScript.Effects
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Time
@@ -72,6 +74,12 @@ defmodule ThistleTea.Game.World.System.Instance do
     GenServer.call(server, {:info, guid})
   end
 
+  def saved_raids(guid, server \\ __MODULE__), do: GenServer.call(server, {:saved_raids, guid})
+
+  def bind_raid(world, killer, server \\ __MODULE__), do: GenServer.cast(server, {:bind_raid, world, killer})
+
+  def reset_raid(map_id, server \\ __MODULE__), do: GenServer.call(server, {:reset_raid, map_id})
+
   def reset(guid, server \\ __MODULE__) when is_integer(guid) do
     GenServer.call(server, {:reset, guid})
   end
@@ -105,6 +113,13 @@ defmodule ThistleTea.Game.World.System.Instance do
        instances: %Instance{},
        cleanup_refs: %{},
        script_timer_refs: %{},
+       reset_schedules: %{},
+       reset_refs: %{},
+       started_at: Keyword.get(opts, :wall_clock, fn -> System.system_time(:second) end).(),
+       wall_clock: Keyword.get(opts, :wall_clock, fn -> System.system_time(:second) end),
+       reset_days: Keyword.get(opts, :reset_days, &MapTemplateLoader.reset_days/1),
+       group: Keyword.get(opts, :group, &PartySystem.group_of/1),
+       notify_lockout: Keyword.get(opts, :notify_lockout, &Entity.instance_lockout_changed/2),
        empty_timeout_ms: Keyword.get(opts, :empty_timeout_ms, @empty_timeout_ms),
        cleanup: Keyword.get(opts, :cleanup, &cleanup_world/1),
        owner: Keyword.get(opts, :owner, &owner/1),
@@ -121,6 +136,7 @@ defmodule ThistleTea.Game.World.System.Instance do
 
   @impl GenServer
   def handle_call({:enter, map_id, guid}, _from, state) do
+    state = ensure_reset_schedule(state, map_id)
     owner = state.owner.(guid)
     script_name = state.script_name.(map_id)
     previous = state.instances
@@ -129,6 +145,8 @@ defmodule ThistleTea.Game.World.System.Instance do
 
     case Instance.admit(previous, map_id, owner, actor, policy, state.clock.(), script_name) do
       {:ok, world, emptied, instances} ->
+        notify_new_saves(state, previous, instances, world)
+
         if is_nil(Instance.copy(previous, world)) do
           state.projection.publish(state.projection_table, Instance.copy(instances, world))
         end
@@ -182,7 +200,7 @@ defmodule ThistleTea.Game.World.System.Instance do
   end
 
   def handle_call({:world_for, map_id, guid}, _from, state) do
-    world = Instance.world_for(state.instances, map_id, state.owner.(guid))
+    world = Instance.selected_world(state.instances, map_id, state.owner.(guid), guid)
     {:reply, world, state}
   end
 
@@ -214,7 +232,7 @@ defmodule ThistleTea.Game.World.System.Instance do
   end
 
   def handle_call({:resume, world, guid}, _from, state) do
-    if Instance.owned_by?(state.instances, world, state.owner.(guid)) do
+    if Instance.accessible?(state.instances, world, state.owner.(guid), guid) do
       case admit_existing(state, guid, world) do
         {:ok, state} -> {:reply, {:ok, world}, state}
         {:error, reason} -> {:reply, {:error, reason}, state}
@@ -244,6 +262,8 @@ defmodule ThistleTea.Game.World.System.Instance do
           owner: copy.owner,
           members: MapSet.to_list(copy.members),
           script_name: copy.script_name,
+          saved?: Instance.saved?(state.instances, copy.world),
+          expired?: copy.expired?,
           data: copy.data
         }
       end)
@@ -252,10 +272,40 @@ defmodule ThistleTea.Game.World.System.Instance do
     {:reply, info, state}
   end
 
+  def handle_call({:saved_raids, guid}, _from, state) do
+    now = state.wall_clock.()
+
+    raids =
+      Enum.map(Instance.saved_worlds(state.instances, guid), fn world ->
+        schedule = Map.fetch!(state.reset_schedules, world.map_id)
+        %{map_id: world.map_id, instance_id: world.instance_id, seconds_remaining: max(schedule.deadline - now, 0)}
+      end)
+
+    {:reply, raids, state}
+  end
+
+  def handle_call({:reset_raid, map_id}, _from, state) do
+    if state.admission_policy.(map_id).raid? do
+      {:reply, :ok, expire_raid(state, map_id)}
+    else
+      {:reply, {:error, :not_raid}, state}
+    end
+  rescue
+    error ->
+      Logger.warning("Raid reset failed: #{Exception.message(error)}")
+      {:reply, {:error, :instance_unavailable}, state}
+  end
+
   def handle_call({:reset, guid}, _from, state) do
     case state.reset_owner.(guid) do
       {:ok, owner} ->
-        copies = Instance.copies_for_owner(state.instances, owner)
+        copies =
+          state.instances
+          |> Instance.copies_for_owner(owner)
+          |> Enum.reject(
+            &(state.admission_policy.(&1.world.map_id).raid? or Instance.saved?(state.instances, &1.world))
+          )
+
         {empty, occupied} = Enum.split_with(copies, &(MapSet.size(&1.members) == 0))
 
         state = Enum.reduce(empty, state, &reset_copy/2)
@@ -285,8 +335,15 @@ defmodule ThistleTea.Game.World.System.Instance do
     actor = state.admission_actor.(guid)
     policy = state.admission_policy.(world.map_id)
 
-    case Instance.admit_copy(state.instances, actor, world, policy, state.clock.()) do
+    result =
+      with :ok <- Lockouts.check(state.instances.lockouts, world, state.owner.(guid), guid),
+           do: Instance.admit_copy(state.instances, actor, world, policy, state.clock.())
+
+    case result do
       {:ok, emptied, instances} ->
+        lockouts = Lockouts.inherit(instances.lockouts, world, state.owner.(guid), guid)
+        instances = %{instances | lockouts: lockouts}
+        notify_new_saves(state, state.instances, instances, world)
         state = %{state | instances: instances} |> cancel_cleanup(world) |> schedule_cleanup(emptied)
         {:ok, state}
 
@@ -296,6 +353,22 @@ defmodule ThistleTea.Game.World.System.Instance do
   end
 
   @impl GenServer
+  def handle_cast({:bind_raid, world, killer}, state) do
+    state = ensure_reset_schedule(state, world.map_id)
+
+    if state.admission_policy.(world.map_id).raid? and Map.has_key?(state.reset_schedules, world.map_id) do
+      {saved, instances} = Instance.bind_raid(state.instances, world, state.group.(killer))
+      Enum.each(saved, &state.notify_lockout.(&1, :created))
+      {:noreply, cancel_cleanup(%{state | instances: instances}, world)}
+    else
+      {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.warning("Raid binding failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_cast({:leave, guid, world}, state) do
     {instances, emptied} = Instance.leave(state.instances, guid, world)
     {:noreply, schedule_cleanup(%{state | instances: instances}, emptied)}
@@ -331,6 +404,17 @@ defmodule ThistleTea.Game.World.System.Instance do
   end
 
   @impl GenServer
+  def handle_info({:raid_reset, map_id, token}, state) do
+    case Map.get(state.reset_refs, map_id) do
+      {_ref, ^token} -> {:noreply, reset_due_map(state, map_id)}
+      _stale -> {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.warning("Raid reset failed: #{Exception.message(error)}")
+      {:noreply, schedule_raid_reset(state, map_id)}
+  end
+
   def handle_info(:prune_entry_history, state) do
     instances = Instance.prune_entry_history(state.instances, state.clock.())
     Process.send_after(self(), :prune_entry_history, @history_cleanup_ms)
@@ -388,9 +472,20 @@ defmodule ThistleTea.Game.World.System.Instance do
 
   defp schedule_cleanup(state, %WorldRef{} = world) do
     state = cancel_cleanup(state, world)
-    token = make_ref()
-    timer_ref = Process.send_after(self(), {:cleanup, world, token}, state.empty_timeout_ms)
-    %{state | cleanup_refs: Map.put(state.cleanup_refs, world, {timer_ref, token})}
+
+    if Instance.saved?(state.instances, world) do
+      state
+    else
+      token = make_ref()
+
+      delay =
+        if match?(%Instance.Copy{expired?: true}, Instance.copy(state.instances, world)),
+          do: 0,
+          else: state.empty_timeout_ms
+
+      timer_ref = Process.send_after(self(), {:cleanup, world, token}, delay)
+      %{state | cleanup_refs: Map.put(state.cleanup_refs, world, {timer_ref, token})}
+    end
   end
 
   defp cancel_cleanup(state, %WorldRef{} = world) do
@@ -407,7 +502,7 @@ defmodule ThistleTea.Game.World.System.Instance do
   defp cleanup_if_empty(state, world) do
     cleanup_refs = Map.delete(state.cleanup_refs, world)
 
-    if Instance.empty?(state.instances, world) do
+    if Instance.empty?(state.instances, world) and not Instance.saved?(state.instances, world) do
       state.cleanup.(world)
       instances = Instance.destroy_empty(state.instances, world)
       state.projection.remove(state.projection_table, world)
@@ -416,6 +511,65 @@ defmodule ThistleTea.Game.World.System.Instance do
     else
       {:noreply, %{state | cleanup_refs: cleanup_refs}}
     end
+  end
+
+  defp notify_new_saves(state, previous, current, world) do
+    copy = Instance.copy(current, world)
+
+    copy.members
+    |> Enum.filter(&(world not in Instance.saved_worlds(previous, &1) and world in Instance.saved_worlds(current, &1)))
+    |> Enum.each(&state.notify_lockout.(&1, :created))
+  end
+
+  defp ensure_reset_schedule(state, map_id) do
+    days = state.reset_days.(map_id)
+
+    if days > 0 and state.admission_policy.(map_id).raid? and not Map.has_key?(state.reset_schedules, map_id) do
+      schedule = days |> ResetSchedule.new(state.started_at) |> ResetSchedule.advance(state.wall_clock.())
+      schedule_raid_reset(%{state | reset_schedules: Map.put(state.reset_schedules, map_id, schedule)}, map_id)
+    else
+      state
+    end
+  end
+
+  defp schedule_raid_reset(state, map_id) do
+    case state.reset_refs[map_id] do
+      {ref, _token} -> Process.cancel_timer(ref)
+      nil -> :ok
+    end
+
+    delay = max(state.reset_schedules[map_id].deadline - state.wall_clock.(), 0) * 1_000
+    token = make_ref()
+    ref = Process.send_after(self(), {:raid_reset, map_id, token}, min(delay, 4_294_967_295))
+    %{state | reset_refs: Map.put(state.reset_refs, map_id, {ref, token})}
+  end
+
+  defp reset_due_map(state, map_id) do
+    now = state.wall_clock.()
+    schedule = Map.fetch!(state.reset_schedules, map_id)
+
+    if now >= schedule.deadline do
+      state = %{
+        state
+        | reset_schedules: Map.put(state.reset_schedules, map_id, ResetSchedule.advance(schedule, now))
+      }
+
+      state |> expire_raid(map_id) |> schedule_raid_reset(map_id)
+    else
+      schedule_raid_reset(state, map_id)
+    end
+  end
+
+  defp expire_raid(state, map_id) do
+    copies = Enum.filter(Map.values(state.instances.copies), &(&1.world.map_id == map_id))
+    saved = for {{^map_id, {:player, guid}}, _world} <- state.instances.lockouts.bindings, do: guid
+    state = %{state | instances: Instance.expire_map(state.instances, map_id)}
+    Enum.each(saved, &state.notify_lockout.(&1, :expired))
+    Enum.each(copies, fn copy -> Enum.each(copy.members, &Entity.instance_membership_changed(&1, copy.world)) end)
+
+    copies
+    |> Enum.filter(&Instance.empty?(state.instances, &1.world))
+    |> Enum.reduce(state, &reset_copy/2)
   end
 
   defp run_script_timer(state, world, key) do

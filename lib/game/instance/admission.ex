@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Instance.Admission do
 
   def check(history, %Policy{} = policy, %Actor{} = actor, %Copy{} = copy, now) do
     cond do
+      copy.expired? -> {:error, :instance_unavailable}
       policy.raid? and not actor.raid? -> {:error, :raid_group_required}
       full?(copy, actor.guid, policy.player_limit) -> {:error, :instance_full}
       limited?(history, actor.account, copy.world, now) -> {:error, :too_many_instances}

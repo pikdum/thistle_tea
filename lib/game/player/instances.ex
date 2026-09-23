@@ -17,6 +17,22 @@ defmodule ThistleTea.Game.Player.Instances do
   def reject(:raid_group_required), do: Network.send_packet(%Message.SmsgRaidGroupOnly{})
   def reject(reason), do: Network.send_packet(%Message.SmsgTransferAborted{reason: reason})
 
+  def send_raid_info(guid) do
+    Network.send_packet(%Message.SmsgRaidInstanceInfo{raids: InstanceSystem.saved_raids(guid)})
+  end
+
+  def send_saved_instances(guid) do
+    raids = InstanceSystem.saved_raids(guid)
+    Network.send_packet(%Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: raids != []})
+    Enum.each(raids, &Network.send_packet(%Message.SmsgUpdateLastInstance{map: &1.map_id}))
+  end
+
+  def lockout_changed(guid, reason) do
+    if reason == :created, do: Network.send_packet(%Message.SmsgInstanceSaveCreated{})
+    send_saved_instances(guid)
+    send_raid_info(guid)
+  end
+
   def restore(character, guid, opts \\ [])
 
   def restore(%Character{internal: %{world: %WorldRef{instance_id: id} = world}} = character, guid, opts)

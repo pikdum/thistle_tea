@@ -61,6 +61,11 @@ defmodule ThistleTea.Game.Instance.MembershipTest do
   end
 
   describe "valid_member?/5" do
+    test "a joining member's former solo copy does not grant membership in their new group" do
+      {world, _, instances} = Instance.enter(%Instance{}, 389, {:player, 2}, 2)
+      refute Instance.accessible?(instances, world, {:party, 10}, 2)
+    end
+
     test "requires current ownership and raid membership without counting admission again" do
       actor = %Actor{guid: 1, account: 1, raid?: true}
       {world, _, instances} = Instance.enter(%Instance{}, 309, {:party, 10}, 1)

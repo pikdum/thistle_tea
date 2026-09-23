@@ -8,6 +8,9 @@ defmodule ThistleTea.Game.Entity.EventSink.InstanceData do
   require Logger
 
   def emit(entity, %Effects.InstanceCreatureEvent{} = effect, context) do
+    if is_integer(effect.bind_player),
+      do: InstanceSystem.bind_raid(effect.world, effect.bind_player, instance_system(context))
+
     InstanceSystem.creature_event(effect.world, effect, instance_system(context))
     entity
   end

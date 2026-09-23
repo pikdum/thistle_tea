@@ -11,6 +11,12 @@ defmodule ThistleTea.Game.Entity.Data.CreatureFlagsVmangosTest do
   @moduletag :vmangos_db
 
   describe "Mob.build/1" do
+    test "retains raid-binding boss flags independently of elite rank" do
+      assert CreatureFlags.locks_raid?(build(10_184))
+      assert CreatureFlags.locks_raid?(build(11_982))
+      refute CreatureFlags.locks_raid?(build(1853))
+    end
+
     test "loads the separate wounded slowdown exemption" do
       boss = build(1853)
       assert boss.internal.creature.rank == 1

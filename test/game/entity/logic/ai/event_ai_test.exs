@@ -80,6 +80,26 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
     end
   end
 
+  describe "on_death/5" do
+    test "only flagged bosses request a raid save for a player or pet owner" do
+      world = WorldRef.instance(249, 1)
+      normal = mob(events: [], world: world)
+      boss = %{normal | internal: %{normal.internal | creature: %{normal.internal.creature | static_flags2: 4}}}
+      player = Guid.from_low_guid(:player, 2)
+      pet = Guid.from_low_guid(:pet, 7, 3)
+      context = target_context(boss, pet, %{owner_guid: player})
+
+      {killed, _} = EventAI.on_death(boss, Blackboard.new(), pet, 0, context)
+      assert [%Effects.InstanceCreatureEvent{event: :death, bind_player: ^player}] = killed.internal.events
+      {killed, _} = EventAI.on_death(boss, Blackboard.new(), player, 0, Context.new(0))
+      assert [%Effects.InstanceCreatureEvent{bind_player: ^player}] = killed.internal.events
+      {killed, _} = EventAI.on_death(normal, Blackboard.new(), player, 0, context)
+      assert [%Effects.InstanceCreatureEvent{bind_player: nil}] = killed.internal.events
+      {killed, _} = EventAI.on_death(boss, Blackboard.new(), pet, 0, Context.new(0))
+      assert [%Effects.InstanceCreatureEvent{bind_player: nil}] = killed.internal.events
+    end
+  end
+
   describe "on_reached_home/3" do
     test "fires reached_home events" do
       mob = mob(events: [event(:reached_home)])

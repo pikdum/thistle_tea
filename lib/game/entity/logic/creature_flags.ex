@@ -34,6 +34,11 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureFlags do
 
   def no_wounded_slowdown?(_entity), do: false
 
+  def locks_raid?(%{internal: %Internal{creature: %Creature{static_flags2: flags}}}) when is_integer(flags),
+    do: (flags &&& 0x4) != 0
+
+  def locks_raid?(_entity), do: false
+
   def unit_flags(flags, static_flags) do
     Enum.reduce(@unit_flags, Pvp.unit_flags(flags, has?(static_flags, :pvp_enabling)), fn {flag, mask}, acc ->
       if has?(static_flags, flag), do: acc ||| mask, else: acc &&& bnot(mask)

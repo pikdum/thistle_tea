@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.Instance do
   @moduledoc """
-  Pure instance-copy membership and ownership transitions.
+  Pure instance-copy membership, ownership, and raid-binding transitions.
   """
 
   import Bitwise
@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Instance do
   alias ThistleTea.Game.Instance.Admission
   alias ThistleTea.Game.Instance.Admission.Actor
   alias ThistleTea.Game.Instance.Admission.Policy
+  alias ThistleTea.Game.Instance.Lockouts
   alias ThistleTea.Game.InstanceScript
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.WorldRef
@@ -16,23 +17,43 @@ defmodule ThistleTea.Game.Instance do
 
   defmodule Copy do
     @moduledoc false
-    defstruct [:world, :owner, :script_name, orphaned?: false, members: MapSet.new(), data: %{}, script_state: %{}]
+    defstruct [
+      :world,
+      :owner,
+      :script_name,
+      orphaned?: false,
+      expired?: false,
+      members: MapSet.new(),
+      data: %{},
+      script_state: %{}
+    ]
   end
 
-  defstruct copies: %{}, owner_index: %{}, member_index: %{}, bindings: %{}, entry_history: %{}, next_id: 1
+  defstruct copies: %{},
+            owner_index: %{},
+            member_index: %{},
+            bindings: %{},
+            entry_history: %{},
+            next_id: 1,
+            lockouts: %Lockouts{}
 
   def admit(%__MODULE__{} = instances, map_id, owner, %Actor{} = actor, %Policy{} = policy, now, script_name) do
-    {world, emptied, proposed} = enter(instances, map_id, owner, actor.guid, script_name)
+    {world, emptied, proposed} = select_copy(instances, map_id, owner, actor.guid, script_name)
     previous = copy(instances, world) || %Copy{world: world}
 
-    with :ok <- Admission.check(instances.entry_history, policy, actor, previous, now) do
+    with :ok <- Lockouts.check(instances.lockouts, world, owner, actor.guid),
+         :ok <- check_owner_copy(instances, world, owner, policy),
+         :ok <- Admission.check(instances.entry_history, policy, actor, previous, now) do
       history = Admission.record(instances.entry_history, actor, world, now)
-      {:ok, world, emptied, %{proposed | entry_history: history}}
+      lockouts = Lockouts.inherit(proposed.lockouts, world, owner, actor.guid)
+      index = Map.put_new(proposed.owner_index, {map_id, owner}, world)
+      {:ok, world, emptied, %{proposed | entry_history: history, lockouts: lockouts, owner_index: index}}
     end
   end
 
   def admit_copy(%__MODULE__{} = instances, %Actor{} = actor, %WorldRef{} = world, %Policy{} = policy, now) do
     with %Copy{} = copy <- copy(instances, world),
+         :ok <- Lockouts.check(instances.lockouts, world, {:player, actor.guid}, actor.guid),
          :ok <- Admission.check(instances.entry_history, policy, actor, copy, now),
          {:ok, emptied, proposed} <- join_copy(instances, actor.guid, world) do
       history = Admission.record(instances.entry_history, actor, world, now)
@@ -48,9 +69,13 @@ defmodule ThistleTea.Game.Instance do
   end
 
   def group_changed(%__MODULE__{} = instances, nil, %Group{id: id, leader: leader}) do
+    instances = %{instances | lockouts: Lockouts.group_changed(instances.lockouts, nil, %Group{id: id, leader: leader})}
+
     instances
     |> copies_for_guid(leader)
-    |> Enum.filter(&(&1.owner == {:player, leader} or &1.orphaned?))
+    |> Enum.filter(
+      &((&1.owner == {:player, leader} or &1.orphaned?) and not &1.expired? and not saved?(instances, &1.world))
+    )
     |> Enum.reduce(instances, &transfer_owner(&2, &1, {:party, id}))
   end
 
@@ -60,19 +85,96 @@ defmodule ThistleTea.Game.Instance do
         {world, if(copy.owner == {:party, id}, do: %{copy | orphaned?: true}, else: copy)}
       end)
 
-    %{instances | copies: copies}
+    lockouts = Lockouts.group_changed(instances.lockouts, %Group{id: id}, nil)
+    index = Map.reject(instances.owner_index, fn {{_map, owner}, _world} -> owner == {:party, id} end)
+    %{instances | copies: copies, lockouts: lockouts, owner_index: index}
+  end
+
+  def group_changed(
+        %__MODULE__{} = instances,
+        %Group{id: id, leader: previous} = old_group,
+        %Group{id: id, leader: current} = new_group
+      )
+      when previous != current do
+    replaced = Lockouts.worlds(instances.lockouts, {:party, id}) ++ saved_worlds(instances, current)
+    maps = MapSet.new(replaced, & &1.map_id)
+    index = Map.reject(instances.owner_index, fn {{map, owner}, _world} -> owner == {:party, id} and map in maps end)
+    lockouts = Lockouts.group_changed(instances.lockouts, old_group, new_group)
+    %{instances | lockouts: lockouts, owner_index: index}
   end
 
   def group_changed(%__MODULE__{} = instances, _previous, _current), do: instances
 
   def owned_by?(%__MODULE__{} = instances, %WorldRef{} = world, owner) do
-    match?(%Copy{owner: ^owner, orphaned?: false}, copy(instances, world))
+    match?(%Copy{expired?: false}, copy(instances, world)) and
+      (world_for(instances, world.map_id, owner) == world or
+         Lockouts.world_for(instances.lockouts, world.map_id, owner) == world)
   end
 
   def valid_member?(%__MODULE__{} = instances, world, owner, %Actor{} = actor, %Policy{} = policy) do
-    member_world(instances, actor.guid) == world and owned_by?(instances, world, owner) and
+    member_world(instances, actor.guid) == world and accessible?(instances, world, owner, actor.guid) and
       (not policy.raid? or actor.raid?)
   end
+
+  def accessible?(%__MODULE__{} = instances, world, owner, guid) do
+    Lockouts.check(instances.lockouts, world, owner, guid) == :ok and
+      (owned_by?(instances, world, owner) or
+         (Lockouts.world_for(instances.lockouts, world.map_id, {:player, guid}) == world and
+            owned_by?(instances, world, {:player, guid})))
+  end
+
+  def selected_world(%__MODULE__{} = instances, map_id, owner, guid) do
+    Lockouts.world_for(instances.lockouts, map_id, owner) ||
+      Lockouts.world_for(instances.lockouts, map_id, {:player, guid}) || world_for(instances, map_id, owner)
+  end
+
+  def saved?(%__MODULE__{} = instances, world), do: Lockouts.saved?(instances.lockouts, world)
+
+  def saved_worlds(%__MODULE__{} = instances, guid), do: Lockouts.worlds(instances.lockouts, {:player, guid})
+
+  def bind_raid(%__MODULE__{} = instances, world, group) do
+    case copy(instances, world) do
+      %Copy{expired?: false, members: members} ->
+        {saved, lockouts} = Lockouts.bind_players(instances.lockouts, world, members, group)
+        {saved, %{instances | lockouts: lockouts}}
+
+      _ ->
+        {[], instances}
+    end
+  end
+
+  def expire_map(%__MODULE__{} = instances, map_id) do
+    copies =
+      Map.new(instances.copies, fn
+        {%WorldRef{map_id: ^map_id} = world, copy} -> {world, %{copy | expired?: true}}
+        other -> other
+      end)
+
+    %{
+      instances
+      | copies: copies,
+        lockouts: Lockouts.reset_map(instances.lockouts, map_id),
+        owner_index: Map.reject(instances.owner_index, fn {{map, _owner}, _world} -> map == map_id end),
+        bindings: Map.reject(instances.bindings, fn {{map, _guid}, _world} -> map == map_id end)
+    }
+  end
+
+  defp select_copy(instances, map_id, owner, guid, script_name) do
+    case selected_world(instances, map_id, owner, guid) do
+      %WorldRef{} = world ->
+        {:ok, emptied, instances} = join_copy(instances, guid, world)
+        {world, emptied, instances}
+
+      nil ->
+        enter(instances, map_id, owner, guid, script_name)
+    end
+  end
+
+  defp check_owner_copy(instances, world, owner, %Policy{raid?: true}) do
+    if world_for(instances, world.map_id, owner) in [nil, world], do: :ok, else: {:error, :instance_unavailable}
+  end
+
+  defp check_owner_copy(_instances, _world, _owner, %Policy{}), do: :ok
 
   defp transfer_owner(instances, %Copy{} = copy, owner) do
     index =
@@ -206,10 +308,14 @@ defmodule ThistleTea.Game.Instance do
 
   def timer(%__MODULE__{}, _world, _key), do: {:error, :open_world}
 
-  def copies_for_owner(%__MODULE__{copies: copies}, owner) do
-    copies
+  def copies_for_owner(%__MODULE__{} = instances, owner) do
+    saved = Lockouts.worlds(instances.lockouts, owner)
+
+    instances.copies
     |> Map.values()
-    |> Enum.filter(&(&1.owner == owner))
+    |> Enum.filter(
+      &(&1.owner == owner or &1.world in saved or world_for(instances, &1.world.map_id, owner) == &1.world)
+    )
     |> Enum.sort_by(& &1.world.instance_id)
   end
 
@@ -259,12 +365,16 @@ defmodule ThistleTea.Game.Instance do
   end
 
   def destroy_empty(%__MODULE__{} = instances, %WorldRef{} = world) do
+    if saved?(instances, world), do: instances, else: delete_empty(instances, world)
+  end
+
+  defp delete_empty(instances, world) do
     case Map.get(instances.copies, world) do
-      %Copy{owner: owner, members: %MapSet{map: members}} when map_size(members) == 0 ->
+      %Copy{members: %MapSet{map: members}} when map_size(members) == 0 ->
         %{
           instances
           | copies: Map.delete(instances.copies, world),
-            owner_index: Map.delete(instances.owner_index, {world.map_id, owner}),
+            owner_index: delete_world_bindings(instances.owner_index, world),
             bindings: delete_world_bindings(instances.bindings, world)
         }
 

@@ -251,6 +251,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_LOOT_MASTER_GIVE: Message.CmsgLootMasterGive,
               CMSG_REQUEST_PARTY_MEMBER_STATS: Message.CmsgRequestPartyMemberStats,
               CMSG_RESET_INSTANCES: Message.CmsgResetInstances,
+              CMSG_REQUEST_RAID_INFO: Message.CmsgRequestRaidInfo,
               CMSG_DUEL_ACCEPTED: Message.CmsgDuelAccepted,
               CMSG_DUEL_CANCELLED: Message.CmsgDuelCancelled,
               CMSG_SEND_MAIL: Message.CmsgSendMail,

@@ -173,6 +173,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".instance info - show instance ownership and membership",
       ".instance data [field] - show read-only instance script data",
       ".instance reset - reset empty owned instances",
+      ".instance raid-reset <map> - expire all raid copies and saves for a map",
       ".instance switch <id> - join a copy of the current map",
       ".learn <spell_id> - learn a spell",
       ".levelup [levels] - increase player level",
@@ -539,6 +540,17 @@ defmodule ThistleTea.Game.Player.DevCommands do
     state
     |> switch_instance(instance_id)
     |> handled()
+  end
+
+  def run(state, ".instance raid-reset " <> map_id) do
+    result = with {map_id, ""} <- Integer.parse(String.trim(map_id)), do: InstanceSystem.reset_raid(map_id)
+
+    message =
+      if result == :ok,
+        do: "Raid copies and saves expired; occupants have one minute to leave.",
+        else: "Invalid raid map."
+
+    state |> system_message(message) |> handled()
   end
 
   def run(state, ".move" <> _) do
