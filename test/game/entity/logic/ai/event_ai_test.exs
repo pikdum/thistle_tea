@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Data.SummonEvent
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
@@ -23,6 +24,56 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
   alias ThistleTea.Game.WorldRef
 
   @talk_step %ScriptStep{command: :talk, texts: [%{text: "!", chat_type: :say, language: 0, emote_id: 0}]}
+
+  describe "on_summon_event/4" do
+    test "matches exact creature entries and preserves the summon as action invoker" do
+      for type <- [:summoned_unit, :summoned_just_died, :summoned_just_despawn] do
+        mob = mob(events: [event(type, param1: 7), event(type, param1: 0)])
+        summon = summon_event(type, 8)
+        {unchanged, blackboard} = EventAI.on_summon_event(mob, Blackboard.new(), summon, Context.new(0))
+        assert unchanged.internal.events == []
+        summon = summon_event(type, 7)
+        {fired, blackboard} = EventAI.on_summon_event(mob, blackboard, summon, Context.new(0))
+        assert [%Effects.MonsterTalk{target_guid: guid}] = fired.internal.events
+        assert guid == summon.observation.guid
+        {unchanged, _} = EventAI.on_summon_event(mob, blackboard, summon, Context.new(1000))
+        assert unchanged.internal.events == []
+      end
+    end
+
+    test "uses the second and third parameters for independent edge cooldowns" do
+      types = [:summoned_unit, :summoned_just_died, :summoned_just_despawn]
+      events = Enum.map(types, &event(&1, param1: 7, param2: 100, param3: 100, repeatable?: true))
+      mob = mob(events: events)
+
+      blackboard =
+        Enum.reduce(types, Blackboard.new(), fn type, blackboard ->
+          {fired, blackboard} = EventAI.on_summon_event(mob, blackboard, summon_event(type, 7), Context.new(0))
+          assert [%Effects.MonsterTalk{}] = fired.internal.events
+          blackboard
+        end)
+
+      for type <- types do
+        {early, _} = EventAI.on_summon_event(mob, blackboard, summon_event(type, 7), Context.new(99))
+        assert early.internal.events == []
+        {ready, _} = EventAI.on_summon_event(mob, blackboard, summon_event(type, 7), Context.new(100))
+        assert [%Effects.MonsterTalk{}] = ready.internal.events
+      end
+    end
+
+    test "does not consume a failing condition" do
+      condition = %Condition{type: :alive, reverse?: true}
+      event = event(:summoned_just_died, param1: 7, condition: condition, inverse_phase_mask: 2)
+      mob = mob(events: [event])
+      summon = summon_event(:summoned_just_died, 7)
+      context = target_context(mob, summon.observation.guid, %{alive?: true})
+      {blocked, blackboard} = EventAI.on_summon_event(mob, Blackboard.new(), summon, context)
+      assert blocked.internal.events == []
+      context = target_context(mob, summon.observation.guid, %{alive?: false})
+      {fired, _} = EventAI.on_summon_event(mob, blackboard, summon, context)
+      assert [%Effects.MonsterTalk{}] = fired.internal.events
+    end
+  end
 
   describe "on_group_member_died/6" do
     test "matches entry and original-leader status" do
@@ -511,6 +562,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       param4: Keyword.get(opts, :param4, 0),
       condition: Keyword.get(opts, :condition),
       actions: [[@talk_step]]
+    }
+  end
+
+  defp summon_event(type, entry) do
+    %SummonEvent{
+      event: type,
+      entry: entry,
+      world: WorldRef.open(0),
+      observation: %Observation{guid: Guid.from_low_guid(:mob, entry, 2)}
     }
   end
 

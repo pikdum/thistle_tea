@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.Entity.Server.WildSummonTest do
       assert mob.unit.created_by_spell == 500
       assert mob.internal.pet == nil
       assert mob.internal.spawn.temporary?
+      assert mob.internal.spawn.summoner_guid == caster.object.guid
       assert mob.internal.spawn.death_at == nil
       assert mob.internal.spawn.despawn_type == 7
       assert mob.internal.loot.tapped_by == nil

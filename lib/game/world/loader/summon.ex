@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.DBC.CreatureFamily
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.PetProgress
@@ -274,9 +275,13 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   defp restore_happiness(pet, _owner, _entry), do: pet
 
   def attach_owner(%Mob{} = mob, owner_guid) when is_integer(owner_guid) do
+    spawn = mob.internal.spawn || %Spawn{}
+    spawn = %{spawn | summoner_guid: spawn.summoner_guid || owner_guid}
+
     %{
       mob
-      | unit: %{
+      | internal: %{mob.internal | spawn: spawn},
+        unit: %{
           mob.unit
           | summoned_by: owner_guid,
             created_by: owner_guid,

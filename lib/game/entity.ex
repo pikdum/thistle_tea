@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity do
   Boundary facade for talking to live entities by guid: registry lookups and
   casts to the owning process (movement, attacks, spells, update requests).
   """
+  alias ThistleTea.Game.Entity.Data.SummonEvent
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
@@ -220,6 +221,8 @@ defmodule ThistleTea.Game.Entity do
   def spell_hit_target(entity, target_guid, spell) when is_integer(target_guid) do
     dispatch_cast(entity, {:spell_hit_target, target_guid, spell})
   end
+
+  def summon_event(entity, %SummonEvent{} = event), do: dispatch_cast(entity, event)
 
   def loot_roll_vote(entity, voter_guid, slot, vote) do
     dispatch_cast(entity, {:loot_roll_vote, voter_guid, slot, vote})

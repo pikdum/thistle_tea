@@ -232,6 +232,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     with true <- summon_allowed?(world, summon),
          %Mob{} = mob <-
            SummonLoader.build(summon.entry, world, summon.position,
+             summoner_guid: entity.object.guid,
              despawn_type: summon.despawn_type,
              despawn_delay_ms: summon.despawn_delay_ms,
              run?: summon.run?

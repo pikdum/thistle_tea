@@ -99,11 +99,14 @@ defmodule ThistleTea.Game.Entity.Data.AIEvent do
   defp event_type(14), do: :friendly_hp
   defp event_type(15), do: :friendly_is_cc
   defp event_type(16), do: :friendly_missing_buff
+  defp event_type(17), do: :summoned_unit
   defp event_type(18), do: :target_mana
   defp event_type(21), do: :reached_home
   defp event_type(22), do: :receive_emote
   defp event_type(23), do: :aura
   defp event_type(24), do: :target_aura
+  defp event_type(25), do: :summoned_just_died
+  defp event_type(26), do: :summoned_just_despawn
   defp event_type(27), do: :missing_aura
   defp event_type(28), do: :target_missing_aura
   defp event_type(30), do: :leave_combat

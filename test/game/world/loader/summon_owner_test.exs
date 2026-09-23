@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Loader.SummonOwnerTest do
 
       assert summon.unit.summoned_by == owner_guid
       assert summon.unit.created_by == owner_guid
+      assert summon.internal.spawn.summoner_guid == owner_guid
       assert (summon.unit.flags &&& @unit_flag_player_controlled) != 0
       assert (summon.unit.flags &&& 0x1000) != 0
     end

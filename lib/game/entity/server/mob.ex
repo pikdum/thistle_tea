@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Data.SummonEvent
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.KillReward
   alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
@@ -81,6 +82,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Entity.Server.Mob.Pockets
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
+  alias ThistleTea.Game.Entity.Server.Mob.SummonLifecycle
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.TotemOwner
@@ -167,6 +169,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       state
       |> schedule_summon_despawn()
       |> schedule_ai_tick(0)
+      |> SummonLifecycle.notify(:summoned_unit)
 
     {:ok, state}
   end
@@ -290,6 +293,23 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   rescue
     error ->
       Logger.error("spell_hit_target crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_cast(%SummonEvent{} = event, %Mob{} = state) do
+    now = Time.now()
+
+    state =
+      state
+      |> SummonLifecycle.receive_event(event, now)
+      |> NavigationResolver.resolve(now)
+      |> EventSink.emit_pending()
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("summon event crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, state}
   end
 
@@ -1293,6 +1313,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def terminate(_reason, state) do
+    SummonLifecycle.notify(state, :summoned_just_despawn)
     CreaturePetOwner.owner_stopped(state)
     GuardianOwner.owner_stopped(state)
     TotemOwner.stopped(state)
@@ -1736,6 +1757,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp mark_death_finalized(%Mob{internal: internal} = state) do
+    SummonLifecycle.notify(state, :summoned_just_died)
     %{state | internal: %{internal | death_finalized?: true}}
   end
 

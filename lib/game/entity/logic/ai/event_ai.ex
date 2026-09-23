@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Data.SummonEvent
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.EventAI, as: EventMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
@@ -52,7 +53,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     :receive_emote,
     :spell_hit_target,
     :script_event,
-    :group_member_died
+    :group_member_died,
+    :summoned_unit,
+    :summoned_just_died,
+    :summoned_just_despawn
   ]
 
   def tick_ms, do: @tick_ms
@@ -316,6 +320,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end
 
     fire_edges(state, blackboard, matcher, guid, now, context)
+  end
+
+  def on_summon_event(state, %Blackboard{} = blackboard, %SummonEvent{} = summon, %Context{now: now} = context) do
+    matcher = fn %AIEvent{} = event ->
+      event.event_type == summon.event and event.param1 == summon.entry
+    end
+
+    fire_edges(state, blackboard, matcher, summon.observation.guid, now, context)
   end
 
   def ooc_timer_delay(state, %Blackboard{} = blackboard, now) when is_integer(now) do
@@ -670,6 +682,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
 
   defp repeat_params(%AIEvent{event_type: :kill} = event), do: {event.param1, event.param2}
   defp repeat_params(%AIEvent{event_type: :victim_rooted} = event), do: {event.param1, event.param2}
+
+  defp repeat_params(%AIEvent{event_type: event_type} = event)
+       when event_type in [:summoned_unit, :summoned_just_died, :summoned_just_despawn],
+       do: {event.param2, event.param3}
 
   defp repeat_params(%AIEvent{event_type: event_type} = event)
        when event_type in [

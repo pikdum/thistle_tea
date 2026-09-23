@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Loader.WildSummon do
 
     mob =
       Summon.build(effect.entry, caster.internal.world, position,
+        summoner_guid: caster.object.guid,
         level: level,
         stat_model: :creature,
         apply_addon_auras?: false

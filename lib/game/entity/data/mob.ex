@@ -246,6 +246,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
     spawn_state = %{
       spawn_state
       | temporary?: true,
+        summoner_guid: Keyword.get(opts, :summoner_guid),
         despawn_type: Keyword.get(opts, :despawn_type),
         despawn_delay_ms: Keyword.get(opts, :despawn_delay_ms),
         movement_type: 0,
