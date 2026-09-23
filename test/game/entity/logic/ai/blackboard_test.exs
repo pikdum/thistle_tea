@@ -4,6 +4,28 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.BlackboardTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Navigation
 
+  describe "delay_until/3" do
+    test "returns remaining delay from explicit time" do
+      blackboard = %Blackboard{navigation: %Navigation{next_wander_at: 11_000}}
+
+      assert Blackboard.delay_until(blackboard, :next_wander_at, 1_000) == 10_000
+    end
+
+    test "ready sentinel deadlines stay ready with a negative monotonic clock" do
+      now = -10_000
+      blackboard = Blackboard.new()
+
+      for key <- [:next_chase_at, :next_eventai_at, :next_regen_at] do
+        assert Blackboard.ready_for?(blackboard, key, now)
+        assert Blackboard.delay_until(blackboard, key, now) == 0
+        scheduled = Blackboard.put_next_at(blackboard, key, 500, now)
+        refute Blackboard.ready_for?(scheduled, key, now)
+        assert Blackboard.delay_until(scheduled, key, now) == 500
+        assert Blackboard.delay_until(scheduled, key, now + 500) == 0
+      end
+    end
+  end
+
   describe "ready_for?/3" do
     test "defaults to true when unset" do
       assert Blackboard.ready_for?(Blackboard.new(), :next_wander_at, 1_000)
@@ -31,14 +53,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.BlackboardTest do
 
       assert blackboard.navigation.next_wander_at == 11_000
       refute Blackboard.ready_for?(blackboard, :next_wander_at, now)
-    end
-  end
-
-  describe "delay_until/3" do
-    test "returns remaining delay from explicit time" do
-      blackboard = %Blackboard{navigation: %Navigation{next_wander_at: 11_000}}
-
-      assert Blackboard.delay_until(blackboard, :next_wander_at, 1_000) == 10_000
     end
   end
 

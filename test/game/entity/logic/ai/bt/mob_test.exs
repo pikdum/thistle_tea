@@ -556,6 +556,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   end
 
   describe "wait_for_chase_tick/3" do
+    test "disabled combat movement retains the normal chase wake on a negative clock" do
+      state = fixture_mob(spline_nodes: [])
+      blackboard = Blackboard.set_combat_movement(Blackboard.new(), false)
+      assert {{:running, 1_000, :chase}, ^state, ^blackboard} = MobBT.wait_for_chase_tick(state, blackboard, -10_000)
+    end
+
     test "returns delay until the next chase check" do
       state = fixture_mob()
       blackboard = %Blackboard{navigation: %Blackboard.Navigation{next_chase_at: 1_250}}

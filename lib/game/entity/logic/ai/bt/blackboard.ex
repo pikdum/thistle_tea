@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
 
   def delay_until(%__MODULE__{} = blackboard, key, now) when is_atom(key) and is_integer(now) do
     case deadline(blackboard, key) do
+      ready_at when ready_at in [nil, 0] -> 0
       ready_at when is_integer(ready_at) -> max(ready_at - now, 0)
       _ -> 0
     end
