@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Player.Instances do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Loader.MapTemplate
+  alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.WorldRef
 
@@ -20,7 +21,10 @@ defmodule ThistleTea.Game.Player.Instances do
 
   def restore(%Character{internal: %{world: %WorldRef{instance_id: id} = world}} = character, guid, opts)
       when is_integer(id) do
-    resume = Keyword.get(opts, :resume, &InstanceSystem.resume/2)
+    resume =
+      if MapTemplate.battleground?(world.map_id),
+        do: Keyword.get(opts, :resume_battleground, &resume_battleground/2),
+        else: Keyword.get(opts, :resume, &InstanceSystem.resume/2)
 
     case resume.(world, guid) do
       {:ok, world} -> %{character | internal: %{character.internal | world: world}}
@@ -29,6 +33,13 @@ defmodule ThistleTea.Game.Player.Instances do
   end
 
   def restore(%Character{} = character, _guid, _opts), do: character
+
+  defp resume_battleground(world, guid) do
+    case BattlegroundSystem.reconnect(guid, world) do
+      :ok -> {:ok, world}
+      {:error, _reason} = error -> error
+    end
+  end
 
   def refresh(state, opts \\ [])
 

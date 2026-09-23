@@ -85,6 +85,38 @@ defmodule ThistleTea.Game.Player.InstancesTest do
   end
 
   describe "restore/3" do
+    test "restores reserved battleground copies through their match owner" do
+      for map <- [489, 529] do
+        previous = :ets.lookup(MapTemplate, map)
+        :ets.insert(MapTemplate, {map, 3, nil})
+
+        on_exit(fn ->
+          :ets.delete(MapTemplate, map)
+          :ets.insert(MapTemplate, previous)
+        end)
+
+        world = WorldRef.instance(map, 7)
+
+        character = %Character{
+          internal: %Internal{
+            world: world,
+            area: 3_358,
+            home_bind: %HomeBind{map_id: 0, area_id: 12, position: {1.0, 2.0, 3.0}}
+          },
+          movement_block: %MovementBlock{position: {50.0, 60.0, 70.0, 1.0}}
+        }
+
+        dungeon = fn _, _ -> flunk("battleground entered the dungeon admission path") end
+        resume = fn ^world, 1 -> {:ok, world} end
+        assert Instances.restore(character, 1, resume: dungeon, resume_battleground: resume) == character
+
+        expired = fn ^world, 1 -> {:error, :not_reserved} end
+        restored = Instances.restore(character, 1, resume: dungeon, resume_battleground: expired)
+        assert restored.internal.world == WorldRef.open(0)
+        assert restored.movement_block.position == {1.0, 2.0, 3.0, 0.0}
+      end
+    end
+
     test "returns to the home bind when the old instance refuses admission" do
       character = %Character{
         internal: %Internal{
