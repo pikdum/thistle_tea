@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.World.Position.ClientMotion
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.Weather
   alias ThistleTea.Game.WorldRef
 
   def nearby_players(entity, range \\ 250) do
@@ -234,6 +235,7 @@ defmodule ThistleTea.Game.World do
   end
 
   def stop_world_entities(%WorldRef{} = world, opts \\ []) do
+    Weather.clear_world(world)
     excluded = [:player | Keyword.get(opts, :except, [])]
 
     world

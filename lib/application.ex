@@ -76,6 +76,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Transport, as: TransportLoader
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.World.Loader.Waypoint, as: WaypointLoader
+  alias ThistleTea.Game.World.Loader.Weather, as: WeatherLoader
   alias ThistleTea.Game.World.MailStore
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
@@ -98,6 +99,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
   alias ThistleTea.Game.World.System.Trade, as: TradeSystem
   alias ThistleTea.Game.World.System.VendorStock
+  alias ThistleTea.Game.World.System.Weather, as: WeatherSystem
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Native.Namigator
 
@@ -165,6 +167,7 @@ defmodule ThistleTea.Application do
         {Registry, keys: :unique, name: BuffRegistry},
         BattlegroundSystem,
         OutdoorPvpSystem,
+        WeatherSystem,
         {ChatChannels, load_catalog: !test},
         !test &&
           {ThousandIsland, port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
@@ -241,6 +244,7 @@ defmodule ThistleTea.Application do
     TaxiLoader.init()
     TransportLoader.init()
     WaypointLoader.init()
+    WeatherLoader.init()
     Transports.init()
     :ets.new(:spline_counters, [:named_table, :public, write_concurrency: :auto])
     :ets.insert(:spline_counters, {:spline_id, 0})
@@ -320,6 +324,7 @@ defmodule ThistleTea.Application do
         ItemEnchantmentLoader.load_all()
         ItemSetLoader.load_all()
         FishingLoader.load_all()
+        WeatherLoader.load_all()
         LootLoader.load_all()
         MailLoader.load_all()
         MapTemplateLoader.load_all()

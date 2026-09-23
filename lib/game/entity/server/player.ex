@@ -117,6 +117,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Player.Taxi, as: PlayerTaxi
   alias ThistleTea.Game.Player.Trade
+  alias ThistleTea.Game.Player.Weather
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Cooldowns
@@ -1437,6 +1438,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   rescue
     error ->
       Logger.error("Outdoor PvP refresh failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:weather_changed, token, weather}, %State{} = state) do
+    {:noreply, Weather.update(state, token, weather)}
+  rescue
+    error ->
+      Logger.error("Weather projection failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 

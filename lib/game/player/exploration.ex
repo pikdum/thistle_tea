@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Player.Exploration do
   alias ThistleTea.Game.Player.Pvp
   alias ThistleTea.Game.Player.Rest
   alias ThistleTea.Game.Player.Stats
+  alias ThistleTea.Game.Player.Weather
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
@@ -45,11 +46,13 @@ defmodule ThistleTea.Game.Player.Exploration do
       ) do
     case Pathfinding.get_zone_and_area(world.map_id, {x, y, z}) do
       {zone_id, area_id} ->
+        state = Weather.refresh(state, zone_id)
         state = Pvp.update_territory(state, zone_id, area_id)
         if health > 0, do: discover_area(state, area_id), else: state
 
       _unknown ->
-        Pvp.update_territory(state, Rest.default_zone(world.map_id), state.character.internal.area)
+        zone = Rest.default_zone(world.map_id)
+        state |> Weather.refresh(zone) |> Pvp.update_territory(zone, state.character.internal.area)
     end
   end
 

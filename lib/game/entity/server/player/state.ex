@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Player.Rest
   alias ThistleTea.Game.Player.Resurrection
   alias ThistleTea.Game.Player.Taxi
+  alias ThistleTea.Game.Player.Weather
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.CharacterStore
@@ -81,6 +82,8 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :quest_share_monitor,
     :item_duration_timer,
     :instance_eviction,
+    :weather_key,
+    :weather_token,
     item_durations_active?: false,
     ready: false,
     pending_worldport?: false,
@@ -98,6 +101,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
 
   def prepare_worldport(%__MODULE__{} = state, origin, destination) do
     state
+    |> Weather.leave()
     |> Resurrection.cancel_transfer()
     |> Instances.clear()
     |> MiniPetOwner.dismiss()
@@ -140,7 +144,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
         state
       end
 
-    state = state |> Looting.release() |> QuestSharing.disconnect() |> OutdoorPvp.leave()
+    state = state |> Looting.release() |> QuestSharing.disconnect() |> OutdoorPvp.leave() |> Weather.leave()
     state = disengage(state)
     state = CompanionOwner.suspend(state)
     state = MiniPetOwner.dismiss(state)

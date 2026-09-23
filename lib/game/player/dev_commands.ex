@@ -48,6 +48,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.Player.Talents
   alias ThistleTea.Game.Player.Taxi, as: PlayerTaxi
+  alias ThistleTea.Game.Player.Weather
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -165,6 +166,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".debug transport advance <seconds> [entry] - advance a transport schedule",
       ".character level <level> - set player level",
       ".die - kill your character",
+      ".weather [fine|auto|step] or <rain|snow|storm> <0..1> [permanent] - zone weather",
       ".go xyz <x> <y> <z> [map] - teleport",
       ".guid - show target guid",
       ".help - show help",
@@ -494,6 +496,11 @@ defmodule ThistleTea.Game.Player.DevCommands do
       :error -> system_message(state, "Invalid command. Use: .go xyz <x> <y> <z> [map]")
     end
     |> handled()
+  end
+
+  def run(state, ".weather" <> params) do
+    {state, message} = Weather.command(state, String.split(params, " ", trim: true))
+    state |> system_message(message) |> handled()
   end
 
   def run(state, ".battleground" <> params) do
