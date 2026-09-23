@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SummonTypes do
     {:SpellGameObjectAction, [:target_guid, :spell_id, :action], []},
     {:ApplyGameObjectAction, [:target_guid, :source_guid, :world, :spell_id, :action], []},
     {:RestoreGameObject, [:revision, :state, :delay_ms], []},
+    {:FinishGameObjectUse, [:revision, :delay_ms], []},
     {:RespawnGameObject, [:blueprint, :duration_ms], []},
     {:DespawnGameObject, [:blueprint, :respawn_delay_ms], []},
     {:LoadGameObjectSpawn, [:blueprint], []},

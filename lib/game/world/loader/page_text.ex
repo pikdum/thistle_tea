@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.World.Loader.PageText do
   @moduledoc """
-  ETS-cached page_text rows for readable items: each page carries its text
+  Preloaded page_text rows for readable items and objects: each page carries its text
   and the next page id in the chain (0 ends the chain).
   """
   alias ThistleTea.DB.Mangos
@@ -17,21 +17,19 @@ defmodule ThistleTea.Game.World.Loader.PageText do
   def get(entry) when is_integer(entry) and entry > 0 do
     case :ets.lookup(__MODULE__, entry) do
       [{^entry, page}] -> page
-      _miss -> cache(entry, load(entry))
+      _miss -> nil
     end
   end
 
   def get(_entry), do: nil
 
-  defp load(entry) do
-    case Mangos.Repo.get(Mangos.PageText, entry) do
-      %Mangos.PageText{text: text, next_page: next_page} -> %{text: text, next_page: next_page || 0}
-      _missing -> nil
-    end
-  end
+  def load_all do
+    Mangos.PageText
+    |> Mangos.Repo.all()
+    |> Enum.each(fn page ->
+      :ets.insert(__MODULE__, {page.entry, %{text: page.text, next_page: page.next_page || 0}})
+    end)
 
-  defp cache(entry, page) do
-    :ets.insert(__MODULE__, {entry, page})
-    page
+    :ok
   end
 end

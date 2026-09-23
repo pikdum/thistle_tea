@@ -670,6 +670,24 @@ defmodule ThistleTea.Game.Player.Quests do
 
   def credit_entity_interaction(state, _target_guid), do: state
 
+  def credit_game_object_use(state, target_guid) do
+    state.guid
+    |> party_members()
+    |> send_to_other_members(state.guid, {:quest_game_object_credit, target_guid})
+
+    credit_entity_interaction(state, target_guid)
+  end
+
+  def credit_game_object_member(%{character: %Character{} = character} = state, target_guid) do
+    distance = World.distance_between(character, target_guid)
+
+    if not Death.ghost?(character) and is_number(distance) and distance <= Experience.group_reward_distance() do
+      credit_entity_objective(state, character, target_guid, 0, &QuestLog.increment_interaction/4, &Quest.shareable?/1)
+    else
+      state
+    end
+  end
+
   def credit_cast(%{character: %Character{player: %{quest_log: quest_log}}} = state, target_guids, spell_id)
       when is_map(quest_log) and is_list(target_guids) and is_integer(spell_id) and spell_id > 0 do
     Enum.reduce(target_guids, state, fn target_guid, state ->
@@ -812,13 +830,21 @@ defmodule ThistleTea.Game.Player.Quests do
     end)
   end
 
-  defp credit_entity_objective(state, %Character{} = character, target_guid, spell_id, increment) do
+  defp credit_entity_objective(
+         state,
+         %Character{} = character,
+         target_guid,
+         spell_id,
+         increment,
+         eligible? \\ fn _ -> true end
+       ) do
     entity_type = quest_entity_type(target_guid)
     target_entry = Guid.entry(target_guid)
     player = character.player
+    quests = Enum.filter(active_quests(player), eligible?)
 
     {quest_log, credited?} =
-      Enum.reduce(active_quests(player), {player.quest_log, false}, fn quest, {quest_log, credited?} ->
+      Enum.reduce(quests, {player.quest_log, false}, fn quest, {quest_log, credited?} ->
         result =
           case spell_id do
             0 -> increment.(quest_log, quest, entity_type, target_entry)
@@ -844,9 +870,11 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   defp send_entity_credit(quest, target_guid, target_entry, credit) do
+    entry = if Guid.type_id(target_guid) == :game_object, do: Bitwise.bor(target_entry, 0x80000000), else: target_entry
+
     Network.send_packet(%Message.SmsgQuestupdateAddKill{
       quest_id: quest.id,
-      creature_entry: target_entry,
+      creature_entry: entry,
       count: credit.count,
       required: credit.required,
       victim_guid: target_guid

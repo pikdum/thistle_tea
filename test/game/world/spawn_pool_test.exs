@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool
@@ -17,6 +18,38 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
   alias ThistleTea.Game.WorldRef
 
   describe "singleton lifecycle" do
+    test "consumed quest objects disappear and respawn with fresh use state" do
+      {guid, group, world, key, cell} = singleton_fixture()
+      blueprint = game_object(guid)
+
+      blueprint = %{
+        blueprint
+        | game_object: %{blueprint.game_object | type_id: 10, state: 1, flags: 0},
+          internal: %{
+            blueprint.internal
+            | goober: %Internal.Goober{consumable?: true},
+              spawn: %Internal.Spawn{respawn_delay_ms: 300}
+          }
+      }
+
+      on_exit(fn -> SpawnPool.stop_world(world) end)
+      :ok = SpawnPool.activate(group, cell, blueprint)
+      first = await_entity(guid)
+      user_guid = System.unique_integer([:positive])
+      SpatialHash.update(:players, user_guid, world, 1.0, 1.0, 1.0)
+      on_exit(fn -> SpatialHash.remove(:players, user_guid) end)
+      assert Entity.call(guid, {:use_goober, user_guid, world, true}) == :activated
+      send(first, {:finish_game_object_use, :sys.get_state(first).internal.object_action.revision})
+      await_absent(guid)
+      assert Metadata.get(guid) == nil
+      assert World.position(guid) == nil
+      fresh = await_replacement(guid, first)
+      refute :sys.get_state(fresh).internal.goober.depleted?
+      refute :sys.get_state(fresh).internal.object_action.active?
+      assert Entity.call(guid, {:use_goober, user_guid, world, true}) == :activated
+      stop_pool(key)
+    end
+
     test "activates a linked member outside the triggering cell and drains it when unobserved" do
       {guid, group, world, key, _cell} = singleton_fixture()
       trigger = {world, 100, 100}
@@ -46,6 +79,7 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
       {first_pid, _monitor} = :sys.get_state(pool).running[member]
       runtime_guid = :sys.get_state(first_pid).object.guid
       refute runtime_guid == guid
+      assert Metadata.query(runtime_guid, [:db_guid]) == %{db_guid: db_guid}
 
       Enum.reduce(1..3, first_pid, fn _cycle, previous_pid ->
         GenServer.cast(pool, {:refresh, []})

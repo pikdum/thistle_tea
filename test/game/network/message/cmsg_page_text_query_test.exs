@@ -36,7 +36,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPageTextQueryTest do
     end
 
     test "sends a placeholder for missing pages" do
-      seed_page(9103, nil)
+      :ets.delete(PageTextLoader, 9103)
 
       CmsgPageTextQuery.handle(%CmsgPageTextQuery{page_id: 9103}, %{})
 
@@ -56,6 +56,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgPageTextQueryTest do
   end
 
   describe "wire formats" do
+    test "world-object reading packs the full guid" do
+      guid = 0xF110004325000007
+
+      assert Message.SmsgGameobjectPagetext.to_binary(%Message.SmsgGameobjectPagetext{guid: guid}) ==
+               <<guid::little-size(64)>>
+
+      assert Message.SmsgGameobjectPagetext.opcode() == 0x1DF
+    end
+
     test "page text response packs id, text, and next page" do
       binary =
         Message.SmsgPageTextQueryResponse.to_binary(%Message.SmsgPageTextQueryResponse{

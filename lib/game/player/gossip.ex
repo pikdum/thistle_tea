@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Player.Gossip do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.GameObjectTemplate
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -24,6 +25,7 @@ defmodule ThistleTea.Game.Player.Gossip do
   alias ThistleTea.Game.Player.Bank
   alias ThistleTea.Game.Player.Battlegrounds
   alias ThistleTea.Game.Player.ConditionContext
+  alias ThistleTea.Game.Player.GameObjects
   alias ThistleTea.Game.Player.GossipCondition
   alias ThistleTea.Game.Player.Guilds
   alias ThistleTea.Game.Player.HomeBind
@@ -91,6 +93,13 @@ defmodule ThistleTea.Game.Player.Gossip do
     PlayerServer.maybe_broadcast_update(%{state | character: character})
   end
 
+  def hello_quest_object(state, guid, menu_id) do
+    case GossipLoader.get_menu(menu_id) do
+      %Menu{} = menu -> send_menu(guid, menu, [], state)
+      _ -> state
+    end
+  end
+
   def select(%{character: %Character{} = character, gossip_menu_guid: guid} = state, guid, gossip_list_id) do
     option_ids = option_ids()
 
@@ -141,7 +150,16 @@ defmodule ThistleTea.Game.Player.Gossip do
   defp put_menu(state, guid, options), do: Map.merge(state, %{gossip_menu_guid: guid, gossip_menu_options: options})
 
   defp source_allowed?(character, guid) do
-    Guid.type_id(guid) != :game_object or QuestGiver.interactable?(character, guid)
+    cond do
+      Guid.type_id(guid) != :game_object ->
+        true
+
+      match?(%GameObjectTemplate{type: 10}, GameObjectTemplateLoader.cached(Guid.entry(guid))) ->
+        GameObjects.interactable?(character, guid)
+
+      true ->
+        QuestGiver.interactable?(character, guid)
+    end
   end
 
   def title_text_id(%Menu{} = menu, %Character{} = character), do: title_text_id(menu, character, 0)

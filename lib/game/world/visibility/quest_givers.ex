@@ -9,6 +9,8 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.GameObject
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.GameObjectTemplate
+  alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Logic.QuestRequirements
   alias ThistleTea.Game.Entity.Server.Player.State
@@ -17,13 +19,15 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
   alias ThistleTea.Game.Network.Message.SmsgQuestgiverStatus
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
 
   def personalize(
         %UpdateObject{object: %{guid: guid}, game_object: %GameObject{} = object} = update,
         %Character{} = viewer
       ) do
-    if questgiver?(guid) do
+    if quest_object?(guid) do
       %{update | game_object: %{object | dyn_flags: flags(guid, viewer)}}
     else
       update
@@ -34,7 +38,7 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
 
   def remember(%State{} = state, %UpdateObject{object: %{guid: guid}, game_object: %GameObject{dyn_flags: flags}})
       when is_integer(flags) do
-    if questgiver?(guid) do
+    if quest_object?(guid) do
       %{state | quest_object_flags: Map.put(state.quest_object_flags, guid, flags)}
     else
       state
@@ -111,9 +115,44 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
     end
   end
 
-  defp questgiver?(guid), do: match?(%{go_type: 2}, Metadata.query(guid, [:go_type]))
+  defp quest_object?(guid) do
+    case Metadata.query(guid, [:go_type]) do
+      %{go_type: type} -> type in [2, 10]
+      _ -> false
+    end
+  end
 
   defp flags(guid, %Character{} = viewer) do
+    case TemplateLoader.cached(Guid.entry(guid)) do
+      %GameObjectTemplate{type: 10, data: data} ->
+        if goober_active?(viewer, Guid.entry(guid), Enum.at(data, 1, 0)), do: 1, else: 0
+
+      _ ->
+        questgiver_flags(guid, viewer)
+    end
+  end
+
+  defp goober_active?(viewer, object_entry, quest_id) do
+    quest_id == -1 or match?(%QuestLog.Entry{status: :incomplete}, QuestLog.get(viewer.player.quest_log, quest_id)) or
+      Enum.any?(viewer.player.quest_log, fn
+        {_slot, %QuestLog.Entry{status: :incomplete, quest_id: id}} ->
+          case QuestLoader.get(id) do
+            %Quest{} = quest ->
+              match?(
+                {:ok, _, _},
+                QuestLog.increment_interaction(viewer.player.quest_log, quest, :game_object, object_entry)
+              )
+
+            _ ->
+              false
+          end
+
+        _ ->
+          false
+      end)
+  end
+
+  defp questgiver_flags(guid, viewer) do
     {givers, enders} = Quests.npc_quests(guid)
     availability = Quests.availability(viewer, givers)
 

@@ -12,7 +12,11 @@ defmodule ThistleTea.Game.Player.GameObjects do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.GameObjectInteraction
+  alias ThistleTea.Game.Entity.Logic.Goober
+  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.Message.SmsgGameobjectPagetext
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Deadmines
   alias ThistleTea.Game.Player.Fishing
@@ -21,8 +25,11 @@ defmodule ThistleTea.Game.Player.GameObjects do
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.ObjectTarget
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
+  alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
@@ -46,20 +53,20 @@ defmodule ThistleTea.Game.Player.GameObjects do
     end
   end
 
-  defp interactable?(character, guid) do
+  def interactable?(character, guid) do
     metadata = Metadata.get(guid) || %{}
     enabled? = ((Map.get(metadata, :go_flags) || 0) &&& 0x10) == 0
 
     case GameObjectTemplateLoader.cached(Guid.entry(guid)) do
-      %GameObjectTemplate{type: type} = template when type in [0, 1] ->
-        enabled? and door_in_range?(character, guid, template, metadata)
+      %GameObjectTemplate{type: type} = template when type in [0, 1, 9, 10] ->
+        enabled? and object_in_range?(character, guid, template, metadata)
 
       _ ->
         enabled?
     end
   end
 
-  defp door_in_range?(character, guid, template, metadata) do
+  defp object_in_range?(character, guid, template, metadata) do
     world = character.internal.world
     {x, y, z, _} = character.movement_block.position
 
@@ -74,11 +81,94 @@ defmodule ThistleTea.Game.Player.GameObjects do
   end
 
   def open_object(%{character: %Character{}} = state, guid) do
-    if questgiver?(guid) do
-      Gossip.hello_game_object(state, guid)
-    else
-      state |> Quests.credit_entity_interaction(guid) |> use_non_questgiver(guid)
+    case GameObjectTemplateLoader.cached(Guid.entry(guid)) do
+      %GameObjectTemplate{type: type} = template when type in [9, 10] ->
+        case battleground_use(state, guid) do
+          :handled -> state
+          :unhandled -> use_readable(state, guid, template)
+        end
+
+      _ ->
+        if questgiver?(guid),
+          do: Gossip.hello_game_object(state, guid),
+          else: state |> Quests.credit_entity_interaction(guid) |> use_non_questgiver(guid)
     end
+  end
+
+  def use_quest_object(%{character: %Character{internal: %{world: world}}} = state, guid, world) do
+    case GameObjectTemplateLoader.cached(Guid.entry(guid)) do
+      %GameObjectTemplate{type: 10} = template -> use_readable(state, guid, template)
+      _ -> state
+    end
+  end
+
+  def use_quest_object(state, _guid, _world), do: state
+
+  defp use_readable(%{character: character} = state, guid, template) do
+    world = character.internal.world
+
+    with true <- character.unit.health > 0,
+         {^world, _, _, _} <- World.position(guid),
+         %{go_spawned?: true, go_flags: flags} <- Metadata.get(guid),
+         {:ok, character} <- GameObjectInteraction.prepare_readable_use(character, template, flags, Time.now()) do
+      use_prepared_readable(state, character, guid, template)
+    else
+      _ -> state
+    end
+  end
+
+  defp use_prepared_readable(state, character, guid, %GameObjectTemplate{type: 9, data: data}) do
+    if Enum.at(data, 0, 0) > 0, do: Network.send_packet(%SmsgGameobjectPagetext{guid: guid})
+    put_user(state, character)
+  end
+
+  defp use_prepared_readable(state, character, guid, %GameObjectTemplate{type: 10} = template) do
+    goober = Goober.configuration(template)
+
+    allowed? =
+      Goober.quest_allowed?(character.player.quest_log, goober.quest_id, QuestLoader.get(goober.quest_id) != nil)
+
+    result = Entity.call(guid, {:use_goober, character.object.guid, character.internal.world, allowed?})
+
+    if result in [:activated, :read_only] do
+      state = state |> put_user(character) |> show_readable(guid, goober)
+
+      if result == :activated do
+        InstanceSystem.game_object_used(character.internal.world, template.entry)
+        Quests.credit_game_object_use(state, guid)
+      else
+        state
+      end
+    else
+      state
+    end
+  end
+
+  defp show_readable(state, guid, %{page_id: page_id}) when page_id > 0 do
+    Network.send_packet(%SmsgGameobjectPagetext{guid: guid})
+    state
+  end
+
+  defp show_readable(state, guid, %{gossip_id: gossip_id}) when gossip_id > 0,
+    do: Gossip.hello_quest_object(state, guid, gossip_id)
+
+  defp show_readable(state, _guid, _goober), do: state
+
+  defp put_user(%{character: character} = state, character), do: state
+
+  defp put_user(state, character) do
+    character = character |> EventSink.emit_pending() |> CharacterStore.put()
+    PlayerServer.maybe_broadcast_update(%{state | character: character})
+  end
+
+  defp battleground_use(%{character: character} = state, guid) do
+    BattlegroundSystem.use_game_object(
+      character.internal.world,
+      state.guid,
+      guid,
+      Guid.entry(guid),
+      character.movement_block.position
+    )
   end
 
   defp use_non_questgiver(%{character: %Character{} = character} = state, guid) do

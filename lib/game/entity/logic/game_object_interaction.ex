@@ -14,17 +14,29 @@ defmodule ThistleTea.Game.Entity.Logic.GameObjectInteraction do
   alias ThistleTea.Game.Entity.Logic.Mount
 
   def prepare_questgiver_use(%Character{} = character, %GameObjectTemplate{type: 2, data: data}, flags, now) do
+    prepare_use(character, flags, Enum.at(data, 5, 0), Enum.at(data, 8, 0), now)
+  end
+
+  def prepare_readable_use(%Character{} = character, %GameObjectTemplate{type: 9, data: data}, flags, now) do
+    prepare_use(character, flags, 0, Enum.at(data, 3, 0), now)
+  end
+
+  def prepare_readable_use(%Character{} = character, %GameObjectTemplate{type: 10, data: data}, flags, now) do
+    prepare_use(character, flags, Enum.at(data, 11, 0), Enum.at(data, 17, 0), now)
+  end
+
+  defp prepare_use(character, flags, no_damage_immune, allow_mounted, now) do
     cond do
       ((flags || 0) &&& 0x10) != 0 ->
         {:error, :not_interactable}
 
-      Enum.at(data, 5, 0) != 0 and ((character.unit.flags || 0) &&& 0x80000000) != 0 ->
+      no_damage_immune != 0 and ((character.unit.flags || 0) &&& 0x80000000) != 0 ->
         {:error, :immune}
 
       true ->
         {character, effects} = Aura.remove_with_interrupt_flags(character, 0x800, now)
         character = Effects.enqueue(character, effects)
-        character = if Enum.at(data, 8, 0) == 0, do: Mount.dismount(character, now), else: character
+        character = if allow_mounted == 0, do: Mount.dismount(character, now), else: character
         {:ok, character}
     end
   end

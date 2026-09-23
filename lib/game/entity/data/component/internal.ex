@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :mini_pet,
     :guardian,
     :chair,
+    :goober,
     :trap,
     :ritual,
     :totem,

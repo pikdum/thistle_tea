@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
   alias ThistleTea.Game.Entity.Data.Transport.Pose
   alias ThistleTea.Game.Entity.Logic.GameObjectActions
+  alias ThistleTea.Game.Entity.Logic.Goober
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.WorldRef
 
@@ -70,6 +71,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
       internal: %Internal{
         world: WorldRef.coerce(world),
         object_action: GameObjectActions.configuration(ot, @go_state_active),
+        goober: Goober.configuration(ot),
         chair: chair(ot),
         fishing: Keyword.get(opts, :fishing),
         gathering: gathering(ot),
@@ -222,6 +224,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
       internal: %Internal{
         world: WorldRef.open(o.map),
         object_action: GameObjectActions.configuration(template, o.state),
+        goober: Goober.configuration(template),
         chair: chair(ot),
         event: event,
         fishing: fishing_hole(ot),
@@ -273,6 +276,10 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   def transport?(%__MODULE__{game_object: %GameObject{type_id: type}}) do
     type in [@go_type_transport, @go_type_mo_transport]
   end
+
+  def db_guid(%__MODULE__{internal: %{spawn: %{pool_member: {:game_object, guid}}}}), do: guid
+  def db_guid(%__MODULE__{internal: %{summon: nil}, object: %{guid: guid}}), do: Guid.low_guid(guid)
+  def db_guid(%__MODULE__{}), do: nil
 
   defp guid_type(@go_type_transport), do: :transport
   defp guid_type(_type), do: :game_object
@@ -384,7 +391,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   defp fishing_hole(_template), do: nil
 
   defp chest_spawn(%Mangos.GameObjectTemplate{type: type}, %Mangos.GameObject{} = o)
-       when type in [@go_type_chest, @go_type_fishing_hole] do
+       when type in [@go_type_chest, @go_type_fishing_hole, 10] do
     case o.spawntimesecsmin do
       seconds when is_integer(seconds) and seconds > 0 -> %Internal.Spawn{respawn_delay_ms: seconds * 1000}
       _instant -> nil

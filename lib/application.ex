@@ -33,6 +33,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
   alias ThistleTea.Game.World.Loader.Emote, as: EmoteLoader
+  alias ThistleTea.Game.World.Loader.EventScript, as: EventScriptLoader
   alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Fishing, as: FishingLoader
@@ -221,6 +222,7 @@ defmodule ThistleTea.Application do
     GraveyardLoader.init()
     NpcTextLoader.init()
     PageTextLoader.init()
+    EventScriptLoader.init()
     AreaTriggerLoader.init()
     BankBagSlotPriceLoader.init()
     StableSlotPriceLoader.init()
@@ -322,6 +324,8 @@ defmodule ThistleTea.Application do
         SpellPetAuraLoader.load_all()
         SpellObjectTargetLoader.load_all()
         GameObjectScriptLoader.load_all()
+        EventScriptLoader.load_all()
+        PageTextLoader.load_all()
         SpellProcEventLoader.load_all()
         SpellScriptLoader.load_all()
         SpellScriptNameLoader.load_all()

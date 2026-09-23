@@ -442,6 +442,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, state, {:continue, :maybe_broadcast_update}}
   end
 
+  def handle_cast({:use_quest_object, guid, world}, %State{} = state) do
+    {:noreply, PlayerGameObjects.use_quest_object(state, guid, world)}
+  rescue
+    error ->
+      Logger.error("Quest object activation failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_cast({:receive_spell_outcome, caster_guid, spell, outcome}, %{character: %Character{} = character} = state) do
     harmful? = Spell.harmful?(spell)
 
@@ -1337,6 +1345,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_info({:quest_group_event_credit, quest_id, distance, world_object_guid}, %State{} = state) do
     {:noreply, Quests.credit_scripted_event_member(state, quest_id, distance, world_object_guid)}
+  end
+
+  def handle_info({:quest_game_object_credit, guid}, %State{} = state) do
+    {:noreply, Quests.credit_game_object_member(state, guid)}
+  rescue
+    error ->
+      Logger.error("Quest object group credit failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
   end
 
   def handle_info({:quest_fail, quest_id, group?}, %State{} = state) do

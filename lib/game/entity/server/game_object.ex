@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.GameObjectActions
   alias ThistleTea.Game.Entity.Logic.GameObjectInteraction
+  alias ThistleTea.Game.Entity.Logic.Goober
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
@@ -30,10 +31,10 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Server.GameObject.Chair
   alias ThistleTea.Game.Entity.Server.GameObject.Chest
   alias ThistleTea.Game.Entity.Server.GameObject.Fishing
+  alias ThistleTea.Game.Entity.Server.GameObject.Goober, as: GooberServer
   alias ThistleTea.Game.Entity.Server.GameObject.Ritual, as: RitualServer
   alias ThistleTea.Game.Entity.Server.GameObject.Trap, as: TrapServer
   alias ThistleTea.Game.Entity.SpellTargetResolver
-  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgFishNotHooked
   alias ThistleTea.Game.Network.Message.SmsgGameobjectCustomAnim
@@ -207,6 +208,29 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   @impl GenServer
   def handle_call(
+        {:use_goober, user_guid, world, quest_allowed?},
+        _from,
+        %GameObject{internal: %{goober: %Internal.Goober{}}} = state
+      ) do
+    {result, updated} = GooberServer.use(state, user_guid, world, quest_allowed?, Time.now())
+
+    updated =
+      if result == :activated do
+        trigger_linked_objects(updated, user_guid)
+        GooberServer.start_script(updated, user_guid)
+        GooberServer.start_spell(updated, user_guid)
+      else
+        updated
+      end
+
+    {:reply, result, flush_actions(updated)}
+  rescue
+    error ->
+      Logger.error("Quest object use failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:reply, :unavailable, state}
+  end
+
+  def handle_call(
         {:loot_view, %Actor{guid: viewer}},
         _from,
         %GameObject{internal: %Internal{fishing: %{owner_guid: owner_guid}}} = state
@@ -222,7 +246,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   def handle_call({:open_lock, %Actor{} = actor, opened, gain?}, {owner_pid, _tag}, %GameObject{} = state) do
     {result, state} = __MODULE__.OpenLock.open(state, actor, opened, gain?, owner_pid: owner_pid)
-    if match?({:ok, _, _}, result), do: trigger_linked_objects(state, actor.guid)
+    if match?({:ok, _, _}, result) and is_nil(state.internal.goober), do: trigger_linked_objects(state, actor.guid)
     {:reply, result, state}
   rescue
     error ->
@@ -321,6 +345,11 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   def handle_info({:script_activate_object, user_guid}, %GameObject{game_object: %{type_id: type}} = state)
       when type in [0, 1], do: use_object(state, user_guid)
 
+  def handle_info({:script_activate_object, user_guid}, %GameObject{internal: %{goober: %Internal.Goober{}}} = state) do
+    Entity.use_quest_object(user_guid, state.object.guid, state.internal.world)
+    {:noreply, state}
+  end
+
   def handle_info({:script_activate_object, _user_guid}, %GameObject{} = state) do
     next = if state.game_object.state == 0, do: 1, else: 0
     {:noreply, state |> GameObjectActions.set_state(next) |> flush_actions()}
@@ -343,6 +372,17 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   def handle_info({:restore_game_object, revision, previous}, %GameObject{} = state),
     do: {:noreply, state |> GameObjectActions.restore(revision, previous) |> flush_actions()}
+
+  def handle_info({:finish_game_object_use, revision}, %GameObject{} = state),
+    do: {:noreply, state |> Goober.finish(revision) |> flush_actions()}
+
+  def handle_info({:game_object_spell, %Spell{} = spell, user_guid}, %GameObject{} = state) do
+    {:noreply, state |> GooberServer.finish_spell(spell, user_guid) |> flush_actions()}
+  rescue
+    error ->
+      Logger.error("Quest object spell failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
 
   def handle_info({:ai_script_steps, steps, target_guid}, %GameObject{} = state)
       when is_list(steps) and is_integer(target_guid) do
@@ -524,7 +564,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   defp use_object(%GameObject{game_object: %{type_id: type}} = state, user_guid) when type in [0, 1] do
     trigger_linked_objects(state, user_guid)
-    Entity.start_script(user_guid, GameObjectScriptLoader.get(condition_db_guid(state)), state.object.guid)
+    Entity.start_script(user_guid, GameObjectScriptLoader.get(GameObject.db_guid(state)), state.object.guid)
     {:noreply, state |> GameObjectActions.activate() |> flush_actions()}
   end
 
@@ -680,7 +720,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   defp publish_condition_metadata(%GameObject{} = state, spawned? \\ true) do
     metadata =
       Map.merge(FactionLoader.metadata(state.game_object.faction), %{
-        db_guid: condition_db_guid(state),
+        db_guid: GameObject.db_guid(state),
         go_spawned?: spawned?,
         go_state: state.game_object.state,
         go_lock_override: state.internal.object_action.lock_override
@@ -707,9 +747,6 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
     state
   end
-
-  defp condition_db_guid(%GameObject{object: %{guid: guid}, internal: %Internal{summon: nil}}), do: Guid.low_guid(guid)
-  defp condition_db_guid(%GameObject{}), do: nil
 
   defp allowed_user?(%Summon{party_only?: true, owner_guid: owner_guid}, user_guid) when is_integer(owner_guid) do
     user_guid == owner_guid or same_group?(owner_guid, user_guid)

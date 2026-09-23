@@ -118,6 +118,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
+  def emit(entity, %Effects.FinishGameObjectUse{revision: revision, delay_ms: delay}, context) do
+    Context.send_after(context, {:finish_game_object_use, revision}, delay)
+    entity
+  end
+
   def emit(
         %{internal: %Internal{world: world}} = entity,
         %Effects.RespawnGameObject{blueprint: %GameObject{} = blueprint, duration_ms: duration_ms},

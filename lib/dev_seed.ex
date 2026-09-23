@@ -299,6 +299,7 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(5515, @base_low_guid + 1100, {x - 2.0, y - 3.0, z}, nil, @respawn_secs)
     spawn_mob(9499, @base_low_guid + 1200, {x + 8.0, y - 4.0, z}, nil, @respawn_secs)
     spawn_mob(9499, @base_low_guid + 1201, {x + 14.0, y - 4.0, z}, nil, @respawn_secs)
+    spawn_mob(3639, @base_low_guid + 1300, {x + 20.0, y + 36.0, z}, nil, @respawn_secs)
   end
 
   defp seed_game_objects do
@@ -310,7 +311,12 @@ defmodule ThistleTea.DevSeed do
           {178_965, 25.0, 22.0},
           {176_557, 25.0, 15.0},
           {180_449, 30.0, 15.0},
-          {180_450, 30.0, 15.0}
+          {180_450, 30.0, 15.0},
+          {37, 20.0, 30.0},
+          {17_188, 25.0, 30.0},
+          {17_189, 30.0, 30.0},
+          {181_598, 40.0, 42.0},
+          {164_882, 35.0, 42.0}
         ] do
       template = GameObjectTemplateLoader.cached(entry)
       {ox, oy, oz} = Pathfinding.snap_to_ground(@map, {x + dx, y + dy, z})
