@@ -509,13 +509,9 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
          source,
          _target
        ) do
-    case Metadata.find_guid_by(:db_guid, db_guid) do
+    case World.spawn_guid(world, :game_object, db_guid) do
       guid when is_integer(guid) ->
-        if match?({^world, _x, _y, _z}, World.position(guid)) do
-          condition_result(child, events, world, source, guid)
-        else
-          :unmet
-        end
+        condition_result(child, events, world, source, guid)
 
       _missing ->
         :unmet

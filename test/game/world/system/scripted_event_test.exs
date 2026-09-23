@@ -212,6 +212,45 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
            ) == %{7 => :met}
   end
 
+  test "object-fit conditions isolate copies and entity types sharing a database id", context do
+    db_guid = System.unique_integer([:positive, :monotonic])
+    first = Guid.from_low_guid(:game_object, 21_145, db_guid)
+    second = Guid.from_low_guid(:game_object, 21_145, db_guid + 1)
+    creature = Guid.from_low_guid(:mob, 21_145, db_guid)
+    other_world = WorldRef.instance(0, db_guid)
+
+    for {guid, type, world, spawned?} <- [
+          {first, :game_objects, context.world, true},
+          {second, :game_objects, other_world, true},
+          {creature, :mobs, context.world, false}
+        ] do
+      Metadata.put(guid, %{db_guid: db_guid, go_spawned?: spawned?})
+      SpatialHash.update(type, guid, world, 12.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        Metadata.delete(guid)
+        SpatialHash.remove(type, guid)
+      end)
+    end
+
+    condition = %Condition{
+      entry: 7,
+      type: :object_fit_condition,
+      value1: db_guid,
+      children: [%Condition{type: :object_spawned}]
+    }
+
+    for world <- [context.world, other_world] do
+      assert ScriptedEventSystem.condition_results(world, context.source_guid, context.target_guid, [condition]) ==
+               %{7 => :met}
+    end
+
+    SpatialHash.remove(:game_objects, first)
+
+    assert ScriptedEventSystem.condition_results(context.world, context.source_guid, context.target_guid, [condition]) ==
+             %{7 => :unmet}
+  end
+
   test "condition results preserve unavailable world facts as unknown", context do
     condition = %Condition{entry: 8, type: :nearby_creature, value1: 4_236, value2: 30}
 
