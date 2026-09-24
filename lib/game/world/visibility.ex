@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.World.Visibility do
   alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.StealthDetection
+  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
@@ -53,7 +54,7 @@ defmodule ThistleTea.Game.World.Visibility do
 
   def refresh_player(%{character: character, guid: guid, visibility_cells: %MapSet{} = old_cells} = state) do
     character = refresh_entity(character)
-    new_cells = viewpoint_cells(character) || visible_cells(character)
+    new_cells = viewpoint_cells(state) || visible_cells(character)
 
     state
     |> Map.put(:character, character)
@@ -62,23 +63,35 @@ defmodule ThistleTea.Game.World.Visibility do
 
   def refresh_player(state), do: state
 
-  def set_viewpoint(%{guid: viewer_guid, visibility_cells: %MapSet{} = old_cells} = state, viewpoint_guid)
+  def select_viewpoint(%{ready: true} = state, 0), do: reset_viewpoint(state)
+
+  def select_viewpoint(%{ready: true, character: %Character{player: %{farsight: guid}}} = state, 1),
+    do: set_viewpoint(state, guid)
+
+  def select_viewpoint(state, _operation), do: state
+
+  def set_viewpoint(
+        %{guid: viewer_guid, character: %{internal: %{world: world}}, visibility_cells: %MapSet{} = old_cells} = state,
+        viewpoint_guid
+      )
       when is_integer(viewpoint_guid) and viewpoint_guid > 0 do
     case viewpoint_location(viewpoint_guid) do
-      {world, x, y, z} ->
+      {^world, x, y, z} ->
         new_cells = visible_cells_at(world, x, y, z)
         ChaseWatch.watch(viewpoint_guid, self(), {x, y, z}, 50.0)
-        sync_visibility_cells(state, viewer_guid, old_cells, new_cells)
 
-      nil ->
+        state
+        |> put_viewpoint(viewpoint_guid)
+        |> sync_visibility_cells(viewer_guid, old_cells, new_cells)
+
+      _missing ->
         state
     end
   end
 
   def set_viewpoint(state, _viewpoint_guid), do: state
 
-  def refresh_viewpoint(%{character: %Character{player: %{farsight: guid}}} = state, guid)
-      when is_integer(guid) and guid > 0 do
+  def refresh_viewpoint(%{viewpoint_guid: guid} = state, guid) when is_integer(guid) and guid > 0 do
     set_viewpoint(state, guid)
   end
 
@@ -88,10 +101,13 @@ defmodule ThistleTea.Game.World.Visibility do
         %{guid: viewer_guid, character: %Character{} = character, visibility_cells: %MapSet{} = old_cells} = state
       ) do
     ChaseWatch.unwatch(self())
-    sync_visibility_cells(state, viewer_guid, old_cells, visible_cells(character))
+
+    state
+    |> put_viewpoint(nil)
+    |> sync_visibility_cells(viewer_guid, old_cells, visible_cells(character))
   end
 
-  def reset_viewpoint(state), do: state
+  def reset_viewpoint(state), do: put_viewpoint(state, nil)
 
   def leave_player(%{character: character, visibility_cells: %MapSet{} = cells} = state) do
     state = cancel_stealth_detection(state)
@@ -101,6 +117,7 @@ defmodule ThistleTea.Game.World.Visibility do
 
     state
     |> Map.put(:character, character)
+    |> put_viewpoint(nil)
     |> Map.put(:visibility_cells, nil)
     |> Map.put(:player_guids, [])
     |> Map.put(:mob_guids, [])
@@ -389,14 +406,18 @@ defmodule ThistleTea.Game.World.Visibility do
     |> sync_visible_entities(viewer_guid, new_cells)
   end
 
-  defp viewpoint_cells(%Character{player: %{farsight: guid}}) when is_integer(guid) and guid > 0 do
+  defp viewpoint_cells(%{viewpoint_guid: guid, character: %{internal: %{world: world}}})
+       when is_integer(guid) and guid > 0 do
     case viewpoint_location(guid) do
-      {world, x, y, z} -> visible_cells_at(world, x, y, z)
-      nil -> nil
+      {^world, x, y, z} -> visible_cells_at(world, x, y, z)
+      _missing -> nil
     end
   end
 
-  defp viewpoint_cells(_character), do: nil
+  defp viewpoint_cells(_state), do: nil
+
+  defp put_viewpoint(%State{} = state, guid), do: %{state | viewpoint_guid: guid}
+  defp put_viewpoint(state, guid), do: Map.put(state, :viewpoint_guid, guid)
 
   defp viewpoint_location(guid) do
     World.position(guid)

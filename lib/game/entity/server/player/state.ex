@@ -58,6 +58,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :character,
     :equipment_requirements,
     :visibility_cells,
+    :viewpoint_guid,
     :stealth_detection_ref,
     :player_tick_ref,
     :logout_timer,

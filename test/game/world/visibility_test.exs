@@ -275,6 +275,46 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   end
 
   describe "viewpoints" do
+    test "client camera selection survives refresh without changing the authorized target" do
+      guid = Guid.from_low_guid(:player, unique_low())
+      viewpoint = Guid.from_low_guid(:mob, unique_low(), unique_low())
+      character = put_in(character(guid, ghost?: false).player.farsight, viewpoint)
+      local_cells = Visibility.visible_cells(character)
+      SpatialHash.insert(:mobs, viewpoint, 0, 1_000.0, 1_000.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:mobs, viewpoint) end)
+
+      state = %State{guid: guid, ready: true, character: character, visibility_cells: local_cells, cell_activator: nil}
+      remote = Message.CmsgFarSight.handle(%Message.CmsgFarSight{operation: 1}, state)
+      assert remote.viewpoint_guid == viewpoint
+      refute remote.visibility_cells == local_cells
+      assert Visibility.refresh_player(remote).visibility_cells == remote.visibility_cells
+
+      local = Message.CmsgFarSight.handle(%Message.CmsgFarSight{operation: 0}, remote)
+      assert local.viewpoint_guid == nil
+      assert local.character.player.farsight == viewpoint
+      assert local.visibility_cells == local_cells
+      assert Visibility.refresh_player(local).visibility_cells == local_cells
+      assert Visibility.refresh_viewpoint(local, viewpoint) == local
+      assert Visibility.select_viewpoint(local, 1).visibility_cells == remote.visibility_cells
+
+      Visibility.leave_player(local)
+    end
+
+    test "rejects missing, foreign-world, and invalid camera requests" do
+      guid = Guid.from_low_guid(:player, unique_low())
+      viewpoint = Guid.from_low_guid(:mob, unique_low(), unique_low())
+      character = put_in(character(guid, ghost?: false).player.farsight, viewpoint)
+      state = %State{guid: guid, ready: true, character: character, visibility_cells: MapSet.new(), cell_activator: nil}
+      assert Visibility.select_viewpoint(state, 1) == state
+
+      SpatialHash.insert(:mobs, viewpoint, WorldRef.instance(0, unique_low()), 0.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:mobs, viewpoint) end)
+      assert Visibility.select_viewpoint(state, 1) == state
+      assert Visibility.select_viewpoint(state, 2) == state
+      unready = %{state | ready: false}
+      assert Visibility.select_viewpoint(unready, 1) == unready
+    end
+
     test "moves visibility to the projected camera source and restores the player view" do
       self_guid = Guid.from_low_guid(:player, unique_low())
       viewpoint_guid = Guid.from_low_guid(:mob, unique_low(), unique_low())

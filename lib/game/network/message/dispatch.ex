@@ -161,6 +161,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_CAST_SPELL: Message.CmsgCastSpell,
               CMSG_PLAYER_LOGIN: Message.CmsgPlayerLogin,
               CMSG_SET_ACTIVE_MOVER: Message.CmsgSetActiveMover,
+              CMSG_FAR_SIGHT: Message.CmsgFarSight,
               MSG_MOVE_WORLDPORT_ACK: Message.CmsgMoveWorldportAck,
               CMSG_FORCE_RUN_SPEED_CHANGE_ACK: Message.CmsgForceRunSpeedChangeAck,
               CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK: Message.CmsgForceRunBackSpeedChangeAck,
