@@ -19,7 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastSpeed do
     end
   end
 
-  defp multiplier(%Unit{auras: holders}) do
+  def multiplier(%Unit{auras: holders}) do
     for %Holder{} = holder <- holders || [],
         %Aura{type: :mod_casting_speed, amount: amount} <- holder.auras,
         is_number(amount),

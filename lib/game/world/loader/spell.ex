@@ -201,6 +201,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       mana_cost_per_second_per_level: row.mana_cost_per_second_per_level || 0,
       power_type: row.power_type || 0,
       gcd_ms: row.start_recovery_time || 0,
+      gcd_category: row.start_recovery_category || 0,
       dispel_type: row.dispel_type || 0,
       required_focus_id: row.requires_spell_focus || 0,
       speed: row.speed || 0.0,

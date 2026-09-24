@@ -199,6 +199,9 @@ defmodule ThistleTea.Game.Spell.Modifiers do
 
   defp operation_used_by_spell?(:duration, %Spell{duration_ms: duration}), do: is_integer(duration) and duration > 0
 
+  defp operation_used_by_spell?(:global_cooldown, %Spell{gcd_category: category, gcd_ms: duration}),
+    do: category > 0 or (is_integer(duration) and duration > 0)
+
   defp operation_used_by_spell?(:activation_time, %Spell{effects: effects}) do
     Enum.any?(effects, fn effect ->
       period = Effect.period_ms(effect)

@@ -780,16 +780,23 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   def cancel(character), do: cancel(character, Time.now())
 
   def cancel(%{internal: %Internal{} = internal} = character, now) do
+    character = reset_preparing_gcd(character, internal.casting)
+
     case internal.casting do
       %Cast{channel_ms: channel_ms} = casting when is_integer(channel_ms) and channel_ms > 0 ->
         stop_channel(character, casting, :cancelled, now)
 
       _ ->
-        %{character | internal: %{internal | casting: nil}}
+        %{character | internal: %{character.internal | casting: nil}}
     end
   end
 
   def cancel(character, _now), do: character
+
+  defp reset_preparing_gcd(character, %Cast{phase: phase, triggered?: false, spell: spell})
+       when phase in [:preparing, :launch], do: Cooldowns.reset_gcd(character, spell)
+
+  defp reset_preparing_gcd(character, _casting), do: character
 
   def interrupt(%{internal: %Internal{casting: %Cast{spell: spell}}} = entity, now) do
     entity

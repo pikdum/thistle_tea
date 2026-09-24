@@ -59,6 +59,7 @@ defmodule ThistleTea.Game.Spell do
     required_focus_id: 0,
     stack_amount: 0,
     category: 0,
+    gcd_category: 0,
     recovery_time_ms: 0,
     category_recovery_time_ms: 0,
     aura_interrupt_flags: 0,

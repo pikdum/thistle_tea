@@ -256,7 +256,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
     end
 
     test "the global cooldown blocks new casts until it lapses" do
-      spell = harmful_spell(gcd_ms: 1_500)
+      spell = harmful_spell(gcd_ms: 1_500, gcd_category: 133)
       on_gcd = Cooldowns.trigger_gcd(caster(), spell, @now)
 
       assert {:error, :not_ready} =
