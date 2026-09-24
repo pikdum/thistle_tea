@@ -220,6 +220,10 @@ defmodule ThistleTea.Game.Player.Login do
   def restore_companion(%{character: %Character{internal: %Internal{taxi_flight: %Flight{}}}} = state), do: state
 
   def restore_companion(
+        %{character: %Character{internal: %{companion: %Companion{restore_automatically?: false}}}} = state
+      ), do: state
+
+  def restore_companion(
         %{
           character:
             %Character{internal: %Internal{companion: %Companion{kind: kind, status: {:suspended, entry, spell_id}}}} =

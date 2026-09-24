@@ -16,7 +16,8 @@ defmodule ThistleTea.Game.Entity.Data.Companion do
   Canonical relationship between a unit and one controlled companion.
 
   Live process bookkeeping stays with the owning boundary; this value contains
-  only stable domain identity and suspension data.
+  only stable domain identity and suspension data. Automatic restoration is
+  disabled by an explicit hunter dismissal until the owner calls the pet again.
   """
 
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
@@ -37,6 +38,7 @@ defmodule ThistleTea.Game.Entity.Data.Companion do
     :progress,
     :possession_spell_id,
     dead?: false,
+    restore_automatically?: true,
     reaction_state: :defensive,
     autocast: MapSet.new()
   ]
@@ -51,6 +53,7 @@ defmodule ThistleTea.Game.Entity.Data.Companion do
           progress: PetProgress.t() | nil,
           possession_spell_id: pos_integer() | nil,
           dead?: boolean(),
+          restore_automatically?: boolean(),
           reaction_state: :passive | :defensive | :aggressive,
           autocast: MapSet.t(non_neg_integer())
         }

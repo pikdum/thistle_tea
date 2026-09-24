@@ -60,7 +60,17 @@ defmodule ThistleTea.Game.Entity.Logic.CompanionTest do
       assert character.unit.summon == 0
 
       assert character.internal.companion ==
-               %CompanionData{kind: :hunter_pet, status: {:suspended, 416, 688}, pet_number: 44}
+               %CompanionData{
+                 kind: :hunter_pet,
+                 status: {:suspended, 416, 688},
+                 pet_number: 44,
+                 restore_automatically?: false
+               }
+
+      assert Companion.suspend(character) == character
+      restored = Companion.activate(character, :hunter_pet, %EntityRef{guid: 55, entry: 416, spell_id: 688})
+      assert Companion.relationship(restored).restore_automatically?
+      assert Companion.relationship(restored).pet_number == 44
     end
 
     test "suspends a hunter pet when the owner dies" do

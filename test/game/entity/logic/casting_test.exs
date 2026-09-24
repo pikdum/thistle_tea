@@ -785,7 +785,8 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
                %ThistleTea.Game.Entity.Data.Companion{
                  kind: :hunter_pet,
                  status: {:suspended, 2960, 1515},
-                 pet_number: 44
+                 pet_number: 44,
+                 restore_automatically?: false
                }
 
       assert Enum.any?(character.internal.events, &match?(%Effects.DismissPet{target_guid: 44}, &1))

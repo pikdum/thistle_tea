@@ -171,6 +171,8 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
     case relationship(character) do
       %Companion{kind: :hunter_pet, status: {:active, %EntityRef{} = entity_ref}} ->
         character = suspend(character)
+        companion = %{relationship(character) | restore_automatically?: reason == :owner_died}
+        character = put_relationship(character, companion)
         {character, [Effects.dismiss_pet(entity_ref.guid)]}
 
       %Companion{kind: kind, status: {:active, %EntityRef{} = entity_ref}} when kind in @summon_kinds ->

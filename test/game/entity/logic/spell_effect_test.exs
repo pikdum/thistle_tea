@@ -1301,7 +1301,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert character.internal.companion == %Companion{
                kind: :hunter_pet,
                status: {:suspended, 1234, 1515},
-               pet_number: 44
+               pet_number: 44,
+               restore_automatically?: false
              }
 
       assert [%Effects.DismissPet{target_guid: 44}] = events

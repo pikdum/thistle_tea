@@ -38,6 +38,16 @@ defmodule ThistleTea.Game.Player.LoginTest do
   end
 
   describe "restore_companion/1" do
+    test "keeps an explicitly dismissed hunter pet absent across automatic restoration" do
+      character = character(health: 100)
+      companion = %{character.internal.companion | kind: :hunter_pet, restore_automatically?: false}
+      character = %{character | internal: %{character.internal | companion: companion}}
+      state = %{character: character}
+
+      assert Login.restore_companion(state) == state
+      refute_receive %Attachment{}
+    end
+
     @tag :dbc_db
     test "keeps a saved pet suspended while a taxi route is unfinished" do
       flight = %Flight{
