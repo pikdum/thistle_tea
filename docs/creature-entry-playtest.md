@@ -86,14 +86,14 @@ and a 30-second respawn.
   original creature each time. The final read showed incarnation 225, full
   original health, no original-template snapshot, and no loot session.
 
-Native inventory collection remains unverified. Early attempts missed the
+The initial run left native inventory collection unverified. Early attempts missed the
 short corpse window. Later attempts opened a populated loot window within that
 window, but native `LootSlot`, button calls, and coordinate clicks produced no
 observed `CMSG_AUTOSTORE_LOOT_ITEM` or inventory change. A client diagnostic
 reported three loot slots, the server session included the Mage as a viewer,
-and the backpack had empty slots. This is an unresolved acceptance issue;
-loot generation and display are established, collection and quest-item progress
-are not. Work was paused at the user's request after recording this evidence.
+and the backpack had empty slots. Work was paused at the user's request after
+recording this evidence. The follow-up below resolves collection and quest-item
+progress through native loot-window clicks.
 
 The final server log has no error-level entries, owner crashes, unsupported
 script commands, or spell-validation failures. Existing unimplemented account
@@ -119,3 +119,58 @@ from 1,231,711,566 to 27,476,700,453 ns. Counter samples are retained in
 Both final clients and the two preliminary clients were stopped through their
 owned helper services. The retained server PTY exited. Artifacts remain local;
 nothing was pushed.
+
+## Collection follow-up, September 24
+
+The first follow-up reproduced the populated loot window on a Zapped Cliff
+Giant. A coordinate click on Miniaturization Residue sent
+`CMSG_AUTOSTORE_LOOT_ITEM` and collected the item. The native client displayed
+the loot message and, after relogging, reported quest progress `1/15`.
+The earlier Lua attempts did not establish a server loot-transfer failure.
+
+Two setup defects were fixed during this check:
+
+- `8331070b` rejects incomplete teleport coordinates, trailing numeric junk,
+  and negative map IDs. An incomplete `.go xyz` command previously crashed
+  the player owner. Regression tests cover malformed input, explicit maps,
+  and preservation of the current instance copy.
+- `75d76943` clears alternate creature-template IDs in developer seed rows.
+  The requested Land Walker previously inherited its source spawn's random
+  alternatives and could become a Cliff Giant. Playground spawns now keep
+  their requested entry.
+
+A fresh server on `75d76943` repeated the complete collection path with
+Debugmage (5) and the intended Land Walker:
+
+- The seed published entry 5357, name Land Walker, and GUID
+  `17379391051899281576`. Malformed native `.go xyz 1 2` and
+  `.go xyz 1 2 3 nope` commands left the same player owner alive.
+- Native Ultra-Shrinker use changed the creature into Zapped Land Walker
+  14604. Native Frostbolt casts killed it, and right-clicking the corpse
+  opened loot containing one Miniaturization Residue and 60 copper.
+- Clicking the two loot slots collected both rewards. The client displayed
+  the item receipt, `Miniaturization Residue: 1/15`, and the copper receipt.
+  The player owner and `CharacterStore` each retained one item 18956;
+  coinage increased from 100,000,000 to 100,000,060.
+- Respawn restored entry 5357 and health 6414/6414, cleared the creature's
+  loot session, and the player's loot GUID was nil after collection.
+- Logout removed the player owner while the store retained the item and
+  copper. Relogging created a new owner with both rewards intact.
+
+Final source gates passed: `mix test.all` (5,413 tests),
+`mix compile --warnings-as-errors`, `mix credo --strict`, formatting,
+diff checks, and commit hooks. No source changed after those gates.
+
+Evidence is in `/tmp/thistle-loot-{seed,shrunk,corpse,collected}-final.txt`,
+`/tmp/thistle-loot-server-final.log`, and the `shrunk`, `loot-open`,
+`collected`, and `quest-progress` screenshots in
+`/home/pikdum/.cache/thistle-wow-playtest.fl8knq/`. The preliminary session
+is `/home/pikdum/.cache/thistle-wow-playtest.GeeOi3/`; its `retained-progress`
+screenshot records the Cliff Giant collection after relogging.
+
+The final server log contains no error-level entries or spell-validation
+failures. WoW's own AMDGPU graphics counter on `0000:0c:00.0` advanced from
+3,345,359,465 to 7,856,360,388 ns; samples are in
+`/tmp/thistle-loot-final-gpu-{start,end}.txt`. Both helper-owned clients and
+both retained server PTYs were stopped, with artifacts retained. Nothing
+was pushed.
