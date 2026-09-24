@@ -82,21 +82,34 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
 
   def add_damage(entity, _source_guid, _damage), do: entity
 
-  def taunt(%Mob{internal: %Internal{threat: table}} = entity, taunter_guid)
-      when is_map(table) and is_integer(taunter_guid) do
-    top = table |> Map.values() |> Enum.max(fn -> 0.0 end)
-    entity = add(entity, taunter_guid, 0)
+  def taunt(%Mob{unit: %Unit{target: victim}, internal: %Internal{threat: table}} = entity, taunter_guid)
+      when is_map(table) and is_integer(taunter_guid) and victim != taunter_guid do
+    case table do
+      %{^victim => threat} ->
+        entity |> add(taunter_guid, 0) |> change(taunter_guid, threat - Map.get(table, taunter_guid, 0))
 
-    case entity.internal.threat do
-      %{^taunter_guid => current} = table ->
-        %{entity | internal: %{entity.internal | threat: Map.put(table, taunter_guid, max(current, top))}}
-
-      _rejected ->
+      _no_victim ->
         entity
     end
   end
 
   def taunt(entity, _taunter_guid), do: entity
+
+  def apply_taunt(
+        %Mob{unit: %Unit{target: victim, health: health}, internal: %Internal{threat: table} = internal} = entity,
+        taunter_guid
+      )
+      when is_map(table) and is_number(health) and health > 0 and victim != taunter_guid do
+    with %{^victim => victim_threat, ^taunter_guid => taunter_threat} <- table,
+         true <- taunter_threat < victim_threat,
+         0 <- Map.get(internal.temporary_threat, taunter_guid, 0) do
+      set_temporary(entity, taunter_guid, victim_threat - taunter_threat)
+    else
+      _unchanged -> entity
+    end
+  end
+
+  def apply_taunt(entity, _taunter_guid), do: entity
 
   def wipe(%Mob{internal: %Internal{threat: table} = internal} = entity) when is_map(table) do
     entity = %{entity | internal: %{internal | threat: %{}, temporary_threat: %{}}}
@@ -233,9 +246,9 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
       end
 
     decision =
-      case taunt_caster(entity) do
+      case taunt_caster(entity, valid?) do
         taunter when is_integer(taunter) and taunter != current ->
-          if valid?.(taunter), do: {:switch, taunter}, else: decide(sorted, current, current_threat, in_melee?)
+          {:switch, taunter}
 
         taunter when is_integer(taunter) ->
           :keep
@@ -275,16 +288,19 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
     end
   end
 
-  defp taunt_caster(%Mob{unit: %Unit{auras: holders}}) when is_list(holders) do
+  defp taunt_caster(%Mob{unit: %Unit{auras: holders}}, valid?) when is_list(holders) do
     holders
-    |> Enum.find(&Holder.has_aura_type?(&1, :mod_taunt))
+    |> Enum.filter(&Holder.has_aura_type?(&1, :mod_taunt))
+    |> Enum.reverse()
+    |> Enum.sort_by(& &1.applied_at, :desc)
+    |> Enum.find(&valid?.(&1.caster_guid))
     |> case do
       %Holder{caster_guid: caster_guid} -> caster_guid
       _no_taunt -> nil
     end
   end
 
-  defp taunt_caster(_entity), do: nil
+  defp taunt_caster(_entity, _valid?), do: nil
 
   defp in_melee_range?(%Mob{} = entity, guid) do
     case World.distance_between(entity, guid) do

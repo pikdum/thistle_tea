@@ -72,20 +72,30 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
   end
 
   describe "taunt/2" do
-    test "raises the taunter to the top threat" do
+    test "matches the current victim even when another entry has higher threat" do
       entity =
-        mob(threat: %{@player_a => 200.0, @player_b => 50.0})
+        mob(target: @player_a, threat: %{@player_a => 200.0, @player_b => 50.0, @player_c => 250.0})
         |> Threat.taunt(@player_b)
 
-      assert entity.internal.threat == %{@player_a => 200.0, @player_b => 200.0}
+      assert entity.internal.threat == %{@player_a => 200.0, @player_b => 200.0, @player_c => 250.0}
     end
 
-    test "keeps a higher taunter threat unchanged" do
+    test "does not affect a mob already attacking the taunter" do
       entity =
-        mob(threat: %{@player_a => 300.0, @player_b => 50.0})
+        mob(target: @player_a, threat: %{@player_a => 300.0, @player_b => 50.0})
         |> Threat.taunt(@player_a)
 
       assert entity.internal.threat == %{@player_a => 300.0, @player_b => 50.0}
+    end
+
+    test "does not borrow threat without a current victim" do
+      entity = mob(threat: %{@player_a => 100.0})
+      assert Threat.taunt(entity, @player_b) == entity
+    end
+
+    test "matches the victim when the taunter already has more threat" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 125.0})
+      assert Threat.taunt(entity, @player_b).internal.threat[@player_b] == 100.0
     end
   end
 
@@ -204,8 +214,8 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
       assert [%Effects.ThreatRefLost{target_guid: @player_a}] = entity.internal.events
     end
 
-    test "taunt seeds a missing taunter at top threat with a gained event" do
-      entity = Threat.taunt(mob(threat: %{@player_a => 200.0}), @player_b)
+    test "taunt seeds a missing taunter at the victim's threat with a gained event" do
+      entity = Threat.taunt(mob(target: @player_a, threat: %{@player_a => 200.0}), @player_b)
 
       assert entity.internal.threat == %{@player_a => 200.0, @player_b => 200.0}
       assert [%Effects.ThreatRefGained{target_guid: @player_b}] = entity.internal.events

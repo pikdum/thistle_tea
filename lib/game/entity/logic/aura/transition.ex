@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Aura.SingleTarget
   alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
   alias ThistleTea.Game.Entity.Logic.Aura.StealthSync
+  alias ThistleTea.Game.Entity.Logic.Aura.TauntSync
   alias ThistleTea.Game.Entity.Logic.Aura.ThreatSync
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Aura.ViewpointSync
@@ -85,6 +86,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     entity =
       entity
       |> put_holders(holders)
+      |> TauntSync.sync(previous, holders)
       |> ComboPoints.expire(removed, cause)
       |> MountSync.sync(previous, holders)
       |> DiminishingReturns.reconcile(previous, holders, now)

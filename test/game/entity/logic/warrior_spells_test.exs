@@ -599,7 +599,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       }
     end
 
-    test "attack_me raises the taunter to the top of the threat table" do
+    test "attack_me matches the current victim's threat" do
       mob = threatened_mob(%{100 => 500.0}, 100)
 
       spell = %Spell{
