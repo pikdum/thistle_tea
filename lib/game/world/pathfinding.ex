@@ -33,7 +33,7 @@ defmodule ThistleTea.Game.World.Pathfinding do
 
   def find_random_point_around_circle(map_id, {x, y, z}, radius) do
     load_adt_at(map_id, {x, y})
-    Namigator.find_random_point_around_circle(map_id, x, y, z, radius)
+    Namigator.find_random_point_around_circle(map_id, x, y, z, radius * 1.0)
   end
 
   def find_path(map_id, {start_x, start_y, start_z}, {stop_x, stop_y, stop_z}, opts \\ []) do

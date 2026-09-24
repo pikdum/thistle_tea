@@ -445,6 +445,39 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   end
 
   describe "scripted waypoint routes" do
+    test "special paths retain authored heights without ground pathfinding" do
+      destination = {10.0, 0.0, 40.0}
+
+      route = %WaypointRoute{
+        first_point: 1,
+        destination_point: 1,
+        points: %{1 => %Waypoint{position: {10.0, 0.0, 40.0, nil}, wait_time: 0}},
+        repeat?: false,
+        pathfind?: false
+      }
+
+      blackboard = %Blackboard{navigation: %Blackboard.Navigation{scripted_waypoint_route: route}}
+      state = fixture_mob(spline_nodes: []) |> BT.init(MobBT.tree(), blackboard)
+      {_, requested} = BehaviorRunner.tick(MobBT.tree(), state, Context.new(1_000))
+      moved = NavigationResolver.resolve(requested, 1_000, fn _, _, _, _ -> flunk("special route pathfinding") end)
+      assert moved.movement_block.spline_nodes == [destination]
+
+      arrived = Movement.sync_position(moved, 100_000)
+      {_, finished} = BehaviorRunner.tick(MobBT.tree(), arrived, Context.new(100_000))
+      assert %Effects.MovementInform{motion_type: 2, point_id: 1} in finished.internal.events
+      assert finished.internal.blackboard.navigation.scripted_waypoint_route.destination_point == nil
+
+      home = %{blackboard | navigation: %{blackboard.navigation | returning_home?: true, target: destination}}
+      {:success, requested, _} = MobBT.move_to_target(state, home, Context.new(1_000))
+
+      NavigationResolver.resolve(requested, 1_000, fn _, _, _, _ ->
+        send(self(), :home_pathfinding)
+        nil
+      end)
+
+      assert_received :home_pathfinding
+    end
+
     test "arrival reports the original point once and failed paths cannot advance it" do
       route = %WaypointRoute{
         first_point: 37,

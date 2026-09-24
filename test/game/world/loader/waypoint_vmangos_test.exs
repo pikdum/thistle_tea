@@ -27,7 +27,7 @@ defmodule ThistleTea.Game.World.Loader.WaypointVmangosTest do
       dataint2: 7_784
     }
 
-    assert %WaypointRoute{first_point: 1, destination_point: 1, repeat?: true, points: points} =
+    assert %WaypointRoute{first_point: 1, destination_point: 1, repeat?: true, pathfind?: false, points: points} =
              Waypoints.resolve(WaypointLoader.context(), mob, step)
 
     assert map_size(points) == 54
@@ -39,12 +39,12 @@ defmodule ThistleTea.Game.World.Loader.WaypointVmangosTest do
 
     guid_mob = %Mob{object: %Object{guid: Guid.from_low_guid(:mob, 1, 11_006)}}
     guid_step = %ScriptStep{command: :start_waypoints, datalong: 1}
-    assert %WaypointRoute{points: guid_points} = Waypoints.resolve(context, guid_mob, guid_step)
+    assert %WaypointRoute{points: guid_points, pathfind?: true} = Waypoints.resolve(context, guid_mob, guid_step)
     assert map_size(guid_points) == 9
 
     entry_mob = %Mob{object: %Object{guid: Guid.from_low_guid(:mob, 1_446, 1)}}
     entry_step = %ScriptStep{command: :start_waypoints, datalong: 2}
-    assert %WaypointRoute{points: entry_points} = Waypoints.resolve(context, entry_mob, entry_step)
+    assert %WaypointRoute{points: entry_points, pathfind?: true} = Waypoints.resolve(context, entry_mob, entry_step)
     assert map_size(entry_points) == 27
   end
 end

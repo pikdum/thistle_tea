@@ -9,6 +9,13 @@ defmodule ThistleTea.Game.World.PathfindingTest do
 
   @human_start {-8949.95, -132.49, 83.53}
 
+  describe "find_random_point_around_circle/3" do
+    test "accepts an integer script radius" do
+      assert {x, y, z} = Pathfinding.find_random_point_around_circle(0, @human_start, 5)
+      assert is_float(x) and is_float(y) and is_float(z)
+    end
+  end
+
   describe "walk_hit_position/3" do
     test "stops at the abbey instead of routing around it" do
       origin = {-8930.0, -150.0, 82.0}

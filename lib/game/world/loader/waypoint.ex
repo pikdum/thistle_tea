@@ -40,7 +40,8 @@ defmodule ThistleTea.Game.World.Loader.Waypoint do
         rows
         |> Enum.group_by(&Map.fetch!(&1, key))
         |> Enum.reduce(catalog, fn {id, route_rows}, catalog ->
-          Map.put(catalog, {origin, id}, WaypointRoute.build_rows(route_rows, scripts))
+          route = WaypointRoute.build_rows(route_rows, scripts)
+          Map.put(catalog, {origin, id}, %{route | pathfind?: origin != :special})
         end)
       end)
 

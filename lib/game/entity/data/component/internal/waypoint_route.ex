@@ -10,7 +10,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute do
   defstruct first_point: 0,
             destination_point: 0,
             points: %{},
-            repeat?: true
+            repeat?: true,
+            pathfind?: true
 
   def build(%Creature{creature_movement: []}), do: nil
   def build(%Creature{creature_movement: nil}), do: nil

@@ -1325,7 +1325,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
             {:success, state, blackboard}
 
           true ->
-            state = move_with_context(state, {x, y, z}, [], context)
+            state = move_with_context(state, {x, y, z}, navigation_options(state, blackboard), context)
             navigation = %{blackboard.navigation | move_target: target}
             {:success, state, %{blackboard | navigation: navigation}}
         end
@@ -1339,6 +1339,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     do: CreatureFlags.has?(state, :sessile)
 
   defp sessile_home?(_state, _target), do: false
+
+  defp navigation_options(state, %Blackboard{navigation: %{returning_home?: false}} = blackboard) do
+    case {waypoint_route(state, blackboard), waypoint_destination(state, blackboard), blackboard.navigation.target} do
+      {%WaypointRoute{pathfind?: false}, %Waypoint{position: {x, y, z, _}}, {x, y, z}} -> [pathfind?: false]
+      _route -> []
+    end
+  end
+
+  defp navigation_options(_state, _blackboard), do: []
 
   defp wait_for_arrival_with_context(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
     wait_for_arrival(state, blackboard, context)

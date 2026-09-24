@@ -88,6 +88,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Server.Mob.SummonLifecycle
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
+  alias ThistleTea.Game.Entity.Server.ScriptSpells
   alias ThistleTea.Game.Entity.Server.TotemOwner
   alias ThistleTea.Game.Entity.SpellReception
   alias ThistleTea.Game.Guid
@@ -203,6 +204,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
     state =
       state
+      |> ScriptSpells.prepare(steps)
       |> EventAI.with_blackboard(
         &Script.run(
           &1,
@@ -1066,6 +1068,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
       state =
         state
+        |> ScriptSpells.prepare(steps)
         |> EventAI.with_blackboard(
           &Script.run(
             &1,
