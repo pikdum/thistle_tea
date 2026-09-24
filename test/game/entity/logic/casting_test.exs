@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.CastResolution
   alias ThistleTea.Game.Spell.CastResolution.Costs
   alias ThistleTea.Game.Spell.CastResolution.Followups
@@ -849,11 +850,10 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
       assert [
                %Effects.SpellCastResult{spell_id: 116},
                %Effects.SpellGo{hit_guids: [], misses: [%{guid: ^target_guid, reason: 2}]},
-               %Effects.DeliverSpellOutcome{
-                 source_guid: ^caster_guid,
+               %Effects.DeliverSpell{
+                 cast_context: %CastContext{caster_guid: ^caster_guid, hit_outcome: :resist},
                  target_guid: ^target_guid,
-                 spell: ^spell,
-                 outcome: :resist
+                 spell: ^spell
                }
              ] = mob.internal.events
 

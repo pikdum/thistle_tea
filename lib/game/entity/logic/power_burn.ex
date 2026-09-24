@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.PowerBurn do
   alias ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Combat, as: SpellCombat
   alias ThistleTea.Game.Spell.Modifiers
 
   def apply(entity, %CastContext{} = context, %Spell{} = spell, amount, effect, now, opts \\ []) do
@@ -19,13 +20,20 @@ defmodule ThistleTea.Game.Entity.Logic.PowerBurn do
       {entity, consumed} = Resources.consume_power(entity, effect.misc_value, amount)
 
       if consumed > 0 do
-        entity = PlayerCombat.mark_hostile_contact(entity, context.caster_guid, now)
+        entity = damage_contact(entity, context, spell, now, opts)
+
         damage = trunc(consumed * multiplier(context, effect.multiple_value, opts))
         apply_damage(entity, context, spell, damage, now, opts)
       else
         {entity, []}
       end
     end
+  end
+
+  defp damage_contact(entity, context, spell, now, opts) do
+    if SpellCombat.damage_contact?(spell, Keyword.get(opts, :periodic?, false), context.triggered_by_proc?),
+      do: PlayerCombat.mark_hostile_contact(entity, context.caster_guid, now),
+      else: entity
   end
 
   defp apply_damage(entity, context, spell, 0, _now, opts) do

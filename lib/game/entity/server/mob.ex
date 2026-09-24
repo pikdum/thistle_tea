@@ -93,6 +93,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Combat, as: SpellCombat
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -415,15 +416,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_cast({:receive_spell, caster, spell}, state) do
     previous = state
     caster_guid = caster_guid(caster)
+    now = Time.now()
+    prepared = SpellReception.prepare(state, caster, spell, now)
 
     state =
-      if Spell.starts_combat?(spell) and not Core.dead?(state) do
+      if SpellReception.starts_combat?(prepared) and not Core.dead?(state) do
         engage_combat(state, caster_guid)
       else
         state
       end
 
-    {state, events} = SpellReception.receive(state, caster, spell, Time.now())
+    before_damage = state
+    {state, events} = SpellReception.apply_prepared(state, prepared, now)
 
     state =
       if SpellEffect.successful_hit?(events), do: eventai_spell_hit(state, caster_guid, spell), else: state
@@ -432,30 +436,38 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
     state =
       state
+      |> react_to_spell_damage(events, before_damage)
       |> EventSink.emit(events)
       |> sync_behavior_tree(previous)
       |> wake_ai_tick()
 
     {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Incoming spell failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
-  def handle_cast({:receive_spell_outcome, caster_guid, spell, outcome}, state) do
+  def handle_cast({:spell_contact, %Effects.SpellContact{} = effect}, state) do
     previous = state
+    state = SpellCombat.apply_caster(state, effect)
 
     state =
-      if Spell.starts_combat?(spell, :miss),
-        do: engage_combat(state, caster_guid),
+      if effect.decision.combat? and not Core.dead?(state),
+        do: engage_combat(state, effect.other_guid),
         else: state
-
-    {state, events} = SpellEffect.receive_outcome(state, caster_guid, spell, outcome, Time.now())
 
     state =
       state
-      |> EventSink.emit(events)
+      |> EventSink.emit_pending()
       |> sync_behavior_tree(previous)
       |> wake_ai_tick()
 
     {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Spell combat contact failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:trigger_spell, spell_id, target_guid, opts}, %Mob{} = state)
@@ -1288,6 +1300,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       started_at = System.monotonic_time()
       previous = state
       {status, state} = BehaviorRunner.tick(behavior_tree, state, AIEnvironment.context(state, now))
+      state = react_to_spell_damage(state, state.internal.events, previous)
       state = NavigationResolver.resolve(state, now)
       state = sync_behavior_tree(state, previous)
       duration = System.monotonic_time() - started_at
@@ -1677,13 +1690,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     was_in_combat = from == :engaged
 
     if to == :engaged do
-      GuardianOwner.defend(state, caster)
-      CreaturePetOwner.defend(state, caster)
-
-      state
-      |> maybe_tap(caster)
-      |> maybe_call_assistance(was_in_combat, caster, opts)
-      |> maybe_eventai_enter_combat(was_in_combat, caster, now)
+      combat_entered(state, caster, was_in_combat, opts, now)
     else
       state
     end
@@ -1691,6 +1698,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp engage_combat(%Mob{} = state, _caster, _opts) do
     state
+  end
+
+  defp combat_entered(state, caster, was_in_combat, opts, now) do
+    GuardianOwner.defend(state, caster)
+    CreaturePetOwner.defend(state, caster)
+
+    state
+    |> maybe_tap(caster)
+    |> maybe_call_assistance(was_in_combat, caster, opts)
+    |> maybe_eventai_enter_combat(was_in_combat, caster, now)
   end
 
   defp maybe_call_assistance(%Mob{} = state, true, _caster, _opts), do: state
@@ -1772,10 +1789,36 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp notify_spell_hit_target(_caster_guid, _target_guid, _spell, _events), do: :ok
 
-  defp maybe_tap(%Mob{internal: %Internal{loot: %Loot{tapped_by: nil}}} = state, caster) do
+  defp react_to_spell_damage(state, _events, %Mob{internal: %Internal{in_combat: true}}), do: state
+
+  defp react_to_spell_damage(state, events, _previous) do
+    damage =
+      Enum.find(events, fn
+        %Effects.SpellDamage{source_guid: source, target_guid: target, damage: damage} ->
+          is_integer(source) and source > 0 and source != target and target == state.object.guid and
+            is_number(damage) and damage > 0
+
+        _ ->
+          false
+      end)
+
+    case damage do
+      %Effects.SpellDamage{source_guid: source} ->
+        if state.internal.in_combat,
+          do: combat_entered(state, source, false, [], Time.now()),
+          else: maybe_tap(state, source, true)
+
+      nil ->
+        state
+    end
+  end
+
+  defp maybe_tap(state, caster, allow_dead? \\ false)
+
+  defp maybe_tap(%Mob{internal: %Internal{loot: %Loot{tapped_by: nil}}} = state, caster, allow_dead?) do
     caster = controlling_player(caster)
 
-    if not Core.dead?(state) and Guid.entity_type(caster) == :player do
+    if (allow_dead? or not Core.dead?(state)) and Guid.entity_type(caster) == :player do
       group_id =
         case PartySystem.group_of(caster) do
           %Party.Group{id: id} -> id
@@ -1788,7 +1831,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     end
   end
 
-  defp maybe_tap(%Mob{} = state, _caster), do: state
+  defp maybe_tap(%Mob{} = state, _caster, _allow_dead?), do: state
 
   defp maybe_finalize_death(%Mob{internal: %Internal{death_finalized?: true}} = state), do: state
 

@@ -28,7 +28,6 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
     Effects.SpellGameObjectAction,
     Effects.DeliverSpell,
     Effects.ProcDamage,
-    Effects.DeliverSpellOutcome,
     Effects.DeliverSpellToQuery,
     Effects.HealThreat,
     Effects.TriggerSpell,

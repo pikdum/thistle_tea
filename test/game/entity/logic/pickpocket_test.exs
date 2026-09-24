@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.PickpocketTest do
   alias ThistleTea.Game.Spell.CastResolution
   alias ThistleTea.Game.Spell.CastResolution.Costs
   alias ThistleTea.Game.Spell.CastResolution.Followups
+  alias ThistleTea.Game.Spell.CastResolution.Impact
   alias ThistleTea.Game.Spell.CastResolution.PowerCost
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
@@ -87,7 +88,7 @@ defmodule ThistleTea.Game.Entity.Logic.PickpocketTest do
       refute Spell.starts_combat?(spell)
     end
 
-    test "a resisted cast breaks stealth and enters combat without opening loot", %{
+    test "a resisted cast breaks stealth and delivers the miss without opening loot", %{
       caster: caster,
       spell: spell,
       target: target
@@ -95,9 +96,14 @@ defmodule ThistleTea.Game.Entity.Logic.PickpocketTest do
       caster = prepare(caster, spell, target.guid, :resist)
       assert {:finished, caster} = Casting.advance(caster, 1_000)
       refute Aura.has_aura?(caster, :mod_stealth)
-      assert caster.internal.in_combat
+      refute caster.internal.in_combat
       refute Enum.any?(caster.internal.events, &is_struct(&1, Effects.PickPocket))
-      assert Enum.any?(caster.internal.events, &match?(%Effects.DeliverSpellOutcome{outcome: :resist}, &1))
+
+      assert Enum.any?(
+               caster.internal.events,
+               &match?(%Effects.DeliverSpell{cast_context: %{hit_outcome: :resist}}, &1)
+             )
+
       assert Spell.starts_combat?(spell, :miss)
     end
   end
@@ -109,7 +115,10 @@ defmodule ThistleTea.Game.Entity.Logic.PickpocketTest do
     resolution = %CastResolution{
       hits: hits,
       misses: misses,
-      impacts: [],
+      impacts:
+        Enum.map(hits ++ Enum.map(misses, & &1.guid), fn target_guid ->
+          %Impact{target_guid: target_guid, target_role: :other, hit_outcome: outcome}
+        end),
       costs: %Costs{
         power: %PowerCost{power_type: nil, amount: 0},
         channel_power: %PowerCost{power_type: nil, amount: 0},

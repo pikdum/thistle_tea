@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Combat, as: SpellCombat
 
   @spirit_of_redemption_talent 20_711
   @spirit_of_redemption_form 27_827
@@ -105,7 +106,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     if spirit_damage_immune?(entity, opts) do
       {entity, damage, damage}
     else
-      entity = PlayerCombat.mark_hostile_contact(entity, Keyword.get(opts, :source), now)
+      entity = enter_damage_combat(entity, now, opts)
       entity = CombatLeash.on_damage(entity, now, opts)
       school = Keyword.get(opts, :school, :physical)
       {entity, damage, remaining} = mitigate_damage(entity, damage, school, now, opts)
@@ -152,6 +153,22 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   defp take_unblocked_damage(entity, _damage, _now, _opts), do: {entity, 0, 0}
+
+  defp enter_damage_combat(entity, now, opts) do
+    if SpellCombat.damage_contact?(
+         Keyword.get(opts, :spell),
+         Keyword.get(opts, :periodic, false),
+         Keyword.get(opts, :triggered_by_proc?, false)
+       ) do
+      source = Keyword.get(opts, :source)
+
+      entity
+      |> PlayerCombat.mark_hostile_contact(source, now)
+      |> Engagement.on_damage(source, now)
+    else
+      entity
+    end
+  end
 
   defp mitigate_damage(entity, damage, school, now, opts) do
     if Keyword.get(opts, :environmental?, false) do

@@ -1,11 +1,13 @@
 defmodule ThistleTea.Game.Entity.SpellReception do
   @moduledoc """
-  Supplies current world projections to incoming spell logic at the target's
-  owning boundary. Dispel resistance and threat modifiers belong to each
-  spell's original caster; periodic threat is refreshed for every due tick.
+  Prepares a recipient's outcome and combat decision before applying effects.
+  Owners enter combat from that decision, preserving tap and lethal-hit order.
+  Current projections supply detection, dispel resistance, and threat modifiers;
+  periodic threat is refreshed for every due tick.
   """
 
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.EffectResolver.Pvp
   alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
@@ -14,32 +16,79 @@ defmodule ThistleTea.Game.Entity.SpellReception do
   alias ThistleTea.Game.Entity.Logic.HealingReceived
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellThreat
+  alias ThistleTea.Game.Entity.Logic.StealthDetection
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.AuraRank
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Combat, as: SpellCombat
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
   alias ThistleTea.Game.World.Metadata
 
-  def receive(target, %CastContext{} = context, %Spell{} = spell, now) do
+  defmodule Prepared do
+    @moduledoc false
+    @enforce_keys [:resolution, :decision, :spell]
+    defstruct [:resolution, :decision, :spell]
+  end
+
+  def receive(target, caster, %Spell{} = spell, now) do
+    apply_prepared(target, prepare(target, caster, spell, now), now)
+  end
+
+  def prepare(target, %CastContext{} = context, %Spell{} = spell, now) do
     spell =
       if context.caster_guid != target.object.guid and AuraRank.party_aura?(spell),
         do: SpellLoader.aura_rank(spell, target.unit.level),
         else: spell
 
     case spell do
-      nil -> {target, []}
-      spell -> receive_ranked(target, %{context | spell: spell}, spell, now)
+      nil -> nil
+      spell -> prepare_ranked(target, %{context | spell: spell}, spell, now)
     end
   end
 
-  def receive(target, caster_guid, %Spell{} = spell, now) when is_integer(caster_guid) do
-    receive(target, %CastContext{caster_guid: caster_guid, caster_level: 1}, spell, now)
+  def prepare(target, caster_guid, %Spell{} = spell, now) when is_integer(caster_guid) do
+    prepare(target, %CastContext{caster_guid: caster_guid, caster_level: 1}, spell, now)
   end
 
-  defp receive_ranked(target, context, spell, now) do
+  def apply_prepared(target, nil, _now), do: {target, []}
+
+  def apply_prepared(target, %Prepared{resolution: resolution, decision: decision, spell: spell}, now) do
+    context = resolution.context
+
+    contacts =
+      Pvp.spell_contacts(target, context.caster_guid, target.object.guid, spell, resolution.outcome,
+        combat_decision: decision,
+        now: now
+      )
+
+    contacts =
+      if context.caster_guid != target.object.guid and
+           (decision.combat? or decision.break_stealth? or decision.break_invisibility?) do
+        [
+          %Effects.SpellContact{
+            target_guid: context.caster_guid,
+            other_guid: target.object.guid,
+            decision: decision,
+            now: now
+          }
+          | contacts
+        ]
+      else
+        contacts
+      end
+
+    {target, events} = SpellEffect.apply_prepared(target, resolution, now)
+    {target, contacts ++ events}
+  end
+
+  def starts_combat?(%Prepared{decision: %{combat?: combat?}}), do: combat?
+  def starts_combat?(_prepared), do: false
+
+  defp prepare_ranked(target, context, spell, now) do
     context = threat_context(target, context, spell)
     context = if Heartbeat.spell?(spell), do: %{context | heartbeat_sample: 1 - :rand.uniform()}, else: context
 
@@ -50,8 +99,47 @@ defmodule ThistleTea.Game.Entity.SpellReception do
         context
       end
 
-    SpellEffect.receive(target, context, spell, now)
+    resolution = SpellEffect.prepare(target, context, spell)
+
+    decision =
+      if context.caster_guid != target.object.guid and Death.alive?(target) and
+           Guid.entity_type(context.caster_guid) in [:player, :mob, :pet],
+         do: SpellCombat.decide(spell, context, resolution.outcome, detects_caster?(target, context, spell, now)),
+         else: %SpellCombat{}
+
+    %Prepared{resolution: resolution, decision: decision, spell: spell}
   end
+
+  defp detects_caster?(target, context, spell, now) do
+    source = caster_detection(context, spell)
+    detector = target |> StealthDetection.target_metadata() |> Map.put(:guid, target.object.guid)
+
+    case {World.position(target, now), World.position(context.caster_guid, now) || context.caster_position} do
+      {{world, x, y, z}, {world, sx, sy, sz}} ->
+        orientation = elem(target.movement_block.position, 3)
+        behind? = Math.behind?({x, y, orientation}, {sx, sy})
+        distance = Math.distance({x, y, z}, {sx, sy, sz})
+
+        StealthDetection.detectable?(detector, source, distance, now, behind?) and
+          detection_line_of_sight?(target, context, source)
+
+      {{_world, _, _, _}, {_other_world, _, _, _}} ->
+        false
+
+      _ ->
+        StealthDetection.detectable?(detector, source, nil, now)
+    end
+  end
+
+  defp caster_detection(context, %{speed: speed}) when speed > 0,
+    do: Metadata.get(context.caster_guid) || context.caster_detection || %{}
+
+  defp caster_detection(context, _spell), do: context.caster_detection || Metadata.get(context.caster_guid) || %{}
+
+  defp detection_line_of_sight?(target, context, source),
+    do:
+      not Map.get(source, :stealthed?, false) or StealthDetection.marked_by?(source, target.object.guid) or
+        World.line_of_sight?(target, context.caster_guid)
 
   def aura_contexts(%{unit: %{auras: holders}} = target, now) when is_list(holders) do
     for %Holder{} = holder <- holders,

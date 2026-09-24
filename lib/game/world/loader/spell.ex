@@ -936,6 +936,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
     base
     |> add_if(attrs_ex1, 0x00000008, :no_redirection)
+    |> add_if(attrs_ex3, 0x00000200, :not_a_proc)
     |> add_if(attrs_ex3, 0x00010000, :suppress_caster_procs)
     |> add_if(attrs_ex3, 0x00020000, :suppress_target_procs)
     |> add_if(attrs_ex3, 0x00040000, :always_hit)
@@ -958,6 +959,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex2, 0x00000008, :allow_low_level_buff)
     |> add_if(attrs_ex2, 0x00000020, :auto_repeat)
     |> add_if(attrs_ex2, 0x00002000, :enchant_own_item_only)
+    |> add_if(attrs_ex2, 0x00004000, :allow_while_invisible)
     |> add_if(attrs_ex2, 0x00400000, :no_initial_threat)
     |> add_if(attrs_ex2, 0x04000000, :no_school_immunities)
     |> add_if(attrs_ex2, @cant_crit_ex2, :cant_crit)

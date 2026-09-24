@@ -215,6 +215,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
   def apply_damage_amount(state, %CastContext{} = context, %Spell{} = spell, amount, now, opts \\ []) do
     opts = if context.proc_damage?, do: Keyword.put(opts, :proc_type, nil), else: opts
+    opts = Keyword.put(opts, :triggered_by_proc?, context.triggered_by_proc?)
     rolled = amount
 
     rolled =
@@ -243,6 +244,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         source_owner: context.caster_owner_guid,
         reflected_by: context.reflected_by_guid,
         periodic: Keyword.get(opts, :periodic?, false),
+        triggered_by_proc?: context.triggered_by_proc?,
         threat_multiplier: SpellThreat.multiplier(context, crit?)
       )
 
@@ -478,7 +480,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         source: context.caster_guid,
         source_owner: context.caster_owner_guid,
         reflected_by: context.reflected_by_guid,
-        threat_multiplier: SpellThreat.multiplier(context, context.melee_crit?)
+        threat_multiplier: SpellThreat.multiplier(context, context.melee_crit?),
+        triggered_by_proc?: context.triggered_by_proc?
       )
 
     event =
@@ -487,6 +490,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         crit?: context.melee_crit? || false,
         resisted: resisted,
         proc_damage: proc_damage,
+        triggered_by_proc?: context.triggered_by_proc?,
         proc_type: dealt_attack_proc_type(spell)
       )
 
@@ -578,7 +582,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     [
       source: context.caster_guid,
       source_owner: context.caster_owner_guid,
-      reflected_by: context.reflected_by_guid
+      reflected_by: context.reflected_by_guid,
+      triggered_by_proc?: context.triggered_by_proc?
     ]
   end
 

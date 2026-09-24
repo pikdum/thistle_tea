@@ -1,21 +1,25 @@
 defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   @moduledoc false
 
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.EffectResolver.Pvp
   alias ThistleTea.Game.Entity.Logic.Aura.ProcDamage
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.SpellTarget
+  alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Chain
+  alias ThistleTea.Game.Spell.Combat, as: SpellCombat
   alias ThistleTea.Game.Spell.Focus
   alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
@@ -83,12 +87,21 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
   def resolve(_entity, %Effects.DeliverSpell{} = effect), do: [effect]
 
-  def resolve(entity, %Effects.DeliverSpellOutcome{} = effect) do
-    Pvp.spell_contacts(entity, effect.source_guid, effect.target_guid, effect.spell, :miss) ++ [effect]
-  end
+  def resolve(entity, %Effects.SpellDamage{damage: damage, source_guid: source, target_guid: target} = effect)
+      when is_number(damage) and damage > 0 and is_integer(source) and source > 0 and source != target do
+    if SpellCombat.damage_contact?(effect.spell, effect.periodic?, effect.triggered_by_proc?) do
+      contact = %Effects.SpellContact{
+        target_guid: source,
+        other_guid: target,
+        decision: %SpellCombat{combat?: true},
+        now: Time.now()
+      }
 
-  def resolve(entity, %Effects.SpellDamage{periodic?: true} = effect) do
-    Pvp.contacts(entity, effect.source_guid, effect.target_guid, :attack) ++ [effect]
+      contacts = if Guid.entity_type(source) in [:player, :mob], do: [contact], else: []
+      contacts ++ Pvp.contacts(entity, source, target, :attack) ++ [effect]
+    else
+      [effect]
+    end
   end
 
   def resolve(entity, %Effects.SpellHeal{periodic?: true} = effect) do
@@ -150,8 +163,14 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   end
 
   def resolved_delivery(entity, %Effects.DeliverSpell{} = effect) do
-    Pvp.spell_contacts(entity, effect.cast_context.caster_guid, effect.target_guid, effect.spell, :hit) ++
-      [%{effect | delay_ms: projectile_delay_ms(entity, effect)}]
+    context = effect.cast_context
+
+    context =
+      if context.caster_guid == entity.object.guid and match?(%{unit: %Unit{}}, entity),
+        do: %{context | caster_detection: StealthDetection.target_metadata(entity)},
+        else: context
+
+    [%{effect | cast_context: context, delay_ms: projectile_delay_ms(entity, effect)}]
   end
 
   defp resolve_trigger(entity, effect, spell) do
@@ -380,6 +399,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
         cast_item_guid: effect.cast_item_guid,
         extra_attack?: effect.extra_attack?,
         triggered_by_aura?: is_integer(effect.triggering_spell_id),
+        triggered_by_proc?: triggered_by_proc?(effect),
         target_role: effect.target_role
     }
   end
@@ -391,6 +411,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
       cast_item_guid: effect.cast_item_guid,
       extra_attack?: effect.extra_attack?,
       triggered_by_aura?: is_integer(effect.triggering_spell_id),
+      triggered_by_proc?: triggered_by_proc?(effect),
       caster_level: effect.source_level || 1,
       target_guid: effect.target_guid,
       target_role: effect.target_role,
@@ -416,4 +437,13 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   end
 
   defp inherit_hit_context(context, _source, _spell), do: context
+
+  defp triggered_by_proc?(%Effects.TriggerSpell{triggering_spell_id: id}) when is_integer(id) do
+    case SpellLoader.cached(id) do
+      %Spell{proc_type_mask: mask} when is_integer(mask) -> mask != 0
+      _ -> false
+    end
+  end
+
+  defp triggered_by_proc?(_effect), do: false
 end

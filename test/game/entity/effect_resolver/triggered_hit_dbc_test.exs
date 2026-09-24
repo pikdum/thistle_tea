@@ -27,6 +27,15 @@ defmodule ThistleTea.Game.Entity.EffectResolver.TriggeredHitDbcTest do
   setup [:entities]
 
   describe "resolve/2" do
+    test "proc aura triggers are distinguished from periodic aura triggers", %{caster: caster, target: target} do
+      for {parent, proc?} <- [{324, true}, {5143, false}] do
+        trigger = Effects.trigger_spell(caster.object.guid, 60, target.object.guid, 133, triggered_by_spell_id: parent)
+        delivery = caster |> Spells.resolve(trigger) |> Enum.find(&is_struct(&1, Effects.DeliverSpell))
+        assert delivery.cast_context.triggered_by_aura?
+        assert delivery.cast_context.triggered_by_proc? == proc?
+      end
+    end
+
     test "foreign chain triggers are resolved by their caster", %{caster: caster, target: target} do
       trigger = Effects.trigger_spell(caster.object.guid, caster.unit.level, target.object.guid, 421)
       caster_guid = caster.object.guid

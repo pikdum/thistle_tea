@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
       damage: damage,
       proc_damage: Keyword.get(opts, :proc_damage),
       periodic?: Keyword.get(opts, :periodic?, false),
+      triggered_by_proc?: Keyword.get(opts, :triggered_by_proc?, false),
       proc_type: Keyword.get(opts, :proc_type, spell_damage_proc_type(opts)),
       resisted: Keyword.get(opts, :resisted, 0),
       absorbed: Keyword.get(opts, :absorbed, 0),
@@ -276,11 +277,6 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
       target_guid: target_guid,
       amount: amount
     }
-  end
-
-  def deliver_spell_outcome(target_guid, source_guid, spell, outcome)
-      when is_integer(target_guid) and is_integer(source_guid) and is_atom(outcome) do
-    %Effects.DeliverSpellOutcome{source_guid: source_guid, target_guid: target_guid, spell: spell, outcome: outcome}
   end
 
   def attack_start(source_guid, target_guid) when is_integer(source_guid) and is_integer(target_guid) do

@@ -20,14 +20,24 @@ defmodule ThistleTea.Game.Entity.Logic.PeriodicCombatTest do
   setup [:player]
 
   describe "take_damage/4" do
-    test "periodic damage refreshes the victim's combat window and blocks health regeneration", %{player: player} do
+    test "channeled damage refreshes the victim's combat window and blocks health regeneration", %{player: player} do
+      spell = %Spell{id: 10_797, attributes: MapSet.new([:channeled])}
       player = PlayerCombat.mark_attacked(player, 0)
-      player = Core.take_damage(player, 10, 4_000, source: 2, periodic: true)
+      player = Core.take_damage(player, 10, 4_000, source: 2, periodic: true, spell: spell)
       {player, _} = PlayerCombat.sync(player, %Blackboard{}, 5_000)
       assert player.internal.in_combat
       assert player.internal.last_hostile_time == 4_000
       assert Regen.tick(player, 6_000).unit.health == 90
       {player, _} = PlayerCombat.sync(player, %Blackboard{}, 9_000)
+      refute player.internal.in_combat
+    end
+
+    test "ordinary periodic damage does not restart or refresh combat", %{player: player} do
+      refute Core.take_damage(player, 10, 4_000, source: 2, periodic: true).internal.in_combat
+      player = PlayerCombat.mark_attacked(player, 0)
+      player = Core.take_damage(player, 10, 4_000, source: 2, periodic: true)
+      assert player.internal.last_hostile_time == 0
+      {player, _} = PlayerCombat.sync(player, %Blackboard{}, 5_000)
       refute player.internal.in_combat
     end
 
@@ -40,12 +50,11 @@ defmodule ThistleTea.Game.Entity.Logic.PeriodicCombatTest do
   end
 
   describe "receive/4" do
-    test "harmful spell feedback refreshes the caster even for fully absorbed ticks", %{player: player} do
+    test "proc feedback leaves combat to the resolved contact", %{player: player} do
       spell = %Spell{id: 24_619}
       payload = %{victim_guid: 2, proc_type: :deal_harmful_periodic, damage: 0, outcome: :normal}
       player = SpellFeedback.receive(player, payload, spell, 4_000)
-      assert player.internal.in_combat
-      assert player.internal.last_hostile_time == 4_000
+      refute player.internal.in_combat
     end
 
     test "healing and feedback after death do not establish combat", %{player: player} do
@@ -58,18 +67,18 @@ defmodule ThistleTea.Game.Entity.Logic.PeriodicCombatTest do
   end
 
   describe "apply/7" do
-    test "zero-damage burns refresh combat only when power is consumed", %{player: player} do
+    test "zero-damage periodic burns do not restart combat", %{player: player} do
       context = %CastContext{caster_guid: 2, caster_level: 50}
       spell = %Spell{id: 23_153, school: :frost}
       effect = %Effect{misc_value: 0, multiple_value: 0.0}
       {player, [event]} = PowerBurn.apply(player, context, spell, 50, effect, 4_000, periodic?: true)
       assert player.unit.power1 == 0
       assert player.unit.health == 100
-      assert player.internal.last_hostile_time == 4_000
+      refute player.internal.in_combat
       assert event.damage == 0
       assert event.proc_type == :deal_harmful_periodic
       {player, []} = PowerBurn.apply(player, context, spell, 50, effect, 6_000, periodic?: true)
-      assert player.internal.last_hostile_time == 4_000
+      refute player.internal.in_combat
     end
   end
 

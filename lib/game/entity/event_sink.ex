@@ -124,7 +124,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.DelayAura,
     Effects.DeliverHealThreat,
     Effects.DeliverSpell,
-    Effects.DeliverSpellOutcome,
+    Effects.SpellContact,
     Effects.DrainPower,
     Effects.GrantPower,
     Effects.HealEntity,

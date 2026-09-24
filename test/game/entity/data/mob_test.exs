@@ -474,7 +474,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       assert_in_delta elem(mob.movement_block.position, 3), :math.pi() / 2, 0.001
 
       assert {:noreply, mob, {:continue, :maybe_broadcast}} =
-               MobServer.handle_cast({:receive_spell_outcome, 1, spell, :resist}, mob)
+               MobServer.handle_cast({:receive_spell, %{context | hit_outcome: :resist}, spell}, mob)
 
       refute mob.internal.in_combat
     end

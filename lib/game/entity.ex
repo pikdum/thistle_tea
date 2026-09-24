@@ -57,9 +57,7 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:pet_spell_modifiers, owner, holders})
   end
 
-  def receive_spell_outcome(entity, caster_guid, spell, outcome) do
-    dispatch_cast(entity, {:receive_spell_outcome, caster_guid, spell, outcome})
-  end
+  def spell_contact(entity, effect), do: dispatch_cast(entity, {:spell_contact, effect})
 
   def trigger_spell(entity, spell_id, target_guid, opts \\ []) do
     dispatch_cast(entity, {:trigger_spell, spell_id, target_guid, opts})

@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
@@ -686,7 +687,10 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       state = %{character: ghost}
 
       assert {:noreply, ^state, {:continue, :maybe_broadcast_update}} =
-               PlayerServer.handle_cast({:receive_spell_outcome, 2, spell, :resist}, state)
+               PlayerServer.handle_cast(
+                 {:receive_spell, %CastContext{caster_guid: 2, hit_outcome: :resist}, spell},
+                 state
+               )
     end
 
     test "syncs detection metadata before projecting a pending update" do

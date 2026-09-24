@@ -58,6 +58,14 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   def enter(%Mob{} = entity, _target_guid, _now, _opts), do: result(entity, entity, :invalid_target)
 
+  def on_damage(%Mob{object: %{guid: guid}, internal: %Internal{in_combat: combat?}} = entity, source, now)
+      when combat? != true and is_integer(source) and source > 0 and source != guid do
+    %Result{entity: entity} = enter(entity, source, now, selection: :preserve)
+    entity
+  end
+
+  def on_damage(entity, _source, _now), do: entity
+
   defp enter_active(
          %Mob{internal: %Internal{blackboard: %Blackboard{navigation: %{returning_home?: true}}}} = entity,
          _target_guid,

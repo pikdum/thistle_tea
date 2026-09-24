@@ -40,68 +40,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   @weapon_effect_types [:weapon_damage, :weapon_damage_noschool, :normalized_weapon_damage, :weapon_percent_damage]
 
+  defmodule Resolution do
+    @moduledoc "A recipient's spell outcome and filtered effects, resolved once before combat entry."
+    @enforce_keys [:context, :spell, :outcome, :kind]
+    defstruct [:context, :spell, :outcome, :kind, :melee_result]
+  end
+
   def receive(target, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
-    cond do
-      context.proc_damage? and (target.unit.health || 0) <= 0 ->
-        {target, []}
-
-      immune_to_spell?(target, context, spell) ->
-        {target, [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
-
-      reflect_harmful_spell?(target, context, spell) ->
-        {target, reactions} =
-          Aura.reactions(target, :spell_hit_taken, %{
-            attacker_guid: context.caster_guid,
-            spell: spell,
-            proc_type: :take_harmful_spell,
-            outcome: :reflect,
-            damage: 0,
-            now: now
-          })
-
-        reflected_context = %{
-          context
-          | target_guid: context.caster_guid,
-            target_role: :other,
-            target_hostile?: true,
-            reflected_by_guid: target.object.guid,
-            hit_outcome: :hit
-        }
-
-        {target,
-         [
-           Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :reflect),
-           Effects.deliver_spell(context.caster_guid, reflected_context, spell)
-         ] ++ reactions}
-
-      context.hit_outcome == :resist ->
-        {target, skill_events} = CombatSkills.resolve(target, special_attack(context, spell), :resist)
-        {target, reactions} = outcome_reactions(target, context, spell, :resist, now)
-
-        {target,
-         [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :resist) | reactions] ++
-           skill_events}
-
-      true ->
-        context = %{context | combo_retention_spell: ComboPoints.retention_spell(spell)}
-
-        effects =
-          target
-          |> applicable_effects(context, spell.effects)
-          |> Chain.effects(context)
-          |> Warrior.filter_target_effects(target.object.guid, context, spell)
-          |> defer_combo_retention(context)
-
-        spell = %{spell | effects: effects}
-        context = %{context | target_guid: target.object.guid, spell: spell}
-
-        {target, events} = receive_unblocked_effects(target, context, now)
-
-        target =
-          if successful_hit?(events), do: Critter.spell_hit(target, context.caster_guid, spell, now), else: target
-
-        {target, events}
-    end
+    apply_prepared(target, prepare(target, context, spell), now)
   end
 
   def receive(target, caster_guid, %Spell{} = spell, now) when is_integer(caster_guid) and is_integer(now) do
@@ -109,6 +55,130 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   def receive(target, _context, _spell, _now), do: {target, []}
+
+  def prepare(target, %CastContext{} = context, %Spell{} = spell) do
+    resolution = %Resolution{context: context, spell: spell, outcome: :hit, kind: :effects}
+
+    cond do
+      context.proc_damage? and (target.unit.health || 0) <= 0 ->
+        %{resolution | kind: :ignored, outcome: :none}
+
+      immune_to_spell?(target, context, spell) ->
+        %{resolution | kind: :immune, outcome: :immune}
+
+      reflect_harmful_spell?(target, context, spell) ->
+        %{resolution | kind: :reflect, outcome: :reflect}
+
+      context.hit_outcome == :resist ->
+        %{resolution | kind: :launch_resist, outcome: :resist}
+
+      true ->
+        prepare_effects(target, resolution)
+    end
+  end
+
+  def apply_prepared(target, %Resolution{kind: :ignored}, _now), do: {target, []}
+
+  def apply_prepared(target, %Resolution{kind: :immune, context: context, spell: spell}, _now) do
+    {target, [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
+  end
+
+  def apply_prepared(target, %Resolution{kind: :reflect, context: context, spell: spell}, now) do
+    {target, reactions} =
+      Aura.reactions(target, :spell_hit_taken, %{
+        attacker_guid: context.caster_guid,
+        spell: spell,
+        proc_type: :take_harmful_spell,
+        outcome: :reflect,
+        damage: 0,
+        now: now
+      })
+
+    reflected_context = %{
+      context
+      | target_guid: context.caster_guid,
+        target_role: :other,
+        target_hostile?: true,
+        reflected_by_guid: target.object.guid,
+        hit_outcome: :hit
+    }
+
+    {target,
+     [
+       Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :reflect),
+       Effects.deliver_spell(context.caster_guid, reflected_context, spell)
+     ] ++ reactions}
+  end
+
+  def apply_prepared(target, %Resolution{kind: :launch_resist, context: context, spell: spell}, now) do
+    {target, skill_events} = CombatSkills.resolve(target, special_attack(context, spell), :resist)
+    {target, reactions} = outcome_reactions(target, context, spell, :resist, now)
+
+    {target,
+     [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :resist) | reactions] ++ skill_events}
+  end
+
+  def apply_prepared(target, %Resolution{context: context, spell: spell} = resolution, now) do
+    {target, events} = apply_resolved_effects(target, resolution, now)
+    target = if successful_hit?(events), do: Critter.spell_hit(target, context.caster_guid, spell, now), else: target
+    {target, events}
+  end
+
+  defp prepare_effects(target, %Resolution{context: context, spell: spell} = resolution) do
+    context = %{context | combo_retention_spell: ComboPoints.retention_spell(spell)}
+
+    applicable =
+      target
+      |> applicable_effects(context, spell.effects)
+      |> Chain.effects(context)
+      |> Warrior.filter_target_effects(target.object.guid, context, spell)
+      |> defer_combo_retention(context)
+
+    spell = %{spell | effects: applicable}
+
+    effects =
+      Enum.reject(applicable, fn effect ->
+        EffectImmunity.blocked?(target, spell, effect) or CreatureImmunity.effect?(target, context, spell, effect) or
+          Totems.immune_effect?(target, context, spell, effect)
+      end)
+
+    if effects == [] and applicable != [] do
+      %{resolution | context: context, spell: spell, kind: :immune, outcome: :immune}
+    else
+      context = %{context | target_guid: target.object.guid, spell: %{spell | effects: effects}}
+      prepare_melee(target, %{resolution | context: context, spell: spell})
+    end
+  end
+
+  defp prepare_melee(target, %Resolution{context: context} = resolution) do
+    if melee_roll_required?(target, context, context.spell) do
+      result = AttackTable.roll_special(target, special_attack(context, context.spell))
+      resolution = %{resolution | kind: :melee, melee_result: result}
+
+      if result.outcome in [:normal, :crit] do
+        context = %{context | melee_crit?: result.crit?}
+        prepare_resistance(target, %{resolution | context: context})
+      else
+        %{resolution | outcome: result.outcome}
+      end
+    else
+      prepare_resistance(target, resolution)
+    end
+  end
+
+  defp prepare_resistance(target, %Resolution{context: %CastContext{spell: spell} = context} = resolution) do
+    resistance = MechanicResistance.projection(target)
+
+    effects =
+      Enum.reject(spell.effects, fn effect ->
+        context.caster_guid != target.object.guid and Spell.harmful?(spell) and
+          MechanicResistance.effect_resisted?(resistance, spell, effect, Math.random_int(0, 99))
+      end)
+
+    if effects == [] and spell.effects != [],
+      do: %{resolution | outcome: :resist},
+      else: %{resolution | context: %{context | spell: %{spell | effects: effects}}}
+  end
 
   defp defer_combo_retention(effects, %CastContext{combo_retention_spell: nil}), do: effects
   defp defer_combo_retention(effects, _context), do: Enum.reject(effects, &ComboPoints.retention_effect?/1)
@@ -221,15 +291,23 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       target_guid != caster_guid
   end
 
-  defp receive_melee_ability(target, %CastContext{} = context, spell, now) do
-    attack = special_attack(context, spell)
-    result = AttackTable.roll_special(target, attack)
-    {target, skill_events} = CombatSkills.resolve(target, attack, result.outcome)
-    {target, events} = receive_melee_result(target, context, spell, result, now)
+  defp apply_resolved_effects(
+         target,
+         %Resolution{kind: :melee, context: context, melee_result: result} = resolution,
+         now
+       ) do
+    {target, skill_events} = CombatSkills.resolve(target, special_attack(context, context.spell), result.outcome)
+    {target, events} = receive_melee_result(target, resolution, now)
     {target, events ++ skill_events}
   end
 
-  defp receive_melee_result(target, context, spell, result, now) do
+  defp apply_resolved_effects(target, %Resolution{context: context} = resolution, now) do
+    target |> apply_resisted_effects(resolution, now) |> with_bonus_threat(context)
+  end
+
+  defp receive_melee_result(target, %Resolution{context: context, melee_result: result} = resolution, now) do
+    spell = context.spell
+
     case result.outcome do
       :resist ->
         {target, reactions} = receive_outcome(target, context.caster_guid, spell, :resist, now)
@@ -241,9 +319,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         {target, melee_avoid_events(target, context, spell, outcome) ++ reaction_events}
 
       _hit ->
-        context = %{context | melee_crit?: result.crit?}
-
-        {target, events} = apply_resisted_effects(target, context, now)
+        {target, events} = apply_resisted_effects(target, resolution, now)
 
         events =
           if Spell.melee_ability?(spell) do
@@ -280,45 +356,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     end
   end
 
-  defp receive_unblocked_effects(target, %CastContext{spell: spell} = context, now) do
-    effects =
-      Enum.reject(
-        spell.effects,
-        &(EffectImmunity.blocked?(target, spell, &1) or CreatureImmunity.effect?(target, context, spell, &1) or
-            Totems.immune_effect?(target, context, spell, &1))
-      )
-
-    if effects == [] and spell.effects != [] do
-      {target, [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
-    else
-      context = %{context | spell: %{spell | effects: effects}}
-
-      if melee_roll_required?(target, context, context.spell) do
-        receive_melee_ability(target, context, context.spell, now)
-      else
-        target
-        |> apply_resisted_effects(context, now)
-        |> with_bonus_threat(context)
-      end
-    end
+  defp apply_resisted_effects(target, %Resolution{outcome: :resist, context: context}, now) do
+    spell = context.spell
+    {target, reactions} = outcome_reactions(target, context, spell, :resist, now)
+    {target, [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :resist) | reactions]}
   end
 
-  defp apply_resisted_effects(target, %CastContext{spell: spell} = context, now) do
-    resistance = MechanicResistance.projection(target)
-
-    effects =
-      Enum.reject(spell.effects, fn effect ->
-        context.caster_guid != target.object.guid and Spell.harmful?(spell) and
-          MechanicResistance.effect_resisted?(resistance, spell, effect, Math.random_int(0, 99))
-      end)
-
-    if effects == [] and spell.effects != [] do
-      {target, reactions} = outcome_reactions(target, context, spell, :resist, now)
-      {target, [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :resist) | reactions]}
-    else
-      context = %{context | spell: %{spell | effects: effects}}
-      apply_effects(target, context, effects, [], now)
-    end
+  defp apply_resisted_effects(target, %Resolution{context: context}, now) do
+    apply_effects(target, context, context.spell.effects, [], now)
   end
 
   defp apply_effects(target, context, effects, events, now) do

@@ -9,13 +9,15 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Pvp do
   alias ThistleTea.Game.Entity.Logic.Pvp, as: PvpLogic
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Combat, as: SpellCombat
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
 
   @fields [:owner_guid, :pvp?, :pvp_combat?, :unit_flags, :free_for_all?, :contested_pvp?, :in_combat]
 
   def spell_contacts(entity, source, target, %Spell{} = spell, outcome, opts \\ []) do
-    case spell_contact(spell, outcome) do
+    case spell_contact(spell, outcome, opts) do
       {role, combat?, only_in_combat?} ->
         opts = Keyword.merge(opts, combat?: combat?, only_in_combat?: only_in_combat?)
         contacts(entity, source, target, role, opts)
@@ -25,9 +27,9 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Pvp do
     end
   end
 
-  defp spell_contact(spell, outcome) do
+  defp spell_contact(spell, outcome, opts) do
     cond do
-      Spell.harmful?(spell) -> hostile_spell_contact(spell, outcome)
+      Spell.harmful?(spell) -> hostile_spell_contact(spell, outcome, opts)
       outcome != :hit -> nil
       friendly_target?(spell) -> {:assist, assistance_combat?(spell), false}
       assistance_combat?(spell) -> {:assist, true, true}
@@ -35,21 +37,11 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Pvp do
     end
   end
 
-  defp hostile_spell_contact(spell, outcome) do
-    cond do
-      Spell.starts_combat?(spell, outcome) and not Spell.attribute?(spell, :no_initial_threat) ->
-        {:attack, true, false}
+  defp hostile_spell_contact(spell, outcome, opts) do
+    decision =
+      Keyword.get_lazy(opts, :combat_decision, fn -> SpellCombat.decide(spell, %CastContext{}, outcome, true) end)
 
-      Spell.attribute?(spell, :pvp_enabling) or (outcome == :miss and not peaceful_only?(spell)) ->
-        {:attack, false, false}
-
-      true ->
-        nil
-    end
-  end
-
-  defp peaceful_only?(spell) do
-    Spell.attribute?(spell, :not_in_combat) and Spell.attribute?(spell, :only_peaceful_targets)
+    if decision.pvp?, do: {:attack, decision.combat?, false}
   end
 
   defp assistance_combat?(spell) do

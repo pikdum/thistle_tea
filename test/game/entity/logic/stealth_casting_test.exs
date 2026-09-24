@@ -26,6 +26,25 @@ defmodule ThistleTea.Game.Entity.Logic.StealthCastingTest do
   setup [:caster]
 
   describe "start/7" do
+    test "an invisibility-compatible cast preserves early and late invisibility independently", ctx do
+      spell = %{ctx.sap | attributes: MapSet.new([:allow_while_invisible]), family_flags_0: 0}
+
+      caster = %{
+        ctx.caster
+        | unit: %{
+            ctx.caster.unit
+            | auras: [holder(2, :mod_invisibility, 5), holder(3, :mod_invisibility, 0x10000) | ctx.caster.unit.auras]
+          }
+      }
+
+      preparing = Casting.start(caster, spell, Target.unit(2), 0)
+      refute Aura.has_aura?(preparing, :mod_stealth)
+      assert Aura.has_spell?(preparing, 2)
+      completed = finish(preparing)
+      assert Aura.has_spell?(completed, 2)
+      assert Aura.has_spell?(completed, 3)
+    end
+
     test "rejects an unstealthed opener before side effects or costs", ctx do
       caster = %{ctx.caster | unit: %{ctx.caster.unit | auras: []}}
       assert CastValidation.validate(caster, ctx.sap, Target.unit(2), ctx.target, 0) == {:error, :only_stealthed}
@@ -45,7 +64,7 @@ defmodule ThistleTea.Game.Entity.Logic.StealthCastingTest do
       assert preparing.unit.power4 == 100
       completed = finish(preparing)
       assert completed.unit.power4 == 35
-      assert completed.internal.in_combat
+      refute completed.internal.in_combat
       refute Aura.has_aura?(completed, :mod_stealth)
     end
 
@@ -92,7 +111,7 @@ defmodule ThistleTea.Game.Entity.Logic.StealthCastingTest do
       preparing = Casting.start(ctx.caster, spell, Target.unit(2), 0)
       completed = finish(preparing, :resist)
       refute Aura.has_aura?(completed, :mod_stealth)
-      assert completed.internal.in_combat
+      refute completed.internal.in_combat
     end
 
     test "peaceful-target requirements reject combat before consuming stealth", ctx do

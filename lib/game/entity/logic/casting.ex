@@ -27,7 +27,6 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.PetLearning
   alias ThistleTea.Game.Entity.Logic.Pickpocket
-  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellEffect
@@ -297,19 +296,15 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp apply_launch(entity, %Cast{resolution: %CastResolution{} = resolution} = casting, now) do
-    attempted_targets = resolution.hits ++ Enum.map(resolution.misses, & &1.guid)
-
     entity =
       entity
       |> spend_power_cost(resolution.costs.power, now)
       |> start_cooldown(casting, now)
       |> queue_cast_result(casting)
       |> queue_spell_go(casting, resolution.followups.packet_hits, resolution.misses)
-      |> queue_spell_miss_outcomes(casting, resolution.misses)
       |> queue_consume_costs(resolution.costs)
       |> break_stealth(casting, now)
       |> interrupt_completion_auras(casting, now)
-      |> mark_hostile_cast(casting, attempted_targets, now)
       |> PetLearning.used(casting.spell)
 
     casting = Cast.transition(casting, :impact)
@@ -436,24 +431,20 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       []
     else
       entity
-      |> unit_impacts(spell, hits, misses)
+      |> unit_impacts(hits, misses)
       |> Enum.map(fn impact ->
         %{impact | chain_effects: if(chain, do: Map.get(chain, impact.target_guid, %{}))}
       end)
     end
   end
 
-  defp unit_impacts(entity, spell, hits, misses) do
+  defp unit_impacts(entity, hits, misses) do
     impacts = Enum.map(hits, &%Impact{target_guid: &1, target_role: target_role(entity, &1)})
 
-    if Spell.reflectable?(spell) do
-      impacts ++
-        Enum.map(misses, fn %{guid: guid} ->
-          %Impact{target_guid: guid, target_role: target_role(entity, guid), hit_outcome: :resist}
-        end)
-    else
-      impacts
-    end
+    impacts ++
+      Enum.map(misses, fn %{guid: guid} ->
+        %Impact{target_guid: guid, target_role: target_role(entity, guid), hit_outcome: :resist}
+      end)
   end
 
   defp empty_resolution(object_guid) do
@@ -751,18 +742,6 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     Effects.enqueue(character, events)
   end
 
-  defp mark_hostile_cast(%Character{object: %{guid: guid}} = character, %Cast{spell: spell} = casting, targets, now) do
-    missed? = casting.resolution.misses != [] and Spell.starts_combat?(spell, :miss)
-
-    if (Spell.starts_combat?(spell) or missed?) and Enum.any?(targets, &(&1 != guid)) do
-      PlayerCombat.mark_initiated(character, now)
-    else
-      character
-    end
-  end
-
-  defp mark_hostile_cast(character, _casting, _targets, _now), do: character
-
   defp break_stealth(character, %Cast{spell: %Spell{} = spell} = casting, now) do
     {character, events} =
       cond do
@@ -770,7 +749,12 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
           AuraLogic.remove_aura_types(character, [:mod_stealth], now)
 
         Spell.harmful?(spell) and not preserves_stealth?(casting) ->
-          AuraLogic.remove_with_interrupt_flags(character, AuraLogic.interrupt_mask(:cast), now)
+          AuraLogic.remove_with_interrupt_flags(
+            character,
+            AuraLogic.interrupt_mask(:cast),
+            now,
+            preserved_aura_types(spell, false)
+          )
 
         true ->
           {character, []}
@@ -794,12 +778,17 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp interrupt_action_auras(entity, action, spell, now, preserve_stealth?) do
-    preserved_types = if preserve_stealth?, do: [:mod_stealth], else: []
+    preserved_types = preserved_aura_types(spell, preserve_stealth?)
 
     {entity, events} =
       AuraLogic.remove_with_interrupt_flags(entity, action_interrupt_mask(action, spell), now, preserved_types)
 
     Effects.enqueue(entity, events)
+  end
+
+  defp preserved_aura_types(spell, preserve_stealth?) do
+    stealth = if preserve_stealth?, do: [:mod_stealth], else: []
+    if Spell.attribute?(spell, :allow_while_invisible), do: [:mod_invisibility | stealth], else: stealth
   end
 
   defp action_interrupt_mask(:action_complete, spell) do
@@ -1345,19 +1334,6 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   @spell_miss_reason_miss 1
   @spell_miss_reason_resist 2
-
-  defp queue_spell_miss_outcomes(%{object: %{guid: caster_guid}} = character, %Cast{spell: %Spell{} = spell}, misses)
-       when is_integer(caster_guid) and is_list(misses) do
-    events =
-      for %{guid: target_guid, reason: @spell_miss_reason_resist} <- misses,
-          not Spell.reflectable?(spell) do
-        Effects.deliver_spell_outcome(target_guid, caster_guid, spell, :resist)
-      end
-
-    Effects.enqueue(character, events)
-  end
-
-  defp queue_spell_miss_outcomes(character, _casting, _misses), do: character
 
   defp roll_spell_hits(_caster, %Spell{dmg_class: class}, targets) when class in [0, 2, 3], do: {targets, []}
 

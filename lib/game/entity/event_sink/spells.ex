@@ -420,8 +420,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
     entity
   end
 
-  def emit(entity, %Effects.DeliverSpellOutcome{} = effect, _context) do
-    Entity.receive_spell_outcome(effect.target_guid, effect.source_guid, effect.spell, effect.outcome)
+  def emit(%{object: %{guid: guid}} = entity, %Effects.SpellContact{target_guid: guid} = effect, context) do
+    Context.cast(context, {:spell_contact, effect})
+    entity
+  end
+
+  def emit(entity, %Effects.SpellContact{} = effect, _context) do
+    Entity.spell_contact(effect.target_guid, effect)
     entity
   end
 

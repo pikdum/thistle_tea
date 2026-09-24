@@ -570,10 +570,11 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
 
       mob = %Mob{object: %Object{guid: caster_guid}}
       spell = %Spell{id: 116, school: :frost}
-      event = Effects.deliver_spell_outcome(target_guid, caster_guid, spell, :resist)
+      context = %CastContext{caster_guid: caster_guid, hit_outcome: :resist}
+      event = Effects.deliver_spell(target_guid, context, spell)
 
       assert ^mob = EventSink.emit(mob, event)
-      assert_receive {:"$gen_cast", {:receive_spell_outcome, ^caster_guid, ^spell, :resist}}
+      assert_receive {:"$gen_cast", {:receive_spell, %{caster_guid: ^caster_guid, hit_outcome: :resist}, ^spell}}
     end
 
     @tag :dbc_db

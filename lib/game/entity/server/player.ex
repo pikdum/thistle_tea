@@ -126,6 +126,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Combat, as: SpellCombat
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Time
@@ -453,13 +454,17 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     now = Time.now()
     harmful? = Spell.harmful?(spell)
     alive? = Death.alive?(character)
-    character = apply_incoming_spell(character, caster, spell, now, harmful?, alive?)
+    {character, combat?} = apply_incoming_spell(character, caster, spell, now, harmful?, alive?)
 
     state = %{state | character: character}
     state = TickScheduler.ensure_scheduled(state)
-    if Spell.starts_combat?(spell) and alive?, do: notify_defensive_pet(character, spell_caster_guid(caster))
+    if combat? and alive?, do: notify_defensive_pet(character, spell_caster_guid(caster))
 
     {:noreply, state, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Incoming spell failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:use_quest_object, guid, world}, %State{} = state) do
@@ -470,29 +475,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
-  def handle_cast({:receive_spell_outcome, caster_guid, spell, outcome}, %{character: %Character{} = character} = state) do
-    harmful? = Spell.harmful?(spell)
-
-    state =
-      if harmful? and not Death.alive?(character) do
-        state
-      else
-        now = Time.now()
-
-        character =
-          if Spell.starts_combat?(spell),
-            do: PlayerCombat.mark_attacked(character, now, PlayerReputation.faction_id(caster_guid)),
-            else: character
-
-        {character, events} = SpellEffect.receive_outcome(character, caster_guid, spell, outcome, now)
-        character = EventSink.emit(character, events)
-        state = %{state | character: character}
-        if harmful?, do: TickScheduler.ensure_scheduled(state), else: state
-      end
-
-    if Spell.starts_combat?(spell) and Death.alive?(character), do: notify_defensive_pet(state.character, caster_guid)
-
+  def handle_cast({:spell_contact, %Effects.SpellContact{} = effect}, %{character: %Character{} = character} = state) do
+    character = character |> SpellCombat.apply_caster(effect) |> EventSink.emit_pending()
+    state = TickScheduler.ensure_scheduled(%{state | character: character})
     {:noreply, state, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Spell combat contact failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:trigger_spell, spell_id, target_guid, opts}, %{character: %Character{} = character} = state)
@@ -1943,29 +1933,32 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp notify_defensive_pet(%Character{}, _attacker_guid), do: :ok
 
-  defp apply_incoming_spell(%Character{} = character, _caster, _spell, _now, true, false), do: character
+  defp apply_incoming_spell(%Character{} = character, _caster, _spell, _now, true, false), do: {character, false}
 
   defp apply_incoming_spell(%Character{} = character, caster, spell, now, true, true) do
     if PlayerCombat.undetectable?(character, now) do
-      character
+      {character, false}
     else
-      character =
-        if Spell.starts_combat?(spell) do
-          PlayerCombat.mark_attacked(character, now, caster |> spell_caster_guid() |> PlayerReputation.faction_id())
-        else
-          character
-        end
-
-      {character, events} = SpellReception.receive(character, caster, spell, now)
-      notify_spell_hit_target(caster, character.object.guid, spell, events)
-      EventSink.emit(character, events)
+      receive_prepared_spell(character, caster, spell, now)
     end
   end
 
   defp apply_incoming_spell(%Character{} = character, caster, spell, now, false, _alive?) do
-    {character, events} = SpellReception.receive(character, caster, spell, now)
+    receive_prepared_spell(character, caster, spell, now)
+  end
+
+  defp receive_prepared_spell(character, caster, spell, now) do
+    prepared = SpellReception.prepare(character, caster, spell, now)
+    combat? = SpellReception.starts_combat?(prepared)
+
+    character =
+      if combat?,
+        do: PlayerCombat.mark_attacked(character, now, caster |> spell_caster_guid() |> PlayerReputation.faction_id()),
+        else: character
+
+    {character, events} = SpellReception.apply_prepared(character, prepared, now)
     notify_spell_hit_target(caster, character.object.guid, spell, events)
-    EventSink.emit(character, events)
+    {EventSink.emit(character, events), combat?}
   end
 
   defp notify_spell_hit_target(caster, target_guid, %Spell{} = spell, events)
