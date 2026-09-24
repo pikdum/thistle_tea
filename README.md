@@ -114,6 +114,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Wounded creature movement](docs/wounded-creatures-playtest.md), with low-health running penalties, pet and boss exemptions, active path retiming, snare composition, and recovery
 - periodic mana drains and life leech, with transfers limited by available mana and actual health lost
 - healing suppression and amplification across direct heals and HoTs, with strongest-effect stacking and live expiry updates
+- [Absorb shield scaling](docs/absorb-scaling-playtest.md), with caster healing and school power, low-rank penalties, talent ordering, depletion, and retained capacity across reconnect
 - stack-aware dispels, with partial cures, Dispel All categories, and client combat-log feedback
 - talent-based dispel resistance, including Vile Poisons, per-stack attempts, and failed-dispel feedback
 - general and school-specific spell reflection, including Sheen of Zanza's guaranteed first reflection and charge consumption
