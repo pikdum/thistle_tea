@@ -16,6 +16,32 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ModifiersTest do
   setup [:entities]
 
   describe "apply_spell/4" do
+    test "fractional attack power survives aggregation before the final unit projection", %{target: target} do
+      holders =
+        for id <- [1, 2],
+            do: %Holder{
+              spell: %Spell{id: id},
+              auras: [%Aura{type: :mod_attack_power, amount: 9.5}]
+            }
+
+      assert Stats.recompute(%{target.unit | auras: holders}).attack_power == 219
+    end
+
+    test "fractional haste reaches both weapon and casting periods", %{caster: caster, target: target} do
+      caster = %{caster | unit: %{caster.unit | auras: [modifier(23, 6)]}}
+
+      for type <- [:mod_melee_haste, :mod_casting_speed] do
+        spell = spell(type, 30)
+        context = CastContext.from_caster(caster, spell, 2)
+        {applied, _events} = AuraLogic.apply_spell(target, context, spell, 1_000)
+        assert hd(hd(applied.unit.auras).auras).amount == 31.8
+
+        if type == :mod_melee_haste,
+          do: assert(applied.unit.base_attack_time == 1_517),
+          else: assert_in_delta(applied.unit.mod_cast_speed, 100 / 131.8, 0.000001)
+      end
+    end
+
     test "attack power operations follow all-effects modifiers and feed derived stats", %{
       caster: caster,
       target: target
@@ -31,7 +57,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ModifiersTest do
         spell = spell(type, 100)
         context = CastContext.from_caster(caster, spell, 2)
         {applied, _events} = AuraLogic.apply_spell(target, context, spell, 1_000)
-        assert [%Holder{auras: [%Aura{amount: 210}]}] = applied.unit.auras
+        assert [%Holder{auras: [%Aura{amount: amount}]}] = applied.unit.auras
+        assert amount == 210
         assert Map.fetch!(applied.unit, field) == expected
         assert Stats.recompute(applied.unit) == applied.unit
 

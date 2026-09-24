@@ -122,7 +122,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
       stacks = holder_stacks(holder)
 
       Enum.reduce(auras, acc, fn
-        %Aura{type: ^type, amount: amount}, inner when is_integer(amount) -> inner + amount * stacks
+        %Aura{type: ^type, amount: amount}, inner when is_number(amount) -> inner + amount * stacks
         _aura, inner -> inner
       end)
     end)

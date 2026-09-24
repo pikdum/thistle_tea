@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.World.Loader.SpellAuraModifiersDbcTest do
   describe "load/1" do
     test "Improved Seal of the Crusader increases attack power without changing haste" do
       target = apply_with_talent(20_337, 20_308)
-      assert amount(target, :mod_attack_power) == 373
+      assert amount(target, :mod_attack_power) == 373.75
       assert amount(target, :mod_attack_speed) == 40
       assert target.unit.attack_power == 573
       assert target.unit.base_attack_time == 1_428
@@ -32,8 +32,8 @@ defmodule ThistleTea.Game.World.Loader.SpellAuraModifiersDbcTest do
 
     test "Bonescythe Breastplate improves Slice and Dice haste" do
       target = apply_with_talent(28_107, 6774)
-      assert amount(target, :mod_melee_haste) == 31
-      assert target.unit.base_attack_time == trunc(2_000 * 100 / 131)
+      assert amount(target, :mod_melee_haste) == 31.8
+      assert target.unit.base_attack_time == trunc(2_000 * 100 / 131.8)
     end
 
     test "profession casts retain the tradeskill exemption from casting haste" do

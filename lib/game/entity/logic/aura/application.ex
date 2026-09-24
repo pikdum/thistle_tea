@@ -655,8 +655,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         do: periodic_done_amount(entity, spell, context, amount) * context.happiness_multiplier,
         else: amount
 
-    amount = Modifiers.aura_amount(context.spell_modifiers, effect, amount * (multiplier || 1.0))
-    trunc(amount + AbsorbBonus.value(spell, effect, context))
+    amount = trunc(amount * (multiplier || 1.0) + AbsorbBonus.value(spell, effect, context))
+    Modifiers.aura_amount(context.spell_modifiers, effect, amount)
   end
 
   defp periodic_done_amount(entity, %Spell{} = spell, %CastContext{} = context, amount) do
