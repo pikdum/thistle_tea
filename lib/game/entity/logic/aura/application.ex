@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Logic.TargetSpellPower
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Chain
   alias ThistleTea.Game.Spell.Coefficient
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Modifiers
@@ -610,11 +611,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     level_units = Spell.level_units(spell, context.caster_level)
     combo_points = finisher_combo_points(spell, context)
 
-    if combo_points > 0 do
-      Effect.amount(effect, level_units, combo_points)
-    else
-      Effect.roll(effect, level_units)
-    end
+    effect
+    |> Effect.amount(level_units, combo_points)
+    |> Chain.scale(effect, context)
   end
 
   defp finisher_combo_points(%Spell{} = spell, %CastContext{combo_points: points}) do

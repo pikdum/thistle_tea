@@ -318,6 +318,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
       caster = caster(player_guid, {0.0, 0.0, 0.0})
 
       spell = %Spell{
+        attributes: MapSet.new([:ignore_line_of_sight]),
         effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy, chain_targets: 3}]
       }
 

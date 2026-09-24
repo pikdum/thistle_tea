@@ -1320,6 +1320,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           in_combat: state.internal.in_combat == true,
           rooted?: state.internal.rooted? == true,
           health_pct: Core.health_pct(state),
+          health_deficit: Core.health_deficit(state),
           mana_pct: Core.mana_pct(state),
           power_type: state.unit.power_type,
           unit_flags: state.unit.flags,

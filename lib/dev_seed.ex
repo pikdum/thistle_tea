@@ -17,6 +17,7 @@ defmodule ThistleTea.DevSeed do
   A door, lever, incantation, mortar, and stink bombs support object use and activation spells.
   A Land Walker supports Zorbin's Ultra-Shrinker and creature transformation testing.
   A Squirrel drops random-property cloth armor and has a three-minute respawn for loot testing.
+  Three adjacent Skeletal Flayers west of the playground support chained spell testing.
   """
   import Ecto.Query
 
@@ -304,6 +305,16 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(3639, @base_low_guid + 1300, {x + 20.0, y + 36.0, z}, nil, @respawn_secs)
     spawn_mob(5357, @base_low_guid + 1400, {x + 40.0, y - 40.0, z}, nil, @hostile_respawn_secs)
     spawn_mob(1412, @base_low_guid + 1500, {x + 10.0, y + 10.0, z}, %{items: [{14_113, 1}], gold: 0}, 180)
+
+    for index <- 0..2 do
+      spawn_mob(
+        @hostile_entry,
+        @base_low_guid + 1600 + index,
+        {x - 110.0 + index * 8.0, y + 40.0, z},
+        nil,
+        @hostile_respawn_secs
+      )
+    end
   end
 
   defp seed_game_objects do

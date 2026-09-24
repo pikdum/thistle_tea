@@ -21,6 +21,16 @@ defmodule ThistleTea.Game.World.PresenceTest do
   alias ThistleTea.Game.WorldRef
 
   describe "enter/2" do
+    test "publishes health deficits through entry and subsequent owner updates" do
+      character = character(WorldRef.open(0), {1.0, 2.0, 3.0, 1.5}, 12)
+      character = %{character | unit: %{character.unit | health: 300, max_health: 1_000}}
+      on_exit(fn -> Presence.leave(character) end)
+      Presence.enter(character, %{})
+      assert Metadata.get(character.object.guid).health_deficit == 700
+      Presence.sync(%{character | unit: %{character.unit | health: 1_000}}, %{})
+      assert Metadata.get(character.object.guid).health_deficit == 0
+    end
+
     test "publishes metadata and position from one character snapshot" do
       character = character(WorldRef.open(0), {1.0, 2.0, 3.0, 1.5}, 12)
       on_exit(fn -> Presence.leave(character) end)

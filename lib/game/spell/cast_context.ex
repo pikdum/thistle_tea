@@ -81,6 +81,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :combo_retention_spell,
     :spell_threat,
     :spell_hit_snapshot,
+    :chain_effects,
     triggered_by_aura?: false,
     caster_available?: true,
     caster_totem?: false,

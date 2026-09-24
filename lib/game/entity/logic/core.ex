@@ -280,6 +280,11 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   def health_pct(_entity), do: 100
 
+  def health_deficit(%{unit: %Unit{health: health, max_health: maximum}})
+      when is_integer(health) and is_integer(maximum), do: max(maximum - health, 0)
+
+  def health_deficit(_entity), do: 0
+
   def mana_pct(%{unit: %Unit{power1: mana, max_power1: max_mana}})
       when is_number(mana) and is_number(max_mana) and max_mana > 0 do
     mana

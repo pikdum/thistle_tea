@@ -27,6 +27,17 @@ defmodule ThistleTea.Game.Entity.EffectResolver.TriggeredHitDbcTest do
   setup [:entities]
 
   describe "resolve/2" do
+    test "foreign chain triggers are resolved by their caster", %{caster: caster, target: target} do
+      trigger = Effects.trigger_spell(caster.object.guid, caster.unit.level, target.object.guid, 421)
+      caster_guid = caster.object.guid
+      target_guid = target.object.guid
+
+      assert [
+               %Effects.TriggerSpellRequest{source_guid: ^caster_guid, target_guid: ^target_guid, spell_id: 421}
+             ] =
+               Spells.resolve(target, trigger)
+    end
+
     test "channel ticks retain caster hit inputs and the selected target after channel cleanup", %{
       caster: caster,
       target: target,

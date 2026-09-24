@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Chain
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
@@ -87,6 +88,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         effects =
           target
           |> applicable_effects(context, spell.effects)
+          |> Chain.effects(context)
           |> Warrior.filter_target_effects(target.object.guid, context, spell)
           |> defer_combo_retention(context)
 

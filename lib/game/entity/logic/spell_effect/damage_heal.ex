@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Chain
   alias ThistleTea.Game.Spell.Coefficient
   alias ThistleTea.Game.Spell.Critical
   alias ThistleTea.Game.Spell.Effect
@@ -378,15 +379,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   defp effect_amount(%Spell{} = spell, %Effect{} = effect, %CastContext{} = context) do
     level_units = Spell.level_units(spell, context.caster_level)
 
-    if Scripts.finisher?(spell) do
-      Effect.amount(effect, level_units, context.combo_points || 0)
-    else
-      Effect.roll(effect, level_units)
-    end
+    amount = Effect.amount(effect, level_units, if(Scripts.finisher?(spell), do: context.combo_points, else: 0))
+    Chain.scale(amount, effect, context)
   end
 
   defp rolled_amount(%Spell{} = spell, %Effect{} = effect, %CastContext{} = context) do
-    Effect.roll(effect, Spell.level_units(spell, context.caster_level))
+    effect
+    |> Effect.roll(Spell.level_units(spell, context.caster_level))
+    |> Chain.scale(effect, context)
   end
 
   defp eviscerate_attack_power(%Spell{} = spell, %CastContext{} = context) do

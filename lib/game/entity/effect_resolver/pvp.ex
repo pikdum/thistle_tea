@@ -57,7 +57,15 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Pvp do
   end
 
   defp friendly_target?(%Spell{effects: effects}) do
-    friendly_targets = [:target_ally, :pet, :party_member, :party_around_caster, :party_around_target, :raid_and_class]
+    friendly_targets = [
+      :target_ally,
+      :chain_heal,
+      :pet,
+      :party_member,
+      :party_around_caster,
+      :party_around_target,
+      :raid_and_class
+    ]
 
     Enum.any?(effects, fn effect ->
       effect.implicit_target_a in friendly_targets or effect.implicit_target_b in friendly_targets

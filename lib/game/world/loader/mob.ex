@@ -100,6 +100,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         in_combat: false,
         rooted?: mob.internal.rooted? == true,
         health_pct: Core.health_pct(mob),
+        health_deficit: Core.health_deficit(mob),
         mana_pct: Core.mana_pct(mob),
         power_type: mob.unit.power_type,
         orientation: elem(mob.movement_block.position, 3),

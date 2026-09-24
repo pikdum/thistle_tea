@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Chain
   alias ThistleTea.Game.Spell.Focus
   alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.Scripts
@@ -176,7 +177,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
   defp foreign_owner_required?(entity, effect, spell) do
     is_integer(effect.source_guid) and effect.source_guid != entity.object.guid and
-      (Spell.attribute?(spell, :channeled) or ObjectTargets.required?(spell) or
+      (Spell.attribute?(spell, :channeled) or Chain.spell?(spell) or ObjectTargets.required?(spell) or
          (Focus.required?(spell) and Guid.entity_type(effect.source_guid) == :player))
   end
 
@@ -195,7 +196,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
       Spell.attribute?(spell, :channeled) ->
         resolve_triggered_channel(entity, effect, spell)
 
-      effect.resolve_targets? or SpellTarget.area_targeted?(spell) ->
+      effect.resolve_targets? or SpellTarget.area_targeted?(spell) or Chain.spell?(spell) ->
         resolve_area_trigger(entity, effect, spell)
 
       true ->
@@ -266,6 +267,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
     {hits, misses} = Enum.split_with(contexts, &(&1.hit_outcome == :hit))
     hit_guids = Enum.map(hits, & &1.target_guid)
+    chain = Chain.plan(entity, spell, targets, hit_guids)
     misses = Enum.map(misses, &%{guid: &1.target_guid, reason: 2})
 
     launch =
@@ -280,6 +282,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
     deliveries =
       Enum.flat_map(contexts, fn context ->
+        context = Chain.put_context(context, chain)
         resolved_delivery(entity, Effects.deliver_spell(context.target_guid, context, spell))
       end)
 

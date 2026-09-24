@@ -847,7 +847,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(28), do: :aoe_enemy_at_channel
   defp target_type(32), do: :minion_position
   defp target_type(5), do: :pet
-  defp target_type(45), do: :target_ally
+  defp target_type(45), do: :chain_heal
   defp target_type(53), do: :aoe_enemy_at_dest
   defp target_type(61), do: :raid_and_class
   defp target_type(other) when is_integer(other), do: other

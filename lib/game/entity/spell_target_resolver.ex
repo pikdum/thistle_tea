@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   Boundary that resolves a spell's target query into concrete guids using
   spatial lookups and hostility checks.
   """
+  alias ThistleTea.Game.Entity.ChainTargets
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Insignia
@@ -22,7 +23,6 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   @cone_arc_radians :math.pi() / 3
-  @chain_jump_radius 10.0
 
   def resolve(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, %Target{} = targets) do
     cond do
@@ -64,7 +64,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
       |> Enum.filter(&creature_type_allowed?(spell, &1))
 
     redirected = redirect_initial(caster, spell, query, initial)
-    targets = if redirected == initial, do: expand_chain(caster, spell, initial), else: redirected
+    targets = if redirected == initial, do: ChainTargets.expand(caster, spell, initial), else: redirected
     targets = if Spell.harmful?(spell), do: targets, else: Enum.filter(targets, &Hostility.can_assist?(caster, &1))
     append_caster_execution_target(targets, spell, caster_guid)
   end
@@ -74,18 +74,6 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   end
 
   defp redirect_initial(_caster, _spell, _query, targets), do: targets
-
-  defp expand_chain(caster, %Spell{} = spell, [first | _] = initial) do
-    count = spell.effects |> Enum.map(&(&1.chain_targets || 0)) |> Enum.max(fn -> 0 end)
-
-    if count > 1 do
-      chain_targets(caster, spell, first, Enum.uniq(initial), count - length(initial))
-    else
-      initial
-    end
-  end
-
-  defp expand_chain(_caster, _spell, initial), do: initial
 
   defp append_caster_execution_target(targets, %Spell{effects: effects}, caster_guid) do
     if Enum.any?(effects, &caster_execution_effect?/1) do
@@ -105,61 +93,6 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   defp caster_execution_effect?(%{type: :summon_wild}), do: true
   defp caster_execution_effect?(%{type: :summon_demon, implicit_target_a: nil, implicit_target_b: nil}), do: true
   defp caster_execution_effect?(effect), do: PetTraining.training_effect?(effect)
-
-  defp chain_targets(_caster, _spell, _previous, selected, remaining) when remaining <= 0, do: selected
-
-  defp chain_targets(caster, spell, previous, selected, remaining) do
-    case next_chain_target(caster, spell, previous, selected) do
-      nil -> selected
-      guid -> chain_targets(caster, spell, guid, selected ++ [guid], remaining - 1)
-    end
-  end
-
-  defp next_chain_target(caster, spell, previous, selected) do
-    case World.position(previous) do
-      {map, x, y, z} ->
-        ((:players |> World.nearby_units_exact(map, {x, y, z}, @chain_jump_radius)) ++
-           (:mobs |> World.nearby_units_exact(map, {x, y, z}, @chain_jump_radius)))
-        |> Enum.reject(fn {guid, _distance} -> guid in selected end)
-        |> Enum.filter(fn {guid, _distance} -> valid_chain_target?(caster, spell, guid) end)
-        |> pick_chain_target(spell)
-
-      _ ->
-        nil
-    end
-  end
-
-  defp pick_chain_target(candidates, %Spell{} = spell) do
-    picked =
-      if Spell.requires_hostile_target?(spell) do
-        Enum.min_by(candidates, &elem(&1, 1), fn -> nil end)
-      else
-        Enum.min_by(candidates, &health_pct(elem(&1, 0)), fn -> nil end)
-      end
-
-    case picked do
-      {guid, _distance} -> guid
-      nil -> nil
-    end
-  end
-
-  defp health_pct(guid) do
-    case Metadata.query(guid, [:health_pct]) do
-      %{health_pct: pct} when is_number(pct) -> pct
-      _ -> 100.0
-    end
-  end
-
-  defp valid_chain_target?(caster, %Spell{} = spell, guid) do
-    if Spell.requires_hostile_target?(spell) do
-      Hostility.valid_attack_target?(caster, guid)
-    else
-      case Metadata.query(guid, [:alive?, :faction_template]) do
-        %{alive?: true} = metadata -> Hostility.friendly?(caster, Map.put(metadata, :guid, guid))
-        _ -> false
-      end
-    end
-  end
 
   defp pet_target_query(%Character{} = caster, %Spell{effects: effects}) do
     pet_guid = Character.controlled_guid(caster)

@@ -180,6 +180,11 @@ defmodule ThistleTea.Game.Spell.Modifiers do
     Enum.any?(effects, &(&1.aura in [:periodic_leech, :periodic_health_funnel]))
   end
 
+  defp operation_used_by_spell?(operation, %Spell{effects: effects})
+       when operation in [:jump_targets, :effect_past_first] do
+    Enum.any?(effects, &(is_integer(&1.chain_targets) and &1.chain_targets > 0))
+  end
+
   defp operation_used_by_spell?(:crit_damage_bonus, %Spell{} = spell), do: critical_spell?(spell)
   defp operation_used_by_spell?(:resist_miss_chance, %Spell{} = spell), do: Spell.harmful?(spell)
 

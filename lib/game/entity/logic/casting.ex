@@ -43,6 +43,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Spell.CastResolution.Impact
   alias ThistleTea.Game.Spell.CastResolution.PowerCost
   alias ThistleTea.Game.Spell.CastValidation
+  alias ThistleTea.Game.Spell.Chain
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.ObjectTargets
@@ -357,13 +358,14 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp resolve(entity, %Cast{spell: %Spell{} = spell, targets: %Target{} = targets} = casting) do
     resolved_targets = resolve_targets(entity, casting)
     {hits, misses} = roll_spell_hits(entity, spell, resolved_targets)
+    chain = Chain.plan(entity, spell, resolved_targets, hits)
     object_guid = Target.object_guid(targets)
 
     %CastResolution{
       hits: hits,
       misses: misses,
       costs: casting_costs(entity, casting),
-      impacts: resolved_impacts(entity, spell, hits, misses),
+      impacts: resolved_impacts(entity, spell, hits, misses, chain),
       followups: %Followups{
         packet_hits: Enum.uniq(hits ++ object_hit(object_guid) ++ object_guids(casting)),
         selected_unit_guid: selected_unit_guid(entity.object.guid, spell, targets, resolved_targets),
@@ -401,8 +403,16 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp selected_unit_guid(_caster, _spell, targets, _resolved), do: Target.unit_guid(targets)
 
-  defp resolved_impacts(entity, spell, hits, misses) do
-    if Insignia.spell?(spell), do: [], else: unit_impacts(entity, spell, hits, misses)
+  defp resolved_impacts(entity, spell, hits, misses, chain) do
+    if Insignia.spell?(spell) do
+      []
+    else
+      entity
+      |> unit_impacts(spell, hits, misses)
+      |> Enum.map(fn impact ->
+        %{impact | chain_effects: if(chain, do: Map.get(chain, impact.target_guid, %{}))}
+      end)
+    end
   end
 
   defp unit_impacts(entity, spell, hits, misses) do
@@ -1385,6 +1395,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
           destination_position: Target.ground_location(casting.targets),
           target_hostile?: target_guid != caster_guid and Hostility.valid_attack_target?(caster, target_guid),
           target_role: target_role,
+          chain_effects: impact.chain_effects,
           hit_outcome: impact.hit_outcome
       }
 
@@ -1426,12 +1437,6 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp dispatch_to_target(character, _context, _spell, _target_guid, _now), do: character
 
   defp resolve_targets(caster, %Cast{spell: %Spell{} = spell, targets: %Target{} = targets}) do
-    resolved = SpellTargetResolver.resolve(caster, spell, targets)
-
-    if Enum.any?(spell.effects, &(&1.implicit_target_a == :caster or &1.implicit_target_b == :caster)) do
-      Enum.uniq([caster.object.guid | resolved])
-    else
-      resolved
-    end
+    SpellTargetResolver.resolve(caster, spell, targets)
   end
 end
