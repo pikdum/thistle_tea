@@ -127,6 +127,10 @@ defmodule ThistleTea.Game.Network.Server do
   defp dispatch_message(message, %ConnectionState{player_pid: player_pid} = state) when is_pid(player_pid) do
     :ok = PlayerServer.handle_message(player_pid, message)
     state
+  catch
+    :exit, {reason, {GenServer, :call, [^player_pid | _args]}}
+    when reason in [:noproc, :normal, {:shutdown, :logout}] ->
+      state
   end
 
   defp dispatch_message(message, state), do: Message.handle(message, state)

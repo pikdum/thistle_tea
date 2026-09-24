@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
 
   alias ThistleTea.Game.Network.Connection
   alias ThistleTea.Game.Network.ConnectionState
+  alias ThistleTea.Game.Network.Message.CmsgQuestgiverStatusQuery
   alias ThistleTea.Game.Network.Message.SmsgPong
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
@@ -48,6 +49,68 @@ defmodule ThistleTea.Game.Network.ServerTest do
   end
 
   describe "handle_packets/1" do
+    test "late queries during logout leave completion to the owner monitor" do
+      player_pid =
+        spawn(fn ->
+          receive do
+            {:"$gen_call", _from, {:client_message, %CmsgQuestgiverStatusQuery{}}} -> exit({:shutdown, :logout})
+          end
+        end)
+
+      packet = %Packet{opcode: Opcodes.get(:CMSG_QUESTGIVER_STATUS_QUERY), payload: <<1::little-size(64)>>}
+      state = %ConnectionState{account: %{id: 1}, conn: %Connection{session_key: <<0>>, packet_queue: [packet, packet]}}
+      state = ConnectionState.attach_player(state, player_pid)
+      monitor = state.player_monitor
+
+      drained = Server.handle_packets(state)
+      assert drained.player_pid == player_pid
+      assert drained.conn.packet_queue == []
+      refute_received {:socket_send, _packet}
+      assert_receive {:DOWN, ^monitor, :process, ^player_pid, {:shutdown, :logout}} = down
+
+      socket = test_socket()
+      assert {:noreply, {^socket, detached}, 0} = Server.handle_info(down, {socket, drained})
+      assert detached.player_pid == nil
+      assert detached.player_monitor == nil
+      assert detached.account == %{id: 1}
+      assert_receive {:socket_send, _logout_complete}
+      refute_received {:socket_send, _duplicate}
+    end
+
+    test "a query after owner exit does not consume the pending shutdown notification" do
+      player_pid =
+        spawn(fn ->
+          receive do
+            :logout -> exit({:shutdown, :logout})
+          end
+        end)
+
+      packet = %Packet{opcode: Opcodes.get(:CMSG_QUESTGIVER_STATUS_QUERY), payload: <<1::little-size(64)>>}
+      state = ConnectionState.attach_player(%ConnectionState{conn: %Connection{packet_queue: [packet]}}, player_pid)
+      monitor = state.player_monitor
+      send(player_pid, :logout)
+      assert_receive {:DOWN, ^monitor, :process, ^player_pid, {:shutdown, :logout}} = down
+      send(self(), down)
+
+      assert %ConnectionState{player_pid: ^player_pid, player_monitor: ^monitor, conn: %Connection{packet_queue: []}} =
+               Server.handle_packets(state)
+
+      assert_receive ^down
+    end
+
+    test "unexpected failures still propagate while dispatching a message" do
+      player_pid =
+        spawn(fn ->
+          receive do
+            {:"$gen_call", _from, _message} -> exit(:boom)
+          end
+        end)
+
+      packet = %Packet{opcode: Opcodes.get(:CMSG_QUESTGIVER_STATUS_QUERY), payload: <<1::little-size(64)>>}
+      state = %ConnectionState{player_pid: player_pid, conn: %Connection{packet_queue: [packet]}}
+      assert {:boom, {GenServer, :call, _args}} = catch_exit(Server.handle_packets(state))
+    end
+
     test "handles ping on the connection before and after player attachment" do
       packet = %Packet{
         opcode: Opcodes.get(:CMSG_PING),
