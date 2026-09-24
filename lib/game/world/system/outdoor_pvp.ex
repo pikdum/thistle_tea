@@ -7,7 +7,9 @@ defmodule ThistleTea.Game.World.System.OutdoorPvp do
   alias ThistleTea.Game.OutdoorPvp.ResourceRace
   alias ThistleTea.Game.OutdoorPvp.Towers
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World.OutdoorPvp.CaptureAnnouncements
   alias ThistleTea.Game.World.OutdoorPvp.CaptureEnvironment
+  alias ThistleTea.Game.World.OutdoorPvp.CaptureRewards
   alias ThistleTea.Game.WorldRef
 
   require Logger
@@ -44,6 +46,8 @@ defmodule ThistleTea.Game.World.System.OutdoorPvp do
        members: %{},
        towers: Keyword.get(opts, :towers, %Towers{}),
        objects: %{},
+       rewards: %{},
+       rewards_enabled?: false,
        timer: nil,
        interval_ms: Keyword.get(opts, :interval_ms, 1000),
        updated_at: clock.(),
@@ -86,6 +90,7 @@ defmodule ThistleTea.Game.World.System.OutdoorPvp do
   def terminate(_reason, state) do
     if state.timer, do: Process.cancel_timer(state.timer)
     CaptureEnvironment.stop_banners(state.objects)
+    CaptureRewards.stop(state.rewards)
   end
 
   defp handle_request(:snapshot, _from, state), do: {:reply, state.race, state}
@@ -104,7 +109,17 @@ defmodule ThistleTea.Game.World.System.OutdoorPvp do
 
   defp handle_request({:configure_towers, %Towers{} = towers, objects}, _from, state) do
     CaptureEnvironment.stop_banners(state.objects)
-    state = %{state | towers: towers, objects: objects, updated_at: state.clock.()}
+    rewards = CaptureRewards.reconcile(state.rewards, towers)
+
+    state = %{
+      state
+      | towers: towers,
+        objects: objects,
+        rewards: rewards,
+        rewards_enabled?: true,
+        updated_at: state.clock.()
+    }
+
     {:reply, :ok, schedule_tick(state)}
   end
 
@@ -204,16 +219,21 @@ defmodule ThistleTea.Game.World.System.OutdoorPvp do
 
   defp advance_towers(state, now) do
     previous = state.towers
-    current = Towers.advance(previous, state.participants.(state.members), max(now - state.updated_at, 0))
+    participants = state.participants.(state.members)
+    current = Towers.advance(previous, participants, max(now - state.updated_at, 0))
 
     Enum.each(Towers.ownership_changes(previous, current), fn {id, _before, owner} ->
       CaptureEnvironment.update_banners(state.objects, id, owner)
-      reward_capture(state.members, current, id, owner)
+      reward_capture(state.members, participants, id, owner)
     end)
+
+    CaptureAnnouncements.publish(previous, current)
+
+    rewards = if state.rewards_enabled?, do: CaptureRewards.reconcile(state.rewards, current), else: state.rewards
 
     Enum.each(state.members, &project_towers(&1, previous, current))
 
-    %{state | towers: current, updated_at: now}
+    %{state | towers: current, rewards: rewards, updated_at: now}
   end
 
   defp project_towers({guid, member}, previous, current) do
@@ -226,18 +246,15 @@ defmodule ThistleTea.Game.World.System.OutdoorPvp do
     end
   end
 
-  defp reward_capture(members, towers, id, owner) when owner in [:alliance, :horde] do
-    Enum.each(towers.members, fn
-      {guid, {^id, ^owner}} ->
-        case members[guid] do
-          %{pid: pid, token: token} -> send(pid, {:outdoor_pvp_credit, token, Plaguelands.towers()[id].credit_entry})
-          _missing -> :ok
-        end
-
-      _other ->
-        :ok
+  defp reward_capture(members, participants, id, owner) do
+    participants
+    |> Towers.capture_recipients(id, owner)
+    |> Enum.uniq()
+    |> Enum.each(fn guid ->
+      case members[guid] do
+        %{pid: pid, token: token} -> send(pid, {:outdoor_pvp_credit, token, Plaguelands.towers()[id].credit_entry})
+        _missing -> :ok
+      end
     end)
   end
-
-  defp reward_capture(_members, _towers, _id, _owner), do: :ok
 end

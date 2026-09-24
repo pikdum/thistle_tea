@@ -80,6 +80,29 @@ defmodule ThistleTea.Game.OutdoorPvp.Towers do
         do: {id, before, after_team}
   end
 
+  def phase_changes(%__MODULE__{} = previous, %__MODULE__{} = current) do
+    for {id, point} <- Enum.sort(current.points),
+        before <- [Map.fetch!(previous.points, id).phase],
+        before != point.phase,
+        do: {id, before, point.phase}
+  end
+
+  def capture_recipients(participants, id, team) when team in [:alliance, :horde] do
+    position = Plaguelands.credit_position(id, team)
+
+    for %Participant{
+          guid: guid,
+          team: ^team,
+          world: %WorldRef{map_id: 0, instance_id: nil},
+          eligible?: true,
+          position: target
+        } <- participants,
+        Math.distance(position, target) <= 100,
+        do: guid
+  end
+
+  def capture_recipients(_participants, _id, _team), do: []
+
   def updates(%__MODULE__{} = previous, %__MODULE__{} = current, guid) do
     region = if world_states(previous) == world_states(current), do: [], else: world_states(current)
     meter = meter_updates(previous, current, guid, region != [])

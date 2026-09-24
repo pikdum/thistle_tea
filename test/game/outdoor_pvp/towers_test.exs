@@ -99,6 +99,23 @@ defmodule ThistleTea.Game.OutdoorPvp.TowersTest do
     end
   end
 
+  describe "capture_recipients/3" do
+    test "credits eligible allies within the reward radius, including outside the capture meter" do
+      {x, y, z} = Plaguelands.credit_position(:northpass, :alliance)
+      ally = %{participant(1, :northpass, :alliance) | position: {x + 90, y, z}}
+
+      excluded = [
+        %{ally | guid: 2, position: {x + 101, y, z}},
+        %{ally | guid: 3, team: :horde},
+        %{ally | guid: 4, eligible?: false},
+        %{ally | guid: 5, world: WorldRef.instance(0, 1)}
+      ]
+
+      assert Towers.capture_recipients([ally | excluded], :northpass, :alliance) == [1]
+      assert Towers.capture_recipients([ally], :northpass, nil) == []
+    end
+  end
+
   defp towers(_context) do
     templates =
       Map.new(Plaguelands.towers(), fn {_id, definition} ->

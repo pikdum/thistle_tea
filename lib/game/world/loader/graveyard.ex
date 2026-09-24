@@ -57,7 +57,7 @@ defmodule ThistleTea.Game.World.Loader.Graveyard do
   def team_for_race(race) when race in @horde_races, do: @team_horde
   def team_for_race(_race), do: nil
 
-  def closest(map, position, team) do
+  def closest(map, position, team, candidates \\ &for_area/1) do
     dungeon = Map.get(MapTemplate.dungeons(), map)
 
     with {zone, area} <- Pathfinding.get_zone_and_area(map, position) || dungeon_zone(dungeon) do
@@ -67,8 +67,8 @@ defmodule ThistleTea.Game.World.Loader.Graveyard do
           _missing -> nil
         end
 
-      closest_of(for_area(area), map, position, team, entrance) ||
-        closest_of(for_area(zone), map, position, team, entrance)
+      closest_of(candidates.(area), map, position, team, entrance) ||
+        closest_of(candidates.(zone), map, position, team, entrance)
     end
   end
 

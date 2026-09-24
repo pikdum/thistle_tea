@@ -14,7 +14,8 @@ defmodule ThistleTea.Game.World.OutdoorPvp.CaptureEnvironment do
 
   def templates do
     Map.new(Plaguelands.towers(), fn {_id, definition} ->
-      {definition.entry, Template.from_game_object(TemplateLoader.get(definition.entry))}
+      %Template{} = template = Template.from_game_object(TemplateLoader.cached(definition.entry))
+      {definition.entry, template}
     end)
   end
 
@@ -35,7 +36,7 @@ defmodule ThistleTea.Game.World.OutdoorPvp.CaptureEnvironment do
     Map.new(Plaguelands.towers(), fn {id, definition} ->
       capture = spawn_object(definition.entry, definition.position, definition.rotation)
       banners = Enum.map(definition.banners, &spawn_object(182_106, &1, nil))
-      {id, Enum.reject([capture | banners], &is_nil/1)}
+      {id, [capture | banners]}
     end)
   end
 
@@ -56,17 +57,13 @@ defmodule ThistleTea.Game.World.OutdoorPvp.CaptureEnvironment do
   end
 
   defp spawn_object(entry, position, rotation) do
-    with %GameObjectTemplate{} = template <- TemplateLoader.get(entry) do
-      entity = GameObject.build_summoned(template, WorldRef.open(0), position)
-      object = %{entity.game_object | art_kit: Plaguelands.art_kit(nil)}
-      object = rotate(object, rotation)
-      entity = %{entity | game_object: object}
-
-      case World.start_entity(entity) do
-        {:ok, _pid} -> entity.object.guid
-        _failure -> nil
-      end
-    end
+    %GameObjectTemplate{} = template = TemplateLoader.cached(entry)
+    entity = GameObject.build_summoned(template, WorldRef.open(0), position)
+    object = %{entity.game_object | art_kit: Plaguelands.art_kit(nil)}
+    object = rotate(object, rotation)
+    entity = %{entity | game_object: object}
+    {:ok, _pid} = World.start_entity(entity)
+    entity.object.guid
   end
 
   defp rotate(object, nil), do: object

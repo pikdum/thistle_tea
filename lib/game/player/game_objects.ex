@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.GameObjects do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.GameObjectInteraction
   alias ThistleTea.Game.Entity.Logic.Goober
+  alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -58,6 +59,9 @@ defmodule ThistleTea.Game.Player.GameObjects do
     enabled? = ((Map.get(metadata, :go_flags) || 0) &&& 0x10) == 0
 
     case GameObjectTemplateLoader.cached(Guid.entry(guid)) do
+      %GameObjectTemplate{type: 22} = template ->
+        enabled? and object_in_range?(character, guid, template, metadata) and not Hostility.hostile?(guid, character)
+
       %GameObjectTemplate{type: type} = template when type in [0, 1, 9, 10] ->
         enabled? and object_in_range?(character, guid, template, metadata)
 

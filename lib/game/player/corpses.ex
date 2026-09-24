@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Player.Corpses do
   alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Graveyards
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.AreaTrigger
   alias ThistleTea.Game.World.Loader.Graveyard
@@ -185,7 +186,7 @@ defmodule ThistleTea.Game.Player.Corpses do
   end
 
   defp defer_open_world_graveyard(state, map_id, position, team) do
-    case Graveyard.closest(map_id, position, team) do
+    case Graveyards.closest(map_id, position, team) do
       %{map: graveyard_map, position: {gx, gy, gz}} ->
         MovementControl.defer_repop(state, {gx, gy, gz, graveyard_map})
 

@@ -11,6 +11,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.Network.Server, as: GameServer
   alias ThistleTea.Game.Network.Sessions
   alias ThistleTea.Game.OutdoorPvp.Plaguelands
+  alias ThistleTea.Game.OutdoorPvp.PlaguelandsRewards
   alias ThistleTea.Game.OutdoorPvp.Towers
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AggroProbe
@@ -23,6 +24,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.CombatLeashes
   alias ThistleTea.Game.World.CreatureGroups
   alias ThistleTea.Game.World.EntitySupervisor
+  alias ThistleTea.Game.World.Graveyards
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.HonorStore
   alias ThistleTea.Game.World.InstanceData
@@ -240,6 +242,7 @@ defmodule ThistleTea.Application do
     MapTemplateLoader.init()
     ModelGeometryLoader.init()
     GraveyardLoader.init()
+    Graveyards.init()
     NpcTextLoader.init()
     PageTextLoader.init()
     EventScriptLoader.init()
@@ -334,7 +337,8 @@ defmodule ThistleTea.Application do
             BattlegroundLoader.broadcast_text_ids() ++ Plaguelands.broadcast_text_ids()
         )
 
-        SummonLoader.preload(InstanceScript.summon_entries())
+        SummonLoader.preload(InstanceScript.summon_entries() ++ PlaguelandsRewards.creature_entries())
+        Enum.each(Plaguelands.buffs() ++ PlaguelandsRewards.aura_ids(), &SpellLoader.cached/1)
         Logger.info("Loading templates...")
         CreatureTemplateLoader.load_all()
         ExplorationLoader.load_all()

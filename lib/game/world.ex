@@ -93,6 +93,13 @@ defmodule ThistleTea.Game.World do
     |> Enum.filter(&(Guid.entity_type(&1) == :game_object))
   end
 
+  def players_in(world) do
+    world
+    |> WorldRef.coerce()
+    |> SpatialHash.guids()
+    |> Enum.filter(&(Guid.entity_type(&1) == :player))
+  end
+
   def nearby_players_at(world, {x, y, z}, range \\ 30) do
     nearby_units_exact(:players, world, {x, y, z}, range)
   end

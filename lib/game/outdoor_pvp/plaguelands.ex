@@ -49,8 +49,15 @@ defmodule ThistleTea.Game.OutdoorPvp.Plaguelands do
     {:controlled, :horde}
   ]
   @buffs %{alliance: [11_413, 11_414, 11_415, 1386], horde: [30_880, 30_683, 30_682, 29_520]}
+  @credit_positions %{
+    crown_guard: %{alliance: {1860.59, -3730.8, 197.854}, horde: {1860.48, -3731.34, 197.778}},
+    eastwall: %{alliance: {2574.12, -4795.33, 145.871}, horde: {2574.0, -4794.79, 145.881}},
+    plaguewood: %{alliance: {2962.6, -3041.96, 155.835}, horde: {2963.02, -3041.9, 155.965}},
+    northpass: %{alliance: {3180.54, -4379.31, 175.275}, horde: {3180.48, -4379.07, 174.995}}
+  }
 
   def towers, do: @towers
+  def credit_position(tower, team), do: @credit_positions[tower][team]
   def objective_zone?(139), do: true
   def objective_zone?(_zone), do: false
   def buff_zone?(zone), do: zone in [139, 2017, 2057]
@@ -71,5 +78,19 @@ defmodule ThistleTea.Game.OutdoorPvp.Plaguelands do
   def animation(:alliance), do: 1
   def animation(:horde), do: 0
 
-  def broadcast_text_ids, do: @towers |> Map.values() |> Enum.flat_map(&Map.values(&1.announcements))
+  def victory_text(:alliance), do: 13_638
+  def victory_text(:horde), do: 13_637
+
+  def phase_sound(_previous, {:controlled, :alliance}), do: 8455
+  def phase_sound(_previous, {:controlled, :horde}), do: 8454
+  def phase_sound({:controlled, :alliance}, {:progress, :alliance}), do: 8332
+  def phase_sound({:controlled, :horde}, {:progress, :horde}), do: 8333
+  def phase_sound(_previous, {:progress, :alliance}), do: 8173
+  def phase_sound(_previous, {:progress, :horde}), do: 8213
+  def phase_sound(_previous, _current), do: nil
+
+  def broadcast_text_ids do
+    [victory_text(:alliance), victory_text(:horde)] ++
+      Enum.flat_map(Map.values(@towers), &Map.values(&1.announcements))
+  end
 end
