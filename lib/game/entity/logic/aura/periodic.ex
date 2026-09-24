@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AttackDamageTaken
   alias ThistleTea.Game.Entity.Logic.Aura.Change
+  alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
   alias ThistleTea.Game.Entity.Logic.Aura.Linked
   alias ThistleTea.Game.Entity.Logic.Aura.Reactions
@@ -42,11 +43,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   def tick(entity, now, contexts \\ %{})
 
   def tick(%{unit: %Unit{auras: holders}} = entity, now, contexts) when is_list(holders) and holders != [] do
+    {entity, heartbeat_events} = Heartbeat.tick(entity, now, contexts)
+
     entity
     |> tick_periodics(now, contexts)
     |> then(fn {entity, events} ->
       {entity, expire_events} = Lifecycle.expire_due(entity, now)
-      {entity, events ++ expire_events}
+      {entity, heartbeat_events ++ events ++ expire_events}
     end)
   end
 
@@ -549,7 +552,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   defp advance_tick(_last_tick, _amplitude_ms, now), do: now + 1_000
 
   defp holder_event_times(%Holder{} = holder) do
-    tick_times = Enum.flat_map(holder.auras, &aura_tick_time/1)
+    tick_times = Heartbeat.event_times(holder) ++ Enum.flat_map(holder.auras, &aura_tick_time/1)
 
     tick_times =
       if is_integer(holder.next_area_refresh_at), do: [holder.next_area_refresh_at | tick_times], else: tick_times

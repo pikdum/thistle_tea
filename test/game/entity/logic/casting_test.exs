@@ -1421,6 +1421,28 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
                %Effects.DeliverSpell{target_guid: 1, spell: ^spell}
              ] = mob.internal.events
     end
+
+    test "routes self heartbeat auras through the owner boundary for a sampled break" do
+      spell = %Spell{
+        id: 50,
+        attributes: MapSet.new([:heartbeat_resist, :negative]),
+        duration_ms: 20_000,
+        effects: [%Effect{type: :apply_aura, aura: :mod_stun}]
+      }
+
+      casting = %Cast{spell: spell, targets: Target.unit(1), ends_at: 1_000}
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 20, max_health: 20, auras: []},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0), casting: casting}
+      }
+
+      mob = Casting.complete(mob, casting, 1_000)
+      assert mob.unit.auras == []
+      assert Enum.any?(mob.internal.events, &match?(%Effects.DeliverSpell{target_guid: 1, spell: ^spell}, &1))
+    end
   end
 
   describe "Feed Pet" do

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Ammunition
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.CastSpeed
   alias ThistleTea.Game.Entity.Logic.Companion
@@ -1434,7 +1435,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp dispatch_to_target(character, %CastContext{caster_guid: caster_guid} = context, spell, target_guid, now)
        when target_guid == caster_guid do
-    if Enum.any?(spell.effects, &(&1.type == :dispel)) do
+    if Heartbeat.spell?(spell) or Enum.any?(spell.effects, &(&1.type == :dispel)) do
       Effects.enqueue(character, Effects.deliver_spell(target_guid, context, spell))
     else
       {character, events} = SpellEffect.receive(character, context, spell, now)

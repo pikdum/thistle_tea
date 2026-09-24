@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Dispel
+  alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
   alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -163,6 +164,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
       Enum.map_reduce(holders, [], fn %Holder{} = holder, events ->
         if Holder.same_source?(holder, spell_id, caster_guid) and is_integer(holder.expires_at) do
           holder = %{holder | expires_at: max(holder.expires_at - delay_ms, now)}
+          holder = Heartbeat.delay(holder, delay_ms, now)
           {holder, events ++ duration_event(holder, now)}
         else
           {holder, events}

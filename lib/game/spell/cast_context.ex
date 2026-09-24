@@ -82,6 +82,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :spell_threat,
     :spell_hit_snapshot,
     :chain_effects,
+    :heartbeat_sample,
+    :heartbeat_roll,
     triggered_by_aura?: false,
     caster_available?: true,
     caster_totem?: false,

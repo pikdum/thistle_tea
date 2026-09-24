@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
   """
 
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.DispelResistance
@@ -13,6 +14,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
   alias ThistleTea.Game.Entity.Logic.HealingReceived
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellThreat
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.World
@@ -21,6 +23,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
 
   def receive(target, %CastContext{} = context, %Spell{} = spell, now) do
     context = threat_context(target, context, spell)
+    context = if Heartbeat.spell?(spell), do: %{context | heartbeat_sample: 1 - :rand.uniform()}, else: context
 
     context =
       if Enum.any?(spell.effects, &(&1.type == :dispel)) do
@@ -38,7 +41,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
 
   def aura_contexts(%{unit: %{auras: holders}} = target, now) when is_list(holders) do
     for %Holder{} = holder <- holders,
-        Enum.any?(holder.auras, &(is_integer(&1.next_tick_at) and &1.next_tick_at <= now)),
+        periodic_due?(holder, now) or Heartbeat.check_due?(holder, now),
         into: %{} do
       context =
         holder.cast_context ||
@@ -53,6 +56,11 @@ defmodule ThistleTea.Game.Entity.SpellReception do
       context = threat_context(target, context, holder.spell)
 
       context =
+        if Heartbeat.check_due?(holder, now),
+          do: %{context | heartbeat_roll: Math.random_int(0, 10_000)},
+          else: context
+
+      context =
         if Holder.has_any_type?(holder, [:periodic_leech, :periodic_health_funnel]) do
           %{context | caster_available?: caster_available?(target, holder.caster_guid, now)}
         else
@@ -64,6 +72,9 @@ defmodule ThistleTea.Game.Entity.SpellReception do
   end
 
   def aura_contexts(_target, _now), do: %{}
+
+  defp periodic_due?(holder, now),
+    do: Enum.any?(holder.auras, &(is_integer(&1.next_tick_at) and &1.next_tick_at <= now))
 
   def heal(target, %Effects.HealEntity{spell: %Spell{} = spell, amount: amount} = effect) do
     if Death.alive?(target) do

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.SpellReceptionTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.SpellReception
   alias ThistleTea.Game.Spell
@@ -68,6 +69,19 @@ defmodule ThistleTea.Game.Entity.SpellReceptionTest do
   end
 
   describe "aura_contexts/2" do
+    test "supplies a fresh roll for a due creature heartbeat without periodic effects", ctx do
+      [holder] = ctx.target.unit.auras
+      holder = %{holder | expires_at: 20_000, heartbeat: %Heartbeat{next_check_at: 5_000, hit_chance_bp: 0}}
+      target = %{ctx.target | unit: %{ctx.target.unit | auras: [holder]}}
+      key = {holder.spell.id, holder.caster_guid, holder.item_source}
+      assert SpellReception.aura_contexts(target, 4_999) == %{}
+      assert %{^key => %CastContext{heartbeat_roll: roll}} = contexts = SpellReception.aura_contexts(target, 5_000)
+      assert roll in 0..10_000
+      {ticked, _} = AuraLogic.tick(target, 5_000, contexts)
+      assert ticked.unit.auras == [] or hd(ticked.unit.auras).heartbeat.next_check_at == 10_000
+      assert SpellReception.aura_contexts(target, 20_000) == %{}
+    end
+
     test "life drains require a living caster in the target's world", ctx do
       for type <- [:periodic_leech, :periodic_health_funnel] do
         spell = %Spell{

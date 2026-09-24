@@ -92,22 +92,30 @@ defmodule ThistleTea.Game.Entity.Logic.SpellResist do
   end
 
   def context_hit?(%CastContext{} = context, %Spell{} = spell, target, target_player?, opts \\ []) do
+    Map.get(target, :alive?) == false or Map.get(target, :no_spell_defense?, false) or
+      Spell.attribute?(spell, :always_hit) or
+      Keyword.get_lazy(opts, :roll, fn -> Math.random_int(0, 9_999) end) <
+        context_hit_chance_bp(context, spell, target, target_player?)
+  end
+
+  def context_hit_chance_bp(%CastContext{} = context, %Spell{} = spell, target, target_player?) do
+    if Spell.attribute?(spell, :always_hit),
+      do: 10_000,
+      else: context_hit_chance(context, spell, target, target_player?)
+  end
+
+  defp context_hit_chance(context, spell, target, target_player?) do
     caster_level = max(context.caster_level || 1, 1)
     target_level = max(Map.get(target, :level) || caster_level, 1)
     target_bonus = Aura.versus_amount(Map.get(target, :attacker_spell_hit_chance), Spell.school_mask(spell))
 
-    magic_hit?(
+    magic_hit_chance_bp(
       caster_level,
       target_level,
       target_player?,
-      Keyword.merge(opts,
-        no_spell_defense?:
-          Map.get(target, :alive?) == false or Map.get(target, :no_spell_defense?, false) or
-            Spell.attribute?(spell, :always_hit),
-        hit_bonus: context.spell_hit_bonus + target_bonus,
-        mechanic_resistance: MechanicResistance.chance(Map.get(target, :mechanic_resistance), spell.mechanic),
-        binary_resistance: binary_resistance(context, spell, target)
-      )
+      hit_bonus: context.spell_hit_bonus + target_bonus,
+      mechanic_resistance: MechanicResistance.chance(Map.get(target, :mechanic_resistance), spell.mechanic),
+      binary_resistance: binary_resistance(context, spell, target)
     )
   end
 

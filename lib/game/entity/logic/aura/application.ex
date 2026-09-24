@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.Capacity
   alias ThistleTea.Game.Entity.Logic.Aura.Change
+  alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
   alias ThistleTea.Game.Entity.Logic.Aura.SingleTarget
   alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
@@ -88,7 +89,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
           negative?: negative?(spell, auras, context, target_guid)
         }
 
-        do_apply(entity, holder, context, now)
+        do_apply(entity, Heartbeat.prepare(entity, holder, context), context, now)
     end
   end
 
@@ -198,6 +199,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   defp apply_diminished(entity, holders, holder, context, now) do
     case DiminishingReturns.apply(entity, holder, context, now) do
       {:ok, entity, diminished} ->
+        diminished = Heartbeat.schedule(diminished)
+
         holders =
           Enum.map(holders, fn
             ^holder -> diminished
@@ -411,6 +414,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
           | slot: nil,
             stacks: next_stacks(old, incoming),
             next_proc_at: old.next_proc_at,
+            heartbeat: old.heartbeat,
             auras: carry_tick_times(old.auras, incoming.auras)
         }
 

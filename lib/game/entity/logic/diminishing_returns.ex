@@ -54,11 +54,19 @@ defmodule ThistleTea.Game.Entity.Logic.DiminishingReturns do
     if entry.applications == 3 do
       {:immune, entity}
     else
-      duration = div(holder.expires_at - holder.applied_at, Integer.pow(2, entry.applications))
+      divisor = Integer.pow(2, entry.applications)
+      duration = div(holder.expires_at - holder.applied_at, divisor)
       entry = %{entry | applications: entry.applications + 1, reset_at: nil}
       history = Map.put(internal.diminishing_returns, group, entry)
       entity = %{entity | internal: %{internal | diminishing_returns: history}}
-      holder = %{holder | expires_at: holder.applied_at + duration, diminishing_group: group}
+
+      holder = %{
+        holder
+        | expires_at: holder.applied_at + duration,
+          diminishing_group: group,
+          diminishing_rate: 1 / divisor
+      }
+
       {:ok, entity, holder}
     end
   end

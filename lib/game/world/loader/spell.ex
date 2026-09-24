@@ -907,6 +907,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @cant_cancel, :cant_cancel)
       |> add_if(attrs, @cooldown_on_event, :cooldown_on_event)
       |> add_if(attrs, 0x20000000, :no_immunities)
+      |> add_if(attrs, 0x40000000, :heartbeat_resist)
 
     base = if attrs == 0x150010, do: MapSet.put(base, :target_facing_caster), else: base
     base = if from_behind?(attrs_ex1, attrs_ex2), do: MapSet.put(base, :from_behind), else: base

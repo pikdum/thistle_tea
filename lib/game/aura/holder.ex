@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Aura.Holder do
     :single_target_generation,
     :expires_at,
     :diminishing_group,
+    :heartbeat,
     :charges,
     :area_radius,
     :next_area_refresh_at,
@@ -34,6 +35,7 @@ defmodule ThistleTea.Game.Aura.Holder do
     auras: [],
     resistance_penetration: [],
     stacks: 1,
+    diminishing_rate: 1.0,
     triggered?: false,
     caster_totem?: false,
     negative?: false
