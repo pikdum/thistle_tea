@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Data.Item do
   alias ThistleTea.Game.Entity.Data.Component.Container
   alias ThistleTea.Game.Entity.Data.Component.Item, as: ItemComponent
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.ItemProperty
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.WrappedItem
   alias ThistleTea.Game.Entity.Logic.Loot
@@ -46,9 +47,37 @@ defmodule ThistleTea.Game.Entity.Data.Item do
       container: build_container(template),
       internal: %{template: template, enchantments: %{}}
     }
+    |> put_random_property(Keyword.get(opts, :random_property))
   end
 
   def template(%__MODULE__{internal: %{template: template}}), do: template
+
+  def random_property(%__MODULE__{internal: internal}), do: Map.get(internal, :random_property)
+
+  def name(%__MODULE__{} = item) do
+    case {wrapped?(item), random_property(item)} do
+      {false, %ItemProperty{suffix: suffix}} when is_binary(suffix) and suffix != "" ->
+        template(item).name <> " " <> suffix
+
+      _ ->
+        template(item).name
+    end
+  end
+
+  defp put_random_property(%__MODULE__{} = item, nil), do: item
+
+  defp put_random_property(%__MODULE__{} = item, %ItemProperty{} = property) do
+    item = %{
+      item
+      | item: %{item.item | random_properties_id: property.id, property_seed: 0},
+        internal: Map.put(item.internal, :random_property, property)
+    }
+
+    property.enchantments
+    |> Enum.take(3)
+    |> Enum.with_index(3)
+    |> Enum.reduce(item, fn {id, slot}, item -> put_enchantment_word(item, slot, 0, id) end)
+  end
 
   defp initial_flags(%ItemTemplate{bonding: bonding}) when bonding in [1, 4], do: 1
   defp initial_flags(%ItemTemplate{}), do: 0
@@ -140,14 +169,20 @@ defmodule ThistleTea.Game.Entity.Data.Item do
   end
 
   def active_enchantments(%__MODULE__{} = item, now) do
-    permanent = enchantment_word(item, 0, 0)
-    entries = if permanent > 0, do: [{0, permanent}], else: []
+    for slot <- [0, 1, 3, 4, 5],
+        id = active_enchantment(item, slot, now),
+        id > 0,
+        do: {slot, id}
+  end
 
+  defp active_enchantment(item, @temporary_enchantment_slot, now) do
     case temporary_enchantment(item) do
-      %{id: id, expires_at: expires_at} when expires_at > now -> entries ++ [{1, id}]
-      _ -> entries
+      %{id: id, expires_at: expires_at} when expires_at > now -> id
+      _ -> 0
     end
   end
+
+  defp active_enchantment(item, slot, _now), do: enchantment_word(item, slot, 0)
 
   def put_temporary_enchantment(%__MODULE__{} = item, enchantment_id, duration_ms, charges, expires_at, token) do
     enchantment = %{id: enchantment_id, expires_at: expires_at, charges: charges, token: token}

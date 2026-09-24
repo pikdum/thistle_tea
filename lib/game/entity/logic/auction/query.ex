@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Auction.Query do
 
   def search(%Book{} = book, %House{} = house, %Query{} = query, now, opts \\ []) do
     usable = Keyword.get(opts, :usable, fn _item -> false end)
-    item_name = Keyword.get(opts, :item_name, &Item.template(&1).name)
+    item_name = Keyword.get(opts, :item_name, &Item.name/1)
     name = String.downcase(query.name)
 
     book

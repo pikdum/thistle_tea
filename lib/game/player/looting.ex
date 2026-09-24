@@ -206,10 +206,10 @@ defmodule ThistleTea.Game.Player.Looting do
     actor = actor(state, loot_guid)
 
     with :ok <- Entity.call(loot_guid, {:loot_validate_commit, actor, reservation.token}),
-         {:ok, state, placed_at} <- Items.store(state, reservation.item.item_id, reservation.item.count) do
+         {:ok, state, placed_at} <- Items.store(state, reservation.item, reservation.item.count) do
       commit = %Commit{token: reservation.token, actor_guid: state.guid}
       Entity.loot_reservation_result(loot_guid, commit)
-      Items.send_push_result(state, reservation.item.item_id, reservation.item.count, placed_at)
+      Items.send_push_result(state, reservation.item, reservation.item.count, placed_at)
       state
     else
       {:error, reason, state} ->

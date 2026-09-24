@@ -108,14 +108,24 @@ defmodule ThistleTea.Game.Player.VendorPurchase do
       count: receipt.count
     })
 
-    {bag_slot, item_slot} = receipt.position
+    if receipt.vendor_item.template.random_property > 0 do
+      Enum.each(receipt.changes.placements, fn placement ->
+        item = placement.item
+        send_item_push(receipt, placement.position, item.item.stack_count, item.item.random_properties_id || 0)
+      end)
+    else
+      send_item_push(receipt, receipt.position, receipt.count * max(receipt.vendor_item.template.buy_count, 1), 0)
+    end
+  end
 
+  defp send_item_push(receipt, {bag_slot, item_slot}, count, property_id) do
     Network.send_packet(%Message.SmsgItemPushResult{
       player_guid: receipt.guid,
       item_id: receipt.vendor_item.template.entry,
+      random_property_id: property_id,
       bag_slot: bag_slot,
       item_slot: item_slot,
-      count: receipt.count * max(receipt.vendor_item.template.buy_count, 1),
+      count: count,
       received: 1
     })
   end

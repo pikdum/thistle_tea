@@ -1032,6 +1032,7 @@ defmodule ThistleTea.Game.Player.Quests do
     Network.send_packet(%Message.SmsgItemPushResult{
       player_guid: state.guid,
       item_id: item.object.entry,
+      random_property_id: item.item.random_properties_id || 0,
       bag_slot: bag_slot,
       item_slot: item_slot,
       count: count,

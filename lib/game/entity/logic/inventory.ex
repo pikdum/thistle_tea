@@ -190,8 +190,8 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
 
   def equip(%Player{} = player, index, %Item{} = item) when is_integer(index) do
     player
-    |> Map.put(Map.fetch!(@field_by_slot, index), item.object.guid)
-    |> Map.put(visible_entry_field(index), Item.visible_value(item))
+    |> struct!([{Map.fetch!(@field_by_slot, index), item.object.guid}])
+    |> sync_visible_item(index, item)
   end
 
   def equipped_templates(%Player{} = player, get_item) do
@@ -1247,7 +1247,12 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   def sync_visible_item(%Player{} = player, slot, item) do
     if equipment_slot?(slot) do
       value = if item, do: Item.visible_value(item), else: 0
-      Map.put(player, visible_entry_field(slot), value)
+      property = if item, do: item.item.random_properties_id || 0, else: 0
+
+      struct!(player, [
+        {visible_entry_field(slot), value},
+        {:"visible_item_#{slot + 1}_properties", property}
+      ])
     else
       player
     end

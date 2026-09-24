@@ -57,11 +57,16 @@ defmodule ThistleTea.Game.Player.ItemLoot do
     pending = state.character.internal.item_loot
 
     with %Loot.Item{} = reward <- Enum.find(pending.loot.items, &(&1.slot == slot and not &1.looted)),
-         %Item{} = item <- ItemStore.prepare(reward.item_id, owner: state.guid, stack_count: reward.count),
+         %Item{} = item <-
+           ItemStore.prepare(reward.item_id,
+             owner: state.guid,
+             stack_count: reward.count,
+             random_property: reward.random_property
+           ),
          {:ok, character, changes} <- PendingLoot.claim(state.character, slot, item, &ItemStore.get/1) do
       state = InventoryUpdate.apply(%{state | character: character}, {:ok, changes})
       Network.send_packet(%Message.SmsgLootRemoved{slot: slot})
-      Items.send_push_result(state, reward.item_id, reward.count, position(changes, item.object.guid))
+      Items.send_push_result(state, reward, reward.count, position(changes, item.object.guid))
       if is_nil(character.internal.item_loot), do: destroy_source(pending.guid)
       state
     else

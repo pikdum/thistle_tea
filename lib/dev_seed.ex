@@ -16,6 +16,7 @@ defmodule ThistleTea.DevSeed do
   Two copies of Plugger Spazzring support limited-stock merchant testing.
   A door, lever, incantation, mortar, and stink bombs support object use and activation spells.
   A Land Walker supports Zorbin's Ultra-Shrinker and creature transformation testing.
+  A Squirrel drops random-property cloth armor and has a three-minute respawn for loot testing.
   """
   import Ecto.Query
 
@@ -302,6 +303,7 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(9499, @base_low_guid + 1201, {x + 14.0, y - 4.0, z}, nil, @respawn_secs)
     spawn_mob(3639, @base_low_guid + 1300, {x + 20.0, y + 36.0, z}, nil, @respawn_secs)
     spawn_mob(5357, @base_low_guid + 1400, {x + 40.0, y - 40.0, z}, nil, @hostile_respawn_secs)
+    spawn_mob(1412, @base_low_guid + 1500, {x + 10.0, y + 10.0, z}, %{items: [{14_113, 1}], gold: 0}, 180)
   end
 
   defp seed_game_objects do

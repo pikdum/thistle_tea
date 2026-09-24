@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Player.VendorStockTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Entity.Data.ItemProperty
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.VendorItem
   alias ThistleTea.Game.Entity.Data.VendorStock.Receipt
@@ -22,6 +23,7 @@ defmodule ThistleTea.Game.Player.VendorStockTest do
   alias ThistleTea.Game.Player.VendorPurchase
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.ItemProperty, as: PropertyLoader
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -32,6 +34,28 @@ defmodule ThistleTea.Game.Player.VendorStockTest do
   setup [:merchant]
 
   describe "buy/4" do
+    test "reports the retained property on every purchased equipment instance", context do
+      %{state: state, vendor: vendor, item: item} = context
+      property = %ItemProperty{id: 59_003, suffix: "of Stamina"}
+      :ets.insert(PropertyLoader, [{{:property, property.id}, property}, {{:table, 999_943}, [{property.id, 100.0}]}])
+      item = %{item | template: %{item.template | stackable: 1, buy_count: 1, random_property: 999_943}}
+      :ets.insert(VendorLoader, {Guid.entry(vendor), [item]})
+
+      on_exit(fn ->
+        :ets.delete(PropertyLoader, {:property, property.id})
+        :ets.delete(PropertyLoader, {:table, 999_943})
+      end)
+
+      bought = Vendor.buy(state, vendor, item.template.entry, 2)
+      assert length(owned(bought)) == 2
+      assert Enum.all?(owned(bought), &(Item.random_property(&1) == property))
+
+      for _ <- 1..2 do
+        assert_receive {:"$gen_cast",
+                        {:send_packet, %SmsgItemPushResult{count: 1, received: 1, random_property_id: 59_003}}}
+      end
+    end
+
     test "depletes units but reports purchased bundles and rejects a stale sold-out request", context do
       %{state: state, vendor: vendor, item: item} = context
       bought = Vendor.buy(state, vendor, item.template.entry, 2)

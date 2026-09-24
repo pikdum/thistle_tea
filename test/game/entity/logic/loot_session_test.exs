@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Entity.Data.Condition
+  alias ThistleTea.Game.Entity.Data.ItemProperty
   alias ThistleTea.Game.Entity.Logic.Condition.Context
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
   alias ThistleTea.Game.Entity.Logic.Loot
@@ -32,6 +33,21 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
   end
 
   describe "view/2" do
+    test "keeps a property's identity through reopen, rolls, and released reservations" do
+      property = %ItemProperty{id: 1182, suffix: "of the Bear", enchantments: [72, 69, 0]}
+      item = %Loot.Item{slot: 0, item_id: 1608, quality: 2, random_property: property}
+      session = LootSession.new(%Loot{items: [item]}, nil)
+      {rolling, [roll]} = LootSession.start_rolls(session, 2, [actor(1), actor(2)])
+      assert roll.random_property_id == 1182
+
+      token = make_ref()
+      assert {:ok, reservation, reserved} = LootSession.reserve_roll(rolling, actor(1), 0, token)
+      assert reservation.item.random_property == property
+      released = reserved |> LootSession.release(token) |> LootSession.unblock_item(0)
+      assert {:ok, %Loot{items: [^item]}} = LootSession.view(released, actor(1))
+      assert {:ok, %Loot{items: [^item]}} = LootSession.view(released, actor(2))
+    end
+
     test "untapped loot is open to nearby actors" do
       assert {:ok, %Loot{}} = loot() |> LootSession.new(nil) |> LootSession.view(actor(999))
     end

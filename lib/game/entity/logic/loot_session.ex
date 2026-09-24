@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
   round-robin assignment, quest-item visibility, interaction distance, and
   master-loot recipient eligibility.
   """
+  alias ThistleTea.Game.Entity.Data.ItemProperty
   alias ThistleTea.Game.Entity.Logic.Condition
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Loot
@@ -179,8 +180,14 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
       rollable
       |> Enum.flat_map(fn item ->
         case eligible_guids(item, eligible) do
-          [] -> []
-          guids -> [{item.slot, LootRoll.new(item.slot, item.item_id, item.count, guids)}]
+          [] ->
+            []
+
+          guids ->
+            [
+              {item.slot,
+               LootRoll.new(item.slot, item.item_id, item.count, guids, ItemProperty.id(item.random_property))}
+            ]
         end
       end)
       |> Map.new()

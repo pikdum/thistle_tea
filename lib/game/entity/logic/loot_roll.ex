@@ -4,10 +4,16 @@ defmodule ThistleTea.Game.Entity.Logic.LootRoll do
   voters, collects votes, and resolves a winner — need beats greed, missing
   votes count as pass.
   """
-  defstruct [:slot, :item_id, :count, eligible: [], votes: %{}]
+  defstruct [:slot, :item_id, :count, random_property_id: 0, eligible: [], votes: %{}]
 
-  def new(slot, item_id, count, eligible_guids) do
-    %__MODULE__{slot: slot, item_id: item_id, count: count, eligible: eligible_guids}
+  def new(slot, item_id, count, eligible_guids, random_property_id \\ 0) do
+    %__MODULE__{
+      slot: slot,
+      item_id: item_id,
+      count: count,
+      eligible: eligible_guids,
+      random_property_id: random_property_id
+    }
   end
 
   def vote(%__MODULE__{} = roll, guid, vote) when vote in [:pass, :need, :greed] do

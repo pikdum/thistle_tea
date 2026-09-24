@@ -78,11 +78,16 @@ defmodule ThistleTea.Game.Player.Containers do
     with {:ok, state, source} <- authorize(state, guid),
          %Loot{} = loot <- Item.loot(source),
          %Loot.Item{} = reward <- Enum.find(loot.items, &(&1.slot == slot and not &1.looted)),
-         %Item{} = item <- ItemStore.prepare(reward.item_id, owner: state.guid, stack_count: reward.count),
+         %Item{} = item <-
+           ItemStore.prepare(reward.item_id,
+             owner: state.guid,
+             stack_count: reward.count,
+             random_property: reward.random_property
+           ),
          {:ok, changes} <- ItemOpening.claim(state.character, source, slot, item, &ItemStore.get/1) do
       state = InventoryUpdate.apply(state, {:ok, changes})
       Network.send_packet(%Message.SmsgLootRemoved{slot: slot})
-      Items.send_push_result(state, reward.item_id, reward.count, position(changes, item.object.guid))
+      Items.send_push_result(state, reward, reward.count, position(changes, item.object.guid))
       state
     else
       {:error, reason} -> failure(state, reason, guid)

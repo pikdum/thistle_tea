@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.World.ItemStore do
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.ItemProperty, as: ItemPropertyLoader
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
@@ -45,6 +46,7 @@ defmodule ThistleTea.Game.World.ItemStore do
 
   def prepare(%ItemTemplate{} = template, opts) do
     guid = Guid.from_low_guid(:item, next_low_guid())
+    opts = Keyword.put_new_lazy(opts, :random_property, fn -> ItemPropertyLoader.roll(template) end)
     Item.build(template, guid, opts)
   end
 

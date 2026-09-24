@@ -8,16 +8,19 @@ defmodule ThistleTea.Game.Player.QuestTurnInTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.ItemProperty
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Network.Message.SmsgItemPushResult
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.ItemProperty, as: PropertyLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
@@ -97,6 +100,23 @@ defmodule ThistleTea.Game.Player.QuestTurnInTest do
   end
 
   test "commits required-item removal and every reward together", context do
+    property = %ItemProperty{id: 59_004, suffix: "of Stamina"}
+
+    :ets.insert(PropertyLoader, [
+      {{:property, property.id}, property},
+      {{:table, @reward1_entry}, [{property.id, 100.0}]}
+    ])
+
+    :ets.insert(
+      ItemLoader,
+      {@reward1_entry, %ItemTemplate{entry: @reward1_entry, name: "Reward One", random_property: @reward1_entry}}
+    )
+
+    on_exit(fn ->
+      :ets.delete(PropertyLoader, {:property, property.id})
+      :ets.delete(PropertyLoader, {:table, @reward1_entry})
+    end)
+
     required1 = ItemStore.create(@required_entry, owner: context.player_guid)
     required2 = ItemStore.create(@required_entry, owner: context.player_guid)
     fillers = create_fillers(context.player_guid, 14)
@@ -112,6 +132,7 @@ defmodule ThistleTea.Game.Player.QuestTurnInTest do
     assert Inventory.count_entry(result.character.player, @reward2_entry, &ItemStore.get/1) == 1
     assert ItemStore.get(required1.object.guid) == nil
     assert ItemStore.get(required2.object.guid) == nil
+    assert_receive {:"$gen_cast", {:send_packet, %SmsgItemPushResult{random_property_id: 59_004}}}
   end
 
   defp completed_player(quest_id, items) do

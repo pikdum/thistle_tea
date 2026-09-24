@@ -327,6 +327,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
             loot_guid: state.object.guid,
             slot: roll.slot,
             item_id: roll.item_id,
+            random_prop: roll.random_property_id,
             countdown: @loot_roll_countdown_ms
           }
 
@@ -398,6 +399,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
         slot: roll.slot,
         player_guid: guid,
         item_id: roll.item_id,
+        random_prop: roll.random_property_id,
         roll_number: rolled_number,
         roll_type: type
       })
@@ -407,6 +409,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
       loot_guid: state.object.guid,
       slot: roll.slot,
       item_id: roll.item_id,
+      random_prop: roll.random_property_id,
       winner_guid: winner,
       roll_number: number,
       roll_type: type
@@ -436,7 +439,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     broadcast_roll_packet(roll, %Message.SmsgLootAllPassed{
       loot_guid: state.object.guid,
       slot: roll.slot,
-      item_id: roll.item_id
+      item_id: roll.item_id,
+      random_prop: roll.random_property_id
     })
 
     put_session(state, LootSession.unblock_item(session(state), roll.slot))
@@ -455,6 +459,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
       slot: roll.slot,
       player_guid: voter_guid,
       item_id: roll.item_id,
+      random_prop: roll.random_property_id,
       roll_number: number,
       roll_type: type
     })

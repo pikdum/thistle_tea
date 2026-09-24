@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Auction.QueryTest do
   alias ThistleTea.Game.Entity.Data.Auction.House
   alias ThistleTea.Game.Entity.Data.Auction.Query
   alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Entity.Data.ItemProperty
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Auction
   alias ThistleTea.Game.Entity.Logic.Auction.Query, as: AuctionQuery
@@ -13,6 +14,16 @@ defmodule ThistleTea.Game.Entity.Logic.Auction.QueryTest do
   setup [:market]
 
   describe "search/5" do
+    test "matches an item's retained random suffix", context do
+      auction = context.book.auctions[1]
+      property = %ItemProperty{id: 1182, suffix: "of the Bear"}
+      item = Item.build(Item.template(auction.item), auction.item.object.guid, random_property: property)
+      book = %{context.book | auctions: %{1 => %{auction | item: item}}}
+
+      assert {[_auction], 1} = AuctionQuery.search(book, context.house, %Query{name: "OF THE BEAR"}, 0)
+      assert {[], 0} = AuctionQuery.search(book, context.house, %Query{name: "eagle"}, 0)
+    end
+
     test "filters localized names, categories, robes, minimum quality, and level bounds", context do
       query = %Query{name: "silk", class: 4, subclass: 1, inventory_type: 5, quality: 2, level_min: 10, level_max: 30}
       assert {[_auction], 1} = AuctionQuery.search(context.book, context.house, query, 0)

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.World.Loader.Loot do
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.ItemProperty, as: ItemPropertyLoader
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
@@ -159,7 +160,8 @@ defmodule ThistleTea.Game.World.Loader.Loot do
           item_id: template.entry,
           display_id: template.display_id,
           count: count,
-          quality: template.quality
+          quality: template.quality,
+          random_property: ItemPropertyLoader.roll(template)
         }
       end)
 
@@ -185,6 +187,7 @@ defmodule ThistleTea.Game.World.Loader.Loot do
         display_id: template.display_id,
         count: count,
         quality: template.quality,
+        random_property: ItemPropertyLoader.roll(template),
         quest_item: quest_item,
         condition: condition
       }

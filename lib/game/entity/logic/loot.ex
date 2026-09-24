@@ -18,7 +18,8 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
             looted: boolean(),
             blocked: boolean(),
             quest_item: boolean(),
-            condition: struct() | nil
+            condition: struct() | nil,
+            random_property: struct() | nil
           }
 
     defstruct [
@@ -31,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
       looted: false,
       blocked: false,
       quest_item: false,
+      random_property: nil,
       condition: nil
     ]
   end

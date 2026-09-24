@@ -46,6 +46,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Graveyard, as: GraveyardLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
+  alias ThistleTea.Game.World.Loader.ItemProperty, as: ItemPropertyLoader
   alias ThistleTea.Game.World.Loader.ItemSet, as: ItemSetLoader
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
@@ -192,6 +193,7 @@ defmodule ThistleTea.Application do
     InstanceData.init()
     ItemLoader.init()
     ItemEnchantmentLoader.init()
+    ItemPropertyLoader.init()
     ItemSetLoader.init()
     DurabilityLoader.init()
     AuctionHouseLoader.init()
@@ -325,6 +327,7 @@ defmodule ThistleTea.Application do
         ExplorationLoader.load_all()
         GameObjectTemplateLoader.load_all()
         ItemEnchantmentLoader.load_all()
+        ItemPropertyLoader.load_all()
         ItemSetLoader.load_all()
         FishingLoader.load_all()
         WeatherLoader.load_all()
