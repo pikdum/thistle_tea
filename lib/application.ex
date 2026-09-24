@@ -10,6 +10,8 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.InstanceScript
   alias ThistleTea.Game.Network.Server, as: GameServer
   alias ThistleTea.Game.Network.Sessions
+  alias ThistleTea.Game.OutdoorPvp.Plaguelands
+  alias ThistleTea.Game.OutdoorPvp.Towers
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.AreaEffects
@@ -83,6 +85,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Weather, as: WeatherLoader
   alias ThistleTea.Game.World.MailStore
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.OutdoorPvp.CaptureEnvironment
   alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.SingleTargetAuras
   alias ThistleTea.Game.World.SocialStore
@@ -326,7 +329,11 @@ defmodule ThistleTea.Application do
         PetLevelLoader.load_all()
         BattlegroundLoader.load_all()
 
-        BroadcastTextLoader.load_all(InstanceScript.broadcast_text_ids() ++ BattlegroundLoader.broadcast_text_ids())
+        BroadcastTextLoader.load_all(
+          InstanceScript.broadcast_text_ids() ++
+            BattlegroundLoader.broadcast_text_ids() ++ Plaguelands.broadcast_text_ids()
+        )
+
         SummonLoader.preload(InstanceScript.summon_entries())
         Logger.info("Loading templates...")
         CreatureTemplateLoader.load_all()
@@ -361,6 +368,12 @@ defmodule ThistleTea.Application do
         PetSpellsLoader.load_all()
         TaxiLoader.load_all()
         CreatureArchetypeLoader.load_all()
+
+        OutdoorPvpSystem.configure_towers(
+          Towers.new(CaptureEnvironment.templates()),
+          CaptureEnvironment.spawn_banners()
+        )
+
         Logger.info("Starting transports...")
         :ok = Transports.start_all()
         Logger.info("Seeding debug data...")

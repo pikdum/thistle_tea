@@ -44,12 +44,14 @@ defmodule ThistleTea.Game.World.System.OutdoorPvpTest do
   describe "sync/5" do
     test "projects progress only in Silithus and clears it on exit", %{server: server} do
       world = WorldRef.open(1)
-      assert OutdoorPvp.sync(1, world, 1377, :alliance, server).states == [{2313, 0}, {2314, 0}, {2317, 2}]
 
-      assert OutdoorPvp.sync(1, world, 14, :alliance, server) == %{
-               favor?: false,
-               states: [{2313, 0}, {2314, 0}, {2317, 0}]
-             }
+      assert Map.take(Map.new(OutdoorPvp.sync(1, world, 1377, :alliance, server).states), [2313, 2314, 2317]) ==
+               %{2313 => 0, 2314 => 0, 2317 => 2}
+
+      assert %{favor?: false, tower_buff: nil, token: nil, states: cleared} =
+               OutdoorPvp.sync(1, world, 14, :alliance, server)
+
+      assert Enum.all?(cleared, fn {_field, value} -> value == 0 end)
 
       assert OutdoorPvp.world_states(14, server) == []
     end

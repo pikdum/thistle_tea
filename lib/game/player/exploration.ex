@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Player.Exploration do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
+  alias ThistleTea.Game.Player.OutdoorPvp
   alias ThistleTea.Game.Player.Pvp
   alias ThistleTea.Game.Player.Rest
   alias ThistleTea.Game.Player.Stats
@@ -47,12 +48,17 @@ defmodule ThistleTea.Game.Player.Exploration do
     case Pathfinding.get_zone_and_area(world.map_id, {x, y, z}) do
       {zone_id, area_id} ->
         state = Weather.refresh(state, zone_id)
+        state = OutdoorPvp.update_zone(state, zone_id)
         state = Pvp.update_territory(state, zone_id, area_id)
         if health > 0, do: discover_area(state, area_id), else: state
 
       _unknown ->
         zone = Rest.default_zone(world.map_id)
-        state |> Weather.refresh(zone) |> Pvp.update_territory(zone, state.character.internal.area)
+
+        state
+        |> Weather.refresh(zone)
+        |> OutdoorPvp.update_zone(zone)
+        |> Pvp.update_territory(zone, state.character.internal.area)
     end
   end
 

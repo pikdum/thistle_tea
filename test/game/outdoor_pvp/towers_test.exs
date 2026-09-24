@@ -70,6 +70,35 @@ defmodule ThistleTea.Game.OutdoorPvp.TowersTest do
     end
   end
 
+  describe "updates/3" do
+    setup [:towers]
+
+    test "orders the meter last and removes it when participation ends", %{towers: towers} do
+      active = Towers.advance(towers, [participant(1, :northpass, :alliance)], 1000)
+      assert Enum.take(Towers.updates(towers, active, 1), -3) == [{2426, 1}, {2428, 20}, {2427, 51}]
+
+      stopped =
+        Towers.advance(active, [participant(1, :northpass, :alliance), participant(2, :northpass, :horde)], 1000)
+
+      assert List.last(Towers.updates(active, stopped, 1)) == {2427, 51}
+
+      unchanged =
+        Towers.advance(stopped, [participant(1, :northpass, :alliance), participant(2, :northpass, :horde)], 1000)
+
+      assert Towers.updates(stopped, unchanged, 1) == []
+      absent = Towers.advance(unchanged, [], 1000)
+      assert Towers.updates(unchanged, absent, 1) == [{2426, 0}]
+    end
+
+    test "resends the current meter after a distant tower changes", %{towers: towers} do
+      participants = [participant(1, :northpass, :alliance)]
+      active = Towers.advance(towers, participants, 1000)
+      current = Towers.advance(active, participants ++ [participant(2, :eastwall, :horde)], 1)
+      assert List.last(Towers.updates(active, current, 1)) == {2427, 51}
+      assert List.last(Towers.updates(active, current, 2)) == {2427, 50}
+    end
+  end
+
   defp towers(_context) do
     templates =
       Map.new(Plaguelands.towers(), fn {_id, definition} ->

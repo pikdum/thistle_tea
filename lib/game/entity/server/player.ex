@@ -1529,6 +1529,22 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
+  def handle_info({:outdoor_pvp_update, token, states, buff}, %State{} = state) do
+    {:noreply, state |> OutdoorPvp.update(token, states, buff) |> maybe_broadcast_update()}
+  rescue
+    error ->
+      Logger.error("Outdoor PvP projection failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:outdoor_pvp_credit, token, entry}, %State{} = state) do
+    {:noreply, OutdoorPvp.credit(state, token, entry)}
+  rescue
+    error ->
+      Logger.error("Outdoor PvP credit failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_info({:weather_changed, token, weather}, %State{} = state) do
     {:noreply, Weather.update(state, token, weather)}
   rescue
@@ -1595,6 +1611,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     |> ServerMovement.reconcile()
     |> cancel_cast_if_dead()
     |> finalize_death()
+    |> OutdoorPvp.reconcile()
     |> SpellAreas.reconcile()
     |> PossessionOwner.reconcile()
     |> Looting.close_unavailable()

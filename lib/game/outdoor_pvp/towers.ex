@@ -80,6 +80,33 @@ defmodule ThistleTea.Game.OutdoorPvp.Towers do
         do: {id, before, after_team}
   end
 
+  def updates(%__MODULE__{} = previous, %__MODULE__{} = current, guid) do
+    region = if world_states(previous) == world_states(current), do: [], else: world_states(current)
+    meter = meter_updates(previous, current, guid, region != [])
+    region ++ meter
+  end
+
+  defp meter_updates(previous, current, guid, region_changed?) do
+    case {previous.members[guid], current.members[guid]} do
+      {nil, nil} ->
+        []
+
+      {{id, _team}, nil} ->
+        CapturePoint.leave_states(Map.fetch!(previous.points, id))
+
+      {{id, _team}, {id, _new_team}} ->
+        old_point = Map.fetch!(previous.points, id)
+        point = Map.fetch!(current.points, id)
+
+        if region_changed? or CapturePoint.slider_changed?(old_point, point),
+          do: [CapturePoint.position_state(point)],
+          else: []
+
+      {_previous, {id, _team}} ->
+        CapturePoint.enter_states(Map.fetch!(current.points, id))
+    end
+  end
+
   defp nearest(%__MODULE__{points: points}, %Participant{
          eligible?: true,
          team: team,

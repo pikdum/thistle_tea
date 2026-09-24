@@ -12,11 +12,13 @@ defmodule ThistleTea.Game.World.Presence do
   alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Logic.Pvp
+  alias ThistleTea.Game.OutdoorPvp.Participation
   alias ThistleTea.Game.Social.Notifier, as: SocialNotifier
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.System.Party
+  alias ThistleTea.Realm
 
   def enter(%Character{} = character, metadata) when is_map(metadata) do
     Metadata.put(character.object.guid, Map.merge(metadata, location_metadata(character)))
@@ -75,6 +77,7 @@ defmodule ThistleTea.Game.World.Presence do
       pvp_combat?: Pvp.combat?(character),
       free_for_all?: Pvp.free_for_all?(character),
       contested_pvp?: Pvp.contested?(character),
+      outdoor_pvp_eligible?: Participation.eligible?(character, Realm.pvp_rules()),
       group_id: group_id(character.object.guid)
     }
     |> Map.put(:owner_guid, PlayerPossession.controller(character))

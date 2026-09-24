@@ -100,6 +100,27 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     {:noreply, state}
   end
 
+  def handle_cast({:set_art_kit, art_kit, animation}, %GameObject{} = state)
+      when art_kit in 0..0xFFFFFFFF and animation in 0..0xFFFFFFFF do
+    if state.game_object.art_kit == art_kit do
+      {:noreply, state}
+    else
+      state = %{state | game_object: %{state.game_object | art_kit: art_kit}}
+      World.broadcast_packet(Core.update_object(state, :values), state)
+
+      World.broadcast_packet(
+        %SmsgGameobjectCustomAnim{guid: state.object.guid, animation: animation},
+        state
+      )
+
+      {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Capture banner update failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_cast({:start_script, steps, target_guid}, %GameObject{} = state)
       when is_list(steps) and is_integer(target_guid) do
     {:noreply, run_script(state, steps, target_guid)}
