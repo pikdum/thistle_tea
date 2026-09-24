@@ -16,7 +16,7 @@ defmodule ThistleTea.DevSeed do
   Two copies of Plugger Spazzring support limited-stock merchant testing.
   A door, lever, incantation, mortar, and stink bombs support object use and activation spells.
   A Land Walker supports Zorbin's Ultra-Shrinker and creature transformation testing.
-  An isolated Salia at {16383.2, 16398.1} supports incoming player charm and AI testing.
+  An isolated Salia at {16203.2, 16318.1} supports incoming player charm and AI testing.
   A Squirrel drops random-property cloth armor and has a three-minute respawn for loot testing.
   Three adjacent Skeletal Flayers west of the playground support chained spell testing.
   Six closely grouped Prairie Wolf Alphas farther west support area target-limit testing.
@@ -307,7 +307,7 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(3639, @base_low_guid + 1300, {x + 20.0, y + 36.0, z}, nil, @respawn_secs)
     spawn_mob(5357, @base_low_guid + 1400, {x + 40.0, y - 40.0, z}, nil, @hostile_respawn_secs)
     spawn_mob(1412, @base_low_guid + 1500, {x + 10.0, y + 10.0, z}, %{items: [{14_113, 1}], gold: 0}, 180)
-    spawn_mob(9860, @base_low_guid + 1800, {x + 80.0, y + 80.0, z}, nil, @hostile_respawn_secs)
+    spawn_mob(9860, @base_low_guid + 1800, {x - 100.0, y, z}, nil, @hostile_respawn_secs)
 
     for index <- 0..2 do
       spawn_mob(
