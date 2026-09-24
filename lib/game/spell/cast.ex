@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Spell.Cast do
   """
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastResolution
+  alias ThistleTea.Game.Spell.Stealth
   alias ThistleTea.Game.Spell.Target
 
   @phases [:preparing, :launch, :impact, :channel_tick, :finish]
@@ -31,6 +32,7 @@ defmodule ThistleTea.Game.Spell.Cast do
     ammunition: :unpaid,
     requirements: :unchecked,
     triggered?: false,
+    preserve_stealth?: false,
     trigger_context: nil,
     modifier_holder_ids: [],
     consume_item: false,
@@ -51,6 +53,7 @@ defmodule ThistleTea.Game.Spell.Cast do
       cast_time_ms: cast_time_ms,
       channel_ms: channel_ms,
       channel_tick_ms: channel_tick_ms,
+      preserve_stealth?: Stealth.exempt?(spell),
       next_channel_tick_at: next_channel_tick_at(now, cast_time_ms, channel_tick_ms),
       started_at: now,
       ends_at: now + cast_time_ms + channel_ms

@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
@@ -160,6 +161,29 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
   end
 
   describe "attempt_commanded_cast/5" do
+    test "requires stealth before admitting an opener and consumes it during preparation" do
+      target_guid = hostile_player(20.0)
+      spell = %{fireball() | attributes: MapSet.new([:only_stealthed])}
+      entry = entry(spell.id, cast_target: :victim)
+      state = fixture_mob(spellbook: %{spell.id => spell}) |> with_target(target_guid)
+
+      assert {:error, :only_stealthed} =
+               MobSpells.attempt_commanded_cast(state, %Blackboard{}, entry, target_guid, context(state))
+
+      stealth = %Holder{
+        spell: %Spell{id: 1784, aura_interrupt_flags: 0x3C07},
+        auras: [%Aura{type: :mod_stealth}]
+      }
+
+      state = %{state | unit: %{state.unit | auras: [stealth]}}
+
+      assert {:ok, {preparing, _blackboard}} =
+               MobSpells.attempt_commanded_cast(state, %Blackboard{}, entry, target_guid, context(state))
+
+      assert preparing.internal.casting.spell == spell
+      assert preparing.unit.auras == []
+    end
+
     test "starts the cast when validation passes" do
       target_guid = hostile_player(20.0)
       spell = fireball()

@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Spell.Focus
   alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.Scripts
+  alias ThistleTea.Game.Spell.Stealth
   alias ThistleTea.Game.Spell.Target
 
   @power_fields %{0 => :power1, 1 => :power2, 2 => :power3, 3 => :power4, 4 => :power5}
@@ -54,6 +55,8 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_spirit_of_redemption(caster, spell),
          :ok <- check_caster_state(caster, spell, now),
          :ok <- check_combat_state(caster, spell),
+         :ok <- Stealth.validate(caster, spell, opts),
+         :ok <- check_peaceful_target(spell, target_info, opts),
          :ok <- AuraRank.validate(caster, spell, target_info, opts),
          :ok <- Battleground.validate(spell, Keyword.get(opts, :battleground)),
          :ok <- Pickpocket.validate(caster, spell, target_info),
@@ -180,6 +183,15 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   defp check_combat_state(_caster, _spell), do: :ok
+
+  defp check_peaceful_target(spell, %{unit_flags: flags}, opts) when is_integer(flags) do
+    if Spell.attribute?(spell, :only_peaceful_targets) and not Keyword.get(opts, :triggered?, false) and
+         (flags &&& 0x00080000) != 0,
+       do: {:error, :target_in_combat},
+       else: :ok
+  end
+
+  defp check_peaceful_target(_spell, _target, _opts), do: :ok
 
   defp check_stance(%{unit: unit}, %Spell{} = spell) do
     Spell.shapeshift_cast_error(spell, unit.shapeshift_form || 0)

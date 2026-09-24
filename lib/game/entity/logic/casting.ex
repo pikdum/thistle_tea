@@ -54,6 +54,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Spell.Requirements
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
+  alias ThistleTea.Game.Spell.Stealth
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -71,9 +72,13 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         opts
       )
       when is_integer(now) do
-    case Disarm.validate(character, spell) do
-      :ok -> start_available_spell(character, spell, targets, now, cast_item_guid, cast_item_id, opts)
-      {:error, reason} -> Effects.enqueue(character, Effects.spell_cast_failed(spell.id, reason))
+    with :ok <- Disarm.validate(character, spell),
+         :ok <- Stealth.validate(character, spell) do
+      start_available_spell(character, spell, targets, now, cast_item_guid, cast_item_id, opts)
+    else
+      {:error, reason} ->
+        requested = Keyword.get(opts, :requested_spell) || spell
+        Effects.enqueue(character, Effects.spell_cast_failed(requested, reason))
     end
   end
 
@@ -93,7 +98,14 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp start_available_spell(character, spell, targets, now, cast_item_guid, cast_item_id, opts) do
-    character = character |> Mount.prepare_cast(spell, now) |> interrupt_action_auras(:action, spell, now)
+    preserve_stealth? = Stealth.preserve?(character, spell, Keyword.get(opts, :stealth_roll))
+    opts = Keyword.put(opts, :preserve_stealth?, preserve_stealth?)
+
+    character =
+      character
+      |> Mount.prepare_cast(spell, now)
+      |> interrupt_action_auras(:action, spell, now, preserve_stealth?)
+
     character = AutoRepeat.interrupt(character, now)
     spell = WeaponDamage.prepare_spell(character, spell)
 
@@ -131,6 +143,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
           | cast_item_guid: cast_item_guid,
             cast_item_id: cast_item_id,
             modifier_holder_ids: modifier_holder_ids,
+            preserve_stealth?: Keyword.fetch!(opts, :preserve_stealth?),
             requested_spell: Keyword.get(opts, :requested_spell)
         }
       )
@@ -295,7 +308,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> queue_spell_miss_outcomes(casting, resolution.misses)
       |> queue_consume_costs(resolution.costs)
       |> break_stealth(casting, now)
-      |> interrupt_action_auras(:action_complete, casting.spell, now)
+      |> interrupt_completion_auras(casting, now)
       |> mark_hostile_cast(casting, attempted_targets, now)
       |> PetLearning.used(casting.spell)
 
@@ -756,7 +769,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         failure_breaks_stealth?(casting) ->
           AuraLogic.remove_aura_types(character, [:mod_stealth], now)
 
-        Spell.harmful?(spell) and not Spell.attribute?(spell, :allow_while_stealthed) ->
+        Spell.harmful?(spell) and not preserves_stealth?(casting) ->
           AuraLogic.remove_with_interrupt_flags(character, AuraLogic.interrupt_mask(:cast), now)
 
         true ->
@@ -772,8 +785,16 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp failure_breaks_stealth?(_casting), do: false
 
-  defp interrupt_action_auras(entity, action, spell, now) do
-    preserved_types = if Spell.attribute?(spell, :allow_while_stealthed), do: [:mod_stealth], else: []
+  defp preserves_stealth?(%Cast{} = cast), do: cast.triggered? or cast.preserve_stealth?
+
+  defp interrupt_completion_auras(entity, %Cast{triggered?: true}, _now), do: entity
+
+  defp interrupt_completion_auras(entity, %Cast{} = cast, now) do
+    interrupt_action_auras(entity, :action_complete, cast.spell, now, preserves_stealth?(cast))
+  end
+
+  defp interrupt_action_auras(entity, action, spell, now, preserve_stealth?) do
+    preserved_types = if preserve_stealth?, do: [:mod_stealth], else: []
 
     {entity, events} =
       AuraLogic.remove_with_interrupt_flags(entity, action_interrupt_mask(action, spell), now, preserved_types)

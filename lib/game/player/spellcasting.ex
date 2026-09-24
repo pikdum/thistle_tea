@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
@@ -44,6 +45,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Modifiers
+  alias ThistleTea.Game.Spell.Stealth
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Spell.TargetCodec
   alias ThistleTea.Game.Time
@@ -290,7 +292,10 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     item_id = cast_item_id(cast_item_guid)
 
     character =
-      Casting.start(state.character, spell, targets, Time.now(), cast_item_guid, item_id, requested_spell: requested)
+      Casting.start(state.character, spell, targets, Time.now(), cast_item_guid, item_id,
+        requested_spell: requested,
+        stealth_roll: stealth_roll(state.character, spell)
+      )
 
     state = %{state | character: character} |> Fishing.start_cast(spell)
 
@@ -310,6 +315,10 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   end
 
   defp cast_item_id(_guid), do: 0
+
+  defp stealth_roll(character, spell) do
+    if Stealth.preservation_chance(character, spell) in 1..99, do: Math.random_int(1, 100)
+  end
 
   def validate_repeat(state, spell, targets), do: validate_cast(state, spell, targets, nil)
 

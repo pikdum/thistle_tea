@@ -17,6 +17,20 @@ defmodule ThistleTea.Game.Entity.EffectResolver.PvpTest do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   describe "spell_contacts/6" do
+    test "successful Sap does not flag either player or enter combat" do
+      spell = %Spell{
+        spell_family: 8,
+        family_flags_0: 0x80,
+        attributes: MapSet.new([:not_in_combat, :only_peaceful_targets]),
+        effects: [%Effect{type: :apply_aura, aura: :mod_stun, implicit_target_a: :target_enemy}]
+      }
+
+      rows = %{2 => %{pvp?: true}}
+      assert Pvp.spell_contacts(character(1), 1, 2, spell, :hit, metadata: &Map.get(rows, &1), now: 0) == []
+      refute Spell.starts_combat?(spell)
+      assert Spell.starts_combat?(spell, :miss)
+    end
+
     @tag :dbc_db
     test "Beast Lore and Mind Vision do not flag their caster" do
       rows = %{2 => %{pvp?: true, in_combat: true, pvp_combat?: true, contested_pvp?: true}}

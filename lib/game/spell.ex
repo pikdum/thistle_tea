@@ -312,7 +312,8 @@ defmodule ThistleTea.Game.Spell do
   def starts_combat?(spell, outcome \\ :hit)
 
   def starts_combat?(%__MODULE__{} = spell, :hit) do
-    harmful?(spell) and not attribute?(spell, :no_threat) and not attribute?(spell, :threat_only_on_miss)
+    harmful?(spell) and not attribute?(spell, :no_threat) and not attribute?(spell, :threat_only_on_miss) and
+      not family_flag?(spell, 8, 0x00000080)
   end
 
   def starts_combat?(%__MODULE__{} = spell, :miss) do

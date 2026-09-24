@@ -924,6 +924,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @hidden_in_combat_log, :hidden_in_combat_log)
       |> add_if(attrs, @not_while_shapeshifted, :not_while_shapeshifted)
       |> add_if(attrs, @not_in_combat, :not_in_combat)
+      |> add_if(attrs, 0x00020000, :only_stealthed)
       |> add_if(attrs, @aura_is_debuff, :negative)
       |> add_if(attrs, @cant_cancel, :cant_cancel)
       |> add_if(attrs, @cooldown_on_event, :cooldown_on_event)
