@@ -60,6 +60,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.ResurrectionTarget
+  alias ThistleTea.Game.World.SpellAreas
   alias ThistleTea.Game.World.SpellFocus
   alias ThistleTea.Game.World.SpellObjects
   alias ThistleTea.Game.World.SpellRequirements
@@ -383,6 +384,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
         ammo_template: ItemLoader.get_template(character.player.ammo_id),
         mount_allowed?: MapTemplateLoader.mount_allowed?(character.internal.world.map_id),
         battleground: battleground_context(character, spell),
+        spell_area: SpellAreas.context(character, spell),
         feed_context: feed_context(character, spell, targets),
         ritual_context: ritual_context(character, spell),
         duel_context: duel_context(character, spell, targets)

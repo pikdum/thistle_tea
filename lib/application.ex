@@ -62,6 +62,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Loader.SpellArea, as: SpellAreaLoader
   alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride, as: SpellEffectOverrideLoader
   alias ThistleTea.Game.World.Loader.SpellObjectTarget, as: SpellObjectTargetLoader
@@ -221,6 +222,7 @@ defmodule ThistleTea.Application do
     SpellChainLoader.init()
     SpellEffectOverrideLoader.init()
     SpellPetAuraLoader.init()
+    SpellAreaLoader.init()
     SpellObjectTargetLoader.init()
     SpellProcEventLoader.init()
     SpellScriptLoader.init()
@@ -301,6 +303,7 @@ defmodule ThistleTea.Application do
 
     with {:ok, pid} <- Supervisor.start_link(children, opts) do
       if !test do
+        SpellAreaLoader.load_all()
         SpellChainLoader.load_abilities()
         CreatureGroupLoader.load_all()
         Logger.info("Loading waypoints...")

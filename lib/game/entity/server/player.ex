@@ -121,6 +121,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Resurrection
   alias ThistleTea.Game.Player.SelfResurrection
   alias ThistleTea.Game.Player.Skinning
+  alias ThistleTea.Game.Player.SpellAreas
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Player.Taxi, as: PlayerTaxi
@@ -1594,6 +1595,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     |> ServerMovement.reconcile()
     |> cancel_cast_if_dead()
     |> finalize_death()
+    |> SpellAreas.reconcile()
     |> PossessionOwner.reconcile()
     |> Looting.close_unavailable()
     |> sync_equipment_requirements()

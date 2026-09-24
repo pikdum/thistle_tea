@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.Game.Spell.Semantics
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.SpellAppearance
+  alias ThistleTea.Game.World.Loader.SpellArea, as: SpellAreaLoader
   alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride, as: SpellEffectOverrideLoader
   alias ThistleTea.Game.World.Loader.SpellObjectTarget, as: SpellObjectTargetLoader
@@ -245,6 +246,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       max_targets: row.max_targets || 0,
       custom_flags: SpellEffectOverrideLoader.custom_flags(row.id),
       object_targets: SpellObjectTargetLoader.get(row.id),
+      area_rules: SpellAreaLoader.get(row.id),
       effects: build_effects(row, radius_lookup),
       script_steps: SpellScriptLoader.get(row.id),
       reagents: build_reagents(row),

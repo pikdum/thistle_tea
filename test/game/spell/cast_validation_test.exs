@@ -11,6 +11,8 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Area
+  alias ThistleTea.Game.Spell.Area.Context, as: AreaContext
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
@@ -18,6 +20,23 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
   alias ThistleTea.Game.WorldRef
 
   @now 10_000
+
+  describe "validate/6 spell areas" do
+    test "rejects an out-of-area cast before spending power" do
+      source = caster()
+      spell = harmful_spell(area_rules: [%Area{area_id: 139}])
+
+      assert CastValidation.validate(source, spell, Target.unit(7), hostile_target(), @now,
+               spell_area: %AreaContext{zone_id: 148}
+             ) == {:error, :requires_area}
+
+      assert CastValidation.validate(source, spell, Target.unit(7), hostile_target(), @now,
+               spell_area: %AreaContext{zone_id: 139}
+             ) == :ok
+
+      assert source.unit.power1 == 100
+    end
+  end
 
   describe "validate/6 target flags" do
     test "NPC and player-controlled casters use different immunity flags" do

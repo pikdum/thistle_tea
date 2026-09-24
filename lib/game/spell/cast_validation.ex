@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.Skinning
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Area
   alias ThistleTea.Game.Spell.AuraRank
   alias ThistleTea.Game.Spell.Battleground
   alias ThistleTea.Game.Spell.Cooldowns
@@ -60,6 +61,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_peaceful_target(spell, target_info, opts),
          :ok <- AuraRank.validate(caster, spell, target_info, opts),
          :ok <- Battleground.validate(spell, Keyword.get(opts, :battleground)),
+         :ok <- Area.validate(spell, Keyword.get(opts, :spell_area)),
          :ok <- Pickpocket.validate(caster, spell, target_info),
          :ok <- Skinning.validate(caster, spell, target_info, opts),
          :ok <- OpenLock.validate(caster, spell, Keyword.get(opts, :lock_context)),

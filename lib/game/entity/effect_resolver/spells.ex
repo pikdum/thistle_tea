@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Area
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Chain
   alias ThistleTea.Game.Spell.Combat, as: SpellCombat
@@ -23,6 +24,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpellAreas
   alias ThistleTea.Game.World.SpellFocus
   alias ThistleTea.Game.World.SpellMagnets
   alias ThistleTea.Game.World.SpellObjects
@@ -194,14 +196,15 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   defp foreign_owner_required?(entity, effect, spell) do
     is_integer(effect.source_guid) and effect.source_guid != entity.object.guid and
       (Spell.attribute?(spell, :channeled) or Chain.spell?(spell) or ObjectTargets.required?(spell) or
+         Area.restricted?(spell) or
          (Focus.required?(spell) and Guid.entity_type(effect.source_guid) == :player))
   end
 
   defp validate_trigger_focus(entity, effect, spell) do
-    case Focus.validate(entity, spell, SpellFocus.find(entity, spell)) do
-      :ok ->
-        resolve_trigger_delivery(entity, effect, spell)
-
+    with :ok <- Focus.validate(entity, spell, SpellFocus.find(entity, spell)),
+         :ok <- Area.validate(spell, SpellAreas.context(entity, spell)) do
+      resolve_trigger_delivery(entity, effect, spell)
+    else
       {:error, reason} ->
         [Effects.spell_cast_failed(spell, reason)]
     end

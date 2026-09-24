@@ -171,7 +171,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
          true <- flags_allow?(state, entry, target_guid, context),
          {:ok, state} <- release_previous_cast(state, entry),
          targets = Target.unit(target_guid),
-         :ok <- CastValidation.validate(state, spell, targets, build_target_info(state, target_guid, context), now) do
+         :ok <-
+           CastValidation.validate(state, spell, targets, build_target_info(state, target_guid, context), now,
+             spell_area: context.spell_area
+           ) do
       {:ok, {scripted_cast(state, spell, targets, target_guid, context), blackboard}}
     else
       {:error, reason} -> {:error, reason}
@@ -237,7 +240,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
        ) do
     targets = Target.unit(target_guid)
 
-    case CastValidation.validate(state, spell, targets, build_target_info(state, target_guid, context), now) do
+    case CastValidation.validate(state, spell, targets, build_target_info(state, target_guid, context), now,
+           spell_area: context.spell_area
+         ) do
       :ok ->
         if probability_passes?(entry, random) do
           start_spell_cast(state, blackboard, entry, index, spell, targets, target_guid, context)

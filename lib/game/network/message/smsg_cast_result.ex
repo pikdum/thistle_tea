@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
   use ThistleTea.Game.Network.ServerMessage, :SMSG_CAST_RESULT
 
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Area
 
   @simple_spell_cast_result_failure 2
 
@@ -102,6 +103,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     %{
       failure(spell.id, reason)
       | required_spell_focus: spell.required_focus_id,
+        area: Area.required_area(spell),
         equipped_item_class: spell.equipped_item_class,
         equipped_item_subclass_mask: spell.equipped_item_subclass_mask,
         equipped_item_inventory_type_mask: 0

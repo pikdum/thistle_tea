@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.SpellReception
   alias ThistleTea.Game.Player.Movement, as: PlayerMovement
+  alias ThistleTea.Game.Spell.Area
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CombatLeashes
@@ -43,6 +44,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.World.Loader.Waypoint, as: WaypointLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.SpellAreas
   alias ThistleTea.Game.World.System.ScriptedEvent
 
   @pet_observation_radius 20.0
@@ -76,6 +78,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       script_targets: script_target_results(entity, request.script_targets),
       condition_now: local_time(),
       condition_area: condition_area(entity, requirements),
+      spell_area: spell_area(entity),
       liquid_surface: liquid_surface(entity),
       body_height: PlayerMovement.body_height(entity),
       instance_data: instance_data(entity, requirements, options),
@@ -88,6 +91,12 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
 
   defp liquid_surface(%Character{} = character), do: PlayerMovement.liquid_surface(character)
   defp liquid_surface(_entity), do: nil
+
+  defp spell_area(%{internal: %{spellbook: spellbook}} = entity) when is_map(spellbook) do
+    if Enum.any?(Map.values(spellbook), &Area.restricted?/1), do: SpellAreas.context(entity)
+  end
+
+  defp spell_area(_entity), do: nil
 
   def move_to(entity, destination, opts \\ [], now \\ Time.now()) do
     {stop_patrol?, opts} = Keyword.pop(opts, :stop_patrol?, false)

@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.Spell do
     custom_flags: 0,
     hidden_aura?: false,
     object_targets: [],
+    area_rules: [],
     family_flags_0: 0,
     family_flags_1: 0,
     mechanic: 0,
