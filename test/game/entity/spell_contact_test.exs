@@ -227,6 +227,7 @@ defmodule ThistleTea.Game.Entity.SpellContactTest do
         assert mob.unit.health < health
         assert mob.internal.loot.tapped_by.player == ctx.caster.object.guid
         assert mob.internal.in_combat == health > 20
+        assert mob.unit.target == if(health > 20, do: ctx.caster.object.guid, else: 0)
         assert_receive {:"$gen_cast", {:spell_contact, %Effects.SpellContact{decision: %{combat?: true}}}}
         cancel_tick(mob)
         Visibility.leave_entity(mob)

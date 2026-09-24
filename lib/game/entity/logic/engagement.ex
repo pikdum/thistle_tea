@@ -60,7 +60,8 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   def on_damage(%Mob{object: %{guid: guid}, internal: %Internal{in_combat: combat?}} = entity, source, now)
       when combat? != true and is_integer(source) and source > 0 and source != guid do
-    %Result{entity: entity} = enter(entity, source, now, selection: :preserve)
+    selection = if default_selection(entity) == :preserve, do: :preserve, else: :target
+    %Result{entity: entity} = enter(entity, source, now, selection: selection)
     entity
   end
 

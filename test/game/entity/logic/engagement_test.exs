@@ -107,6 +107,16 @@ defmodule ThistleTea.Game.Entity.Logic.EngagementTest do
     end
   end
 
+  describe "on_damage/3" do
+    test "first damage selects the attacker so the combat tree can run" do
+      mob = Engagement.on_damage(mob(), 20, 1_000)
+      assert mob.internal.in_combat
+      assert mob.unit.target == 20
+      assert Enum.any?(mob.internal.events, &match?(%Effects.AttackerGained{target_guid: 20}, &1))
+      assert Engagement.on_damage(mob, 30, 2_000) == mob
+    end
+  end
+
   describe "die/1" do
     test "releases combat identity while preserving corpse tap ownership" do
       target = 20
