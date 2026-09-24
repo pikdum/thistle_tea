@@ -21,6 +21,8 @@ defmodule ThistleTea.DevSeed do
   A Squirrel drops random-property cloth armor and has a three-minute respawn for loot testing.
   Three adjacent Skeletal Flayers west of the playground support chained spell testing.
   Six closely grouped Prairie Wolf Alphas farther west support area target-limit testing.
+  A Highperch Soarer circles above the northeast field, alongside a stationary
+  Bloodseeker Bat, for flight, corpse landing, and respawn testing.
   """
   import Ecto.Query
 
@@ -326,6 +328,9 @@ defmodule ThistleTea.DevSeed do
     |> Enum.each(fn {{dx, dy}, index} ->
       spawn_mob(2960, @base_low_guid + 1700 + index, {x - 150.0 + dx, y - 20.0 + dy, z}, nil, @hostile_respawn_secs)
     end)
+
+    spawn_mob(6139, @base_low_guid + 1900, {x + 90.0, y + 50.0, z}, nil, 30, altitude: 18.0, wander: 10.0)
+    spawn_mob(11_368, @base_low_guid + 1901, {x + 90.0, y + 10.0, z}, nil, 30, altitude: 18.0)
   end
 
   defp seed_game_objects do
@@ -350,8 +355,10 @@ defmodule ThistleTea.DevSeed do
     end
   end
 
-  defp spawn_mob(entry, low_guid, {x, y, z}, loot_override, respawn_secs) do
+  defp spawn_mob(entry, low_guid, {x, y, z}, loot_override, respawn_secs, opts \\ []) do
     {x, y, z} = Pathfinding.snap_to_ground(@map, {x, y, z})
+    z = z + Keyword.get(opts, :altitude, 0.0)
+    wander = Keyword.get(opts, :wander, 0.0)
 
     case Mangos.Repo.one(from(c in Mangos.Creature, where: c.id == ^entry, limit: 1, preload: [:creature_template])) do
       %Mangos.Creature{} = creature ->
@@ -370,8 +377,8 @@ defmodule ThistleTea.DevSeed do
             spawntimesecs: respawn_secs,
             spawntimesecsmin: respawn_secs,
             spawntimesecsmax: respawn_secs,
-            spawndist: 0.0,
-            movement_type: 0
+            spawndist: wander,
+            movement_type: if(wander > 0, do: 1, else: 0)
         }
 
         mob =

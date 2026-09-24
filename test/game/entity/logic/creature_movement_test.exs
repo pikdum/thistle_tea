@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureMovementTest do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
+  alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
   alias ThistleTea.Game.Entity.Data.CreatureArchetype
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
@@ -12,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureMovementTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Patrol
   alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
   alias ThistleTea.Game.Entity.Logic.CreatureEntry
   alias ThistleTea.Game.Entity.Logic.CreatureMovement
@@ -112,6 +114,55 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureMovementTest do
     end
   end
 
+  describe "cycle/5" do
+    test "loads and repeats the entire authored route without per-point stops", %{mob: mob} do
+      route = cyclic_route()
+      assert route.cyclic?
+      mob = %{mob | internal: %{mob.internal | spawn: %{mob.internal.spawn | waypoint_route: route, movement_type: 3}}}
+      blackboard = Blackboard.put_next_at(Blackboard.new(), :next_aggro_at, 100_000, 0)
+      mob = BT.init(mob, MobBT.tree(), blackboard)
+      assert {{:running, 0, :navigation}, requested} = BehaviorRunner.tick(MobBT.tree(), mob, Context.new(0))
+      assert [%NavigationIntent{path: path}] = requested.internal.navigation_intents
+      assert path == [{0.0, 0.0, 30.0}, {10.0, 10.0, 35.0}, {-10.0, 10.0, 40.0}, {0.0, 0.0, 30.0}]
+      moving = NavigationResolver.resolve(requested, 0, fn _, _, _, _ -> flunk("authored route queried ground") end)
+      assert moving.movement_block.spline_nodes == path
+      deadline = moving.movement_block.duration
+      arrived = Movement.sync_position(moving, deadline)
+      assert {{:running, 0, :navigation}, repeated} = BehaviorRunner.tick(MobBT.tree(), arrived, Context.new(deadline))
+      assert [%NavigationIntent{path: ^path}] = repeated.internal.navigation_intents
+    end
+
+    test "approaches the first node through navigation after an interruption", %{mob: mob} do
+      mob = %{mob | movement_block: %{mob.movement_block | position: {30.0, 0.0, 30.0, 0.0}}}
+
+      assert {{:running, 1_000, :navigation}, requested, blackboard} =
+               Patrol.cycle(mob, Blackboard.new(), Context.new(0), cyclic_route(), [])
+
+      assert [%NavigationIntent{destination: {+0.0, +0.0, 30.0}, path: nil}] = requested.internal.navigation_intents
+      assert blackboard.navigation.move_target == {0.0, 0.0, 30.0}
+    end
+
+    test "roots block both cyclic routes and idle flight circles", %{mob: mob} do
+      mob = %{mob | movement_block: %{mob.movement_block | movement_flags: 0x08000000}}
+
+      assert {{:running, 1_000, :blocked}, ^mob, _} =
+               Patrol.cycle(mob, Blackboard.new(), Context.new(0), cyclic_route(), [])
+
+      assert {{:running, 1_000, :blocked}, ^mob, _} =
+               Patrol.circle(mob, Blackboard.new(), Context.new(0), {0.0, 0.0, 30.0}, 10.0, [])
+    end
+
+    test "combat interrupts circles at their current position", %{mob: mob} do
+      {_, requested, blackboard} = Patrol.circle(mob, Blackboard.new(), Context.new(0), {0.0, 0.0, 30.0}, 10.0, [])
+      moving = NavigationResolver.resolve(requested, 0)
+      {:success, stopped, blackboard} = MobBT.interrupt_idle_movement(moving, blackboard, 1_000)
+      refute Movement.moving?(stopped, 1_000)
+      assert stopped.movement_block.position != moving.movement_block.position
+      assert blackboard.navigation.move_target == nil
+      assert CreatureMovement.flying?(stopped)
+    end
+  end
+
   describe "land_corpse/3" do
     test "falls to the highest surface below the corpse with matching acceleration", %{mob: mob} do
       dead = %{mob | unit: %{mob.unit | health: 0}}
@@ -148,6 +199,26 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureMovementTest do
   end
 
   defp build_flyer(_context), do: %{mob: build_mob(4)}
+
+  defp cyclic_route do
+    points = [{0.0, 0.0, 30.0}, {10.0, 10.0, 35.0}, {-10.0, 10.0, 40.0}]
+
+    rows =
+      points
+      |> Enum.with_index()
+      |> Enum.map(fn {{x, y, z}, index} ->
+        %Mangos.CreatureMovement{
+          point: index,
+          position_x: x,
+          position_y: y,
+          position_z: z,
+          orientation: 100.0,
+          waittime: 0
+        }
+      end)
+
+    WaypointRoute.build(%Mangos.Creature{movement_type: 3, creature_movement: rows})
+  end
 
   defp build_mob(inhabit_type) do
     Mob.build(%Mangos.Creature{

@@ -18,6 +18,11 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureMovement do
 
   def can_fly?(_entity), do: false
 
+  def always_run?(%{internal: %Internal{creature: %Creature{extra_flags: flags}}}) when is_integer(flags),
+    do: (flags &&& 0x40) != 0
+
+  def always_run?(_entity), do: false
+
   def flying?(%{unit: %{health: health}} = entity) when is_number(health) and health > 0, do: can_fly?(entity)
   def flying?(_entity), do: false
 

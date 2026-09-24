@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Formation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Patrol
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
@@ -37,7 +38,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
-  alias ThistleTea.Game.Entity.Logic.CreatureMovement
   alias ThistleTea.Game.Entity.Logic.Critter
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -171,12 +171,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       BT.action(&Formation.tick/3),
       BT.sequence([
         BT.condition(&has_waypoints?/2),
-        BT.action(&wait_until_waypoint_ready/3),
-        BT.action(&pick_waypoint/3),
-        BT.action(&move_to_target_with_context/3),
-        BT.action(&wait_for_waypoint_arrival/3),
-        BT.action(&apply_waypoint/3),
-        BT.action(&set_next_waypoint_wait/3)
+        BT.selector([
+          BT.action(&cycle_patrol/3),
+          BT.sequence([
+            BT.action(&wait_until_waypoint_ready/3),
+            BT.action(&pick_waypoint/3),
+            BT.action(&move_to_target_with_context/3),
+            BT.action(&wait_for_waypoint_arrival/3),
+            BT.action(&apply_waypoint/3),
+            BT.action(&set_next_waypoint_wait/3)
+          ])
+        ])
       ]),
       BT.sequence([
         BT.condition(&can_wander?/2),
@@ -1246,24 +1251,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp circle_in_flight(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
-    cond do
-      not CreatureMovement.flying?(state) ->
-        {:failure, state, blackboard}
+    wakes = [idle_wake(state, blackboard, now)]
+    Patrol.circle(state, blackboard, context, wander_anchor(state, blackboard), wander_radius(state, blackboard), wakes)
+  end
 
-      Movement.blocked?(state) ->
-        {BT.running(@blocked_retry_delay, :blocked), state, blackboard}
-
-      Movement.moving?(state, now) ->
-        {reason, delay} = idle_wake(state, blackboard, now)
-        Navigation.wait_for_arrival(state, blackboard, context, [{reason, delay}])
-
-      true ->
-        state = set_running(state, true)
-        {x, y, z, _orientation} = state.movement_block.position
-        path = CreatureMovement.circle(wander_anchor(state, blackboard), wander_radius(state, blackboard), {x, y, z})
-        state = NavigationIntent.enqueue_path(state, path, run?: true, flying?: true)
-        {BT.running(if(path == [], do: @blocked_retry_delay, else: 0), :navigation), state, blackboard}
-    end
+  defp cycle_patrol(state, blackboard, %Context{now: now} = context) do
+    Patrol.cycle(state, blackboard, context, waypoint_route(state, blackboard), [idle_wake(state, blackboard, now)])
   end
 
   defp pick_wander_point(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
