@@ -85,6 +85,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :chain_effects,
     :heartbeat_sample,
     :heartbeat_roll,
+    :feign_death,
     triggered_by_aura?: false,
     triggered_by_proc?: false,
     caster_available?: true,

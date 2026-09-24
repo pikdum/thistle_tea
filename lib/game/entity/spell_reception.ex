@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
 
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.EffectResolver.Pvp
+  alias ThistleTea.Game.Entity.FeignDeath
   alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
@@ -89,6 +90,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
   def starts_combat?(_prepared), do: false
 
   defp prepare_ranked(target, context, spell, now) do
+    context = FeignDeath.prepare(target, context, spell, now)
     context = threat_context(target, context, spell)
     context = if Heartbeat.spell?(spell), do: %{context | heartbeat_sample: 1 - :rand.uniform()}, else: context
 

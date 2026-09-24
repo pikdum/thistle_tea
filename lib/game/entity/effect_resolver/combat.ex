@@ -25,6 +25,12 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Combat do
 
   def resolve(_entity, %Effects.DropNearbyThreat{}), do: []
 
+  def resolve(entity, %Effects.FeignDeathApplied{}) do
+    guids = World.nearby_players(entity, @drop_threat_radius) ++ World.nearby_mobs(entity, @drop_threat_radius)
+    targets = guids |> Enum.map(&elem(&1, 0)) |> Enum.reject(&(&1 == entity.object.guid))
+    [%Effects.FeignDeathAppliedResolved{target_guids: targets}]
+  end
+
   def resolve(%Character{} = entity, %Effects.BladeFlurry{} = effect) when is_integer(effect.spell_id) do
     resolve_secondary(entity, effect.target_guid, effect.damage, effect.spell_id, Scripts.blade_flurry_radius_yards())
   end

@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Dueling
+  alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
@@ -74,14 +75,16 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
       pvp_attack_allowed?(source, target)
   end
 
-  def valid_attack_target?(source, target) when is_integer(target) do
+  def valid_attack_target?(source, target, opts \\ [])
+
+  def valid_attack_target?(source, target, opts) when is_integer(target) do
     target
     |> target_metadata()
-    |> then(&valid_attack_target?(source, &1))
+    |> then(&valid_attack_target?(source, &1, opts))
   end
 
-  def valid_attack_target?(source, target) do
-    alive?(target) and targetable_by?(source, target) and
+  def valid_attack_target?(source, target, opts) do
+    alive?(target) and targetable_by?(source, target, false, opts) and
       attack_reaction_allows?(source, target) and
       pvp_attack_allowed?(source, target)
   end
@@ -107,13 +110,16 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
          player_projection(target, :duel_started?) != true)
   end
 
-  def targetable_by?(source, target, helpful? \\ false)
+  def targetable_by?(source, target, helpful? \\ false, opts \\ [])
 
-  def targetable_by?(source, target, true) do
+  def targetable_by?(source, target, true, _opts) do
     (unit_flags(target) &&& @unit_flag_non_attackable_2) == 0 and assist_flags_allow?(source, target)
   end
 
-  def targetable_by?(source, target, false), do: targetable?(target) and attack_flags_allow?(source, target)
+  def targetable_by?(source, target, false, opts) do
+    targetable?(target) and attack_flags_allow?(source, target) and
+      (not FeignDeath.successful?(target) or player_controlled?(source) or Keyword.get(opts, :area?, false))
+  end
 
   def faction_template(%FactionTemplate{} = faction_template), do: faction_template
   def faction_template(%{faction_template: %FactionTemplate{} = faction_template}), do: faction_template
@@ -144,6 +150,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   defp target_metadata(guid) when is_integer(guid) do
     case Metadata.query(guid, [
            :alive?,
+           :feigning_death?,
            :faction_template,
            :faction_can_have_reputation?,
            :unit_flags,

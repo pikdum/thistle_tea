@@ -164,6 +164,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:drop_threat, source_guid})
   end
 
+  def feign_death_target_lost(entity, source_guid) do
+    dispatch_cast(entity, {:feign_death_target_lost, source_guid})
+  end
+
   def temporary_threat(entity, source_guid, incarnation_id, amount) do
     dispatch_cast(entity, {:temporary_threat, source_guid, incarnation_id, amount})
   end

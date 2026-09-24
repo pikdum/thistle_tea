@@ -303,7 +303,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     results
     |> Enum.reject(fn {guid, _distance} -> guid == caster_guid end)
     |> Enum.filter(fn {guid, _distance} ->
-      Hostility.valid_attack_target?(caster, guid) and Hostility.can_attack_without_flagging?(caster, guid)
+      Hostility.valid_attack_target?(caster, guid, area?: true) and Hostility.can_attack_without_flagging?(caster, guid)
     end)
     |> Enum.map(fn {guid, _distance} -> guid end)
   end

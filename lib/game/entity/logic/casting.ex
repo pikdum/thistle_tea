@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Enchantments
+  alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.ItemUse
@@ -1342,7 +1343,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       {hits, missed} =
         Enum.split_with(targets, fn target_guid ->
           target_guid == caster_guid or
-            not Hostility.valid_attack_target?(caster, target_guid) or
+            not Hostility.valid_attack_target?(caster, target_guid, area?: true) or
             spell_hits_target?(caster, target_guid, spell)
         end)
 
@@ -1415,7 +1416,8 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
           cooldown_started_at: cooldown_started_at(caster, spell.id),
           selected_target_guid: casting.resolution.followups.selected_unit_guid,
           destination_position: Target.ground_location(casting.targets),
-          target_hostile?: target_guid != caster_guid and Hostility.valid_attack_target?(caster, target_guid),
+          target_hostile?:
+            target_guid != caster_guid and Hostility.valid_attack_target?(caster, target_guid, area?: true),
           target_role: target_role,
           chain_effects: impact.chain_effects,
           hit_outcome: impact.hit_outcome
@@ -1444,7 +1446,8 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp dispatch_to_target(character, %CastContext{caster_guid: caster_guid} = context, spell, target_guid, now)
        when target_guid == caster_guid do
-    if Heartbeat.spell?(spell) or Enum.any?(spell.effects, &(&1.type == :dispel)) do
+    if Heartbeat.spell?(spell) or FeignDeath.spell?(spell) or
+         Enum.any?(spell.effects, &(&1.type == :dispel)) do
       Effects.enqueue(character, Effects.deliver_spell(target_guid, context, spell))
     else
       {character, events} = SpellEffect.receive(character, context, spell, now)

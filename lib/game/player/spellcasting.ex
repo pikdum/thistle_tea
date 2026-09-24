@@ -512,6 +512,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp target_info(character, guid) do
     case Metadata.query(guid, [
            :alive?,
+           :feigning_death?,
            :faction_template,
            :unit_flags,
            :health_pct,
@@ -540,6 +541,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
           guid: guid,
           visible?: Visibility.can_see?(%{guid: character.object.guid, character: character}, guid),
           unit_flags: Map.get(metadata, :unit_flags, 0),
+          feigning_death?: Map.get(metadata, :feigning_death?, false),
           alive?: Map.get(metadata, :alive?, true),
           hostile?: Hostility.hostile?(character, metadata),
           friendly?: Hostility.friendly?(character, metadata),

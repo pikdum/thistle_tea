@@ -119,6 +119,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     death_finalized?: false,
     rooted?: false,
     spline_id: 0,
-    godmode: false
+    godmode: false,
+    combat_timeout_ms: 5_000
   ]
 end

@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Entity.Logic.Engagement
+  alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
@@ -215,6 +216,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       unit_flags: state.unit.flags,
       incarnation_id: Incarnation.id(state),
       alive?: state.unit.health > 0,
+      feigning_death?: FeignDeath.successful?(state),
+      victim_guid: state.unit.target,
+      detect_range_modifier: Aura.flat_amount(state, :mod_detect_range),
       health_pct: Core.health_pct(state),
       health_deficit: Core.health_deficit(state),
       orientation: elem(state.movement_block.position, 3),

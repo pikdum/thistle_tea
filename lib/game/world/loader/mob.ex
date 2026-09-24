@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.World
@@ -97,6 +98,9 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         attacker_count: 0,
         incarnation_id: Incarnation.id(mob),
         alive?: mob.unit.health > 0,
+        feigning_death?: FeignDeath.successful?(mob),
+        victim_guid: mob.unit.target,
+        detect_range_modifier: Aura.flat_amount(mob, :mod_detect_range),
         in_combat: false,
         rooted?: mob.internal.rooted? == true,
         health_pct: Core.health_pct(mob),

@@ -34,12 +34,18 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   def mark_attacked(character, now, faction_id \\ nil)
 
   def mark_attacked(%Character{internal: %Internal{} = internal} = character, now, faction_id) when is_integer(now) do
-    %{character | internal: %{internal | in_combat: true, last_hostile_time: now}}
+    %{character | internal: %{internal | in_combat: true, last_hostile_time: now, combat_timeout_ms: @combat_drop_ms}}
     |> CombatLogic.sync_combat_flag()
     |> mark_temporary_at_war(faction_id)
   end
 
   def mark_attacked(character, _now, _faction_id), do: character
+
+  def hold_combat(%Character{internal: %Internal{} = internal} = character, now, duration)
+      when is_integer(now) and is_integer(duration) and duration > 0 do
+    %{character | internal: %{internal | in_combat: true, last_hostile_time: now, combat_timeout_ms: duration}}
+    |> CombatLogic.sync_combat_flag()
+  end
 
   def mark_initiated(character, now), do: mark_attacked(character, now)
 
@@ -221,12 +227,12 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   defp attack_stop_effects(_source_guid, _target_guid), do: []
 
   defp touch_hostile(%Character{internal: %Internal{} = internal} = character, now) do
-    %{character | internal: %{internal | last_hostile_time: now}}
+    %{character | internal: %{internal | last_hostile_time: now, combat_timeout_ms: @combat_drop_ms}}
   end
 
-  defp within_drop_window?(%Character{internal: %Internal{last_hostile_time: last}}, now)
+  defp within_drop_window?(%Character{internal: %Internal{last_hostile_time: last, combat_timeout_ms: duration}}, now)
        when is_integer(last) and is_integer(now) do
-    now - last < @combat_drop_ms
+    now - last < duration
   end
 
   defp within_drop_window?(_character, _now), do: false

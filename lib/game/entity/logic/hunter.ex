@@ -2,17 +2,11 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
   @moduledoc """
   Pure Hunter pet, reactive ability, and combat lifecycle rules.
   """
-  import Bitwise, only: [&&&: 2, <<<: 2, |||: 2, bnot: 1]
+  import Bitwise, only: [&&&: 2, <<<: 2]
 
-  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Companion, as: CompanionData
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.AI.BT
-  alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Companion
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
@@ -93,22 +87,6 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
 
   def apply_food_benefit(%Spell{} = spell, _benefit), do: spell
 
-  def reconcile_feign_death(%{unit: %Unit{}} = entity, previous, current, now) do
-    case {feigning?(previous), feigning?(current)} do
-      {false, true} -> entity |> project_feign_death(true) |> apply_feign_death(now)
-      {true, false} -> {project_feign_death(entity, false), []}
-      _ -> {entity, []}
-    end
-  end
-
-  defp feigning?(holders), do: Enum.any?(holders, &Holder.has_aura_type?(&1, :feign_death))
-
-  defp project_feign_death(%{unit: %Unit{} = unit} = entity, active?) do
-    flags = unit.dynamic_flags || 0
-    flags = if active?, do: flags ||| 0x20, else: flags &&& bnot(0x20)
-    %{entity | unit: %{unit | dynamic_flags: flags}}
-  end
-
   def auto_shot?(%Spell{} = spell) do
     Spell.family_flag?(spell, @hunter_family, @auto_shot_family_mask) and
       Enum.any?(spell.effects, &(&1.type == :weapon_damage))
@@ -130,20 +108,6 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
   end
 
   def reset_cooldowns(entity, _spell), do: entity
-
-  defp apply_feign_death(%Character{} = character, now) do
-    {character, mob_guids} = PlayerCombat.vanish(character, now)
-    {character, auto_repeat_events} = AutoRepeat.cancel(character)
-
-    events =
-      auto_repeat_events ++
-        [Effects.drop_nearby_threat()] ++
-        Enum.map(mob_guids, &Effects.drop_threat/1) ++ attack_stop_events(character)
-
-    {BT.clear_auto_attack(character), events}
-  end
-
-  defp apply_feign_death(entity, _now), do: {entity, []}
 
   defp validate_companion_state(%CompanionData{kind: :hunter_pet, dead?: true}, :revive_pet), do: :ok
 
@@ -197,9 +161,4 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
   defp tame_creature?(%Spell{id: 1515}), do: true
   defp tame_creature?(%Spell{effects: effects}), do: Enum.any?(effects, &(&1.type == :tame_creature))
   defp feed_pet?(%Spell{effects: effects}), do: Enum.any?(effects, &(&1.type == :feed_pet))
-
-  defp attack_stop_events(%Character{object: %{guid: guid}, unit: %{target: target}})
-       when is_integer(target) and target > 0, do: [Effects.attack_stop(guid, target)]
-
-  defp attack_stop_events(_character), do: []
 end

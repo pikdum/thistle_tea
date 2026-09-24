@@ -44,6 +44,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Experience
+  alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.Inventory
@@ -440,6 +441,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     character = PlayerCombat.lose_threat_ref(character, mob_guid, incarnation_id)
     state = TickScheduler.ensure_scheduled(%{state | character: character})
     {:noreply, state}
+  end
+
+  def handle_cast({:feign_death_target_lost, source_guid}, %{character: %Character{} = character} = state) do
+    character = FeignDeath.target_lost(character, source_guid, Time.now())
+    {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Feign Death target cleanup failed: #{inspect(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:bind_home, guid}, state) do

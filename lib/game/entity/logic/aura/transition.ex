@@ -34,7 +34,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.DiminishingReturns
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Fear
-  alias ThistleTea.Game.Entity.Logic.Hunter
+  alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Entity.Logic.Silithyst
   alias ThistleTea.Game.Entity.Logic.SpellMagnet
@@ -63,6 +63,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     desired = Capacity.retain(desired, entity_guid(entity))
     desired = MountSync.interrupt_holders(previous, desired)
     desired = StealthSync.interrupt_holders(previous, desired)
+    desired = FeignDeath.interrupt_holders(previous, desired)
     desired = Silithyst.reconcile(desired)
     desired = StackingProc.reconcile(previous, desired)
     desired = Linked.reconcile(entity, previous, desired, now)
@@ -95,7 +96,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     {entity, control_events} = ControlSync.sync(entity, now)
     {entity, movement_events} = MovementSync.sync_movement_state(entity, now)
     {entity, control_movement_events} = ControlMovement.reconcile(entity, previous, holders, now)
-    {entity, feign_events} = Hunter.reconcile_feign_death(entity, previous, holders, now)
+    {entity, feign_events} = FeignDeath.reconcile(entity, previous, holders, now)
     entity = maybe_interrupt_fear_casting(entity)
     viewpoint_events = ViewpointSync.events(previous, holders, entity_guid(entity))
     release_events = release_controlled_events(entity, removed)

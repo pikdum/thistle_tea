@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CallForHelp
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
 
   @victimstate_normal 1
@@ -226,13 +227,23 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   def emit(entity, %Effects.TemporaryThreat{}, _context), do: entity
 
   def emit(%Character{} = entity, %Effects.DropNearbyThreatResolved{} = effect, _context) do
-    Metadata.update(entity.object.guid, effect.metadata)
+    Presence.sync(entity, effect.metadata)
     Enum.each(effect.target_guids, &Entity.drop_threat(&1, entity.object.guid))
 
     entity
   end
 
   def emit(entity, %Effects.DropNearbyThreatResolved{}, _context), do: entity
+
+  def emit(entity, %Effects.FeignDeathAppliedResolved{} = effect, _context) do
+    case entity do
+      %Character{} -> Presence.sync(entity, %{})
+      %Mob{} -> Metadata.update(entity.object.guid, %{feigning_death?: true})
+    end
+
+    Enum.each(effect.target_guids, &Entity.feign_death_target_lost(&1, entity.object.guid))
+    entity
+  end
 
   def emit(entity, %Effects.AttackerLost{target_guid: target_guid}, _context) do
     Metadata.decrement(target_guid, :attacker_count, 0)

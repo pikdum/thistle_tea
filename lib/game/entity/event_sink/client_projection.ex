@@ -37,6 +37,13 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
 
   def emit(entity, %Effects.CancelAutoRepeat{}, _context), do: entity
 
+  def emit(%Character{} = entity, %Effects.FeignDeathResisted{}, context) do
+    Context.send_packet(context, %Message.SmsgFeignDeathResisted{})
+    entity
+  end
+
+  def emit(entity, %Effects.FeignDeathResisted{}, _context), do: entity
+
   def emit(%Character{} = entity, %Effects.ConsumeCastItem{cast_item_guid: item_guid}, context)
       when is_integer(item_guid) do
     Context.send(context, {:consume_cast_item, item_guid})

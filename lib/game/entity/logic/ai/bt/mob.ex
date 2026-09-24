@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Aggro
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Formation, as: FormationMemory
@@ -70,7 +71,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @default_detection_range 20.0
   @max_db_detection_range 45.0
   @max_level_aggro_bonus 25
-  @min_aggro_radius 5.0
   @max_aggro_radius @max_db_detection_range + @max_level_aggro_bonus
   @aggro_check_delay 5_000
   @dead_idle_delay 1_000
@@ -366,18 +366,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp aggro_radius(%Mob{} = state, _target_guid, _perception), do: detection_range(state)
 
-  def aggro_radius_for(detection_range, level, target_level, modifier \\ 0)
-
-  def aggro_radius_for(detection_range, _level, _target_level, _modifier)
-      when is_number(detection_range) and detection_range < 1 do
-    0.0
-  end
-
-  def aggro_radius_for(detection_range, level, target_level, modifier)
-      when is_number(detection_range) and is_integer(level) and is_integer(target_level) and is_integer(modifier) do
-    level_diff = max(target_level - level, -@max_level_aggro_bonus)
-    max(detection_range - level_diff + modifier, min(detection_range, @min_aggro_radius))
-  end
+  defdelegate aggro_radius_for(detection_range, level, target_level, modifier \\ 0), to: Aggro, as: :radius_for
 
   def detection_range(%Mob{internal: %Internal{creature: %Creature{detection_range: range}}}) when is_number(range) do
     range

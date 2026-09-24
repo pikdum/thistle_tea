@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.Presence do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Social.Notifier, as: SocialNotifier
@@ -61,6 +62,7 @@ defmodule ThistleTea.Game.World.Presence do
        ) do
     %{
       health_deficit: Core.health_deficit(character),
+      feigning_death?: FeignDeath.successful?(character),
       area: area,
       chat_status: character.internal.chat_status,
       orientation: orientation,

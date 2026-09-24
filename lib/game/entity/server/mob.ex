@@ -53,6 +53,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
   alias ThistleTea.Game.Entity.Logic.Experience
+  alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
@@ -569,6 +570,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, state}
   end
 
+  def handle_cast({:feign_death_target_lost, source_guid}, %Mob{} = state) do
+    state = FeignDeath.target_lost(state, source_guid, Time.now())
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Feign Death target cleanup failed: #{inspect(error)}")
+      {:noreply, state}
+  end
+
   @impl GenServer
   def handle_cast({:temporary_threat, source_guid, incarnation_id, amount}, %Mob{} = state) do
     if is_integer(incarnation_id) and Incarnation.id(state) == incarnation_id do
@@ -755,6 +765,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_call(:feed_info, _from, %Mob{internal: %Internal{pet: %Pet{} = pet}} = state) do
     info = %{
       alive?: not Core.dead?(state),
+      feigning_death?: FeignDeath.successful?(state),
+      victim_guid: state.unit.target,
+      detect_range_modifier: Aura.flat_amount(state, :mod_detect_range),
       food_mask: pet.food_mask || 0,
       in_combat: state.internal.in_combat,
       level: state.unit.level

@@ -34,6 +34,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
     {:TemporaryThreat, [:target_guid, :incarnation_id, :amount], []},
     {:DropThreat, [:target_guid], []},
     {:DropNearbyThreat, [], []},
+    {:FeignDeathApplied, [], []},
+    {:FeignDeathAppliedResolved, [:target_guids], []},
     {:DropNearbyThreatResolved, [:target_guids, :metadata], []},
     {:BladeFlurry, [:target_guid, :damage, :spell_id], []},
     {:SecondaryMelee, [:target_guid, :damage, :spell_id, :range_yards], []},
