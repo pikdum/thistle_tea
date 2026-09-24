@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.Reactive
+  alias ThistleTea.Game.Entity.Logic.Resistances
   alias ThistleTea.Game.Entity.Logic.Skinning
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Time
@@ -59,6 +60,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
     {min_damage, max_damage} = melee_damage_values(ct, stats)
 
     unit = %Unit{
+      stat_model: :creature,
       health: health,
       power1: mana,
       power_type: creature_power_type(max_mana, ct.unit_class),
@@ -118,7 +120,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       auras: []
     }
 
-    unit = stat_inputs(unit, ct, stats, Keyword.get(opts, :stat_model))
+    unit = unit |> stat_inputs(ct, stats, Keyword.get(opts, :stat_model)) |> Resistances.recompute()
 
     movement_block = %MovementBlock{
       update_flag: @update_flag_all ||| @update_flag_living ||| @update_flag_has_position,

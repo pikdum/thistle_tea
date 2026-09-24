@@ -41,7 +41,7 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgressionTest do
       assert updated.unit.power3 == 100
       assert updated.unit.power5 == pet.unit.power5
       assert updated.unit.strength == 31
-      assert updated.unit.normal_resistance == 518
+      assert updated.unit.normal_resistance == 570
       assert updated.unit.min_damage > pet.unit.min_damage
       assert Stats.recompute(updated.unit) == updated.unit
       assert length(updated.internal.events) == 1

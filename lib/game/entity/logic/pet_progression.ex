@@ -111,6 +111,7 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgression do
       %{
         unit
         | level: stats.level,
+          stat_model: :creature,
           base_strength: stats.strength,
           base_attack_power: max(stats.strength * 2 - 20, 0),
           attack_power_model: :hunter_pet,
@@ -119,7 +120,7 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgression do
           base_stamina: stats.stamina,
           base_intellect: stats.intellect,
           base_spirit: stats.spirit,
-          base_health: stats.health - Stats.stamina_health_bonus(stats.stamina),
+          base_health: stats.health,
           base_normal_resistance: stats.armor,
           base_min_damage: stats.level * 1.15 * 1.05 * speed / 2,
           base_max_damage: stats.level * 1.45 * 1.05 * speed / 2,

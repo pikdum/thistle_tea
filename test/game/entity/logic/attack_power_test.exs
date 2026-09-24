@@ -191,7 +191,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackPowerTest do
   describe "from_caster/3" do
     test "weapon spells use adjusted creature damage without adding player AP damage", %{mob: mob} do
       mob = %{mob | unit: recompute(mob.unit, [holder(:mod_attack_power, -100)])}
-      target = %{mob | object: %Object{guid: 2}, unit: %{mob.unit | flags: 0x00040000, auras: []}}
+      target = %{mob | object: %Object{guid: 2}, unit: %{mob.unit | flags: 0x00040000, normal_resistance: 0, auras: []}}
 
       for {type, damage_class, expected} <- [
             {:weapon_damage, 2, 85},
@@ -223,7 +223,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackPowerTest do
       assert context.weapon_base_min == 130.0
       assert context.happiness_multiplier == 1.25
       assert_in_delta mob.unit.min_damage, 162.5, 0.0001
-      target = %{mob | object: %Object{guid: 2}, unit: %{mob.unit | flags: 0x00040000, auras: []}}
+      target = %{mob | object: %Object{guid: 2}, unit: %{mob.unit | flags: 0x00040000, normal_resistance: 0, auras: []}}
       context = %{context | hit_chance_bonus: 100, melee_crit_chance: 0, caster_position: nil}
       {_target, events} = SpellEffect.receive(target, context, spell, 0)
       assert damage(events) == 162

@@ -5,8 +5,6 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   health/mana maxima, attack power, and weapon damage. Fields whose base
   inputs are nil are skipped, which keeps mob DB values untouched.
   """
-  import Bitwise, only: [&&&: 2]
-
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -14,18 +12,9 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   alias ThistleTea.Game.Entity.Logic.AttackSpeed
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.PetHappiness
+  alias ThistleTea.Game.Entity.Logic.Resistances
   alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Spell
-
-  @resistance_fields [
-    {0x01, :normal_resistance, :base_normal_resistance, :armor},
-    {0x02, :holy_resistance, :base_holy_resistance, :holy},
-    {0x04, :fire_resistance, :base_fire_resistance, :fire},
-    {0x08, :nature_resistance, :base_nature_resistance, :nature},
-    {0x10, :frost_resistance, :base_frost_resistance, :frost},
-    {0x20, :shadow_resistance, :base_shadow_resistance, :shadow},
-    {0x40, :arcane_resistance, :base_arcane_resistance, :arcane}
-  ]
 
   @stat_fields [
     {0, :strength, :base_strength, :strength},
@@ -38,7 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   def recompute(%Unit{} = unit) do
     unit
     |> derive_stats()
-    |> derive_resistances()
+    |> Resistances.recompute()
     |> derive_max_health()
     |> derive_max_mana()
     |> derive_max_energy()
@@ -111,32 +100,6 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
         _ ->
           acc
       end
-    end)
-  end
-
-  defp derive_resistances(%Unit{} = unit) do
-    Enum.reduce(@resistance_fields, unit, fn {bit, field, base_field, bonus_key}, acc ->
-      base = Map.get(acc, base_field) || 0
-      base_and_equipment = base + equipment_bonus(acc, bonus_key)
-      scaled = trunc(base_and_equipment * aura_base_resistance_multiplier(acc, bit))
-      total = scaled + stat_armor(acc, bit) + aura_resistance_bonus(acc, bit) + aura_stat_resistance_bonus(acc, bit)
-      Map.put(acc, field, trunc(total * aura_resistance_multiplier(acc, bit)))
-    end)
-  end
-
-  defp stat_armor(%Unit{stat_model: :creature, agility: agility}, 0x01), do: agility || 0
-  defp stat_armor(_unit, _bit), do: 0
-
-  defp aura_stat_resistance_bonus(%Unit{} = unit, bit) do
-    intellect = unit.intellect || 0
-
-    sum_aura_amounts(unit, fn
-      %Aura{type: :mod_resistance_of_stat_percent, amount: amount, misc_value: mask}
-      when is_integer(amount) and is_integer(mask) and (mask &&& bit) != 0 ->
-        div(intellect * amount, 100)
-
-      _aura ->
-        0
     end)
   end
 
@@ -413,61 +376,6 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   end
 
   defp aura_stat_multiplier(_unit, _index, _type), do: 1.0
-
-  defp aura_resistance_bonus(%Unit{} = unit, bit) do
-    additive_resistance_bonus(unit, bit) + exclusive_resistance_bonus(unit, bit)
-  end
-
-  defp additive_resistance_bonus(unit, bit) do
-    sum_aura_amounts(unit, fn
-      %Aura{type: :mod_resistance, amount: amount, misc_value: mask}
-      when is_integer(amount) and is_integer(mask) and (mask &&& bit) != 0 ->
-        amount
-
-      _aura ->
-        0
-    end)
-  end
-
-  defp exclusive_resistance_bonus(%Unit{auras: holders}, bit) when is_list(holders) do
-    amounts =
-      for %Holder{auras: auras, stacks: stacks} <- holders,
-          %Aura{type: :mod_resistance_exclusive, amount: amount, misc_value: mask} <- auras,
-          is_integer(amount) and is_integer(mask) and (mask &&& bit) != 0,
-          do: amount * if(is_integer(stacks) and stacks > 1, do: stacks, else: 1)
-
-    Enum.max([0 | amounts]) + Enum.min([0 | amounts])
-  end
-
-  defp exclusive_resistance_bonus(_unit, _bit), do: 0
-
-  defp aura_base_resistance_multiplier(%Unit{} = unit, bit) do
-    percent =
-      sum_aura_amounts(unit, fn
-        %Aura{type: :mod_base_resistance_percent, amount: amount, misc_value: mask}
-        when is_integer(amount) and is_integer(mask) and (mask &&& bit) != 0 ->
-          amount
-
-        _aura ->
-          0
-      end)
-
-    max(100 + percent, 0) / 100
-  end
-
-  defp aura_resistance_multiplier(%Unit{} = unit, bit) do
-    percent =
-      sum_aura_amounts(unit, fn
-        %Aura{type: :mod_resistance_percent, amount: amount, misc_value: mask}
-        when is_integer(amount) and is_integer(mask) and (mask &&& bit) != 0 ->
-          amount
-
-        _aura ->
-          0
-      end)
-
-    max(100 + percent, 0) / 100
-  end
 
   defp sum_aura_amounts(%Unit{auras: holders}, fun) when is_list(holders) do
     Enum.reduce(holders, 0, fn %Holder{auras: auras} = holder, acc ->

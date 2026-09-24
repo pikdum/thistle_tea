@@ -154,7 +154,7 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
       assert unit.shadow_resistance == 25
       assert unit.arcane_resistance == 25
       assert unit.holy_resistance == 25
-      assert unit.normal_resistance == 0
+      assert unit.normal_resistance == 82
       assert recompute(unit) == unit
     end
 
@@ -178,7 +178,7 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
 
       unit = recompute(%{mage_unit() | base_normal_resistance: 100, auras: [stacked, other, multiplier]})
 
-      assert unit.normal_resistance == 240
+      assert unit.normal_resistance == 363
     end
 
     test "derives stats and maxima from base values" do
@@ -233,7 +233,7 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
 
       assert unit.stamina == 55
       assert unit.intellect == 176
-      assert unit.normal_resistance == 280
+      assert unit.normal_resistance == 362
       assert unit.max_health == 1360 + 20 + (55 - 20) * 10 + 50
       assert unit.max_power1 == 1273 + 20 + (176 - 20) * 15 + 30
     end
@@ -369,7 +369,7 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
             auras: [holder([bear_armor, bear_ap])]
         })
 
-      assert bear.normal_resistance == 840
+      assert bear.normal_resistance == 980
       assert bear.attack_power == 170
       assert bear.base_attack_time == 2_500
       assert_in_delta bear.min_damage, 40 * 0.85 * 2.5 + 170 / 14 * 2.5, 0.01

@@ -721,6 +721,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(80), do: :mod_percent_stat
   defp aura_type(81), do: :split_damage_percent
   defp aura_type(82), do: :water_breathing
+  defp aura_type(83), do: :mod_base_resistance
   defp aura_type(78), do: :mounted
   defp aura_type(87), do: :mod_damage_percent_taken
   defp aura_type(74), do: :reflect_spells_school

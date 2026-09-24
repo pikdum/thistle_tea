@@ -113,7 +113,7 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
       assert pet.internal.spellbook == family
       assert pet.internal.pet.family_spells == MapSet.new([17_223])
       assert PetProgression.snapshot(pet) == progress
-      assert pet.unit.normal_resistance == trunc(3_018 * 1.05)
+      assert pet.unit.normal_resistance == trunc(3_018 * 1.05) + 164
       assert Enum.map(pet.unit.auras, & &1.spell.id) == [17_223]
     end
 

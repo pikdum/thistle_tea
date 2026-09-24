@@ -191,7 +191,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
 
       assert character.unit.strength == 33
       assert character.unit.stamina == 30
-      assert character.unit.normal_resistance == 120
+      assert character.unit.normal_resistance == 162
       assert character.unit.fire_resistance == 10
       assert character.unit.max_health == 100 + 20 + (30 - 20) * 10
       assert character.unit.health == 170
@@ -218,7 +218,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
 
       assert unequipped.unit.strength == 30
       assert unequipped.unit.stamina == 25
-      assert unequipped.unit.normal_resistance == 0
+      assert unequipped.unit.normal_resistance == 42
       assert unequipped.unit.max_health == 170
       assert unequipped.unit.health == 170
     end
@@ -288,7 +288,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
       resynced = EquipmentStats.resync(leveled, get_item)
 
       assert resynced.unit.stamina == 45
-      assert resynced.unit.normal_resistance == 120
+      assert resynced.unit.normal_resistance == 162
       assert resynced.unit.max_health == 200 + 20 + (45 - 20) * 10
     end
   end
