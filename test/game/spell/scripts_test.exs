@@ -51,6 +51,13 @@ defmodule ThistleTea.Game.Spell.ScriptsTest do
       assert Scripts.exclusive_category(row) == :warlock_armor
     end
 
+    test "Dampen and Amplify Magic share a family-specific category" do
+      for mask <- [0x2000, 0x80002000] do
+        assert Scripts.exclusive_category(dbc_row(spell_class_set: 3, spell_class_mask_0: mask)) == :mage_magic
+        assert Scripts.exclusive_category(dbc_row(spell_class_set: 6, spell_class_mask_0: mask)) == nil
+      end
+    end
+
     test "leaves other spells uncategorized" do
       assert Scripts.exclusive_category(dbc_row([])) == nil
       assert Scripts.exclusive_category(dbc_row(spell_class_set: 3, spell_class_mask_0: 0x1)) == nil

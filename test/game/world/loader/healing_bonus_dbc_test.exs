@@ -17,6 +17,22 @@ defmodule ThistleTea.Game.World.Loader.HealingBonusDbcTest do
   setup [:coefficients]
 
   describe "load/1" do
+    test "Amplify and Dampen Magic replace one another across ranks and casters" do
+      for id <- [604, 1008, 8450, 8451, 8455, 10_169, 10_170, 10_173, 10_174] do
+        assert SpellLoader.load(id).exclusive_category == :mage_magic
+      end
+
+      for ids <- [[10_170, 10_174, 1008], [10_174, 10_170, 604]] do
+        Enum.reduce(Enum.with_index(ids, 1), recipient(), fn {id, caster}, target ->
+          {target, _events} = Aura.apply_spell(target, caster, 60, SpellLoader.load(id), 1_000 * caster)
+          assert [holder] = target.unit.auras
+          assert holder.spell.id == id
+          assert holder.caster_guid == caster
+          target
+        end)
+      end
+    end
+
     test "Amplify and Dampen Magic scale differently for Flash Heal and Renew" do
       direct = SpellLoader.load(10_917)
       hot = SpellLoader.load(10_929)

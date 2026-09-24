@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @spell_family_paladin 10
   @spell_family_shaman 11
   @mage_armor_family_flags 0x12000000
+  @mage_magic_family_flag 0x00002000
   @paladin_seal_family_flags 0x0A000200
   @paladin_blessing_family_flags 0x10000100
   @warlock_armor_visual 130
@@ -195,7 +196,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @positive_shout_flags_1 0x00008000
 
   def exclusive_category(row) do
-    generic_exclusive_category(row) || paladin_exclusive_category(row) || non_paladin_exclusive_category(row)
+    generic_exclusive_category(row) || mage_exclusive_category(row) || paladin_exclusive_category(row) ||
+      warlock_exclusive_category(row)
   end
 
   defp generic_exclusive_category(row) do
@@ -253,12 +255,20 @@ defmodule ThistleTea.Game.Spell.Scripts do
       ((attributes &&& @allow_while_mounted) != 0 or (attributes_ex1 &&& @no_autocast_ai) != 0)
   end
 
-  defp non_paladin_exclusive_category(row) do
-    cond do
-      row.spell_class_set == @spell_family_mage and
-          ((row.spell_class_mask_0 || 0) &&& @mage_armor_family_flags) != 0 ->
-        :mage_armor
+  defp mage_exclusive_category(%{spell_class_set: @spell_family_mage, spell_class_mask_0: flags}) do
+    flags = flags || 0
 
+    cond do
+      (flags &&& @mage_armor_family_flags) != 0 -> :mage_armor
+      (flags &&& @mage_magic_family_flag) != 0 -> :mage_magic
+      true -> nil
+    end
+  end
+
+  defp mage_exclusive_category(_row), do: nil
+
+  defp warlock_exclusive_category(row) do
+    cond do
       row.spell_visual_0 == @warlock_armor_visual and row.spell_icon == @warlock_armor_icon ->
         :warlock_armor
 
