@@ -385,6 +385,29 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       end
     end
 
+    test "near and cross-map teleports notify the client when interrupting a cast" do
+      for destination <- [WorldRef.open(0), WorldRef.open(309)] do
+        guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+        character = character(guid, health: 100, max_health: 100)
+        spell = %Spell{id: 116, cast_time_ms: 3_000, gcd_ms: 1_500}
+        casting = Cast.new(spell, Target.none(), Time.now())
+        character = %{character | internal: %{character.internal | casting: casting}}
+        state = %State{connection_pid: self(), guid: guid, character: character, ready: true}
+
+        on_exit(fn ->
+          Metadata.delete(guid)
+          SpatialHash.remove(:players, guid)
+        end)
+
+        assert {:noreply, %State{character: teleported}} =
+                 PlayerServer.handle_cast({:start_teleport, 10.0, 20.0, 30.0, 0.0, destination}, state)
+
+        assert teleported.internal.casting == nil
+        assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{spell: 116, result: 2, reason: 0x23}}}
+        assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgSpellFailure{guid: ^guid, spell: 116, result: 0x23}}}
+      end
+    end
+
     test "clears city rest when teleporting to a map without loaded navigation data" do
       guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
 

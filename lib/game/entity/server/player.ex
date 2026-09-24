@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Data.Trade.Decision
   alias ThistleTea.Game.Entity.Data.Trade.Prepare
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.EventSink.Context, as: EventContext
   alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request, as: ObservationRequest
@@ -1996,7 +1997,12 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp disengage_for_world_transition(%State{character: %Character{}} = state) do
     state = PossessionOwner.release(state)
-    character = Casting.cancel(state.character, Time.now())
+
+    character =
+      state.character
+      |> Casting.interrupt(Time.now())
+      |> EventSink.emit_pending(EventContext.new(self()))
+
     {character, effects} = PlayerCombat.disengage(character)
     %{state | character: EventSink.emit(character, effects)}
   end
