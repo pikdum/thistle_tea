@@ -85,6 +85,13 @@ defmodule ThistleTea.Game.Spell do
   def wand?(%__MODULE__{dmg_class: 1} = spell), do: auto_repeat?(spell)
   def wand?(_spell), do: false
 
+  def polymorph?(%__MODULE__{spell_family: 3, prevention_type: 1, effects: effects} = spell) do
+    not family_flag?(spell, 3, 0x12000000) and
+      Enum.any?(effects, &match?(%Effect{index: 0, aura: :mod_confuse}, &1))
+  end
+
+  def polymorph?(_spell), do: false
+
   def ranged_attack?(%__MODULE__{} = spell), do: ranged_ability?(spell) or auto_repeat?(spell)
 
   def reflectable?(%__MODULE__{dmg_class: 1} = spell) do

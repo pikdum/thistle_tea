@@ -5,6 +5,18 @@ defmodule ThistleTea.Game.SpellTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
 
+  describe "polymorph?/1" do
+    test "recognizes silence-prevented mage confusion in the first effect" do
+      spell = %Spell{spell_family: 3, prevention_type: 1, effects: [%Effect{index: 0, aura: :mod_confuse}]}
+      assert Spell.polymorph?(spell)
+      refute Spell.polymorph?(%{spell | spell_family: 0})
+      refute Spell.polymorph?(%{spell | prevention_type: 0})
+      refute Spell.polymorph?(%{spell | effects: [%Effect{index: 1, aura: :mod_confuse}]})
+      refute Spell.polymorph?(%{spell | effects: [%Effect{index: 0, aura: :transform}]})
+      refute Spell.polymorph?(%{spell | family_flags_0: 0x10000000})
+    end
+  end
+
   describe "harmful?/1" do
     test "external instant kills are hostile even with an any-unit target" do
       spell = %Spell{effects: [%Effect{type: :instakill, implicit_target_a: :any_unit}]}

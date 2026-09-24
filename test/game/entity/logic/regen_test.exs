@@ -12,7 +12,9 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Entity.Logic.Resources
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
 
   @warrior 1
   @paladin 2
@@ -45,6 +47,60 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
 
     holder = %Holder{spell: %Spell{id: Keyword.get(opts, :spell_id, 1)}, auras: [aura]}
     %{entity | unit: %{entity.unit | auras: (entity.unit.auras || []) ++ [holder]}}
+  end
+
+  defp polymorphed(entity) do
+    holder = %Holder{
+      spell: %Spell{
+        id: 118,
+        spell_family: 3,
+        prevention_type: 1,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_confuse}]
+      },
+      negative?: true,
+      auras: [%AuraEffect{index: 1, type: :transform, misc_value: 856}]
+    }
+
+    %{entity | unit: %{entity.unit | auras: (entity.unit.auras || []) ++ [holder]}}
+  end
+
+  describe "tick/2 while polymorphed" do
+    test "players recover ten percent in combat and carry fractional health" do
+      entity = character([class: @mage, health: 1, max_health: 105], in_combat: true) |> polymorphed()
+      first = Regen.tick(entity, 10_000)
+      assert first.unit.health == 11
+      assert first.internal.health_regen_carry == 0.5
+      assert first.internal.broadcast_update?
+      assert Regen.tick(first, 12_000).unit.health == 22
+    end
+
+    test "polymorph replaces spirit, food, sitting and percentage bonuses but retains flat regeneration" do
+      entity =
+        character(class: @mage, health: 1, max_health: 100, spirit: 1_000, stand_state: 1)
+        |> polymorphed()
+        |> with_aura(:mod_regen, 100, amplitude_ms: 2_000)
+        |> with_aura(:mod_health_regen_percent, 100)
+        |> with_aura(:mod_health_regen_in_combat, 5)
+
+      assert Regen.tick(entity, 10_000).unit.health == 13
+    end
+
+    test "polymorph healing requires neither class nor spirit and caps at maximum health" do
+      entity = character(health: 99, class: nil, spirit: nil) |> polymorphed()
+      assert Regen.tick(entity, 10_000).unit.health == 100
+    end
+
+    test "other transforms do not grant combat regeneration" do
+      entity = character([class: @mage, health: 50], in_combat: true) |> with_aura(:transform, 0, misc_value: 856)
+      assert Regen.tick(entity, 10_000).unit.health == 50
+    end
+
+    test "dead players and ghosts cannot recover health" do
+      dead = character(health: 0) |> polymorphed()
+      assert Regen.tick(dead, 10_000) == dead
+      ghost = %{dead | unit: %{dead.unit | health: 1}, player: %Player{flags: 0x10}}
+      assert Regen.tick(ghost, 10_000) == ghost
+    end
   end
 
   describe "tick/2" do
@@ -392,6 +448,33 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
       entity = mob([health: 50], in_combat: true)
 
       assert Regen.tick(entity, 10_000).unit.health == 50
+    end
+
+    test "polymorphed wild creatures keep health ticking during combat" do
+      entity = mob([health: 50], in_combat: true) |> polymorphed()
+      assert Regen.needs_resource_regen?(entity)
+      assert Regen.tick(entity, 10_000).unit.health == 150
+
+      for inactive <- [
+            %{entity | unit: %{entity.unit | auras: []}},
+            %{entity | unit: %{entity.unit | health: 0}},
+            %{entity | internal: %{entity.internal | creature: %Creature{regenerate_stats: 0}}}
+          ] do
+        refute Regen.needs_resource_regen?(inactive)
+        assert Regen.tick(inactive, 10_000) == inactive
+      end
+    end
+
+    test "polymorphed player pets and charmed creatures recover ten percent" do
+      creature_guid = Guid.from_low_guid(:mob, 1, 10)
+
+      for ownership <- [[summoned_by: 1], [charmed_by: 1], [summoned_by: creature_guid, charmed_by: 1]] do
+        entity = mob([health: 50, max_health: 305] ++ ownership, in_combat: true) |> polymorphed()
+        assert Regen.tick(entity, 10_000).unit.health == 80
+      end
+
+      entity = mob([health: 50, summoned_by: 1, charmed_by: creature_guid], in_combat: true) |> polymorphed()
+      assert Regen.tick(entity, 10_000).unit.health == 150
     end
 
     test "regenerates a third of max mana out of combat" do

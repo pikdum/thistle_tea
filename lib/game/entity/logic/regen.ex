@@ -14,9 +14,11 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Appearance
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Guid
 
   @tick_ms 2_000
   @creature_tick_ms 5_000
@@ -100,18 +102,29 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
 
   def needs_focus_regen?(_entity), do: false
 
-  defp creature_regen_health(%{internal: %Internal{in_combat: true}} = entity), do: entity
-
   defp creature_regen_health(%{unit: %Unit{health: health, max_health: max_health}} = entity)
        when is_integer(health) and is_integer(max_health) and health < max_health do
-    if creature_regenerates?(entity, @regen_flag_health) do
-      Core.heal(entity, max(div(max_health, 3), 1))
+    if creature_needs_health_regen?(entity) do
+      Core.heal(entity, creature_health_per_tick(entity))
     else
       entity
     end
   end
 
   defp creature_regen_health(entity), do: entity
+
+  defp creature_health_per_tick(%{unit: %Unit{} = unit}) do
+    if Appearance.polymorphed?(unit) and player_controlled?(unit) do
+      div(unit.max_health, 10)
+    else
+      max(div(unit.max_health, 3), 1)
+    end
+  end
+
+  defp player_controlled?(%Unit{charmed_by: charmer, summoned_by: owner}) do
+    controller = if charmer in [nil, 0], do: owner, else: charmer
+    Guid.entity_type(controller) == :player
+  end
 
   defp creature_regen_mana(%{unit: %Unit{power1: mana, max_power1: max_mana}} = entity, now)
        when is_integer(mana) and is_integer(max_mana) and max_mana > 0 and mana < max_mana do
@@ -145,7 +158,8 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
   end
 
   defp creature_needs_health_regen?(entity) do
-    not in_combat?(entity) and missing_health?(entity) and creature_regenerates?(entity, @regen_flag_health)
+    missing_health?(entity) and creature_regenerates?(entity, @regen_flag_health) and
+      (not in_combat?(entity) or Appearance.polymorphed?(entity.unit))
   end
 
   defp creature_needs_mana_regen?(entity) do
@@ -211,13 +225,19 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
     entity
   end
 
-  defp regen_health(%{unit: %Unit{class: class, spirit: spirit}} = entity)
-       when is_integer(class) and is_number(spirit) do
-    value = spirit_health_portion(entity, class, spirit) + food_health_per_tick(entity) + flat_combat_health(entity)
-    apply_health_regen(entity, value)
+  defp regen_health(%{unit: %Unit{max_health: max_health} = unit} = entity) when is_integer(max_health) do
+    value = if Appearance.polymorphed?(unit), do: max_health / 10, else: ordinary_health_per_tick(entity)
+    apply_health_regen(entity, value + flat_combat_health(entity))
   end
 
   defp regen_health(entity), do: entity
+
+  defp ordinary_health_per_tick(%{unit: %Unit{class: class, spirit: spirit}} = entity)
+       when is_integer(class) and is_number(spirit) do
+    spirit_health_portion(entity, class, spirit) + food_health_per_tick(entity)
+  end
+
+  defp ordinary_health_per_tick(_entity), do: 0.0
 
   defp spirit_health_portion(entity, class, spirit) do
     base = health_per_tick(class, spirit)

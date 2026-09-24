@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Appearance do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.Model
   alias ThistleTea.Game.Entity.Logic.ScriptEquipment
+  alias ThistleTea.Game.Spell
 
   def sync_unit(%Unit{} = unit) do
     case model(unit) do
@@ -28,6 +29,13 @@ defmodule ThistleTea.Game.Entity.Logic.Appearance do
   end
 
   def model(%Unit{} = unit), do: transform(unit) || shapeshift(unit)
+
+  def polymorphed?(%Unit{} = unit) do
+    case selected_transform(unit) do
+      {%Holder{spell: spell}, _model} -> Spell.polymorph?(spell)
+      nil -> false
+    end
+  end
 
   def project(%{object: object, unit: %Unit{} = unit} = entity, multiplier) do
     model = model(unit)
@@ -73,15 +81,27 @@ defmodule ThistleTea.Game.Entity.Logic.Appearance do
   def shapeshift_model(32, _race), do: %Model{display_id: 16_031}
   def shapeshift_model(_form, _race), do: nil
 
-  defp transform(%Unit{auras: holders} = unit) when is_list(holders) do
+  defp transform(unit) do
+    case selected_transform(unit) do
+      {_holder, model} -> model
+      nil -> nil
+    end
+  end
+
+  defp selected_transform(%Unit{auras: holders} = unit) when is_list(holders) do
     holders
     |> Enum.filter(&Holder.has_aura_type?(&1, :transform))
     |> Enum.reverse()
     |> Enum.sort_by(&{&1.negative?, is_integer(&1.applied_at), &1.applied_at}, :desc)
-    |> Enum.find_value(&holder_model(&1, unit, :transform))
+    |> Enum.find_value(fn holder ->
+      case holder_model(holder, unit, :transform) do
+        %Model{} = model -> {holder, model}
+        nil -> nil
+      end
+    end)
   end
 
-  defp transform(_unit), do: nil
+  defp selected_transform(_unit), do: nil
 
   defp shapeshift(%Unit{auras: holders, shapeshift_form: form, race: race} = unit) do
     Enum.find_value(holders || [], &holder_model(&1, unit, :mod_shapeshift)) || shapeshift_model(form, race)

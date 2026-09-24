@@ -11,14 +11,55 @@ defmodule ThistleTea.Game.Entity.Logic.AppearanceTest do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.Model
+  alias ThistleTea.Game.Entity.Logic.Appearance
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.ObjectSync
+  alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Entity.Logic.ScriptEquipment
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
 
   setup [:character]
+
+  describe "polymorphed?/1" do
+    test "regeneration follows the selected transformation through replacement and expiry", %{character: character} do
+      character = %{character | unit: %{character.unit | health: 50}, internal: %{character.internal | in_combat: true}}
+
+      polymorph = %{
+        disguise(118, 856)
+        | spell_family: 3,
+          prevention_type: 1,
+          attributes: MapSet.new([:negative]),
+          effects: [
+            %Effect{index: 0, type: :apply_aura, aura: :mod_confuse},
+            %Effect{index: 1, type: :apply_aura, aura: :transform, appearance: %Model{display_id: 856}}
+          ]
+      }
+
+      {sheep, _events} = Aura.apply_spell(character, 2, 60, polymorph, 1_000)
+      {disguised, _events} = Aura.apply_spell(sheep, 1, 60, disguise(900_001, 100), 2_000)
+      assert Appearance.polymorphed?(disguised.unit)
+      assert Regen.tick(disguised, 2_000).unit.health == 60
+
+      overriding = %{disguise(900_002, 200) | attributes: MapSet.new([:negative]), duration_ms: 1_000}
+      {overridden, _events} = Aura.apply_spell(disguised, 3, 60, overriding, 3_000)
+      refute Appearance.polymorphed?(overridden.unit)
+      assert Regen.tick(overridden, 3_000).unit.health == 50
+
+      {revealed, _events} = Aura.expire_due(overridden, 4_000)
+      assert Appearance.polymorphed?(revealed.unit)
+      assert Regen.tick(revealed, 4_000).unit.health == 60
+
+      {expired, _events} = Aura.expire_due(revealed, 11_000)
+      refute Appearance.polymorphed?(expired.unit)
+      assert Regen.tick(expired, 11_000).unit.health == 50
+
+      {removed, _events} = Aura.remove_spells(sheep, [118], 2_000)
+      refute Appearance.polymorphed?(removed.unit)
+      assert Regen.tick(removed, 2_000).unit.health == 50
+    end
+  end
 
   describe "apply_spell/5" do
     test "newer disguises replace the display and reveal the older one on removal", %{character: character} do

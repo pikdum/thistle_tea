@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.Loader.SpellAppearanceDbcTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.Loader.ModelGeometry
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
@@ -14,6 +15,15 @@ defmodule ThistleTea.Game.World.Loader.SpellAppearanceDbcTest do
   setup [:model_cache]
 
   describe "load/1" do
+    test "all mage polymorph ranks and alternate animals qualify for regeneration" do
+      for id <- [118, 12_824, 12_825, 12_826, 28_271, 28_272] do
+        assert Spell.polymorph?(SpellLoader.load(id)), "spell #{id}"
+      end
+
+      refute Spell.polymorph?(SpellLoader.load(16_739))
+      refute Spell.polymorph?(SpellLoader.load(8219))
+    end
+
     test "Orb of Deception selects all eight races and both genders" do
       spell = SpellLoader.load(16_739)
 
