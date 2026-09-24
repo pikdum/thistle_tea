@@ -34,7 +34,43 @@ defmodule ThistleTea.Game.World.Pathfinding do
     Namigator.find_random_point_around_circle(map_id, x, y, z, radius * 1.0)
   end
 
-  def find_path(map_id, {start_x, start_y, start_z}, {stop_x, stop_y, stop_z}, opts \\ []) do
+  def find_path(map_id, start, destination, opts \\ []) do
+    if Keyword.get(opts, :flying?, false) do
+      flight_path(map_id, start, destination, opts)
+    else
+      ground_path(map_id, start, destination, opts)
+    end
+  end
+
+  defp flight_path(map_id, {sx, sy, _sz} = start, {dx, dy, _dz} = destination, opts) do
+    load_adt_at(map_id, {sx, sy})
+    load_adt_at(map_id, {dx, dy})
+
+    if collision_clear?(map_id, start, destination) do
+      [destination]
+    else
+      flight_detour(map_id, start, destination, opts)
+    end
+  end
+
+  defp flight_detour(map_id, start, destination, opts) do
+    case ground_path(map_id, start, destination, opts) do
+      [_ | _] = path ->
+        candidate = path ++ [destination]
+        if clear_path?(map_id, [start | candidate]), do: candidate
+
+      _ ->
+        nil
+    end
+  end
+
+  defp clear_path?(map_id, points) do
+    points
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.all?(fn [start, destination] -> collision_clear?(map_id, start, destination) end)
+  end
+
+  defp ground_path(map_id, {start_x, start_y, start_z}, {stop_x, stop_y, stop_z}, opts) do
     load_adt_at(map_id, {start_x, start_y})
     load_adt_at(map_id, {stop_x, stop_y})
 

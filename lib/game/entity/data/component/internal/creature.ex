@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Creature do
     :family,
     :type_flags,
     :creature_type,
+    :inhabit_type,
     :damage_multiplier,
     :regenerate_stats,
     :detection_range,

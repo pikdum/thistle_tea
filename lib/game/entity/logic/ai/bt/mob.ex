@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
+  alias ThistleTea.Game.Entity.Logic.CreatureMovement
   alias ThistleTea.Game.Entity.Logic.Critter
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -179,11 +180,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       ]),
       BT.sequence([
         BT.condition(&can_wander?/2),
-        BT.action(&wait_until_wander_ready/3),
-        BT.action(&pick_wander_point/3),
-        BT.action(&move_to_target_with_context/3),
-        BT.action(&wait_for_arrival_with_context/3),
-        BT.action(&set_next_wander_wait/3)
+        BT.selector([
+          BT.action(&circle_in_flight/3),
+          BT.sequence([
+            BT.action(&wait_until_wander_ready/3),
+            BT.action(&pick_wander_point/3),
+            BT.action(&move_to_target_with_context/3),
+            BT.action(&wait_for_arrival_with_context/3),
+            BT.action(&set_next_wander_wait/3)
+          ])
+        ])
       ]),
       BT.action(&idle/3)
     ])
@@ -1236,6 +1242,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     else
       {reason, delay_ms} = idle_wake(state, blackboard, :next_waypoint_at, now, :waypoint)
       {BT.running(delay_ms, reason), state, blackboard}
+    end
+  end
+
+  defp circle_in_flight(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
+    cond do
+      not CreatureMovement.flying?(state) ->
+        {:failure, state, blackboard}
+
+      Movement.blocked?(state) ->
+        {BT.running(@blocked_retry_delay, :blocked), state, blackboard}
+
+      Movement.moving?(state, now) ->
+        {reason, delay} = idle_wake(state, blackboard, now)
+        Navigation.wait_for_arrival(state, blackboard, context, [{reason, delay}])
+
+      true ->
+        state = set_running(state, true)
+        {x, y, z, _orientation} = state.movement_block.position
+        path = CreatureMovement.circle(wander_anchor(state, blackboard), wander_radius(state, blackboard), {x, y, z})
+        state = NavigationIntent.enqueue_path(state, path, run?: true, flying?: true)
+        {BT.running(if(path == [], do: @blocked_retry_delay, else: 0), :navigation), state, blackboard}
     end
   end
 

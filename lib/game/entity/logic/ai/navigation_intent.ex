@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.NavigationIntent do
   @floor_tolerance 1.5
 
   @enforce_keys [:destination]
-  defstruct [:destination, opts: []]
+  defstruct [:destination, :path, opts: []]
 
   @doc "Accepts navigation floor refinement without treating a different floor or a short path as arrival."
   def reached?({x, y, z}, {tx, ty, tz}) do
@@ -26,6 +26,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.NavigationIntent do
 
   def pending?(%{internal: %Internal{navigation_intents: [_ | _]}}), do: true
   def pending?(_entity), do: false
+
+  def enqueue_path(%{internal: %Internal{navigation_intents: intents} = internal} = entity, [_ | _] = path, opts)
+      when is_list(opts) do
+    intent = %__MODULE__{destination: List.last(path), path: path, opts: opts}
+    %{entity | internal: %{internal | navigation_intents: [intent | intents]}}
+  end
+
+  def enqueue_path(entity, [], _opts), do: entity
 
   def drain(%{internal: %Internal{navigation_intents: intents} = internal} = entity) when is_list(intents) do
     {%{entity | internal: %{internal | navigation_intents: []}}, Enum.reverse(intents)}

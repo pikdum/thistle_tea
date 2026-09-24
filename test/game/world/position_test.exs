@@ -16,6 +16,20 @@ defmodule ThistleTea.Game.World.PositionTest do
   alias ThistleTea.Game.WorldRef
 
   describe "put/2" do
+    test "projects a falling corpse with the owner's acceleration and stops at the floor" do
+      guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      corpse = mob(guid) |> stop_at({0.0, 0.0, 30.0, 0.0}) |> Movement.fall_to(10.0, 1_000)
+      on_exit(fn -> World.remove_position(corpse) end)
+      World.update_position(corpse)
+      assert %Spline{falling?: true} = Position.projection(guid)
+      assert {_, +0.0, +0.0, z} = World.position(guid, 1_500)
+      assert_in_delta z, elem(Movement.sync_position(corpse, 1_500).movement_block.position, 2), 0.00001
+      assert {_, +0.0, +0.0, 10.0} = World.position(guid, 10_000)
+      landed = Movement.sync_position(corpse, 10_000)
+      World.update_position(landed)
+      assert Position.projection(guid) == nil
+    end
+
     test "reconciles a mob's stationary and projected positions" do
       guid = Guid.from_low_guid(:mob, 1, unique_guid())
       moving = mob(guid)

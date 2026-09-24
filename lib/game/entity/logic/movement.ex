@@ -8,7 +8,9 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Logic.CreatureMovement
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Falling
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.SpatialGrid
 
@@ -54,10 +56,27 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   def completion_at(%{internal: %Internal{movement_start_time: started, movement_options: opts}, movement_block: mb})
       when is_integer(started) and is_list(opts) do
-    if Keyword.has_key?(opts, :movement_inform), do: started + mb.duration
+    if Keyword.has_key?(opts, :movement_inform) or Keyword.get(opts, :falling?, false), do: started + mb.duration
   end
 
   def completion_at(_entity), do: nil
+
+  def falling?(%{internal: %Internal{movement_options: opts}}) when is_list(opts),
+    do: Keyword.get(opts, :falling?, false)
+
+  def falling?(_entity), do: false
+
+  def fall_to(%{movement_block: %MovementBlock{position: {x, y, z, _}}} = entity, floor, now)
+      when is_number(floor) and floor < z - 0.1 do
+    opts = [falling?: true, flying?: false, run?: true]
+
+    entity
+    |> start_timed_path([{x, y, floor}], Falling.duration(z - floor), now, opts)
+    |> CreatureMovement.sync()
+    |> Effects.enqueue(Effects.monster_move(opts))
+  end
+
+  def fall_to(entity, _floor, _now), do: CreatureMovement.sync(entity)
 
   def next_spatial_update_delay(
         %{
@@ -188,7 +207,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     entity = sync_position(entity, now)
     %{movement_block: %MovementBlock{position: {x0, y0, z0, _orientation}}} = entity
 
-    if path == [] or at_destination?({x0, y0, z0}, List.last(path)) do
+    if Enum.all?(path, &at_destination?({x0, y0, z0}, &1)) do
       entity
     else
       entity
@@ -201,7 +220,8 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     entity = sync_position(entity, now)
     %{movement_block: %MovementBlock{position: {x0, y0, z0, _o}}} = entity
 
-    if path == [] or (at_destination?({x0, y0, z0}, List.last(path)) and not Keyword.has_key?(opts, :movement_inform)) do
+    if path == [] or
+         (Enum.all?(path, &at_destination?({x0, y0, z0}, &1)) and not Keyword.has_key?(opts, :movement_inform)) do
       entity
     else
       start_resolved_path(entity, path, now, opts)
@@ -242,7 +262,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     } = entity
 
     running = Keyword.get(opts, :run?, default_running)
-    flying? = Keyword.get(opts, :flying?, false)
+    flying? = Keyword.get(opts, :flying?, CreatureMovement.flying?(entity))
 
     internal = %{
       internal
@@ -263,7 +283,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
         duration: duration,
         time_passed: 0,
         movement_flags: movement_flags(mb.movement_flags, running, flying?),
-        spline_flags: spline_flags(running, flying?),
+        spline_flags: if(Keyword.get(opts, :falling?, false), do: 0x00000002, else: spline_flags(running, flying?)),
         spline_id: spline_id,
         spline_start_position: {x0, y0, z0}
     }
@@ -439,6 +459,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     }
 
     %{entity | movement_block: movement_block, internal: internal}
+    |> CreatureMovement.sync()
   end
 
   defp projected?(%{
@@ -493,11 +514,16 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     total_distance = path_length(path)
 
     {{x, y, z}, orientation} =
-      if total_distance <= 0 do
-        {List.last(path), orientation}
-      else
-        distance_travelled = total_distance * elapsed / duration
-        pose_along_path(path, distance_travelled, orientation)
+      cond do
+        falling?(entity) ->
+          {Falling.position(start_position, List.last(path), elapsed), orientation}
+
+        total_distance <= 0 ->
+          {List.last(path), orientation}
+
+        true ->
+          distance_travelled = total_distance * elapsed / duration
+          pose_along_path(path, distance_travelled, orientation)
       end
 
     movement_block = %{mb | position: {x, y, z, orientation}, time_passed: elapsed}
@@ -515,7 +541,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   defp movement_flags(flags, running, flying?) do
     flags = flags || 0
     flags = bor(flags, bor(@movement_flag_forward, @movement_flag_spline_enabled))
-    flags = if flying?, do: bor(flags, @movement_flag_flying), else: flags
+    flags = if flying?, do: bor(flags, @movement_flag_flying), else: flags &&& bnot(@movement_flag_flying)
 
     if running do
       flags &&& bnot(@movement_flag_walk_mode)
@@ -553,7 +579,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
           mb
           | position: {x, y, z, orientation},
             spline_nodes: [],
-            movement_flags: 0,
+            movement_flags: MovementBlock.clear_motion_flags(mb.movement_flags),
             time_passed: mb.duration,
             spline_flags: 0,
             spline_id: nil,
@@ -568,7 +594,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
             movement_options: nil
         }
 
-        entity = %{entity | movement_block: movement_block, internal: internal}
+        entity = CreatureMovement.sync(%{entity | movement_block: movement_block, internal: internal})
 
         case Keyword.get(opts, :movement_inform) do
           %Effects.MovementInform{} = event -> Effects.enqueue(entity, event)

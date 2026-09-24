@@ -82,6 +82,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Server.CreaturePetOwner
   alias ThistleTea.Game.Entity.Server.GuardianOwner
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
+  alias ThistleTea.Game.Entity.Server.Mob.Flight
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Entity.Server.Mob.Pockets
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
@@ -1544,7 +1545,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp spellbook_spell(%Mob{}, _spell_id), do: nil
 
   defp schedule_next_ai_tick(%Mob{} = state, %TickPlan{} = plan) do
-    if Core.dead?(state), do: deactivate_ai(state), else: schedule_ai_tick(state, TickPlan.delay(plan))
+    if Core.dead?(state) and not Movement.falling?(state),
+      do: deactivate_ai(state),
+      else: schedule_ai_tick(state, TickPlan.delay(plan))
   end
 
   defp schedule_movement_completion(%Mob{} = state) do
@@ -1554,7 +1557,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         ref = state.internal.ai_tick_ref
         remaining = if is_reference(ref), do: Process.read_timer(ref)
 
-        if Core.dead?(state) or (is_integer(remaining) and remaining <= delay),
+        if (Core.dead?(state) and not Movement.falling?(state)) or (is_integer(remaining) and remaining <= delay),
           do: state,
           else: schedule_ai_tick(state, delay)
 
@@ -1897,6 +1900,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         )
       )
       |> NavigationResolver.resolve(now)
+      |> Flight.land_corpse(now)
       |> EventSink.emit_pending()
       |> maybe_reward_kill(killer)
       |> Corpse.prepare(killer)

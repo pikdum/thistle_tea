@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEntry do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Aura.ObjectSync
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.CreatureMovement
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -84,6 +85,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEntry do
     |> preserve_resources(previous)
     |> ObjectSync.sync()
     |> sync_movement()
+    |> CreatureMovement.sync()
     |> Reactive.sync_health()
     |> Core.mark_broadcast_update()
   end

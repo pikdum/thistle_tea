@@ -103,7 +103,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
   def translating?(_movement_block), do: false
 
   def clear_motion_flags(flags) when is_integer(flags) do
-    motion_flags = @movement_flag_mask_translating ||| @movement_flag_spline_enabled ||| @movement_flag_flying
+    motion_flags = 0x000000FF ||| @movement_flag_spline_enabled ||| @movement_flag_flying ||| 0x00800000
     band(flags, bnot(motion_flags))
   end
 

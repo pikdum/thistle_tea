@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.Position do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Logic.Falling
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.SpatialGrid
   alias ThistleTea.Game.World.Position.ClientMotion
@@ -104,11 +105,13 @@ defmodule ThistleTea.Game.World.Position do
     end
   end
 
-  defp reconcile_spline(%{
-         object: %{guid: guid},
-         internal: %Internal{world: world, movement_start_time: start_time, movement_start_position: start_position},
-         movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration}
-       })
+  defp reconcile_spline(
+         %{
+           object: %{guid: guid},
+           internal: %Internal{world: world, movement_start_time: start_time, movement_start_position: start_position},
+           movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration}
+         } = entity
+       )
        when is_integer(start_time) and is_tuple(start_position) and is_list(spline_nodes) and spline_nodes != [] and
               is_integer(duration) and duration > 0 do
     projection = %Spline{
@@ -116,7 +119,8 @@ defmodule ThistleTea.Game.World.Position do
       origin: start_position,
       nodes: spline_nodes,
       started_at: start_time,
-      duration_ms: duration
+      duration_ms: duration,
+      falling?: Movement.falling?(entity)
     }
 
     SpatialHash.put_projection(guid, projection)
@@ -133,6 +137,10 @@ defmodule ThistleTea.Game.World.Position do
     speed = :math.sqrt(vx * vx + vy * vy + vz * vz)
     max_duration_ms = trunc(SpatialGrid.max_cell_drift() / speed * 1_000)
     min(requested_duration_ms, max(max_duration_ms, 1))
+  end
+
+  defp spline_position(%Spline{falling?: true} = projection, now) do
+    Falling.position(projection.origin, List.last(projection.nodes), max(now - projection.started_at, 0))
   end
 
   defp spline_position(%Spline{} = projection, now) do

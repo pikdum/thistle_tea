@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
+  alias ThistleTea.Game.Entity.Logic.CreatureMovement
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.World.Pathfinding
@@ -22,11 +23,12 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
 
   defp resolve_intent(
          %{internal: %Internal{world: world}} = entity,
-         %NavigationIntent{destination: destination, opts: opts},
+         %NavigationIntent{destination: destination, path: requested_path, opts: opts},
          now,
          find_path
        ) do
     entity = Movement.sync_position(entity, now)
+    flying? = Keyword.get(opts, :flying?, CreatureMovement.flying?(entity))
     {start_x, start_y, start_z, _orientation} = entity.movement_block.position
 
     {allow_steep, opts} = Keyword.pop(opts, :allow_steep, true)
@@ -36,11 +38,14 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
     start = {start_x, start_y, start_z}
     opts = travel_velocity(opts, start, destination)
     entity = replace_point_movement(entity, opts, now)
+    path_opts = if flying?, do: [allow_steep: allow_steep, flying?: true], else: [allow_steep: allow_steep]
 
     path =
-      if pathfind?,
-        do: find_path.(world.map_id, start, destination, allow_steep: allow_steep),
-        else: [destination]
+      cond do
+        is_list(requested_path) -> requested_path
+        pathfind? -> find_path.(world.map_id, start, destination, path_opts)
+        true -> [destination]
+      end
 
     case path do
       path when is_list(path) ->

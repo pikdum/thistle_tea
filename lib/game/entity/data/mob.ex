@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.CreatureEntry
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
+  alias ThistleTea.Game.Entity.Logic.CreatureMovement
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -187,6 +188,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
           family: ct.family,
           type_flags: type_flags(ct),
           creature_type: ct.creature_type,
+          inhabit_type: ct.inhabit_type,
           critter?: ct.creature_type == 8 and ct.ai_name in [nil, "", "CritterAI"] and c.ai_events in [nil, []],
           damage_multiplier: ct.damage_multiplier,
           regenerate_stats: regenerate_stats(ct),
@@ -222,6 +224,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
     }
     |> Reactive.sync_health()
     |> MovementStats.recompute()
+    |> CreatureMovement.sync()
     |> then(fn mob ->
       if Keyword.get(opts, :apply_addon_auras?, true), do: apply_addon_auras(mob, Time.now()), else: mob
     end)
@@ -351,7 +354,12 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
     %Engagement.Result{entity: mob} =
       Engagement.reset(%{mob | unit: unit, movement_block: movement_block, internal: internal})
 
-    mob |> Reactive.sync_health() |> MovementStats.recompute() |> Companion.project() |> Skinning.sync()
+    mob
+    |> Reactive.sync_health()
+    |> MovementStats.recompute()
+    |> CreatureMovement.sync()
+    |> Companion.project()
+    |> Skinning.sync()
   end
 
   defp effective_scale(%Mangos.CreatureTemplate{scale: scale}, _display_scale) when is_number(scale) and scale > 0,

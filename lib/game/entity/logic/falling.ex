@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.Falling do
   @moduledoc """
-  Tracks client-driven falls in world or transport coordinates and applies
-  landing damage through the shared health and death transition.
+  Computes falling trajectories and tracks client-driven landing damage
+  through the shared health and death transition.
   """
 
   import Bitwise, only: [&&&: 2]
@@ -14,6 +14,30 @@ defmodule ThistleTea.Game.Entity.Logic.Falling do
   alias ThistleTea.Game.Entity.Logic.EnvironmentalDamage
 
   defstruct [:height, :transport_guid, far?: false]
+
+  @gravity 19.29110527038574
+  @terminal_velocity 60.148003
+  @terminal_time @terminal_velocity / @gravity
+  @terminal_distance @terminal_velocity * @terminal_velocity / (2 * @gravity)
+
+  def duration(distance) when is_number(distance) and distance > 0 do
+    seconds =
+      if distance >= @terminal_distance,
+        do: (distance - @terminal_distance) / @terminal_velocity + @terminal_time,
+        else: :math.sqrt(2 * distance / @gravity)
+
+    ceil(seconds * 1_000)
+  end
+
+  def distance(elapsed_ms) when is_number(elapsed_ms) and elapsed_ms >= 0 do
+    seconds = elapsed_ms / 1_000
+
+    if seconds > @terminal_time,
+      do: @terminal_velocity * (seconds - @terminal_time) + @terminal_distance,
+      else: @gravity * seconds * seconds / 2
+  end
+
+  def position({x, y, z}, {_x, _y, floor}, elapsed_ms), do: {x, y, max(floor, z - distance(elapsed_ms))}
 
   def update(%Character{} = character, action, now) do
     movement = character.movement_block

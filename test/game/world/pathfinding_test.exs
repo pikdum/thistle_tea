@@ -9,6 +9,27 @@ defmodule ThistleTea.Game.World.PathfindingTest do
 
   @human_start {-8949.95, -132.49, 83.53}
 
+  describe "find_path/4 with flight" do
+    test "retains a flight destination above the ground mesh" do
+      origin = {-8949.95, -132.49, 110.0}
+      destination = {-8969.95, -132.49, 120.0}
+      assert Pathfinding.find_path(0, origin, destination, flying?: true) == [destination]
+    end
+
+    test "does not fly straight through an obstructing wall" do
+      origin = {-8930.0, -150.0, 84.0}
+      destination = {-8910.0, -150.0, 84.0}
+      path = Pathfinding.find_path(0, origin, destination, flying?: true)
+      refute path == [destination]
+
+      if is_list(path) do
+        for [start, stop] <- Enum.chunk_every([origin | path], 2, 1, :discard) do
+          assert Pathfinding.collision_position(0, start, stop) == stop
+        end
+      end
+    end
+  end
+
   describe "find_random_point_around_circle/3" do
     test "accepts an integer script radius" do
       assert {x, y, z} = Pathfinding.find_random_point_around_circle(0, @human_start, 5)

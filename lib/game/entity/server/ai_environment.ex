@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Condition.Requirements
+  alias ThistleTea.Game.Entity.Logic.CreatureMovement
   alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Server.FormationEnvironment
   alias ThistleTea.Game.Entity.Server.NavigationResolver
@@ -501,7 +502,9 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   end
 
   defp random_point_requests(entity, now) do
-    [wander_request(entity, now), Confusion.request(entity, now)]
+    wander = if not CreatureMovement.flying?(entity), do: wander_request(entity, now)
+
+    [wander, Confusion.request(entity, now)]
     |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
   end
