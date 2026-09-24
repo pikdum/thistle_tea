@@ -22,7 +22,6 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
@@ -600,10 +599,11 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   describe "Curse of Tongues" do
     test "negative casting speed increases cast duration" do
       spell = %Spell{id: 686, cast_time_ms: 2_000}
-      cast = spell |> Cast.new(Target.none(), 1_000) |> Cast.apply_speed_modifier(-50)
+      curse = %Holder{spell: %Spell{id: 1714}, auras: [%Aura{type: :mod_casting_speed, amount: -50}]}
+      target = Casting.start(mob([curse]), spell, Target.none(), 1_000)
 
-      assert cast.cast_time_ms == 4_000
-      assert cast.ends_at == 5_000
+      assert target.internal.casting.cast_time_ms == 3_000
+      assert target.internal.casting.ends_at == 4_000
     end
   end
 

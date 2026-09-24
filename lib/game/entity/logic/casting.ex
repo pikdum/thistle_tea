@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.Ammunition
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
+  alias ThistleTea.Game.Entity.Logic.CastSpeed
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Disarm
@@ -118,7 +119,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     casting =
       spell
       |> Cast.new(targets, now)
-      |> Cast.apply_speed_modifier(AuraLogic.flat_amount(character, :mod_casting_speed))
+      |> Cast.apply_speed_multiplier(CastSpeed.multiplier(character.unit, spell))
       |> then(
         &%{&1 | cast_item_guid: cast_item_guid, cast_item_id: cast_item_id, modifier_holder_ids: modifier_holder_ids}
       )

@@ -80,8 +80,8 @@ defmodule ThistleTea.Game.Spell.Cast do
   def channeled?(%__MODULE__{channel_ms: channel_ms}) when is_integer(channel_ms) and channel_ms > 0, do: true
   def channeled?(_cast), do: false
 
-  def apply_speed_modifier(%__MODULE__{} = cast, modifier) when is_number(modifier) and modifier != 0 do
-    cast_time_ms = trunc(cast.cast_time_ms * 100 / max(100 + modifier, 1))
+  def apply_speed_multiplier(%__MODULE__{} = cast, multiplier) when is_number(multiplier) and multiplier > 0 do
+    cast_time_ms = trunc(cast.cast_time_ms * multiplier)
     delta = cast_time_ms - cast.cast_time_ms
 
     %{
@@ -91,8 +91,6 @@ defmodule ThistleTea.Game.Spell.Cast do
         next_channel_tick_at: shift_time(cast.next_channel_tick_at, delta)
     }
   end
-
-  def apply_speed_modifier(%__MODULE__{} = cast, _modifier), do: cast
 
   def push_back_cast(%__MODULE__{cast_time_ms: cast_time_ms} = cast, now)
       when is_integer(cast_time_ms) and cast_time_ms > 0 and is_integer(now) do

@@ -891,6 +891,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @on_next_swing_2, :on_next_swing)
       |> add_if(attrs, @passive, :passive)
       |> add_if(attrs, @ability, :ability)
+      |> add_if(attrs, 0x00000020, :tradeskill)
       |> add_if(attrs, @allow_while_mounted, :allow_while_mounted)
       |> add_if(attrs, @hidden_in_combat_log, :hidden_in_combat_log)
       |> add_if(attrs, @not_while_shapeshifted, :not_while_shapeshifted)

@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.CastSpeed
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.CreatureEntry
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
@@ -120,7 +121,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       auras: []
     }
 
-    unit = unit |> stat_inputs(ct, stats, Keyword.get(opts, :stat_model)) |> Resistances.recompute()
+    unit =
+      unit |> stat_inputs(ct, stats, Keyword.get(opts, :stat_model)) |> Resistances.recompute() |> CastSpeed.recompute()
 
     movement_block = %MovementBlock{
       update_flag: @update_flag_all ||| @update_flag_living ||| @update_flag_has_position,

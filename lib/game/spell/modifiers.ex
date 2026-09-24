@@ -13,6 +13,17 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   @modifier_types [:add_flat_modifier, :add_pct_modifier]
   @periodic_auras [:periodic_damage, :periodic_heal, :periodic_leech, :periodic_health_funnel, :periodic_mana_leech]
 
+  @aura_operations %{
+    mod_attack_power: :attack_power,
+    mod_ranged_attack_power: :attack_power,
+    mod_attack_power_pct: :attack_power,
+    mod_ranged_attack_power_pct: :attack_power,
+    mod_attack_speed: :haste,
+    mod_casting_speed: :haste,
+    mod_melee_haste: :haste,
+    mod_ranged_haste: :haste
+  }
+
   @operations %{
     0 => :damage,
     1 => :duration,
@@ -61,6 +72,13 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   end
 
   def value(_modifiers, _operation, base), do: base
+
+  def aura_amount(modifiers, %Effect{aura: type}, amount) do
+    case Map.fetch(@aura_operations, type) do
+      {:ok, operation} -> value(modifiers, operation, amount)
+      :error -> amount
+    end
+  end
 
   def snapshot(entity, %Spell{} = spell), do: entity |> snapshot_all() |> for_spell(spell)
   def snapshot(_entity, _spell), do: []
@@ -162,6 +180,10 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   defp operation_used_by_spell?(:critical_chance, %Spell{} = spell), do: critical_spell?(spell)
   defp operation_used_by_spell?(:damage, %Spell{} = spell), do: Spell.damage_effects(spell) != []
   defp operation_used_by_spell?(:all_effects, %Spell{effects: effects}), do: Enum.any?(effects, &effectful?/1)
+
+  defp operation_used_by_spell?(operation, %Spell{effects: effects}) when operation in [:attack_power, :haste] do
+    Enum.any?(effects, &(Map.get(@aura_operations, &1.aura) == operation))
+  end
 
   defp operation_used_by_spell?(:speed, %Spell{effects: effects}) do
     Enum.any?(effects, &(&1.aura in [:mod_increase_speed, :mod_decrease_speed, :mod_increase_swim_speed]))

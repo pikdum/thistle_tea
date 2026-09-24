@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AttackPower
   alias ThistleTea.Game.Entity.Logic.AttackSpeed
+  alias ThistleTea.Game.Entity.Logic.CastSpeed
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.Resistances
@@ -35,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     |> derive_weapon_damage()
     |> derive_happiness_damage()
     |> AttackSpeed.recompute()
+    |> CastSpeed.recompute()
   end
 
   defp derive_happiness_damage(%Unit{base_min_damage: base_min, base_max_damage: base_max} = unit)

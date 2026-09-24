@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackSpeed do
   defp base_period(%Unit{base_offhand_attack_time: base}, :offhand), do: base
   defp base_period(%Unit{base_ranged_attack_time: base}, :ranged), do: base
 
-  defp multiplier(%Unit{auras: holders} = unit, hand) do
+  def multiplier(%Unit{auras: holders} = unit, hand) do
     {amounts, slow} =
       for %Holder{} = holder <- holders || [],
           %Aura{type: type, amount: amount} <- holder.auras,

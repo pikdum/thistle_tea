@@ -97,6 +97,31 @@ defmodule ThistleTea.Game.Spell.ModifiersTest do
   end
 
   describe "consumable_holder_ids/2" do
+    test "attack power and haste charges require the matching aura operation" do
+      entity =
+        entity([
+          modifier_holder(:add_flat_modifier, 10, 3, 1, charges: 1, id: 2),
+          modifier_holder(:add_flat_modifier, 10, 23, 1, charges: 1, id: 3)
+        ])
+
+      for {type, ids} <- [
+            {:mod_attack_power, [2]},
+            {:mod_ranged_attack_power, [2]},
+            {:mod_attack_power_pct, [2]},
+            {:mod_ranged_attack_power_pct, [2]},
+            {:mod_attack_speed, [3]},
+            {:mod_melee_haste, [3]},
+            {:mod_ranged_haste, [3]},
+            {:mod_casting_speed, [3]},
+            {:mod_stat, []}
+          ] do
+        spell = %Spell{spell_family: 8, family_flags_0: 1, effects: [%Effect{type: :apply_aura, aura: type}]}
+        assert Modifiers.consumable_holder_ids(entity, spell) == ids
+        assert Modifiers.consumable_holder_ids(entity, %{spell | family_flags_0: 2}) == []
+        assert Modifiers.consumable_holder_ids(entity, %{spell | spell_family: 3}) == []
+      end
+    end
+
     test "selects charged modifiers only when the cast uses their operation" do
       crit = modifier_holder(:add_flat_modifier, 100, 7, 0x4, charges: 1, id: 14_177)
       cast_time = modifier_holder(:add_flat_modifier, -5_500, 10, 0x8, charges: 1, id: 18_708)
