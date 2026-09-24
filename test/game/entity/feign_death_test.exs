@@ -5,17 +5,23 @@ defmodule ThistleTea.Game.Entity.FeignDeathTest do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.FeignDeath
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.FeignDeath, as: FeignLogic
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
   alias ThistleTea.Game.Entity.SpellReception
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -88,6 +94,31 @@ defmodule ThistleTea.Game.Entity.FeignDeathTest do
       Metadata.put(ctx.pet, %{alive?: true, in_combat: true, victim_guid: ctx.mob})
       assert prepare(%{ctx | character: character}, 0).feign_death.pet_in_combat?
       Metadata.update(ctx.pet, %{victim_guid: 0})
+      refute prepare(%{ctx | character: character}, 0).feign_death.pet_in_combat?
+    end
+
+    test "reads the victim published by the pet owner through combat entry and exit", ctx do
+      pet = %Mob{
+        object: %Object{guid: ctx.pet, entry: 1},
+        unit: %Unit{health: 100, max_health: 100, level: 50, auras: []},
+        movement_block: ctx.character.movement_block,
+        internal: %Internal{
+          world: ctx.world,
+          pet: %Pet{owner_guid: ctx.guid, kind: :hunter, profile: :combat},
+          creature: %Creature{},
+          spawn: %Spawn{}
+        }
+      }
+
+      pet = Engagement.enter(pet, ctx.mob, 1_000, selection: :target).entity
+      assert {:noreply, pet} = MobServer.handle_continue(:maybe_broadcast, pet)
+      assert Metadata.query(ctx.pet, [:victim_guid, :in_combat]) == %{victim_guid: ctx.mob, in_combat: true}
+
+      character = Companion.activate(ctx.character, :hunter_pet, %EntityRef{guid: ctx.pet, entry: 1, spell_id: 1515})
+      assert prepare(%{ctx | character: character}, 0).feign_death.pet_in_combat?
+
+      pet = Engagement.leave(pet, :pet_command).entity
+      assert {:noreply, _pet} = MobServer.handle_continue(:maybe_broadcast, pet)
       refute prepare(%{ctx | character: character}, 0).feign_death.pet_in_combat?
     end
 

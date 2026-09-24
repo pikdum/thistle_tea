@@ -765,9 +765,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_call(:feed_info, _from, %Mob{internal: %Internal{pet: %Pet{} = pet}} = state) do
     info = %{
       alive?: not Core.dead?(state),
-      feigning_death?: FeignDeath.successful?(state),
-      victim_guid: state.unit.target,
-      detect_range_modifier: Aura.flat_amount(state, :mod_detect_range),
       food_mask: pet.food_mask || 0,
       in_combat: state.internal.in_combat,
       level: state.unit.level
@@ -1353,6 +1350,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       metadata =
         %{
           alive?: not Core.dead?(state),
+          feigning_death?: FeignDeath.successful?(state),
+          victim_guid: state.unit.target,
+          detect_range_modifier: Aura.flat_amount(state, :mod_detect_range),
           level: state.unit.level,
           in_combat: state.internal.in_combat == true,
           rooted?: state.internal.rooted? == true,
