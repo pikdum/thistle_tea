@@ -23,36 +23,27 @@ defmodule ThistleTea.Game.Spell.GlobalCooldownTest do
   setup [:caster]
 
   describe "gcd_duration/2" do
-    test "spell haste truncates milliseconds within vanilla's one to one-and-a-half second bounds", %{caster: caster} do
-      assert Cooldowns.gcd_duration(caster, spell()) == 1500
-
-      for {amount, expected} <- [{33, 1127}, {100, 1000}, {-50, 1500}] do
-        assert Cooldowns.gcd_duration(with_auras(caster, [haste(amount)]), spell()) == expected
+    test "ordinary casting haste and slows leave vanilla global cooldowns unchanged", %{caster: caster} do
+      for amount <- [33, 100, -50], duration <- [1000, 1500, 2000] do
+        assert Cooldowns.gcd_duration(with_auras(caster, [haste(amount)]), %{spell() | gcd_ms: duration}) == duration
       end
     end
 
-    test "abilities, ranged spells, other categories, and other base times ignore haste", %{caster: caster} do
-      caster = with_auras(caster, [haste(100)])
-
-      for spell <- [
-            %{spell() | dmg_class: 2},
-            %{spell() | dmg_class: 3},
-            %{spell() | attributes: MapSet.new([:ability])},
-            %{spell() | attributes: MapSet.new([:uses_ranged_slot])},
-            %{spell() | gcd_category: 0},
-            %{spell() | gcd_category: 4},
-            %{spell() | gcd_ms: 1000},
-            %{spell() | gcd_ms: 2000}
-          ] do
-        assert Cooldowns.gcd_duration(caster, spell) == spell.gcd_ms
-      end
+    test "an accelerated cast can finish before its unchanged global cooldown", %{caster: caster} do
+      spell = %{spell() | cast_time_ms: 1500}
+      caster = with_auras(caster, [haste(33)]) |> Casting.start(spell, Target.self(1), 1000)
+      assert caster.internal.casting.cast_time_ms == 1127
+      completed = Casting.complete(caster, 2127)
+      assert completed.internal.casting == nil
+      assert Cooldowns.on_gcd?(completed, spell, 2499)
+      refute Cooldowns.on_gcd?(completed, spell, 2500)
     end
 
-    test "family modifiers precede the haste eligibility check", %{caster: caster} do
+    test "family modifiers alter the cooldown independently of casting haste", %{caster: caster} do
       caster = with_auras(caster, [modifier(-100), haste(100)])
       assert Cooldowns.gcd_duration(caster, spell()) == 1400
-      assert Cooldowns.gcd_duration(caster, %{spell() | family_flags_0: 2}) == 1000
-      assert Cooldowns.gcd_duration(caster, %{spell() | spell_family: 5}) == 1000
+      assert Cooldowns.gcd_duration(caster, %{spell() | family_flags_0: 2}) == 1500
+      assert Cooldowns.gcd_duration(caster, %{spell() | spell_family: 5}) == 1500
 
       percent = modifier(-20, :add_pct_modifier)
       assert Cooldowns.gcd_duration(with_auras(caster, [modifier(-100), percent]), spell()) == 1120
@@ -91,13 +82,13 @@ defmodule ThistleTea.Game.Spell.GlobalCooldownTest do
       assert :ok = CastValidation.validate(caster, member, Target.self(1), nil, 2500)
     end
 
-    test "a running cooldown retains its captured duration when the haste aura expires", %{caster: caster} do
-      caster = with_auras(caster, [%{haste(33) | expires_at: 1100}])
+    test "a running cooldown retains its captured duration when its modifier expires", %{caster: caster} do
+      caster = with_auras(caster, [%{modifier(-100) | expires_at: 1100}])
       caster = Cooldowns.trigger_gcd(caster, spell(), 1000)
       {caster, _events} = AuraLogic.expire_due(caster, 1100)
       assert Cooldowns.gcd_duration(caster, spell()) == 1500
-      assert Cooldowns.on_gcd?(caster, spell(), 2126)
-      refute Cooldowns.on_gcd?(caster, spell(), 2127)
+      assert Cooldowns.on_gcd?(caster, spell(), 2399)
+      refute Cooldowns.on_gcd?(caster, spell(), 2400)
     end
   end
 

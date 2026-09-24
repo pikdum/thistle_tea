@@ -36,9 +36,9 @@ defmodule ThistleTea.Game.World.Loader.GlobalCooldownDbcTest do
       end
     end
 
-    test "Mind Quickening shortens magic cooldowns but leaves rogue attacks at one second", %{caster: caster} do
+    test "Mind Quickening leaves magic and rogue global cooldowns unchanged", %{caster: caster} do
       {modified, _events} = Aura.apply_spell(caster, 1, 60, SpellLoader.load(23_723), 0)
-      assert Cooldowns.gcd_duration(modified, SpellLoader.load(10_917)) == 1127
+      assert Cooldowns.gcd_duration(modified, SpellLoader.load(10_917)) == 1500
       assert Cooldowns.gcd_duration(modified, SpellLoader.load(1752)) == 1000
       assert Cooldowns.gcd_duration(modified, SpellLoader.load(23_723)) == 0
     end

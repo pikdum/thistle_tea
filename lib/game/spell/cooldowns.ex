@@ -7,7 +7,6 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
   import Bitwise, only: [&&&: 2, <<<: 2]
 
   alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Logic.CastSpeed
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns.Entry
@@ -62,24 +61,13 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
     base = positive(spell.gcd_ms)
 
     if spell.gcd_category > 0 or base > 0 do
-      duration = entity |> Modifiers.value(spell, :global_cooldown, base) |> trunc() |> max(0)
-
-      if haste_affects_gcd?(spell, duration),
-        do: duration |> Kernel.*(CastSpeed.multiplier(entity.unit)) |> trunc() |> max(1_000) |> min(1_500),
-        else: duration
+      entity |> Modifiers.value(spell, :global_cooldown, base) |> trunc() |> max(0)
     else
       0
     end
   end
 
   def gcd_duration(_entity, %Spell{} = spell), do: positive(spell.gcd_ms)
-
-  defp haste_affects_gcd?(%Spell{gcd_category: 133, dmg_class: damage_class} = spell, 1_500) do
-    damage_class not in [2, 3] and not Spell.attribute?(spell, :ability) and
-      not Spell.attribute?(spell, :uses_ranged_slot)
-  end
-
-  defp haste_affects_gcd?(_spell, _duration), do: false
 
   def on_gcd?(%{internal: internal}, %Spell{gcd_category: category}, now) when is_integer(now),
     do: locked_until?(Map.get(stored(internal), {:gcd, category}), now)
