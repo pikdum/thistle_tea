@@ -536,6 +536,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
           guid: target_guid,
           unit_flags: Map.get(metadata, :unit_flags, 0),
           feigning_death?: Map.get(metadata, :feigning_death?, false),
+          shapeshift_form: Map.get(metadata, :shapeshift_form, 0),
           owner_guid: Map.get(metadata, :owner_guid),
           alive?: Map.get(metadata, :alive?, true),
           hostile?: Hostility.hostile?(source, metadata),

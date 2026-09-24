@@ -107,6 +107,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         health_deficit: Core.health_deficit(mob),
         mana_pct: Core.mana_pct(mob),
         power_type: mob.unit.power_type,
+        shapeshift_form: mob.unit.shapeshift_form || 0,
         orientation: elem(mob.movement_block.position, 3),
         aura_sources: Aura.source_spells(mob),
         aura_stacks: Aura.spell_stacks(mob),

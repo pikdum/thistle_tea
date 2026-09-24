@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
+  alias ThistleTea.Game.Entity.Logic.Shapeshift
   alias ThistleTea.Game.Entity.Logic.Silithyst
   alias ThistleTea.Game.Entity.Logic.SpellMagnet
   alias ThistleTea.Game.Spell
@@ -61,6 +62,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
       when is_list(desired) and cause in @causes and is_integer(now) do
     previous = if is_list(unit.auras), do: unit.auras, else: []
     desired = Capacity.retain(desired, entity_guid(entity))
+    desired = Shapeshift.interrupt_holders(previous, desired)
     desired = MountSync.interrupt_holders(previous, desired)
     desired = StealthSync.interrupt_holders(previous, desired)
     desired = FeignDeath.interrupt_holders(previous, desired)

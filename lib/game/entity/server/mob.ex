@@ -1360,6 +1360,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           health_deficit: Core.health_deficit(state),
           mana_pct: Core.mana_pct(state),
           power_type: state.unit.power_type,
+          shapeshift_form: state.unit.shapeshift_form || 0,
           unit_flags: state.unit.flags,
           aura_sources: Aura.source_spells(state),
           aura_stacks: Aura.spell_stacks(state),

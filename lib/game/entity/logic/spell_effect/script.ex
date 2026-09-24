@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Druid
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -10,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
   alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.Rogue
+  alias ThistleTea.Game.Entity.Logic.Shapeshift
   alias ThistleTea.Game.Entity.Logic.Silithyst
   alias ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal
   alias ThistleTea.Game.Entity.Logic.SpellTeaching
@@ -103,6 +105,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
 
   defp apply_class_dummy(state, context, spell, effect, :execute, now) do
     DamageHeal.execute(state, context, spell, effect, now)
+  end
+
+  defp apply_class_dummy(state, _context, _spell, _effect, :shapeshift_cleanse, now) do
+    Aura.remove_spells(state, Shapeshift.removable_spells(state.unit.auras || []), now)
   end
 
   defp apply_class_dummy(state, _context, _spell, _effect, :silithyst_pickup, now), do: Silithyst.pickup(state, now)

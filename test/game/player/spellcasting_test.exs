@@ -39,6 +39,32 @@ defmodule ThistleTea.Game.Player.SpellcastingTest do
   describe "scripted_cast/4" do
     setup [:script_caster]
 
+    test "rejects shapeshift-sensitive auras using the recipient's published form", %{
+      state: state,
+      spell: spell,
+      entry: entry
+    } do
+      guid = Guid.from_low_guid(:mob, 4952, System.unique_integer([:positive]))
+      Metadata.put(guid, %{alive?: true, shapeshift_form: 1})
+      on_exit(fn -> Metadata.delete(guid) end)
+
+      spell = %{
+        spell
+        | aura_interrupt_flags: 0x8000,
+          effects: [%Effect{type: :apply_aura, aura: :water_walk, implicit_target_a: :any_unit}],
+          attributes: MapSet.new([:ignore_line_of_sight])
+      }
+
+      rejected = Spellcasting.scripted_cast(state, spell, entry, guid)
+      assert rejected.character.internal.casting == nil
+      assert rejected.character.unit.power1 == state.character.unit.power1
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{result: 2}}}
+
+      Metadata.update(guid, %{shapeshift_form: 31})
+      allowed = Spellcasting.scripted_cast(state, spell, entry, guid)
+      assert allowed.character.internal.casting.spell.id == spell.id
+    end
+
     test "any-unit casts receive template immunity from metadata", %{state: state, spell: spell, entry: entry} do
       guid = Guid.from_low_guid(:mob, 4952, System.unique_integer([:positive]))
       Metadata.put(guid, %{alive?: true, unit_flags: 0})

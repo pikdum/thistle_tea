@@ -195,7 +195,7 @@ defmodule ThistleTea.Game.Spell do
     cond do
       (stance_mask &&& (spell.stances_not || 0)) != 0 -> {:error, :not_shapeshift}
       (stance_mask &&& stances) != 0 -> :ok
-      true -> shapeshifted_cast_error(spell, stances, acts_as_shifted?(form))
+      true -> shapeshifted_cast_error(spell, stances, shapeshifted?(form))
     end
   end
 
@@ -215,7 +215,7 @@ defmodule ThistleTea.Game.Spell do
     end
   end
 
-  defp acts_as_shifted?(form), do: form > 0 and form not in @stance_like_forms
+  def shapeshifted?(form), do: is_integer(form) and form > 0 and form not in @stance_like_forms
 
   def stance_like_forms, do: @stance_like_forms
 

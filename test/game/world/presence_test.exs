@@ -82,6 +82,18 @@ defmodule ThistleTea.Game.World.PresenceTest do
   end
 
   describe "sync/2" do
+    test "publishes and clears form restrictions from the owner's current state" do
+      character = character(WorldRef.open(0), {1.0, 2.0, 3.0, 0.0}, 12)
+      on_exit(fn -> Presence.leave(character) end)
+      Presence.enter(character, %{})
+      assert Metadata.get(character.object.guid).shapeshift_form == 0
+      shifted = %{character | unit: %{character.unit | shapeshift_form: 1}}
+      Presence.sync(shifted, %{shapeshift_form: 0})
+      assert Metadata.get(character.object.guid).shapeshift_form == 1
+      Presence.sync(character, %{})
+      assert Metadata.get(character.object.guid).shapeshift_form == 0
+    end
+
     test "derives creature type from the current form and restores humanoid on removal" do
       character = character(WorldRef.open(0), {1.0, 2.0, 3.0, 0.0}, 12)
       on_exit(fn -> Presence.leave(character) end)

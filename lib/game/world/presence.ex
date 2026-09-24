@@ -63,6 +63,7 @@ defmodule ThistleTea.Game.World.Presence do
     %{
       health_deficit: Core.health_deficit(character),
       feigning_death?: FeignDeath.successful?(character),
+      shapeshift_form: shapeshift_form(character),
       area: area,
       chat_status: character.internal.chat_status,
       orientation: orientation,
@@ -84,6 +85,9 @@ defmodule ThistleTea.Game.World.Presence do
 
   defp honor_rank(%Character{player: %{honor_rank: rank}}), do: rank || 0
   defp honor_rank(%Character{}), do: 0
+
+  defp shapeshift_form(%Character{unit: %Unit{shapeshift_form: form}}), do: form || 0
+  defp shapeshift_form(%Character{}), do: 0
 
   defp group_id(guid) do
     case Party.group_of(guid) do

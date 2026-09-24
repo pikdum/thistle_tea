@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
+  alias ThistleTea.Game.Entity.Logic.Shapeshift
   alias ThistleTea.Game.Entity.Logic.Skinning
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
@@ -106,6 +107,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp validate_unit_target(caster, spell, targets, target_info) do
     with :ok <- check_target_flags(caster, spell, target_info),
+         :ok <- Shapeshift.validate_target(caster, spell, target_info),
          :ok <- check_target(spell, target_info),
          :ok <- check_target_power_type(spell, targets, target_info),
          :ok <- check_dispel_target(caster, spell, targets, target_info),
