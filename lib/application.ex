@@ -301,6 +301,7 @@ defmodule ThistleTea.Application do
 
     with {:ok, pid} <- Supervisor.start_link(children, opts) do
       if !test do
+        SpellChainLoader.load_abilities()
         CreatureGroupLoader.load_all()
         Logger.info("Loading waypoints...")
         WaypointLoader.load_all()

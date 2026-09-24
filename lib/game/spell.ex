@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Spell do
     :gcd_ms,
     :dispel_type,
     :first_in_chain,
+    :previous_in_chain,
     :rank,
     :exclusive_category,
     spell_family: 0,

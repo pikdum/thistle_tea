@@ -163,7 +163,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
         {:party_aoe, radius}
 
       target_party_aoe_spell?(spell) and is_integer(unit_guid) ->
-        {:target_party_aoe, unit_guid, radius, max((spell.spell_level || 0) - 10, 0)}
+        {:target_party_aoe, unit_guid, radius}
 
       true ->
         nil

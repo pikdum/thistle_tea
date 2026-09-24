@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.AuraRank
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Target
@@ -26,7 +27,9 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
 
   @cone_arc_radians :math.pi() / 3
 
-  def resolve(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, %Target{} = targets) do
+  def resolve(caster, spell, targets, opts \\ [])
+
+  def resolve(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, %Target{} = targets, opts) do
     cond do
       Insignia.spell?(spell) ->
         case insignia_target(caster, spell, targets) do
@@ -41,11 +44,11 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
         end
 
       true ->
-        resolve_targets(caster, caster_guid, spell, targets)
+        resolve_targets(caster, caster_guid, spell, targets, opts)
     end
   end
 
-  def resolve(_caster, _spell, _targets), do: []
+  def resolve(_caster, _spell, _targets, _opts), do: []
 
   def insignia_target(caster, spell, targets) do
     info = InsigniaTarget.info(caster, targets)
@@ -57,14 +60,22 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     with :ok <- CastValidation.validate_target(caster, spell, targets, info), do: {:ok, info.guid}
   end
 
-  defp resolve_targets(caster, caster_guid, spell, targets) do
+  defp resolve_targets(caster, caster_guid, spell, targets, opts) do
     query =
       pet_target_query(caster, spell) || SpellTarget.target_query(spell, targets, Modifiers.snapshot(caster, spell))
 
-    initial = resolve_query(caster, spell, query, selected_guid: Target.unit_guid(targets))
+    opts = [
+      selected_guid: Target.unit_guid(targets),
+      check_buff_level?:
+        match?(%Character{}, caster) and not Spell.harmful?(spell) and not Keyword.get(opts, :triggered?, false) and
+          is_nil(Keyword.get(opts, :cast_item_guid))
+    ]
+
+    initial = resolve_query(caster, spell, query, opts)
 
     redirected = redirect_initial(caster, spell, query, initial)
     targets = if redirected == initial, do: ChainTargets.expand(caster, spell, initial), else: redirected
+    targets = Enum.filter(targets, &buff_level_allowed?(caster, spell, &1, opts))
     targets = if Spell.harmful?(spell), do: targets, else: Enum.filter(targets, &Hostility.can_assist?(caster, &1))
     append_caster_execution_target(targets, spell, caster_guid)
   end
@@ -117,9 +128,17 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     |> resolve_query(query)
     |> Enum.reject(&(&1 in excluded))
     |> Enum.filter(fn guid ->
-      creature_type_allowed?(spell, guid) and (Spell.harmful?(spell) or Hostility.can_assist?(caster, guid))
+      creature_type_allowed?(spell, guid) and buff_level_allowed?(caster, spell, guid, opts) and
+        (Spell.harmful?(spell) or Hostility.can_assist?(caster, guid))
     end)
     |> limit_targets(spell, Keyword.get(opts, :selected_guid))
+  end
+
+  defp buff_level_allowed?(%{object: %{guid: guid}}, _spell, guid, _opts), do: true
+
+  defp buff_level_allowed?(_caster, spell, guid, opts) do
+    not Keyword.get(opts, :check_buff_level?, false) or guid == Keyword.get(opts, :selected_guid) or
+      AuraRank.party_aura?(spell) or AuraRank.eligible?(spell, Map.get(Metadata.get(guid) || %{}, :level))
   end
 
   defp limit_targets(candidates, %Spell{max_targets: limit} = spell, primary_guid)
@@ -169,8 +188,8 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
       {:party_aoe, radius} ->
         nearby_party_guids(caster, caster_guid, radius)
 
-      {:target_party_aoe, target_guid, radius, minimum_level} ->
-        target_party_guids(target_guid, radius, minimum_level)
+      {:target_party_aoe, target_guid, radius} ->
+        target_party_guids(target_guid, radius)
 
       {:party_class_aoe, class_guid, radius} ->
         party_class_guids(caster, caster_guid, class_guid, radius)
@@ -315,7 +334,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
 
   defp nearby_party_guids(_caster, caster_guid, _radius, _scope), do: [caster_guid]
 
-  defp target_party_guids(target_guid, radius, minimum_level) when is_number(radius) and radius > 0 do
+  defp target_party_guids(target_guid, radius) when is_number(radius) and radius > 0 do
     with owner_guid when is_integer(owner_guid) <- target_party_owner(target_guid),
          {world, x, y, z} <- World.position(owner_guid) do
       members =
@@ -323,7 +342,6 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
           %Party.Group{} = group ->
             group
             |> Party.subgroup_members(owner_guid)
-            |> Enum.filter(&eligible_party_member?(&1.guid, minimum_level))
             |> MapSet.new(& &1.guid)
 
           _ ->
@@ -341,16 +359,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     end
   end
 
-  defp target_party_guids(_target_guid, _radius, _minimum_level), do: []
-
-  defp eligible_party_member?(_guid, minimum_level) when minimum_level <= 0, do: true
-
-  defp eligible_party_member?(guid, minimum_level) do
-    case Metadata.query(guid, [:level]) do
-      %{level: level} when is_integer(level) -> level >= minimum_level
-      _ -> false
-    end
-  end
+  defp target_party_guids(_target_guid, _radius), do: []
 
   defp party_unit_guids(caster, caster_guid, target_guid) do
     owner_guid = party_owner_guid(caster, caster_guid)

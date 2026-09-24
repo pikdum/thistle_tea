@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity.Data.CreatureTemplate
   alias ThistleTea.Game.Spell, as: SpellData
+  alias ThistleTea.Game.Spell.AuraRank
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
@@ -52,6 +53,25 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   end
 
   def cached(_spell_id), do: nil
+
+  def aura_rank(%SpellData{} = spell, level) do
+    if AuraRank.eligible?(spell, level), do: spell, else: AuraRank.select(spell, level, aura_ancestors(spell))
+  end
+
+  defp aura_ancestors(spell), do: aura_ancestors(spell, MapSet.new([spell.id]))
+
+  defp aura_ancestors(%SpellData{previous_in_chain: previous}, seen) when is_integer(previous) and previous > 0 do
+    if MapSet.member?(seen, previous) do
+      []
+    else
+      case cached(previous) do
+        %SpellData{} = spell -> [spell | aura_ancestors(spell, MapSet.put(seen, previous))]
+        nil -> []
+      end
+    end
+  end
+
+  defp aura_ancestors(_spell, _seen), do: []
 
   def chain(spell_id) when is_integer(spell_id) and spell_id > 0 do
     SpellChainLoader.get(spell_id) || TalentLoader.chain(spell_id)
@@ -336,10 +356,11 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> Map.reject(fn {_id, chain} -> is_nil(chain) end)
   end
 
-  defp put_chain(%SpellData{} = spell, %{first_spell: first_spell, rank: rank}) do
+  defp put_chain(%SpellData{} = spell, %{first_spell: first_spell, rank: rank} = chain) do
     %{
       spell
       | first_in_chain: first_spell,
+        previous_in_chain: Map.get(chain, :prev_spell),
         rank: rank,
         proc_rule: spell.proc_rule || SpellProcEventLoader.get(first_spell)
     }
@@ -933,6 +954,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex1, @finishing_move_damage_ex_1, :finishing_move)
     |> add_if(attrs_ex1, @finishing_move_duration_ex_1, :finishing_move)
     |> add_if(attrs_ex2, @ignore_line_of_sight_ex2, :ignore_line_of_sight)
+    |> add_if(attrs_ex2, 0x00000008, :allow_low_level_buff)
     |> add_if(attrs_ex2, 0x00000020, :auto_repeat)
     |> add_if(attrs_ex2, 0x00002000, :enchant_own_item_only)
     |> add_if(attrs_ex2, 0x00400000, :no_initial_threat)

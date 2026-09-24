@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.SpellTargetResolver
@@ -254,10 +255,40 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
       Metadata.update(selected, %{level: 50})
       Metadata.update(nearby, %{level: 37})
       Metadata.update(other_subgroup, %{level: 50})
-      high_rank = %{spell | spell_level: 48}
+      Metadata.update(pet, %{level: 40})
+      Metadata.update(low_level_pet, %{level: 37})
+
+      high_rank = %{
+        spell
+        | spell_level: 48,
+          rank: 1,
+          effects: [%{hd(spell.effects) | type: :apply_aura, aura: :mod_stat}]
+      }
+
+      casting_player = %Character{
+        object: %Object{guid: caster_guid},
+        unit: %Unit{level: 60},
+        internal: casting_player.internal,
+        movement_block: casting_player.movement_block
+      }
 
       assert Enum.sort(SpellTargetResolver.resolve(casting_player, high_rank, Target.unit(selected))) ==
                Enum.sort([selected, pet])
+
+      Metadata.update(pet, %{level: 1})
+      Metadata.update(low_level_pet, %{level: 60})
+
+      assert Enum.sort(SpellTargetResolver.resolve(casting_player, high_rank, Target.unit(selected))) ==
+               Enum.sort([selected, low_level_pet])
+
+      all = Enum.sort([selected, nearby, pet, low_level_pet])
+
+      for opts <- [[triggered?: true], [cast_item_guid: 123]] do
+        assert Enum.sort(SpellTargetResolver.resolve(casting_player, high_rank, Target.unit(selected), opts)) == all
+      end
+
+      party_aura = %{high_rank | effects: [%{hd(high_rank.effects) | type: :apply_area_aura}]}
+      assert Enum.sort(SpellTargetResolver.resolve(casting_player, party_aura, Target.unit(selected))) == all
     end
 
     test "targeted party buffs include an ungrouped friend and its nearby pet" do

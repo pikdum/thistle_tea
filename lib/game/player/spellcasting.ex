@@ -123,14 +123,31 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       target_name: Target.unit_guid(targets)
     )
 
-    cast_target(state, spell, targets, cast_item_guid)
+    selected = select_aura_rank(state.character, spell, targets, cast_item_guid)
+    requested = if selected.id != spell.id, do: spell
+    cast_target(state, selected, targets, cast_item_guid, requested)
   end
 
-  defp cast_target(state, spell, %Target{selection: {:trade_item, slot}}, cast_item_guid) do
+  defp select_aura_rank(character, spell, targets, nil) do
+    guid = Target.unit_guid(targets)
+
+    level =
+      if guid == character.object.guid,
+        do: character.unit.level,
+        else: Map.get(Metadata.get(guid) || %{}, :level)
+
+    SpellLoader.aura_rank(spell, level) || spell
+  end
+
+  defp select_aura_rank(_character, spell, _targets, _item), do: spell
+
+  defp cast_target(state, spell, targets, cast_item_guid, requested \\ nil)
+
+  defp cast_target(state, spell, %Target{selection: {:trade_item, slot}}, cast_item_guid, _requested) do
     Trade.cast(state, spell, slot, cast_item_guid)
   end
 
-  defp cast_target(state, spell, targets, cast_item_guid) do
+  defp cast_target(state, spell, targets, cast_item_guid, requested) do
     spell = WeaponDamage.prepare_spell(state.character, spell)
 
     with :ok <- Deadmines.validate_cast(state, spell, targets, cast_item_guid),
@@ -138,14 +155,14 @@ defmodule ThistleTea.Game.Player.Spellcasting do
          :ok <- Teaching.validate(state.character, spell, cast_item_guid),
          :ok <- PetTraining.validate(state.character, spell),
          {:ok, state} <- Fishing.prepare_cast(state, spell) do
-      {:ok, do_cast(state, spell, targets, cast_item_guid)}
+      {:ok, do_cast(state, spell, targets, cast_item_guid, requested)}
     else
       {:error, reason, state} ->
-        fail_cast(state, spell, reason)
+        fail_cast(state, requested || spell, reason)
         {:error, state}
 
       {:error, reason} ->
-        fail_cast(state, spell, reason)
+        fail_cast(state, requested || spell, reason)
         state = if reason == :already_open, do: state |> Looting.release() |> ItemLoot.open(), else: state
         {:error, state}
     end
@@ -201,7 +218,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
         spell_id = Cast.spell_id(casting)
 
         Network.send_packet(%Message.SmsgCastResult{
-          spell: spell_id,
+          spell: Cast.result_spell(casting).id,
           result: 2,
           reason: reason,
           required_spell_focus: nil,
@@ -250,7 +267,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
   defp clear_next_swing_spell(state), do: state
 
-  defp do_cast(state, %Spell{} = spell, %Target{} = targets, cast_item_guid) do
+  defp do_cast(state, %Spell{} = spell, %Target{} = targets, cast_item_guid, requested) do
     state = cancel(state)
     cast_time_ms = Modifiers.integer_value(state.character, spell, :casting_time, spell.cast_time_ms || 0)
     projectile = Projectile.fields(state.character, spell)
@@ -271,7 +288,10 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     |> World.broadcast_packet(state.character)
 
     item_id = cast_item_id(cast_item_guid)
-    character = Casting.start(state.character, spell, targets, Time.now(), cast_item_guid, item_id)
+
+    character =
+      Casting.start(state.character, spell, targets, Time.now(), cast_item_guid, item_id, requested_spell: requested)
+
     state = %{state | character: character} |> Fishing.start_cast(spell)
 
     cond do
@@ -305,6 +325,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
         targets,
         build_target_info(state, spell, targets),
         Time.now(),
+        cast_item_guid: cast_item_guid,
         count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end,
         equipped_items: equipped_weapon_templates(character),
         spell_focus: focus,

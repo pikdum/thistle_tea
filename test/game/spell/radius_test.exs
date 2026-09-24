@@ -29,7 +29,7 @@ defmodule ThistleTea.Game.Spell.RadiusTest do
             {:aoe_enemy_in_cone, {:caster_cone, 22.5}},
             {:aoe_enemy_at_dest, {:targeted_aoe, {1.0, 2.0, 3.0}, 22.5}},
             {:party_around_caster, {:party_aoe, 22.5}},
-            {:party_around_target, {:target_party_aoe, 2, 22.5, 0}},
+            {:party_around_target, {:target_party_aoe, 2, 22.5}},
             {:aoe_ally_at_source, {:caster_friendly_aoe, 22.5}},
             {:aoe_ally_at_dest, {:targeted_friendly_aoe, {1.0, 2.0, 3.0}, 22.5}},
             {:raid_and_class, {:party_class_aoe, 2, 22.5}}

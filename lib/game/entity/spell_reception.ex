@@ -16,12 +16,30 @@ defmodule ThistleTea.Game.Entity.SpellReception do
   alias ThistleTea.Game.Entity.Logic.SpellThreat
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.AuraRank
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
   alias ThistleTea.Game.World.Metadata
 
   def receive(target, %CastContext{} = context, %Spell{} = spell, now) do
+    spell =
+      if context.caster_guid != target.object.guid and AuraRank.party_aura?(spell),
+        do: SpellLoader.aura_rank(spell, target.unit.level),
+        else: spell
+
+    case spell do
+      nil -> {target, []}
+      spell -> receive_ranked(target, %{context | spell: spell}, spell, now)
+    end
+  end
+
+  def receive(target, caster_guid, %Spell{} = spell, now) when is_integer(caster_guid) do
+    receive(target, %CastContext{caster_guid: caster_guid, caster_level: 1}, spell, now)
+  end
+
+  defp receive_ranked(target, context, spell, now) do
     context = threat_context(target, context, spell)
     context = if Heartbeat.spell?(spell), do: %{context | heartbeat_sample: 1 - :rand.uniform()}, else: context
 
@@ -33,10 +51,6 @@ defmodule ThistleTea.Game.Entity.SpellReception do
       end
 
     SpellEffect.receive(target, context, spell, now)
-  end
-
-  def receive(target, caster_guid, %Spell{} = spell, now) when is_integer(caster_guid) do
-    receive(target, %CastContext{caster_guid: caster_guid, caster_level: 1}, spell, now)
   end
 
   def aura_contexts(%{unit: %{auras: holders}} = target, now) when is_list(holders) do

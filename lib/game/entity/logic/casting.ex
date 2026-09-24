@@ -59,7 +59,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
 
-  def start(entity, spell, targets, now, cast_item_guid \\ nil, cast_item_id \\ 0)
+  def start(entity, spell, targets, now, cast_item_guid \\ nil, cast_item_id \\ 0, opts \\ [])
 
   def start(
         %{internal: %Internal{}} = character,
@@ -67,16 +67,17 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         %Target{} = targets,
         now,
         cast_item_guid,
-        cast_item_id
+        cast_item_id,
+        opts
       )
       when is_integer(now) do
     case Disarm.validate(character, spell) do
-      :ok -> start_available_spell(character, spell, targets, now, cast_item_guid, cast_item_id)
+      :ok -> start_available_spell(character, spell, targets, now, cast_item_guid, cast_item_id, opts)
       {:error, reason} -> Effects.enqueue(character, Effects.spell_cast_failed(spell.id, reason))
     end
   end
 
-  def start(entity, _spell, _targets, _now, _cast_item_guid, _cast_item_id), do: entity
+  def start(entity, _spell, _targets, _now, _cast_item_guid, _cast_item_id, _opts), do: entity
 
   def start_triggered(entity, %Spell{} = spell, %Target{} = targets, now, cast_item_guid, context \\ nil) do
     modifiers = if context, do: context.spell_modifiers, else: Modifiers.snapshot(entity, spell)
@@ -91,7 +92,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     entity |> cancel(now) |> put_cast(casting) |> complete(now)
   end
 
-  defp start_available_spell(character, spell, targets, now, cast_item_guid, cast_item_id) do
+  defp start_available_spell(character, spell, targets, now, cast_item_guid, cast_item_id, opts) do
     character = character |> Mount.prepare_cast(spell, now) |> interrupt_action_auras(:action, spell, now)
     character = AutoRepeat.interrupt(character, now)
     spell = WeaponDamage.prepare_spell(character, spell)
@@ -104,7 +105,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         MeleeSpell.queue_next_swing(character, spell)
 
       true ->
-        do_start(character, spell, targets, now, cast_item_guid, cast_item_id)
+        do_start(character, spell, targets, now, cast_item_guid, cast_item_id, opts)
     end
   end
 
@@ -114,7 +115,8 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
          %Target{} = targets,
          now,
          cast_item_guid,
-         cast_item_id
+         cast_item_id,
+         opts
        ) do
     modifier_holder_ids = Modifiers.consumable_holder_ids(character, spell)
     spell = %{spell | cast_time_ms: Modifiers.integer_value(character, spell, :casting_time, spell.cast_time_ms || 0)}
@@ -124,7 +126,13 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> Cast.new(targets, now, Modifiers.snapshot(character, spell))
       |> Cast.apply_speed_multiplier(CastSpeed.multiplier(character.unit, spell))
       |> then(
-        &%{&1 | cast_item_guid: cast_item_guid, cast_item_id: cast_item_id, modifier_holder_ids: modifier_holder_ids}
+        &%{
+          &1
+          | cast_item_guid: cast_item_guid,
+            cast_item_id: cast_item_id,
+            modifier_holder_ids: modifier_holder_ids,
+            requested_spell: Keyword.get(opts, :requested_spell)
+        }
       )
 
     character = %{character | internal: %{internal | casting: casting}}
@@ -164,12 +172,12 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   def complete(entity, _casting, _now), do: entity
 
   def resolve_requirements(%{internal: %Internal{casting: cast}} = entity, %Cast{} = cast, requirements, now) do
-    case Requirements.validate(entity, cast.spell, requirements) do
+    case Requirements.validate(entity, cast.spell, requirements, cast_options(cast)) do
       :ok ->
         complete(entity, %{cast | requirements: requirements}, now)
 
       {:error, reason} ->
-        events = [Effects.spell_cast_failed(cast.spell, reason)]
+        events = [Effects.spell_cast_failed(Cast.result_spell(cast), reason)]
 
         events =
           if reason == :no_edible_corpses,
@@ -222,7 +230,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp launch(entity, %Cast{requirements: :unchecked} = casting, now) do
-    if Requirements.required?(entity, casting.spell) do
+    if Requirements.required?(entity, casting.spell, cast_options(casting)) do
       casting = %{casting | requirements: :pending}
 
       entity =
@@ -244,12 +252,14 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       {:error, reason} ->
         entity =
           entity
-          |> Effects.enqueue(Effects.spell_cast_failed(Cast.spell_id(casting), reason))
+          |> Effects.enqueue(Effects.spell_cast_failed(Cast.result_spell(casting), reason))
           |> cancel()
 
         {:finished, entity}
     end
   end
+
+  defp cast_options(%Cast{} = cast), do: [triggered?: cast.triggered?, cast_item_guid: cast.cast_item_guid]
 
   defp prepare_launch(%Character{} = entity, %Cast{ammunition: :unpaid} = casting, now) do
     if Ammunition.required?(casting.spell) do
@@ -602,7 +612,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp opening_success_events(character, %Cast{spell: spell, resolution: resolution} = casting) do
     [
-      Effects.spell_cast_result(spell.id),
+      Effects.spell_cast_result(Cast.result_spell(casting).id),
       Effects.spell_go(
         character.object.guid,
         spell.id,
@@ -799,10 +809,10 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp reset_preparing_gcd(character, _casting), do: character
 
-  def interrupt(%{internal: %Internal{casting: %Cast{spell: spell}}} = entity, now) do
+  def interrupt(%{internal: %Internal{casting: %Cast{} = cast}} = entity, now) do
     entity
     |> cancel(now)
-    |> Effects.enqueue(Effects.spell_cast_failed(spell, :interrupted))
+    |> Effects.enqueue(Effects.spell_cast_failed(Cast.result_spell(cast), :interrupted))
   end
 
   def interrupt(entity, _now), do: entity
@@ -1126,8 +1136,10 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp queue_cast_result(character, %Cast{triggered?: true}), do: character
 
-  defp queue_cast_result(character, %{spell: %Spell{} = spell}) do
-    if OpenLock.spell?(spell), do: character, else: Effects.enqueue(character, Effects.spell_cast_result(spell.id))
+  defp queue_cast_result(character, %Cast{spell: %Spell{} = spell} = cast) do
+    if OpenLock.spell?(spell),
+      do: character,
+      else: Effects.enqueue(character, Effects.spell_cast_result(Cast.result_spell(cast).id))
   end
 
   defp queue_cast_result(character, _casting), do: character
@@ -1449,7 +1461,10 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp dispatch_to_target(character, _context, _spell, _target_guid, _now), do: character
 
-  defp resolve_targets(caster, %Cast{spell: %Spell{} = spell, targets: %Target{} = targets}) do
-    SpellTargetResolver.resolve(caster, spell, targets)
+  defp resolve_targets(caster, %Cast{spell: %Spell{} = spell, targets: %Target{} = targets} = cast) do
+    SpellTargetResolver.resolve(caster, spell, targets,
+      triggered?: cast.triggered?,
+      cast_item_guid: cast.cast_item_guid
+    )
   end
 end

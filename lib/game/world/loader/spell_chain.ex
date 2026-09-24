@@ -1,11 +1,12 @@
 defmodule ThistleTea.Game.World.Loader.SpellChain do
   @moduledoc """
-  Loads VMangos spell rank lineages used for spell metadata and talent-family resolution.
+  Loads explicit VMangos spell lineages with a preloaded skill-ability fallback.
   """
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
+  alias ThistleTea.Game.Spell.RankChain
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
@@ -22,13 +23,43 @@ defmodule ThistleTea.Game.World.Loader.SpellChain do
 
   def get(_spell_id), do: nil
 
+  def load_abilities do
+    abilities =
+      DBC.all(
+        from(a in SkillLineAbility,
+          join: s in Spell,
+          on: s.id == a.spell,
+          select: {a.spell, a.superseded_by}
+        )
+      )
+
+    known = abilities |> MapSet.new(&elem(&1, 0))
+
+    abilities
+    |> Enum.map(fn
+      {2366, _next} -> {2366, 2368}
+      ability -> ability
+    end)
+    |> Enum.filter(fn {id, next} -> id != 20_154 and next > 0 and MapSet.member?(known, next) end)
+    |> RankChain.from_successors()
+    |> Enum.each(fn {id, chain} -> :ets.insert(__MODULE__, {{:ability_chain, id}, chain}) end)
+
+    :ok
+  end
+
   def get_many(spell_ids) when is_list(spell_ids) do
     spell_ids = spell_ids |> Enum.filter(&(is_integer(&1) and &1 > 0)) |> Enum.uniq()
     {cached, missing} = split_cached(spell_ids)
     loaded = load_many(missing)
 
     Enum.each(missing, &:ets.insert(__MODULE__, {{:chain, &1}, Map.get(loaded, &1)}))
-    Map.merge(cached, loaded)
+
+    Enum.reduce(spell_ids, Map.merge(cached, loaded), fn id, chains ->
+      case :ets.lookup(__MODULE__, {:ability_chain, id}) do
+        [{_key, chain}] -> Map.put_new(chains, id, chain)
+        _missing -> chains
+      end
+    end)
   end
 
   def get_many(_spell_ids), do: %{}

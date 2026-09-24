@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.SpellReceptionTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
@@ -22,6 +23,76 @@ defmodule ThistleTea.Game.Entity.SpellReceptionTest do
   setup [:target]
 
   describe "receive/4" do
+    test "party aura ranks refresh, upgrade and expire through normal stat transitions", ctx do
+      [low_id, high_id] = for _ <- 1..2, do: System.unique_integer([:positive]) + 96_000_000
+
+      low = %Spell{
+        id: low_id,
+        rank: 1,
+        first_in_chain: low_id,
+        spell_level: 1,
+        duration_ms: -1,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_area_aura,
+            aura: :mod_stat,
+            misc_value: 0,
+            base_points: 3,
+            implicit_target_a: :caster,
+            radius_yards: 30.0
+          }
+        ]
+      }
+
+      high = %{
+        low
+        | id: high_id,
+          rank: 2,
+          previous_in_chain: low_id,
+          spell_level: 60,
+          effects: [%{hd(low.effects) | base_points: 20}]
+      }
+
+      :ets.insert(SpellLoader, {{:spell, low_id}, low})
+      on_exit(fn -> :ets.delete(SpellLoader, {:spell, low_id}) end)
+      target = %{ctx.target | unit: %{ctx.target.unit | level: 1, base_strength: 10, auras: []}}
+      context = %CastContext{caster_guid: ctx.caster, caster_level: 60}
+
+      {target, _} = SpellReception.receive(target, context, high, 0)
+      assert target.unit.strength == 13
+      assert [%Holder{spell: ^low, expires_at: 2_500}] = target.unit.auras
+      {target, _} = SpellReception.receive(target, context, high, 1_000)
+      assert target.unit.strength == 13
+      assert [%Holder{expires_at: 3_500}] = target.unit.auras
+
+      target = %{target | unit: %{target.unit | level: 50}}
+      {target, _} = SpellReception.receive(target, context, high, 2_000)
+      assert target.unit.strength == 30
+      assert [%Holder{spell: ^high, expires_at: 4_500}] = target.unit.auras
+      {target, _} = AuraLogic.tick(target, 4_500)
+      assert target.unit.auras == []
+      assert target.unit.strength == 10
+
+      target = %{target | unit: %{target.unit | level: 1}}
+      self_context = %{context | caster_guid: target.object.guid}
+      {target, _} = SpellReception.receive(target, self_context, high, 5_000)
+      assert [%Holder{spell: ^high, expires_at: -1}] = target.unit.auras
+      assert target.unit.strength == 30
+    end
+
+    test "a party aura without an eligible rank never reaches the recipient", ctx do
+      spell = %Spell{
+        id: 96_000_000,
+        rank: 1,
+        spell_level: 60,
+        effects: [%Effect{type: :apply_area_aura, aura: :mod_stat, implicit_target_a: :caster}]
+      }
+
+      target = %{ctx.target | unit: %{ctx.target.unit | level: 1}}
+      assert SpellReception.receive(target, ctx.caster, spell, 0) == {target, []}
+    end
+
     test "reads current modifiers from the original caster on each dispel", ctx do
       Metadata.put(ctx.caster, %{dispel_resistance: protection()})
       assert {target, [%Effects.DispelFailed{}]} = receive_dispel(ctx)

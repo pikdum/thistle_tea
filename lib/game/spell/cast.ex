@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Spell.Cast do
 
   defstruct [
     :spell,
+    :requested_spell,
     :targets,
     :resolution,
     :cast_time_ms,
@@ -58,6 +59,9 @@ defmodule ThistleTea.Game.Spell.Cast do
 
   def spell_id(%__MODULE__{spell: %Spell{id: id}}), do: id
   def spell_id(_cast), do: 0
+
+  def result_spell(%__MODULE__{requested_spell: %Spell{} = spell}), do: spell
+  def result_spell(%__MODULE__{spell: spell}), do: spell
 
   def phases, do: @phases
 

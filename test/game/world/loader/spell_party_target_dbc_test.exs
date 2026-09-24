@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.World.Loader.SpellPartyTargetDbcTest do
         assert Enum.all?(spell.effects, &(&1.implicit_target_a == :party_around_target))
 
         assert SpellTarget.target_query(spell, Target.unit(7)) ==
-                 {:target_party_aoe, 7, 100.0, max(spell.spell_level - 10, 0)}
+                 {:target_party_aoe, 7, 100.0}
       end
     end
 

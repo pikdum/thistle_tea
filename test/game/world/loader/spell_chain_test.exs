@@ -64,6 +64,14 @@ defmodule ThistleTea.Game.World.Loader.SpellChainTest do
     end
   end
 
+  describe "get/1" do
+    test "explicit chains take precedence over skill abilities" do
+      :ets.insert(SpellChain, {{:ability_chain, @ordinary_rank_2}, chain(@rank_1, @rank_1, 9)})
+      on_exit(fn -> :ets.delete(SpellChain, {:ability_chain, @ordinary_rank_2}) end)
+      assert SpellChain.get(@ordinary_rank_2) == chain(@ordinary_spell, @ordinary_spell, 2)
+    end
+  end
+
   defp chain(first_spell, prev_spell, rank) do
     %{first_spell: first_spell, prev_spell: prev_spell, rank: rank, req_spell: 0}
   end

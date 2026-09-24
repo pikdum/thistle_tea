@@ -20,8 +20,14 @@ defmodule ThistleTea.Game.World.SpellRequirements do
     %Requirements{
       focus: focus,
       corpse: corpse(caster, spell),
+      aura_target: aura_target(caster, targets),
       objects: SpellObjects.resolve(caster, spell, targets, focus)
     }
+  end
+
+  defp aura_target(caster, targets) do
+    guid = Target.unit_guid(targets)
+    if is_integer(guid) and guid != caster.object.guid, do: Metadata.query(guid, [:level])
   end
 
   def corpse(caster, %Spell{} = spell) do
