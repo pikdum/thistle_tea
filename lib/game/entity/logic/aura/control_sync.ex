@@ -266,7 +266,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
 
   defp possession_holder(_holders), do: nil
 
-  defp charm_holder(holders) when is_list(holders), do: Enum.find(holders, &Holder.has_aura_type?(&1, :mod_charm))
+  defp charm_holder(holders) when is_list(holders) do
+    Enum.find(holders, &Holder.charm?/1)
+  end
+
   defp charm_holder(_holders), do: nil
 
   defp original_value(%Pet{} = pet, field, fallback), do: Map.get(pet, field) || fallback

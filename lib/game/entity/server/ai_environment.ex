@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Data.Possession
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Navigation, as: NavigationMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Confusion
@@ -214,6 +215,11 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     else
       Map.put(nearby, :game_objects, [])
     end
+  end
+
+  defp direct_guids(%Character{internal: %{possession: %Possession{} = control}, unit: %{target: target}}) do
+    controller = Metadata.get(control.caster_guid) || %{}
+    [control.caster_guid, control.command_target, target, controller[:victim_guid] | controller[:combat_targets] || []]
   end
 
   defp direct_guids(%{

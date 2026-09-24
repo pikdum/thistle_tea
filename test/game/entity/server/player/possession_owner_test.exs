@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.PossessionOwnerTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Presence
@@ -85,6 +86,54 @@ defmodule ThistleTea.Game.Entity.Server.Player.PossessionOwnerTest do
   end
 
   describe "emit/3" do
+    test "charm movement controls stay on the victim's connection", %{state: state, caster: caster} do
+      character = state.character
+      character = put_in(character.internal.possession.kind, :charm)
+      guid = state.guid
+
+      EventSink.emit(
+        character,
+        [
+          Effects.movement_root_changed(true),
+          Effects.movement_speed_changed(3.5),
+          Effects.client_control_changed(true)
+        ],
+        Context.new(self())
+      )
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgForceMoveRoot{guid: ^guid}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgForceRunSpeedChange{guid: ^guid}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgClientControlUpdate{allow_movement?: false}}}
+      refute_receive {:controller, {:"$gen_cast", {:send_packet, %Message.SmsgForceMoveRoot{}, _}}}
+      refute_receive {:controller, {:"$gen_cast", {:send_packet, %Message.SmsgClientControlUpdate{}, _}}}
+      movement = MovementBlock.movement_info_to_binary(character.movement_block)
+      state = %{state | character: character}
+      assert PossessionOwner.move(state, caster, movement, 0xEE) == state
+    end
+
+    test "charm casts route to the explicit owner and stale control cannot cast", %{state: state, caster: caster} do
+      character = state.character
+      character = put_in(character.internal.possession.kind, :charm)
+
+      effect = %Effects.CharmCast{
+        controller_guid: caster,
+        control_spell_id: 10_912,
+        control_applied_at: 0,
+        spell_id: 133,
+        target_guid: caster
+      }
+
+      EventSink.emit(character, effect, Context.new(self()))
+      assert_receive {:charm_cast, ^effect}
+      state = %{state | character: character}
+      assert Spellcasting.charm_cast(state, %{effect | controller_guid: caster + 1}) == state
+      assert Spellcasting.charm_cast(state, %{effect | control_spell_id: 605}) == state
+      assert Spellcasting.charm_cast(state, %{effect | control_applied_at: 1}) == state
+      assert Spellcasting.charm_cast(state, effect) == state
+      released = PossessionOwner.release(state)
+      assert Spellcasting.charm_cast(released, effect) == released
+    end
+
     test "PvP flags only dispatch creature commands to creature companions", %{state: state, caster: caster} do
       controller = %{state.character | object: %Object{guid: caster}}
 

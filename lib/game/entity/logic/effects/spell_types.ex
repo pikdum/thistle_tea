@@ -54,6 +54,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
     {:ProcDamage, [:target_guid, :spell, :effect_index], []},
     {:TriggerSpellRequest, [:source_guid, :target_guid, :spell_id, :opts], []},
     {:ScriptedCast, [:entry, :target_guid], []},
+    {:CharmCast, [:controller_guid, :control_spell_id, :control_applied_at, :spell_id, :target_guid], []},
     {:DeliverHealThreat, [:mob_guid, :source_guid, :target_guid, :amount], []},
     {:SpellContact, [:target_guid, :other_guid, :decision, :now], []},
     {:DrainPower, [:target_guid, :misc_value], []},

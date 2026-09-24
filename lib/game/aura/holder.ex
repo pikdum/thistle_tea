@@ -43,6 +43,12 @@ defmodule ThistleTea.Game.Aura.Holder do
 
   @type t :: %__MODULE__{}
 
+  def charm?(%__MODULE__{spell: %Spell{id: 28_410}} = holder), do: has_any_type?(holder, [:mod_charm, :aoe_charm])
+
+  def charm?(%__MODULE__{} = holder), do: has_aura_type?(holder, :mod_charm)
+
+  def control?(%__MODULE__{} = holder), do: charm?(holder) or has_any_type?(holder, [:mod_possess, :mod_possess_pet])
+
   def key(%__MODULE__{spell: %Spell{id: id}, caster_guid: caster, item_source: item, linked_from: link}),
     do: {id, caster, item, link}
 

@@ -486,6 +486,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
     entity
   end
 
+  def emit(%Character{} = entity, %Effects.CharmCast{} = effect, context) do
+    Context.send(context, {:charm_cast, effect})
+    entity
+  end
+
   def deliver_spell(%Effects.DeliverSpell{} = effect) do
     Entity.receive_spell(effect.target_guid, effect.cast_context, effect.spell)
   end

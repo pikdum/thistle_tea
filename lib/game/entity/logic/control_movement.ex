@@ -109,8 +109,8 @@ defmodule ThistleTea.Game.Entity.Logic.ControlMovement do
 
   defp confusion_memory(_entity, _mode, _running, _now), do: nil
 
-  defp control_events(%Character{}, previous, current) when previous != current,
-    do: [Effects.client_control_changed(not current)]
+  defp control_events(%Character{} = character, previous, current) when previous != current,
+    do: [Effects.client_control_changed(not current and not match?(%{kind: :charm}, character.internal.possession))]
 
   defp control_events(%Mob{internal: %Internal{pet: %Pet{possessed?: true}}}, previous, current)
        when previous != current, do: [Effects.client_control_changed(not current)]

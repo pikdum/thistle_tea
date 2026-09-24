@@ -98,6 +98,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Priority do
 
   defp effect_priority(%Holder{spell: spell} = holder) do
     cond do
+      Holder.charm?(holder) ->
+        adjust_priority(4, holder)
+
       Holder.has_aura_type?(holder, :ranged_attack_power_attacker_bonus) ->
         3
 

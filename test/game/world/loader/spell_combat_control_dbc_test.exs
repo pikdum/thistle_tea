@@ -11,6 +11,14 @@ defmodule ThistleTea.Game.World.Loader.SpellCombatControlDbcTest do
   @moduletag :dbc_db
 
   describe "load/1" do
+    test "area charm retains the vanilla spell-specific activation rule" do
+      for id <- [26_740, 28_225, 28_410] do
+        spell = SpellLoader.load(id)
+        assert Enum.any?(spell.effects, &(&1.aura == :aoe_charm))
+        assert Enum.any?(spell.effects, &Spell.charm_effect?(spell, &1)) == (id == 28_410)
+      end
+    end
+
     test "instant kills distinguish Death Touch from Suicide and positive sacrifice overrides" do
       assert Spell.starts_combat?(SpellLoader.load(5))
       refute Spell.harmful?(SpellLoader.load(7))

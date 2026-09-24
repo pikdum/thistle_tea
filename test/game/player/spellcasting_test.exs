@@ -8,7 +8,9 @@ defmodule ThistleTea.Game.Player.SpellcastingTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
+  alias ThistleTea.Game.Entity.Data.Possession
   alias ThistleTea.Game.Entity.Logic.Casting
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
@@ -20,7 +22,68 @@ defmodule ThistleTea.Game.Player.SpellcastingTest do
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
+
+  describe "charm_cast/2" do
+    setup [:script_caster]
+
+    test "starts learned casts and retains death and resource validation", %{state: state, spell: spell} do
+      controller = Guid.from_low_guid(:mob, 1, state.guid)
+      target = state.guid + 1_000_000
+      world = state.character.internal.world
+      enemy = %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+      friendly = %FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}
+      Metadata.put(controller, %{alive?: true, in_combat: true, faction_template: enemy})
+      Metadata.put(state.guid, %{alive?: true, owner_guid: controller, faction_template: enemy})
+      Metadata.put(target, %{alive?: true, faction_template: friendly, unit_flags: 8})
+      SpatialHash.update(:mobs, controller, world, 0.0, 0.0, 0.0)
+      SpatialHash.update(:players, target, world, 5.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        Enum.each([state.guid, controller, target], &Metadata.delete/1)
+        SpatialHash.remove(:mobs, controller)
+        SpatialHash.remove(:players, target)
+      end)
+
+      spell = %{
+        spell
+        | attributes: MapSet.new([:ignore_line_of_sight]),
+          effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy}]
+      }
+
+      control = %Possession{
+        caster_guid: controller,
+        spell_id: 28_410,
+        applied_at: 1,
+        original_faction_template: 1,
+        kind: :charm,
+        spells: [spell]
+      }
+
+      character = state.character
+      character = %{character | internal: %{character.internal | possession: control, spellbook: %{spell.id => spell}}}
+      state = %{state | ready: true, character: character}
+
+      effect = %Effects.CharmCast{
+        controller_guid: controller,
+        control_spell_id: 28_410,
+        control_applied_at: 1,
+        spell_id: spell.id,
+        target_guid: target
+      }
+
+      cast = Spellcasting.charm_cast(state, effect)
+      assert %Cast{spell: ^spell} = cast.character.internal.casting
+      assert Target.unit_guid(cast.character.internal.casting.targets) == target
+      assert_receive :player_tick
+
+      for unit <- [%{character.unit | health: 0}, %{character.unit | power1: 0}] do
+        rejected = %{state | character: %{character | unit: unit}}
+        assert Spellcasting.charm_cast(rejected, effect) == rejected
+      end
+    end
+  end
 
   describe "cast_result/3" do
     setup [:script_caster]

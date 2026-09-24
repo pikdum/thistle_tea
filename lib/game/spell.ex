@@ -92,6 +92,10 @@ defmodule ThistleTea.Game.Spell do
 
   def polymorph?(_spell), do: false
 
+  def charm_effect?(%__MODULE__{}, %Effect{aura: :mod_charm}), do: true
+  def charm_effect?(%__MODULE__{id: 28_410}, %Effect{aura: :aoe_charm}), do: true
+  def charm_effect?(_spell, _effect), do: false
+
   def ranged_attack?(%__MODULE__{} = spell), do: ranged_ability?(spell) or auto_repeat?(spell)
 
   def reflectable?(%__MODULE__{dmg_class: 1} = spell) do

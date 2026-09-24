@@ -10,10 +10,12 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
+  alias ThistleTea.Game.Entity.Data.Possession
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Insignia
@@ -67,6 +69,28 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   require Logger
 
   @spell_failed_interrupted 0x23
+
+  def charm_cast(%{ready: true, character: %Character{} = character} = state, %Effects.CharmCast{} = effect) do
+    with %Possession{kind: :charm} = control <- character.internal.possession,
+         true <- control.caster_guid == effect.controller_guid and control.spell_id == effect.control_spell_id,
+         true <- control.applied_at == effect.control_applied_at,
+         nil <- character.internal.casting,
+         %Spell{} = spell <- Enum.find(control.spells, &(&1.id == effect.spell_id)),
+         true <- Map.has_key?(character.internal.spellbook, spell.id),
+         %{alive?: true} <- Metadata.get(control.caster_guid),
+         {world, _, _, _} when world == character.internal.world <- World.position(control.caster_guid) do
+      state = snapshot_action_position(state)
+      targets = Target.unit(effect.target_guid)
+
+      if validate_cast(state, spell, targets, nil) == :ok,
+        do: state |> cast_target(spell, targets, nil) |> cast_state(),
+        else: state
+    else
+      _invalid -> state
+    end
+  end
+
+  def charm_cast(state, _effect), do: state
 
   def scripted_cast(state, %CreatureSpell{} = entry, target_guid) do
     case SpellLoader.load(entry.spell_id) do
@@ -515,6 +539,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
            :feigning_death?,
            :faction_template,
            :unit_flags,
+           :charmed_by,
            :health_pct,
            :power_type,
            :shapeshift_form,
@@ -542,6 +567,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
           guid: guid,
           visible?: Visibility.can_see?(%{guid: character.object.guid, character: character}, guid),
           unit_flags: Map.get(metadata, :unit_flags, 0),
+          charmed_by: Map.get(metadata, :charmed_by),
           feigning_death?: Map.get(metadata, :feigning_death?, false),
           alive?: Map.get(metadata, :alive?, true),
           hostile?: Hostility.hostile?(character, metadata),

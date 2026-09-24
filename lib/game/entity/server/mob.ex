@@ -1353,6 +1353,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           alive?: not Core.dead?(state),
           feigning_death?: FeignDeath.successful?(state),
           victim_guid: state.unit.target,
+          combat_targets: Threat.targets(state),
+          charmed_by: state.unit.charmed_by,
           detect_range_modifier: Aura.flat_amount(state, :mod_detect_range),
           level: state.unit.level,
           in_combat: state.internal.in_combat == true,

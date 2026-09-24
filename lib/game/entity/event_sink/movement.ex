@@ -84,12 +84,15 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
     Presence.relocate(entity, %{movement_velocity: {0.0, 0.0, 0.0}, moving_until: nil, airborne?: false})
 
     case entity.internal.possession do
-      %{caster_guid: controller} ->
+      %{kind: :possession, caster_guid: controller} ->
         Context.send_packet(context, %Message.SmsgClientControlUpdate{guid: guid, allow_movement?: false})
 
         World.broadcast_packet(%Message.SmsgClientControlUpdate{guid: guid, allow_movement?: allowed?}, entity,
           recipients: [controller]
         )
+
+      %{kind: :charm} ->
+        Context.send_packet(context, %Message.SmsgClientControlUpdate{guid: guid, allow_movement?: false})
 
       nil ->
         Context.send_packet(context, %Message.SmsgClientControlUpdate{guid: guid, allow_movement?: allowed?})
@@ -309,7 +312,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
     entity
   end
 
-  defp send_control_packet(%Character{internal: %{possession: %{caster_guid: controller}}} = entity, packet, _context) do
+  defp send_control_packet(
+         %Character{internal: %{possession: %{kind: :possession, caster_guid: controller}}} = entity,
+         packet,
+         _context
+       ) do
     World.broadcast_packet(packet, entity, recipients: [controller])
   end
 

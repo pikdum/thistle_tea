@@ -84,12 +84,25 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerPossessionTest do
       assert restored.unit.faction_template == 1
     end
 
-    test "self and creature casters do not acquire player possession", %{character: character} do
-      for caster <- [1, Guid.from_low_guid(:mob, 1, 1)] do
-        {unchanged, events} = change(character, [holder(caster)], :applied)
-        refute PlayerPossession.active?(unchanged)
-        refute Enum.any?(events, &is_struct(&1, Effects.ControlGranted))
-      end
+    test "self possession does not acquire control", %{character: character} do
+      {unchanged, events} = change(character, [holder(1)], :applied)
+      refute PlayerPossession.active?(unchanged)
+      refute Enum.any?(events, &is_struct(&1, Effects.ControlGranted))
+    end
+
+    test "creature charm uses AI without a player controller", %{character: character} do
+      caster = Guid.from_low_guid(:mob, 1, 1)
+      charm = %{holder(caster) | auras: [%AuraData{type: :mod_charm}]}
+      {controlled, events} = change(character, [charm], :applied)
+      assert PlayerPossession.charmed?(controlled)
+      refute PlayerPossession.manually_controlled?(controlled)
+      assert controlled.unit.flags == 0
+      refute Enum.any?(events, &is_struct(&1, Effects.ControlGranted))
+      {released, events} = change(controlled, [], :removed)
+      assert released.unit.flags == 8
+      refute Enum.any?(events, &is_struct(&1, Effects.ControlReleased))
+      {uncontrolled, _events} = change(character, [holder(caster)], :applied)
+      refute PlayerPossession.active?(uncontrolled)
     end
 
     test "release cannot restore movement while fear remains", %{character: character} do
@@ -116,6 +129,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerPossessionTest do
       assert PlayerPossession.validate(character, spell, %{level: 32}) == :ok
       assert PlayerPossession.validate(character, spell, %{level: 33}) == {:error, :highlevel}
       assert PlayerPossession.validate(character, spell, %{level: 32, unit_flags: 0x01000000}) == {:error, :charmed}
+      assert PlayerPossession.validate(character, spell, %{level: 32, charmed_by: 2}) == {:error, :charmed}
     end
   end
 

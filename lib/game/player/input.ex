@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Player.Input do
-  @moduledoc "Keeps connection and query traffic available while a possessed player's gameplay input is suspended."
+  @moduledoc "Keeps connection and query traffic available while an externally controlled player's input is suspended."
 
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Network.Message

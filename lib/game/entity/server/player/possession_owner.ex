@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.PossessionOwner do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.PlayerCharm
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Server.Player.PossessionOwner.Monitor
@@ -57,7 +58,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.PossessionOwner do
   def reconcile(state), do: state
 
   def release(%State{character: %Character{} = character} = state) do
-    {character, events} = Aura.remove_aura_types(character, [:mod_possess], Time.now())
+    {character, events} = Aura.remove_aura_types(character, [:mod_possess, :mod_charm, :aoe_charm], Time.now())
     clear_monitor(%{state | character: EventSink.emit(character, events)})
   end
 
@@ -69,7 +70,9 @@ defmodule ThistleTea.Game.Entity.Server.Player.PossessionOwner do
   def release(%State{} = state, _caster, _spell), do: state
 
   def move(%State{ready: true, character: %Character{} = character} = state, caster, payload, opcode) do
-    if authorized?(character, caster), do: Movement.handle_controlled(state, caster, payload, opcode), else: state
+    if authorized?(character, caster) and PlayerPossession.manually_controlled?(character),
+      do: Movement.handle_controlled(state, caster, payload, opcode),
+      else: state
   end
 
   def move(%State{} = state, _caster, _payload, _opcode), do: state
@@ -87,6 +90,17 @@ defmodule ThistleTea.Game.Entity.Server.Player.PossessionOwner do
       match?({^world, _, _, _}, World.position(caster))
   end
 
+  defp apply_command(state, :dismiss, _target), do: release(state)
+
+  defp apply_command(
+         %State{character: %Character{internal: %{possession: %Possession{kind: :charm}}}} = state,
+         command,
+         target
+       ) do
+    character = PlayerCharm.command(state.character, command, target, Time.now())
+    %{state | character: EventSink.emit_pending(character)}
+  end
+
   defp apply_command(state, :attack, target) do
     Attacking.start(state, target)
   end
@@ -96,7 +110,6 @@ defmodule ThistleTea.Game.Entity.Server.Player.PossessionOwner do
     %{state | character: EventSink.emit(character, events)}
   end
 
-  defp apply_command(state, :dismiss, _target), do: release(state)
   defp apply_command(state, _command, _target), do: state
 
   defp clear_monitor(%State{possession_monitor: %Monitor{token: token}} = state) do

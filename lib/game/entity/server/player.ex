@@ -55,6 +55,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.PlayerFlags
+  alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
@@ -1035,6 +1036,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
+  def handle_info({:charm_cast, effect}, %State{} = state) do
+    {:noreply, Spellcasting.charm_cast(state, effect), {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Charmed player cast failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   @impl GenServer
   def handle_info({:logout_complete, token}, %{logout_timer: %{token: token}} = state) do
     state = State.leave_world(state)
@@ -1709,6 +1718,9 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         unit_flags: character.unit.flags,
         shapeshift_form: character.unit.shapeshift_form,
         controlled_guid: Character.controlled_guid(character),
+        owner_guid: PlayerPossession.controller(character),
+        charmed_by: character.unit.charmed_by,
+        victim_guid: character.unit.target,
         duel_opponent_guid: Dueling.opponent_guid(character),
         duel_started?: Dueling.active?(character),
         contested_pvp?: PlayerFlags.contested_pvp?(character),

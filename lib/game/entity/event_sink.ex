@@ -112,6 +112,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.CastRequirementsResolved,
     Effects.StartTriggeredChannel,
     Effects.ScriptedCast,
+    Effects.CharmCast,
     Effects.PetSpellModifiers,
     Effects.SpellMagnetsChanged,
     Effects.SingleTargetAurasChanged,

@@ -40,8 +40,8 @@ defmodule ThistleTea.Game.Player.PetActions do
     send(pid, {:controlled_command, controller, command(action), target})
   end
 
-  defp dispatch_player(pid, controller, %Message.CmsgPetAction{action_type: @act_reaction, action: 0}) do
-    send(pid, {:controlled_command, controller, :passive, 0})
+  defp dispatch_player(pid, controller, %Message.CmsgPetAction{action_type: @act_reaction, action: action}) do
+    send(pid, {:controlled_command, controller, reaction(action), 0})
   end
 
   defp dispatch_player(_pid, _controller, _message), do: :ok

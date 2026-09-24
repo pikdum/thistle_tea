@@ -234,7 +234,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   end
 
   defp player_controlled?(entity) do
-    player_guid?(guid(entity)) or player_guid?(owner_guid(entity))
+    player_guid?(controller_guid(entity))
   end
 
   defp duel_opponents?(source, target) do
@@ -372,17 +372,21 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   end
 
   defp player_owner_guid(entity) do
-    cond do
-      player_guid?(owner_guid(entity)) -> owner_guid(entity)
-      player_guid?(guid(entity)) -> guid(entity)
-      true -> nil
-    end
+    controller = controller_guid(entity)
+    if player_guid?(controller), do: controller
   end
 
   defp same_controller?(source, target) do
-    source_owner = player_owner_guid(source)
-    target_owner = player_owner_guid(target)
-    is_integer(source_owner) and source_owner == target_owner
+    source_owner = controller_guid(source)
+    target_owner = controller_guid(target)
+    is_integer(source_owner) and source_owner > 0 and source_owner == target_owner
+  end
+
+  defp controller_guid(entity) do
+    case owner_guid(entity) do
+      owner when is_integer(owner) and owner > 0 -> owner
+      _ -> guid(entity)
+    end
   end
 
   defp faction_id(entity) do

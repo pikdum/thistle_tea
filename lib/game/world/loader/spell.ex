@@ -841,6 +841,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(174), do: :mod_spell_damage_of_stat_percent
   defp aura_type(175), do: :mod_spell_healing_of_stat_percent
   defp aura_type(176), do: :spirit_of_redemption
+  defp aura_type(177), do: :aoe_charm
   defp aura_type(179), do: :mod_attacker_spell_crit_chance
   defp aura_type(180), do: :mod_flat_spell_damage_versus
   defp aura_type(182), do: :mod_resistance_of_stat_percent
@@ -925,6 +926,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @on_next_swing_1, :on_next_swing)
       |> add_if(attrs, @on_next_swing_2, :on_next_swing)
       |> add_if(attrs, @passive, :passive)
+      |> add_if(attrs, 0x00000080, :do_not_display)
       |> add_if(attrs, @ability, :ability)
       |> add_if(attrs, 0x00000020, :tradeskill)
       |> add_if(attrs, @allow_while_mounted, :allow_while_mounted)
@@ -952,6 +954,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex1, 0x00000100, :only_peaceful_targets)
     |> add_if(attrs_ex1, 0x00000400, :no_threat)
     |> add_if(attrs_ex1, 0x00001000, :failure_breaks_stealth)
+    |> add_if(attrs_ex1, 0x00020000, :no_autocast_ai)
     |> add_if(attrs_ex1, 0x00200000, :threat_only_on_miss)
     |> add_if(attrs_ex1, @use_all_mana_ex_1, :use_all_mana)
     |> add_if(attrs_ex1, @channeled_ex_1, :channeled)

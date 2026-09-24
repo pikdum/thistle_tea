@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.World
@@ -22,6 +23,9 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
   @heal_threat_ratio 0.5
 
   def heal_threat_ratio, do: @heal_threat_ratio
+
+  def targets(%Mob{internal: %{threat: table}}) when is_map(table), do: table |> Map.keys() |> Enum.sort()
+  def targets(_entity), do: []
 
   def heal_threat_events(entity, healer_guid, healing, multiplier) when is_number(multiplier) and multiplier > 0 do
     entity
@@ -60,7 +64,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
     if Map.has_key?(existing, source_guid) do
       entity
     else
-      Effects.enqueue(entity, Effects.threat_ref_gained(source_guid))
+      entity |> Effects.enqueue(Effects.threat_ref_gained(source_guid)) |> Core.mark_broadcast_update()
     end
   end
 
@@ -117,6 +121,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
     table
     |> Map.keys()
     |> Enum.reduce(entity, &Effects.enqueue(&2, Effects.threat_ref_lost(&1)))
+    |> Core.mark_broadcast_update()
   end
 
   def wipe(%Mob{internal: %Internal{} = internal} = entity) do
@@ -143,6 +148,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
           }
       }
       |> Effects.enqueue(Effects.threat_ref_lost(guid))
+      |> Core.mark_broadcast_update()
     else
       entity
     end

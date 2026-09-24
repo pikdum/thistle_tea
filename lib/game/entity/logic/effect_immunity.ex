@@ -65,7 +65,7 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunity do
   end
 
   defp harmful_effect?(spell, effect) do
-    Spell.attribute?(spell, :negative) or effect.aura in @harmful_auras or
+    Spell.attribute?(spell, :negative) or Spell.charm_effect?(spell, effect) or effect.aura in @harmful_auras or
       Spell.harmful?(%{spell | effects: [effect]})
   end
 

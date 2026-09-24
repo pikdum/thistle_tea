@@ -222,7 +222,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   def spell_stacks(_entity), do: %{}
 
   def crowd_controlled?(%{unit: %Unit{auras: holders}} = entity) when is_list(holders) do
-    frozen?(entity) or Fear.active?(entity) or Enum.any?(holders, &Holder.has_any_type?(&1, @crowd_control_aura_types))
+    frozen?(entity) or Fear.active?(entity) or
+      Enum.any?(holders, &(Holder.charm?(&1) or Holder.has_any_type?(&1, @crowd_control_aura_types)))
   end
 
   def crowd_controlled?(_entity), do: false

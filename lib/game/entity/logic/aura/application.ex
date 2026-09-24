@@ -166,6 +166,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       Spell.attribute?(spell, :negative) -> true
       context.caster_guid == target_guid -> false
       context.target_hostile? == true and Spell.harmful?(spell) -> true
+      Holder.charm?(%Holder{spell: spell, auras: auras}) -> true
       Enum.any?(auras, fn %Aura{type: type} -> type in @negative_auras end) -> true
       Enum.any?(auras, &negative_resistance_modifier?/1) -> true
       true -> false
@@ -259,14 +260,20 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
          shapeshift?
        ) do
     cond do
+      control_conflict?(existing, incoming) -> true
       exclusive_category_conflict?(existing, incoming) -> true
       shapeshift? and Holder.has_aura_type?(existing, :mod_shapeshift) -> true
       mount_conflict?(existing, incoming) -> true
-      other.id == spell.id and existing.caster_guid != incoming.caster_guid -> replaces_same_spell?(existing, incoming)
+      other_caster_same_spell?(existing, incoming) -> replaces_same_spell?(existing, incoming)
       Spell.same_chain?(other, spell) -> replaces_chain_rank?(existing, incoming)
       true -> false
     end
   end
+
+  defp control_conflict?(existing, incoming), do: Holder.control?(existing) and Holder.control?(incoming)
+
+  defp other_caster_same_spell?(existing, incoming),
+    do: existing.spell.id == incoming.spell.id and existing.caster_guid != incoming.caster_guid
 
   defp mount_conflict?(existing, incoming) do
     Holder.has_aura_type?(incoming, :mounted) and Holder.has_aura_type?(existing, :mounted)

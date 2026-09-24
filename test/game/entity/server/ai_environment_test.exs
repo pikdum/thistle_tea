@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Data.Possession
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
@@ -49,6 +50,41 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   end
 
   describe "context/3" do
+    test "a charmed player observes its controller and every threat candidate" do
+      world = WorldRef.open(999)
+      caster = Guid.from_low_guid(:mob, 1, 98_190)
+      target = Guid.from_low_guid(:player, 98_191)
+      put_actor(:mobs, caster, world, 150.0)
+      put_actor(:players, target, world, 160.0)
+      Metadata.update(caster, %{combat_targets: [target], victim_guid: target})
+
+      on_exit(fn ->
+        remove_actor(:mobs, caster)
+        remove_actor(:players, target)
+      end)
+
+      entity = %Character{
+        object: %Object{guid: 98_192},
+        unit: %Unit{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{
+          world: world,
+          possession: %Possession{
+            caster_guid: caster,
+            spell_id: 28_410,
+            original_faction_template: 1,
+            kind: :charm
+          }
+        }
+      }
+
+      context = AIEnvironment.context(entity, 1_000)
+      Metadata.update(caster, %{combat_targets: []})
+      assert Perception.position(context.perception, caster) == {world, 150.0, 0.0, 0.0}
+      assert Perception.position(context.perception, target) == {world, 160.0, 0.0, 0.0}
+      assert Perception.metadata(context.perception, caster).combat_targets == [target]
+    end
+
     test "observes the fear caster beyond ordinary perception range" do
       actor_guid = Guid.from_low_guid(:player, 98_090)
       world = WorldRef.open(999)
