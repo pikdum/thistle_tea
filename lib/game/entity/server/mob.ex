@@ -418,14 +418,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
     state =
       if Spell.starts_combat?(spell) and not Core.dead?(state) do
-        state
-        |> engage_combat(caster_guid)
-        |> eventai_spell_hit(caster_guid, spell)
+        engage_combat(state, caster_guid)
       else
         state
       end
 
     {state, events} = SpellReception.receive(state, caster, spell, Time.now())
+
+    state =
+      if SpellEffect.successful_hit?(events), do: eventai_spell_hit(state, caster_guid, spell), else: state
+
     notify_spell_hit_target(caster_guid, state.object.guid, spell, events)
 
     state =

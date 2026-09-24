@@ -9,6 +9,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CreatureEntryTest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.CreatureArchetype, as: ArchetypeLoader
   alias ThistleTea.Game.World.Metadata
@@ -17,6 +20,27 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CreatureEntryTest do
   setup [:creatures]
 
   describe "handle_cast/2" do
+    test "noncombat spell hits invoke EventAI after reception", %{mob: mob, template: template} do
+      spell = %Spell{id: 23_359, effects: [%Effect{index: 0, type: :dummy}]}
+      refute Spell.starts_combat?(spell)
+      {:ok, pid} = World.start_entity(with_spell_hit(mob, template, spell))
+      Entity.receive_spell(mob.object.guid, %CastContext{caster_guid: 1, caster_level: 60}, spell)
+      GenServer.cast(pid, {:send_update_to, self()})
+      assert_receive {:"$gen_cast", {:send_packet, %UpdateObject{object: %{entry: entry}}}}, 1_000
+      assert entry == template.entry
+      assert Metadata.get(mob.object.guid).in_combat == false
+    end
+
+    test "resisted spells do not invoke spell-hit transformations", %{mob: mob, template: template} do
+      spell = %Spell{id: 23_359, effects: [%Effect{index: 0, type: :dummy}]}
+      {:ok, pid} = World.start_entity(with_spell_hit(mob, template, spell))
+      context = %CastContext{caster_guid: 1, caster_level: 60, hit_outcome: :resist}
+      Entity.receive_spell(mob.object.guid, context, spell)
+      GenServer.cast(pid, {:send_update_to, self()})
+      assert_receive {:"$gen_cast", {:send_packet, %UpdateObject{object: %{entry: entry}}}}, 1_000
+      assert entry == mob.object.entry
+    end
+
     test "publishes current identity and client fields while retaining the process", %{mob: mob, template: template} do
       {:ok, pid} = World.start_entity(mob)
       guid = mob.object.guid
@@ -87,6 +111,17 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CreatureEntryTest do
     end)
 
     %{mob: mob, template: template}
+  end
+
+  defp with_spell_hit(mob, template, spell) do
+    event = %AIEvent{
+      event_type: :hit_by_spell,
+      param1: spell.id,
+      param2: -1,
+      actions: [[%ScriptStep{command: :update_entry, datalong: template.entry}]]
+    }
+
+    %{mob | internal: %{mob.internal | creature: %{mob.internal.creature | ai_events: [event]}}}
   end
 
   defp build(entry, name, display, level, npc_flags) do
