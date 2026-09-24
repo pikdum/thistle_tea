@@ -251,7 +251,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_heal, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
-    amount = HealingReceived.amount(entity, aura.amount * max(holder.stacks || 1, 1))
+    amount = healing_amount(entity, holder, aura, aura.amount)
+
     threat_events = SpellThreat.heal_events(entity, cast_context(holder), holder.spell, amount, periodic?: true)
     entity = Core.heal(entity, amount)
     event = Effects.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_heal, amount)
@@ -264,7 +265,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :obs_mod_health, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
-    amount = HealingReceived.amount(entity, (entity.unit.max_health || 0) * (aura.amount || 0) / 100)
+    amount = healing_amount(entity, holder, aura, (entity.unit.max_health || 0) * (aura.amount || 0) / 100)
     threat_events = SpellThreat.heal_events(entity, cast_context(holder), holder.spell, amount, periodic?: true)
     entity = Core.heal(entity, amount)
     event = Effects.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_heal, amount)
@@ -518,6 +519,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   end
 
   defp apply_energize(entity, _holder, _power_type, _amount), do: {entity, []}
+
+  defp healing_amount(entity, holder, aura, base) do
+    effect = Enum.find(holder.spell.effects, &(&1.index == aura.index))
+    stacks = max(holder.stacks || 1, 1)
+    HealingReceived.spell_amount(entity, base * stacks, holder.spell, effect, damage_type: :dot, stacks: stacks)
+  end
 
   defp cast_context(%Holder{cast_context: %CastContext{} = context}), do: context
 

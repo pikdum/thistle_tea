@@ -58,11 +58,15 @@ defmodule ThistleTea.Game.Spell.Chain do
     Enum.filter(effects, &Map.has_key?(selected, &1.index))
   end
 
-  def scale(amount, %Effect{index: index}, %CastContext{chain_effects: effects}) when is_map(effects) do
-    trunc(amount * Map.get(effects, index, 1.0))
-  end
+  def scale(amount, effect, %CastContext{chain_effects: effects} = context) when is_map(effects),
+    do: trunc(amount * multiplier(effect, context))
 
   def scale(amount, _effect, _context), do: amount
+
+  def multiplier(%Effect{index: index}, %CastContext{chain_effects: effects}) when is_map(effects),
+    do: Map.get(effects, index, 1.0)
+
+  def multiplier(_effect, _context), do: 1.0
 
   defp recipients(caster, spell, effect, targets) do
     cond do

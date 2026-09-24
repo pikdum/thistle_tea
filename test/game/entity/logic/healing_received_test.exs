@@ -47,6 +47,41 @@ defmodule ThistleTea.Game.Entity.Logic.HealingReceivedTest do
   end
 
   describe "receive/4" do
+    test "applies caster percentages before recipient flats and critical healing", %{entity: entity} do
+      entity = with_flat(entity, 100)
+      spell = scaling_heal()
+
+      context = %CastContext{
+        caster_guid: 2,
+        caster_level: 60,
+        healing_bonus: 200,
+        effect_healing_multiplier: 1.5,
+        spell_crit_chance: 100
+      }
+
+      {entity, events} = SpellEffect.receive(entity, context, spell, 0)
+      assert entity.unit.health == 850
+      assert Enum.any?(events, &match?(%Effects.SpellHeal{damage: 750, crit?: true}, &1))
+      assert Enum.any?(events, &match?(%Effects.HealThreat{amount: 375.0}, &1))
+    end
+
+    test "chain bounces scale both caster and recipient bonuses", %{entity: entity} do
+      entity = with_flat(entity, 100)
+      spell = scaling_heal()
+
+      context = %CastContext{
+        caster_guid: 2,
+        caster_level: 60,
+        healing_bonus: 200,
+        effect_healing_multiplier: 1.5,
+        chain_effects: %{0 => 0.5}
+      }
+
+      {entity, events} = SpellEffect.receive(entity, context, spell, 0)
+      assert entity.unit.health == 350
+      assert Enum.any?(events, &match?(%Effects.SpellHeal{damage: 250}, &1))
+    end
+
     test "modifies direct healing and its feedback and effective threat", %{entity: entity} do
       entity = with_modifiers(entity, [-50, -20, 30])
       {entity, events} = SpellEffect.receive(entity, 2, heal_spell(), 0)
@@ -64,7 +99,96 @@ defmodule ThistleTea.Game.Entity.Logic.HealingReceivedTest do
     end
   end
 
+  describe "spell_amount/5" do
+    test "school flats use the coefficient before percentage modifiers", %{entity: entity} do
+      entity = entity |> with_modifiers([-50, 30]) |> with_flat(100)
+      assert HealingReceived.spell_amount(entity, 200, scaling_heal(), hd(scaling_heal().effects)) == 162
+      spell = %{scaling_heal() | school: :nature}
+      assert HealingReceived.spell_amount(entity, 200, spell, hd(spell.effects)) == 130
+    end
+
+    test "negative flats cannot remove more than half before percentages", %{entity: entity} do
+      entity = entity |> with_modifiers([-50]) |> with_flat(-1_000)
+      assert HealingReceived.spell_amount(entity, 200, scaling_heal(), hd(scaling_heal().effects)) == 50
+      assert HealingReceived.spell_amount(entity, 0, scaling_heal(), hd(scaling_heal().effects)) == 0
+    end
+
+    test "uses low-rank penalties and honors explicit zero coefficients", %{entity: entity} do
+      entity = with_flat(entity, 100)
+      spell = %{scaling_heal() | spell_level: 10, cast_time_ms: 3_500}
+      effect = %{hd(spell.effects) | bonus_coefficient: nil}
+      assert HealingReceived.spell_amount(entity, 200, spell, effect) == 262
+      assert HealingReceived.spell_amount(entity, 200, spell, %{effect | bonus_coefficient: 0.0}) == 200
+    end
+
+    test "stacks both the received bonus and the periodic spell independently", %{entity: entity} do
+      entity = with_flat(entity, 100)
+      entity = put_in(entity.unit.auras, [%{hd(entity.unit.auras) | stacks: 2}])
+      assert HealingReceived.spell_amount(entity, 600, scaling_heal(), hd(scaling_heal().effects), stacks: 3) == 900
+    end
+
+    test "unclassified heals retain percentages without spell-power bonuses", %{entity: entity} do
+      entity = entity |> with_modifiers([-50]) |> with_flat(100)
+      spell = %{scaling_heal() | dmg_class: 0}
+      assert HealingReceived.spell_amount(entity, 200, spell, hd(spell.effects)) == 100
+    end
+
+    test "Blessing of Light selects the matching Paladin heal effect", %{entity: entity} do
+      blessing = %Holder{
+        spell: %Spell{id: 19_979, spell_family: 10, family_flags_0: 0x10000000, spell_visual: 300},
+        auras: [%AuraData{index: 0, type: :dummy, amount: 400}, %AuraData{index: 1, type: :dummy, amount: 114}]
+      }
+
+      entity = %{entity | unit: %{entity.unit | auras: [blessing]}}
+
+      for {family, mask, expected} <- [
+            {10, 0x80000000, 400},
+            {10, 0x40000000, 257},
+            {10, 0x2000, 257},
+            {6, 0x80000000, 200},
+            {10, 1, 200}
+          ] do
+        spell = %{scaling_heal() | spell_family: family, family_flags_0: mask}
+        assert HealingReceived.spell_amount(entity, 200, spell, hd(spell.effects)) == expected
+      end
+    end
+
+    test "Healing Way stacks affect only Healing Wave and use current holders", %{entity: entity} do
+      way = %Holder{spell: %Spell{id: 29_203}, stacks: 3, auras: [%AuraData{type: :dummy, amount: 6}]}
+      entity = entity |> with_modifiers([-50]) |> with_flat(100)
+      entity = put_in(entity.unit.auras, [way | entity.unit.auras])
+
+      for {family, mask, expected} <- [{11, 0x40, 147}, {11, 0x80, 125}, {11, 0x100, 125}, {6, 0x40, 125}] do
+        spell = %{scaling_heal() | spell_family: family, family_flags_0: mask}
+        assert HealingReceived.spell_amount(entity, 200, spell, hd(spell.effects)) == expected
+      end
+    end
+  end
+
   describe "tick/2" do
+    test "flat changes affect active HoTs without rewriting their snapshot", %{entity: entity} do
+      spell = %{hot_spell() | dmg_class: 1, effects: [%{hd(hot_spell().effects) | bonus_coefficient: 0.2}]}
+      {entity, _events} = Aura.apply_spell(entity, 2, 60, spell, 0)
+      {entity, _events} = Aura.tick(entity, 1_000)
+      assert entity.unit.health == 300
+      entity = with_flat(entity, 100)
+      {entity, events} = Aura.tick(entity, 2_000)
+      assert entity.unit.health == 520
+      assert Enum.any?(events, &match?(%Effects.PeriodicAuraLog{amount: 220}, &1))
+      assert Enum.any?(events, &match?(%Effects.SpellHeal{damage: 220, periodic?: true}, &1))
+      assert Enum.any?(events, &match?(%Effects.HealThreat{amount: 110.0}, &1))
+      {entity, _events} = Aura.remove_spells(entity, [20], 2_100)
+      entity = with_flat(entity, -1_000)
+      {entity, _events} = Aura.tick(entity, 3_000)
+      assert entity.unit.health == 620
+      {entity, _events} = Aura.remove_spells(entity, [20], 3_100)
+      {entity, _events} = Aura.tick(entity, 4_000)
+      assert entity.unit.health == 820
+      [holder] = entity.unit.auras
+      assert hd(holder.auras).amount == 200
+      assert hd(holder.auras).next_tick_at == 5_000
+    end
+
     test "uses current modifiers on every tick without changing the snapshot", %{entity: entity} do
       {entity, _events} = Aura.apply_spell(entity, 2, 60, hot_spell(), 0)
       {entity, _events} = Aura.tick(entity, 1_000)
@@ -196,6 +320,15 @@ defmodule ThistleTea.Game.Entity.Logic.HealingReceivedTest do
 
   defp heal_spell do
     %Spell{id: 1, school: :holy, effects: [%Effect{type: :heal, base_points: 200}]}
+  end
+
+  defp scaling_heal do
+    %{heal_spell() | dmg_class: 1, effects: [%Effect{index: 0, type: :heal, base_points: 200, bonus_coefficient: 0.5}]}
+  end
+
+  defp with_flat(entity, amount) do
+    flat = %Holder{spell: %Spell{id: 20}, auras: [%AuraData{type: :mod_healing, amount: amount, misc_value: 2}]}
+    %{entity | unit: %{entity.unit | auras: [flat | entity.unit.auras]}}
   end
 
   defp hot_spell(type \\ :periodic_heal, amount \\ 200) do

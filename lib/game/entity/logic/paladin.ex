@@ -126,30 +126,21 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
   def blessing_of_light_bonus(%{unit: %Unit{auras: holders}}, %Spell{} = spell) when is_list(holders) do
     aura_index = healing_bonus_index(spell)
 
-    Enum.find_value(holders, 0, fn
-      %Holder{spell: %Spell{} = blessing, auras: auras} when is_integer(aura_index) ->
-        blessing_of_light_bonus(blessing, auras, aura_index)
-
-      _holder ->
-        nil
-    end)
+    for %Holder{spell: %Spell{spell_visual: 300} = blessing, auras: auras, stacks: stacks} <- holders,
+        Spell.family_flag?(blessing, @spell_family, @blessing_of_light_family_mask),
+        %Aura{index: ^aura_index, type: :dummy, amount: amount} <- auras,
+        is_integer(amount),
+        reduce: 0 do
+      bonus -> bonus + amount * max(stacks || 1, 1)
+    end
   end
 
   def blessing_of_light_bonus(_entity, _spell), do: 0
 
-  defp blessing_of_light_bonus(blessing, auras, aura_index) do
-    if Spell.family_flag?(blessing, @spell_family, @blessing_of_light_family_mask) do
-      case Enum.find(auras, &match?(%Aura{index: ^aura_index, type: :dummy}, &1)) do
-        %Aura{amount: amount} when is_integer(amount) -> amount
-        _ -> nil
-      end
-    end
-  end
-
   defp healing_bonus_index(spell) do
     cond do
       Spell.family_flag?(spell, @spell_family, @holy_light_family_mask) -> 0
-      Spell.family_flag?(spell, @spell_family, @flash_of_light_family_mask) -> 1
+      Spell.family_flag?(spell, @spell_family, @flash_of_light_family_mask + 0x2000) -> 1
       true -> nil
     end
   end

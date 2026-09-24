@@ -376,9 +376,15 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
                SpellEffect.receive(target, context, spell, 1_000)
     end
 
-    test "Blessing of Light increases Holy Light by its first dummy amount" do
+    test "Blessing of Light scales its first dummy amount by Holy Light's coefficient" do
       blessing = %Holder{
-        spell: %Spell{id: 19_977, name: "Blessing of Light", spell_family: 10, family_flags_0: 0x10000000},
+        spell: %Spell{
+          id: 19_977,
+          name: "Blessing of Light",
+          spell_family: 10,
+          family_flags_0: 0x10000000,
+          spell_visual: 300
+        },
         auras: [%Aura{index: 0, type: :dummy, amount: 210}, %Aura{index: 1, type: :dummy, amount: 60}]
       }
 
@@ -391,12 +397,13 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
         spell_family: 10,
         family_flags_0: 0x80000000,
         school: :holy,
-        effects: [%Spell.Effect{type: :heal, base_points: 100}]
+        dmg_class: 1,
+        effects: [%Spell.Effect{type: :heal, base_points: 100, bonus_coefficient: 0.5}]
       }
 
       context = %CastContext{caster_guid: 5, caster_level: 60}
 
-      assert {%Character{unit: %Unit{health: 410}}, _events} = SpellEffect.receive(target, context, spell, 1_000)
+      assert {%Character{unit: %Unit{health: 305}}, _events} = SpellEffect.receive(target, context, spell, 1_000)
     end
   end
 

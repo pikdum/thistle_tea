@@ -12,7 +12,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   alias ThistleTea.Game.Entity.Logic.EnvironmentalDamage
   alias ThistleTea.Game.Entity.Logic.HealingReceived
   alias ThistleTea.Game.Entity.Logic.Hunter
-  alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.ResistancePenetration
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellResist
@@ -112,15 +111,19 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   def apply(state, %CastContext{} = context, spell, %Effect{type: :heal} = effect, now) do
     {state, swiftmend_healing, swiftmend_events} = Druid.consume_swiftmend_hot(state, spell, now)
 
-    base_healing =
-      trunc((rolled_amount(spell, effect, context) + swiftmend_healing) * (context.effect_healing_multiplier || 1.0))
+    bonus = Coefficient.bonus(context.healing_bonus || 0, spell, effect, :direct)
 
     healing =
-      base_healing + Coefficient.bonus(context.healing_bonus || 0, spell, effect, :direct) +
-        Aura.flat_modifier(state, :mod_healing, Spell.school_mask(spell)) +
-        Paladin.blessing_of_light_bonus(state, spell)
+      trunc(
+        (base_amount(spell, effect, context) + swiftmend_healing + bonus) * Chain.multiplier(effect, context) *
+          (context.effect_healing_multiplier || 1.0)
+      )
 
-    healing = HealingReceived.amount(state, healing)
+    healing =
+      HealingReceived.spell_amount(state, healing, spell, effect,
+        coefficient_multiplier: Chain.multiplier(effect, context)
+      )
+
     crit? = heal_crit?(context, spell)
     healing = if crit?, do: healing + div(healing, 2), else: healing
     events = SpellThreat.heal_events(state, context, spell, healing)
@@ -204,8 +207,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
   defp apply_damage_effect(state, %CastContext{} = context, spell, %Effect{} = effect, now, opts \\ [])
        when is_integer(now) do
-    base = effect_amount(spell, effect, context)
-    rolled = base + damage_bonus(state, context, spell, effect, opts)
+    base = base_amount(spell, effect, context)
+    rolled = Chain.scale(base + damage_bonus(state, context, spell, effect, opts), effect, context)
 
     apply_damage_amount(state, context, spell, rolled, now, Keyword.put(opts, :damage_effect, effect))
   end
@@ -377,10 +380,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   end
 
   defp effect_amount(%Spell{} = spell, %Effect{} = effect, %CastContext{} = context) do
-    level_units = Spell.level_units(spell, context.caster_level)
+    Chain.scale(base_amount(spell, effect, context), effect, context)
+  end
 
-    amount = Effect.amount(effect, level_units, if(Scripts.finisher?(spell), do: context.combo_points, else: 0))
-    Chain.scale(amount, effect, context)
+  defp base_amount(%Spell{} = spell, %Effect{} = effect, %CastContext{} = context) do
+    level_units = Spell.level_units(spell, context.caster_level)
+    Effect.amount(effect, level_units, if(Scripts.finisher?(spell), do: context.combo_points, else: 0))
   end
 
   defp rolled_amount(%Spell{} = spell, %Effect{} = effect, %CastContext{} = context) do

@@ -402,10 +402,15 @@ defmodule ThistleTea.Game.World.Loader.Spell do
           trigger_spell_id: nonzero(int_field(mod, :effect_trigger_spell, row, :"effect_trigger_spell_#{index}")),
           summon_slot: summon_slot(type_int),
           damage_multiplier: damage_multiplier(Map.get(row, :"damage_multiplier_#{index}")),
-          bonus_coefficient: SpellEffectOverrideLoader.bonus_coefficient(row.id, index)
+          bonus_coefficient: effect_bonus_coefficient(row.id, index, type_int, type)
         }
     end
   end
+
+  defp effect_bonus_coefficient(_spell_id, 0, 77, :heal), do: SpellEffectOverrideLoader.bonus_coefficient(19_993, 0)
+
+  defp effect_bonus_coefficient(spell_id, index, _raw_type, _type),
+    do: SpellEffectOverrideLoader.bonus_coefficient(spell_id, index)
 
   defp effect_class_mask(_spell_id, _index, _aura, fallback, %SpellEffectMod{effect_item_type: value})
        when is_integer(value) and value != -1, do: fallback

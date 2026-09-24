@@ -1398,7 +1398,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert target.unit.health == 15
     end
 
-    test "mod_healing modifies incoming heals" do
+    test "mod_healing scales with the receiving heal coefficient" do
       amplify = %Spell{
         id: 1008,
         name: "Amplify Magic",
@@ -1425,13 +1425,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
         id: 2050,
         name: "Lesser Heal",
         school: :holy,
-        effects: [%Effect{index: 0, type: :heal, base_points: 5, die_sides: 0}]
+        dmg_class: 1,
+        effects: [%Effect{index: 0, type: :heal, base_points: 5, die_sides: 0, bonus_coefficient: 0.5}]
       }
 
       context = %CastContext{caster_guid: 999, caster_level: 10}
       {target, _events} = SpellEffect.receive(target, context, heal, 1_000)
 
-      assert target.unit.health == 1 + 5 + 30
+      assert target.unit.health == 1 + 5 + 15
     end
   end
 end

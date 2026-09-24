@@ -70,12 +70,12 @@ defmodule ThistleTea.Game.Spell.ChainTest do
   end
 
   describe "scale/3" do
-    test "scales damage before spell power and retains target health and feedback", %{caster: caster} do
+    test "scales damage and spell power together and retains target health and feedback", %{caster: caster} do
       spell = %Spell{id: 421, school: :nature, dmg_class: 0, effects: [effect(0, 3, 0.7)]}
       plan = Chain.plan(caster, spell, [2, 3, 4], [2, 3, 4])
       context = %CastContext{caster_guid: 1, caster_level: 60, spell_damage_bonus: %{nature: 40}}
 
-      for {guid, damage} <- [{2, 240}, {3, 180}, {4, 137}] do
+      for {guid, damage} <- [{2, 240}, {3, 168}, {4, 117}] do
         target = %{caster | object: %Object{guid: guid}}
         context = %{context | target_guid: guid} |> Chain.put_context(plan)
         {target, events} = SpellEffect.receive(target, context, spell, 1_000)
@@ -84,13 +84,13 @@ defmodule ThistleTea.Game.Spell.ChainTest do
       end
     end
 
-    test "scales healing before healing power including a jump back to the caster", %{caster: caster} do
+    test "scales healing and healing power including a jump back to the caster", %{caster: caster} do
       effect = %{effect(0, 3, 0.5) | type: :heal, implicit_target_a: :chain_heal}
       spell = %Spell{id: 1064, school: :nature, effects: [effect]}
       plan = Chain.plan(caster, spell, [2, 3, 1], [2, 3, 1])
       context = %CastContext{caster_guid: 1, caster_level: 60, healing_bonus: 40}
 
-      for {guid, healing} <- [{2, 240}, {3, 140}, {1, 90}] do
+      for {guid, healing} <- [{2, 240}, {3, 120}, {1, 60}] do
         target = %{caster | object: %Object{guid: guid}, unit: %{caster.unit | health: 100}}
         context = %{context | target_guid: guid} |> Chain.put_context(plan)
         {target, _events} = SpellEffect.receive(target, context, spell, 1_000)
