@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.PeriodicDeathTest do
         :periodic_damage,
         :periodic_damage_percent,
         :periodic_leech,
+        :periodic_health_funnel,
         :periodic_mana_leech,
         :periodic_power_burn,
         :periodic_heal,

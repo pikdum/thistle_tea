@@ -707,6 +707,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(59), do: :mod_damage_done_creature
   defp aura_type(60), do: :mod_pacify_silence
   defp aura_type(61), do: :mod_scale
+  defp aura_type(62), do: :periodic_health_funnel
   defp aura_type(64), do: :periodic_mana_leech
   defp aura_type(65), do: :mod_casting_speed
   defp aura_type(66), do: :feign_death

@@ -123,11 +123,14 @@ defmodule ThistleTea.Game.Entity.SpellReceptionThreatTest do
       Metadata.put(ctx.caster, %{spell_threat: projection(-30)})
       healed = SpellReception.heal(target, effect)
       assert healed.unit.health == 2_000
-      assert [%Effects.HealThreat{amount: amount}] = healed.internal.events
+
+      assert [%Effects.SpellHeal{damage: 100, proc_type: nil}, %Effects.HealThreat{amount: amount}] =
+               healed.internal.events
+
       assert_in_delta amount, 10.5, 0.0001
 
       {healed, _events} = Effects.drain(healed)
-      assert SpellReception.heal(healed, effect).internal.events == []
+      assert [%Effects.SpellHeal{damage: 100, proc_type: nil}] = SpellReception.heal(healed, effect).internal.events
       dead = %{target | unit: %{target.unit | health: 0}}
       assert SpellReception.heal(dead, effect) == dead
     end

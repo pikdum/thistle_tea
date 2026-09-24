@@ -3,7 +3,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
   Snapshot of the caster taken at cast time — guid, level, spell
   damage/healing bonuses, and for melee abilities the weapon/attack-power
   numbers — so effects apply consistently even after the caster's state
-  changes. The receiving owner refreshes threat modifiers when the spell lands.
+  changes. The receiving owner refreshes threat modifiers when the spell lands
+  and caster availability for periodic life drains.
   """
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
@@ -81,6 +82,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :spell_threat,
     :spell_hit_snapshot,
     triggered_by_aura?: false,
+    caster_available?: true,
     caster_totem?: false,
     triggered?: false,
     proc_damage?: false,

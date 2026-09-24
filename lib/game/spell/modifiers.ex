@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   alias ThistleTea.Game.Spell.Effect
 
   @modifier_types [:add_flat_modifier, :add_pct_modifier]
+  @periodic_auras [:periodic_damage, :periodic_heal, :periodic_leech, :periodic_health_funnel, :periodic_mana_leech]
 
   @operations %{
     0 => :damage,
@@ -172,7 +173,11 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   end
 
   defp operation_used_by_spell?(:dot, %Spell{effects: effects}) do
-    Enum.any?(effects, &(&1.aura in [:periodic_damage, :periodic_heal, :periodic_leech, :periodic_mana_leech]))
+    Enum.any?(effects, &(&1.aura in @periodic_auras))
+  end
+
+  defp operation_used_by_spell?(:multiple_value, %Spell{effects: effects}) do
+    Enum.any?(effects, &(&1.aura in [:periodic_leech, :periodic_health_funnel]))
   end
 
   defp operation_used_by_spell?(:crit_damage_bonus, %Spell{} = spell), do: critical_spell?(spell)
@@ -185,7 +190,7 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   end
 
   defp effectful?(%Effect{type: type, aura: aura}) when type in [:apply_aura, :apply_area_aura] do
-    aura in [:periodic_damage, :periodic_heal, :periodic_leech, :periodic_mana_leech]
+    aura in @periodic_auras
   end
 
   defp effectful?(%Effect{type: type}) do

@@ -102,11 +102,12 @@ defmodule ThistleTea.Game.Spell.Coefficient do
 
   defp max_ticks(%Spell{effects: effects} = spell) do
     duration = max(spell.duration_ms || 0, 0)
+    fallback = if Enum.any?(effects, &(&1.aura == :periodic_health_funnel)), do: 6, else: 0
 
     effects
     |> Enum.filter(&(&1.aura in @over_time_auras and is_integer(&1.amplitude_ms) and &1.amplitude_ms > 0))
     |> Enum.map(&div(duration, &1.amplitude_ms))
-    |> Enum.max(fn -> 0 end)
+    |> Enum.max(fn -> fallback end)
   end
 
   defp channeled?(%Spell{} = spell), do: Spell.attribute?(spell, :channeled)

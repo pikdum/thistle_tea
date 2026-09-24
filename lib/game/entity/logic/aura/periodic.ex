@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     :periodic_damage,
     :periodic_damage_percent,
     :periodic_leech,
+    :periodic_health_funnel,
     :periodic_mana_leech,
     :periodic_power_burn
   ]
@@ -172,20 +173,30 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_checked_aura(entity, %Holder{} = holder, %Aura{type: type, next_tick_at: at} = aura, now)
        when type in @harmful_periodics and is_integer(at) and now >= at do
-    if DamageImmunity.immune?(entity, holder.spell.school, holder.spell) do
-      event = %Effects.SpellDamageImmune{
-        source_guid: holder.caster_guid,
-        target_guid: entity.object.guid,
-        spell_id: holder.spell.id
-      }
+    cond do
+      unavailable_drain_caster?(holder, aura) ->
+        {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, []}
 
-      {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event]}
-    else
-      tick_aura(entity, holder, aura, now)
+      DamageImmunity.immune?(entity, holder.spell.school, holder.spell) ->
+        event = %Effects.SpellDamageImmune{
+          source_guid: holder.caster_guid,
+          target_guid: entity.object.guid,
+          spell_id: holder.spell.id
+        }
+
+        {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event]}
+
+      true ->
+        tick_aura(entity, holder, aura, now)
     end
   end
 
   defp tick_checked_aura(entity, holder, aura, now), do: tick_aura(entity, holder, aura, now)
+
+  defp unavailable_drain_caster?(%Holder{cast_context: %CastContext{caster_available?: false}}, %Aura{type: type}),
+    do: type in [:periodic_leech, :periodic_health_funnel]
+
+  defp unavailable_drain_caster?(_holder, _aura), do: false
 
   defp party_aura_effects(%Character{object: %{guid: guid}, unit: %Unit{level: level}}, spell, radius) do
     [
@@ -278,10 +289,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
   end
 
-  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_leech, next_tick_at: at} = aura, now)
-       when is_integer(at) and now >= at do
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: type, next_tick_at: at} = aura, now)
+       when type in [:periodic_leech, :periodic_health_funnel] and is_integer(at) and now >= at do
     health_before = max(entity.unit.health || 0, 0)
-    {entity, damage, log_opts} = apply_periodic_damage(entity, holder, aura.amount, now)
+    effect = Enum.find(holder.spell.effects, &(&1.index == aura.index))
+    stacks = max(holder.stacks || 1, 1)
+    amount = AttackDamageTaken.spell_amount(entity, aura.amount * stacks, holder.spell, effect, :dot, stacks)
+    {entity, damage, log_opts} = apply_periodic_damage(entity, holder, amount, now)
     health_drained = max(health_before - (entity.unit.health || 0), 0)
 
     events = [
@@ -456,7 +470,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
          %Aura{} = aura
        )
        when is_integer(caster_guid) and caster_guid != owner_guid and damage > 0 do
-    multiplier = if is_number(aura.multiple_value) and aura.multiple_value > 0, do: aura.multiple_value, else: 1.0
+    multiplier = if is_number(aura.multiple_value), do: max(aura.multiple_value, 0), else: 1.0
     [Effects.heal_entity(caster_guid, trunc(damage * multiplier), source_guid: caster_guid, spell: spell)]
   end
 

@@ -57,6 +57,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     :periodic_heal,
     :periodic_energize,
     :periodic_leech,
+    :periodic_health_funnel,
     :periodic_mana_leech,
     :periodic_trigger_spell,
     :obs_mod_health,
@@ -293,6 +294,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     :periodic_damage_percent,
     :periodic_damage,
     :periodic_leech,
+    :periodic_health_funnel,
     :periodic_heal,
     :periodic_mana_leech,
     :channel_death_item
@@ -593,7 +595,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       type: effect.aura,
       amount: modified_aura_amount(entity, spell, effect, amount_override, context),
       misc_value: effect.misc_value,
-      multiple_value: effect.multiple_value,
+      multiple_value: transfer_multiplier(effect, context),
       class_mask: effect.class_mask,
       item_type: effect.item_type,
       amplitude_ms: amplitude_ms,
@@ -626,7 +628,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
     multiplier =
       case effect.aura do
-        aura when aura in [:periodic_damage, :periodic_leech, :periodic_mana_leech] ->
+        aura when aura in [:periodic_damage, :periodic_leech, :periodic_health_funnel, :periodic_mana_leech] ->
           context.effect_damage_multiplier
 
         :periodic_heal ->
@@ -637,13 +639,23 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       end
 
     amount =
-      if effect.aura in [:periodic_damage, :periodic_leech, :periodic_mana_leech, :periodic_heal] do
+      if effect.aura in [
+           :periodic_damage,
+           :periodic_leech,
+           :periodic_health_funnel,
+           :periodic_mana_leech,
+           :periodic_heal
+         ] do
         Modifiers.value(context.spell_modifiers, :dot, amount * 1.0)
       else
         Modifiers.value(context.spell_modifiers, :all_effects, amount)
       end
 
-    happiness = if effect.aura in [:periodic_damage, :periodic_leech], do: context.happiness_multiplier, else: 1.0
+    happiness =
+      if effect.aura in [:periodic_damage, :periodic_leech, :periodic_health_funnel],
+        do: context.happiness_multiplier,
+        else: 1.0
+
     trunc(amount * (multiplier || 1.0) * happiness)
   end
 
@@ -659,7 +671,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   defp modify_aura_base_amount(_aura, amount, _context), do: amount
 
   defp periodic_benefit(entity, %Spell{} = spell, %Effect{aura: aura} = effect, %CastContext{} = context)
-       when aura in [:periodic_damage, :periodic_leech] do
+       when aura in [:periodic_damage, :periodic_leech, :periodic_health_funnel] do
     Coefficient.bonus(TargetSpellPower.benefit(entity, context, spell), spell, effect, :dot) +
       TargetDamage.spell_bonus(entity, context.target_damage, spell, effect, :dot)
   end
@@ -669,6 +681,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   end
 
   defp periodic_benefit(_entity, _spell, _effect, _context), do: 0
+
+  defp transfer_multiplier(%Effect{aura: aura, multiple_value: value}, %CastContext{} = context)
+       when aura in [:periodic_leech, :periodic_health_funnel] do
+    base = if is_number(value) and value > 0, do: value, else: 1.0
+    max(Modifiers.value(context.spell_modifiers, :multiple_value, base), 0.0)
+  end
+
+  defp transfer_multiplier(%Effect{multiple_value: value}, _context), do: value
 
   defp effective_amplitude(%Effect{aura: :mod_power_regen_percent, amplitude_ms: amp}) do
     if is_integer(amp) and amp > 0, do: amp, else: @percent_regen_tick_ms

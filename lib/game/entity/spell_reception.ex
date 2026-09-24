@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
 
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.DispelResistance
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.HealingReceived
@@ -14,6 +15,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
   alias ThistleTea.Game.Entity.Logic.SpellThreat
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
   alias ThistleTea.Game.World.Metadata
 
@@ -48,25 +50,41 @@ defmodule ThistleTea.Game.Entity.SpellReception do
             spell: holder.spell
           }
 
-      {{holder.spell.id, holder.caster_guid, holder.item_source}, threat_context(target, context, holder.spell)}
+      context = threat_context(target, context, holder.spell)
+
+      context =
+        if Holder.has_any_type?(holder, [:periodic_leech, :periodic_health_funnel]) do
+          %{context | caster_available?: caster_available?(target, holder.caster_guid, now)}
+        else
+          context
+        end
+
+      {{holder.spell.id, holder.caster_guid, holder.item_source}, context}
     end
   end
 
   def aura_contexts(_target, _now), do: %{}
 
   def heal(target, %Effects.HealEntity{spell: %Spell{} = spell, amount: amount} = effect) do
-    if Core.dead?(target) do
-      target
-    else
+    if Death.alive?(target) do
       context = threat_context(target, %CastContext{caster_guid: effect.source_guid}, spell)
       healing = HealingReceived.amount(target, amount)
       events = SpellThreat.heal_events(target, context, spell, healing, periodic?: true)
-      target |> Core.heal(healing) |> Effects.enqueue(events)
+      event = Effects.spell_heal(effect.source_guid, target.object.guid, spell, healing, false, proc_type: nil)
+      target |> Core.heal(healing) |> Effects.enqueue([event | events])
+    else
+      target
     end
   end
 
   def heal(target, %Effects.HealEntity{amount: amount}), do: HealingReceived.heal(target, amount)
   def heal(target, amount) when is_number(amount), do: HealingReceived.heal(target, amount)
+
+  defp caster_available?(%{object: %{guid: guid}} = target, guid, _now), do: Death.alive?(target)
+
+  defp caster_available?(%{internal: %{world: world}}, guid, now) do
+    match?(%{alive?: true}, Metadata.get(guid)) and match?({^world, _, _, _}, World.position(guid, now))
+  end
 
   defp threat_context(target, %CastContext{} = context, spell) do
     context = %{context | spell_threat: SpellThreatLoader.get(spell.id) || context.spell_threat}

@@ -8,12 +8,14 @@ defmodule ThistleTea.Game.Entity.SpellReceptionTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.SpellReception
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
   setup [:target]
@@ -63,6 +65,54 @@ defmodule ThistleTea.Game.Entity.SpellReceptionTest do
       Metadata.put(target.object.guid, %{dispel_resistance: []})
       assert {^target, [%Effects.DispelFailed{}]} = receive_dispel(%{ctx | target: target}, true)
     end
+  end
+
+  describe "aura_contexts/2" do
+    test "life drains require a living caster in the target's world", ctx do
+      for type <- [:periodic_leech, :periodic_health_funnel] do
+        spell = %Spell{
+          id: 40,
+          school: :physical,
+          duration_ms: 6_000,
+          effects: [%Effect{index: 0, type: :apply_aura, aura: type, base_points: 10, amplitude_ms: 1_000}]
+        }
+
+        {target, _events} = AuraLogic.apply_spell(ctx.target, ctx.caster, 60, spell, 0)
+        Metadata.put(ctx.caster, %{alive?: true})
+        SpatialHash.update(:mobs, ctx.caster, target.internal.world, 0.0, 0.0, 0.0)
+        on_exit(fn -> SpatialHash.remove(:mobs, ctx.caster) end)
+        {target, events} = projected_tick(target, 1_000)
+        assert target.unit.health == 90
+        assert Enum.any?(events, &match?(%Effects.HealEntity{amount: 10}, &1))
+
+        Metadata.update(ctx.caster, %{alive?: false})
+        {target, events} = projected_tick(target, 2_000)
+        assert target.unit.health == 90
+        assert events == []
+
+        Metadata.update(ctx.caster, %{alive?: true})
+        SpatialHash.update(:mobs, ctx.caster, WorldRef.open(1), 0.0, 0.0, 0.0)
+        {target, events} = projected_tick(target, 3_000)
+        assert target.unit.health == 90
+        assert events == []
+
+        SpatialHash.remove(:mobs, ctx.caster)
+        Metadata.delete(ctx.caster)
+        {target, events} = projected_tick(target, 4_000)
+        assert target.unit.health == 90
+        assert events == []
+
+        Metadata.put(ctx.caster, %{alive?: true})
+        SpatialHash.update(:mobs, ctx.caster, target.internal.world, 0.0, 0.0, 0.0)
+        {target, events} = projected_tick(target, 5_000)
+        assert target.unit.health == 80
+        assert Enum.any?(events, &match?(%Effects.HealEntity{amount: 10}, &1))
+      end
+    end
+  end
+
+  defp projected_tick(target, now) do
+    AuraLogic.tick(target, now, SpellReception.aura_contexts(target, now))
   end
 
   defp receive_dispel(ctx, hostile? \\ false) do
