@@ -87,6 +87,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Ownerless summoned objects](docs/wild-object-playtest.md), with shared loot, caster-independent lifetimes, linked objects, and environmental trap activation
 - creature-specific melee and ranged attack power from slaying gear and consumables, with weapon-speed scaling and live target debuffs
 - [Armor and spell penetration](docs/resistance-penetration-playtest.md), with school masks, stacking, equipment bonuses, and periodic damage
+- [Armor and resistance modifiers](docs/armor-resistance-playtest.md), with agility armor, base and total modifier layers, multiplicative percentages, and form and talent lifecycles
 - school-based spell cost reductions, with stacking, client cost displays, and free casts
 - percentage base-stat bonuses and penalties, including world buffs and Resurrection Sickness, with layered stacking and death-persistent aura expiry
 - independent mana and energy regeneration across Druid forms, with the five-second rule, Reflection, and Innervate
