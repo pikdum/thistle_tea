@@ -92,6 +92,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - percentage base-stat bonuses and penalties, including world buffs and Resurrection Sickness, with layered stacking and death-persistent aura expiry
 - independent mana and energy regeneration across Druid forms, with the five-second rule, Reflection, and Innervate
 - [Shapeshift cleansing](docs/shapeshift-cleansing-playtest.md), with root and snare removal, daze exceptions, buff interruption, target restrictions, and movement acknowledgements
+- [Transformation appearance](docs/appearance-playtest.md), with disguise priority, model geometry, form scales, creature weapons, reconnect restoration, and Polymorph regeneration
 - ground mounts, mounted speed bonuses, and dismounting on cancellation or swimming
 - parry haste for player and mob melee swings, including dual-wield timing
 - shield block value from equipment, enchants, and percentage talents, shared by defensive blocks and Shield Slam
