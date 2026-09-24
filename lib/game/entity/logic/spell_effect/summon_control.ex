@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Modifiers
 
   def apply(
         %Character{
@@ -281,8 +282,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
         _now
       )
       when (is_nil(slot) or slot in 1..4) and is_integer(entry) and entry > 0 do
+    duration = context.spell_modifiers |> Modifiers.value(:duration, spell.duration_ms || 0) |> round() |> max(0)
+
     summon = %{
-      Effects.summon_totem(entry, slot, max(spell.duration_ms || 0, 0))
+      Effects.summon_totem(entry, slot, duration)
       | spell_id: spell.id,
         health: max(Amount.roll(spell, effect, context), 0)
     }

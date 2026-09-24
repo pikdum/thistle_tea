@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -12,6 +13,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
   alias ThistleTea.Game.Spell.Cast
 
   describe "mob_delay/3" do
+    test "wakes at totem expiry even when behavior and aura ticks are later" do
+      entity = fixture()
+      entity = %{entity | internal: %{entity.internal | totem: %Totem{expires_at: 1_050}}}
+      assert Tick.mob_delay(entity, {:running, 2_000}, 1_000) == 50
+      assert Tick.mob_delay(entity, {:running, 2_000}, 1_100) == 0
+    end
+
     test "wakes for a scripted arrival before a long behavior sleep" do
       entity = %{fixture() | movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}}
       event = %Effects.MovementInform{motion_type: 9, point_id: 1}

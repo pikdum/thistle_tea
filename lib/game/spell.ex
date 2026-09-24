@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Spell do
   import Bitwise, only: [<<<: 2, &&&: 2]
 
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Modifiers
 
   @creature_type_mask_ignored_spell_ids [2641, 23_356]
 
@@ -442,10 +443,10 @@ defmodule ThistleTea.Game.Spell do
 
   def target_dependent_channel?(_spell), do: false
 
-  def channel_tick_ms(%__MODULE__{effects: effects}) do
+  def channel_tick_ms(%__MODULE__{effects: effects}, modifiers \\ []) do
     effects
-    |> Enum.map(& &1.amplitude_ms)
-    |> Enum.filter(&(is_integer(&1) and &1 > 0))
+    |> Enum.filter(&(is_integer(&1.amplitude_ms) and &1.amplitude_ms > 0))
+    |> Enum.map(&Modifiers.periodic_interval(modifiers, &1))
     |> Enum.min(fn -> 1_000 end)
   end
 

@@ -80,6 +80,14 @@ defmodule ThistleTea.Game.Spell.Modifiers do
     end
   end
 
+  def periodic_interval(modifiers, %Effect{} = effect) do
+    period = Effect.period_ms(effect)
+
+    if Effect.periodic?(effect) and is_integer(period) and period > 0,
+      do: max(trunc(value(modifiers, :activation_time, period)), 1),
+      else: period
+  end
+
   def snapshot(entity, %Spell{} = spell), do: entity |> snapshot_all() |> for_spell(spell)
   def snapshot(_entity, _spell), do: []
 
@@ -190,6 +198,13 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   end
 
   defp operation_used_by_spell?(:duration, %Spell{duration_ms: duration}), do: is_integer(duration) and duration > 0
+
+  defp operation_used_by_spell?(:activation_time, %Spell{effects: effects}) do
+    Enum.any?(effects, fn effect ->
+      period = Effect.period_ms(effect)
+      Effect.periodic?(effect) and is_integer(period) and period > 0
+    end)
+  end
 
   defp operation_used_by_spell?(:radius, %Spell{effects: effects}) do
     Enum.any?(effects, &(is_number(&1.radius_yards) and &1.radius_yards > 0))

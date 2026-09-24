@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   cadence only when no subsystem needs a specific wake.
   """
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat
@@ -66,6 +67,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
     |> schedule_pvp(entity)
     |> schedule_rest(entity)
     |> schedule_summon_death(entity)
+    |> schedule_totem_expiry(entity)
     |> schedule_movement(entity)
   end
 
@@ -82,6 +84,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
       _ -> plan
     end
   end
+
+  defp schedule_totem_expiry(plan, %{internal: %Internal{totem: %Totem{expires_at: at}}}) when is_integer(at),
+    do: TickPlan.schedule_at(plan, :totem_expiry, at)
+
+  defp schedule_totem_expiry(plan, _entity), do: plan
 
   defp schedule_extra_attacks(plan, entity) do
     if ExtraAttacks.pending?(entity), do: TickPlan.schedule_in(plan, :extra_attacks, @default_tick_ms), else: plan

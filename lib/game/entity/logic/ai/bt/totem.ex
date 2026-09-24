@@ -33,19 +33,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Totem do
     ])
   end
 
-  def lifetime(%Mob{internal: %Internal{totem: %Totem{} = totem}} = state, blackboard, %Context{} = context) do
-    expired? = is_integer(totem.expires_at) and context.now >= totem.expires_at
-
-    if expired? or not owner_present?(state, context) do
-      {:success, Effects.enqueue(state, Effects.despawn_self(0, 0)), blackboard}
-    else
+  def lifetime(%Mob{} = state, blackboard, %Context{} = context) do
+    if active?(state, context) do
       {:failure, state, blackboard}
+    else
+      {:success, Effects.enqueue(state, Effects.despawn_self(0, 0)), blackboard}
     end
   end
 
-  defp owner_present?(%Mob{internal: %{totem: %Totem{owner_guid: owner}, world: world}}, %Context{
-         perception: perception
-       }) do
+  defp active?(%Mob{internal: %Internal{totem: %Totem{} = totem}} = state, %Context{} = context) do
+    expired? = is_integer(totem.expires_at) and context.now >= totem.expires_at
+    not expired? and owner_present?(state, context)
+  end
+
+  def owner_present?(%Mob{internal: %{totem: %Totem{owner_guid: owner}, world: world}}, %Context{perception: perception}) do
     with %{alive?: alive?} <- Perception.metadata(perception, owner),
          {^world, _, _, _} <- Perception.position(perception, owner),
          distance when is_number(distance) and distance <= 120.0 <- Perception.distance(perception, owner) do

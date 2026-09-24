@@ -8,12 +8,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
   """
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Totem, as: TotemBT
   alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.Entity.Logic.TemporarySummon
 
@@ -24,12 +26,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
 
   defp tick_entity(tree, %Mob{unit: %{health: 0}} = entity, context), do: BT.tick(tree, entity, context)
 
-  defp tick_entity(tree, entity, %Context{now: now} = context) do
+  defp tick_entity(tree, %Mob{internal: %Internal{totem: %Totem{expires_at: expires_at}}} = entity, context) do
+    entity =
+      if TotemBT.owner_present?(entity, context) do
+        now = if is_integer(expires_at), do: min(context.now, expires_at), else: context.now
+        maintain(entity, %{context | now: now})
+      else
+        entity
+      end
+
+    BT.tick(tree, entity, context)
+  end
+
+  defp tick_entity(tree, entity, context), do: BT.tick(tree, maintain(entity, context), context)
+
+  defp maintain(entity, %Context{now: now} = context) do
     blackboard = Blackboard.ensure(entity.internal.blackboard)
     {:failure, entity, blackboard} = AuraBT.tick(entity, blackboard, context)
     {:failure, entity, blackboard} = RegenBT.tick(entity, blackboard, now)
     entity = %{entity | internal: %{entity.internal | blackboard: blackboard}}
-    entity = CombatLeash.maintain(entity, now)
-    BT.tick(tree, entity, context)
+    CombatLeash.maintain(entity, now)
   end
 end

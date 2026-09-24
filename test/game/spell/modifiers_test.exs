@@ -96,6 +96,33 @@ defmodule ThistleTea.Game.Spell.ModifiersTest do
     end
   end
 
+  describe "periodic_interval/2" do
+    test "applies flat then percent timing and keeps a positive integer interval" do
+      effect = %Effect{aura: :periodic_trigger_spell, amplitude_ms: 4_000}
+      flat = %Aura{type: :add_flat_modifier, misc_value: 19, amount: -1_001}
+      percent = %Aura{type: :add_pct_modifier, misc_value: 19, amount: -50}
+      assert Modifiers.periodic_interval([flat, percent], effect) == 1_499
+      assert Modifiers.periodic_interval([%{flat | amount: -4_001}], effect) == 1
+      assert Modifiers.periodic_interval([%{percent | amount: -100}], effect) == 1
+    end
+
+    test "preserves absent intervals and nonperiodic regeneration schedules" do
+      modifier = %Aura{type: :add_flat_modifier, misc_value: 19, amount: -500}
+
+      for {type, amplitude, expected} <- [
+            {:periodic_damage, nil, nil},
+            {:periodic_damage, 0, 0},
+            {:obs_mod_mana, 0, 500},
+            {:mod_regen, 0, 5_000},
+            {:mod_power_regen, 0, 5_000},
+            {:mod_power_regen_percent, 0, 2_000},
+            {:mod_stat, 4_000, 4_000}
+          ] do
+        assert Modifiers.periodic_interval([modifier], %Effect{aura: type, amplitude_ms: amplitude}) == expected
+      end
+    end
+  end
+
   describe "consumable_holder_ids/2" do
     test "attack power and haste charges require the matching aura operation" do
       entity =

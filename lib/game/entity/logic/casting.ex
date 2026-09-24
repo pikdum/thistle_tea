@@ -78,8 +78,10 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   def start(entity, _spell, _targets, _now, _cast_item_guid, _cast_item_id), do: entity
 
   def start_triggered(entity, %Spell{} = spell, %Target{} = targets, now, cast_item_guid, context \\ nil) do
+    modifiers = if context, do: context.spell_modifiers, else: Modifiers.snapshot(entity, spell)
+
     casting = %{
-      Cast.new(%{spell | cast_time_ms: 0}, targets, now)
+      Cast.new(%{spell | cast_time_ms: 0}, targets, now, modifiers)
       | triggered?: true,
         trigger_context: context,
         cast_item_guid: cast_item_guid
@@ -118,7 +120,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
     casting =
       spell
-      |> Cast.new(targets, now)
+      |> Cast.new(targets, now, Modifiers.snapshot(character, spell))
       |> Cast.apply_speed_multiplier(CastSpeed.multiplier(character.unit, spell))
       |> then(
         &%{&1 | cast_item_guid: cast_item_guid, cast_item_id: cast_item_id, modifier_holder_ids: modifier_holder_ids}

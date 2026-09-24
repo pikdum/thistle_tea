@@ -6,6 +6,20 @@ defmodule ThistleTea.Game.Spell.Effect do
   """
   alias ThistleTea.Game.Math
 
+  @periodic_auras [
+    :periodic_power_burn,
+    :periodic_damage_percent,
+    :periodic_damage,
+    :periodic_heal,
+    :periodic_energize,
+    :periodic_leech,
+    :periodic_health_funnel,
+    :periodic_mana_leech,
+    :periodic_trigger_spell,
+    :obs_mod_health,
+    :obs_mod_mana
+  ]
+
   defstruct [
     :index,
     :type,
@@ -46,6 +60,14 @@ defmodule ThistleTea.Game.Spell.Effect do
   end
 
   def damage_roll(%__MODULE__{} = effect), do: roll(effect, 0)
+
+  def periodic?(%__MODULE__{aura: aura}), do: aura in @periodic_auras
+
+  def period_ms(%__MODULE__{amplitude_ms: period}) when is_integer(period) and period > 0, do: period
+  def period_ms(%__MODULE__{aura: :mod_power_regen_percent}), do: 2_000
+  def period_ms(%__MODULE__{aura: :obs_mod_mana}), do: 1_000
+  def period_ms(%__MODULE__{aura: aura}) when aura in [:mod_regen, :mod_power_regen], do: 5_000
+  def period_ms(%__MODULE__{amplitude_ms: period}), do: period
 
   def amount(%__MODULE__{} = effect, level_units, combo_points) when is_integer(combo_points) and combo_points > 0 do
     roll(effect, level_units) + trunc((effect.points_per_combo || 0.0) * combo_points)

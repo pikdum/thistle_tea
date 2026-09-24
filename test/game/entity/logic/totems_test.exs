@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.TotemsTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Commands
   alias ThistleTea.Game.Entity.Data.Character
@@ -34,6 +35,60 @@ defmodule ThistleTea.Game.Entity.Logic.TotemsTest do
   setup [:totem]
 
   describe "prepare/4" do
+    test "snapshots owner timing modifiers for the summon and its periodic aura" do
+      modifier = %Holder{
+        spell: %Spell{id: 50, spell_family: 11},
+        auras: [
+          %ThistleTea.Game.Aura{type: :add_flat_modifier, misc_value: 1, amount: -2000, class_mask: 0x08000000},
+          %ThistleTea.Game.Aura{type: :add_flat_modifier, misc_value: 19, amount: -2000, class_mask: 0x20}
+        ]
+      }
+
+      owner = character(%{})
+      owner = %{owner | unit: %{owner.unit | auras: [modifier]}}
+
+      spell = %Spell{
+        id: 1535,
+        spell_family: 11,
+        family_flags_0: 0x28000000,
+        duration_ms: 5000,
+        effects: [%Effect{index: 0, type: :summon_totem, misc_value: 5879, base_points: 5}]
+      }
+
+      context = CastContext.from_caster(owner, spell, owner.object.guid)
+      assert {_, [%Effects.SummonTotem{duration_ms: 3000} = effect]} = SpellEffect.receive(owner, context, spell, 1000)
+
+      ward =
+        Totems.prepare(
+          %Mob{object: %Object{guid: 2}, unit: %Unit{auras: []}, internal: %Internal{}},
+          owner,
+          effect,
+          1000
+        )
+
+      assert ward.internal.totem.expires_at == 4000
+
+      spell = %Spell{
+        id: 8443,
+        spell_family: 11,
+        family_flags_0: 0x20,
+        duration_ms: -1,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :periodic_trigger_spell,
+            amplitude_ms: 4000,
+            trigger_spell_id: 8349
+          }
+        ]
+      }
+
+      context = CastContext.from_caster(ward, spell, 2)
+      {ward, _events} = Aura.apply_spell(ward, context, spell, 1000)
+      assert [%Holder{auras: [%{amplitude_ms: 2000, next_tick_at: 3000}]}] = ward.unit.auras
+    end
+
     test "retains spell health and projects the area aura without buffing the totem itself" do
       owner = character(%{})
 

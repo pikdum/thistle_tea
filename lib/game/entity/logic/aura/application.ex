@@ -49,23 +49,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   @ignite_dot 12_654
   @ignite_max_stacks 5
 
-  @regen_tick_ms 5000
-  @percent_regen_tick_ms 2000
-  @regen_auras [:mod_regen, :mod_power_regen, :mod_power_regen_percent]
   @context_auras [:periodic_power_burn, :periodic_trigger_spell, :proc_trigger_spell, :damage_shield]
-  @periodic_auras [
-    :periodic_power_burn,
-    :periodic_damage_percent,
-    :periodic_damage,
-    :periodic_heal,
-    :periodic_energize,
-    :periodic_leech,
-    :periodic_health_funnel,
-    :periodic_mana_leech,
-    :periodic_trigger_spell,
-    :obs_mod_health,
-    :obs_mod_mana
-  ]
 
   def apply_spell(entity, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
     if CreatureImmunity.spell?(entity, context, spell),
@@ -589,7 +573,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
        ), do: %Aura{index: index, type: :none, amount: 0}
 
   defp build_aura(entity, %Spell{} = spell, %Effect{} = effect, amount_override, %CastContext{} = context, now) do
-    amplitude_ms = effective_amplitude(effect)
+    amplitude_ms = Modifiers.periodic_interval(context.spell_modifiers, effect)
 
     %Aura{
       index: effect.index,
@@ -700,24 +684,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp transfer_multiplier(%Effect{multiple_value: value}, _context), do: value
 
-  defp effective_amplitude(%Effect{aura: :mod_power_regen_percent, amplitude_ms: amp}) do
-    if is_integer(amp) and amp > 0, do: amp, else: @percent_regen_tick_ms
+  defp next_tick(spell, %Effect{} = effect, amplitude_ms, now) do
+    if Effect.periodic?(effect) and is_integer(amplitude_ms) and amplitude_ms > 0,
+      do: now + Scripts.initial_periodic_delay(spell, amplitude_ms)
   end
-
-  defp effective_amplitude(%Effect{aura: :obs_mod_mana, amplitude_ms: amp}) do
-    if is_integer(amp) and amp > 0, do: amp, else: 1_000
-  end
-
-  defp effective_amplitude(%Effect{aura: aura, amplitude_ms: amp}) when aura in @regen_auras do
-    if is_integer(amp) and amp > 0, do: amp, else: @regen_tick_ms
-  end
-
-  defp effective_amplitude(%Effect{amplitude_ms: amp}), do: amp
-
-  defp next_tick(spell, %Effect{aura: aura}, amplitude_ms, now)
-       when aura in @periodic_auras and is_integer(amplitude_ms) and amplitude_ms > 0 do
-    now + Scripts.initial_periodic_delay(spell, amplitude_ms)
-  end
-
-  defp next_tick(_spell, _effect, _amplitude_ms, _now), do: nil
 end
