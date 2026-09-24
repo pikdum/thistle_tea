@@ -80,7 +80,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
           cast_context: if(Enum.any?(auras, &(&1.type in @context_auras)), do: context),
           applied_at: now,
           expires_at: expires_at(now, effective_duration(spell, context)),
-          charges: holder_charges(spell),
+          charges: holder_charges(spell, context.spell_modifiers),
           area_radius: area_radius(spell, context.spell_modifiers),
           next_area_refresh_at: next_area_refresh_at(spell, context, target_guid, now),
           auras: auras,
@@ -134,7 +134,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       passive_holder(entity, spell, now)
       | linked_from: source,
         expires_at: expires_at(now, spell.duration_ms),
-        charges: holder_charges(spell)
+        charges: holder_charges(spell, Modifiers.snapshot(entity, spell))
     }
   end
 
@@ -334,8 +334,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     Spell.same_exclusive_category?(existing, incoming)
   end
 
-  defp holder_charges(%Spell{proc_charges: charges}) when is_integer(charges) and charges > 0, do: charges
-  defp holder_charges(_spell), do: nil
+  defp holder_charges(%Spell{proc_charges: charges}, modifiers) do
+    charges = trunc(Modifiers.value(modifiers, :charges, charges || 0))
+    if charges > 0, do: charges
+  end
 
   defp blocked_by_mechanic_immunity?(holders, %Spell{mechanic: mechanic}) when is_integer(mechanic) and mechanic > 0 do
     Enum.any?(holders, &immunity_holder_for_mechanic?(&1, mechanic))

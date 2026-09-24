@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     :damage_shield,
     :proc_trigger_spell,
     :proc_trigger_damage,
+    :mod_block_percent,
     :mod_resistance,
     :mod_resistance_exclusive
   ]

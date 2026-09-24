@@ -14,13 +14,16 @@ defmodule ThistleTea.Game.Entity.Logic.ShieldBlockTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.EquipmentStats
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.ProcRule
 
   setup [:character]
 
@@ -115,6 +118,66 @@ defmodule ThistleTea.Game.Entity.Logic.ShieldBlockTest do
     end
   end
 
+  describe "receive_attack/4" do
+    test "full and partial blocks spend the last charge and remove the projected bonus", %{character: character} do
+      for damage <- [10, 100] do
+        {buffed, _} = Aura.apply_spell(character, 1, 60, shield_block(), 0)
+        assert [%Holder{charges: 1}] = buffed.unit.auras
+        {blocked, events} = Combat.receive_attack(buffed, attack(damage), 1_000, roll: 5_000)
+
+        assert %Effects.AttackOutcome{outcome: :block, damage: remaining} =
+                 Enum.find(events, &is_struct(&1, Effects.AttackOutcome))
+
+        assert remaining == max(damage - 26, 0)
+        assert blocked.unit.health == 1_000 - remaining
+        assert blocked.unit.auras == []
+        assert blocked.unit.aura == 0
+        assert blocked.unit.aura_applications == <<0::size(48 * 8)>>
+        assert blocked.player.block_percentage == 5.0
+        assert Aura.next_event_at(blocked) == nil
+      end
+    end
+
+    test "two charges survive the first block and disappear after the second", %{character: character} do
+      spell = %{shield_block() | proc_charges: 2}
+      {buffed, _} = Aura.apply_spell(character, 1, 60, spell, 0)
+      assert [%Holder{charges: 2, slot: slot}] = buffed.unit.auras
+      assert :binary.at(buffed.unit.aura_applications, slot) == 1
+      {blocked, _events} = Combat.receive_attack(buffed, attack(10), 1_000, roll: 5_000)
+      assert [%Holder{charges: 1, slot: ^slot}] = blocked.unit.auras
+      assert :binary.at(blocked.unit.aura_applications, slot) == 0
+      assert blocked.player.block_percentage == 80.0
+      {blocked, _events} = Combat.receive_attack(blocked, attack(100), 2_000, roll: 5_000)
+      assert blocked.unit.auras == []
+      assert blocked.player.block_percentage == 5.0
+      {_ordinary, events} = Combat.receive_attack(blocked, attack(100), 3_000, roll: 5_000)
+      assert %Effects.AttackOutcome{outcome: :normal} = Enum.find(events, &is_struct(&1, Effects.AttackOutcome))
+    end
+
+    test "misses, dodges, parries and unblocked hits preserve the charge", %{character: character} do
+      {buffed, _} = Aura.apply_spell(character, 1, 60, shield_block(), 0)
+
+      buffed = %{buffed | unit: %{buffed.unit | agility: 100}}
+
+      for {roll, outcome} <- [{0, :miss}, {600, :dodge}, {1_200, :parry}, {9_999, :normal}] do
+        {updated, events} = Combat.receive_attack(buffed, attack(100), 1_000, roll: roll)
+        assert %Effects.AttackOutcome{outcome: ^outcome} = Enum.find(events, &is_struct(&1, Effects.AttackOutcome))
+        assert [%Holder{charges: 1}] = updated.unit.auras
+        assert updated.player.block_percentage == 80.0
+      end
+    end
+
+    test "unused charges are removed on expiry and death", %{character: character} do
+      {buffed, _} = Aura.apply_spell(character, 1, 60, shield_block(), 0)
+      {expired, _events} = Aura.expire_due(buffed, 5_000)
+      assert expired.unit.auras == []
+      assert expired.player.block_percentage == 5.0
+      dead = Core.take_damage(buffed, 1_000, 1_000)
+      assert dead.unit.auras == []
+      assert dead.player.block_percentage == 5.0
+    end
+  end
+
   describe "apply_spell/5" do
     test "refresh, cancellation, expiry and death restore the derived value", %{character: character} do
       spell = bonus_spell(28_773, :mod_shield_block_value, 235)
@@ -193,6 +256,28 @@ defmodule ThistleTea.Game.Entity.Logic.ShieldBlockTest do
       school: :physical,
       duration_ms: 20_000,
       effects: [%Effect{index: 0, type: :apply_aura, aura: type, base_points: amount, implicit_target_a: :caster}]
+    }
+  end
+
+  defp shield_block do
+    %{
+      bonus_spell(2565, :mod_block_percent, 75)
+      | duration_ms: 5_000,
+        proc_charges: 1,
+        proc_type_mask: 0x2A8,
+        proc_chance: 100,
+        proc_rule: %ProcRule{proc_ex: 0x40}
+    }
+  end
+
+  defp attack(damage) do
+    %{
+      caster: 99,
+      caster_level: 60,
+      caster_player?: false,
+      caster_position: {2.0, 0.0, 0.0},
+      crit_chance: 0,
+      damage: damage
     }
   end
 end

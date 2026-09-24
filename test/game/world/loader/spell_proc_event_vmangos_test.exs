@@ -14,6 +14,10 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   end
 
   describe "get/1" do
+    test "Shield Block spends charges only on blocked attacks" do
+      assert %ProcRule{proc_ex: 0x40} = SpellProcEvent.get(2565)
+    end
+
     test "shield spikes and first-rank Paladin defenses are block-only procs" do
       for id <- [9782, 9784, 16_624, 20_911, 20_925] do
         assert %ProcRule{proc_ex: 0x40} = SpellProcEvent.get(id)

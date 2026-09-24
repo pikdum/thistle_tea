@@ -8,11 +8,28 @@ defmodule ThistleTea.Game.World.Loader.ShieldBlockDbcTest do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Proficiency
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db
 
   describe "load/1" do
+    test "Improved Shield Block adds one charge and the rank's duration bonus" do
+      block = SpellLoader.load(2565)
+      assert block.proc_charges == 1
+      assert block.proc_type_mask == 0x2A8
+
+      for {id, duration} <- [{12_945, 5_500}, {12_307, 6_000}, {12_944, 7_000}] do
+        talent = SpellLoader.load(id)
+        {caster, _events} = Aura.apply_spell(character(), 1, 60, talent, 0)
+        context = CastContext.from_caster(caster, block, 1)
+        {caster, _events} = Aura.apply_spell(caster, context, block, 1_000)
+        holder = Enum.find(caster.unit.auras, &(&1.spell.id == 2565))
+        assert holder.charges == 2
+        assert holder.expires_at == 1_000 + duration
+      end
+    end
+
     test "Block and Parry grant combat capabilities while the Shaman talent teaches Parry" do
       block = SpellLoader.load(107)
       parry = SpellLoader.load(3127)
@@ -56,6 +73,7 @@ defmodule ThistleTea.Game.World.Loader.ShieldBlockDbcTest do
     %Character{
       object: %Object{guid: 1},
       unit: %Unit{
+        level: 60,
         health: 1_000,
         max_health: 1_000,
         strength: 140,
