@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCharm do
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
 
   def spells(%Character{internal: %{spellbook: spellbook}}) when is_map(spellbook) do
@@ -20,6 +21,11 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCharm do
   def spells(_entity), do: []
 
   def melee?(%Character{unit: %{class: class}}), do: class in [1, 2, 4, 11]
+
+  def controller_active?(guid, %{alive?: true} = controller),
+    do: Guid.entity_type(guid) == :player or controller[:in_combat] == true
+
+  def controller_active?(_guid, _controller), do: false
 
   def command(%Character{internal: %{possession: %Possession{kind: :charm} = control}} = entity, command, target, now) do
     case command do

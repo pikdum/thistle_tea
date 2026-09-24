@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
+  alias ThistleTea.Game.Entity.Logic.PlayerCharm
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Entity.Logic.WeaponDamage
@@ -74,10 +75,11 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     with %Possession{kind: :charm} = control <- character.internal.possession,
          true <- control.caster_guid == effect.controller_guid and control.spell_id == effect.control_spell_id,
          true <- control.applied_at == effect.control_applied_at,
+         true <- character.unit.target == effect.target_guid and control.command_target in [nil, effect.target_guid],
          nil <- character.internal.casting,
          %Spell{} = spell <- Enum.find(control.spells, &(&1.id == effect.spell_id)),
          true <- Map.has_key?(character.internal.spellbook, spell.id),
-         %{alive?: true} <- Metadata.get(control.caster_guid),
+         true <- PlayerCharm.controller_active?(control.caster_guid, Metadata.get(control.caster_guid)),
          {world, _, _, _} when world == character.internal.world <- World.position(control.caster_guid) do
       state = snapshot_action_position(state)
       targets = Target.unit(effect.target_guid)

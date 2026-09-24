@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.ServerMovementTest do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Possession
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Confusion
   alias ThistleTea.Game.Entity.Logic.ControlMovement
@@ -120,6 +121,19 @@ defmodule ThistleTea.Game.Entity.Server.Player.ServerMovementTest do
   end
 
   describe "reconcile/1" do
+    test "incoming control invalidates an old charge arrival" do
+      for kind <- [:charm, :possession] do
+        state = ServerMovement.start(state(), command(), 1_000)
+        token = state.server_movement.token
+        control = %Possession{caster_guid: 2, spell_id: 605, original_faction_template: 1, kind: kind}
+        state = put_in(state.character.internal.possession, control)
+        state = ServerMovement.reconcile(state)
+        on_exit(fn -> World.remove_position(state.character) end)
+        assert state.server_movement == nil
+        assert ServerMovement.finish(state, token, 1_100) == state
+      end
+    end
+
     test "an interrupted charge cannot finish a later forced movement" do
       state = ServerMovement.start(state(), command(), 1_000)
       token = state.server_movement.token

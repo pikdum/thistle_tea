@@ -54,12 +54,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Charm do
 
   def tick(entity, blackboard, _context), do: {:failure, entity, blackboard}
 
-  defp controller_present?(entity, control, controller, context) when is_map(controller) do
-    controller[:alive?] == true and Navigation.target_valid_same_map?(entity, control.caster_guid, context) and
-      (Guid.entity_type(control.caster_guid) == :player or controller[:in_combat] == true)
+  defp controller_present?(entity, control, controller, context) do
+    PlayerCharm.controller_active?(control.caster_guid, controller) and
+      Navigation.target_valid_same_map?(entity, control.caster_guid, context)
   end
-
-  defp controller_present?(_entity, _control, _controller, _context), do: false
 
   defp act(%Character{internal: %{casting: %Cast{}}} = entity, blackboard, context) do
     {_status, entity, blackboard} = SpellBT.cast_tick(entity, blackboard, context.now)

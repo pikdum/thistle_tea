@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.ServerMovement do
   alias ThistleTea.Game.Entity.Logic.BoundaryResult
   alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Player.Exploration
   alias ThistleTea.Game.Player.Rest
@@ -22,7 +23,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.ServerMovement do
   defstruct [:token, :timer_ref]
 
   def reconcile(%State{character: character, server_movement: %__MODULE__{timer_ref: ref}} = state) do
-    if ControlMovement.active?(character) do
+    if ControlMovement.active?(character) or PlayerPossession.active?(character) do
       Process.cancel_timer(ref)
       %{state | server_movement: nil}
     else

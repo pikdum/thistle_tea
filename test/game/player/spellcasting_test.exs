@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Player.SpellcastingTest do
   alias ThistleTea.Game.Entity.Data.Possession
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.PlayerCharm
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
@@ -62,7 +63,13 @@ defmodule ThistleTea.Game.Player.SpellcastingTest do
       }
 
       character = state.character
-      character = %{character | internal: %{character.internal | possession: control, spellbook: %{spell.id => spell}}}
+
+      character = %{
+        character
+        | unit: %{character.unit | target: target},
+          internal: %{character.internal | possession: control, spellbook: %{spell.id => spell}}
+      }
+
       state = %{state | ready: true, character: character}
 
       effect = %Effects.CharmCast{
@@ -82,6 +89,11 @@ defmodule ThistleTea.Game.Player.SpellcastingTest do
         rejected = %{state | character: %{character | unit: unit}}
         assert Spellcasting.charm_cast(rejected, effect) == rejected
       end
+
+      cancelled = %{state | character: PlayerCharm.command(character, :passive, 0, Time.now())}
+      assert Spellcasting.charm_cast(cancelled, effect) == cancelled
+      Metadata.update(controller, %{in_combat: false})
+      assert Spellcasting.charm_cast(state, effect) == state
     end
   end
 
