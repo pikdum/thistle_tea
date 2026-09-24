@@ -74,8 +74,8 @@ defmodule ThistleTea.Game.OutdoorPvp.Towers do
 
   def ownership_changes(%__MODULE__{} = previous, %__MODULE__{} = current) do
     for {id, point} <- Enum.sort(current.points),
-        before = CapturePoint.owner(Map.fetch!(previous.points, id)),
-        after_team = CapturePoint.owner(point),
+        before <- [CapturePoint.owner(Map.fetch!(previous.points, id))],
+        after_team <- [CapturePoint.owner(point)],
         before != after_team,
         do: {id, before, after_team}
   end
