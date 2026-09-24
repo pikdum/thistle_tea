@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.FeignDeathTest do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.World.Metadata
 
   setup [:character]
 
@@ -157,6 +158,16 @@ defmodule ThistleTea.Game.Entity.Logic.FeignDeathTest do
       EventSink.emit(ctx.character, %Effects.FeignDeathResisted{}, Context.new(owner))
       assert_receive {:owner, {:"$gen_cast", {:send_packet, %SmsgFeignDeathResisted{}}}}
       refute_receive {:"$gen_cast", {:send_packet, %SmsgFeignDeathResisted{}}}
+    end
+  end
+
+  describe "metadata publication" do
+    test "publishes current aura state when an application effect is drained after removal", ctx do
+      mob = %Mob{object: %Object{guid: ctx.mob}, unit: %Unit{auras: []}}
+      Metadata.put(ctx.mob, %{feigning_death?: true})
+      on_exit(fn -> Metadata.delete(ctx.mob) end)
+      EventSink.emit(mob, %Effects.FeignDeathAppliedResolved{target_guids: []})
+      assert Metadata.query(ctx.mob, [:feigning_death?]) == %{feigning_death?: false}
     end
   end
 

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   alias ThistleTea.Game.Entity.Logic.AttackSchool
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Guid
@@ -238,7 +239,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   def emit(entity, %Effects.FeignDeathAppliedResolved{} = effect, _context) do
     case entity do
       %Character{} -> Presence.sync(entity, %{})
-      %Mob{} -> Metadata.update(entity.object.guid, %{feigning_death?: true})
+      %Mob{} -> Metadata.update(entity.object.guid, %{feigning_death?: FeignDeath.successful?(entity)})
     end
 
     Enum.each(effect.target_guids, &Entity.feign_death_target_lost(&1, entity.object.guid))
