@@ -84,6 +84,14 @@ defmodule ThistleTea.Game.World.PathfindingTest do
     test "does not invent an area when map geometry is unavailable" do
       assert Pathfinding.get_zone_and_area(999, {0.0, 0.0, 0.0}) == nil
     end
+
+    test "rejects unsigned unknown-area sentinels on Programmer Isle" do
+      for z <- [69.34, 69.5] do
+        assert Pathfinding.get_zone_and_area(451, {16_335.2, 16_298.1, z}) == nil
+      end
+
+      assert Pathfinding.get_zone_and_area(451, {16_303.2, 16_318.1, 69.44}) == {22, 22}
+    end
   end
 
   describe "line_of_sight?/3" do

@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.World.Pathfinding do
     load_adt_at(map_id, {x, y})
 
     case Namigator.get_zone_and_area(map_id, x, y, z) do
-      {_zone, area} = result when area > 0 -> result
+      {zone, area} = result when zone in 1..0xFFFFFFFE and area in 1..0xFFFFFFFE -> result
       _unknown -> surface_zone_and_area(map_id, {x, y, z})
     end
   end
@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.World.Pathfinding do
     |> Enum.sort_by(&abs(&1 - z))
     |> Enum.find_value(fn height ->
       case Namigator.get_zone_and_area(map_id, x, y, height - @area_floor_tolerance) do
-        {_zone, area} = result when area > 0 -> result
+        {zone, area} = result when zone in 1..0xFFFFFFFE and area in 1..0xFFFFFFFE -> result
         _unknown -> nil
       end
     end)
