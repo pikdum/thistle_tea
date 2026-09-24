@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Aura.Capacity
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.ControlSync
+  alias ThistleTea.Game.Entity.Logic.Aura.Linked
   alias ThistleTea.Game.Entity.Logic.Aura.ModifierSync
   alias ThistleTea.Game.Entity.Logic.Aura.MountSync
   alias ThistleTea.Game.Entity.Logic.Aura.MovementSync
@@ -63,6 +64,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     desired = StealthSync.interrupt_holders(previous, desired)
     desired = Silithyst.reconcile(desired)
     desired = StackingProc.reconcile(previous, desired)
+    desired = Linked.reconcile(entity, previous, desired, now)
 
     if desired == previous do
       {entity, []}
@@ -197,7 +199,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   end
 
   defp previous_slot(previous, %Holder{} = holder) do
-    case Enum.find(previous, &(holder_key(&1) == holder_key(holder))) do
+    case Enum.find(previous, &(Holder.key(&1) == Holder.key(holder))) do
       %Holder{slot: slot} -> slot
       _holder -> nil
     end
@@ -230,16 +232,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   defp indexed(holders) do
     {indexed, _counts} =
       Enum.map_reduce(holders, %{}, fn %Holder{} = holder, counts ->
-        key = holder_key(holder)
+        key = Holder.key(holder)
         occurrence = Map.get(counts, key, 0)
         {{key, occurrence, holder}, Map.put(counts, key, occurrence + 1)}
       end)
 
     Enum.map(indexed, fn {key, occurrence, holder} -> {{key, occurrence}, holder} end)
   end
-
-  defp holder_key(%Holder{spell: %Spell{id: id}, caster_guid: caster_guid, item_source: source}),
-    do: {id, caster_guid, source}
 
   defp application_hooks(entity, touched, :applied, now) do
     {entity, immediate_events} =

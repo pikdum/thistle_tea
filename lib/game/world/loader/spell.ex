@@ -174,13 +174,13 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   def superseded_by_map(_spell_ids), do: %{}
 
-  defp build(row) do
+  defp build(row, ancestors \\ MapSet.new()) do
     row = DBC.preload(row, [:spell_cast_time, :spell_duration, :spell_range])
-    build_preloaded(row, &lookup_radius/1)
+    build_preloaded(row, &lookup_radius/1, ancestors)
   end
 
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
-  defp build_preloaded(row, radius_lookup) do
+  defp build_preloaded(row, radius_lookup, ancestors \\ MapSet.new()) do
     %SpellData{
       id: row.id,
       name: row.name_en_gb,
@@ -231,7 +231,20 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> struct!(equipped_item_fields(row))
     |> struct!(power_fields(row))
     |> append_shapeshift_passives(radius_lookup)
+    |> load_linked_auras(MapSet.put(ancestors, row.id))
     |> Semantics.compile()
+  end
+
+  defp load_linked_auras(%SpellData{effects: effects} = spell, ancestors) do
+    linked =
+      for %Effect{aura: :linked_aura, trigger_spell_id: id} <- effects,
+          is_integer(id) and id > 0,
+          not MapSet.member?(ancestors, id),
+          row = DBC.get(Spell, id),
+          not is_nil(row),
+          do: build(row, ancestors)
+
+    %{spell | linked_auras: Enum.uniq_by(linked, & &1.id)}
   end
 
   defp power_fields(row) do
@@ -802,6 +815,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(188), do: :mod_attacker_ranged_crit_chance
   defp aura_type(190), do: :mod_faction_reputation_gain
   defp aura_type(191), do: :use_normal_movement_speed
+  defp aura_type(192), do: :linked_aura
   defp aura_type(other) when is_integer(other), do: other
 
   defp target_type(0), do: nil

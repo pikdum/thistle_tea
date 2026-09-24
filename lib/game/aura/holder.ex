@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Aura.Holder do
     :caster_guid,
     :caster_owner_guid,
     :item_source,
+    :linked_from,
     :reflected_by_guid,
     :caster_level,
     :caster_faction_template,
@@ -38,6 +39,9 @@ defmodule ThistleTea.Game.Aura.Holder do
   ]
 
   @type t :: %__MODULE__{}
+
+  def key(%__MODULE__{spell: %Spell{id: id}, caster_guid: caster, item_source: item, linked_from: link}),
+    do: {id, caster, item, link}
 
   def has_aura_type?(%__MODULE__{auras: auras}, type) do
     Enum.any?(auras, fn %Aura{type: t} -> t == type end)

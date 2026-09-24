@@ -6,8 +6,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
   with a label. The `:dbc_db` coverage test walks every trainable class
   spell and fails when a value falls outside this matrix, so new content
   can never silently no-op.
-
-  VMangos linked auras remain deferred.
   """
 
   @deferred_effects %{
@@ -21,9 +19,7 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
     86 => :holiday_gift
   }
 
-  @deferred_auras %{
-    192 => :vmangos_linked_aura
-  }
+  @deferred_auras %{}
 
   @deferred_targets %{
     17 => :database_location,

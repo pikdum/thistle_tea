@@ -138,13 +138,25 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   def dispel_immune?(_entity, _spell), do: false
 
   def equipment_holder(entity, %Spell{} = spell, source, now) do
+    %{passive_holder(entity, spell, now) | item_source: source}
+  end
+
+  def linked_holder(entity, %Spell{} = spell, source, now) do
+    %{
+      passive_holder(entity, spell, now)
+      | linked_from: source,
+        expires_at: expires_at(now, spell.duration_ms),
+        charges: holder_charges(spell)
+    }
+  end
+
+  defp passive_holder(entity, %Spell{} = spell, now) do
     context = %CastContext{caster_guid: entity.object.guid, caster_level: entity.unit.level || 1}
 
     %Holder{
       spell: %{spell | attributes: MapSet.put(spell.attributes, :passive), spell_visual: 0},
       caster_guid: context.caster_guid,
       caster_level: context.caster_level,
-      item_source: source,
       applied_at: now,
       auras: build_auras(entity, context, spell, now)
     }
@@ -244,6 +256,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     shapeshift? = Holder.has_aura_type?(incoming, :mod_shapeshift)
     Enum.reject(holders, &non_stacking?(&1, incoming, shapeshift?))
   end
+
+  defp non_stacking?(%Holder{linked_from: source}, _incoming, _shapeshift?) when not is_nil(source), do: false
 
   defp non_stacking?(
          %Holder{spell: %Spell{} = other} = existing,
@@ -388,7 +402,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp upsert_holder(existing, %Holder{spell: %Spell{id: spell_id} = spell, caster_guid: caster_guid} = incoming) do
     index =
-      Enum.find_index(existing, &Holder.same_source?(&1, spell_id, caster_guid)) ||
+      Enum.find_index(existing, &(is_nil(&1.linked_from) and Holder.same_source?(&1, spell_id, caster_guid))) ||
         shared_stack_index(existing, spell)
 
     case index do
@@ -470,7 +484,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp shared_stack_index(existing, %Spell{id: spell_id} = spell) do
     if Spell.custom?(spell, :allow_stack_between_caster) do
-      Enum.find_index(existing, &(&1.spell.id == spell_id))
+      Enum.find_index(existing, &(&1.spell.id == spell_id and is_nil(&1.linked_from)))
     end
   end
 
