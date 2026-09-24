@@ -63,7 +63,7 @@ defmodule ThistleTea.Game.Spell.RadiusTest do
     end
   end
 
-  describe "area aura lifecycle" do
+  describe "apply_spell/4" do
     test "totems snapshot owner modifiers and refresh using their retained radius", %{caster: owner} do
       summon = %{Effects.summon_totem(1, 1, 60_000) | spell_id: 100, health: 5}
       totem = Totems.prepare(%{owner | object: %Object{guid: 2}, unit: %{owner.unit | auras: []}}, owner, summon, 0)
@@ -92,7 +92,7 @@ defmodule ThistleTea.Game.Spell.RadiusTest do
     end
   end
 
-  describe "persistent area effects" do
+  describe "complete/3" do
     test "retains the radius after consuming a modifier charge", %{caster: caster} do
       spell = spell(%Effect{index: 0, type: :persistent_area_aura, aura: :periodic_damage, radius_yards: 10.0})
       casting = %{Cast.new(spell, Target.at({1.0, 2.0, 3.0}), 0) | modifier_holder_ids: [900]}

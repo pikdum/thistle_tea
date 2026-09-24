@@ -82,6 +82,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - mob spawns, combat, navigation, and respawns
 - auto-attacks + class abilities
 - [Chained spells](docs/chain-spells-playtest.md), with per-jump attenuation, spell modifiers, line of sight, injured-friendly selection, and caster bounces
+- [Spell radius modifiers](docs/spell-radius-playtest.md), with area targeting, persistent ground effects, totem inheritance, talent reset, and reconnect acceptance
 - [Combo point builders](docs/combo-points-playtest.md), with Premeditation expiry, talent-generated points, finisher consumption, and single melee proc delivery
 - [Ownerless summoned objects](docs/wild-object-playtest.md), with shared loot, caster-independent lifetimes, linked objects, and environmental trap activation
 - creature-specific melee and ranged attack power from slaying gear and consumables, with weapon-speed scaling and live target debuffs
