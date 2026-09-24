@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Logic.TargetDamage
   alias ThistleTea.Game.Entity.Logic.TargetSpellPower
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.AbsorbBonus
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Chain
   alias ThistleTea.Game.Spell.Coefficient
@@ -654,7 +655,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         do: periodic_done_amount(entity, spell, context, amount) * context.happiness_multiplier,
         else: amount
 
-    trunc(amount * (multiplier || 1.0))
+    trunc(amount * (multiplier || 1.0) + AbsorbBonus.value(spell, effect, context))
   end
 
   defp periodic_done_amount(entity, %Spell{} = spell, %CastContext{} = context, amount) do

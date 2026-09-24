@@ -47,11 +47,11 @@ defmodule ThistleTea.Game.Spell.Coefficient do
     cast_time_for_bonus(spell, damage_type) / 3500 * dot_factor
   end
 
-  defp level_penalty(%Spell{spell_level: spell_level}) when is_integer(spell_level) and spell_level in 1..20 do
+  def level_penalty(%Spell{spell_level: spell_level}) when is_integer(spell_level) and spell_level in 1..20 do
     1.0 - (20 - spell_level) * 0.0375
   end
 
-  defp level_penalty(_spell), do: 1.0
+  def level_penalty(_spell), do: 1.0
 
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defp cast_time_for_bonus(%Spell{effects: effects} = spell, damage_type) do
