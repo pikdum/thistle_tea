@@ -657,7 +657,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(6), do: :mod_charm
   defp aura_type(7), do: :mod_fear
   defp aura_type(8), do: :periodic_heal
-  defp aura_type(9), do: :mod_melee_haste
+  defp aura_type(9), do: :mod_attack_speed
   defp aura_type(10), do: :mod_threat
   defp aura_type(11), do: :mod_taunt
   defp aura_type(12), do: :mod_stun

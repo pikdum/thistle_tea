@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AttackPower
+  alias ThistleTea.Game.Entity.Logic.AttackSpeed
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.WeaponDamage
@@ -44,6 +45,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     |> derive_attack_power()
     |> derive_weapon_damage()
     |> derive_happiness_damage()
+    |> AttackSpeed.recompute()
   end
 
   defp derive_happiness_damage(%Unit{base_min_damage: base_min, base_max_damage: base_max} = unit)
@@ -286,43 +288,15 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
 
   defp derive_weapon_damage(%Unit{} = unit) do
     unit
-    |> derive_melee_attack_time()
-    |> derive_ranged_attack_time()
     |> derive_mainhand_damage()
     |> derive_damage(
       :base_offhand_min_damage,
       :base_offhand_max_damage,
       :min_offhand_damage,
       :max_offhand_damage,
-      unit.offhand_attack_time
+      AttackSpeed.base_ms(unit, :offhand)
     )
     |> derive_ranged_damage()
-  end
-
-  defp derive_melee_attack_time(%Unit{class: @druid, shapeshift_form: 1} = unit), do: %{unit | base_attack_time: 1_000}
-
-  defp derive_melee_attack_time(%Unit{class: @druid, shapeshift_form: form} = unit) when form in [5, 8],
-    do: %{unit | base_attack_time: 2_500}
-
-  defp derive_melee_attack_time(%Unit{base_melee_attack_time: base} = unit) when is_number(base) and base > 0 do
-    unarmed? = not AttackPower.creature?(unit) and Disarm.unarmed?(unit)
-    %{unit | base_attack_time: if(unarmed?, do: 2_000, else: base)}
-  end
-
-  defp derive_melee_attack_time(%Unit{} = unit), do: unit
-
-  defp derive_ranged_attack_time(%Unit{base_ranged_attack_time: base} = unit) when is_number(base) and base > 0 do
-    haste = max(equipment_bonus(unit, :ranged_haste) + aura_ranged_haste(unit), 0)
-    %{unit | ranged_attack_time: trunc(base * 100 / (100 + haste))}
-  end
-
-  defp derive_ranged_attack_time(%Unit{} = unit), do: unit
-
-  defp aura_ranged_haste(%Unit{} = unit) do
-    sum_aura_amounts(unit, fn
-      %Aura{type: :mod_ranged_haste, amount: amount} when is_integer(amount) -> amount
-      _aura -> 0
-    end)
   end
 
   defp derive_ranged_damage(%Unit{} = unit) do
@@ -347,7 +321,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
       {base_min * multiplier, base_max * multiplier, equipment_bonus(unit, :ranged_damage)}
     else
       bonus =
-        attack_power_bonus(WeaponDamage.ranged_attack_power(unit), unit.ranged_attack_time) +
+        attack_power_bonus(WeaponDamage.ranged_attack_power(unit), AttackSpeed.base_ms(unit, :ranged)) +
           equipment_bonus(unit, :ranged_damage)
 
       {base_min, base_max, bonus}
@@ -355,18 +329,25 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   end
 
   defp derive_mainhand_damage(%Unit{class: @druid, shapeshift_form: form} = unit) when form in [1, 5, 8] do
-    speed = (unit.base_attack_time || 2000) / 1000
+    speed = AttackSpeed.base_ms(unit, :mainhand) / 1000
     level = min(unit.level || 1, 60)
-    bonus = attack_power_bonus(unit.attack_power, unit.base_attack_time)
+    bonus = attack_power_bonus(unit.attack_power, AttackSpeed.base_ms(unit, :mainhand))
     %{unit | min_damage: level * 0.85 * speed + bonus, max_damage: level * 1.25 * speed + bonus}
   end
 
   defp derive_mainhand_damage(%Unit{} = unit) do
     if not AttackPower.creature?(unit) and is_number(unit.base_melee_attack_time) and Disarm.unarmed?(unit) do
-      bonus = attack_power_bonus(unit.attack_power, unit.base_attack_time)
+      bonus = attack_power_bonus(unit.attack_power, AttackSpeed.base_ms(unit, :mainhand))
       %{unit | min_damage: 1.0 + bonus, max_damage: 2.0 + bonus}
     else
-      derive_damage(unit, :base_min_damage, :base_max_damage, :min_damage, :max_damage, unit.base_attack_time)
+      derive_damage(
+        unit,
+        :base_min_damage,
+        :base_max_damage,
+        :min_damage,
+        :max_damage,
+        AttackSpeed.base_ms(unit, :mainhand)
+      )
     end
   end
 

@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.AttackSpeed
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
@@ -169,7 +170,7 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
   defp trigger_righteousness(entity, %Holder{auras: auras}, victim_guid, spell_id) do
     case Enum.find(auras, &match?(%Aura{index: 0}, &1)) do
       %Aura{amount: amount} when is_integer(amount) ->
-        speed = max((entity.unit.base_attack_time || 2_000) / 1_000, 1.5)
+        speed = max(AttackSpeed.base_ms(entity.unit, :mainhand) / 1_000, 1.5)
         damage = trunc(amount / 87 + (amount / 25 - amount / 87) * ((min(speed, 4.0) - 1.5) / 2.5))
 
         spell = %Spell{

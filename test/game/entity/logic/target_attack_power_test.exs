@@ -205,8 +205,11 @@ defmodule ThistleTea.Game.Entity.Logic.TargetAttackPowerTest do
       base_ranged_min_damage: 0,
       base_ranged_max_damage: 0,
       base_attack_time: 2_000,
+      base_melee_attack_time: 2_000,
       offhand_attack_time: 1_400,
+      base_offhand_attack_time: 1_400,
       ranged_attack_time: 2_800,
+      base_ranged_attack_time: 2_800,
       auras: []
     }
 

@@ -17,6 +17,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Linked do
     |> Enum.flat_map(&expand(&1, entity, requested, retained, now))
   end
 
+  def active?(%Holder{linked_from: nil}, _holders, _now), do: true
+
+  def active?(%Holder{linked_from: {key, applied_at}}, holders, now) do
+    case Enum.find(holders, &(Holder.key(&1) == key and &1.applied_at == applied_at)) do
+      %Holder{} = parent -> Holder.alive?(parent, now) and active?(parent, holders, now)
+      nil -> false
+    end
+  end
+
   defp expand(%Holder{} = parent, entity, requested, retained, now) do
     children =
       parent

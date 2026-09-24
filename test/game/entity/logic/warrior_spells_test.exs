@@ -724,13 +724,13 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
     test "melee haste slows attack speed when negative" do
       entity = warrior_fixture()
-      entity = %{entity | unit: %{entity.unit | base_attack_time: 2_000}}
+      entity = %{entity | unit: %{entity.unit | base_melee_attack_time: 2_000, base_attack_time: 2_000}}
 
       assert Combat.attack_speed_ms(entity) == 2_000
 
       entity = buffed(entity, 6343, :mod_melee_haste, -11)
 
-      assert Combat.attack_speed_ms(entity) == 2_222
+      assert Combat.attack_speed_ms(entity) == 2_200
     end
 
     test "shield wall cuts damage taken" do

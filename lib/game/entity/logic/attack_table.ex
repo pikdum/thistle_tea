@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AttackDamageTaken
   alias ThistleTea.Game.Entity.Logic.AttackSchool
+  alias ThistleTea.Game.Entity.Logic.AttackSpeed
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.CombatWeapon
@@ -120,8 +121,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
 
   defp attack_power_damage(unit, multipliers) do
     %{
-      mainhand: (unit.base_attack_time || 2_000) / 14_000 * multipliers.mainhand,
-      offhand: (unit.offhand_attack_time || 2_000) / 14_000 * multipliers.offhand
+      mainhand: AttackSpeed.base_ms(unit, :mainhand) / 14_000 * multipliers.mainhand,
+      offhand: AttackSpeed.base_ms(unit, :offhand) / 14_000 * multipliers.offhand
     }
   end
 

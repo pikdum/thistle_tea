@@ -67,6 +67,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Priority do
     :prevent_fleeing,
     :mod_attacker_spell_crit_chance,
     :mod_melee_haste,
+    :mod_attack_speed,
     :mod_attack_power,
     :mod_damage_done,
     :mod_damage_taken,

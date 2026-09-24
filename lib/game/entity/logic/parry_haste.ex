@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.ParryHaste do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AttackSpeed
   alias ThistleTea.Game.Entity.Logic.Combat
 
   def apply(%{internal: %Internal{blackboard: %Blackboard{} = blackboard}} = entity, :parry, now)
@@ -32,9 +33,9 @@ defmodule ThistleTea.Game.Entity.Logic.ParryHaste do
     offhand = remaining(blackboard, :next_offhand_attack_at, now)
 
     if Combat.offhand_damage_range(entity) && offhand < main do
-      {:next_offhand_attack_at, blackboard.combat.next_offhand_attack_at, unit.offhand_attack_time}
+      {:next_offhand_attack_at, blackboard.combat.next_offhand_attack_at, AttackSpeed.base_ms(unit, :offhand)}
     else
-      {:next_attack_at, blackboard.combat.next_attack_at, unit.base_attack_time}
+      {:next_attack_at, blackboard.combat.next_attack_at, AttackSpeed.base_ms(unit, :mainhand)}
     end
   end
 

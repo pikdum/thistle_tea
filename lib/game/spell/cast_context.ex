@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AttackPower
+  alias ThistleTea.Game.Entity.Logic.AttackSpeed
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.CombatSkills
@@ -224,7 +225,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
             weapon_attack_power_included?: AttackPower.creature?(caster.unit),
             weapon_base_min: min_damage,
             weapon_base_max: max_damage,
-            attack_time_ms: caster.unit.ranged_attack_time,
+            attack_time_ms: AttackSpeed.base_ms(caster.unit, :ranged),
             normalized_speed: @normalized_ranged,
             attack_skill: skill.caster_attack_skill,
             weapon_skill_id: skill.weapon_skill_id,
@@ -242,7 +243,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
             weapon_attack_power_included?: AttackPower.creature?(caster.unit),
             weapon_base_min: min_damage,
             weapon_base_max: max_damage,
-            attack_time_ms: caster.unit.base_attack_time,
+            attack_time_ms: AttackSpeed.base_ms(caster.unit, :mainhand),
             normalized_speed: normalized_speed(caster),
             attack_skill: skill.caster_attack_skill,
             weapon_skill_id: skill.weapon_skill_id,

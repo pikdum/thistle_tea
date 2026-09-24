@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgression do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.PetLevel
   alias ThistleTea.Game.Entity.Data.PetProgress
+  alias ThistleTea.Game.Entity.Logic.AttackSpeed
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Experience
@@ -104,7 +105,7 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgression do
   end
 
   defp apply_level(%Mob{unit: %Unit{} = unit} = pet, %PetLevel{} = stats) do
-    speed = (unit.base_attack_time || 2_000) / 1_000
+    speed = AttackSpeed.base_ms(unit, :mainhand) / 1_000
 
     unit =
       %{

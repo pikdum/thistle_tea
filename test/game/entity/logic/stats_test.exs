@@ -278,6 +278,7 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
           level: 60,
           base_strength: 145,
           base_attack_time: 3400,
+          base_melee_attack_time: 3400,
           base_min_damage: 100.0,
           base_max_damage: 150.0,
           equipment_bonuses: %{attack_power: 40},

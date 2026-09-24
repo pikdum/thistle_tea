@@ -88,7 +88,6 @@ defmodule ThistleTea.Game.Entity.Data.Character do
         unit
         | mainhand_weapon: weapon,
           base_melee_attack_time: delay,
-          base_attack_time: delay,
           base_min_damage: weapon_min,
           base_max_damage: weapon_max
       }
@@ -104,7 +103,7 @@ defmodule ThistleTea.Game.Entity.Data.Character do
         %{
           unit
           | offhand_weapon: weapon,
-            offhand_attack_time: positive_or(weapon.delay, @base_attack_time),
+            base_offhand_attack_time: positive_or(weapon.delay, @base_attack_time),
             base_offhand_min_damage: positive_or(weapon.dmg_min1, 0.0),
             base_offhand_max_damage: positive_or(weapon.dmg_max1, 0.0)
         }
@@ -112,7 +111,7 @@ defmodule ThistleTea.Game.Entity.Data.Character do
         %{
           unit
           | offhand_weapon: weapon,
-            offhand_attack_time: @base_attack_time,
+            base_offhand_attack_time: @base_attack_time,
             base_offhand_min_damage: nil,
             base_offhand_max_damage: nil,
             min_offhand_damage: 0.0,
@@ -147,7 +146,6 @@ defmodule ThistleTea.Game.Entity.Data.Character do
           unit
           | ranged_weapon: weapon,
             base_ranged_attack_time: positive_or(weapon.delay, @base_attack_time),
-            ranged_attack_time: positive_or(weapon.delay, @base_attack_time),
             base_ranged_min_damage: positive_or(weapon.dmg_min1, 0.0) + ammo_dps * speed,
             base_ranged_max_damage: positive_or(weapon.dmg_max1, 0.0) + ammo_dps * speed
         }

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   queued on-next-swing spell generate no rage.
   """
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Logic.AttackSpeed
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatWeapon
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -125,8 +126,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
 
   defp trigger_melee_procs(entity, _payload, _spell, _now), do: entity
 
-  defp attack_time_ms(entity, :offhand), do: entity.unit.offhand_attack_time
-  defp attack_time_ms(entity, _hand), do: entity.unit.base_attack_time
+  defp attack_time_ms(entity, :offhand), do: AttackSpeed.base_ms(entity.unit, :offhand)
+  defp attack_time_ms(entity, _hand), do: AttackSpeed.base_ms(entity.unit, :mainhand)
 
   defp mark_reactives(entity, %{outcome: :dodge, victim_guid: victim_guid}, now) do
     Reactive.mark_dodging_target(entity, victim_guid, now)

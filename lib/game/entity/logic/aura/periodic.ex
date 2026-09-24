@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Logic.AttackDamageTaken
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
+  alias ThistleTea.Game.Entity.Logic.Aura.Linked
   alias ThistleTea.Game.Entity.Logic.Aura.Reactions
   alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
@@ -64,7 +65,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
         context = Map.get(contexts, {holder.spell.id, holder.caster_guid, holder.item_source}, holder.cast_context)
         holder = %{holder | cast_context: context}
         was_dead? = Core.dead?(ent)
-        {ent, new_holder, holder_events} = tick_holder(ent, holder, now)
+        {ent, new_holder, holder_events} = tick_active_holder(ent, holder, now)
         events = events ++ holder_events
 
         if Core.dead?(ent) and not was_dead? do
@@ -87,6 +88,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
         {entity, reaction_events} = periodic_taken_reactions(entity, events, now)
         {entity, events ++ transition_events ++ reaction_events}
     end
+  end
+
+  defp tick_active_holder(entity, holder, now) do
+    if Linked.active?(holder, entity.unit.auras, now), do: tick_holder(entity, holder, now), else: {entity, holder, []}
   end
 
   defp periodic_taken_reactions(entity, events, now) do

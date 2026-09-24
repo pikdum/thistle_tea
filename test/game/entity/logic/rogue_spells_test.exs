@@ -438,7 +438,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
         effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_melee_haste, base_points: 20}]
       }
 
-      entity = %{rogue() | unit: %{rogue().unit | base_attack_time: 2_000}}
+      entity = %{rogue() | unit: %{rogue().unit | base_melee_attack_time: 2_000, base_attack_time: 2_000}}
       {entity, _events} = Aura.apply_spell(entity, 5, 60, slice_and_dice, 1_000)
       assert Combat.attack_speed_ms(entity) == 1_666
     end

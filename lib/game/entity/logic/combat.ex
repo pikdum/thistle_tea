@@ -41,23 +41,15 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   @chase_distance_inset 0.5
   @chase_rechase_range_factor 0.75
 
-  def attack_speed_ms(%{unit: %Unit{base_attack_time: attack_time}} = entity)
-      when is_integer(attack_time) and attack_time > 0 do
-    haste = Aura.flat_amount(entity, :mod_melee_haste)
-
-    if haste == 0 do
-      attack_time
-    else
-      trunc(attack_time * 100 / max(100 + haste, 1))
-    end
+  def attack_speed_ms(%{unit: %Unit{base_attack_time: attack_time}}) when is_integer(attack_time) and attack_time > 0 do
+    attack_time
   end
 
   def attack_speed_ms(_entity), do: @default_attack_speed_ms
 
-  def offhand_attack_speed_ms(%{unit: %Unit{offhand_attack_time: attack_time}} = entity)
+  def offhand_attack_speed_ms(%{unit: %Unit{offhand_attack_time: attack_time}})
       when is_integer(attack_time) and attack_time > 0 do
-    haste = Aura.flat_amount(entity, :mod_melee_haste)
-    trunc(attack_time * 100 / max(100 + haste, 1))
+    attack_time
   end
 
   def offhand_attack_speed_ms(_entity), do: nil

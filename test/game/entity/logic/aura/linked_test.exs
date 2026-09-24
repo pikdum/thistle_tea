@@ -127,6 +127,18 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.LinkedTest do
     end
   end
 
+  describe "tick/2" do
+    test "expired parents cannot produce a late child tick", %{character: character, parent: parent, child: child} do
+      damage = %Effect{index: 0, type: :apply_aura, aura: :periodic_damage, base_points: 100, amplitude_ms: 1_000}
+      child = %{child | effects: [damage], school: :shadow}
+      parent = %{parent | duration_ms: 1_000, linked_auras: [child]}
+      {active, _} = Aura.apply_spell(character, 1, 60, parent, 1_000)
+      {expired, _} = Aura.tick(active, 3_000)
+      assert expired.unit.health == 1_000
+      assert expired.unit.auras == []
+    end
+  end
+
   defp character_and_spells(_context) do
     character = %Character{
       object: %Object{guid: 1},

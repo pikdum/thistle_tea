@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.ParryHasteTest do
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ParryHaste
+  alias ThistleTea.Game.Entity.Logic.Stats
 
   @now -10_000
 
@@ -68,7 +69,7 @@ defmodule ThistleTea.Game.Entity.Logic.ParryHasteTest do
     test "uses the unmodified weapon period under melee haste" do
       entity = defender(1_000)
       holder = %Holder{auras: [%Aura{type: :mod_melee_haste, amount: 100}]}
-      entity = %{entity | unit: %{entity.unit | auras: [holder]}}
+      entity = %{entity | unit: Stats.recompute(%{entity.unit | auras: [holder]})}
 
       assert Combat.attack_speed_ms(entity) == 1_000
       result = ParryHaste.apply(entity, :parry, @now)
@@ -117,13 +118,23 @@ defmodule ThistleTea.Game.Entity.Logic.ParryHasteTest do
     combat = %{blackboard.combat | next_attack_at: @now + main, next_offhand_attack_at: @now + offhand}
 
     %Mob{
-      unit: %Unit{base_attack_time: 2_000},
+      unit: %Unit{base_attack_time: 2_000, base_melee_attack_time: 2_000},
       internal: %Internal{blackboard: %{blackboard | combat: combat}}
     }
   end
 
   defp dual_wielder(main, offhand) do
     entity = defender(main, offhand)
-    %{entity | unit: %{entity.unit | offhand_attack_time: 1_000, min_offhand_damage: 5, max_offhand_damage: 10}}
+
+    %{
+      entity
+      | unit: %{
+          entity.unit
+          | offhand_attack_time: 1_000,
+            base_offhand_attack_time: 1_000,
+            min_offhand_damage: 5,
+            max_offhand_damage: 10
+        }
+    }
   end
 end

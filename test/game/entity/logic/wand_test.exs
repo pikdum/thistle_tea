@@ -209,6 +209,7 @@ defmodule ThistleTea.Game.Entity.Logic.WandTest do
       normal_resistance: 10_000,
       ranged_weapon: wand,
       ranged_attack_time: 1_500,
+      base_ranged_attack_time: 1_500,
       base_ranged_min_damage: 100,
       base_ranged_max_damage: 100,
       base_min_damage: 1_000,
