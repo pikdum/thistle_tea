@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Aura do
   defstruct [
     :index,
     :type,
+    :appearance,
     :amount,
     :misc_value,
     :multiple_value,

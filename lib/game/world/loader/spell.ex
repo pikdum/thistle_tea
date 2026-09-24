@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
+  alias ThistleTea.Game.World.Loader.SpellAppearance
   alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride, as: SpellEffectOverrideLoader
   alias ThistleTea.Game.World.Loader.SpellObjectTarget, as: SpellObjectTargetLoader
@@ -411,6 +412,12 @@ defmodule ThistleTea.Game.World.Loader.Spell do
             float_field(mod, :effect_real_points_per_level, row, :"effect_real_points_per_level_#{index}") || 0.0,
           points_per_combo: float_field(mod, :effect_points_per_combo, row, :"effect_points_per_combo_#{index}") || 0.0,
           aura: aura,
+          appearance:
+            SpellAppearance.load(
+              aura,
+              int_field(mod, :effect_misc_value, row, :"effect_misc_value_#{index}") || 0,
+              row.id
+            ),
           amplitude_ms: effect_amplitude(mod, row, index),
           misc_value: effect_misc_value(mod, row, index, type, aura),
           multiple_value: float_field(mod, :effect_multiple_value, row, :"effect_multiple_values_#{index}") || 0.0,

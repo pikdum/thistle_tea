@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.World.PresenceTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Model
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -82,6 +84,52 @@ defmodule ThistleTea.Game.World.PresenceTest do
   end
 
   describe "sync/2" do
+    test "publishes transformed reach and restores native geometry" do
+      character = character(WorldRef.open(0), {1.0, 2.0, 3.0, 0.0}, 12)
+
+      character = %{
+        character
+        | unit: %Unit{
+            health: 100,
+            max_health: 100,
+            level: 60,
+            auras: [],
+            display_id: 49,
+            native_display_id: 49,
+            bounding_radius: 0.389,
+            combat_reach: 1.5,
+            base_bounding_radius: 0.389,
+            base_combat_reach: 1.5
+          }
+      }
+
+      on_exit(fn -> Presence.leave(character) end)
+      Presence.enter(character, %{})
+
+      spell = %Spell{
+        id: 900_070,
+        duration_ms: 1_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :transform,
+            appearance: %Model{display_id: 100, scale: 2.0, bounding_radius: 0.6, combat_reach: 2.5}
+          }
+        ]
+      }
+
+      {transformed, _events} = Aura.apply_spell(character, character.object.guid, 60, spell, 1_000)
+      Presence.sync(transformed, %{combat_reach: 1.5})
+
+      assert Metadata.query(character.object.guid, [:display_id, :scale_x, :bounding_radius, :combat_reach]) ==
+               %{display_id: 100, scale_x: 2.0, bounding_radius: 1.2, combat_reach: 5.0}
+
+      {restored, _events} = Aura.expire_due(transformed, 2_000)
+      Presence.sync(restored, %{})
+      assert Metadata.query(character.object.guid, [:display_id, :combat_reach]) == %{display_id: 49, combat_reach: 1.5}
+    end
+
     test "publishes and clears form restrictions from the owner's current state" do
       character = character(WorldRef.open(0), {1.0, 2.0, 3.0, 0.0}, 12)
       on_exit(fn -> Presence.leave(character) end)

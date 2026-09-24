@@ -42,6 +42,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.AI.TickPlan
+  alias ThistleTea.Game.Entity.Logic.Appearance
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
@@ -1372,6 +1373,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(state)
         }
         |> Map.merge(FactionLoader.metadata(state.unit.faction_template))
+        |> Map.merge(Appearance.metadata(state))
         |> Map.merge(control_metadata(state))
         |> Map.put(:proximity_aggro?, Mob.proximity_aggro?(state))
         |> Map.put(:no_spell_defense?, CreatureFlags.has?(state, :no_spell_defense))

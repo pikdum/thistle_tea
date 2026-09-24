@@ -24,4 +24,19 @@ defmodule ThistleTea.Game.World.Loader.ModelGeometryTest do
       assert ModelGeometry.height(999, table) == 2.0
     end
   end
+
+  describe "load_addons/2" do
+    test "normalizes reach and radius and retains display scale" do
+      table = :ets.new(:geometry, [:set])
+      ModelGeometry.load([%{id: 59, collision_height: 1.653, model_scale: 1.0, display_scale: 1.35}], table)
+      addons = [%{display_id: 59, bounding_radius: 0.405, combat_reach: 2.025}]
+      ModelGeometry.load_addons(addons, table)
+      model = ModelGeometry.get(59, table)
+      assert_in_delta model.scale, 1.35, 0.001
+      assert_in_delta model.bounding_radius, 0.3, 0.001
+      assert_in_delta model.combat_reach, 1.5, 0.001
+      ModelGeometry.load_addons(addons, table)
+      assert ModelGeometry.get(59, table) == model
+    end
+  end
 end

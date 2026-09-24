@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Spell.Effect do
     :real_points_per_level,
     :points_per_combo,
     :aura,
+    :appearance,
     :amplitude_ms,
     :misc_value,
     :multiple_value,

@@ -587,6 +587,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     %Aura{
       index: effect.index,
       type: effect.aura,
+      appearance: effect.appearance,
       amount: modified_aura_amount(entity, spell, effect, amount_override, context),
       misc_value: effect.misc_value,
       multiple_value: transfer_multiplier(effect, context),

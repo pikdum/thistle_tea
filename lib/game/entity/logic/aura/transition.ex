@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Appearance
   alias ThistleTea.Game.Entity.Logic.Aura.Capacity
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.ControlSync
@@ -86,6 +87,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     entity =
       entity
       |> put_holders(holders)
+      |> Appearance.reconcile_equipment(previous, holders)
       |> TauntSync.sync(previous, holders)
       |> ComboPoints.expire(removed, cause)
       |> MountSync.sync(previous, holders)

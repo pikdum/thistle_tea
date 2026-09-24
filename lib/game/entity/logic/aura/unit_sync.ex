@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Appearance
   alias ThistleTea.Game.Entity.Logic.Aura.PowerCostSync
   alias ThistleTea.Game.Entity.Logic.CombatControl
   alias ThistleTea.Game.Entity.Logic.Empathy
@@ -35,9 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
     |> Stats.recompute()
     |> PowerCostSync.sync()
     |> Empathy.sync()
-    |> sync_native_display()
-    |> sync_shapeshift_display()
-    |> sync_transform()
+    |> Appearance.sync_unit()
     |> sync_disarm()
     |> CombatControl.sync()
     |> sync_unattackable()
@@ -87,25 +86,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
     Enum.find(range, &(not MapSet.member?(used, &1)))
   end
 
-  defp sync_transform(%Unit{auras: holders} = unit) when is_list(holders) do
-    transform =
-      holders
-      |> Enum.flat_map(fn %Holder{auras: auras} -> auras end)
-      |> Enum.find(fn %Aura{type: type, misc_value: misc} -> type == :transform and is_integer(misc) and misc > 0 end)
-
-    case transform do
-      %Aura{misc_value: display_id} -> %{unit | display_id: display_id}
-      _ -> unit
-    end
-  end
-
-  defp sync_transform(unit), do: unit
-
-  defp sync_native_display(%Unit{native_display_id: native} = unit) when is_integer(native) and native > 0,
-    do: %{unit | display_id: native}
-
-  defp sync_native_display(unit), do: unit
-
   defp sync_shapeshift(%Unit{auras: holders} = unit) when is_list(holders) do
     auras = Enum.flat_map(holders, fn %Holder{auras: auras} -> auras end)
 
@@ -130,22 +110,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
 
   defp sync_druid_power(%Unit{class: 11} = unit, _form), do: %{unit | power_type: 0, power2: 0}
   defp sync_druid_power(unit, _form), do: unit
-
-  defp sync_shapeshift_display(%Unit{shapeshift_form: form, race: race} = unit) do
-    %{unit | display_id: shapeshift_display_id(form, race, unit.display_id)}
-  end
-
-  defp shapeshift_display_id(1, 6, _current), do: 8571
-  defp shapeshift_display_id(1, _race, _current), do: 892
-  defp shapeshift_display_id(3, _race, _current), do: 632
-  defp shapeshift_display_id(4, _race, _current), do: 2428
-  defp shapeshift_display_id(form, 6, _current) when form in [5, 8], do: 2289
-  defp shapeshift_display_id(form, _race, _current) when form in [5, 8], do: 2281
-  defp shapeshift_display_id(16, _race, _current), do: 4613
-  defp shapeshift_display_id(31, 6, _current), do: 15_375
-  defp shapeshift_display_id(31, _race, _current), do: 15_374
-  defp shapeshift_display_id(32, _race, _current), do: 16_031
-  defp shapeshift_display_id(_form, _race, current), do: current
 
   defp sync_disarm(%Unit{auras: holders} = unit) when is_list(holders) do
     disarmed? = Enum.any?(holders, &Holder.has_aura_type?(&1, :mod_disarm))

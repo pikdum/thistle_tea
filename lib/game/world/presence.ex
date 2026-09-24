@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.Presence do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Appearance
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
@@ -77,6 +78,7 @@ defmodule ThistleTea.Game.World.Presence do
       group_id: group_id(character.object.guid)
     }
     |> Map.put(:owner_guid, PlayerPossession.controller(character))
+    |> Map.merge(Appearance.metadata(character))
     |> Map.merge(faction_metadata(character))
   end
 

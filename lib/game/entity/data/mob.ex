@@ -77,6 +77,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       misc_flags: ct.extra_flags,
       bounding_radius: mob_bounding_radius(display_info_addon, effective_scale),
       combat_reach: mob_combat_reach(display_info_addon, effective_scale),
+      base_bounding_radius: mob_bounding_radius(display_info_addon, effective_scale),
+      base_combat_reach: mob_combat_reach(display_info_addon, effective_scale),
       display_id: c.modelid,
       native_display_id: c.modelid,
       min_damage: min_damage,

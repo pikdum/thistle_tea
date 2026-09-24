@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.Loader.Character do
   alias ThistleTea.Game.Entity.Data.HomeBind
   alias ThistleTea.Game.Entity.Data.Taxi.Network, as: TaxiNetwork
   alias ThistleTea.Game.Player.Stats
+  alias ThistleTea.Game.World.Loader.ModelGeometry
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.WorldRef
 
@@ -37,10 +38,13 @@ defmodule ThistleTea.Game.World.Loader.Character do
         1 -> chr_race.female_display
       end
 
+    model = ModelGeometry.get(unit_display_id)
+
     %Character{
       account_id: account_id,
       object: %Object{
-        scale_x: 1.0
+        scale_x: model.scale,
+        base_scale_x: model.scale
       },
       unit: %Unit{
         health: stats.max_health,
@@ -67,8 +71,10 @@ defmodule ThistleTea.Game.World.Loader.Character do
         base_offhand_attack_time: 2000,
         min_offhand_damage: 0.0,
         max_offhand_damage: 0.0,
-        bounding_radius: Unit.default_bounding_radius(),
-        combat_reach: Unit.default_combat_reach(),
+        bounding_radius: model.bounding_radius * model.scale,
+        combat_reach: model.combat_reach * model.scale,
+        base_bounding_radius: model.bounding_radius * model.scale,
+        base_combat_reach: model.combat_reach * model.scale,
         display_id: unit_display_id,
         native_display_id: unit_display_id,
         min_damage: 10,

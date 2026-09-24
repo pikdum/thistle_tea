@@ -339,6 +339,7 @@ defmodule ThistleTea.Application do
         MapTemplateLoader.load_all()
         GraveyardLoader.load_all()
         ModelGeometryLoader.load_all()
+        ModelGeometryLoader.load_all_addons()
         TransportLoader.load_all()
         SpellEffectOverrideLoader.load_all()
         SpellLoader.load_target_positions()

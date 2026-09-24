@@ -5,8 +5,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ObjectSync do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Appearance
 
-  def sync(%{object: %Object{} = object, unit: %Unit{auras: holders}} = entity) when is_list(holders) do
+  def sync(%{object: %Object{}, unit: %Unit{auras: holders}} = entity) when is_list(holders) do
     scale_multiplier =
       Enum.reduce(holders, 1.0, fn %Holder{auras: auras}, multiplier ->
         Enum.reduce(auras, multiplier, fn
@@ -15,8 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ObjectSync do
         end)
       end)
 
-    object = %{object | scale_x: (object.base_scale_x || 1.0) * scale_multiplier}
-    %{entity | object: object}
+    Appearance.project(entity, scale_multiplier)
   end
 
   def sync(entity), do: entity

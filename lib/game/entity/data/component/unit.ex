@@ -49,6 +49,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Unit do
     ranged_attack_time: {0x0080, 1, :int, :private},
     bounding_radius: {0x0081, 1, :float},
     combat_reach: {0x0082, 1, :float},
+    base_bounding_radius: :virtual,
+    base_combat_reach: :virtual,
     display_id: {0x0083, 1, :int},
     native_display_id: {0x0084, 1, :int},
     mount_display_id: {0x0085, 1, :int},
