@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Player.Gossip do
   alias ThistleTea.Game.Player.Taxi
   alias ThistleTea.Game.Player.Vendor
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
@@ -53,7 +54,7 @@ defmodule ThistleTea.Game.Player.Gossip do
     if Reputation.can_interact?(character, guid) do
       quests = quest_items(guid, character)
 
-      case GossipLoader.menu_for_creature(Guid.entry(guid)) do
+      case GossipLoader.menu_for_creature(World.entry(guid)) do
         %Menu{} = menu -> send_menu(guid, menu, quests, state)
         nil when quests != [] -> send_menu(guid, %Menu{text_id: @default_gossip_text_id, options: []}, quests, state)
         nil -> Vendor.list(state, guid)
@@ -67,7 +68,7 @@ defmodule ThistleTea.Game.Player.Gossip do
 
   def hello_game_object(%{character: %Character{} = character} = state, guid) do
     with true <- QuestGiver.interactable?(character, guid),
-         template = GameObjectTemplateLoader.cached(Guid.entry(guid)),
+         template = GameObjectTemplateLoader.cached(World.entry(guid)),
          {:ok, character} <-
            GameObjectInteraction.prepare_questgiver_use(character, template, Metadata.get(guid)[:go_flags], Time.now()) do
       state = put_object_user(state, character)
@@ -154,7 +155,7 @@ defmodule ThistleTea.Game.Player.Gossip do
       Guid.type_id(guid) != :game_object ->
         true
 
-      match?(%GameObjectTemplate{type: 10}, GameObjectTemplateLoader.cached(Guid.entry(guid))) ->
+      match?(%GameObjectTemplate{type: 10}, GameObjectTemplateLoader.cached(World.entry(guid))) ->
         GameObjects.interactable?(character, guid)
 
       true ->
@@ -282,7 +283,7 @@ defmodule ThistleTea.Game.Player.Gossip do
 
   defp submenu_quests(guid, menu_id, character) do
     if Guid.type_id(guid) == :game_object do
-      template = GameObjectTemplateLoader.cached(Guid.entry(guid))
+      template = GameObjectTemplateLoader.cached(World.entry(guid))
       if template && Enum.at(template.data, 3, 0) == menu_id, do: quest_items(guid, character), else: []
     else
       quest_items(guid, character)
@@ -301,7 +302,7 @@ defmodule ThistleTea.Game.Player.Gossip do
         case option.option_id do
           ^trainer ->
             GossipLoader.trainer_of?(
-              Guid.entry(npc_guid),
+              World.entry(npc_guid),
               unit.class,
               unit.race,
               Reputation.exalted_with?(character, npc_guid)
@@ -334,7 +335,7 @@ defmodule ThistleTea.Game.Player.Gossip do
   defp creature_flag_allowed?(%Option{npc_flag: npc_flag}, _npc_guid) when npc_flag in [nil, 0], do: true
 
   defp creature_flag_allowed?(%Option{npc_flag: npc_flag}, npc_guid) do
-    GossipLoader.npc_flags(Guid.entry(npc_guid))
+    GossipLoader.npc_flags(World.entry(npc_guid))
     |> Bitwise.band(npc_flag)
     |> Kernel.!=(0)
   end
@@ -345,7 +346,7 @@ defmodule ThistleTea.Game.Player.Gossip do
     do: GossipCondition.allows?(context, condition, policy)
 
   defp condition_context(character, npc_guid, conditions) do
-    source = %Subject{guid: npc_guid, kind: :creature, entry: Guid.entry(npc_guid)}
+    source = %Subject{guid: npc_guid, kind: :creature, entry: World.entry(npc_guid)}
     ConditionContext.build(character, conditions, source: source)
   end
 

@@ -11,7 +11,6 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
-  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
@@ -28,7 +27,7 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
   @interaction_range 10.0
 
   def battlemaster_hello(%{ready: true, character: %Character{} = character} = state, guid) do
-    entry = Guid.entry(guid)
+    entry = World.entry(guid)
 
     if BattlegroundLoader.battlemaster?(entry) and nearby?(character, guid) do
       template = BattlegroundLoader.template_for_battlemaster(entry)
@@ -378,7 +377,7 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
   end
 
   defp spirit_guide?(character, guid) do
-    Guid.entry(guid) in BattlegroundLoader.spirit_guide_entries(character.internal.world.map_id) and
+    World.entry(guid) in BattlegroundLoader.spirit_guide_entries(character.internal.world.map_id) and
       nearby?(character, guid)
   end
 end

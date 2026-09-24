@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CombatLeashes
   alias ThistleTea.Game.World.InstanceData
+  alias ThistleTea.Game.World.Loader.CreatureArchetype, as: CreatureArchetypeLoader
   alias ThistleTea.Game.World.Loader.Waypoint, as: WaypointLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
@@ -79,7 +80,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       instance_data: instance_data(entity, requirements, options),
       formation: FormationEnvironment.snapshot(entity, now),
       shared_leash_time: CombatLeashes.last_extended_at(entity),
-      aura_contexts: SpellReception.aura_contexts(entity, now)
+      aura_contexts: SpellReception.aura_contexts(entity, now),
+      creature_archetypes: creature_archetypes(entity, request.creature_entries)
     }
   end
 
@@ -270,6 +272,25 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     (request.script_conditions ++ event_ai_conditions(entity) ++ waypoint_conditions(entity))
     |> Enum.uniq()
   end
+
+  defp creature_archetypes(entity, requested) do
+    event_steps = entity |> EventAI.events() |> Enum.flat_map(&List.flatten(&1.actions))
+    route_steps = waypoint_steps(entity)
+    entries = requested ++ Script.creature_entries(event_steps ++ route_steps)
+    CreatureArchetypeLoader.get_many(entries)
+  end
+
+  defp waypoint_steps(%Mob{} = entity) do
+    case waypoint_route(entity) do
+      %WaypointRoute{points: points} when is_map(points) ->
+        points |> Map.values() |> Enum.flat_map(& &1.script_steps)
+
+      _ ->
+        []
+    end
+  end
+
+  defp waypoint_steps(_entity), do: []
 
   defp event_ai_conditions(%Mob{} = entity), do: EventAI.conditions(entity)
   defp event_ai_conditions(_entity), do: []

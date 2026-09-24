@@ -134,7 +134,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.EntityContext do
     %Subject{
       guid: guid,
       kind: Guid.entity_type(guid),
-      entry: Guid.entry(guid),
+      entry: Perception.entry(perception, guid),
       position: Perception.position(perception, guid),
       level: Map.get(metadata, :level),
       race: Map.get(metadata, :race),

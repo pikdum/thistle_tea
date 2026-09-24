@@ -33,6 +33,15 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.World.System.Weather
   alias ThistleTea.Game.WorldRef
 
+  def entry(%{object: %{entry: entry}}), do: entry
+
+  def entry(guid) when is_integer(guid) do
+    case Metadata.query(guid, [:entry]) do
+      %{entry: entry} when is_integer(entry) -> entry
+      _ -> Guid.entry(guid)
+    end
+  end
+
   def nearby_players(entity, range \\ 250) do
     case position(entity, Time.now()) do
       {world, x, y, z} -> nearby_units_exact(:players, world, {x, y, z}, range)

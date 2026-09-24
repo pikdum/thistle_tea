@@ -42,7 +42,7 @@ defmodule ThistleTea.Game.Player.TalentReset do
   @visual_spell 14_867
 
   def available?(%Character{unit: %{class: class, level: level}}, trainer) when is_integer(level) and level >= 10,
-    do: Gossip.class_trainer?(Guid.entry(trainer), class)
+    do: Gossip.class_trainer?(World.entry(trainer), class)
 
   def available?(_character, _trainer), do: false
 

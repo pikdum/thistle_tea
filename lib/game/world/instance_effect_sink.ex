@@ -105,7 +105,7 @@ defmodule ThistleTea.Game.World.InstanceEffectSink do
     world
     |> guids.()
     |> Enum.filter(fn guid ->
-      Guid.entity_type(guid) == entity_type and (is_nil(entry) or Guid.entry(guid) == entry)
+      Guid.entity_type(guid) == entity_type and (is_nil(entry) or World.entry(guid) == entry)
     end)
   end
 

@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionEvaluator
   alias ThistleTea.Game.Entity.Logic.Condition.EntityContext
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.CreatureEntry
   alias ThistleTea.Game.Entity.Logic.CreatureGroup.Member
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
@@ -222,7 +223,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
       perception
       |> Perception.nearby(:mobs, positive_radius(radius, @default_buddy_radius))
       |> Enum.any?(fn {guid, _distance} ->
-        Guid.entry(guid) == entry and alive_observation?(perception, guid)
+        Perception.entry(perception, guid) == entry and alive_observation?(perception, guid)
       end)
 
     if (option == 0 and not found?) or (option == 1 and found?) do
@@ -282,6 +283,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :move_to, datalong: 0} = step, _target, _now, %Context{}) do
     {__MODULE__.MoveTo.apply(state, step), blackboard}
+  end
+
+  defp execute(
+         %Mob{} = state,
+         blackboard,
+         %ScriptStep{command: :update_entry} = step,
+         _target,
+         now,
+         %Context{} = context
+       ) do
+    template = Random.weighted_choice(context.random, Map.get(context.creature_archetypes, step.datalong, []))
+    updated = CreatureEntry.apply(state, template, now)
+
+    blackboard =
+      if updated.internal.creature.spells == state.internal.creature.spells,
+        do: blackboard,
+        else: %{blackboard | spells: %{blackboard.spells | timers: nil, next_list_at: 0}}
+
+    {updated, blackboard}
   end
 
   defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :teleport_to} = step, _target_guid, now, %Context{}) do
@@ -391,7 +411,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp execute(
-         %Mob{internal: %{spawn: %{unit: default_unit}}} = state,
+         %Mob{} = state,
          blackboard,
          %ScriptStep{command: :set_equipment, datalong: reset_default},
          _target,
@@ -399,7 +419,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
          %Context{}
        )
        when reset_default != 0 do
-    state = %{state | unit: ScriptEquipment.reset(state.unit, default_unit)}
+    state = ScriptEquipment.reset(state)
     {Core.mark_broadcast_update(state), blackboard}
   end
 
@@ -1537,6 +1557,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   def conditions(_steps), do: []
 
+  def creature_entries(steps) when is_list(steps) do
+    Enum.flat_map(steps, fn %ScriptStep{} = step ->
+      own = if step.command == :update_entry, do: [step.datalong], else: []
+      nested = step.sub_scripts |> Map.values() |> List.flatten() |> creature_entries()
+      own ++ nested
+    end)
+    |> Enum.uniq()
+  end
+
   def target_requests(steps) when is_list(steps) do
     steps
     |> Enum.flat_map(fn
@@ -1650,7 +1679,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     candidates =
       perception
       |> Perception.nearby(:mobs, range)
-      |> Enum.filter(fn {guid, _distance} -> guid != self_guid and Guid.entry(guid) == entry end)
+      |> Enum.filter(fn {guid, _distance} -> guid != self_guid and Perception.entry(perception, guid) == entry end)
 
     case {target_type, candidates} do
       {_target_type, []} -> nil
@@ -1671,7 +1700,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     candidates =
       perception
       |> Perception.nearby(:game_objects, range)
-      |> Enum.filter(fn {guid, _distance} -> guid != self_guid and Guid.entry(guid) == entry end)
+      |> Enum.filter(fn {guid, _distance} -> guid != self_guid and Perception.entry(perception, guid) == entry end)
 
     case {target_type, candidates} do
       {_target_type, []} -> nil

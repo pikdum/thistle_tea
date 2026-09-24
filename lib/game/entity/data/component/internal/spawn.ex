@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Spawn do
   """
   defstruct [
     :unit,
+    :original_template,
     :movement_block,
     :position,
     :home_orientation,

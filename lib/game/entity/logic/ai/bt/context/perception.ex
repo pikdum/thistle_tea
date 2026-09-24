@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception do
   """
 
   alias __MODULE__.Observation
+  alias ThistleTea.Game.Guid
 
   @enforce_keys [:now, :origin, :entities, :nearby]
   defstruct [:now, :origin, :entities, :nearby]
@@ -54,6 +55,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception do
     case observation(perception, guid) do
       %Observation{metadata: metadata} -> metadata
       nil -> nil
+    end
+  end
+
+  def entry(%__MODULE__{} = perception, guid) do
+    case metadata(perception, guid) do
+      %{entry: entry} when is_integer(entry) -> entry
+      _ -> Guid.entry(guid)
     end
   end
 

@@ -15,6 +15,7 @@ defmodule ThistleTea.DevSeed do
   vendor and spirit healer support equipment wear and resurrection testing.
   Two copies of Plugger Spazzring support limited-stock merchant testing.
   A door, lever, incantation, mortar, and stink bombs support object use and activation spells.
+  A Land Walker supports Zorbin's Ultra-Shrinker and creature transformation testing.
   """
   import Ecto.Query
 
@@ -300,6 +301,7 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(9499, @base_low_guid + 1200, {x + 8.0, y - 4.0, z}, nil, @respawn_secs)
     spawn_mob(9499, @base_low_guid + 1201, {x + 14.0, y - 4.0, z}, nil, @respawn_secs)
     spawn_mob(3639, @base_low_guid + 1300, {x + 20.0, y + 36.0, z}, nil, @respawn_secs)
+    spawn_mob(5357, @base_low_guid + 1400, {x + 40.0, y - 40.0, z}, nil, @hostile_respawn_secs)
   end
 
   defp seed_game_objects do

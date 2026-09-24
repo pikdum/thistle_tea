@@ -29,4 +29,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context.Random do
   end
 
   def choice(%__MODULE__{}, []), do: nil
+
+  def weighted_choice(%__MODULE__{} = random, [_ | _] = choices) do
+    total = Enum.reduce(choices, 0, fn {weight, _value}, sum -> sum + weight end)
+    roll = float(random) * total
+
+    Enum.reduce_while(choices, 0, fn {weight, value}, sum ->
+      if roll < sum + weight, do: {:halt, value}, else: {:cont, sum + weight}
+    end)
+  end
+
+  def weighted_choice(%__MODULE__{}, []), do: nil
 end

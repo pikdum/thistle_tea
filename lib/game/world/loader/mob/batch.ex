@@ -37,6 +37,14 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
     |> List.first()
   end
 
+  def load_definitions(creatures) when is_list(creatures) do
+    creatures
+    |> attach_class_level_stats()
+    |> attach_display_data()
+    |> attach_equipment()
+    |> attach_spells()
+  end
+
   defp select_template_entries(creatures) do
     Enum.map(creatures, fn creature ->
       %{creature | id: creature |> template_pool() |> Enum.random()}
@@ -325,10 +333,10 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
     prepared =
       Enum.map(creatures, fn creature ->
         list = Map.get(lists, creature.creature_template.spell_list_id, [])
-        addon_ids = addon_aura_ids(creature, addons)
+        {addon_source, addon_ids} = addon_auras(creature, addons)
 
         %{
-          creature: creature,
+          creature: %{creature | addon_source: addon_source},
           list: list,
           addon_ids: addon_ids,
           spell_ids:
@@ -423,15 +431,14 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
     }
   end
 
-  defp addon_aura_ids(creature, addons) do
+  defp addon_auras(creature, addons) do
     case Map.get(addons, creature.guid) do
       %Mangos.CreatureAddon{auras: auras} = row when is_binary(auras) and auras != "" ->
-        Mangos.CreatureAddon.aura_ids(row)
+        {:spawn, Enum.uniq(Mangos.CreatureAddon.aura_ids(row))}
 
       _ ->
-        AddonAuras.parse(creature.creature_template.auras)
+        {:template, Enum.uniq(AddonAuras.parse(creature.creature_template.auras))}
     end
-    |> Enum.uniq()
   end
 
   defp script_cast_spell_ids(creature) do

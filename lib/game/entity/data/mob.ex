@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.CreatureEntry
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.MovementStats
@@ -160,6 +161,13 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         invincibility_health_threshold: CreatureFlags.invincibility_threshold(ct.creature_type_flags),
         creature: %Creature{
           db_guid: c.guid,
+          addon_source: c.addon_source,
+          spell_list_id: ct.spell_list_id,
+          template_unit_flags: unit.flags,
+          default_equipment: %{
+            virtual_item_slot_display: virtual_item_slot_display,
+            virtual_item_info: virtual_item_info
+          },
           experience_multiplier: experience_multiplier(ct),
           extra_flags: ct.extra_flags,
           static_flags: ct.creature_type_flags,
@@ -280,10 +288,18 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   def proximity_aggro?(%__MODULE__{}), do: true
 
   def visibility_metadata(%__MODULE__{
+        object: object,
         unit: %Unit{} = unit,
-        internal: %Internal{creature: %Creature{} = creature, loot: loot}
+        internal: %Internal{creature: %Creature{} = creature, loot: loot, name: name}
       }) do
     %{
+      entry: object.entry,
+      name: name,
+      display_id: unit.display_id,
+      bounding_radius: unit.bounding_radius,
+      combat_reach: unit.combat_reach,
+      tameable?: ((creature.type_flags || 0) &&& @creature_type_flag_tameable) != 0,
+      detection_range: creature.detection_range,
       db_guid: creature.db_guid,
       npc_flags: unit.npc_flags || 0,
       spirit_service?: ((unit.npc_flags || 0) &&& @npc_flag_spirit_service) != 0,
@@ -296,7 +312,11 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
     }
   end
 
-  def respawn(%__MODULE__{internal: %Internal{} = internal} = mob) do
+  def visibility_metadata(%__MODULE__{}), do: %{}
+
+  def respawn(%__MODULE__{} = mob) do
+    mob = CreatureEntry.restore(mob)
+    internal = mob.internal
     spawn_state = internal.spawn || %Spawn{}
     loot = internal.loot || %Loot{}
 

@@ -76,7 +76,7 @@ defmodule ThistleTea.Game.Player.Vendor do
   end
 
   def visible_items(%Character{} = character, vendor_guid) do
-    items = VendorLoader.items(Guid.entry(vendor_guid))
+    items = VendorLoader.items(World.entry(vendor_guid))
     conditions = Enum.map(items, &condition_of/1)
 
     visible = condition_visible_items(character, vendor_guid, items, conditions)
@@ -96,7 +96,7 @@ defmodule ThistleTea.Game.Player.Vendor do
   end
 
   defp condition_context(character, vendor_guid, conditions) do
-    source = %Subject{guid: vendor_guid, kind: :mob, entry: Guid.entry(vendor_guid), alive?: true}
+    source = %Subject{guid: vendor_guid, kind: :mob, entry: World.entry(vendor_guid), alive?: true}
     ConditionContext.build(character, conditions, source: source)
   end
 

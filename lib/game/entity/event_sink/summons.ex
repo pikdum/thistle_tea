@@ -17,7 +17,6 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
-  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Cooldowns
@@ -284,7 +283,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
           kind: effect.kind,
           entity_ref: %EntityRef{
             guid: effect.target_guid,
-            entry: Guid.entry(effect.target_guid),
+            entry: World.entry(effect.target_guid),
             spell_id: effect.spell_id
           },
           pid: controlled_pid,
@@ -492,7 +491,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
       map
       |> World.nearby_mobs_at({x, y, z}, range)
       |> Enum.count(fn {guid, _distance} ->
-        Guid.entry(guid) == entry and (count_dead? or summon_alive?(guid))
+        World.entry(guid) == entry and (count_dead? or summon_alive?(guid))
       end)
 
     existing < limit

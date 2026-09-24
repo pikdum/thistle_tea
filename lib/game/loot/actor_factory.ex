@@ -131,7 +131,7 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
     %Subject{
       guid: guid,
       kind: Guid.entity_type(guid),
-      entry: Guid.entry(guid),
+      entry: World.entry(guid),
       db_guid: loot_db_guid(guid),
       position: position,
       map_id: map_id,

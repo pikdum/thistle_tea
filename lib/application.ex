@@ -31,6 +31,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Loader.BroadcastText, as: BroadcastTextLoader
   alias ThistleTea.Game.World.Loader.ClassSpell, as: ClassSpellLoader
+  alias ThistleTea.Game.World.Loader.CreatureArchetype, as: CreatureArchetypeLoader
   alias ThistleTea.Game.World.Loader.CreatureGroup, as: CreatureGroupLoader
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
@@ -206,6 +207,7 @@ defmodule ThistleTea.Application do
     ReputationLoader.init()
     GossipLoader.init()
     CreatureTemplateLoader.init()
+    CreatureArchetypeLoader.init()
     FactionLoader.init()
     ExplorationLoader.init()
     GameObjectTemplateLoader.init()
@@ -348,6 +350,7 @@ defmodule ThistleTea.Application do
         PetTrainingLoader.load_all()
         PetSpellsLoader.load_all()
         TaxiLoader.load_all()
+        CreatureArchetypeLoader.load_all()
         Logger.info("Starting transports...")
         :ok = Transports.start_all()
         Logger.info("Seeding debug data...")

@@ -13,9 +13,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context.Waypoints do
   def empty, do: new(%{})
   def new(routes) when is_map(routes), do: %__MODULE__{routes: routes}
 
-  def resolve(%__MODULE__{routes: routes}, %{object: %{guid: guid}}, %ScriptStep{command: :start_waypoints} = step) do
+  def resolve(
+        %__MODULE__{routes: routes},
+        %{object: %{guid: guid, entry: entry}},
+        %ScriptStep{command: :start_waypoints} = step
+      ) do
     guid_key = positive_or(step.dataint, Guid.low_guid(guid))
-    entry_key = positive_or(step.dataint2, Guid.entry(guid))
+    entry_key = positive_or(step.dataint2, positive_or(entry, Guid.entry(guid)))
 
     route =
       case step.datalong do

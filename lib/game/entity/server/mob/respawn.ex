@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.StealthDetection
@@ -206,6 +207,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       bounding_radius: state.unit.bounding_radius,
       combat_reach: state.unit.combat_reach,
       level: state.unit.level,
+      proximity_aggro?: Mob.proximity_aggro?(state),
+      no_spell_defense?: CreatureFlags.has?(state, :no_spell_defense),
       unit_flags: state.unit.flags,
       incarnation_id: Incarnation.id(state),
       alive?: state.unit.health > 0,

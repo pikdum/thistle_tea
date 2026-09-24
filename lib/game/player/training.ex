@@ -28,7 +28,7 @@ defmodule ThistleTea.Game.Player.Training do
 
   def send_list(%{character: %Character{} = character} = state, trainer_guid) do
     if valid_trainer?(character, trainer_guid) do
-      %{trainer_type: type, spells: spells} = TrainerLoader.trainer_info(Guid.entry(trainer_guid))
+      %{trainer_type: type, spells: spells} = TrainerLoader.trainer_info(World.entry(trainer_guid))
 
       Network.send_packet(%SmsgTrainerList{
         guid: trainer_guid,
@@ -42,7 +42,7 @@ defmodule ThistleTea.Game.Player.Training do
 
   def buy(%{character: %Character{} = character} = state, trainer_guid, spell_id) do
     with true <- valid_trainer?(character, trainer_guid),
-         %TrainerSpell{} = spell <- find_spell(Guid.entry(trainer_guid), spell_id),
+         %TrainerSpell{} = spell <- find_spell(World.entry(trainer_guid), spell_id),
          true <- Trainer.fits_class_race?(spell, character.unit.class, character.unit.race),
          :green <- Trainer.state(spell, character.internal.spells, character.unit.level, character.player.skills),
          price = Reputation.price(character, trainer_guid, spell.cost),
@@ -62,7 +62,7 @@ defmodule ThistleTea.Game.Player.Training do
          false <- Hostility.hostile?(character, guid),
          true <-
            GossipLoader.trainer_of?(
-             Guid.entry(guid),
+             World.entry(guid),
              character.unit.class,
              character.unit.race,
              Reputation.exalted_with?(character, guid)

@@ -243,7 +243,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
 
   defp select_event_target(%Event{targets: targets}, :map_event_extra_target, entry) do
     targets
-    |> Enum.find(fn %Target{guid: guid} -> entry == 0 or Guid.entry(guid) == entry end)
+    |> Enum.find(fn %Target{guid: guid} -> entry == 0 or World.entry(guid) == entry end)
     |> case do
       %Target{guid: guid} -> guid
       nil -> nil
@@ -411,7 +411,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
       {^world, x, y, z} ->
         :mobs
         |> World.nearby_units_exact(world, {x, y, z}, radius)
-        |> Enum.filter(fn {guid, _distance} -> Guid.entry(guid) == entry and (not_self == 0 or guid != target) end)
+        |> Enum.filter(fn {guid, _distance} -> World.entry(guid) == entry and (not_self == 0 or guid != target) end)
         |> Enum.map(&nearby_creature_result(condition, &1, dead))
         |> Result.combine_or()
 
@@ -432,7 +432,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
         result =
           :game_objects
           |> World.nearby_units_exact(world, {x, y, z}, radius)
-          |> Enum.any?(fn {guid, _distance} -> Guid.entry(guid) == entry end)
+          |> Enum.any?(fn {guid, _distance} -> World.entry(guid) == entry end)
 
         Result.truth(result)
 
@@ -581,7 +581,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
 
   defp evaluate_condition(%Condition{type: :source_entry} = condition, _events, _world, source, _target) do
     if is_integer(source) and source > 0 do
-      Result.truth(Guid.entry(source) in [condition.value1, condition.value2, condition.value3, condition.value4])
+      Result.truth(World.entry(source) in [condition.value1, condition.value2, condition.value3, condition.value4])
     else
       Result.unknown(condition, {:missing_fact, :source, :entry})
     end
@@ -726,7 +726,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
     with {world, x, y, z} <- World.position(effect.source_guid) do
       effect.step.datalong2
       |> nearby_targets(world, x, y, z, effect.step.datalong4)
-      |> Enum.filter(fn guid -> effect.step.datalong3 in [0, Guid.entry(guid)] end)
+      |> Enum.filter(fn guid -> effect.step.datalong3 in [0, World.entry(guid)] end)
       |> Enum.each(&run_steps(&1, sub_steps(effect.step, effect.step.datalong), effect.target_guid))
     end
   end

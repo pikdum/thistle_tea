@@ -558,8 +558,8 @@ defmodule ThistleTea.Game.Player.Quests do
     {load_quests(giver_ids(npc_guid)), load_quests(ender_ids(npc_guid))}
   end
 
-  defp giver_ids(guid), do: QuestLoader.given_by(Guid.type_id(guid), Guid.entry(guid))
-  defp ender_ids(guid), do: QuestLoader.ended_by(Guid.type_id(guid), Guid.entry(guid))
+  defp giver_ids(guid), do: QuestLoader.given_by(Guid.type_id(guid), World.entry(guid))
+  defp ender_ids(guid), do: QuestLoader.ended_by(Guid.type_id(guid), World.entry(guid))
 
   def quest_menu(npc_guid, %Character{} = character) do
     {giver_quests, ender_quests} = npc_quests(npc_guid)
@@ -625,7 +625,7 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def credit_kill(%{character: %Character{}} = state, victim_guid) do
-    credit_kill_entry(state, Guid.entry(victim_guid), victim_guid)
+    credit_kill_entry(state, World.entry(victim_guid), victim_guid)
   end
 
   def credit_kill_entry(%{character: %Character{} = character} = state, creature_entry, victim_guid) do
@@ -839,7 +839,7 @@ defmodule ThistleTea.Game.Player.Quests do
          eligible? \\ fn _ -> true end
        ) do
     entity_type = quest_entity_type(target_guid)
-    target_entry = Guid.entry(target_guid)
+    target_entry = World.entry(target_guid)
     player = character.player
     quests = Enum.filter(active_quests(player), eligible?)
 

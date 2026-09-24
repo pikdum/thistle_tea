@@ -1637,7 +1637,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       ObservationRequest.new([target_guid], Script.observation_radius(steps),
         game_object_radius: Script.game_object_observation_radius(steps),
         script_conditions: Script.conditions(steps),
-        script_targets: Script.target_requests(steps)
+        script_targets: Script.target_requests(steps),
+        creature_entries: Script.creature_entries(steps)
       )
 
     context = AIEnvironment.context(character, now, request)
@@ -1891,12 +1892,12 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
     state
     |> maybe_reward_kill_reputation(victim)
-    |> Quests.credit_kill(victim.object.guid)
+    |> Quests.credit_kill_entry(victim.object.entry, victim.object.guid)
     |> maybe_broadcast_update()
   end
 
   defp maybe_reward_kill_reputation(state, %{internal: %Internal{pet: nil}} = victim) do
-    PlayerReputation.reward_kill(state, Guid.entry(victim.object.guid), victim.unit.level)
+    PlayerReputation.reward_kill(state, victim.object.entry, victim.unit.level)
   end
 
   defp maybe_reward_kill_reputation(state, _victim), do: state

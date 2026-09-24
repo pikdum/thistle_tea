@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.ScriptEquipment do
 
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Data.Mob
 
   def apply(%Unit{} = unit, [main_hand, off_hand, ranged]) do
     displays = unpack_displays(unit.virtual_item_slot_display)
@@ -24,11 +25,18 @@ defmodule ThistleTea.Game.Entity.Logic.ScriptEquipment do
     %{unit | virtual_item_slot_display: pack_displays(displays), virtual_item_info: IO.iodata_to_binary(info)}
   end
 
-  def reset(%Unit{} = unit, %Unit{} = default) do
+  def reset(%Mob{internal: %{creature: %{default_equipment: default}}} = mob) when is_map(default),
+    do: %{mob | unit: reset(mob.unit, default)}
+
+  def reset(%Mob{internal: %{spawn: %{unit: %Unit{} = default}}} = mob), do: %{mob | unit: reset(mob.unit, default)}
+
+  def reset(%Mob{} = mob), do: mob
+
+  def reset(%Unit{} = unit, %{virtual_item_slot_display: displays, virtual_item_info: info}) do
     %{
       unit
-      | virtual_item_slot_display: default.virtual_item_slot_display,
-        virtual_item_info: default.virtual_item_info
+      | virtual_item_slot_display: displays,
+        virtual_item_info: info
     }
   end
 

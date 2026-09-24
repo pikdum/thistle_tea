@@ -36,7 +36,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
     :instance_data,
     :formation,
     :shared_leash_time,
-    aura_contexts: %{}
+    aura_contexts: %{},
+    creature_archetypes: %{}
   ]
 
   def new(now, opts \\ []) when is_integer(now) do
@@ -56,7 +57,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
       instance_data: Keyword.get(opts, :instance_data),
       formation: Keyword.get(opts, :formation),
       shared_leash_time: Keyword.get(opts, :shared_leash_time),
-      aura_contexts: Keyword.get(opts, :aura_contexts, %{})
+      aura_contexts: Keyword.get(opts, :aura_contexts, %{}),
+      creature_archetypes: Keyword.get(opts, :creature_archetypes, %{})
     }
   end
 end

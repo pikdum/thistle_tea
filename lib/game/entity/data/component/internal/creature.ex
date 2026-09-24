@@ -8,6 +8,10 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Creature do
   """
   defstruct [
     :db_guid,
+    :addon_source,
+    :spell_list_id,
+    :template_unit_flags,
+    :default_equipment,
     :experience_multiplier,
     :extra_flags,
     :static_flags,

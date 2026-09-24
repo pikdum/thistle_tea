@@ -212,7 +212,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
             ObservationRequest.new([target_guid], Script.observation_radius(steps),
               game_object_radius: Script.game_object_observation_radius(steps),
               script_conditions: Script.conditions(steps),
-              script_targets: Script.target_requests(steps)
+              script_targets: Script.target_requests(steps),
+              creature_entries: Script.creature_entries(steps)
             )
           )
         )
@@ -1041,7 +1042,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
               ObservationRequest.new([target_guid], Script.observation_radius(steps),
                 game_object_radius: Script.game_object_observation_radius(steps),
                 script_conditions: Script.conditions(steps),
-                script_targets: Script.target_requests(steps)
+                script_targets: Script.target_requests(steps),
+                creature_entries: Script.creature_entries(steps)
               )
             )
           )
@@ -1124,7 +1126,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
     attachment = %Attachment{
       kind: companion_kind(state.internal.pet),
-      entity_ref: %EntityRef{guid: state.object.guid, entry: Guid.entry(state.object.guid), spell_id: spell_id},
+      entity_ref: %EntityRef{guid: state.object.guid, entry: state.object.entry, spell_id: spell_id},
       pid: self(),
       spells: pet_spells,
       create: Core.update_object(state),
@@ -1306,8 +1308,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp broadcast_if_pending(%Mob{internal: %Internal{broadcast_update?: true}} = state) do
     if !Corpse.removed?(state) do
-      detection = StealthDetection.target_metadata(state)
-      previous_detection = Metadata.query(state.object.guid, Map.keys(detection))
+      visibility = Map.merge(StealthDetection.target_metadata(state), Mob.visibility_metadata(state))
+      previous_visibility = Metadata.query(state.object.guid, Map.keys(visibility))
 
       metadata =
         %{
@@ -1330,10 +1332,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         }
         |> Map.merge(FactionLoader.metadata(state.unit.faction_template))
         |> Map.merge(control_metadata(state))
-        |> Map.merge(detection)
+        |> Map.put(:proximity_aggro?, Mob.proximity_aggro?(state))
+        |> Map.put(:no_spell_defense?, CreatureFlags.has?(state, :no_spell_defense))
+        |> Map.merge(visibility)
 
       Metadata.update(state.object.guid, metadata)
-      if previous_detection != detection, do: Visibility.notify_visibility_changed(state)
+      if previous_visibility != visibility, do: Visibility.notify_visibility_changed(state)
       update_type = if Core.dead?(state), do: :create_object2, else: :values
       Core.update_object(state, update_type) |> World.broadcast_packet(state)
     end

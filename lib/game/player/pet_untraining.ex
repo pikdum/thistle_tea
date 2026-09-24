@@ -27,7 +27,7 @@ defmodule ThistleTea.Game.Player.PetUntraining do
   alias ThistleTea.Game.World.Metadata
 
   def available?(%Character{unit: %{class: 3}} = character, trainer_guid) do
-    Gossip.pet_trainer?(Guid.entry(trainer_guid)) and match?({:ok, _cost}, current_price(character))
+    Gossip.pet_trainer?(World.entry(trainer_guid)) and match?({:ok, _cost}, current_price(character))
   end
 
   def available?(_character, _trainer), do: false
@@ -97,7 +97,7 @@ defmodule ThistleTea.Game.Player.PetUntraining do
   defp valid_trainer?(character, guid) do
     with false <- Core.dead?(character),
          :mob <- Guid.entity_type(guid),
-         true <- Gossip.pet_trainer?(Guid.entry(guid)),
+         true <- Gossip.pet_trainer?(World.entry(guid)),
          %{alive?: true, npc_flags: flags} when is_integer(flags) <- Metadata.query(guid, [:alive?, :npc_flags]),
          true <- (flags &&& 0x10) != 0,
          true <- Reputation.can_interact?(character, guid),

@@ -218,6 +218,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(24), do: :mount
   defp command(25), do: :set_run
   defp command(26), do: :attack_start
+  defp command(27), do: :update_entry
   defp command(28), do: :stand_state
   defp command(29), do: :modify_threat
   defp command(30), do: :send_taxi_path
