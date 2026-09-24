@@ -156,8 +156,10 @@ x=16306.7. Screenshots show normal controls and camera on both restored clients.
 No owner exceptions or crashes appeared in the final server log. It still logs
 unimplemented `CMSG_FAR_SIGHT` and `CMSG_MOVE_NOT_ACTIVE_MOVER` notifications
 during control changes, plus the existing account-data, ticket, and meeting-stone
-login requests. Those protocol gaps remain; the accepted movement and lifecycle
-behavior above does not establish support for them or complete Vanilla parity.
+login requests. Those protocol gaps remained at this milestone; the accepted
+movement and lifecycle behavior above did not establish support for them or
+complete Vanilla parity. They were subsequently implemented in `6432a6ab` and
+`ef018b16`; see [camera and mover acceptance](camera-mover-playtest.md).
 
 Final evidence:
 
