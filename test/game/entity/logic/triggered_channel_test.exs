@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.Entity.Logic.TriggeredChannelTest do
 
       assert final.unit.health == 450
       refute Aura.has_spell?(final, spell.id)
+      assert {:finished, final} = Casting.advance(final, 11_000)
       assert final.internal.casting == nil
       assert final.unit.channel_spell == 0
       assert Enum.any?(final.internal.events, &match?(%Effects.ChannelUpdate{channel_time_ms: 0}, &1))

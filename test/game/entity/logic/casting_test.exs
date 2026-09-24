@@ -11,7 +11,9 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Casting
@@ -255,6 +257,36 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   end
 
   describe "cast_tick/3" do
+    test "upkeep expiry preserves the channel's completion tick" do
+      for now <- [21_000, 21_050] do
+        mob = channel_aura_fixture(21_000)
+
+        assert {:success, mob} = BehaviorRunner.tick(SpellBT.casting_sequence(), mob, Context.new(now))
+        assert mob.unit.auras == []
+        assert mob.internal.casting == nil
+        assert Enum.count(mob.internal.events, &match?(%Effects.TriggerSpell{spell_id: 13_481}, &1)) == 1
+        assert {:idle, ^mob} = Casting.advance(mob, now + 100)
+      end
+    end
+
+    test "early aura expiry cancels the channel even when upkeep runs late" do
+      for now <- [20_000, 21_050] do
+        mob = channel_aura_fixture(20_000)
+
+        assert {:failure, mob} = BehaviorRunner.tick(SpellBT.casting_sequence(), mob, Context.new(now))
+        assert mob.internal.casting == nil
+        refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
+      end
+    end
+
+    test "explicit aura removal cancels the channel at its completion deadline" do
+      {mob, _events} = Aura.remove_spells(channel_aura_fixture(21_000), [1515], 21_000)
+
+      assert {:idle, ^mob} = Casting.advance(mob, 21_000)
+      assert mob.internal.casting == nil
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
+    end
+
     test "delivers a channel tick at its exact completion deadline only once" do
       mob = final_channel_tick_fixture()
 
@@ -1646,6 +1678,19 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
       {mob, _events} = Aura.tick(mob, now + 8_001)
       assert mob.unit.auras == []
     end
+  end
+
+  defp channel_aura_fixture(expires_at) do
+    mob = final_channel_tick_fixture()
+
+    holder = %Holder{
+      spell: mob.internal.casting.spell,
+      caster_guid: mob.object.guid,
+      expires_at: expires_at,
+      auras: [%AuraData{type: :dummy}]
+    }
+
+    %{mob | unit: %{mob.unit | auras: [holder]}}
   end
 
   defp final_channel_tick_fixture do

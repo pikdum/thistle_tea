@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   The behavior tree schedules these transitions; this module owns preparation,
   launch, impact, channel ticks, and finish.
   """
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Logic.AI.BT
@@ -831,18 +832,25 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   def reconcile_channel_auras(
         %{
           object: %{guid: guid},
-          internal: %{casting: %Cast{phase: :channel_tick, spell: spell}},
+          internal: %{casting: %Cast{phase: :channel_tick, spell: spell, ends_at: ends_at}},
           unit: %{auras: holders}
         } = entity,
         removed,
+        cause,
         now
       ) do
     matching? = &(&1.spell.id == spell.id and &1.caster_guid == guid)
+    interrupted? = Enum.any?(removed, &(matching?.(&1) and channel_aura_interrupted?(&1, cause, ends_at)))
 
-    if Enum.any?(removed, matching?) and not Enum.any?(holders, matching?), do: cancel(entity, now), else: entity
+    if interrupted? and not Enum.any?(holders, matching?), do: cancel(entity, now), else: entity
   end
 
-  def reconcile_channel_auras(entity, _removed, _now), do: entity
+  def reconcile_channel_auras(entity, _removed, _cause, _now), do: entity
+
+  defp channel_aura_interrupted?(%Holder{expires_at: expires_at}, :expired, ends_at)
+       when is_integer(expires_at) and is_integer(ends_at) and expires_at >= ends_at, do: false
+
+  defp channel_aura_interrupted?(_holder, _cause, _ends_at), do: true
 
   def start_game_object_channel(
         %{internal: %Internal{} = internal, unit: unit, object: %{guid: guid}} = character,
