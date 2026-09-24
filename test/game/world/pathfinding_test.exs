@@ -82,6 +82,12 @@ defmodule ThistleTea.Game.World.PathfindingTest do
   end
 
   describe "get_zone_and_area/2" do
+    test "retains the tower area on an unlabelled roof and in the air above it" do
+      for z <- [192.51268, 194.6, 220.0] do
+        assert Pathfinding.get_zone_and_area(0, {1854.0, -3724.0, z}) == {139, 2263}
+      end
+    end
+
     test "resolves Goldshire across the inn's unlabelled floor surface" do
       for z <- [56.96, 56.96255874633789, 57.05, 59.0] do
         assert Pathfinding.get_zone_and_area(0, {-9461.5, 16.190000534057617, z}) == {12, 87}
