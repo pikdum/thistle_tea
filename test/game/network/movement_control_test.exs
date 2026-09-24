@@ -43,7 +43,7 @@ defmodule ThistleTea.Game.Network.MovementControlTest do
     test "also advances counters for movement flags without implemented acknowledgements" do
       state = %State{guid: 1, movement_counter: 7}
 
-      {packet, state} = MovementControl.prepare(%Message.SmsgMoveWaterWalk{guid: 1}, state)
+      {packet, state} = MovementControl.prepare(%Message.SmsgMoveSetHover{guid: 1}, state)
 
       assert packet.counter == 7
       assert state.movement_counter == 8

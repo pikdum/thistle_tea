@@ -60,11 +60,11 @@ defmodule ThistleTea.Game.Network.MovementControl do
   end
 
   def prepare(%Message.SmsgMoveWaterWalk{} = packet, %State{} = state) do
-    stamp(state, nil, &%{packet | counter: &1})
+    stamp(state, controlled_change(state, packet.guid, {:water_walk, true}), &%{packet | counter: &1})
   end
 
   def prepare(%Message.SmsgMoveLandWalk{} = packet, %State{} = state) do
-    stamp(state, nil, &%{packet | counter: &1})
+    stamp(state, controlled_change(state, packet.guid, {:water_walk, false}), &%{packet | counter: &1})
   end
 
   def prepare(%Message.SmsgMoveFeatherFall{} = packet, %State{} = state) do

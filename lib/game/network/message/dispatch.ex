@@ -170,6 +170,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK: Message.CmsgForceSwimBackSpeedChangeAck,
               CMSG_FORCE_MOVE_ROOT_ACK: Message.CmsgForceMoveRootAck,
               CMSG_MOVE_FEATHER_FALL_ACK: Message.CmsgMoveFeatherFallAck,
+              CMSG_MOVE_WATER_WALK_ACK: Message.CmsgMoveWaterWalkAck,
               CMSG_MOVE_KNOCK_BACK_ACK: Message.CmsgMoveKnockBackAck,
               CMSG_FORCE_MOVE_UNROOT_ACK: Message.CmsgForceMoveUnrootAck,
               CMSG_MOVE_TIME_SKIPPED: Message.CmsgMoveTimeSkipped,
