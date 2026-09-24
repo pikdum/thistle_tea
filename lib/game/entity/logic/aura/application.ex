@@ -651,12 +651,22 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         Modifiers.value(context.spell_modifiers, :all_effects, amount)
       end
 
-    happiness =
+    amount =
       if effect.aura in [:periodic_damage, :periodic_leech, :periodic_health_funnel],
-        do: context.happiness_multiplier,
-        else: 1.0
+        do: periodic_done_amount(entity, spell, context, amount) * context.happiness_multiplier,
+        else: amount
 
-    trunc(amount * (multiplier || 1.0) * happiness)
+    trunc(amount * (multiplier || 1.0))
+  end
+
+  defp periodic_done_amount(entity, %Spell{} = spell, %CastContext{} = context, amount) do
+    if Spell.custom?(spell, :fixed_damage) or Spell.attribute?(spell, :ignore_caster_modifiers) or
+         spell.id == @ignite_dot do
+      amount
+    else
+      versus = max(100 + TargetDamage.bonus(entity, context.damage_done_versus), 0) / 100
+      amount * (context.damage_done_multiplier || 1.0) * versus
+    end
   end
 
   defp modify_aura_base_amount(aura, amount, %CastContext{} = context)

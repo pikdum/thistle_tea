@@ -300,7 +300,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
     events = [
       Effects.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, log_opts)
-      | leech_heal_events(holder, entity, health_drained, aura)
+      | leech_heal_events(holder, health_drained, aura)
     ]
 
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
@@ -463,18 +463,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   defp school_atom(%Spell{} = spell), do: Enum.at(@schools, Spell.school_index(spell), :physical)
   defp school_atom(_spell), do: :physical
 
-  defp leech_heal_events(
-         %Holder{caster_guid: caster_guid, spell: spell},
-         %{object: %{guid: owner_guid}},
-         damage,
-         %Aura{} = aura
-       )
-       when is_integer(caster_guid) and caster_guid != owner_guid and damage > 0 do
+  defp leech_heal_events(%Holder{caster_guid: caster_guid, spell: spell}, damage, %Aura{} = aura)
+       when is_integer(caster_guid) and damage > 0 do
     multiplier = if is_number(aura.multiple_value), do: max(aura.multiple_value, 0), else: 1.0
     [Effects.heal_entity(caster_guid, trunc(damage * multiplier), source_guid: caster_guid, spell: spell)]
   end
 
-  defp leech_heal_events(_holder, _entity, _damage, _aura), do: []
+  defp leech_heal_events(_holder, _damage, _aura), do: []
 
   defp restore_percent_mana(
          %{unit: %Unit{health: health, power1: mana, max_power1: max_mana}} = entity,

@@ -75,9 +75,50 @@ defmodule ThistleTea.Game.Entity.Logic.HealthFunnelTest do
       {target, _events} = AuraLogic.remove_spells(target, [24_617], 500)
       assert {^target, []} = AuraLogic.tick(target, 1_000)
     end
+
+    test "self-targeted funnels return the drained health through the owner", %{target: target} do
+      {target, _events} = AuraLogic.apply_spell(target, 1, 60, spell(), 0)
+      {target, events} = AuraLogic.tick(target, 1_000)
+      assert target.unit.health == 900
+      assert Enum.any?(events, &match?(%Effects.HealEntity{target_guid: 1, amount: 100}, &1))
+    end
   end
 
   describe "apply_spell/4" do
+    test "snapshots outgoing damage percentages before the drain transfer", %{target: target} do
+      for type <- [:periodic_damage, :periodic_leech, :periodic_health_funnel] do
+        context = %CastContext{
+          caster_guid: 2,
+          caster_level: 60,
+          damage_done_multiplier: 1.5,
+          damage_done_versus: [{64, 20}, {1, 50}]
+        }
+
+        {affected, _events} = AuraLogic.apply_spell(target, context, spell(type, 2.0), 0)
+        {ticked, events} = AuraLogic.tick(affected, 1_000)
+        assert ticked.unit.health == 820
+        assert damage(events) == 180
+        if type != :periodic_damage, do: assert(healing(events) == 360)
+        {refreshed, _events} = AuraLogic.apply_spell(ticked, 2, 60, spell(type, 2.0), 1_000)
+        assert hd(hd(refreshed.unit.auras).auras).amount == 100
+      end
+    end
+
+    test "outgoing damage percentages skip fixed damage and healing", %{target: target} do
+      context = %CastContext{caster_guid: 2, damage_done_multiplier: 2.0, damage_done_versus: [{64, 50}]}
+
+      for spell <- [
+            %{spell() | custom_flags: 0x010},
+            %{spell() | attributes: MapSet.new([:ignore_caster_modifiers])},
+            %{spell(:periodic_damage) | id: 12_654},
+            spell(:periodic_heal),
+            spell(:periodic_mana_leech)
+          ] do
+        {affected, _events} = AuraLogic.apply_spell(target, context, spell, 0)
+        assert hd(hd(affected.unit.auras).auras).amount == 100
+      end
+    end
+
     test "friendly health funnels retain their positive aura polarity", %{target: target} do
       spell = spell()
       spell = %{spell | effects: [%{hd(spell.effects) | implicit_target_a: :target_ally}]}
