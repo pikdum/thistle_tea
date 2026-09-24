@@ -49,6 +49,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Logic.Loot.Reservation
+  alias ThistleTea.Game.Entity.Logic.MovementHandoff
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.PlayerFlags
@@ -106,6 +107,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Login
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.Mail
+  alias ThistleTea.Game.Player.Movement
   alias ThistleTea.Game.Player.OutdoorPvp
   alias ThistleTea.Game.Player.PetExperience
   alias ThistleTea.Game.Player.PetTraining
@@ -208,6 +210,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def handle_cast({:send_packet, message, opts}, state), do: {:noreply, PacketSink.send(state, message, opts)}
 
   def handle_cast({:send_packet, message}, state), do: {:noreply, PacketSink.send(state, message)}
+
+  def handle_cast({:finish_movement, controller, payload}, %State{} = state) do
+    {:noreply, Movement.finish_input(state, controller, payload), {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Movement handoff failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
 
   def handle_cast({:honor_updated, award}, %{character: %Character{} = character} = state) do
     state = %{state | character: Honor.sync(character)}
@@ -1807,6 +1817,11 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       %{character | player: %{character.player | farsight: guid}}
       |> Core.mark_broadcast_update()
 
+    character =
+      if state.client_mover_guid == state.guid,
+        do: MovementHandoff.offer(character, state.guid, Time.now()),
+        else: character
+
     Network.send_packet(%Message.SmsgClientControlUpdate{guid: guid, allow_movement?: true})
 
     if match?(%{rooted?: true}, Metadata.query(guid, [:rooted?])) do
@@ -2049,6 +2064,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     |> Resurrection.cancel_transfer()
     |> PlayerTaxi.cancel()
     |> ServerMovement.cancel()
+    |> then(&%{&1 | character: MovementHandoff.clear(&1.character)})
   end
 
   defp transport_worldport(%State{} = state, %{entry: entry, world: %WorldRef{} = world}, {x, y, z, orientation}) do

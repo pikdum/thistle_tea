@@ -2,50 +2,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SET_ACTIVE_MOVER
 
-  alias ThistleTea.Game.Entity.Logic.Companion
-  alias ThistleTea.Game.Entity.Server.Player.State
-  alias ThistleTea.Game.Player.CompanionVisibility
-  alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
-  alias ThistleTea.Game.Player.Instances
-  alias ThistleTea.Game.Player.ItemLoot
-  alias ThistleTea.Game.Player.Taxi
-  alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Game.Player.Mover
 
   defstruct [:guid]
 
   @impl ClientMessage
-  def handle(%__MODULE__{guid: guid}, %{guid: guid} = state) do
-    state |> set_active_mover(guid) |> enter_world()
-  end
-
-  def handle(%__MODULE__{guid: guid}, %{character: %Character{object: %{guid: guid}}} = state) do
-    state |> set_active_mover(guid) |> enter_world()
-  end
-
-  def handle(%__MODULE__{guid: guid}, %{ready: true, character: %Character{} = character} = state)
-      when is_integer(guid) and guid > 0 do
-    if Companion.possession_guid(character) == guid, do: set_active_mover(state, guid), else: state
-  end
-
-  def handle(%__MODULE__{}, state), do: state
+  def handle(%__MODULE__{guid: guid}, state), do: Mover.select(state, guid)
 
   @impl ClientMessage
   def from_binary(<<guid::little-size(64)>>) do
     %__MODULE__{guid: guid}
   end
-
-  defp enter_world(%{ready: true} = state), do: state
-
-  defp enter_world(state) do
-    state = Visibility.enter_player(%{state | ready: true})
-
-    state
-    |> Instances.refresh()
-    |> Taxi.resume()
-    |> CompanionVisibility.defer_restoration()
-    |> PlayerExploration.check_current()
-    |> ItemLoot.open()
-  end
-
-  defp set_active_mover(%State{} = state, guid), do: %{state | active_mover_guid: guid}
 end

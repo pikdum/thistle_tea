@@ -59,6 +59,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.MovementHandoff
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
   alias ThistleTea.Game.Entity.Logic.PetNaming
@@ -343,6 +344,21 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   @impl GenServer
   def handle_cast({:move_to, x, y, z}, state) do
     handle_cast({:move_to, x, y, z, []}, state)
+  end
+
+  def handle_cast({:finish_movement, controller, payload}, %Mob{} = state) do
+    case MovementHandoff.take(state, controller, Time.now()) do
+      {:ok, state} ->
+        message = Message.MsgMove.from_final_movement(payload)
+        {:noreply, apply_controlled_move(state, payload, message.opcode, controller)}
+
+      {:error, state} ->
+        {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Movement handoff failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:move_to, x, y, z, opts}, state) when is_list(opts) do
@@ -931,7 +947,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       ) do
     if Core.dead?(state) or ControlMovement.active?(state),
       do: {:noreply, state},
-      else: {:noreply, apply_controlled_move(state, payload, opcode)}
+      else: {:noreply, apply_controlled_move(state, payload, opcode, owner_guid)}
   rescue
     error ->
       Logger.error("Controlled movement failed: #{inspect(error)}")
@@ -1216,7 +1232,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, state}
   end
 
-  defp apply_controlled_move(%Mob{internal: %{pet: %Pet{owner_guid: owner_guid}}} = state, payload, opcode) do
+  defp apply_controlled_move(%Mob{} = state, payload, opcode, owner_guid) do
+    state = MovementHandoff.clear(state)
     movement_block = MovementBlock.from_binary(payload, state.movement_block)
     {x, y, z, _orientation} = movement_block.position
     state = %{state | movement_block: movement_block, unit: %{state.unit | stand_state: 0}}

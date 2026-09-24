@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.MovementHandoff
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Guid
@@ -32,7 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
 
     cond do
       match?(%Holder{}, possession) -> sync_possession(mob, possession, internal.pet, guid, now)
-      match?(%Pet{possessed?: true}, internal.pet) -> release_possession(mob, internal.pet)
+      match?(%Pet{possessed?: true}, internal.pet) -> release_possession(mob, internal.pet, now)
       match?(%Holder{}, charm) -> sync_charm(mob, charm, internal.pet, guid, now)
       match?(%Pet{kind: :charmed}, internal.pet) -> release_charm(mob, internal.pet)
       true -> {mob, []}
@@ -137,6 +138,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
   end
 
   defp grant_possession(%Mob{} = mob, %Holder{} = holder, previous, events, now) do
+    mob = MovementHandoff.clear(mob)
     original_faction = original_value(previous, :original_faction_template, mob.unit.faction_template)
     original_npc_flags = original_value(previous, :original_npc_flags, mob.unit.npc_flags)
     %Engagement.Result{entity: mob} = Engagement.leave(mob, :controlled, clear_tap?: false)
@@ -212,12 +214,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
     }
   end
 
-  defp release_possession(%Mob{} = mob, %Pet{possession_original_kind: nil} = pet) do
-    mob = restore_controlled_unit(mob, pet, nil)
+  defp release_possession(%Mob{} = mob, %Pet{possession_original_kind: nil} = pet, now) do
+    mob = mob |> restore_controlled_unit(pet, nil) |> MovementHandoff.offer(pet.owner_guid, now)
     {mob, [Effects.control_released(pet.owner_guid, mob.object.guid)]}
   end
 
-  defp release_possession(%Mob{} = mob, %Pet{} = pet) do
+  defp release_possession(%Mob{} = mob, %Pet{} = pet, now) do
     restored = %{
       pet
       | kind: pet.possession_original_kind,
@@ -234,7 +236,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
         possessed?: false
     }
 
-    mob = restore_controlled_unit(mob, pet, restored)
+    mob = mob |> restore_controlled_unit(pet, restored) |> MovementHandoff.offer(pet.owner_guid, now)
     {mob, [Effects.control_released(pet.owner_guid, mob.object.guid)]}
   end
 

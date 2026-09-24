@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Emote
   alias ThistleTea.Game.Entity.Logic.Falling
+  alias ThistleTea.Game.Entity.Logic.MovementHandoff
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Logic.SafePosition
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
@@ -95,7 +96,7 @@ defmodule ThistleTea.Game.Player.Movement do
   def handle_controlled(%{character: %Character{} = character, server_movement: nil} = state, caster, payload, opcode) do
     if PlayerPossession.controlled_by?(character, caster) and can_move?(character) do
       message = %Message.MsgMove{payload: payload, opcode: opcode}
-      reconcile_movement(message, state, character.movement_block, caster)
+      reconcile_movement(message, state, character.movement_block, controller: caster)
     else
       state
     end
@@ -103,14 +104,32 @@ defmodule ThistleTea.Game.Player.Movement do
 
   def handle_controlled(state, _caster, _payload, _opcode), do: state
 
-  defp reconcile_movement(message, state, movement_block, controller \\ nil) do
+  def finish_input(
+        %{ready: true, server_movement: nil, character: %Character{} = character} = state,
+        controller,
+        payload
+      ) do
+    case MovementHandoff.take(character, controller, Time.now()) do
+      {:ok, character} ->
+        message = Message.MsgMove.from_final_movement(payload)
+        opts = [controller: controller, final?: true]
+        reconcile_movement(message, %{state | character: character}, character.movement_block, opts)
+
+      {:error, character} ->
+        %{state | character: character}
+    end
+  end
+
+  def finish_input(state, _controller, _payload), do: state
+
+  defp reconcile_movement(message, state, movement_block, opts \\ []) do
     character = state.character
     movement_block = MovementBlock.from_binary(message.payload, movement_block)
 
     case Transports.reconcile(character, movement_block) do
       {:ok, movement_block} ->
         state = MovementControl.track_transport_boarding(state, character.movement_block, movement_block)
-        handle_player_movement(message, state, movement_block, controller)
+        handle_player_movement(message, state, movement_block, opts)
 
       {:error, _reason} ->
         state
@@ -167,9 +186,9 @@ defmodule ThistleTea.Game.Player.Movement do
          message,
          %{character: %Character{movement_block: %MovementBlock{} = previous_movement_block}} = state,
          %MovementBlock{} = movement_block,
-         controller
+         opts
        ) do
-    character = state.character
+    character = MovementHandoff.clear(state.character)
     character = %{character | movement_block: movement_block} |> remember_safe_position()
     %{internal: %{world: world}} = character
     %MovementBlock{position: {x1, y1, z1, orientation}} = movement_block
@@ -209,7 +228,7 @@ defmodule ThistleTea.Game.Player.Movement do
         ChaseWatch.notify_moved(state.guid, {x1, y1, z1})
 
         %{state | character: character}
-        |> cancel_moving_cast(movement_block)
+        |> cancel_moving_cast(movement_block, Keyword.get(opts, :final?, false))
         |> PlayerRest.check_tavern_exit()
         |> PlayerExploration.check_movement(now)
       else
@@ -218,7 +237,7 @@ defmodule ThistleTea.Game.Player.Movement do
 
     new_state
     |> Visibility.refresh_player()
-    |> broadcast(message, controller)
+    |> broadcast(message, Keyword.get(opts, :controller))
     |> publish_changes()
   end
 
@@ -232,14 +251,17 @@ defmodule ThistleTea.Game.Player.Movement do
     end
   end
 
+  defp cancel_moving_cast(state, _movement, true), do: state
+
   defp cancel_moving_cast(
          %{character: %Character{internal: %Internal{casting: %Cast{spell: %Spell{id: @stuck_spell}}}}} = state,
-         movement
+         movement,
+         false
        ) do
     if MovementBlock.falling_far?(movement), do: state, else: Spellcasting.cancel(state, @spell_failed_moving)
   end
 
-  defp cancel_moving_cast(state, _movement), do: Spellcasting.cancel(state, @spell_failed_moving)
+  defp cancel_moving_cast(state, _movement, false), do: Spellcasting.cancel(state, @spell_failed_moving)
 
   defp broadcast(state, message, controller) do
     recipients =

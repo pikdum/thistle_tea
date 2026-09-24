@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Dueling
+  alias ThistleTea.Game.Entity.Logic.MovementHandoff
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Totems
   alias ThistleTea.Game.Entity.Server.GuardianOwner
@@ -74,6 +75,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :taxi_arrival_ref,
     :server_movement,
     :active_mover_guid,
+    :client_mover_guid,
     :active_banker_guid,
     :gossip_menu_guid,
     :companion_monitor,
@@ -176,7 +178,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   end
 
   defp disengage(%__MODULE__{character: %Character{} = character} = state) do
-    character = Casting.cancel(character)
+    character = character |> Casting.cancel() |> MovementHandoff.clear()
     {character, effects} = PlayerCombat.disengage(character)
     character = character |> Totems.dismiss_all() |> EventSink.emit_pending()
     %{state | character: EventSink.emit(character, effects)}

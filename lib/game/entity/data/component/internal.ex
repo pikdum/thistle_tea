@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :summon,
     :pet,
     :possession,
+    :movement_handoff,
     :mini_pet,
     :guardian,
     :chair,

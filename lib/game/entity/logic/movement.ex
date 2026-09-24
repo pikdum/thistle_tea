@@ -247,6 +247,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     internal = %{
       internal
       | movement_start_time: now,
+        movement_handoff: nil,
         movement_start_position: {x0, y0, z0},
         movement_speed: nil,
         movement_options: opts,
@@ -399,6 +400,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     internal = %{
       entity.internal
       | events: Enum.reject(entity.internal.events, &stale_movement_projection?/1),
+        movement_handoff: nil,
         navigation_intents: [],
         fall: nil
     }

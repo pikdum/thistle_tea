@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerPossession do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.MovementHandoff
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -61,8 +62,12 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerPossession do
         {character, granted} = grant(character, holder, now)
         {character, events ++ granted}
 
-      {nil, holder} ->
-        grant(character, holder, now)
+      {nil, %Holder{} = holder} ->
+        {character, events} = grant(character, holder, now)
+        {MovementHandoff.offer(character, guid, now), events}
+
+      {nil, nil} ->
+        {character, []}
     end
   end
 
@@ -124,6 +129,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerPossession do
         ]
 
     root_events = if character.internal.rooted?, do: [Effects.movement_root_changed(true)], else: []
+    character = MovementHandoff.offer(character, previous.caster_guid, now)
     {Core.mark_broadcast_update(character), events ++ root_events}
   end
 

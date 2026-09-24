@@ -51,6 +51,7 @@ defmodule ThistleTea.Game.Entity do
   def instance_membership_changed(entity, world), do: dispatch_cast(entity, {:instance_membership_changed, world})
   def instance_lockout_changed(entity, reason), do: dispatch_cast(entity, {:instance_lockout_changed, reason})
   def sync_pvp(entity, owner, enabled), do: dispatch_cast(entity, {:sync_pvp, owner, enabled})
+  def finish_movement(entity, controller, payload), do: dispatch_cast(entity, {:finish_movement, controller, payload})
 
   def sync_pet_spell_modifiers(entity, owner, holders) do
     dispatch_cast(entity, {:pet_spell_modifiers, owner, holders})

@@ -142,8 +142,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerPossessionTest do
             %Message.CmsgCastSpell{},
             %Message.CmsgUseItem{},
             %Message.CmsgPetAction{},
-            %Message.CmsgSetSelection{},
-            %Message.CmsgSetActiveMover{}
+            %Message.CmsgSetSelection{}
           ] do
         refute Input.allowed?(message, state)
         assert Input.handle(message, state) == state
@@ -153,6 +152,8 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerPossessionTest do
             %Message.CmsgMessagechat{},
             %Message.CmsgNameQuery{},
             %Message.CmsgLogoutRequest{},
+            %Message.CmsgSetActiveMover{},
+            %Message.CmsgMoveNotActiveMover{},
             %Message.CmsgForceMoveRootAck{}
           ] do
         assert Input.allowed?(message, state)
