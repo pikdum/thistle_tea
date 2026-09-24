@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.Capacity
   alias ThistleTea.Game.Entity.Logic.Aura.Change
+  alias ThistleTea.Game.Entity.Logic.Aura.SingleTarget
   alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.CreatureImmunity
@@ -218,6 +219,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   end
 
   defp upsert_unblocked(entity, existing, %Holder{} = holder, context, now) do
+    {entity, holder} = SingleTarget.assign(entity, holder)
+
     existing =
       existing
       |> remove_immune_mechanics(holder)

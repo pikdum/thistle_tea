@@ -12,6 +12,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot, as: InternalLoot
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.Aura.SingleTarget
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Loot
@@ -29,6 +31,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
   alias ThistleTea.Game.World.Metadata
@@ -121,6 +124,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
       true ->
         state = Pockets.close(state)
         state = resolve_pending_rolls(state)
+        state = state |> SingleTarget.detach(Time.now()) |> EventSink.emit_pending()
         close_loot_windows(state)
 
         Metadata.update(state.object.guid, %{

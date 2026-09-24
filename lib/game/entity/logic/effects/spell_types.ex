@@ -4,6 +4,9 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
   effects = [
     {:TeachSpell, [:spell, :skill_steps], [cast_item_guid: nil]},
     {:SpellMagnetsChanged, [:magnets], []},
+    {:SingleTargetAurasChanged, [:claims], []},
+    {:SingleTargetAurasLeft, [], []},
+    {:SingleTargetCasterDied, [], []},
     {:SpellDamage, [:source_guid, :target_guid, :spell_id, :spell, :school, :damage, :proc_type],
      [proc_damage: nil, periodic?: false, resisted: 0, absorbed: 0, crit?: false, blocked: 0]},
     {:SpellHeal, [:source_guid, :target_guid, :spell_id, :spell, :school, :damage, :proc_type, :crit?],

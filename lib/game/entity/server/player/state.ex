@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.Aura.SingleTarget
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.MovementHandoff
@@ -106,6 +107,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
 
   def prepare_worldport(%__MODULE__{} = state, origin, destination) do
     state
+    |> detach_single_target_auras()
     |> Weather.leave()
     |> Resurrection.cancel_transfer()
     |> Instances.clear()
@@ -151,7 +153,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
       end
 
     state = state |> Looting.release() |> QuestSharing.disconnect() |> OutdoorPvp.leave() |> Weather.leave()
-    state = state |> PossessionOwner.release() |> disengage()
+    state = state |> PossessionOwner.release() |> disengage() |> detach_single_target_auras()
     state = CompanionOwner.suspend(state)
     state = MiniPetOwner.dismiss(state)
     state = dismiss_guardians(state)
@@ -185,6 +187,13 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   end
 
   defp disengage(%__MODULE__{} = state), do: state
+
+  defp detach_single_target_auras(%__MODULE__{character: %Character{} = character} = state) do
+    character = character |> SingleTarget.detach(Time.now()) |> EventSink.emit_pending()
+    %{state | character: character}
+  end
+
+  defp detach_single_target_auras(%__MODULE__{} = state), do: state
 
   defp dismiss_totems(%__MODULE__{character: nil} = state), do: state
 

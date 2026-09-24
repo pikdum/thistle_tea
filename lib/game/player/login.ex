@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Aura.ModifierSync
+  alias ThistleTea.Game.Entity.Logic.Aura.SingleTarget
   alias ThistleTea.Game.Entity.Logic.ChatStatus
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
@@ -132,6 +133,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> BT.init(PlayerBT.tree())
       |> ControlMovement.restore(Time.now())
       |> ModifierSync.restore()
+      |> SingleTarget.detach(Time.now())
 
     c = PlayerFlags.set_group_leader(c, party_leader?(character_guid))
 

@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Aura.ObjectSync
   alias ThistleTea.Game.Entity.Logic.Aura.PlayerSync
   alias ThistleTea.Game.Entity.Logic.Aura.Script
+  alias ThistleTea.Game.Entity.Logic.Aura.SingleTarget
   alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
   alias ThistleTea.Game.Entity.Logic.Aura.StealthSync
   alias ThistleTea.Game.Entity.Logic.Aura.ThreatSync
@@ -102,7 +103,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     threat_events = ThreatSync.events(entity, previous, holders)
 
     events =
-      SpellMagnet.events(previous, holders) ++
+      SingleTarget.events(previous, holders, entity_guid(entity)) ++
+        SpellMagnet.events(previous, holders) ++
         modifier_events ++
         application_events ++
         cooldown_events ++

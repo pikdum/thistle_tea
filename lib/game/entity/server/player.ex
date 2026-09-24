@@ -508,6 +508,16 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   end
 
+  def handle_cast({:remove_single_target_aura, claim, cause}, %{character: %Character{} = character} = state) do
+    {character, events} = Aura.SingleTarget.remove(character, claim, Time.now(), cause)
+    character = EventSink.emit(character, events)
+    {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Single-target aura removal failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_cast({:remove_spell_auras, spell_ids}, %{character: %Character{} = character} = state)
       when is_list(spell_ids) do
     {character, events} = Aura.remove_spells(character, spell_ids, Time.now())

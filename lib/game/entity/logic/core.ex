@@ -338,7 +338,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
         %Aura.Change{holders: death_auras(unit.auras), cause: :death, now: now}
       )
 
-    entity = Effects.enqueue(entity, aura_events)
+    entity = Effects.enqueue(entity, aura_events ++ [%Effects.SingleTargetCasterDied{}])
     internal = entity.internal
     unit = entity.unit
     mb = entity.movement_block

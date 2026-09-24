@@ -83,6 +83,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.MailStore
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
+  alias ThistleTea.Game.World.SingleTargetAuras
   alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.SpawnPool.Catalog, as: SpawnPoolCatalog
@@ -164,6 +165,7 @@ defmodule ThistleTea.Application do
         VendorStock,
         AreaEffects,
         SpellMagnets,
+        SingleTargetAuras,
         ThistleTea.DBC,
         Repo,
         BattlegroundSupervisor,

@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Aura.Holder do
     :cooldown_started_at,
     :slot,
     :applied_at,
+    :single_target_generation,
     :expires_at,
     :diminishing_group,
     :charges,

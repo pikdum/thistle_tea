@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Aura.SingleTarget
   alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
@@ -157,6 +158,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       |> CombatLeash.stop()
       |> EventSink.emit_pending()
       |> Corpse.remove()
+      |> SingleTarget.detach(now, keep_self?: false)
+      |> EventSink.emit_pending()
       |> Incarnation.renew()
       |> Mob.respawn()
       |> at_position(position)

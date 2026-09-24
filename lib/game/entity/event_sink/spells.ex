@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.SingleTargetAuras
   alias ThistleTea.Game.World.SpellMagnets
 
   @spell_hit_type_crit 0x2
@@ -61,6 +62,25 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   end
 
   def emit(entity, %Effects.SpellMagnetsChanged{}, nil), do: entity
+
+  def emit(entity, %Effects.SingleTargetAurasChanged{claims: claims}, %Context{owner_pid: owner}) do
+    SingleTargetAuras.sync(entity.object.guid, owner, entity.internal.world, claims)
+    entity
+  end
+
+  def emit(entity, %Effects.SingleTargetAurasLeft{}, %Context{owner_pid: owner}) do
+    SingleTargetAuras.leave(entity.object.guid, owner)
+    entity
+  end
+
+  def emit(entity, %Effects.SingleTargetCasterDied{}, %Context{owner_pid: owner}) do
+    SingleTargetAuras.caster_died(entity.object.guid, owner)
+    entity
+  end
+
+  def emit(entity, %Effects.SingleTargetAurasChanged{}, nil), do: entity
+  def emit(entity, %Effects.SingleTargetAurasLeft{}, nil), do: entity
+  def emit(entity, %Effects.SingleTargetCasterDied{}, nil), do: entity
 
   def emit(entity, %Effects.DispelFailed{} = effect, _context) do
     %Message.SmsgDispelFailed{
