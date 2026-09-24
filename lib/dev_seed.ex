@@ -334,6 +334,10 @@ defmodule ThistleTea.DevSeed do
         creature = %{
           creature
           | guid: low_guid,
+            id2: 0,
+            id3: 0,
+            id4: 0,
+            id5: 0,
             map: @map,
             position_x: x,
             position_y: y,
