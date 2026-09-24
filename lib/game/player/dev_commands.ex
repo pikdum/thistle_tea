@@ -1023,10 +1023,8 @@ defmodule ThistleTea.Game.Player.DevCommands do
   defp owner_label({:player, guid}), do: "player #{guid}"
 
   defp parse_coords([x, y, z, map]) do
-    with {x, _} <- Float.parse(x),
-         {y, _} <- Float.parse(y),
-         {z, _} <- Float.parse(z),
-         {map, _} <- Integer.parse(map) do
+    with {:ok, x, y, z} <- parse_coords([x, y, z]),
+         {map, ""} when map >= 0 <- Integer.parse(map) do
       {:ok, x, y, z, map}
     else
       _ -> :error
@@ -1034,14 +1032,16 @@ defmodule ThistleTea.Game.Player.DevCommands do
   end
 
   defp parse_coords([x, y, z]) do
-    with {x, _} <- Float.parse(x),
-         {y, _} <- Float.parse(y),
-         {z, _} <- Float.parse(z) do
+    with {x, ""} <- Float.parse(x),
+         {y, ""} <- Float.parse(y),
+         {z, ""} <- Float.parse(z) do
       {:ok, x, y, z}
     else
       _ -> :error
     end
   end
+
+  defp parse_coords(_args), do: :error
 
   defp show_transport(%{character: %Character{} = character} = state) do
     case Transports.target(character) do

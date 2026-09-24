@@ -446,6 +446,27 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
   end
 
   describe ".go xyz" do
+    test "rejects malformed coordinates without teleporting" do
+      state = %{guid: 1, character: debug_character()}
+
+      for args <- ["", "1", "1 2", "1 2 3 0 extra", "bad 2 3", "1 2m 3", "1 2 3m", "1 2 3 -1", "1 2 3 0x"] do
+        assert {:handled, ^state} = DevCommands.run(state, ".go xyz " <> args)
+
+        assert_received {:"$gen_cast",
+                         {:send_packet,
+                          %Message.SmsgMessagechat{message: "Invalid command. Use: .go xyz <x> <y> <z> [map]"}}}
+      end
+
+      refute_received {:"$gen_cast", {:start_teleport, _, _, _, _}}
+    end
+
+    test "accepts complete coordinates with an explicit map" do
+      state = %{guid: 1, character: debug_character()}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".go xyz 16342 16279 69.44 451")
+      assert_receive {:"$gen_cast", {:start_teleport, 16_342.0, 16_279.0, 69.44, 451}}
+    end
+
     test "preserves the current instance copy when no map is supplied" do
       world = WorldRef.instance(329, System.unique_integer([:positive, :monotonic]))
       character = %{debug_character() | internal: %Internal{world: world}}
