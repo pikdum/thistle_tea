@@ -48,6 +48,18 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCharmTest do
   end
 
   describe "tick/3" do
+    test "initial casts and movement work with negative monotonic time", %{character: character} do
+      context = %{context(character, 20.0) | now: -576_000_000}
+      {_status, casting, blackboard} = tick(character, context)
+      assert Enum.any?(casting.internal.events, &is_struct(&1, Effects.CharmCast))
+      assert blackboard.charm.next_cast_at == context.now + 1_500
+
+      character = put_in(character.unit.power1, 0)
+      {_status, moving, blackboard} = tick(character, context)
+      assert moving.internal.navigation_intents != []
+      assert blackboard.charm.next_move_at == context.now + 500
+    end
+
     test "the player tree gives charm control over ordinary combat", %{character: character} do
       {{:running, 100, :charm}, acting} = BT.tick(PlayerBT.tree(), character, context(character, 20.0))
       assert acting.unit.target == 2

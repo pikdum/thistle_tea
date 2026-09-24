@@ -152,7 +152,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Charm do
   end
 
   defp try_spell(entity, target, %Blackboard{charm: memory} = blackboard, %Context{now: now} = context) do
-    if now >= memory.next_cast_at do
+    if is_nil(memory.next_cast_at) or now >= memory.next_cast_at do
       spell = Random.choice(context.random, entity.internal.possession.spells)
       distance = Perception.distance(context.perception, target) || 100
 
@@ -208,7 +208,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Charm do
 
   defp approach(entity, target, distance, %Blackboard{charm: memory} = blackboard, %Context{now: now} = context) do
     case Perception.position(context.perception, target) do
-      {_world, tx, ty, tz} when now >= memory.next_move_at and entity.internal.rooted? != true ->
+      {_world, tx, ty, tz}
+      when (is_nil(memory.next_move_at) or now >= memory.next_move_at) and entity.internal.rooted? != true ->
         {x, y, z, _} = entity.movement_block.position
         length = Math.distance({x, y, z}, {tx, ty, tz})
         fraction = max(length - distance, 0) / max(length, 0.001)
