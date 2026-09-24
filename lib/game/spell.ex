@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.Spell do
     spell_level: 0,
     base_level: 0,
     max_level: 0,
+    max_targets: 0,
     custom_flags: 0,
     hidden_aura?: false,
     object_targets: [],

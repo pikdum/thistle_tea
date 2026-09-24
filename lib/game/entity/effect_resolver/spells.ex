@@ -99,11 +99,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   def resolve(_entity, %Effects.SpellHeal{} = effect), do: [effect]
 
   def resolve(entity, %Effects.DeliverSpellToQuery{spell: %Spell{} = spell} = effect) do
-    excluded = MapSet.new(effect.exclude_guids)
-
     entity
-    |> SpellTargetResolver.resolve_query(effect.query)
-    |> Enum.reject(&MapSet.member?(excluded, &1))
+    |> SpellTargetResolver.resolve_query(spell, effect.query, exclude_guids: effect.exclude_guids)
     |> Enum.flat_map(fn target_guid ->
       context = %CastContext{
         caster_guid: effect.source_guid,

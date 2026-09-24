@@ -18,6 +18,7 @@ defmodule ThistleTea.DevSeed do
   A Land Walker supports Zorbin's Ultra-Shrinker and creature transformation testing.
   A Squirrel drops random-property cloth armor and has a three-minute respawn for loot testing.
   Three adjacent Skeletal Flayers west of the playground support chained spell testing.
+  Six closely grouped Prairie Wolf Alphas farther west support area target-limit testing.
   """
   import Ecto.Query
 
@@ -315,6 +316,12 @@ defmodule ThistleTea.DevSeed do
         @hostile_respawn_secs
       )
     end
+
+    [{-2.0, -2.0}, {0.0, -2.0}, {2.0, -2.0}, {-2.0, 2.0}, {0.0, 2.0}, {2.0, 2.0}]
+    |> Enum.with_index()
+    |> Enum.each(fn {{dx, dy}, index} ->
+      spawn_mob(2960, @base_low_guid + 1700 + index, {x - 150.0 + dx, y - 20.0 + dy, z}, nil, @hostile_respawn_secs)
+    end)
   end
 
   defp seed_game_objects do

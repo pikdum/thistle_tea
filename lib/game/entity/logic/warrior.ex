@@ -16,15 +16,16 @@ defmodule ThistleTea.Game.Entity.Logic.Warrior do
 
   def shield_slam_bonus(_spell, _effect, _block_value), do: 0
 
-  def filter_target_effects(effects, target_guid, %CastContext{selected_target_guid: target_guid}, %Spell{} = spell) do
+  def filter_target_effects(effects, target_guid, %CastContext{selected_target_guid: selected}, %Spell{} = spell) do
     if Spell.vmangos_script?(spell, "spell_warrior_intimidating_shout") do
-      Enum.filter(effects, &(&1.index == 0))
+      shout_effects(effects, target_guid == selected)
     else
       effects
     end
   end
 
-  def filter_target_effects(effects, _target_guid, _context, _spell), do: effects
+  defp shout_effects(effects, true), do: Enum.filter(effects, &(&1.index == 0))
+  defp shout_effects(effects, false), do: Enum.reject(effects, &(&1.index == 0))
 
   def after_energize(%Character{} = character, %Spell{} = spell, now) do
     if Spell.vmangos_script?(spell, "spell_warrior_bloodrage") do

@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.SpellObjects do
   alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.ObjectTargets.Selector
   alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Spell.TargetLimit
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
@@ -22,8 +23,12 @@ defmodule ThistleTea.Game.World.SpellObjects do
     |> Enum.filter(&(&1.type == :activate_object))
     |> Enum.reduce_while(%ObjectTargets{}, fn effect, snapshot ->
       case effect_targets(caster, spell, effect, targets, focus) do
-        {:ok, guids} -> {:cont, %{snapshot | by_effect: Map.put(snapshot.by_effect, effect.index, guids)}}
-        {:error, reason} -> {:halt, %{snapshot | error: reason}}
+        {:ok, guids} ->
+          selected = TargetLimit.select(guids, spell)
+          {:cont, %{snapshot | by_effect: Map.put(snapshot.by_effect, effect.index, selected)}}
+
+        {:error, reason} ->
+          {:halt, %{snapshot | error: reason}}
       end
     end)
   end

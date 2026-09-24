@@ -89,6 +89,56 @@ defmodule ThistleTea.Game.Entity.ChainTargetsTest do
   end
 
   describe "cast completion" do
+    test "launch and multi-effect deliveries share one capped selection", %{caster: source} do
+      candidates = for x <- 1..6, do: target(:enemy, x * 1.0)
+      selected = List.last(candidates)
+
+      caster = %Mob{
+        object: %Object{guid: source.object.guid},
+        unit: %Unit{health: 1_000, max_health: 1_000, level: 60, auras: []},
+        internal: source.internal,
+        movement_block: source.movement_block
+      }
+
+      spell = %Spell{
+        id: 900_712,
+        school: :physical,
+        max_targets: 4,
+        cast_time_ms: 1_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :school_damage,
+            base_points: 10,
+            implicit_target_a: :aoe_enemy_at_caster,
+            radius_yards: 10.0
+          },
+          %Effect{
+            index: 1,
+            type: :apply_aura,
+            aura: :mod_attack_speed,
+            base_points: -10,
+            implicit_target_a: :aoe_enemy_at_caster,
+            radius_yards: 10.0
+          }
+        ]
+      }
+
+      casting = Casting.start(caster, spell, Target.unit(selected), 1_000)
+      finished = Casting.complete(casting, 2_000)
+      go = Enum.find(finished.internal.events, &is_struct(&1, Effects.SpellGo))
+      deliveries = for %Effects.DeliverSpell{} = effect <- finished.internal.events, do: effect
+      assert length(go.hit_guids) == 4
+      assert selected in go.hit_guids
+      assert go.misses == []
+      assert Enum.map(deliveries, & &1.target_guid) == go.hit_guids
+      assert Enum.all?(deliveries, &(&1.spell.effects == spell.effects))
+      assert Enum.all?(go.hit_guids, &(&1 in candidates))
+
+      cancelled = Casting.cancel(casting, 1_500)
+      refute Enum.any?(cancelled.internal.events, &is_struct(&1, Effects.DeliverSpell))
+    end
+
     test "publishes ordered hits and retains distinct jump amounts for delivery", %{caster: source} do
       first = target(:enemy, 4.0)
       second = target(:enemy, 13.0)
@@ -112,6 +162,7 @@ defmodule ThistleTea.Game.Entity.ChainTargetsTest do
 
       spell = %Spell{
         id: 900_711,
+        max_targets: 1,
         school: :nature,
         dmg_class: 0,
         cast_time_ms: 1_000,

@@ -581,10 +581,11 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       assert Enum.any?(primary_events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 20_511))
 
       secondary = put_in(melee_target().object.guid, 10)
-      {secondary, _events} = SpellEffect.receive(secondary, context, spell, 1_000)
+      {secondary, secondary_events} = SpellEffect.receive(secondary, context, spell, 1_000)
 
       assert Aura.has_aura?(secondary, :mod_fear)
       assert Aura.has_aura?(secondary, :mod_confuse)
+      refute Enum.any?(secondary_events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 20_511))
     end
   end
 

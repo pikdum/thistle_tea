@@ -221,6 +221,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       spell_level: row.spell_level || 0,
       base_level: row.base_level || 0,
       max_level: row.max_level || 0,
+      max_targets: row.max_targets || 0,
       custom_flags: SpellEffectOverrideLoader.custom_flags(row.id),
       object_targets: SpellObjectTargetLoader.get(row.id),
       effects: build_effects(row, radius_lookup),

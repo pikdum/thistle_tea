@@ -114,7 +114,7 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
     }
 
     caster
-    |> SpellTargetResolver.resolve_query({:targeted_aoe, {x, y, z}, radius})
+    |> SpellTargetResolver.resolve_query(tick_spell, {:targeted_aoe, {x, y, z}, radius})
     |> Enum.each(fn target_guid ->
       context = %CastContext{
         caster_guid: caster.object.guid,

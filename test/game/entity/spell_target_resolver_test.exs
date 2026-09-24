@@ -21,6 +21,74 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   alias ThistleTea.Game.WorldRef
 
   describe "resolve/3" do
+    test "caps area candidates while retaining an eligible selected target" do
+      source = player_guid()
+      put_spatial_target(:players, source, {0.0, 0.0, 0.0})
+      enemies = for _ <- 1..6, do: mob_guid()
+      Enum.each(enemies, &put_spatial_target(:mobs, &1, {3.0, 0.0, 0.0}))
+      selected = List.last(enemies)
+      spell = %{aoe_spell(:aoe_enemy_at_caster) | max_targets: 2}
+      caster = caster(source, {0.0, 0.0, 0.0})
+
+      for _ <- 1..10 do
+        targets = SpellTargetResolver.resolve(caster, spell, Target.unit(selected))
+        assert length(targets) == 2
+        assert selected in targets
+        assert Enum.all?(targets, &(&1 in enemies))
+      end
+
+      assert Enum.sort(SpellTargetResolver.resolve(caster, %{spell | max_targets: 0}, Target.none())) ==
+               Enum.sort(enemies)
+    end
+
+    test "filters dead foreign and incompatible targets before assigning slots" do
+      source = player_guid()
+      put_spatial_target(:players, source, {0.0, 0.0, 0.0})
+      [eligible, dead, foreign, wrong_type] = for _ <- 1..4, do: mob_guid()
+
+      for guid <- [eligible, dead, foreign, wrong_type] do
+        put_spatial_target(:mobs, guid, {3.0, 0.0, 0.0})
+        Metadata.update(guid, %{creature_type: 1})
+      end
+
+      Metadata.update(dead, %{alive?: false})
+      Metadata.update(wrong_type, %{creature_type: 2})
+      SpatialHash.update(:mobs, foreign, WorldRef.instance(0, 99), 3.0, 0.0, 0.0)
+      caster = caster(source, {0.0, 0.0, 0.0})
+      spell = %{aoe_spell(:aoe_enemy_at_caster) | max_targets: 2, target_creature_type_mask: 1}
+
+      assert SpellTargetResolver.resolve(caster, spell, Target.unit(dead)) == [eligible]
+    end
+
+    test "caps ground and cone areas without inserting an out-of-range selection" do
+      source = player_guid()
+      put_spatial_target(:players, source, {0.0, 0.0, 0.0})
+      enemies = for _ <- 1..4, do: mob_guid()
+      Enum.each(enemies, &put_spatial_target(:mobs, &1, {3.0, 0.0, 0.0}))
+      distant = mob_guid()
+      put_spatial_target(:mobs, distant, {50.0, 0.0, 0.0})
+      caster = caster(source, {0.0, 0.0, 0.0})
+      targets = %{Target.unit(distant) | destination_location: {3.0, 0.0, 0.0}}
+
+      for mode <- [:aoe_enemy_at_dest, :aoe_enemy_in_cone] do
+        selected = SpellTargetResolver.resolve(caster, %{aoe_spell(mode) | max_targets: 2}, targets)
+        assert length(selected) == 2
+        assert Enum.all?(selected, &(&1 in enemies))
+      end
+    end
+
+    test "caster execution effects do not consume hostile area slots" do
+      source = player_guid()
+      put_spatial_target(:players, source, {0.0, 0.0, 0.0})
+      enemies = for _ <- 1..3, do: mob_guid()
+      Enum.each(enemies, &put_spatial_target(:mobs, &1, {3.0, 0.0, 0.0}))
+      spell = aoe_spell(:aoe_enemy_at_caster)
+      spell = %{spell | max_targets: 1, effects: spell.effects ++ [%Effect{implicit_target_a: :caster}]}
+      targets = SpellTargetResolver.resolve(caster(source, {0.0, 0.0, 0.0}), spell, Target.none())
+      assert [enemy, ^source] = targets
+      assert enemy in enemies
+    end
+
     test "radius modifiers include the outer ring and removal restores the original boundary" do
       source = mob_guid()
       inner = player_guid()
@@ -503,6 +571,22 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
       caster = caster(player_guid, {40.0, 0.0, 0.0})
 
       assert SpellTargetResolver.resolve_query(caster, {:targeted_aoe, {0.0, 0.0, 0.0}, 10.0}) == [mob_guid]
+    end
+  end
+
+  describe "resolve_query/4" do
+    test "excludes recipients before capping a friendly area" do
+      source = player_guid()
+      allies = for _ <- 1..3, do: player_guid()
+      Enum.each([source | allies], &put_spatial_target(:players, &1, {0.0, 0.0, 0.0}))
+      spell = %Spell{max_targets: 2, effects: [%Effect{type: :heal}]}
+
+      selected =
+        SpellTargetResolver.resolve_query(caster(source, {0.0, 0.0, 0.0}), spell, {:caster_friendly_aoe, 10.0},
+          exclude_guids: [source, hd(allies)]
+        )
+
+      assert Enum.sort(selected) == Enum.sort(tl(allies))
     end
   end
 

@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Spell.TargetLimit
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.InsigniaTarget
@@ -60,10 +61,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     query =
       pet_target_query(caster, spell) || SpellTarget.target_query(spell, targets, Modifiers.snapshot(caster, spell))
 
-    initial =
-      caster
-      |> resolve_query(caster_guid, query)
-      |> Enum.filter(&creature_type_allowed?(spell, &1))
+    initial = resolve_query(caster, spell, query, selected_guid: Target.unit_guid(targets))
 
     redirected = redirect_initial(caster, spell, query, initial)
     targets = if redirected == initial, do: ChainTargets.expand(caster, spell, initial), else: redirected
@@ -107,36 +105,57 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   defp pet_target_query(_caster, _spell), do: nil
 
   def resolve_query(%{object: %{guid: caster_guid}} = caster, query) do
-    resolve_query(caster, caster_guid, query)
+    query_guids(caster, caster_guid, query)
   end
 
   def resolve_query(_caster, _query), do: []
 
-  defp resolve_query(caster, caster_guid, {:party_unit, guid}), do: party_unit_guids(caster, caster_guid, guid)
+  def resolve_query(caster, %Spell{} = spell, query, opts \\ []) do
+    excluded = Keyword.get(opts, :exclude_guids, [])
 
-  defp resolve_query(caster, caster_guid, :caster_master) do
+    caster
+    |> resolve_query(query)
+    |> Enum.reject(&(&1 in excluded))
+    |> Enum.filter(fn guid ->
+      creature_type_allowed?(spell, guid) and (Spell.harmful?(spell) or Hostility.can_assist?(caster, guid))
+    end)
+    |> limit_targets(spell, Keyword.get(opts, :selected_guid))
+  end
+
+  defp limit_targets(candidates, %Spell{max_targets: limit} = spell, primary_guid)
+       when is_integer(limit) and limit > 0 do
+    candidates = Enum.uniq(candidates)
+    candidates = if length(candidates) > limit, do: Enum.shuffle(candidates), else: candidates
+    TargetLimit.select(candidates, spell, primary_guid)
+  end
+
+  defp limit_targets(candidates, _spell, _primary_guid), do: Enum.uniq(candidates)
+
+  defp query_guids(caster, caster_guid, {:party_unit, guid}), do: party_unit_guids(caster, caster_guid, guid)
+
+  defp query_guids(caster, caster_guid, :caster_master) do
     case party_owner_guid(caster, caster_guid) do
       owner_guid when is_integer(owner_guid) and owner_guid != caster_guid -> [owner_guid]
       _ -> []
     end
   end
 
-  defp resolve_query(caster, caster_guid, {:unit_and_master, unit_guid}) do
-    resolve_query(caster, caster_guid, :caster_master) ++ [unit_guid]
+  defp query_guids(caster, caster_guid, {:unit_and_master, unit_guid}) do
+    query_guids(caster, caster_guid, :caster_master) ++ [unit_guid]
   end
 
-  defp resolve_query(caster, _caster_guid, {:caster_friendly_aoe, radius}) do
+  defp query_guids(caster, _caster_guid, {:caster_friendly_aoe, radius}) do
     case caster_position(caster, Time.now()) do
       {_world, x, y, z} -> nearby_friendly_guids_at(caster, {x, y, z}, radius)
       nil -> []
     end
   end
 
-  defp resolve_query(caster, _caster_guid, {:targeted_friendly_aoe, position, radius}) do
+  defp query_guids(caster, _caster_guid, {:targeted_friendly_aoe, position, radius}) do
     nearby_friendly_guids_at(caster, position, radius)
   end
 
-  defp resolve_query(caster, caster_guid, query) do
+  defp query_guids(caster, caster_guid, query) do
     case query do
       {:caster_aoe, radius} ->
         nearby_enemy_guids(caster, caster_guid, radius)

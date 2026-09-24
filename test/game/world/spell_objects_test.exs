@@ -34,6 +34,32 @@ defmodule ThistleTea.Game.World.SpellObjectsTest do
   setup [:caster]
 
   describe "resolve/4" do
+    test "caps each object's effect independently after selector filtering", %{caster: caster, spell: spell} do
+      first = for x <- 1..3, do: spawn_object(100, caster.internal.world, {x * 1.0, 0.0, 0.0})
+      second = for x <- 1..3, do: spawn_object(200, caster.internal.world, {x * 1.0, 0.0, 0.0})
+      spawn_object(300, caster.internal.world, {0.0, 0.0, 0.0})
+
+      spell = %{
+        spell
+        | max_targets: 2,
+          effects:
+            for index <- 0..1 do
+              %Effect{
+                index: index,
+                type: :activate_object,
+                implicit_target_a: :game_objects_at_source,
+                radius_yards: 5.0,
+                misc_value: 7
+              }
+            end,
+          object_targets: [%Selector{entry: 100, inverse_effect_mask: 2}, %Selector{entry: 200, inverse_effect_mask: 1}]
+      }
+
+      resolved = SpellObjects.resolve(caster, spell, Target.none())
+      assert resolved.by_effect == %{0 => Enum.take(first, 2), 1 => Enum.take(second, 2)}
+      assert length(ObjectTargets.actions(spell, resolved)) == 4
+    end
+
     test "validates explicit object presence, range and instance", %{caster: caster, spell: spell} do
       spell = %{
         spell
