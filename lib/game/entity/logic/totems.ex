@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Totems do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Modifiers
 
   @regeneration_effects [:heal, :heal_max_health, :heal_mechanical, :energize]
   @regeneration_auras [:periodic_heal, :periodic_energize, :obs_mod_health, :obs_mod_mana, :mod_regen, :mod_power_regen]
@@ -44,7 +45,13 @@ defmodule ThistleTea.Game.Entity.Logic.Totems do
     unit = if effect.health > 0, do: %{unit | base_health: effect.health}, else: unit
     unit = Stats.recompute(unit)
     unit = %{unit | health: unit.max_health}
-    totem = %Totem{owner_guid: owner.object.guid, expires_at: now + effect.duration_ms}
+
+    totem = %Totem{
+      owner_guid: owner.object.guid,
+      expires_at: now + effect.duration_ms,
+      owner_spell_modifiers: Modifiers.holders(owner)
+    }
+
     internal = %{mob.internal | totem: totem, rooted?: true, loot: nil}
     %{mob | unit: unit, internal: internal}
   end

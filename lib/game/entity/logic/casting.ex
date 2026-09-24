@@ -48,6 +48,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.Proc
+  alias ThistleTea.Game.Spell.Radius
   alias ThistleTea.Game.Spell.Requirements
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
@@ -1011,7 +1012,8 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       position ->
         events =
           for %Spell.Effect{type: :persistent_area_aura} = effect <- spell.effects do
-            Effects.spawn_area_effect(spell, effect, position, area_duration(casting, spell))
+            radius = Radius.effect(effect, Modifiers.snapshot(character, spell), 8.0)
+            %{Effects.spawn_area_effect(spell, effect, position, area_duration(casting, spell)) | radius_yards: radius}
           end
 
         Effects.enqueue(character, events)

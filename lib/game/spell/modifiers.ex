@@ -96,6 +96,7 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   def holders(_entity), do: []
 
   defp inherited_holders(%{internal: %{pet: %{owner_spell_modifiers: holders}}}), do: holders
+  defp inherited_holders(%{internal: %{totem: %{owner_spell_modifiers: holders}}}), do: holders
   defp inherited_holders(_entity), do: []
 
   defp holder_stacks(%Holder{stacks: stacks}) when is_integer(stacks) and stacks > 1, do: stacks
@@ -167,6 +168,10 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   end
 
   defp operation_used_by_spell?(:duration, %Spell{duration_ms: duration}), do: is_integer(duration) and duration > 0
+
+  defp operation_used_by_spell?(:radius, %Spell{effects: effects}) do
+    Enum.any?(effects, &(is_number(&1.radius_yards) and &1.radius_yards > 0))
+  end
 
   defp operation_used_by_spell?(:cooldown, %Spell{} = spell) do
     (spell.recovery_time_ms || 0) > 0 or (spell.category_recovery_time_ms || 0) > 0

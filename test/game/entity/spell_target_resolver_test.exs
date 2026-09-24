@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
@@ -19,6 +21,32 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   alias ThistleTea.Game.WorldRef
 
   describe "resolve/3" do
+    test "radius modifiers include the outer ring and removal restores the original boundary" do
+      source = mob_guid()
+      inner = player_guid()
+      outer = player_guid()
+      beyond = player_guid()
+      put_spatial_target(:mobs, source, {0.0, 0.0, 0.0})
+
+      for {guid, x} <- [{inner, 9.0}, {outer, 11.0}, {beyond, 13.0}] do
+        put_spatial_target(:players, guid, {x, 0.0, 0.0})
+      end
+
+      spell = %{aoe_spell(:aoe_enemy_at_caster) | spell_family: 3, family_flags_0: 0x40}
+
+      holder = %Holder{
+        spell: %Spell{id: 16_758, spell_family: 3},
+        auras: [%Aura{type: :add_pct_modifier, misc_value: 6, class_mask: 0x40, amount: 20}]
+      }
+
+      base = Map.put(caster(source, {0.0, 0.0, 0.0}), :unit, %Unit{auras: []})
+      modified = %{base | unit: %{base.unit | auras: [holder]}}
+      assert SpellTargetResolver.resolve(base, spell, Target.none()) == [inner]
+      assert Enum.sort(SpellTargetResolver.resolve(modified, spell, Target.none())) == Enum.sort([inner, outer])
+      reset = %{modified | unit: %{modified.unit | auras: []}}
+      assert SpellTargetResolver.resolve(reset, spell, Target.none()) == [inner]
+    end
+
     test "friendly areas include allies and self but exclude enemies dead actors and other copies" do
       [source, ally, dead, distant, foreign] = for _ <- 1..5, do: mob_guid()
       enemy = player_guid()

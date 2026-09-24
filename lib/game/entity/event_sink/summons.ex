@@ -20,6 +20,8 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Cooldowns
+  alias ThistleTea.Game.Spell.Modifiers
+  alias ThistleTea.Game.Spell.Radius
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AreaEffects
@@ -41,11 +43,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
         %Effects.SpawnAreaEffect{} = effect,
         _context
       ) do
-    radius =
-      case effect.effect do
-        %{radius_yards: radius} when is_number(radius) and radius > 0 -> radius
-        _ -> 8.0
-      end
+    radius = effect.radius_yards || Radius.effect(effect.effect, Modifiers.snapshot(entity, effect.spell), 8.0)
 
     dynamic_object = DataDynamicObject.build(caster_guid, world, effect.spell, effect.position, radius)
 

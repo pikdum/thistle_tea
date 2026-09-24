@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Spell.Coefficient
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Modifiers
+  alias ThistleTea.Game.Spell.Radius
   alias ThistleTea.Game.Spell.Scripts
 
   @negative_auras [
@@ -95,7 +96,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
           applied_at: now,
           expires_at: expires_at(now, effective_duration(spell, context)),
           charges: holder_charges(spell),
-          area_radius: area_radius(spell),
+          area_radius: area_radius(spell, context.spell_modifiers),
           next_area_refresh_at: next_area_refresh_at(spell, context, target_guid, now),
           auras: auras,
           negative?: negative?(spell, auras, context, target_guid)
@@ -539,12 +540,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     if proc_chance == spell.proc_chance, do: spell, else: %{spell | proc_chance: proc_chance}
   end
 
-  defp area_radius(%Spell{effects: effects}) do
+  defp area_radius(%Spell{effects: effects}, modifiers \\ []) do
     effects
     |> Enum.filter(&match?(%Effect{type: :apply_area_aura}, &1))
-    |> Enum.map(& &1.radius_yards)
-    |> Enum.filter(&is_number/1)
-    |> Enum.max(fn -> nil end)
+    |> Radius.maximum(modifiers, nil)
   end
 
   defp next_area_refresh_at(%Spell{} = spell, %CastContext{caster_guid: caster_guid}, caster_guid, now) do

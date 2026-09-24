@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastValidation
+  alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -56,7 +57,8 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   end
 
   defp resolve_targets(caster, caster_guid, spell, targets) do
-    query = pet_target_query(caster, spell) || SpellTarget.target_query(spell, targets)
+    query =
+      pet_target_query(caster, spell) || SpellTarget.target_query(spell, targets, Modifiers.snapshot(caster, spell))
 
     initial =
       caster

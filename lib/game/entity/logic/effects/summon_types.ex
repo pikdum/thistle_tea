@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SummonTypes do
   @moduledoc false
 
   effects = [
-    {:SpawnAreaEffect, [:spell, :effect, :position, :duration_ms], []},
+    {:SpawnAreaEffect, [:spell, :effect, :position, :duration_ms], [radius_yards: nil]},
     {:SpawnFarsight, [:spell, :position, :duration_ms], []},
     {:DespawnAreaEffects, [:spell_id], []},
     {:DespawnEntity, [:target_guid], []},
