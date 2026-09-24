@@ -25,6 +25,42 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureMovementTest do
 
   setup [:build_flyer]
 
+  describe "path_options/1" do
+    test "separates water permission from swim animation" do
+      fish = build_mob(2)
+      fish = %{fish | internal: %{fish.internal | creature: %{fish.internal.creature | static_flags: 0x10000000}}}
+
+      refute CreatureMovement.can_walk?(fish)
+      assert CreatureMovement.can_swim?(fish)
+      assert CreatureMovement.swims?(fish)
+      assert CreatureMovement.accessible?(fish, true)
+      refute CreatureMovement.accessible?(fish, false)
+
+      bottom_walker = build_mob(3)
+      assert CreatureMovement.can_walk?(bottom_walker)
+      assert CreatureMovement.can_swim?(bottom_walker)
+      refute CreatureMovement.swims?(bottom_walker)
+
+      land = build_mob(1)
+      assert CreatureMovement.accessible?(land, false)
+      refute CreatureMovement.accessible?(land, true)
+    end
+
+    test "combat pets can travel between habitats while charmed creatures retain their restrictions" do
+      fish = build_mob(2)
+
+      for kind <- [:hunter, :summon] do
+        pet = %{fish | internal: %{fish.internal | pet: %Pet{kind: kind}}}
+        assert CreatureMovement.can_walk?(pet)
+        assert CreatureMovement.can_swim?(pet)
+      end
+
+      charmed = %{fish | internal: %{fish.internal | pet: %Pet{kind: :charmed}}}
+      refute CreatureMovement.can_walk?(charmed)
+      assert CreatureMovement.can_swim?(charmed)
+    end
+  end
+
   describe "can_fly?/1" do
     test "loads template capability while combat pets remain grounded", %{mob: mob} do
       assert CreatureMovement.can_fly?(mob)
@@ -100,6 +136,25 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureMovementTest do
   end
 
   describe "resolve/3" do
+    test "passes aquatic capabilities to the path boundary without enabling flight" do
+      fish = build_mob(2)
+      fish = %{fish | internal: %{fish.internal | creature: %{fish.internal.creature | static_flags: 0x10000000}}}
+      requested = NavigationIntent.enqueue(fish, {20.0, 0.0, 35.0}, run?: true)
+
+      moving =
+        NavigationResolver.resolve(requested, 0, fn 0, _, destination, opts ->
+          assert opts[:can_swim?]
+          refute opts[:can_walk?]
+          assert opts[:swim_animation?]
+          assert opts[:minimum_depth] > 0
+          refute opts[:flying?]
+          [destination]
+        end)
+
+      assert moving.movement_block.spline_nodes == [{20.0, 0.0, 35.0}]
+      assert (moving.movement_block.spline_flags &&& 0x200) == 0
+    end
+
     test "requests airborne navigation for chase and home movement", %{mob: mob} do
       requested = NavigationIntent.enqueue(mob, {20.0, 0.0, 45.0}, face_target: 9)
 

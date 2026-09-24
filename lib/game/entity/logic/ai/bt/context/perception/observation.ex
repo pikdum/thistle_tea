@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation do
     :grounded_position,
     :distance,
     :metadata,
+    :swimmable?,
     moving?: false,
     line_of_sight?: true
   ]

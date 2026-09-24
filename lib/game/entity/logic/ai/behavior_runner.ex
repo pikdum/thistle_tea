@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Totem, as: TotemBT
   alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.Entity.Logic.TemporarySummon
+  alias ThistleTea.Game.Entity.Logic.UnreachableTarget
 
   def tick(tree, %{internal: %Internal{}} = entity, %Context{now: now} = context) do
     entity = TemporarySummon.tick(entity, now)
@@ -45,6 +46,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
     {:failure, entity, blackboard} = AuraBT.tick(entity, blackboard, context)
     {:failure, entity, blackboard} = RegenBT.tick(entity, blackboard, now)
     entity = %{entity | internal: %{entity.internal | blackboard: blackboard}}
-    CombatLeash.maintain(entity, now)
+    entity |> CombatLeash.maintain(now) |> UnreachableTarget.maintain(context)
   end
 end

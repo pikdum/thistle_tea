@@ -31,7 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Navigation do
   end
 
   def chase(entity, target_guid, destination, %Context{} = context) do
-    move_to(entity, destination, [face_target: target_guid], context)
+    move_to(entity, destination, [face_target: target_guid, chase_target: target_guid], context)
   end
 
   def follow(entity, destination, orientation, velocity, %Context{} = context) do

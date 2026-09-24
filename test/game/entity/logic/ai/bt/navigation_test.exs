@@ -39,7 +39,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.NavigationTest do
       assert [
                %NavigationIntent{
                  destination: destination,
-                 opts: [face_target: 42]
+                 opts: [face_target: 42, chase_target: 42]
                }
              ] = requested.internal.navigation_intents
 

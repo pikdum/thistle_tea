@@ -8,7 +8,9 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
   alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
   alias ThistleTea.Game.Entity.Logic.CreatureMovement
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.UnreachableTarget
   alias ThistleTea.Game.Math
+  alias ThistleTea.Game.World.Loader.ModelGeometry
   alias ThistleTea.Game.World.Pathfinding
 
   def resolve(entity, now, find_path \\ &Pathfinding.find_path/4)
@@ -20,6 +22,20 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
   end
 
   def resolve(entity, _now, _find_path), do: entity
+
+  def path_options(entity) do
+    case CreatureMovement.path_options(entity) do
+      [] ->
+        []
+
+      opts ->
+        Keyword.put(
+          opts,
+          :minimum_depth,
+          ModelGeometry.height(entity.unit.display_id) * (entity.object.scale_x || 1.0) * 0.75
+        )
+    end
+  end
 
   defp resolve_intent(
          %{internal: %Internal{world: world}} = entity,
@@ -35,10 +51,12 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
     {max_distance, opts} = Keyword.pop(opts, :max_distance)
     {within_radius, opts} = Keyword.pop(opts, :within_radius)
     {pathfind?, opts} = Keyword.pop(opts, :pathfind?, true)
+    {chase_target, opts} = Keyword.pop(opts, :chase_target)
     start = {start_x, start_y, start_z}
     opts = travel_velocity(opts, start, destination)
     entity = replace_point_movement(entity, opts, now)
     path_opts = if flying?, do: [allow_steep: allow_steep, flying?: true], else: [allow_steep: allow_steep]
+    path_opts = path_opts ++ path_options(entity)
 
     path =
       cond do
@@ -52,10 +70,13 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
         path = path |> limit_path(start, max_distance) |> within_radius(start, within_radius)
         opts = arrival_velocity(opts, [start | path], now)
         opts = completion_options(opts, path, destination)
-        Movement.move_along_path(entity, path, opts, now)
+
+        entity
+        |> UnreachableTarget.record(chase_target, NavigationIntent.reached?(List.last(path) || start, destination), now)
+        |> Movement.move_along_path(path, opts, now)
 
       _no_path ->
-        entity
+        UnreachableTarget.record(entity, chase_target, false, now)
     end
   end
 

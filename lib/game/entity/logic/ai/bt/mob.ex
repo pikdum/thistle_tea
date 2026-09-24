@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
+  alias ThistleTea.Game.Entity.Logic.CreatureMovement
   alias ThistleTea.Game.Entity.Logic.Critter
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -46,6 +47,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.Invisibility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
+  alias ThistleTea.Game.Entity.Logic.UnreachableTarget
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Time
@@ -356,6 +358,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       perception_target(perception, guid)
     ) and
       distance <= aggro_radius(state, guid, perception) and
+      CreatureMovement.accessible?(state, Perception.swimmable?(perception, guid)) and
       Detection.detectable?(state, guid, context) and
       Perception.line_of_sight?(perception, guid)
   end
@@ -555,14 +558,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {:success, state, blackboard}
   end
 
-  def should_tether?(%Mob{} = state, _blackboard, %Context{now: now, perception: perception} = context) do
+  def should_tether?(%Mob{} = state, blackboard, %Context{now: now, perception: perception} = context) do
     target = state.unit.target
 
-    Core.should_tether?(state, now,
-      shared_time: context.shared_leash_time,
-      attack_distance: aggro_radius(state, target, perception),
-      victim_position: Perception.position(perception, target)
-    )
+    UnreachableTarget.expired?(state, blackboard, now) or
+      Core.should_tether?(state, now,
+        shared_time: context.shared_leash_time,
+        attack_distance: aggro_radius(state, target, perception),
+        victim_position: Perception.position(perception, target)
+      )
   end
 
   def should_tether?(%Mob{} = state, _blackboard, now) when is_integer(now) do
@@ -1016,7 +1020,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
        ) do
     target = state.unit.target
 
-    case Perception.grounded_position(perception, target) do
+    case pursuit_position(state, target, perception) do
       {world, x, y, z} when world == state.internal.world ->
         {state, blackboard} = maybe_repath_chase(state, blackboard, {x, y, z}, target, context)
         delay_ms = chase_delay(state, target, {x, y}, context)
@@ -1027,6 +1031,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         clear_chase_and_idle(state, blackboard, context)
     end
   end
+
+  defp pursuit_position(state, target, perception) do
+    if spatial_pursuit?(state, target, perception),
+      do: Perception.position(perception, target),
+      else: Perception.grounded_position(perception, target)
+  end
+
+  defp spatial_pursuit?(state, target, perception),
+    do:
+      CreatureMovement.can_fly?(state) or
+        (CreatureMovement.can_swim?(state) and Perception.swimmable?(perception, target) == true)
 
   def wait_for_chase_tick(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
     wait_for_chase_tick(state, blackboard, now)
@@ -1149,7 +1164,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
          %Context{perception: perception}
        ) do
     threshold = chase_repath_distance(state, target_guid, perception)
-    planar_distance({lx, ly, lz}, {tx, ty, tz}) > threshold
+
+    distance =
+      if spatial_pursuit?(state, target_guid, perception),
+        do: Math.distance({lx, ly, lz}, {tx, ty, tz}),
+        else: planar_distance({lx, ly, lz}, {tx, ty, tz})
+
+    distance > threshold
   end
 
   defp target_moved_enough?(%Mob{}, %Blackboard{}, {_x, _y, _z}, _target_guid, %Context{}), do: true

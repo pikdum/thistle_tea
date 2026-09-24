@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.World.Pathfinding do
   terrain and liquid heights, and zone/area lookup.
   """
   alias ThistleTea.Game.Math
+  alias ThistleTea.Game.World.Pathfinding.Aquatic
   alias ThistleTea.Native.Namigator
 
   @area_floor_tolerance 0.1
@@ -35,10 +36,10 @@ defmodule ThistleTea.Game.World.Pathfinding do
   end
 
   def find_path(map_id, start, destination, opts \\ []) do
-    if Keyword.get(opts, :flying?, false) do
-      flight_path(map_id, start, destination, opts)
-    else
-      ground_path(map_id, start, destination, opts)
+    cond do
+      Keyword.get(opts, :flying?, false) -> flight_path(map_id, start, destination, opts)
+      Keyword.has_key?(opts, :can_swim?) -> Aquatic.path(map_id, start, destination, opts, &ground_path/4)
+      true -> ground_path(map_id, start, destination, opts)
     end
   end
 
@@ -183,8 +184,11 @@ defmodule ThistleTea.Game.World.Pathfinding do
       else: collision_fraction(map_id, origin, destination, clear, fraction, steps - 1)
   end
 
-  defp collision_clear?(map_id, {sx, sy, sz}, {dx, dy, dz}),
-    do: Namigator.line_of_sight(map_id, sx, sy, sz, dx, dy, dz, true) != false
+  def collision_clear?(map_id, {sx, sy, sz}, {dx, dy, dz}) do
+    load_adt_at(map_id, {sx, sy})
+    load_adt_at(map_id, {dx, dy})
+    Namigator.line_of_sight(map_id, sx, sy, sz, dx, dy, dz, true) != false
+  end
 
   defp clear_segment(map_id, origin, destination, clear, _blocked, 0),
     do: nearest_ground(map_id, interpolate(origin, destination, clear))

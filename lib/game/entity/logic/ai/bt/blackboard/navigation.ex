@@ -13,6 +13,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Navigation do
             wait_time: nil,
             last_target_pos: nil,
             chase_started: false,
+            unreachable_target: nil,
+            unreachable_since: nil,
             run_mode: false,
             next_chase_at: 0,
             next_wander_at: 0,

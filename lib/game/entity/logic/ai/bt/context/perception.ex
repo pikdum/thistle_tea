@@ -29,6 +29,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception do
     end
   end
 
+  def swimmable?(%__MODULE__{} = perception, guid) do
+    case observation(perception, guid) do
+      %Observation{swimmable?: swimmable?} -> swimmable?
+      nil -> nil
+    end
+  end
+
   def projected_position(%__MODULE__{} = perception, guid, horizon_ms)
       when is_integer(horizon_ms) and horizon_ms >= 0 do
     case observation(perception, guid) do

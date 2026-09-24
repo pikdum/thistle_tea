@@ -139,7 +139,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   end
 
   def clear_chase(%__MODULE__{navigation: navigation} = blackboard) do
-    %{blackboard | navigation: %{navigation | chase_started: false, last_target_pos: nil}}
+    %{
+      blackboard
+      | navigation: %{
+          navigation
+          | chase_started: false,
+            last_target_pos: nil,
+            unreachable_target: nil,
+            unreachable_since: nil
+        }
+    }
   end
 
   def spread_attempts(%__MODULE__{combat: %Combat{spread_attempts: attempts}}), do: attempts

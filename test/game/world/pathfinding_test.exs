@@ -3,11 +3,61 @@ defmodule ThistleTea.Game.World.PathfindingTest do
 
   alias ThistleTea.Game.Player.Fishing
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.Pathfinding.Aquatic
   alias ThistleTea.Game.WorldRef
 
   @moduletag :namigator_maps
 
   @human_start {-8949.95, -132.49, 83.53}
+
+  describe "find_path/4 with aquatic habitats" do
+    test "retains depth and follows vertical destinations in open water" do
+      origin = {-2183.26, -1867.59, -5.0}
+      opts = [can_walk?: false, can_swim?: true, swim_animation?: true]
+
+      for destination <- [{-2178.26, -1867.59, -3.0}, {-2183.26, -1867.59, -1.0}] do
+        assert Pathfinding.find_path(0, origin, destination, opts) == [destination]
+      end
+    end
+
+    test "clamps nearby airborne targets to the water surface and rejects dry destinations" do
+      origin = {-2183.26, -1867.59, -5.0}
+      opts = [can_walk?: false, can_swim?: true, swim_animation?: true]
+      assert [{x, y, z}] = Pathfinding.find_path(0, origin, {-2183.26, -1867.59, 1.0}, opts)
+      assert {x, y} == {-2183.26, -1867.59}
+      assert_in_delta z, 0.268179, 0.00001
+      assert Pathfinding.find_path(0, origin, {-2183.26, -1867.59, 5.0}, opts) == nil
+      assert Pathfinding.find_path(0, origin, @human_start, opts) == nil
+    end
+
+    test "land-only creatures reject submerged targets and water needs enough depth" do
+      origin = {-2183.26, -1867.59, -5.0}
+      assert Pathfinding.find_path(0, origin, {-2178.26, -1867.59, -3.0}, can_walk?: true, can_swim?: false) == nil
+      assert Aquatic.water(0, origin, 5.0)
+      assert Aquatic.water(0, origin, 20.0) == nil
+      assert Aquatic.water(0, {-2183.26, -1867.59, -20.0}) == nil
+    end
+
+    test "underwater wandering retains depth instead of choosing the seabed" do
+      origin = {-2183.26, -1867.59, -5.0}
+      opts = [can_walk?: false, can_swim?: true, swim_animation?: true]
+
+      for _ <- 1..12 do
+        assert {x, y, z} = Aquatic.random_point(0, origin, 2.0, opts)
+        assert_in_delta z, -5.0, 0.00001
+        assert distance(origin, {x, y, z}) <= 2.0
+        assert Aquatic.water(0, {x, y, z})
+      end
+    end
+
+    test "rejects a detour that takes a water-only creature above the surface" do
+      origin = {-2183.26, -1867.59, -5.0}
+      destination = {-2178.26, -1867.59, -3.0}
+      opts = [can_walk?: false, can_swim?: true, swim_animation?: false]
+      detour = fn _, _, _, _ -> [{-2183.26, -1867.59, 5.0}, destination] end
+      assert Aquatic.path(0, origin, destination, opts, detour) == nil
+    end
+  end
 
   describe "find_path/4 with flight" do
     test "retains a flight destination above the ground mesh" do

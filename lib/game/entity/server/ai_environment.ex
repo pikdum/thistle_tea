@@ -45,6 +45,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.World.Loader.Waypoint, as: WaypointLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.Pathfinding.Aquatic
   alias ThistleTea.Game.World.SpellAreas
   alias ThistleTea.Game.World.System.ScriptedEvent
 
@@ -407,10 +408,20 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       grounded_position: World.grounded_target_position(guid, now),
       distance: distance(origin(entity), position),
       metadata: Metadata.get(guid),
+      swimmable?: swimmable_target?(entity, position),
       moving?: World.moving?(guid, now),
       line_of_sight?: line_of_sight?(entity, guid, line_of_sight_guids)
     }
   end
+
+  defp swimmable_target?(%Mob{} = entity, {%{map_id: map_id}, x, y, z}) do
+    case NavigationResolver.path_options(entity) do
+      [] -> nil
+      opts -> Aquatic.water(map_id, {x, y, z}, opts[:minimum_depth]) != nil
+    end
+  end
+
+  defp swimmable_target?(_entity, _position), do: nil
 
   defp line_of_sight?(entity, guid, line_of_sight_guids) do
     guid == own_guid(entity) or
@@ -489,13 +500,14 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       entity
       |> random_point_requests(now)
       |> Map.new(fn {map_id, anchor, radius} ->
-        {{map_id, anchor, radius}, Pathfinding.find_random_point_around_circle(map_id, anchor, radius)}
+        {{map_id, anchor, radius},
+         Aquatic.random_point(map_id, anchor, radius, NavigationResolver.path_options(entity))}
       end)
       |> Navigation.new()
 
     if Fear.ready?(entity, now) do
       {map_id, anchor, radius} = Fear.destination_request(entity, perception, random)
-      %{navigation | fear_point: Pathfinding.find_random_point_around_circle(map_id, anchor, radius)}
+      %{navigation | fear_point: Aquatic.random_point(map_id, anchor, radius, NavigationResolver.path_options(entity))}
     else
       navigation
     end
