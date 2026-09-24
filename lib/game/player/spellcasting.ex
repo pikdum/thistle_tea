@@ -82,7 +82,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
          true <- PlayerCharm.controller_active?(control.caster_guid, Metadata.get(control.caster_guid)),
          {world, _, _, _} when world == character.internal.world <- World.position(control.caster_guid) do
       state = snapshot_action_position(state)
-      targets = Target.unit(effect.target_guid)
+      targets = charm_targets(spell, effect.target_guid)
 
       if validate_cast(state, spell, targets, nil) == :ok,
         do: state |> cast_target(spell, targets, nil) |> cast_state(),
@@ -93,6 +93,16 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   end
 
   def charm_cast(state, _effect), do: state
+
+  defp charm_targets(spell, guid) do
+    position =
+      case World.position(guid) do
+        {_world, x, y, z} -> {x, y, z}
+        _missing -> nil
+      end
+
+    SpellTarget.aim_at_unit(spell, guid, position)
+  end
 
   def scripted_cast(state, %CreatureSpell{} = entry, target_guid) do
     case SpellLoader.load(entry.spell_id) do

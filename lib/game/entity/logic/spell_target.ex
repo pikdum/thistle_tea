@@ -10,6 +10,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   alias ThistleTea.Game.Spell.Radius
   alias ThistleTea.Game.Spell.Target
 
+  def aim_at_unit(%Spell{} = spell, guid, {x, y, z}) do
+    targets = Target.unit(guid)
+
+    if targeted_aoe_spell?(spell) and not caster_destination_spell?(spell),
+      do: %{targets | destination_location: {x, y, z}},
+      else: targets
+  end
+
+  def aim_at_unit(%Spell{}, guid, _position), do: Target.unit(guid)
+
   def target_query(spell, targets, modifiers \\ [])
 
   def target_query(%Spell{} = spell, %Target{} = targets, modifiers) do

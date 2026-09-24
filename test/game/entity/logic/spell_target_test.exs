@@ -6,6 +6,30 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Target
 
+  describe "aim_at_unit/3" do
+    test "anchors hostile ground areas to the selected unit" do
+      for target <- [:aoe_enemy_at_dest, :aoe_enemy_at_channel] do
+        spell = aoe_spell(target)
+        targets = SpellTarget.aim_at_unit(spell, 2, {20.0, 30.0, 40.0})
+
+        assert Target.unit_guid(targets) == 2
+        assert SpellTarget.target_query(spell, targets) == {:targeted_aoe, {20.0, 30.0, 40.0}, 10.0}
+      end
+    end
+
+    test "preserves caster areas and direct unit selection" do
+      for target <- [:aoe_enemy_at_caster, :aoe_enemy_in_cone, :target_enemy] do
+        assert SpellTarget.aim_at_unit(aoe_spell(target), 2, {20.0, 30.0, 40.0}) == Target.unit(2)
+      end
+
+      spell = %Spell{
+        effects: [%Effect{implicit_target_a: :caster_destination, implicit_target_b: :aoe_enemy_at_dest}]
+      }
+
+      assert SpellTarget.aim_at_unit(spell, 2, {20.0, 30.0, 40.0}) == Target.unit(2)
+    end
+  end
+
   describe "target_query/2" do
     test "friendly source areas ignore an enemy selection and distinguish explicit source positions" do
       effect = %Effect{

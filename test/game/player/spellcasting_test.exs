@@ -85,6 +85,17 @@ defmodule ThistleTea.Game.Player.SpellcastingTest do
       assert Target.unit_guid(cast.character.internal.casting.targets) == target
       assert_receive :player_tick
 
+      ground_spell = %{
+        spell
+        | effects: [%Effect{type: :persistent_area_aura, implicit_target_a: :aoe_enemy_at_channel, radius_yards: 8.0}]
+      }
+
+      ground_control = %{control | spells: [ground_spell]}
+      ground_internal = %{character.internal | possession: ground_control, spellbook: %{spell.id => ground_spell}}
+      ground_state = %{state | character: %{character | internal: ground_internal}}
+      ground_cast = Spellcasting.charm_cast(ground_state, effect)
+      assert Target.ground_location(ground_cast.character.internal.casting.targets) == {5.0, 0.0, 0.0}
+
       for unit <- [%{character.unit | health: 0}, %{character.unit | power1: 0}] do
         rejected = %{state | character: %{character | unit: unit}}
         assert Spellcasting.charm_cast(rejected, effect) == rejected
