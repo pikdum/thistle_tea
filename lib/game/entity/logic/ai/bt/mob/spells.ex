@@ -552,6 +552,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
           attackable?: Hostility.attackable?(source, metadata),
           creature_type: Map.get(metadata, :creature_type),
           combat_reach: Map.get(metadata, :combat_reach),
+          orientation: Map.get(metadata, :orientation),
           position: Perception.position(perception, target_guid),
           los?: Perception.line_of_sight?(perception, target_guid)
         }

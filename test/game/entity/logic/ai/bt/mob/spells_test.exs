@@ -161,6 +161,26 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
   end
 
   describe "attempt_commanded_cast/5" do
+    test "positional casts use the target facing from the supplied observation" do
+      target_guid = hostile_player(3.0)
+      spell = %{fireball() | attributes: MapSet.new([:from_behind])}
+      entry = entry(spell.id)
+      state = fixture_mob(spellbook: %{spell.id => spell}) |> with_target(target_guid)
+      Metadata.update(target_guid, %{orientation: 0.0})
+      behind = context(state)
+      Metadata.update(target_guid, %{orientation: :math.pi()})
+      facing = context(state)
+
+      assert {:error, :not_behind} =
+               MobSpells.attempt_commanded_cast(state, Blackboard.new(), entry, target_guid, facing)
+
+      assert {:ok, {casted, _}} =
+               MobSpells.attempt_commanded_cast(state, Blackboard.new(), entry, target_guid, behind)
+
+      assert casted.internal.casting.spell.id == spell.id
+      assert Enum.any?(casted.internal.events, &is_struct(&1, Effects.SpellStart))
+    end
+
     test "requires stealth before admitting an opener and consumes it during preparation" do
       target_guid = hostile_player(20.0)
       spell = %{fireball() | attributes: MapSet.new([:only_stealthed])}
