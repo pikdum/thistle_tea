@@ -141,9 +141,11 @@ on device `0000:0c:00.0`; samples are `accepted-gpu.log` and
 
 The final server had no error-level entries or spell-validation failures.
 Existing debug-level unsupported `swap-initial-targets` messages for script
-1569406 appeared in the visited world content; fireworks scripting was not
-validated by these creature-variant checks. This is not whole-holiday or vanilla
-parity acceptance.
+1569406 appeared in the visited world content. That reveler conversation was
+subsequently implemented and validated in
+[script target acceptance](script-targets-playtest.md). Fireworks scripting was
+not validated by these creature-variant checks. This is not whole-holiday or
+vanilla parity acceptance.
 
 The final client and both earlier clients were stopped through their exact
 helper-owned services. All three retained server PTYs exited. After final
