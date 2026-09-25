@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
             fear: nil,
             flee: nil,
             assistance: nil,
+            distancing: nil,
             confusion: nil,
             charm: nil,
             critter: nil,

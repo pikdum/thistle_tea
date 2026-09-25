@@ -415,6 +415,28 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, state}
   end
 
+  def handle_cast({:flee_from_help, caller_guid, target_guid}, %Mob{} = state) do
+    now = Time.now()
+
+    if Assistance.flee_available?(state) and Hostility.valid_attack_target?(state, target_guid) do
+      context = AIEnvironment.context(state, now, %ObservationRequest{actors: [caller_guid, target_guid]})
+
+      state =
+        state
+        |> Assistance.flee_from_help(caller_guid, target_guid, context)
+        |> NavigationResolver.resolve(now)
+        |> wake_ai_tick()
+
+      {:noreply, state, {:continue, :maybe_broadcast}}
+    else
+      {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Creature help retreat failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   @impl GenServer
   def handle_cast({:receive_spell, caster, spell}, state) do
     previous = state
@@ -1397,7 +1419,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
          %Mob{object: %{guid: guid}, movement_block: %MovementBlock{position: {_x, _y, _z, orientation}}} = state
        )
        when is_integer(guid) and is_number(orientation) do
-    Metadata.update(guid, %{orientation: orientation, assistance_available?: Assistance.available?(state)})
+    Metadata.update(guid, %{
+      orientation: orientation,
+      assistance_available?: Assistance.available?(state),
+      flee_from_help_available?: Assistance.flee_available?(state)
+    })
+
     state
   end
 

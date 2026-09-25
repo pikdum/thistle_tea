@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Waypoints
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Distancing
   alias ThistleTea.Game.Entity.Logic.AI.BT.Flee
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.Assistance
@@ -400,6 +401,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
          %Context{}
        ) do
     {halt_scripted_movement(state, now), Blackboard.start_home(blackboard, {x, y, z})}
+  end
+
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :movement, datalong: 19} = step, target, _now, context) do
+    if step.datalong3 == 0 or (Core.mana_pct(state) || 0) >= step.datalong3 do
+      Distancing.start(state, blackboard, resolve_target(state, step, target, context), elem(step.position, 0), context)
+    else
+      {state, blackboard}
+    end
   end
 
   defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :movement}, _target, _now, %Context{}) do

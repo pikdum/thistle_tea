@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
   alias ThistleTea.Game.Entity.Logic.CreatureMovement
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.UnreachableTarget
+  alias ThistleTea.Game.Entity.Server.DistancingNavigation
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.World.Loader.ModelGeometry
   alias ThistleTea.Game.World.Pathfinding
@@ -37,7 +38,13 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
     end
   end
 
-  defp resolve_intent(
+  defp resolve_intent(entity, %NavigationIntent{opts: opts} = intent, now, find_path) do
+    if Keyword.get(opts, :distancing?, false),
+      do: DistancingNavigation.resolve(Movement.sync_position(entity, now), intent, now, find_path),
+      else: resolve_path(entity, intent, now, find_path)
+  end
+
+  defp resolve_path(
          %{internal: %Internal{world: world}} = entity,
          %NavigationIntent{destination: destination, path: requested_path, opts: opts},
          now,

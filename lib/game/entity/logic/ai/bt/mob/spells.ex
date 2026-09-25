@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Distancing
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
@@ -475,12 +476,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   defp missing_buff_spell_id(%CreatureSpell{spell_id: spell_id}), do: spell_id
 
-  def flags_allow?(
-        %{object: %{guid: guid}, unit: %Unit{}} = state,
-        %CreatureSpell{} = entry,
-        target_guid,
-        %Context{} = context
-      ) do
+  def flags_allow?(%{object: %{}, unit: %Unit{}} = state, %CreatureSpell{} = entry, target_guid, %Context{} = context) do
+    movement_allows_cast?(state, entry) and target_flags_allow?(state, entry, target_guid, context)
+  end
+
+  def flags_allow?(_state, _entry, _target_guid, _context), do: false
+
+  defp movement_allows_cast?(state, entry), do: not Distancing.active?(state) or CreatureSpell.flag?(entry, :force_cast)
+
+  defp target_flags_allow?(%{object: %{guid: guid}} = state, entry, target_guid, context) do
     cond do
       CreatureSpell.flag?(entry, :target_unreachable) ->
         false
@@ -501,8 +505,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
         true
     end
   end
-
-  def flags_allow?(_state, _entry, _target_guid, _context), do: false
 
   defp in_melee_range?(%{object: %{guid: guid}}, target_guid, %Context{}) when target_guid == guid, do: false
 

@@ -95,6 +95,25 @@ defmodule ThistleTea.Game.World.CallForHelpTest do
   end
 
   describe "pulse/2" do
+    test "alarms wandering members of fleeing factions without recruiting them" do
+      {caller, enemy_guid} = combat_scene()
+      caller_guid = caller.object.guid
+      put_helper({4.0, 0.0, 0.0}, faction_template: fleeing_trogg(), flee_from_help_available?: true)
+
+      assert CallForHelp.capture(caller, enemy_guid) == []
+      CallForHelp.pulse(caller, enemy_guid)
+      assert_receive {:"$gen_cast", {:flee_from_help, ^caller_guid, ^enemy_guid}}
+      refute_receive {:"$gen_cast", {:assist_attack, _}}
+    end
+
+    test "does not alarm unavailable or distant creatures" do
+      {caller, enemy_guid} = combat_scene()
+      put_helper({4.0, 0.0, 0.0}, faction_template: fleeing_trogg())
+      put_helper({8.0, 0.0, 0.0}, faction_template: fleeing_trogg(), flee_from_help_available?: true)
+      CallForHelp.pulse(caller, enemy_guid)
+      refute_receive {:"$gen_cast", {:flee_from_help, _, _}}
+    end
+
     test "recruits friendly helpers of other factions within call_for_help_range" do
       {caller, enemy_guid} = combat_scene(range: 5.0)
       put_helper({4.0, 0.0, 0.0}, faction_template: defias_ally())
@@ -215,6 +234,7 @@ defmodule ThistleTea.Game.World.CallForHelpTest do
 
     Metadata.put(helper_guid, %{
       assistance_available?: Keyword.get(opts, :alive?, true) and is_nil(Keyword.get(opts, :owner_guid)),
+      flee_from_help_available?: Keyword.get(opts, :flee_from_help_available?, false),
       alive?: Keyword.get(opts, :alive?, true),
       faction_template: Keyword.get(opts, :faction_template, defias()),
       unit_flags: 0,

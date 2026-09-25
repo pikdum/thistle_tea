@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Distancing
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
@@ -124,7 +125,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     nearby = nearby_guids(entity, radius, game_object_radius)
 
     guids =
-      [own_guid(entity), Fear.source_guid(entity) | direct_guids(entity)]
+      [own_guid(entity), Fear.source_guid(entity), Distancing.target_guid(entity) | direct_guids(entity)]
       |> Enum.concat(observed_guids)
       |> Enum.concat(Enum.flat_map(nearby, fn {_kind, entries} -> Enum.map(entries, &elem(&1, 0)) end))
       |> Enum.filter(&(is_integer(&1) and &1 > 0))

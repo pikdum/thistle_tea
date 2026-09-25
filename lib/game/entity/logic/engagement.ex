@@ -287,7 +287,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
     |> Blackboard.reset_spread()
     |> Blackboard.reset_spells()
     |> Blackboard.clear_flee()
-    |> then(&%{&1 | critter: nil})
+    |> then(&%{&1 | critter: nil, distancing: nil})
   end
 
   defp leave_effects(source_guid, target, clear_tap?) do

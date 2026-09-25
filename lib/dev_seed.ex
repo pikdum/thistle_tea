@@ -25,6 +25,9 @@ defmodule ThistleTea.DevSeed do
   Bloodseeker Bat, for flight, corpse landing, and respawn testing.
   Two Horde Laborers east of the playground retain their low-health assistance
   event, with their initial aggro shout disabled, to isolate retreat and recruitment.
+  Marisa du'Paige northeast of the playground retains her root-and-retreat spells.
+  A stationary Rockjaw Trogg and wandering Burly Rockjaw Trogg farther north
+  support fleeing-faction help alarms without initial assistance recruitment.
   """
   import Ecto.Query
 
@@ -337,6 +340,10 @@ defmodule ThistleTea.DevSeed do
     for {offset, index} <- [{160.0, 0}, {184.0, 1}] do
       spawn_mob(14_718, @base_low_guid + 2000 + index, {x + offset, y, z}, nil, 30, ai_events: [:hp])
     end
+
+    spawn_mob(599, @base_low_guid + 2100, {x + 160.0, y + 80.0, z}, nil, 30)
+    spawn_mob(707, @base_low_guid + 2200, {x + 160.0, y + 150.0, z}, nil, 30)
+    spawn_mob(724, @base_low_guid + 2201, {x + 176.0, y + 150.0, z}, nil, 30, wander: 2.0)
   end
 
   defp seed_game_objects do

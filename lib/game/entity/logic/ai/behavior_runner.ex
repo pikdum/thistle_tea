@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Distancing
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.SeekAssistance
   alias ThistleTea.Game.Entity.Logic.AI.BT.Totem, as: TotemBT
@@ -47,6 +48,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
     {:failure, entity, blackboard} = AuraBT.tick(entity, blackboard, context)
     {:failure, entity, blackboard} = RegenBT.tick(entity, blackboard, now)
     entity = %{entity | internal: %{entity.internal | blackboard: blackboard}}
-    entity |> SeekAssistance.maintain(context) |> CombatLeash.maintain(now) |> UnreachableTarget.maintain(context)
+
+    entity
+    |> SeekAssistance.maintain(context)
+    |> Distancing.maintain(context)
+    |> CombatLeash.maintain(now)
+    |> UnreachableTarget.maintain(context)
   end
 end

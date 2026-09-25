@@ -43,6 +43,9 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:assist_attack, target_guid, source})
   end
 
+  def flee_from_help(entity, caller_guid, target_guid),
+    do: dispatch_cast(entity, {:flee_from_help, caller_guid, target_guid})
+
   def receive_spell(entity, caster, spell) do
     dispatch_cast(entity, {:receive_spell, caster, spell})
   end

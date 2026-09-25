@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
   alias ThistleTea.Game.Entity.Logic.AI.BT.Critter, as: CritterBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Detection
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Distancing
   alias ThistleTea.Game.Entity.Logic.AI.BT.Fear, as: FearBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Flee
   alias ThistleTea.Game.Entity.Logic.AI.BT.Formation
@@ -111,6 +112,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       BT.action(&eventai_step/3),
       BT.action(&SeekAssistance.tick/3),
       BT.action(&Flee.tick/3),
+      BT.action(&Distancing.tick/3),
       BT.sequence([
         BT.condition(&aggro_check_ready?/3),
         BT.condition(&not_in_combat?/2),
@@ -225,18 +227,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp has_waypoints?(%Mob{} = state, %Blackboard{} = blackboard),
     do: is_struct(waypoint_destination(state, blackboard), Waypoint)
 
-  defp can_wander?(%Mob{}, %Blackboard{navigation: %NavigationMemory{movement_override: :random}}), do: true
-
-  defp can_wander?(%Mob{}, %Blackboard{navigation: %NavigationMemory{movement_override: override}})
-       when not is_nil(override), do: false
-
-  defp can_wander?(%Mob{internal: %Internal{spawn: %Spawn{movement_type: 1}}}, _blackboard) do
-    true
-  end
-
-  defp can_wander?(%Mob{}, _blackboard) do
-    false
-  end
+  defp can_wander?(%Mob{} = state, %Blackboard{} = blackboard), do: CreatureMovement.random?(state, blackboard)
 
   defp scripted_home?(%Mob{}, %Blackboard{navigation: %NavigationMemory{movement_override: :home}}), do: true
   defp scripted_home?(%Mob{}, %Blackboard{}), do: false

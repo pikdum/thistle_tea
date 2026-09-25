@@ -7,12 +7,21 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureMovement do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
 
   @inhabit_ground 1
   @inhabit_water 2
   @inhabit_air 4
   @flight_flags 0x01800000
+
+  def random?(%{internal: internal} = entity), do: random?(entity, Blackboard.ensure(internal.blackboard))
+
+  def random?(_entity, %Blackboard{navigation: %{movement_override: override}}) when not is_nil(override),
+    do: override == :random
+
+  def random?(%{internal: %{spawn: %{movement_type: 1}}}, _blackboard), do: true
+  def random?(_entity, _blackboard), do: false
 
   def can_fly?(%{internal: %Internal{pet: %Pet{kind: kind}}}) when kind in [:hunter, :summon], do: false
 

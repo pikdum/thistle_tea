@@ -56,7 +56,7 @@ defmodule ThistleTea.Game.World.CallForHelp do
     state
     |> World.nearby_mobs(radius)
     |> Enum.flat_map(fn {guid, _distance} ->
-      if guid != state.object.guid and Assistance.eligible?(Metadata.get(guid), caller, enemy, faction_check) and
+      if guid != state.object.guid and not is_nil(reaction(Metadata.get(guid), caller, enemy, faction_check)) and
            World.line_of_sight?(state, guid), do: [guid], else: []
     end)
   end
@@ -66,18 +66,31 @@ defmodule ThistleTea.Game.World.CallForHelp do
     enemy = Assistance.faction(Metadata.get(target_guid))
 
     Enum.each(helpers, fn guid ->
-      if same_world?(state, guid) and Assistance.eligible?(Metadata.get(guid), caller, enemy, faction_check) do
-        notify_helper(state, guid, target_guid, faction_check)
+      reaction = reaction(Metadata.get(guid), caller, enemy, faction_check)
+
+      if same_world?(state, guid) and not is_nil(reaction) do
+        notify_helper(state, guid, target_guid, faction_check, reaction)
       end
     end)
 
     :ok
   end
 
-  defp notify_helper(state, guid, target_guid, :same_faction),
+  defp reaction(helper, caller, enemy, check) do
+    cond do
+      Assistance.eligible?(helper, caller, enemy, check) -> :assist
+      check == :friendly and Assistance.eligible_flee?(helper, caller, enemy) -> :flee
+      true -> nil
+    end
+  end
+
+  defp notify_helper(state, guid, target_guid, :same_faction, :assist),
     do: Entity.assist_attack(guid, target_guid, CombatLeash.reference(state))
 
-  defp notify_helper(_state, guid, target_guid, :friendly), do: Entity.assist_attack(guid, target_guid)
+  defp notify_helper(_state, guid, target_guid, :friendly, :assist), do: Entity.assist_attack(guid, target_guid)
+
+  defp notify_helper(state, guid, target_guid, :friendly, :flee),
+    do: Entity.flee_from_help(guid, state.object.guid, target_guid)
 
   defp same_world?(state, guid) do
     case World.position(guid) do

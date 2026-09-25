@@ -32,6 +32,11 @@ defmodule FactionTemplate do
 
   def responds_to_call_for_help?(_faction_template), do: false
 
+  def flees_from_call_for_help?(%__MODULE__{flags: flags}) when is_integer(flags),
+    do: (flags &&& @flag_flee_from_call_for_help) != 0
+
+  def flees_from_call_for_help?(_faction_template), do: false
+
   def attacks_contested_players?(%__MODULE__{flags: flags}) when is_integer(flags) do
     (flags &&& @flag_attack_contested_players) != 0
   end
