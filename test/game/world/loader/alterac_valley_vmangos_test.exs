@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.World.Loader.AlteracValleyVMangosTest do
         assert MapSet.member?(events, {event, state})
       end
 
-      for {id, node} <- Node.all(), node.kind == :tower, tier <- 0..3 do
+      for {_id, node} <- Node.all(), node.kind == :tower, tier <- 0..3 do
         for event <- Node.defender_events(node, tier), do: assert(MapSet.member?(events, event))
       end
     end
