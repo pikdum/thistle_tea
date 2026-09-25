@@ -10,21 +10,26 @@ defmodule ThistleTea.Game.Entity.Server.ScriptRoutingTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
+  alias ThistleTea.Game.Entity.Logic.AI.Script.Request
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Server.GameObject, as: GameObjectServer
   alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Entity.Server.ScriptExecution
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.SmsgEmote
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Emote, as: EmoteLoader
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
   alias ThistleTea.Game.WorldRef
 
   setup [:world]
@@ -137,6 +142,105 @@ defmodule ThistleTea.Game.Entity.Server.ScriptRoutingTest do
       step = %ScriptStep{command: :set_game_object_state, datalong: 1}
       EventSink.emit(mob(world, 0.0, 0.0), Effects.forward_script_steps(object.object.guid, [step], 0))
       assert :sys.get_state(pid).game_object.state == 1
+    end
+  end
+
+  describe "acknowledged scripts" do
+    test "a remote termination or failed condition cancels the caller's immediate and delayed tail", %{world: world} do
+      {source, source_pid} = start_mob(world)
+      {target, target_pid} = start_mob(world)
+
+      for command <- [
+            %ScriptStep{command: :terminate_script},
+            %ScriptStep{command: :stand_state, datalong: 1, condition: %Condition{type: :source_entry, value1: 999}}
+          ] do
+        step = %{command | swap_initial?: true, abort_on_failure?: true}
+        Entity.start_script(source_pid, [step, stand(1), %{stand(2) | delay_ms: 20}], target.object.guid, world)
+        finished = finished_script(source_pid)
+        assert finished.unit.stand_state == source.unit.stand_state
+        assert :sys.get_state(target_pid).unit.stand_state == target.unit.stand_state
+        assert finished.internal.events == []
+      end
+    end
+
+    test "missing or wrong-world recipients honor the abort flag", %{world: world} do
+      {_source, source_pid} = start_mob(world)
+      {target, _target_pid} = start_mob(WorldRef.instance(world.map_id, world.instance_id + 1_000_000))
+      absent = Guid.runtime(:mob, 15_694)
+
+      for recipient <- [target.object.guid, absent], abort? <- [true, false] do
+        step = %{stand(2) | swap_initial?: true, abort_on_failure?: abort?}
+        Entity.start_script(source_pid, [stand(0), step, stand(1)], recipient, world)
+        assert finished_script(source_pid).unit.stand_state == if(abort?, do: 0, else: 1)
+      end
+    end
+
+    test "a command can swap back to its caller without blocking either owner", %{world: world} do
+      {_source, source_pid} = start_mob(world)
+      {target, target_pid} = start_mob(world)
+      step = %{stand(1) | swap_initial?: true, swap_final?: true}
+      Entity.start_script(source_pid, [step, stand(2)], target.object.guid, world)
+      assert finished_script(source_pid).unit.stand_state == 2
+      assert :sys.get_state(target_pid).unit.stand_state == target.unit.stand_state
+    end
+
+    test "duplicate map-event starts stop the losing script before its tail", %{world: world} do
+      {source, first} = start_mob(world)
+      {_target, second} = start_mob(world)
+      gate = %ScriptStep{command: :start_map_event, datalong: 648, datalong2: 60, abort_on_failure?: true}
+      steps = [stand(0), gate, stand(1), %{stand(2) | delay_ms: 25}]
+
+      on_exit(fn ->
+        ScriptedEventSystem.command_result(
+          Effects.scripted_event_command(world, source.object.guid, 0, %{gate | command: :end_map_event})
+        )
+      end)
+
+      Entity.start_script(first, steps, 0, world)
+      Entity.start_script(second, steps, 0, world)
+      results = Enum.map([first, second], &finished_script/1)
+      assert Enum.map(results, & &1.unit.stand_state) |> Enum.sort() == [0, 2]
+      assert Enum.all?(results, &(&1.internal.events == []))
+    end
+
+    test "expired requests cannot mutate any entity owner", %{world: world} do
+      request = %Request{
+        id: make_ref(),
+        world: world,
+        step: stand(2),
+        target_guid: 0,
+        reply_to: self(),
+        deadline: Time.now() - 1
+      }
+
+      object = %GameObject{internal: %Internal{world: world}}
+
+      for actor <- [mob(world, 0.0, 0.0), character(7, world), object] do
+        failed = ScriptExecution.command(actor, request)
+        assert [%Effects.ScriptReply{request: ^request, status: :failed}] = failed.internal.events
+        assert %{failed | internal: %{failed.internal | events: []}} == actor
+      end
+    end
+  end
+
+  defp stand(value), do: %ScriptStep{command: :stand_state, datalong: value}
+
+  defp start_mob(world) do
+    actor = mob(world, 0.0, 0.0)
+    {:ok, pid} = World.start_entity(actor)
+    on_exit(fn -> World.stop_entity(actor.object.guid) end)
+    {actor, pid}
+  end
+
+  defp finished_script(pid, attempts \\ 200) do
+    state = :sys.get_state(pid)
+
+    if state.internal.scripts.runs == %{} or attempts == 0 do
+      assert state.internal.scripts.runs == %{}
+      state
+    else
+      Process.sleep(5)
+      finished_script(pid, attempts - 1)
     end
   end
 

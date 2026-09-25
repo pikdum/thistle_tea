@@ -10,7 +10,9 @@ defmodule ThistleTea.Game.CreatureTeleportContentTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.Script
+  alias ThistleTea.Game.Entity.Logic.AI.Script.Run
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.WorldRef
@@ -164,13 +166,28 @@ defmodule ThistleTea.Game.CreatureTeleportContentTest do
       }
     ]
 
-    {initiator, _blackboard} = Script.run(initiator, Blackboard.new(), spybot_steps, nil, 1_000)
-    forwarded = Enum.flat_map(initiator.internal.events, & &1.steps)
-    {spybot, _blackboard} = Script.run(spybot, Blackboard.new(), forwarded, initiator.object.guid, 1_000)
+    {initiator, blackboard} = Script.run(initiator, Blackboard.new(), spybot_steps, nil, 1_000)
+
+    {initiator, [%Effects.ForwardScriptSteps{steps: [movement], reply: {id, receipt, ^world}}]} =
+      Effects.drain(initiator)
+
+    {spybot, spybot_blackboard, :continue} =
+      Script.execute_step(spybot, Blackboard.new(), movement, initiator.object.guid, Context.new(1_000))
+
+    {initiator, blackboard} = Run.resume(initiator, blackboard, id, receipt, world, :continue, Context.new(1_000))
+
+    {initiator, [%Effects.ForwardScriptSteps{steps: [teleport], reply: {^id, receipt, ^world}}]} =
+      Effects.drain(initiator)
+
+    {spybot, _, :continue} =
+      Script.execute_step(spybot, spybot_blackboard, teleport, initiator.object.guid, Context.new(1_000))
+
+    {initiator, _} = Run.resume(initiator, blackboard, id, receipt, world, :continue, Context.new(1_000))
 
     assert initiator.movement_block.position == initiator_position
     assert spybot.movement_block.position == {-8408.25, 451.896, 123.76, 5.52986}
     assert [%Effects.CreatureTeleported{}] = spybot.internal.events
+    assert initiator.internal.scripts.runs == %{}
 
     actor = mob(1_482, world, {-3670.0, -730.0, 11.0, 0.0})
     jesse = mob(1_445, world, {-3667.39, -733.498, 10.9584, 2.74017})

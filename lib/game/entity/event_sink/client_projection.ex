@@ -5,8 +5,10 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.EventSink.Context
+  alias ThistleTea.Game.Entity.Logic.AI.Script.Request
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Emote
+  alias ThistleTea.Game.Entity.Server.ScriptDelivery
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
@@ -210,14 +212,36 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
     entity
   end
 
+  def emit(entity, %Effects.ScriptSteps{run_id: id} = effect, context) when not is_nil(id) do
+    Context.send_after(
+      context,
+      {:script_resume, id, effect.receipt, entity.internal.world, :continue},
+      effect.duration_ms
+    )
+
+    entity
+  end
+
   def emit(entity, %Effects.ScriptSteps{} = effect, context) do
     message = {:ai_script_steps, effect.steps, effect.target_guid, entity.internal.world}
     Context.send_after(context, message, effect.duration_ms || 0)
     entity
   end
 
-  def emit(entity, %Effects.ForwardScriptSteps{} = effect, _context) do
+  def emit(entity, %Effects.ForwardScriptSteps{reply: nil} = effect, _context) do
     Entity.start_script(effect.target_guid, effect.steps, effect.source_guid, entity.internal.world)
+    entity
+  end
+
+  def emit(entity, %Effects.ForwardScriptSteps{} = effect, context) do
+    case effect.reply do
+      %Request{} = request ->
+        ScriptDelivery.forward(request, effect)
+
+      receipt ->
+        ScriptDelivery.start(context, receipt, effect)
+    end
+
     entity
   end
 

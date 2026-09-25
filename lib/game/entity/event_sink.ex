@@ -194,7 +194,12 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.ViewpointGranted,
     Effects.ViewpointReleased
   ]
-  @scripted_event_effects [Effects.ScriptedEventCommand, Effects.SendScriptEvent]
+  @scripted_event_effects [
+    Effects.ScriptedEventCommand,
+    Effects.SendScriptEvent,
+    Effects.ScriptCompleted,
+    Effects.ScriptReply
+  ]
   @instance_effects [Effects.InstanceCreatureEvent, Effects.InstanceDataCommand]
 
   def emit_pending(entity, context \\ nil) do

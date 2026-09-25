@@ -10,6 +10,9 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
   alias ThistleTea.Game.Entity.Data.Component.Player, as: PlayerComponent
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.PetProgress
+  alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
   alias ThistleTea.Game.Entity.Logic.Effects.PetDied
   alias ThistleTea.Game.Entity.Logic.Effects.PetHappinessChanged
@@ -71,6 +74,25 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
   end
 
   describe "worldport bookkeeping" do
+    test "discards script continuations while retaining the receipt sequence" do
+      origin = WorldRef.open(0)
+      destination = WorldRef.open(1)
+
+      character = %Character{
+        object: %Object{guid: 7},
+        unit: %Unit{},
+        player: %PlayerComponent{},
+        internal: %Internal{world: origin}
+      }
+
+      step = %ScriptStep{command: :stand_state, datalong: 1, delay_ms: 1_000}
+      {character, _} = Script.run(character, Blackboard.new(), [step], 0, 0)
+      assert map_size(character.internal.scripts.runs) == 1
+      state = State.prepare_worldport(%State{character: character}, origin, destination)
+      assert state.character.internal.scripts.runs == %{}
+      assert state.character.internal.scripts.sequence == 1
+    end
+
     test "emits the previous instance after worldport completion" do
       state =
         State.prepare_worldport(

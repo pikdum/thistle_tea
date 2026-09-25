@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request, as: ObservationRequest
   alias ThistleTea.Game.Entity.Logic.AI.Script
+  alias ThistleTea.Game.Entity.Logic.AI.Script.Request, as: ScriptRequest
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -82,6 +83,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.Entity.Server.PlayerSupervisor
+  alias ThistleTea.Game.Entity.Server.ScriptDelivery
+  alias ThistleTea.Game.Entity.Server.ScriptExecution
   alias ThistleTea.Game.Entity.SpellReception
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -1048,6 +1051,25 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def handle_info({:ai_script_steps, _steps, _target_guid, _world}, %State{} = state), do: {:noreply, state}
+
+  def handle_info({:script_command, %ScriptRequest{} = request}, %State{character: %Character{} = character} = state) do
+    character = ScriptExecution.command(character, request)
+    {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("script command crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      ScriptDelivery.reply(request, :failed)
+      {:noreply, state}
+  end
+
+  def handle_info({:script_resume, id, receipt, world, result}, %State{character: %Character{} = character} = state) do
+    character = ScriptExecution.resume(character, id, receipt, world, result)
+    {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("script resume crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
 
   def handle_info({:ai_script_steps, steps, target_guid}, %State{character: %Character{}} = state)
       when is_list(steps) and is_integer(target_guid) do

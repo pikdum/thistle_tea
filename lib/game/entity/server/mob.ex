@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Totem, as: TotemBT
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.AI.Script
+  alias ThistleTea.Game.Entity.Logic.AI.Script.Request, as: ScriptRequest
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.AI.TickPlan
   alias ThistleTea.Game.Entity.Logic.Appearance
@@ -90,6 +91,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Server.Mob.SummonLifecycle
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
+  alias ThistleTea.Game.Entity.Server.ScriptDelivery
+  alias ThistleTea.Game.Entity.Server.ScriptExecution
   alias ThistleTea.Game.Entity.Server.ScriptSpells
   alias ThistleTea.Game.Entity.Server.TotemOwner
   alias ThistleTea.Game.Entity.SpellReception
@@ -1111,6 +1114,34 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         Task.start(fn -> World.stop_entity(pid) end)
         {:noreply, state}
     end
+  end
+
+  def handle_info({:script_command, %ScriptRequest{} = request}, %Mob{} = state) do
+    state = state |> ScriptExecution.command(request) |> EventSink.emit_pending()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("script command crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      ScriptDelivery.reply(request, :failed)
+      {:noreply, state}
+  end
+
+  def handle_info({:script_resume, id, receipt, world, result}, %Mob{} = state) do
+    state = state |> ScriptExecution.resume(id, receipt, world, result) |> EventSink.emit_pending()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("script resume crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info(%Effects.ScriptCompleted{} = effect, %Mob{} = state) do
+    state = EventAI.with_blackboard(state, &EventAI.complete_script(&1, &2, effect, Time.now()))
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("script completion crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
   end
 
   def handle_info({:ai_script_steps, steps, target_guid, world}, %Mob{internal: %{world: world}} = state) do

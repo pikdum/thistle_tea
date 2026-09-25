@@ -13,8 +13,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   selected owner. Conditions and commands then use the final source and target.
   Triggered casts use the trigger-spell pipeline; normal casts use the caster's
   mob or player casting machinery. Failed local target selection, conditions,
-  and normal mob casts honor the abort flag. `execute_steps_with_status/5`
-  exposes termination to direct EventAI actions so their events can retry.
+  and normal mob casts honor the abort flag. World-event commands and commands
+  forwarded to another owner suspend their remaining steps until acknowledged.
+  Continuations retain original due times and resume against current state.
+  `execute_steps_with_status/5` exposes completion or suspension to EventAI so
+  result-checked events retry after all their action groups finish.
   """
   import Bitwise, only: [&&&: 2, |||: 2, bnot: 1]
 
@@ -33,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Distancing
   alias ThistleTea.Game.Entity.Logic.AI.BT.Flee
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
+  alias ThistleTea.Game.Entity.Logic.AI.Script.Run
   alias ThistleTea.Game.Entity.Logic.Assistance
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Casting
@@ -98,9 +102,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   def run(state, %Blackboard{} = blackboard, steps, target_guid, %Context{} = context) when is_list(steps) do
-    {due, delayed} = Enum.split_with(steps, &(&1.delay_ms <= 0))
-    {state, blackboard, status} = execute_steps_with_status(state, blackboard, due, target_guid, context)
-    state = if status == :continue, do: schedule_delayed(state, delayed, target_guid), else: state
+    {state, blackboard, _status} = Run.start(state, blackboard, steps, target_guid, context, :scheduled)
     {state, blackboard}
   end
 
@@ -114,18 +116,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {state, blackboard}
   end
 
-  def execute_steps_with_status(state, %Blackboard{} = blackboard, steps, target_guid, %Context{} = context)
+  def execute_steps_with_status(
+        state,
+        %Blackboard{} = blackboard,
+        steps,
+        target_guid,
+        %Context{} = context,
+        completion \\ nil
+      )
       when is_list(steps) do
-    Enum.reduce_while(steps, {state, blackboard, :continue}, fn %ScriptStep{} = step, {state, blackboard, :continue} ->
-      case dispatch(state, blackboard, step, target_guid, context) do
-        {state, blackboard, :terminated} ->
-          {:halt, {state, blackboard, :terminated}}
-
-        {state, blackboard, :continue} ->
-          {:cont, {state, blackboard, :continue}}
-      end
-    end)
+    Run.start(state, blackboard, steps, target_guid, context, :direct, completion)
   end
+
+  def execute_step(state, %Blackboard{} = blackboard, %ScriptStep{} = step, target_guid, %Context{} = context),
+    do: dispatch(state, blackboard, step, target_guid, context)
 
   defp dispatch(
          %{object: %{guid: self_guid}} = state,
@@ -226,6 +230,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {state, blackboard, :continue}
   end
 
+  defp execute_command(state, blackboard, %ScriptStep{command: command} = step, target_guid, _now, _context)
+       when command in @scripted_event_commands do
+    effect = Effects.scripted_event_command(state.internal.world, state.object.guid, target_guid, step)
+    {state, blackboard, {:await, effect}}
+  end
+
   defp execute_command(state, blackboard, step, target_guid, now, context) do
     {state, blackboard} = execute(state, blackboard, step, target_guid, now, context)
     {state, blackboard, :continue}
@@ -252,20 +262,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp forward(state, blackboard, step, owner_guid, target_guid),
-    do: {Effects.enqueue(state, Effects.forward_script_steps(owner_guid, [step], target_guid)), blackboard, :continue}
+    do: {state, blackboard, {:await, Effects.forward_script_steps(owner_guid, [step], target_guid)}}
 
   defp script_owner?(guid) when is_integer(guid) and guid > 0,
     do: Guid.entity_type(guid) in [:mob, :player, :game_object]
 
   defp script_owner?(_guid), do: false
-
-  defp schedule_delayed(state, [], _target_guid), do: state
-
-  defp schedule_delayed(state, delayed, target_guid) do
-    next_delay_ms = delayed |> Enum.map(& &1.delay_ms) |> Enum.min()
-    steps = Enum.map(delayed, &%{&1 | delay_ms: &1.delay_ms - next_delay_ms})
-    Effects.enqueue(state, Effects.script_steps(steps, target_guid, next_delay_ms))
-  end
 
   defp termination(state, %ScriptStep{command: :terminate_script, datalong: 0}, _target_guid, %Context{}) do
     {:terminate, state}
@@ -601,19 +603,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :start_waypoints}, _target_guid, _now, %Context{}) do
     {state, blackboard}
-  end
-
-  defp execute(
-         %{object: %{guid: source_guid}, internal: %{world: world}} = state,
-         blackboard,
-         %ScriptStep{command: command} = step,
-         target_guid,
-         _now,
-         %Context{}
-       )
-       when command in @scripted_event_commands do
-    effect = Effects.scripted_event_command(world, source_guid, target_guid, step)
-    {Effects.enqueue(state, effect), blackboard}
   end
 
   defp execute(

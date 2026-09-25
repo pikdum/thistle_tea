@@ -212,6 +212,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
 
   def on_evade(state, %Blackboard{} = blackboard, now, %Context{} = context) do
     state = enqueue_instance_event(state, :evade)
+    blackboard = %{blackboard | event_ai: %{blackboard.event_ai | pending: %{}}}
     {state, blackboard} = fire_edges(state, blackboard, :evade, nil, now, context)
     {state, reset_ooc(blackboard, events(state), now, context)}
   end
@@ -399,9 +400,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
         |> maybe_disable(event, index)
 
       if chance_passes?(event, context.random) do
-        {state, blackboard, failed?} = run_actions(state, blackboard, event, invoker_guid, context)
-
-        {state, retry_failed_event(blackboard, event, index, now, failed?)}
+        run_actions(state, blackboard, event, index, invoker_guid, context)
       else
         {state, blackboard}
       end
@@ -427,14 +426,66 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     |> Kernel.==(:met)
   end
 
-  defp run_actions(state, %Blackboard{} = blackboard, %AIEvent{} = event, invoker_guid, %Context{} = context) do
-    actions = if event.random_action?, do: [Random.choice(context.random, event.actions)], else: event.actions
+  defp run_actions(state, %Blackboard{} = blackboard, %AIEvent{} = event, index, invoker_guid, %Context{} = context) do
+    actions = select_actions(event, context.random)
     target_guid = invoker_guid || victim(state)
+    token = blackboard.event_ai.sequence + 1
+    blackboard = %{blackboard | event_ai: %{blackboard.event_ai | sequence: token}}
+    pending = %EventMemory.Actions{token: token, event_id: event.id}
 
-    Enum.reduce(actions, {state, blackboard, false}, fn steps, {state, blackboard, failed?} ->
-      {state, blackboard, status} = Script.execute_steps_with_status(state, blackboard, steps, target_guid, context)
-      {state, blackboard, failed? or status == :terminated}
-    end)
+    {state, blackboard, pending} =
+      Enum.reduce(actions, {state, blackboard, pending}, fn steps, {state, blackboard, pending} ->
+        {state, blackboard, status} =
+          Script.execute_steps_with_status(state, blackboard, steps, target_guid, context, {:event_ai, index, token})
+
+        pending =
+          case status do
+            {:pending, id} -> %{pending | runs: MapSet.put(pending.runs, id)}
+            :terminated -> %{pending | failed?: true}
+            :continue -> pending
+          end
+
+        {state, blackboard, pending}
+      end)
+
+    {state, finish_actions(blackboard, event, index, pending, context.now)}
+  end
+
+  defp select_actions(%AIEvent{actions: []}, _random), do: []
+  defp select_actions(%AIEvent{random_action?: true, actions: actions}, random), do: [Random.choice(random, actions)]
+  defp select_actions(%AIEvent{actions: actions}, _random), do: actions
+
+  def complete_script(state, blackboard, %Effects.ScriptCompleted{completion: {:event_ai, index, token}} = effect, now) do
+    case {Map.get(blackboard.event_ai.pending, index), Enum.at(events(state), index)} do
+      {%EventMemory.Actions{token: ^token, event_id: event_id} = pending, %AIEvent{id: event_id} = event} ->
+        if MapSet.member?(pending.runs, effect.run_id) do
+          pending = %{
+            pending
+            | runs: MapSet.delete(pending.runs, effect.run_id),
+              failed?: pending.failed? or effect.status == :terminated
+          }
+
+          {state, finish_actions(blackboard, event, index, pending, now)}
+        else
+          {state, blackboard}
+        end
+
+      _stale ->
+        {state, blackboard}
+    end
+  end
+
+  defp finish_actions(blackboard, event, index, pending, now) do
+    if MapSet.size(pending.runs) == 0 do
+      blackboard = %{
+        blackboard
+        | event_ai: %{blackboard.event_ai | pending: Map.delete(blackboard.event_ai.pending, index)}
+      }
+
+      retry_failed_event(blackboard, event, index, now, pending.failed?)
+    else
+      %{blackboard | event_ai: %{blackboard.event_ai | pending: Map.put(blackboard.event_ai.pending, index, pending)}}
+    end
   end
 
   defp satisfy(state, %AIEvent{event_type: :timer_in_combat}, invoker_guid, %Context{}) do
@@ -753,12 +804,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   end
 
   defp ensure_init(%Blackboard{} = blackboard, events, now, %Context{} = context) do
-    event_ai = %{blackboard.event_ai | timers: %{}, disabled: MapSet.new()}
+    event_ai = %{blackboard.event_ai | timers: %{}, disabled: MapSet.new(), pending: %{}}
     reset_ooc(%{blackboard | event_ai: event_ai}, events, now, context)
   end
 
   defp reset_for_combat(%Blackboard{} = blackboard, events, now, %Context{random: random}) do
-    event_ai = %{blackboard.event_ai | timers: %{}, disabled: MapSet.new()}
+    event_ai = %{blackboard.event_ai | timers: %{}, disabled: MapSet.new(), pending: %{}}
     blackboard = %{blackboard | event_ai: event_ai}
 
     events
@@ -789,8 +840,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
 
   defp reset_ooc(%Blackboard{} = blackboard, _events, _now, %Context{}), do: blackboard
 
-  defp enabled?(%Blackboard{event_ai: %EventMemory{disabled: %MapSet{} = disabled}}, index) do
-    not MapSet.member?(disabled, index)
+  defp enabled?(%Blackboard{event_ai: %EventMemory{disabled: %MapSet{} = disabled}} = blackboard, index) do
+    not MapSet.member?(disabled, index) and not Map.has_key?(blackboard.event_ai.pending, index)
   end
 
   defp enabled?(%Blackboard{}, _index), do: true

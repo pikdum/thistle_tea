@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.AI.Script.Run, as: ScriptRun
   alias ThistleTea.Game.Entity.Logic.Aura.SingleTarget
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Dueling
@@ -112,6 +113,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
 
   def prepare_worldport(%__MODULE__{} = state, origin, destination) do
     state
+    |> clear_scripts()
     |> detach_single_target_auras()
     |> Weather.leave()
     |> Resurrection.cancel_transfer()
@@ -141,7 +143,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   def complete_worldport(%__MODULE__{} = state), do: %{state | pending_worldport?: false}
 
   def leave_world(%__MODULE__{} = state) do
-    state = state |> Logout.clear() |> Instances.clear() |> Resurrection.clear()
+    state = state |> clear_scripts() |> Logout.clear() |> Instances.clear() |> Resurrection.clear()
 
     case state.player_tick_ref do
       ref when is_reference(ref) -> Process.cancel_timer(ref)
@@ -192,6 +194,11 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   end
 
   defp disengage(%__MODULE__{} = state), do: state
+
+  defp clear_scripts(%__MODULE__{character: %Character{} = character} = state),
+    do: %{state | character: ScriptRun.clear(character)}
+
+  defp clear_scripts(%__MODULE__{} = state), do: state
 
   defp detach_single_target_auras(%__MODULE__{character: %Character{} = character} = state) do
     character = character |> SingleTarget.detach(Time.now()) |> EventSink.emit_pending()

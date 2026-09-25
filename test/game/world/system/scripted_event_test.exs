@@ -418,6 +418,48 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
     refute_receive {:"$gen_cast", {:start_script, [^sub_step], _target_guid}}
   end
 
+  describe "command_result/1" do
+    test "reports duplicate starts and missing event mutations within one world", context do
+      start = %ScriptStep{command: :start_map_event, datalong: 648, datalong2: 60}
+      effect = Effects.scripted_event_command(context.world, context.source_guid, context.target_guid, start)
+
+      for command <- [
+            :end_map_event,
+            :add_map_event_target,
+            :remove_map_event_target,
+            :set_map_event_data,
+            :send_map_event,
+            :edit_map_event
+          ] do
+        assert {:error, :event_state} =
+                 ScriptedEventSystem.command_result(%{effect | step: %{start | command: command}})
+      end
+
+      assert :ok = ScriptedEventSystem.command_result(effect)
+      assert {:error, :event_state} = ScriptedEventSystem.command_result(effect)
+      assert :ok = ScriptedEventSystem.command_result(%{effect | world: WorldRef.instance(context.world.map_id, 1)})
+      assert :ok = ScriptedEventSystem.command_result(%{effect | step: %{start | command: :end_map_event}})
+      assert :ok = ScriptedEventSystem.command_result(effect)
+    end
+
+    test "conditional target removal requires a resolved condition", context do
+      start = %ScriptStep{command: :start_map_event, datalong: 648, datalong2: 60}
+      effect = Effects.scripted_event_command(context.world, context.source_guid, context.target_guid, start)
+      assert :ok = ScriptedEventSystem.command_result(effect)
+
+      for mode <- [1, 2] do
+        remove = %{start | command: :remove_map_event_target, datalong3: mode}
+        assert {:error, :event_state} = ScriptedEventSystem.command_result(%{effect | step: remove})
+
+        assert :ok =
+                 ScriptedEventSystem.command_result(%{
+                   effect
+                   | step: %{remove | target_condition: %Condition{type: :alive}}
+                 })
+      end
+    end
+  end
+
   defp command(context, step) do
     context.world
     |> Effects.scripted_event_command(context.source_guid, context.target_guid, step)

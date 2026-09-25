@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.AI.Script.Run, as: ScriptRun
   alias ThistleTea.Game.Entity.Logic.Aura.SingleTarget
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Experience
@@ -138,6 +139,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
         loot = state.internal.loot || %InternalLoot{}
 
         state
+        |> ScriptRun.clear()
         |> put_internal_loot(%{loot | session: nil, corpse_removed?: true})
         |> publish_skinning()
     end

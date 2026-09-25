@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptFailureTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.AI.Script
+  alias ThistleTea.Game.Entity.Logic.AI.Script.Run
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.WorldRef
@@ -141,6 +142,81 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptFailureTest do
       assert blackboard.event_ai.phase == 2
     end
   end
+
+  describe "EventAI.complete_script/4" do
+    test "waits for every action group before retrying a failed event", %{mob: mob} do
+      gate = %ScriptStep{command: :start_map_event, abort_on_failure?: true}
+      mob = with_event(mob, event([[gate, phase(1)], [gate, phase(2)], [phase(3)]]))
+      {waiting, blackboard} = EventAI.tick(mob, Blackboard.new(), 0, Context.new(0))
+      assert blackboard.event_ai.phase == 3
+      assert [first, second] = waiting.internal.events
+      {waiting, blackboard} = resume(waiting, blackboard, first.reply, :failed, 10)
+      assert [%Effects.ScriptCompleted{} = failed] = waiting.internal.events
+      {waiting, blackboard} = EventAI.complete_script(waiting, blackboard, failed, 10)
+      assert MapSet.member?(blackboard.event_ai.disabled, 0)
+      assert blackboard.event_ai.timers[0] == 60_000
+      {blocked, blackboard} = EventAI.tick(clear_effects(waiting), blackboard, 1_000, Context.new(1_000))
+      assert blocked.internal.events == []
+      {finished, blackboard} = resume(blocked, blackboard, second.reply, :continue, 1_010)
+      assert blackboard.event_ai.phase == 2
+      assert [%Effects.ScriptCompleted{} = success] = finished.internal.events
+      {finished, blackboard} = EventAI.complete_script(finished, blackboard, success, 1_010)
+      assert blackboard.event_ai.pending == %{}
+      assert blackboard.event_ai.timers[0] == 1_010
+      refute MapSet.member?(blackboard.event_ai.disabled, 0)
+      assert EventAI.complete_script(finished, blackboard, failed, 2_000) == {finished, blackboard}
+      assert EventAI.complete_script(finished, blackboard, success, 2_000) == {finished, blackboard}
+    end
+
+    test "successful or unchecked asynchronous actions keep their consumed cooldown", %{mob: mob} do
+      for {result, check?} <- [{:continue, true}, {:failed, false}] do
+        gate = %ScriptStep{command: :start_map_event, abort_on_failure?: true}
+        mob = with_event(mob, %{event([[gate]]) | check_result?: check?})
+        {waiting, blackboard} = EventAI.tick(mob, Blackboard.new(), 0, Context.new(0))
+        assert [effect] = waiting.internal.events
+        {finished, blackboard} = resume(waiting, blackboard, effect.reply, result, 10)
+        assert [%Effects.ScriptCompleted{} = completed] = finished.internal.events
+        {_, blackboard} = EventAI.complete_script(finished, blackboard, completed, 10)
+        assert MapSet.member?(blackboard.event_ai.disabled, 0)
+        assert blackboard.event_ai.timers[0] == 60_000
+        assert blackboard.event_ai.pending == %{}
+      end
+    end
+
+    test "combat entry and evade invalidate pending tails", %{mob: mob} do
+      gate = %ScriptStep{command: :start_map_event, abort_on_failure?: true}
+      mob = with_event(mob, event([[gate, phase(9)]]))
+      {waiting, blackboard} = EventAI.tick(mob, Blackboard.new(), 0, Context.new(0))
+      assert [effect] = waiting.internal.events
+
+      for reset <- [
+            &EventAI.enter_combat(&1, &2, 7, 10, Context.new(10)),
+            &EventAI.on_evade(&1, &2, 10, Context.new(10))
+          ] do
+        {reset, reset_blackboard} = reset.(waiting, blackboard)
+        {finished, reset_blackboard} = resume(reset, reset_blackboard, effect.reply, :continue, 20)
+        assert finished.internal.scripts.runs == %{}
+        assert finished.internal.events == []
+        assert reset_blackboard.event_ai.phase == 0
+        assert reset_blackboard.event_ai.pending == %{}
+      end
+    end
+
+    test "a local failure survives a later asynchronous success", %{mob: mob, cast: cast} do
+      gate = %ScriptStep{command: :start_map_event}
+      mob = with_event(mob, event([[cast], [gate]]))
+      {waiting, blackboard} = EventAI.tick(mob, Blackboard.new(), 0, Context.new(0))
+      assert [effect] = waiting.internal.events
+      {finished, blackboard} = resume(waiting, blackboard, effect.reply, :continue, 10)
+      assert [%Effects.ScriptCompleted{} = completed] = finished.internal.events
+      {_, blackboard} = EventAI.complete_script(finished, blackboard, completed, 10)
+      refute MapSet.member?(blackboard.event_ai.disabled, 0)
+      assert blackboard.event_ai.timers[0] == 10
+    end
+  end
+
+  defp resume(state, blackboard, {id, receipt, world}, result, now),
+    do: Run.resume(clear_effects(state), blackboard, id, receipt, world, result, Context.new(now))
 
   defp caster(_context) do
     spell = %Spell{id: 12_544, cast_time_ms: 0, power_type: 0, mana_cost: 20, effects: []}

@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
   alias ThistleTea.Game.Entity.Data.ChatStatus
   alias ThistleTea.Game.Entity.Data.Companion
   alias ThistleTea.Game.Entity.Data.Component.Internal.ObjectAction
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Scripts
   alias ThistleTea.Game.Entity.Data.CorpseReclaim
   alias ThistleTea.Game.Entity.Data.Honor.Damage, as: HonorDamage
   alias ThistleTea.Game.Entity.Data.PetStable
@@ -93,6 +94,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :invincibility_health_threshold,
     world: WorldRef.open(0),
     single_target_sequence: 0,
+    scripts: %Scripts{},
     object_action: %ObjectAction{},
     buyback: %Buyback{},
     chat_status: %ChatStatus{},

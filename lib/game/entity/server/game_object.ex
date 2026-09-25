@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request, as: ObservationRequest
   alias ThistleTea.Game.Entity.Logic.AI.Script
+  alias ThistleTea.Game.Entity.Logic.AI.Script.Request, as: ScriptRequest
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.GameObjectActions
@@ -36,6 +37,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Server.GameObject.Goober, as: GooberServer
   alias ThistleTea.Game.Entity.Server.GameObject.Ritual, as: RitualServer
   alias ThistleTea.Game.Entity.Server.GameObject.Trap, as: TrapServer
+  alias ThistleTea.Game.Entity.Server.ScriptDelivery
+  alias ThistleTea.Game.Entity.Server.ScriptExecution
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgFishNotHooked
@@ -417,6 +420,27 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   rescue
     error ->
       Logger.error("Quest object spell failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:script_command, %ScriptRequest{} = request}, %GameObject{} = state) do
+    state = state |> ScriptExecution.command(request) |> EventSink.emit_pending() |> broadcast_if_pending()
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("script command crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      ScriptDelivery.reply(request, :failed)
+      {:noreply, state}
+  end
+
+  def handle_info({:script_resume, id, receipt, world, result}, %GameObject{} = state) do
+    state =
+      state |> ScriptExecution.resume(id, receipt, world, result) |> EventSink.emit_pending() |> broadcast_if_pending()
+
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("script resume crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, state}
   end
 

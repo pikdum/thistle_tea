@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.AI.Script.Request
   alias ThistleTea.Game.Entity.Logic.Condition.Context
   alias ThistleTea.Game.Entity.Logic.Condition.Leaf
   alias ThistleTea.Game.Entity.Logic.Condition.Result
@@ -62,6 +63,12 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
 
   def command(%Effects.ScriptedEventCommand{} = effect), do: GenServer.cast(__MODULE__, {:command, effect})
 
+  def command_result(%Effects.ScriptedEventCommand{} = effect) do
+    GenServer.call(__MODULE__, {:command_result, effect})
+  catch
+    :exit, _reason -> {:error, :unavailable}
+  end
+
   def condition_results(_world, _source_guid, _target_guid, []), do: %{}
 
   def condition_results(world, source_guid, target_guid, conditions) when is_list(conditions) do
@@ -86,6 +93,18 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   def init(state), do: {:ok, state}
 
   @impl GenServer
+  def handle_call({:command_result, %Effects.ScriptedEventCommand{} = effect}, _from, events) do
+    if current_request?(effect.reply) and command_allowed?(events, effect) do
+      {:reply, :ok, apply_command(events, effect)}
+    else
+      {:reply, {:error, :event_state}, events}
+    end
+  rescue
+    error ->
+      Logger.error("scripted event command crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:reply, {:error, :command_failed}, events}
+  end
+
   def handle_call({:condition_results_by_target, world, source_guid, groups}, _from, events) do
     results =
       Map.new(groups, fn {target_guid, conditions} ->
@@ -125,6 +144,23 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
       Logger.error("scripted event evaluation crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, events}
   end
+
+  defp command_allowed?(_events, %Effects.ScriptedEventCommand{step: %ScriptStep{command: :start_script_for_all}}),
+    do: true
+
+  defp command_allowed?(_events, %Effects.ScriptedEventCommand{
+         step: %ScriptStep{command: :remove_map_event_target, datalong3: mode, target_condition: nil}
+       })
+       when mode in [1, 2], do: false
+
+  defp command_allowed?(events, %Effects.ScriptedEventCommand{world: world, step: step}) do
+    present? = Map.has_key?(events, event_key(world, step.datalong))
+    if step.command == :start_map_event, do: not present?, else: present?
+  end
+
+  defp current_request?(%Request{} = request), do: Time.now() <= request.deadline and Process.alive?(request.reply_to)
+
+  defp current_request?(_receipt), do: true
 
   defp apply_command(events, %Effects.ScriptedEventCommand{step: %ScriptStep{command: :start_map_event}} = effect) do
     key = event_key(effect.world, effect.step.datalong)

@@ -9,7 +9,9 @@ defmodule ThistleTea.Game.ScriptTargetsVmangosTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.Script
+  alias ThistleTea.Game.Entity.Logic.AI.Script.Run
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
@@ -34,18 +36,28 @@ defmodule ThistleTea.Game.ScriptTargetsVmangosTest do
 
       source = %Mob{object: %Object{guid: Guid.from_low_guid(:mob, 15_694, 1)}, internal: %Internal{}}
       target = Guid.from_low_guid(:mob, 15_694, 2)
-      {updated, _} = Script.run(source, Blackboard.new(), steps, target, 0)
+      {updated, blackboard} = Script.run(source, Blackboard.new(), steps, target, 0)
+
+      {updated, [%Effects.ForwardScriptSteps{target_guid: ^target, steps: [turn], reply: {id, receipt, world}}]} =
+        Effects.drain(updated)
+
+      receiver = %{source | object: %{source.object | guid: target}}
+
+      {receiver, _, :continue} =
+        Script.execute_step(receiver, Blackboard.new(), turn, source.object.guid, Context.new(0))
+
+      assert [%Effects.SetFacing{facing: {:target, source_guid}}] = receiver.internal.events
+      assert source_guid == source.object.guid
+      {updated, blackboard} = Run.resume(updated, blackboard, id, receipt, world, :continue, Context.new(0))
       assert Enum.any?(updated.internal.events, &match?(%Effects.SetFacing{facing: {:target, ^target}}, &1))
 
-      assert Enum.any?(updated.internal.events, fn
-               %Effects.ForwardScriptSteps{target_guid: ^target, steps: [%ScriptStep{command: :turn_to}]} -> true
-               _ -> false
-             end)
+      assert %Effects.ScriptSteps{duration_ms: 1_000, run_id: ^id, receipt: receipt, steps: [emote]} =
+               List.last(updated.internal.events)
 
-      assert %Effects.ScriptSteps{duration_ms: 1_000, steps: [emote]} = List.last(updated.internal.events)
       assert emote.command == :emote
       assert emote.datalong == 1
-      {due, _} = Script.run(source, Blackboard.new(), [emote], target, 1_000)
+      {updated, _effects} = Effects.drain(updated)
+      {due, _} = Run.resume(updated, blackboard, id, receipt, world, :continue, Context.new(1_000))
 
       assert [%Effects.ForwardScriptSteps{target_guid: ^target, steps: [%ScriptStep{command: :emote}]}] =
                due.internal.events
