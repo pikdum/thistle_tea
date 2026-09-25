@@ -60,6 +60,7 @@ defmodule ThistleTea.Game.World.Transports do
     snapshot = %{
       guid: entity.object.guid,
       entry: entity.object.entry,
+      display_id: entity.game_object.display_id,
       world: entity.internal.world,
       name: route.name,
       route_kind: route.kind,

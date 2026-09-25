@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Player.Spells do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.Environment
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
@@ -139,7 +140,7 @@ defmodule ThistleTea.Game.Player.Spells do
       when is_map(spellbook) and is_integer(now) do
     spellbook
     |> Map.values()
-    |> Enum.filter(&passive_aura_spell?/1)
+    |> Enum.filter(&(passive_aura_spell?(&1) and Environment.validate(&1, character.internal.outdoors?) == :ok))
     |> Enum.reduce(character, fn spell, character ->
       if AuraLogic.has_spell?(character, spell.id) do
         character

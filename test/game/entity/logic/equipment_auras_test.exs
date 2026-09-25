@@ -85,6 +85,26 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentAurasTest do
   end
 
   describe "sync/5" do
+    test "removes outdoor set bonuses indoors and restores their source on exit", %{character: character} do
+      spell = %Spell{
+        id: 23_218,
+        attributes: MapSet.new([:passive, :only_outdoors]),
+        effects: [%Effect{type: :apply_aura, aura: :mod_speed_always, base_points: 10}]
+      }
+
+      source = {:item_set, 201, spell.id}
+      lookup = fn _ -> spell end
+      outside = EquipmentAuras.sync(character, [], lookup, 0, [source])
+      assert Aura.has_spell?(outside, spell.id)
+      inside = %{outside | internal: %{outside.internal | outdoors?: false}}
+      inside = EquipmentAuras.sync(inside, [], lookup, 1000, [source])
+      refute Aura.has_spell?(inside, spell.id)
+      restored = %{inside | internal: %{inside.internal | outdoors?: true}}
+      restored = EquipmentAuras.sync(restored, [], lookup, 2000, [source])
+      assert [%{item_source: ^source}] = restored.unit.auras
+      assert EquipmentAuras.sync(restored, [], lookup, 3000, [source]) == restored
+    end
+
     test "keeps set bonuses independent of enchants and ordinary auras", %{
       character: character,
       enchants: enchants,

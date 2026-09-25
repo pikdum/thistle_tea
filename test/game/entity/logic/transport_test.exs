@@ -3,6 +3,20 @@ defmodule ThistleTea.Game.Entity.Logic.TransportTest do
 
   alias ThistleTea.Game.Entity.Logic.Transport
 
+  describe "outdoors?/2" do
+    test "accepts the supported ship and zeppelin mounting spots" do
+      for position <- [{6.21, 0.12, 14.05, 0.0}, {-10.46, 6.62, 17.77, 0.0}, {1.55, -4.51, 11.30, 0.0}] do
+        assert Transport.outdoors?(3015, position)
+      end
+
+      assert Transport.outdoors?(3031, {-21.77, -7.90, -13.27, 0.0})
+      refute Transport.outdoors?(3015, {6.21, 0.12, 12.0, 0.0})
+      refute Transport.outdoors?(3031, {-21.77, -7.90, -15.0, 0.0})
+      refute Transport.outdoors?(3015, {0.0, 0.0, 0.0, 0.0})
+      refute Transport.outdoors?(999, {6.21, 0.12, 14.05, 0.0})
+    end
+  end
+
   describe "build_ship/7" do
     test "builds stop timing and honors the VMangos period override" do
       route = Transport.build_ship(1, "Test", 10, ship_nodes(), 10, 1, 20_000)

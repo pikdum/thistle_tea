@@ -127,6 +127,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Skinning
   alias ThistleTea.Game.Player.SpellAreas
   alias ThistleTea.Game.Player.Spellcasting
+  alias ThistleTea.Game.Player.SpellEnvironment
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Player.Taxi, as: PlayerTaxi
   alias ThistleTea.Game.Player.Trade
@@ -1697,6 +1698,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     |> finalize_death()
     |> OutdoorPvp.reconcile()
     |> SpellAreas.reconcile()
+    |> SpellEnvironment.reconcile()
     |> PossessionOwner.reconcile()
     |> Looting.close_unavailable()
     |> sync_equipment_requirements()
@@ -1708,7 +1710,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def maybe_broadcast_update(state), do: state
 
   defp sync_equipment_requirements(%State{character: %Character{player: %{} = player} = character} = state) do
-    requirements = {character.unit.shapeshift_form, player.skills, player.skill_bonuses}
+    requirements = {character.unit.shapeshift_form, player.skills, player.skill_bonuses, character.internal.outdoors?}
 
     character =
       if state.equipment_requirements != nil and state.equipment_requirements != requirements do
@@ -1717,7 +1719,10 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         character
       end
 
-    requirements = {character.unit.shapeshift_form, character.player.skills, character.player.skill_bonuses}
+    requirements =
+      {character.unit.shapeshift_form, character.player.skills, character.player.skill_bonuses,
+       character.internal.outdoors?}
+
     %{state | character: character, equipment_requirements: requirements}
   end
 

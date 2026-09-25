@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.World.SpellRequirements do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpellAreas
+  alias ThistleTea.Game.World.SpellEnvironment
   alias ThistleTea.Game.World.SpellFocus
   alias ThistleTea.Game.World.SpellObjects
   alias ThistleTea.Game.World.Visibility
@@ -23,6 +24,7 @@ defmodule ThistleTea.Game.World.SpellRequirements do
       corpse: corpse(caster, spell),
       aura_target: aura_target(caster, targets),
       spell_area: SpellAreas.context(caster, spell),
+      outdoors?: SpellEnvironment.context(caster, spell),
       objects: SpellObjects.resolve(caster, spell, targets, focus)
     }
   end

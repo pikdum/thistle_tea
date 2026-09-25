@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentAuras do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.EquipmentSpells
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Environment
 
   def sync(character, enchantments, get_spell, now, spell_sources \\ []) do
     previous = character.unit.auras || []
@@ -37,10 +38,10 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentAuras do
 
   defp eligible?(character, %Holder{item_source: {kind, _id, _spell_id}, spell: spell})
        when kind in [:item_set, :item_equip] do
-    EquipmentSpells.eligible?(spell, character.unit.shapeshift_form)
+    EquipmentSpells.eligible?(spell, character.unit.shapeshift_form, character.internal.outdoors?)
   end
 
-  defp eligible?(_character, _holder), do: true
+  defp eligible?(character, %Holder{spell: spell}), do: Environment.validate(spell, character.internal.outdoors?) == :ok
 
   defp build_holder(character, spell, {:item_equip, _guid, _spell_id} = source, now) do
     build_aura_holder(character, EquipmentSpells.aura_spell(spell), source, now)

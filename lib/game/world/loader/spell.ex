@@ -930,6 +930,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @on_next_swing_1, :on_next_swing)
       |> add_if(attrs, @on_next_swing_2, :on_next_swing)
       |> add_if(attrs, @passive, :passive)
+      |> add_if(attrs, 0x00004000, :only_indoors)
+      |> add_if(attrs, 0x00008000, :only_outdoors)
       |> add_if(attrs, 0x00000080, :do_not_display)
       |> add_if(attrs, @ability, :ability)
       |> add_if(attrs, 0x00000020, :tradeskill)

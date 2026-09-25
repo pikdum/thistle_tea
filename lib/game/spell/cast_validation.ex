@@ -44,6 +44,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Spell.CorpseTarget
   alias ThistleTea.Game.Spell.Destination
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Environment
   alias ThistleTea.Game.Spell.Focus
   alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.Scripts
@@ -66,6 +67,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- AuraRank.validate(caster, spell, target_info, opts),
          :ok <- Battleground.validate(spell, Keyword.get(opts, :battleground)),
          :ok <- Area.validate(spell, Keyword.get(opts, :spell_area)),
+         :ok <- Environment.validate(caster, spell, Keyword.get(opts, :outdoors?)),
          :ok <- Pickpocket.validate(caster, spell, target_info),
          :ok <- Skinning.validate(caster, spell, target_info, opts),
          :ok <- OpenLock.validate(caster, spell, Keyword.get(opts, :lock_context)),

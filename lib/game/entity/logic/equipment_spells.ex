@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentSpells do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Environment
 
   @stat_auras [
     :mod_damage_done,
@@ -44,8 +45,12 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentSpells do
     |> Enum.uniq()
   end
 
-  def eligible?(%Spell{} = spell, form), do: Spell.shapeshift_cast_error(spell, form || 0) == :ok
-  def eligible?(_spell, _form), do: false
+  def eligible?(spell, form, outdoors \\ nil)
+
+  def eligible?(%Spell{} = spell, form, outdoors),
+    do: Spell.shapeshift_cast_error(spell, form || 0) == :ok and Environment.validate(spell, outdoors) == :ok
+
+  def eligible?(_spell, _form, _outdoors), do: false
 
   def aura_spell(%Spell{} = spell), do: %{spell | effects: Enum.reject(spell.effects, &stat_effect?/1)}
   def aura_spell(_spell), do: nil

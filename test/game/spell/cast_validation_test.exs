@@ -22,6 +22,26 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
 
   @now 10_000
 
+  describe "validate/6 terrain requirements" do
+    test "restricts players with known terrain and leaves creatures and unknown terrain unaffected" do
+      npc = caster()
+      player = %Character{object: npc.object, unit: npc.unit, internal: npc.internal}
+
+      for {attribute, forbidden} <- [only_outdoors: false, only_indoors: true] do
+        spell = helpful_spell(attributes: MapSet.new([attribute]))
+
+        assert CastValidation.validate(player, spell, Target.none(), nil, @now, outdoors?: forbidden) ==
+                 {:error, attribute}
+
+        for outdoors <- [not forbidden, nil] do
+          assert CastValidation.validate(player, spell, Target.none(), nil, @now, outdoors?: outdoors) == :ok
+        end
+
+        assert CastValidation.validate(npc, spell, Target.none(), nil, @now, outdoors?: forbidden) == :ok
+      end
+    end
+  end
+
   describe "validate/6 creature resources" do
     test "ordinary creatures can use non-mana abilities without those power pools" do
       for type <- 1..4 do

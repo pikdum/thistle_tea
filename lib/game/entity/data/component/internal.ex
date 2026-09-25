@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :home_bind,
     :name,
     :area,
+    :outdoors?,
     :spells,
     :spellbook,
     :casting,

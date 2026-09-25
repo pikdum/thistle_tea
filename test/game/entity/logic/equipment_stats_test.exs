@@ -116,6 +116,22 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
     end
   end
 
+  describe "bonuses/4" do
+    test "excludes outdoor on-equip stats indoors without dropping the item's own stats" do
+      spell = %Spell{
+        id: 1,
+        attributes: MapSet.new([:only_outdoors]),
+        effects: [%Effect{type: :apply_aura, aura: :mod_attack_power, base_points: 50}]
+      }
+
+      template = %ItemTemplate{entry: 1, armor: 20, spellid_1: 1, spelltrigger_1: 1}
+      lookup = fn 1 -> spell end
+      assert EquipmentStats.bonuses([template], lookup, 0, true).attack_power == 50
+      assert EquipmentStats.bonuses([template], lookup, 0, false).attack_power == 0
+      assert EquipmentStats.bonuses([template], lookup, 0, false).armor == 20
+    end
+  end
+
   describe "resync/2" do
     test "ranged attack power disappears when gear breaks or is removed", %{character: character} do
       item =

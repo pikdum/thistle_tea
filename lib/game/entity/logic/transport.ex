@@ -139,6 +139,17 @@ defmodule ThistleTea.Game.Entity.Logic.Transport do
     }
   end
 
+  def outdoors?(3015, {x, y, z, _orientation}) do
+    Enum.any?(
+      [{6.21, 0.12, 14.05, 1.1}, {-10.46, 6.62, 17.77, 1.0}, {1.55, -4.51, 11.30, 0.5}],
+      fn {px, py, pz, radius} -> Math.distance({x, y, z}, {px, py, pz}) < radius end
+    )
+  end
+
+  def outdoors?(3031, {x, y, z, _orientation}), do: Math.distance({x, y, z}, {-21.77, -7.90, -13.27}) < 1.1
+
+  def outdoors?(_display, _position), do: false
+
   def valid_passenger_position?({x, y, z, orientation}) do
     Enum.all?([x, y, z, orientation], &is_number/1) and
       abs(x) <= 250 and abs(y) <= 250 and abs(z) <= 100

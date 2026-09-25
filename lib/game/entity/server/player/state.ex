@@ -61,6 +61,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :character,
     :equipment_requirements,
     :spell_area_snapshot,
+    :spell_environment_position,
     :visibility_cells,
     :viewpoint_guid,
     :stealth_detection_ref,

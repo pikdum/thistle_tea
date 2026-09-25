@@ -55,7 +55,11 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
   def resync(character, get_item, get_spell \\ fn _spell_id -> nil end, enchantments \\ [])
 
   def resync(%{unit: %Unit{} = unit, player: %Player{} = player} = character, get_item, get_spell, enchantments) do
-    bonuses = player |> Inventory.usable_equipped_templates(get_item) |> bonuses(get_spell, unit.shapeshift_form)
+    bonuses =
+      player
+      |> Inventory.usable_equipped_templates(get_item)
+      |> bonuses(get_spell, unit.shapeshift_form, outdoors(character))
+
     bonuses = Enum.reduce(enchantments, bonuses, &add_enchantment(&2, &1, unit.class))
     unit = %{unit | equipment_bonuses: bonuses} |> Stats.recompute()
     player = apply_spell_damage_fields(player, bonuses)
@@ -87,11 +91,14 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
   defp add_weapon_damage(acc, :ranged, amount), do: add(acc, :ranged_damage, amount)
   defp add_weapon_damage(acc, _slot, _amount), do: acc
 
-  def bonuses(templates, get_spell \\ fn _spell_id -> nil end, form \\ 0) do
-    Enum.reduce(templates, @zero, &add_template(&2, &1, get_spell, form))
+  def bonuses(templates, get_spell \\ fn _spell_id -> nil end, form \\ 0, outdoors \\ nil) do
+    Enum.reduce(templates, @zero, &add_template(&2, &1, get_spell, form, outdoors))
   end
 
-  defp add_template(acc, %ItemTemplate{} = template, get_spell, form) do
+  defp outdoors(%{internal: %{outdoors?: outdoors}}), do: outdoors
+  defp outdoors(_character), do: nil
+
+  defp add_template(acc, %ItemTemplate{} = template, get_spell, form, outdoors) do
     acc =
       acc
       |> add(:armor, template.armor)
@@ -102,7 +109,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
       |> add(:shadow, template.shadow_res)
       |> add(:arcane, template.arcane_res)
       |> add_shield(template)
-      |> add_equip_spells(template, get_spell, form)
+      |> add_equip_spells(template, get_spell, form, outdoors)
 
     Enum.reduce(1..10, acc, fn i, acc ->
       case Map.get(@stat_mods, Map.get(template, :"stat_type#{i}")) do
@@ -122,10 +129,10 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
 
   defp add_shield(acc, _template), do: acc
 
-  defp add_equip_spells(acc, %ItemTemplate{} = template, get_spell, form) do
+  defp add_equip_spells(acc, %ItemTemplate{} = template, get_spell, form, outdoors) do
     Enum.reduce(EquipmentSpells.spell_ids(template), acc, fn spell_id, acc ->
       spell = get_spell.(spell_id)
-      if EquipmentSpells.eligible?(spell, form), do: add_spell_auras(acc, spell), else: acc
+      if EquipmentSpells.eligible?(spell, form, outdoors), do: add_spell_auras(acc, spell), else: acc
     end)
   end
 

@@ -69,6 +69,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.Social
+  alias ThistleTea.Game.Player.SpellEnvironment
   alias ThistleTea.Game.Player.Spells, as: PlayerSpells
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Player.Trade
@@ -123,6 +124,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> Dueling.abandon(Time.now())
       |> Pvp.reconnect(Time.now())
       |> build_spellbook()
+      |> SpellEnvironment.restore()
       |> PlayerSpells.apply_passives(Time.now())
       |> PlayerSpells.apply_default_auras(Time.now())
       |> LogicTalents.sync_points()
