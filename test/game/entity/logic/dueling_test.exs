@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.DuelingTest do
   alias ThistleTea.Game.Spell
 
   describe "requested/2 and started/2" do
-    test "projects the arbiter, opponent, team, and combat state" do
+    test "projects the arbiter, opponent, and team without entering combat" do
       character = character()
 
       character =
@@ -33,7 +33,29 @@ defmodule ThistleTea.Game.Entity.Logic.DuelingTest do
       assert character.player.duel_team == 1
       assert character.internal.duel.state == :started
       assert character.internal.duel.started_at == 4_000
+      refute character.internal.in_combat
+      assert Bitwise.band(character.unit.flags, 0x00080000) == 0
+    end
+
+    test "preserves existing combat when the countdown ends" do
+      character = character()
+      refs = MapSet.new([{20, 1}])
+
+      character = %{
+        character
+        | unit: %{character.unit | flags: 0x00080000},
+          internal: %{character.internal | in_combat: true, last_hostile_time: 3_900, threat_refs: refs}
+      }
+
+      character =
+        character
+        |> Dueling.requested(%{initiator_guid: 1, opponent_guid: 2, arbiter_guid: 3})
+        |> Dueling.started(%{opponent_guid: 2, team: 1, started_at: 4_000})
+
       assert character.internal.in_combat
+      assert character.internal.last_hostile_time == 3_900
+      assert character.internal.threat_refs == refs
+      assert Bitwise.band(character.unit.flags, 0x00080000) != 0
     end
   end
 

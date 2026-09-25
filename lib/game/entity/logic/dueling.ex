@@ -46,10 +46,9 @@ defmodule ThistleTea.Game.Entity.Logic.Dueling do
 
     %{
       character
-      | internal: %{internal | duel: duel, in_combat: true},
+      | internal: %{internal | duel: duel},
         player: %{player | duel_team: team}
     }
-    |> Combat.sync_combat_flag()
     |> Core.mark_broadcast_update()
   end
 
