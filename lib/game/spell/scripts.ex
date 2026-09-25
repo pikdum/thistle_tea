@@ -201,6 +201,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
       warlock_exclusive_category(row)
   end
 
+  defp generic_exclusive_category(%{id: id}) when id in [28_418, 28_419, 28_420], do: :generals_warcry
+
   defp generic_exclusive_category(row) do
     cond do
       shapeshift_spell?(row) -> :shapeshift

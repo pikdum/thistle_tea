@@ -79,6 +79,15 @@ defmodule ThistleTea.Game.World.System.Battleground do
     GenServer.call(server, {:supply_allowed, world, guid, entry})
   end
 
+  def quest_rewarded(%WorldRef{} = world, guid, quest_id, server \\ __MODULE__),
+    do: GenServer.cast(server, {:quest_rewarded, world, guid, quest_id})
+
+  def gossip(%WorldRef{} = world, guid, entry, standing, server \\ __MODULE__),
+    do: GenServer.call(server, {:gossip, world, guid, entry, standing})
+
+  def interact(%WorldRef{} = world, guid, entry, action, standing, server \\ __MODULE__),
+    do: GenServer.call(server, {:interact, world, guid, entry, action, standing})
+
   def participants(world, server \\ __MODULE__)
 
   def participants(%WorldRef{instance_id: id} = world, server) when is_integer(id) do
@@ -164,6 +173,34 @@ defmodule ThistleTea.Game.World.System.Battleground do
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
+  end
+
+  def handle_call({:gossip, world, guid, entry, standing}, _from, state) do
+    reply =
+      case Map.get(state.worlds, world) do
+        nil -> nil
+        pid -> Match.gossip(pid, guid, entry, standing)
+      end
+
+    {:reply, reply, state}
+  rescue
+    error ->
+      Logger.error("Battleground gossip routing failed: #{Exception.message(error)}")
+      {:reply, nil, state}
+  end
+
+  def handle_call({:interact, world, guid, entry, action, standing}, _from, state) do
+    reply =
+      case Map.get(state.worlds, world) do
+        nil -> :unhandled
+        pid -> Match.interact(pid, guid, entry, action, standing)
+      end
+
+    {:reply, reply, state}
+  rescue
+    error ->
+      Logger.error("Battleground interaction routing failed: #{Exception.message(error)}")
+      {:reply, :unhandled, state}
   end
 
   def handle_call({:leave_queue, guid}, _from, state) do
@@ -388,6 +425,15 @@ defmodule ThistleTea.Game.World.System.Battleground do
   end
 
   @impl GenServer
+  def handle_cast({:quest_rewarded, world, guid, quest_id}, state) do
+    if pid = Map.get(state.worlds, world), do: Match.quest_rewarded(pid, guid, quest_id)
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("Battleground quest reward routing failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_cast({:player_died, world, defeat}, state) do
     if pid = Map.get(state.worlds, world) do
       Match.player_died(pid, defeat, dropped_flag_guid())

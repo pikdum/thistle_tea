@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party.Group
+  alias ThistleTea.Game.Player.Battlegrounds
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.QuestGiver
@@ -395,6 +396,7 @@ defmodule ThistleTea.Game.Player.Quests do
 
     Network.send_packet(%Message.SmsgQuestgiverQuestComplete{quest: quest, xp: xp, money: money})
     state = put_character(state, character)
+    state = Battlegrounds.quest_rewarded(state, quest.id)
     state = PlayerReputation.reward_quest(state, quest)
     state = Mail.send_quest_reward(state, npc_guid, quest)
     state = run_quest_script(state, npc_guid, quest.complete_script_steps)

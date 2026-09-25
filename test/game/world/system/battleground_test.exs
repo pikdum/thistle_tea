@@ -62,6 +62,31 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
   end
 
   describe "join_group/3" do
+    test "routes quest donations and revalidates serialized blacksmith upgrades", %{server: server} do
+      assert :ok = BattlegroundSystem.join(%{alliance(1) | level: 60}, 30, server)
+      assert :ok = BattlegroundSystem.join(%{horde(2) | level: 60}, 30, server)
+      destination = {WorldRef.open(0), {0.0, 0.0, 0.0, 0.0}}
+      assert {:ok, world, _} = BattlegroundSystem.port(1, 1, destination, server)
+      assert {:ok, ^world, _} = BattlegroundSystem.port(2, 1, destination, server)
+      assert :ok = BattlegroundSystem.debug_start_now(world, server)
+
+      for _ <- 1..25, do: BattlegroundSystem.quest_rewarded(world, 1, 6_781, server)
+
+      assert %{options: [_, %{action: {:upgrade_armor, 1}}]} =
+               BattlegroundSystem.gossip(world, 1, 13_257, 9_000, server)
+
+      assert BattlegroundSystem.gossip(world, 2, 13_257, 9_000, server) == nil
+      assert BattlegroundSystem.gossip(WorldRef.instance(30, 999), 1, 13_257, 9_000, server) == nil
+      assert :close = BattlegroundSystem.interact(world, 1, 13_257, {:upgrade_armor, 1}, 8_999, server)
+      pid = BattlegroundSystem.match_for_world(world, server)
+      assert Match.snapshot(pid).armor.alliance.tier == 0
+      assert :close = BattlegroundSystem.interact(world, 1, 13_257, {:upgrade_armor, 1}, 9_000, server)
+      assert Match.snapshot(pid).armor.alliance.tier == 1
+      assert :close = BattlegroundSystem.interact(world, 1, 13_257, {:upgrade_armor, 1}, 9_000, server)
+      assert Match.snapshot(pid).armor.alliance.tier == 1
+      assert Match.snapshot(pid).armor.horde.tier == 0
+    end
+
     test "admits levels 51 and 60 to one Alterac match and routes creature objectives", %{server: server} do
       assert :ok = BattlegroundSystem.join_group([%{alliance(1) | level: 51}, alliance(3)], 30, server)
       assert :ok = BattlegroundSystem.join(horde(2), 30, server)

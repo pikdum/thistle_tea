@@ -44,6 +44,11 @@ defmodule ThistleTea.Game.World.Battleground.Match do
   end
 
   def creature_died(server, defeat), do: GenServer.cast(server, {:creature_died, defeat})
+  def quest_rewarded(server, guid, quest_id), do: GenServer.cast(server, {:quest_rewarded, guid, quest_id})
+  def gossip(server, guid, entry, standing), do: GenServer.call(server, {:gossip, guid, entry, standing})
+
+  def interact(server, guid, entry, action, standing),
+    do: GenServer.call(server, {:interact, guid, entry, action, standing})
 
   def disconnect(server, guid, position, dropped_guid) do
     GenServer.cast(server, {:disconnect, guid, position, dropped_guid})
@@ -151,6 +156,24 @@ defmodule ThistleTea.Game.World.Battleground.Match do
   def handle_call(:start_now, _from, state), do: {:reply, {:error, :not_counting_down}, state}
 
   def handle_call(:snapshot, _from, state), do: {:reply, state.match, state}
+
+  def handle_call({:gossip, guid, entry, standing}, _from, state) do
+    {:reply, state.rules.gossip(state.match, guid, entry, standing), state}
+  rescue
+    error ->
+      Logger.error("Battleground gossip failed: #{Exception.message(error)}")
+      {:reply, nil, state}
+  end
+
+  def handle_call({:interact, guid, entry, action, standing}, _from, state) do
+    {reply, result} = state.rules.interact(state.match, guid, entry, action, standing)
+    {:reply, reply, apply_result(state, result)}
+  rescue
+    error ->
+      Logger.error("Battleground interaction failed: #{Exception.message(error)}")
+      {:reply, :unhandled, state}
+  end
+
   def handle_call(:world_states, _from, state), do: {:reply, state.rules.world_states(state.match), state}
   def handle_call(:scoreboard, _from, state), do: {:reply, state.rules.scoreboard_snapshot(state.match), state}
 
@@ -178,6 +201,14 @@ defmodule ThistleTea.Game.World.Battleground.Match do
   rescue
     error ->
       Logger.error("Battleground creature death failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:quest_rewarded, guid, quest_id}, state) do
+    {:noreply, apply_result(state, state.rules.quest_rewarded(state.match, guid, quest_id))}
+  rescue
+    error ->
+      Logger.error("Battleground quest reward failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 

@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Battleground.AlteracValley do
   @moduledoc "Pure Alterac Valley match lifecycle, contested objectives, creature victories, and resurrection geography."
 
+  alias ThistleTea.Game.Battleground.AlteracValley.Armor
   alias ThistleTea.Game.Battleground.AlteracValley.Creatures
   alias ThistleTea.Game.Battleground.AlteracValley.Mine
   alias ThistleTea.Game.Battleground.AlteracValley.Node
@@ -29,7 +30,7 @@ defmodule ThistleTea.Game.Battleground.AlteracValley do
     mines: %{},
     defeated_events: MapSet.new(),
     defeated_incarnations: MapSet.new(),
-    armor_upgrades: %{alliance: 0, horde: 0},
+    armor: %{},
     team_scores: %{alliance: 0, horde: 0},
     resurrection_queue: MapSet.new(),
     weekend?: false
@@ -50,6 +51,7 @@ defmodule ThistleTea.Game.Battleground.AlteracValley do
       players: Roster.new(reservations),
       nodes: Node.all(),
       mines: Mine.all(),
+      armor: Armor.all(),
       weekend?: Keyword.get(opts, :weekend?, false)
     }
 
@@ -75,6 +77,9 @@ defmodule ThistleTea.Game.Battleground.AlteracValley do
   defdelegate auto_leave_ms(match, now), to: Lifecycle
   defdelegate next_resurrection_ms(match, now), to: Lifecycle
   defdelegate creature_died(match, defeat, now), to: Creatures, as: :defeated
+  defdelegate quest_rewarded(match, guid, quest_id), to: Armor, as: :contribute
+  defdelegate gossip(match, guid, entry, standing), to: Armor
+  defdelegate interact(match, guid, entry, action, standing), to: Armor
 
   def disconnect(%__MODULE__{} = match, guid, _position, _dropped_guid), do: Roster.disconnect(match, guid)
   def leave(%__MODULE__{} = match, guid, _position, _dropped_guid), do: Roster.leave(match, guid)
@@ -246,7 +251,7 @@ defmodule ThistleTea.Game.Battleground.AlteracValley do
   end
 
   defp defender_effects(match, node, action) do
-    upgrade = Map.get(match.armor_upgrades, node.point.owner, 0)
+    upgrade = Armor.tier(match, node.point.owner)
 
     Enum.map(Node.defender_events(node, upgrade), fn {event, state} ->
       if action == :assaulted,

@@ -101,6 +101,11 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
   defp emit_effect(_match, %Effects.QuestKillCredit{guid: guid, entry: entry}),
     do: Entity.quest_kill_credit(guid, entry)
 
+  defp emit_effect(match, %Effects.ArmorUpgrade{team: team, tier: tier}) do
+    rank = Enum.at(["Seasoned", "Veteran", "Champion"], tier - 1)
+    send_to(match, team, battleground_message("#{rank} units are entering the battle!", team, nil))
+  end
+
   defp emit_effect(match, %Effects.TeamSpell{team: team, spell_id: spell_id}) do
     match.players
     |> Map.values()

@@ -11,6 +11,35 @@ defmodule ThistleTea.Game.World.Loader.AlteracValleyVMangosTest do
   @moduletag :vmangos_db
 
   describe "Alterac event catalog" do
+    test "armor donations consume twenty scraps and every graveyard and tower guard tier has spawns" do
+      quests = Mangos.Repo.all(from(quest in Mangos.QuestTemplate, where: quest.entry in [6_741, 6_781, 7_223, 7_224]))
+      assert length(quests) == 4
+
+      for quest <- quests do
+        assert quest.req_item_id1 == 17_422
+        assert quest.req_item_count1 == 20
+      end
+
+      events =
+        Mangos.Repo.all(
+          from(binding in Mangos.CreatureBattleground,
+            join: creature in Mangos.Creature,
+            on: creature.guid == binding.guid,
+            where: creature.map == 30,
+            select: {binding.event1, binding.event2}
+          )
+        )
+        |> MapSet.new()
+
+      for event <- 15..21, state <- 0..7 do
+        assert MapSet.member?(events, {event, state})
+      end
+
+      for {id, node} <- Node.all(), node.kind == :tower, tier <- 0..3 do
+        for event <- Node.defender_events(node, tier), do: assert(MapSet.member?(events, event))
+      end
+    end
+
     test "every neutral and faction supply spawn maps to its controlling mine" do
       supplies =
         Mangos.Repo.all(

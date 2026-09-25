@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.ProcRule
+  alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.WorldRef
 
   defp fixture_entity(opts \\ []) do
@@ -1759,6 +1760,16 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       {entity, _events} = apply_spell(entity, 1, 1, mage_armor)
 
       assert [%Holder{spell: %Spell{id: 6117}}] = entity.unit.auras
+    end
+
+    test "successive General's Warcry upgrades retain only the newest tier" do
+      Enum.reduce([28_418, 28_419, 28_420], fixture_entity(), fn id, entity ->
+        category = Scripts.exclusive_category(%{id: id})
+        spell = buff_spell(id, exclusive_category: category)
+        {entity, _events} = apply_spell(entity, 1, 1, spell)
+        assert [%Holder{spell: %Spell{id: ^id}}] = entity.unit.auras
+        entity
+      end)
     end
 
     test "same spell from a different caster replaces the existing holder" do

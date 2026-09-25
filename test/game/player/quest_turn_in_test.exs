@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Player.QuestTurnInTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Battleground.Template
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
@@ -17,12 +18,15 @@ defmodule ThistleTea.Game.Player.QuestTurnInTest do
   alias ThistleTea.Game.Network.Message.SmsgItemPushResult
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Battleground.Match
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.ItemProperty, as: PropertyLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.WorldRef
 
   @moduletag :vmangos_db
@@ -133,6 +137,77 @@ defmodule ThistleTea.Game.Player.QuestTurnInTest do
     assert ItemStore.get(required1.object.guid) == nil
     assert ItemStore.get(required2.object.guid) == nil
     assert_receive {:"$gen_cast", {:send_packet, %SmsgItemPushResult{random_property_id: 59_004}}}
+  end
+
+  describe "choose_reward/4" do
+    test "credits the match only after a successful inventory commit and ignores duplicate reward requests", context do
+      quest_id = 6_781
+      quest = %{QuestLoader.get(context.quest_id) | id: quest_id}
+      previous = :ets.lookup(QuestLoader, {:quest, quest_id})
+      :ets.insert(QuestLoader, {{:quest, quest_id}, quest})
+      :ets.insert(QuestLoader, {{:ender, Guid.entry(context.npc_guid)}, [quest_id]})
+      context = %{context | quest_id: quest_id}
+      {world, match_pid} = enter_alterac(context.player_guid)
+
+      on_exit(fn ->
+        :ets.delete(QuestLoader, {:quest, quest_id})
+        :ets.insert(QuestLoader, previous)
+      end)
+
+      npc = %{
+        object: %Object{guid: context.npc_guid},
+        internal: %Internal{world: world},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      World.update_position(npc, :mobs)
+      incomplete = state(context, completed_player(quest_id, []))
+      incomplete = put_in(incomplete.character.internal.world, world)
+      assert Quests.choose_reward(incomplete, context.npc_guid, quest_id, 0) == incomplete
+      assert Match.snapshot(match_pid).armor.alliance.scraps == 0
+
+      required = Enum.map(1..2, fn _ -> ItemStore.create(@required_entry, owner: context.player_guid) end)
+      ready = %{incomplete | character: %{incomplete.character | player: completed_player(quest_id, required)}}
+      rewarded = Quests.choose_reward(ready, context.npc_guid, quest_id, 0)
+      refute QuestLog.active?(rewarded.character.player.quest_log, quest_id)
+      assert Inventory.count_entry(rewarded.character.player, @required_entry, &ItemStore.get/1) == 0
+      assert BattlegroundSystem.match_for_world(world) == match_pid
+      assert Match.snapshot(match_pid).armor.alliance.scraps == 20
+      assert Quests.choose_reward(rewarded, context.npc_guid, quest_id, 0) == rewarded
+      assert BattlegroundSystem.match_for_world(world) == match_pid
+      assert Match.snapshot(match_pid).armor.alliance.scraps == 20
+    end
+  end
+
+  defp enter_alterac(guid) do
+    previous = :ets.lookup(BattlegroundLoader, {:map, 30})
+
+    template = %Template{
+      type_id: 1,
+      map_id: 30,
+      min_players_per_team: 20,
+      max_players_per_team: 40,
+      min_level: 51,
+      max_level: 60,
+      alliance_start: {0.0, 0.0, 0.0, 0.0},
+      horde_start: {10.0, 0.0, 0.0, 0.0}
+    }
+
+    :ets.insert(BattlegroundLoader, {{:map, 30}, template})
+    assert :ok = BattlegroundSystem.join(%{guid: guid, name: "Donor", team: :alliance, level: 60}, 30)
+    assert {:ok, _status} = BattlegroundSystem.debug_start_queued(guid)
+    return_to = {WorldRef.open(0), {0.0, 0.0, 0.0, 0.0}}
+    assert {:ok, world, _position} = BattlegroundSystem.port(guid, 1, return_to)
+    assert :ok = BattlegroundSystem.debug_start_now(world)
+    pid = BattlegroundSystem.match_for_world(world)
+
+    on_exit(fn ->
+      BattlegroundSystem.leave(guid, nil)
+      :ets.delete(BattlegroundLoader, {:map, 30})
+      :ets.insert(BattlegroundLoader, previous)
+    end)
+
+    {world, pid}
   end
 
   defp completed_player(quest_id, items) do

@@ -145,7 +145,24 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
   def broadcast_text_ids,
     do:
       @warsong_broadcast_text_ids ++
-        [7_335, 7_336, 10_477, 10_478, 10_479, 10_598, 10_599, 10_633, 10_634, 10_638, 10_639, 10_640]
+        [
+          7_335,
+          7_336,
+          8_718,
+          8_719,
+          8_723,
+          9_130,
+          10_477,
+          10_478,
+          10_479,
+          10_598,
+          10_599,
+          10_633,
+          10_634,
+          10_638,
+          10_639,
+          10_640
+        ]
 
   defp template(row, safe_locs) do
     %Template{

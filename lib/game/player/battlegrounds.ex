@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
   """
 
   alias ThistleTea.Game.Battleground
+  alias ThistleTea.Game.Battleground.AlteracValley.Armor
   alias ThistleTea.Game.Battleground.Resurrection, as: BattlegroundResurrection
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
@@ -15,16 +16,84 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party.Group
+  alias ThistleTea.Game.Player.Gossip
+  alias ThistleTea.Game.Player.QuestGiver
+  alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Battleground.Match
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
+  alias ThistleTea.Game.World.Loader.BroadcastText
+  alias ThistleTea.Game.World.Loader.Gossip.Menu
+  alias ThistleTea.Game.World.Loader.Gossip.Option
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.WorldRef
 
   @interaction_range 10.0
+
+  def quest_rewarded(%{character: %Character{internal: %{world: %WorldRef{instance_id: id} = world}}} = state, quest_id)
+      when is_integer(id) do
+    BattlegroundSystem.quest_rewarded(world, state.character.object.guid, quest_id)
+    state
+  end
+
+  def quest_rewarded(state, _quest_id), do: state
+
+  def gossip_menu(%Character{internal: %{world: %WorldRef{map_id: 30, instance_id: id} = world}} = character, guid)
+      when is_integer(id) do
+    if Armor.smith_team(World.entry(guid)) && QuestGiver.interactable?(character, guid) do
+      case BattlegroundSystem.gossip(world, character.object.guid, World.entry(guid), upgrade_standing(character)) do
+        nil -> nil
+        menu -> build_gossip_menu(menu)
+      end
+    end
+  end
+
+  def gossip_menu(%Character{}, _guid), do: nil
+
+  def select_gossip(%{character: %Character{} = character} = state, guid, action) do
+    if QuestGiver.interactable?(character, guid) do
+      case BattlegroundSystem.interact(
+             character.internal.world,
+             character.object.guid,
+             World.entry(guid),
+             action,
+             upgrade_standing(character)
+           ) do
+        {:menu, menu} ->
+          Gossip.send_menu(guid, build_gossip_menu(menu), Gossip.quest_items(guid, character), state)
+
+        :close ->
+          Network.send_packet(%Message.SmsgGossipComplete{})
+          %{state | gossip_menu_options: []}
+
+        :unhandled ->
+          state
+      end
+    else
+      state
+    end
+  end
+
+  defp upgrade_standing(character), do: max(Reputation.standing(character, 729), Reputation.standing(character, 730))
+
+  defp build_gossip_menu(%{text_id: text_id, options: options}) do
+    options =
+      Enum.flat_map(options, fn option ->
+        case BroadcastText.get(option.text_id) do
+          %{text: text} ->
+            [%Option{id: option.id, icon: 0, text: text, option_id: 1, action: {:battleground, option.action}}]
+
+          nil ->
+            []
+        end
+      end)
+
+    %Menu{text_id: text_id, options: options}
+  end
 
   def battlemaster_hello(%{ready: true, character: %Character{} = character} = state, guid) do
     entry = World.entry(guid)

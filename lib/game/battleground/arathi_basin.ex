@@ -119,6 +119,9 @@ defmodule ThistleTea.Game.Battleground.ArathiBasin do
   def player_died(%__MODULE__{} = match, %Defeat{}, _dropped_guid), do: %Result{match: match}
 
   def creature_died(%__MODULE__{} = match, _defeat, _now), do: %Result{match: match}
+  def quest_rewarded(%__MODULE__{} = match, _guid, _quest_id), do: %Result{match: match}
+  def gossip(%__MODULE__{}, _guid, _entry, _standing), do: nil
+  def interact(%__MODULE__{} = match, _guid, _entry, _action, _standing), do: {:unhandled, %Result{match: match}}
 
   def handle_timer(%__MODULE__{phase: :countdown} = match, :start_one_minute, _now),
     do: %Result{match: match, effects: [announce(10_477)]}

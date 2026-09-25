@@ -54,7 +54,7 @@ defmodule ThistleTea.Game.Player.Gossip do
     if Reputation.can_interact?(character, guid) do
       quests = quest_items(guid, character)
 
-      case GossipLoader.menu_for_creature(World.entry(guid)) do
+      case Battlegrounds.gossip_menu(character, guid) || GossipLoader.menu_for_creature(World.entry(guid)) do
         %Menu{} = menu -> send_menu(guid, menu, quests, state)
         nil when quests != [] -> send_menu(guid, %Menu{text_id: @default_gossip_text_id, options: []}, quests, state)
         nil -> Vendor.list(state, guid)
@@ -193,6 +193,9 @@ defmodule ThistleTea.Game.Player.Gossip do
   defp dispatch(state, _character, _guid, %Option{taxi_path_steps: [_ | _] = steps}, _option_ids) do
     run_taxi_script(state, steps)
   end
+
+  defp dispatch(state, _character, guid, %Option{action: {:battleground, action}}, _option_ids),
+    do: Battlegrounds.select_gossip(state, guid, action)
 
   defp dispatch(
          state,

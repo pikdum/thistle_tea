@@ -54,6 +54,12 @@ defmodule ThistleTea.Game.Battleground.Effects do
     defstruct [:team, :spell_id]
   end
 
+  defmodule ArmorUpgrade do
+    @moduledoc false
+    @enforce_keys [:team, :tier]
+    defstruct [:team, :tier]
+  end
+
   defmodule OperateGates do
     @moduledoc false
     @enforce_keys [:action]

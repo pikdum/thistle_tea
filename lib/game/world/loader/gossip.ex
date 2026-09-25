@@ -65,6 +65,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
       :npc_flag,
       :action_menu_id,
       :condition,
+      :action,
       action_steps: [],
       coded: 0,
       taxi_path_steps: []

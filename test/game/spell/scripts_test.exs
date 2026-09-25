@@ -39,6 +39,14 @@ defmodule ThistleTea.Game.Spell.ScriptsTest do
   end
 
   describe "exclusive_category/1" do
+    test "General's Warcry upgrades replace earlier tiers" do
+      for id <- [28_418, 28_419, 28_420] do
+        assert Scripts.exclusive_category(dbc_row(id: id)) == :generals_warcry
+      end
+
+      assert Scripts.exclusive_category(dbc_row(id: 23_693)) == nil
+    end
+
     test "classifies mage armors by family flags" do
       row = dbc_row(spell_class_set: 3, spell_class_mask_0: 0x02000000)
 
