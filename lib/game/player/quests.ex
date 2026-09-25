@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Player.Battlegrounds
   alias ThistleTea.Game.Player.ConditionContext
+  alias ThistleTea.Game.Player.Gossip
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.QuestGiver
   alias ThistleTea.Game.Player.QuestSharing
@@ -80,7 +81,10 @@ defmodule ThistleTea.Game.Player.Quests do
 
   def hello(state, npc_guid) do
     if QuestGiver.interactable?(state.character, npc_guid) do
-      do_hello(state, npc_guid)
+      case Battlegrounds.gossip_menu(state.character, npc_guid) do
+        nil -> do_hello(state, npc_guid)
+        menu -> Gossip.send_menu(npc_guid, menu, Gossip.quest_items(npc_guid, state.character), state)
+      end
     else
       state
     end

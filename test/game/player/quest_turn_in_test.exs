@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Player.QuestTurnInTest do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Network.Message.SmsgGossipMessage
   alias ThistleTea.Game.Network.Message.SmsgItemPushResult
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World
@@ -22,6 +23,7 @@ defmodule ThistleTea.Game.Player.QuestTurnInTest do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
+  alias ThistleTea.Game.World.Loader.BroadcastText
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.ItemProperty, as: PropertyLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
@@ -137,6 +139,41 @@ defmodule ThistleTea.Game.Player.QuestTurnInTest do
     assert ItemStore.get(required1.object.guid) == nil
     assert ItemStore.get(required2.object.guid) == nil
     assert_receive {:"$gen_cast", {:send_packet, %SmsgItemPushResult{random_property_id: 59_004}}}
+  end
+
+  describe "hello/2" do
+    test "questgiver-only blacksmiths expose match gossip through the quest hello path", context do
+      {world, _pid} = enter_alterac(context.player_guid)
+      npc_guid = Guid.from_low_guid(:mob, 13_257, context.id)
+      Entity.register(npc_guid)
+
+      npc = %{
+        object: %Object{guid: npc_guid},
+        internal: %Internal{world: world},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      World.update_position(npc, :mobs)
+      Metadata.put(npc_guid, %{alive?: true, npc_flags: 2})
+      previous = :ets.lookup(BroadcastText, 9_130)
+      :ets.insert(BroadcastText, {9_130, %{text: "How many more supplies are needed?"}})
+
+      on_exit(fn ->
+        World.remove_position(npc, :mobs)
+        Metadata.delete(npc_guid)
+        :ets.delete(BroadcastText, 9_130)
+        :ets.insert(BroadcastText, previous)
+      end)
+
+      state = state(context, %Player{})
+      state = put_in(state.character.internal.world, world)
+      result = Quests.hello(state, npc_guid)
+      assert result.gossip_menu_guid == npc_guid
+      assert [%{action: {:battleground, :armor_status}}] = result.gossip_menu_options
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %SmsgGossipMessage{guid: ^npc_guid, title_text_id: 6_073, gossips: [_]}}}
+    end
   end
 
   describe "choose_reward/4" do
