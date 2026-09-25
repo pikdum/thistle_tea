@@ -326,7 +326,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   end
 
   def run(state, ".debug events" <> params) do
-    state |> world_events_command(String.split(params, trim: true)) |> handled()
+    state |> world_events_command(String.split(params)) |> handled()
   end
 
   def run(state, ".debug explore" <> _) do

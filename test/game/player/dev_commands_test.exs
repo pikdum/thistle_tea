@@ -88,6 +88,22 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
     end
   end
 
+  describe ".debug events" do
+    test "parses status and event changes without terminating the player" do
+      state = %{guid: 1, character: debug_character()}
+      assert {:handled, ^state} = DevCommands.run(state, ".debug events")
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "Active events:" <> _}}}
+
+      for action <- ["start", "stop"] do
+        assert {:handled, ^state} = DevCommands.run(state, ".debug events  #{action}  999999  ")
+        assert_received {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "Unknown world event."}}}
+      end
+
+      assert {:handled, ^state} = DevCommands.run(state, ".debug events invalid")
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "Usage: .debug events" <> _}}}
+    end
+  end
+
   describe ".debug honor" do
     test "changes the ledger and owner projection while retaining the earned rank" do
       id = System.unique_integer([:positive, :monotonic])
