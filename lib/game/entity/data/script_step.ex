@@ -81,8 +81,8 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
 
   def talk_text_ids(%__MODULE__{}), do: []
 
-  def emote_ids(%__MODULE__{command: :emote} = step) do
-    Enum.filter([step.datalong, step.datalong2, step.datalong3, step.datalong4], &(is_integer(&1) and &1 > 0))
+  def emote_ids(%__MODULE__{command: :emote, datalong: first} = step) when is_integer(first) and first >= 0 do
+    [first | Enum.take_while([step.datalong2, step.datalong3, step.datalong4], &(is_integer(&1) and &1 > 0))]
   end
 
   def emote_ids(%__MODULE__{}), do: []

@@ -30,6 +30,28 @@ defmodule ThistleTea.Game.Entity.Server.ScriptRoutingTest do
   setup [:world]
 
   describe "script delivery" do
+    test "zero emotes restore a creature after a persistent scripted animation", %{world: world} do
+      previous = Enum.flat_map([0, 69], &:ets.lookup(EmoteLoader, {:animation, &1}))
+      EmoteLoader.load([%{id: 0, spec_proc: 0}, %{id: 69, spec_proc: 2}], [])
+      creature = mob(world, 0.0, 0.0)
+      {:ok, pid} = World.start_entity(creature)
+
+      on_exit(fn ->
+        World.stop_entity(creature.object.guid)
+        for id <- [0, 69], do: :ets.delete(EmoteLoader, {:animation, id})
+        :ets.insert(EmoteLoader, previous)
+      end)
+
+      Entity.start_script(pid, [%ScriptStep{command: :emote, datalong: 69}], 0, world)
+      assert :sys.get_state(pid).unit.npc_emote_state == 69
+      Entity.start_script(pid, [%ScriptStep{command: :emote, datalong: 0}], 0, world)
+      assert :sys.get_state(pid).unit.npc_emote_state == 0
+      Entity.request_update_from(pid, self())
+      guid = creature.object.guid
+
+      assert_receive {:"$gen_cast", {:send_packet, %{object: %{guid: ^guid}, unit: %{npc_emote_state: 0}}}}
+    end
+
     test "live creatures face each other and project a delayed swapped emote", %{world: world} do
       previous = :ets.lookup(EmoteLoader, {:animation, 1})
       EmoteLoader.load([%{id: 1, spec_proc: 0}], [])

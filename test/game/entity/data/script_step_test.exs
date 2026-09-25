@@ -228,11 +228,17 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
   end
 
   describe "emote_ids/1" do
-    test "collects the non-zero emote ids of emote steps" do
+    test "collects consecutive alternatives after the first emote" do
       step = %ScriptStep{command: :emote, datalong: 11, datalong2: 0}
 
       assert ScriptStep.emote_ids(step) == [11]
+      assert ScriptStep.emote_ids(%{step | datalong2: 1, datalong3: 0, datalong4: 2}) == [11, 1]
       assert ScriptStep.emote_ids(%ScriptStep{command: :talk, datalong: 11}) == []
+    end
+
+    test "retains the zero emote that clears a persistent animation" do
+      assert ScriptStep.emote_ids(%ScriptStep{command: :emote, datalong: 0}) == [0]
+      assert ScriptStep.emote_ids(%ScriptStep{command: :emote, datalong: 0, datalong2: 1}) == [0, 1]
     end
   end
 
