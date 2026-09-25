@@ -18,7 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:CancelBattlegroundResurrection, [:world, :guid], []},
     {:DisenchantItem, [:target_guid, :spell_id], []},
     {:CreateItem, [:item_id, :count], [spell_id: nil]},
-    {:GiveItem, [:target_guid, :item_id, :count], []},
+    {:GiveItem, [:target_guid, :item_id, :count], [partial?: false]},
     {:ConsumeReagents, [:reagents], []},
     {:LaunchRanged, [:kind, :request, :now], []},
     {:MonsterTalk, [:text, :chat_type, :target_guid], []},

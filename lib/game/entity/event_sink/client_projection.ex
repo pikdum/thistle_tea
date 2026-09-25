@@ -143,10 +143,12 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
 
   def emit(entity, %Effects.DisenchantItem{}, _context), do: entity
 
-  def emit(entity, %Effects.GiveItem{target_guid: target_guid, item_id: item_id, count: count}, _context)
+  def emit(entity, %Effects.GiveItem{target_guid: target_guid, item_id: item_id, count: count} = effect, _context)
       when is_integer(target_guid) do
+    action = if effect.partial?, do: :reward_item, else: :create_item
+
     case Entity.pid(target_guid) do
-      pid when is_pid(pid) -> send(pid, {:create_item, item_id, count})
+      pid when is_pid(pid) -> send(pid, {action, item_id, count})
       _pid -> :ok
     end
 

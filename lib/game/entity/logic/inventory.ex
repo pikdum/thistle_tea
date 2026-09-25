@@ -602,10 +602,15 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   end
 
   def can_store?(%Player{} = player, %ItemTemplate{} = template, count, get_item) do
-    ctx = ctx(player, nil, nil, nil, get_item)
+    storable_count(player, template, count, get_item) == count
+  end
 
-    limit_new_count(player, template, count, get_item) == count and
-      (free_position(ctx, :carried, template) != nil or stack_room(ctx, template, :carried) >= count)
+  def storable_count(%Player{} = player, %ItemTemplate{} = template, count, get_item)
+      when is_integer(count) and count >= 0 do
+    ctx = ctx(player, nil, nil, nil, get_item)
+    empty_slots = ctx |> stack_positions(:carried, template) |> Enum.count(&(guid_at(ctx, &1) == nil))
+    capacity = empty_slots * max(template.stackable || 1, 1) + stack_room(ctx, template, :carried)
+    min(limit_new_count(player, template, count, get_item), capacity)
   end
 
   def split(%Player{} = player, owner_guid, src_pos, dst_pos, %Item{} = new_item, get_item) do
@@ -786,7 +791,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   end
 
   defp stack_room(ctx, %ItemTemplate{entry: entry} = template, scope) do
-    max_stack = max(template.stackable, 1)
+    max_stack = max(template.stackable || 1, 1)
 
     stack_positions(ctx, scope, template)
     |> Enum.map(fn pos ->

@@ -74,6 +74,33 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
     Enum.find(items, fn i -> i.object.guid == item.object.guid end)
   end
 
+  describe "storable_count/4" do
+    test "combines free stack space with empty compatible slots" do
+      template = %ItemTemplate{entry: 900, stackable: 20}
+      existing = build_item(20, template, stack_count: 18)
+      filler = build_item(21, %ItemTemplate{entry: 901})
+
+      player =
+        Enum.reduce(1..14, store(%Player{}, @backpack_start, existing), fn offset, player ->
+          store(player, @backpack_start + offset, filler)
+        end)
+
+      lookup = get_item_fn([existing, filler])
+      assert Inventory.storable_count(player, template, 25, lookup) == 22
+      assert Inventory.can_store?(player, template, 22, lookup)
+      refute Inventory.can_store?(player, template, 23, lookup)
+      assert Inventory.storable_count(player, %{template | max_count: 21}, 25, lookup) == 3
+    end
+
+    test "counts soul bags only for compatible rewards and excludes bank capacity" do
+      bag = build_item(20, %ItemTemplate{entry: 800, inventory_type: 18, container_slots: 6, class: 1, bag_family: 4})
+      player = %Player{bag1: bag.object.guid, bank_bag1: bag.object.guid, bank_bag_slots: 1}
+      lookup = get_item_fn([bag])
+      assert Inventory.storable_count(player, %ItemTemplate{entry: 6265, bag_family: 4}, 100, lookup) == 22
+      assert Inventory.storable_count(player, %ItemTemplate{entry: 6435}, 100, lookup) == 16
+    end
+  end
+
   describe "count_entry/3" do
     test "sums stacks across backpack and bag contents" do
       pelt_template = %ItemTemplate{entry: 750, stackable: 10}

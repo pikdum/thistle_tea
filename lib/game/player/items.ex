@@ -34,6 +34,26 @@ defmodule ThistleTea.Game.Player.Items do
     end
   end
 
+  def reward(state, item_id, count) when is_integer(count) and count > 0 do
+    case ItemLoader.get_template(item_id) do
+      %ItemTemplate{} = template -> reward_template(state, template, count)
+      _missing -> state
+    end
+  end
+
+  defp reward_template(state, %ItemTemplate{} = template, count) do
+    player = state.character.player
+    allowed = Inventory.limit_new_count(player, template, count, &ItemStore.get/1)
+    stored = Inventory.storable_count(player, template, count, &ItemStore.get/1)
+
+    if stored < count do
+      reason = if allowed < count, do: :cant_carry_more_of_this, else: :inventory_full
+      InventoryUpdate.send_failure(reason, 0, 0)
+    end
+
+    if stored > 0, do: give(state, template.entry, stored), else: state
+  end
+
   def give(state, item_id, count), do: give(state, item_id, count, nil)
 
   defp give(state, item_id, count, recipe) do

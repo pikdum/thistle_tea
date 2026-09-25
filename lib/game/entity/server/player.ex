@@ -1164,6 +1164,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   @impl GenServer
+  def handle_info({:reward_item, item_id, count}, state) do
+    {:noreply, Items.reward(state, item_id, count)}
+  rescue
+    error ->
+      Logger.error("reward_item crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  @impl GenServer
   def handle_info({:create_item, item_id, count}, state) do
     handle_info({:create_item, item_id, count, nil}, state)
   end

@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Player.ItemsTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -15,6 +16,8 @@ defmodule ThistleTea.Game.Player.ItemsTest do
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Network.Message.SmsgInventoryChangeFailure
+  alias ThistleTea.Game.Network.Message.SmsgItemPushResult
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
@@ -24,6 +27,55 @@ defmodule ThistleTea.Game.Player.ItemsTest do
   @entry 987_950
 
   setup [:inventory]
+
+  describe "reward/3" do
+    test "delivers a partial reward through the owner and commits only the instances that fit", %{state: state} do
+      state = fill_backpack(state, 1..14)
+      {:ok, _value} = Entity.register(state.guid)
+      effect = %Effects.GiveItem{target_guid: state.guid, item_id: @entry, count: 3, partial?: true}
+      EventSink.emit(state.character, effect, Context.new(self()))
+      assert_received {:reward_item, @entry, 3} = message
+      assert {:noreply, rewarded} = PlayerServer.handle_info(message, state)
+      assert Inventory.count_entry(rewarded.character.player, @entry, &ItemStore.get/1) == 2
+      assert CharacterStore.get(state.guid).player == rewarded.character.player
+      assert_received {:"$gen_cast", {:send_packet, %SmsgInventoryChangeFailure{code: 50}}}
+      assert_received {:"$gen_cast", {:send_packet, %SmsgItemPushResult{count: 1, created: 1}}}
+      assert_received {:"$gen_cast", {:send_packet, %SmsgItemPushResult{count: 1, created: 1}}}
+      refute_received {:"$gen_cast", {:send_packet, %SmsgItemPushResult{}}}
+    end
+
+    test "reports full bags without overwriting inventory or inserting an orphan", %{state: state} do
+      state = fill_backpack(state, 1..16)
+      size = :ets.info(ItemStore, :size)
+      assert Items.reward(state, @entry, 1) == state
+      assert :ets.info(ItemStore, :size) == size
+      assert_received {:"$gen_cast", {:send_packet, %SmsgInventoryChangeFailure{code: 50}}}
+      refute_received {:"$gen_cast", {:send_packet, %SmsgItemPushResult{}}}
+    end
+
+    test "reports a banked unique item instead of silently dropping the death reward", %{state: state} do
+      template = %ItemTemplate{entry: @entry, max_count: 1}
+      :ets.insert(ItemLoader, {@entry, template})
+      item = ItemStore.create(template, owner: state.guid)
+      state = put_in(state.character.player.bank1, item.object.guid)
+      size = :ets.info(ItemStore, :size)
+      assert Items.reward(state, @entry, 1) == state
+      assert :ets.info(ItemStore, :size) == size
+      code = Inventory.error_code(:cant_carry_more_of_this)
+      assert_received {:"$gen_cast", {:send_packet, %SmsgInventoryChangeFailure{code: ^code}}}
+      refute_received {:"$gen_cast", {:send_packet, %SmsgItemPushResult{}}}
+    end
+  end
+
+  defp fill_backpack(state, slots) do
+    player =
+      Enum.reduce(slots, state.character.player, fn slot, player ->
+        item = ItemStore.create(%ItemTemplate{entry: @entry + 2}, owner: state.guid)
+        struct!(player, [{:"inv#{slot}", item.object.guid}])
+      end)
+
+    %{state | character: %{state.character | player: player}}
+  end
 
   describe "create/4" do
     setup [:recipe]

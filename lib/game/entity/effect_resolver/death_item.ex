@@ -19,7 +19,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.DeathItem do
     with :player <- Guid.entity_type(caster),
          %{level: level} <- metadata.(caster),
          true <- DeathItem.eligible?(reward, level, tapped?(reward, opts)) do
-      [Effects.create_item(caster, reward.item_id, reward.count)]
+      [%Effects.GiveItem{target_guid: caster, item_id: reward.item_id, count: reward.count, partial?: true}]
     else
       _ineligible -> []
     end
