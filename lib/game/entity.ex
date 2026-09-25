@@ -103,6 +103,8 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:battleground_exit, world, position})
   end
 
+  def battleground_deserted(entity), do: dispatch_cast(entity, :battleground_deserted)
+
   def reward_reputation(entity, faction_id, amount) do
     dispatch_cast(entity, {:battleground_reputation, faction_id, amount})
   end

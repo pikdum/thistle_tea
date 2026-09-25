@@ -147,6 +147,12 @@ defmodule ThistleTea.Game.Battleground.Effects do
     defstruct [:guid]
   end
 
+  defmodule ApplyDeserter do
+    @moduledoc false
+    @enforce_keys [:guid]
+    defstruct [:guid]
+  end
+
   defmodule ResurrectPlayers do
     @moduledoc false
     @enforce_keys [:guids]

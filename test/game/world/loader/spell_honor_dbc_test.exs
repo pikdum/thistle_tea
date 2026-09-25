@@ -8,6 +8,15 @@ defmodule ThistleTea.Game.World.Loader.SpellHonorDbcTest do
   @moduletag :dbc_db
 
   describe "load/1" do
+    test "decodes Deserter as a fifteen-minute death-persistent negative aura" do
+      spell = SpellLoader.load(26_013)
+      assert spell.duration_ms == 900_000
+      assert :negative in spell.attributes
+      assert :death_persistent in spell.attributes
+      assert spell.dispel_type == 0
+      assert [%{type: :apply_aura, aura: :dummy}] = spell.effects
+    end
+
     test "decodes Honorless Target duration and attack interruption" do
       spell = SpellLoader.load(2479)
       assert spell.duration_ms == 30_000

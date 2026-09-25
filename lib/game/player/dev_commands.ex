@@ -849,6 +849,11 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
   defp battleground_command(state, ["join"]), do: battleground_command(state, ["join", "warsong"])
 
+  defp battleground_command(state, ["list", name]) when name in ["warsong", "arathi", "alterac"] do
+    map_id = Map.fetch!(%{"warsong" => @warsong_gulch_map_id, "arathi" => 529, "alterac" => 30}, name)
+    PlayerBattlegrounds.list(state, map_id)
+  end
+
   defp battleground_command(state, ["join", name]) when name in ["warsong", "arathi", "alterac"] do
     map_id = Map.fetch!(%{"warsong" => @warsong_gulch_map_id, "arathi" => 529, "alterac" => 30}, name)
 
@@ -883,7 +888,10 @@ defmodule ThistleTea.Game.Player.DevCommands do
   end
 
   defp battleground_command(state, _params) do
-    system_message(state, "Invalid command. Use: .battleground <join [warsong|arathi|alterac]|start|info|leave>")
+    system_message(
+      state,
+      "Invalid command. Use: .battleground <join|list> [warsong|arathi|alterac], start, info, or leave"
+    )
   end
 
   defp battleground_info_message(%{status: :none}), do: "Battleground: none."
@@ -901,6 +909,8 @@ defmodule ThistleTea.Game.Player.DevCommands do
   end
 
   defp battleground_error(:already_queued), do: "You are already queued or matched."
+  defp battleground_error(:deserter), do: "You cannot join a battleground while affected by Deserter."
+  defp battleground_error(:already_inside), do: "You are already inside a battleground."
   defp battleground_error(:level_restricted), do: "Your level is outside this battleground's range."
   defp battleground_error(:unsupported_battleground), do: "This battleground is unavailable."
   defp battleground_error(:not_counting_down), do: "The battleground is not counting down."

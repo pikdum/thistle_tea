@@ -93,6 +93,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
   alias ThistleTea.Game.Player.Ammunition
   alias ThistleTea.Game.Player.Auction.ClientProjection, as: AuctionProjection
+  alias ThistleTea.Game.Player.Battlegrounds
   alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Durability
@@ -674,6 +675,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     character = EventSink.emit(character, [Effects.movement_speed_changed(character.movement_block.run_speed)])
 
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast(:battleground_deserted, state) do
+    {:noreply, Battlegrounds.apply_deserter(state), {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Battleground deserter penalty failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:battleground_exit, world, {x, y, z, orientation}}, %{character: %Character{} = character} = state) do

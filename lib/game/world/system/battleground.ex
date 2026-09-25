@@ -548,6 +548,12 @@ defmodule ThistleTea.Game.World.System.Battleground do
     brackets = Enum.map(players, &Battleground.bracket(template.map_id, &1.level)) |> Enum.uniq()
 
     cond do
+      Enum.any?(players, &Map.get(&1, :deserter?, false)) ->
+        {:error, :deserter}
+
+      Enum.any?(players, &Map.get(&1, :in_battleground?, false)) ->
+        {:error, :already_inside}
+
       Enum.any?(players, &(&1.level < template.min_level or &1.level > template.max_level)) ->
         {:error, :level_restricted}
 

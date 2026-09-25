@@ -5,7 +5,9 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
 
   alias ThistleTea.Game.Battleground
   alias ThistleTea.Game.Battleground.AlteracValley.Armor
+  alias ThistleTea.Game.Battleground.Deserter
   alias ThistleTea.Game.Battleground.Resurrection, as: BattlegroundResurrection
+  alias ThistleTea.Game.Battleground.Rules
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.EventSink
@@ -119,6 +121,7 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
 
     case result do
       {:ok, guids} -> Enum.each(guids, &notify_queued(&1, map_id))
+      {:error, :deserter} -> send_deserter_error()
       _error -> :ok
     end
 
@@ -188,20 +191,33 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
   def send_status(state), do: state
 
   def port(%{ready: true, character: %Character{} = character} = state, action) when action in [0, 1] do
-    return_to = return_destination(character)
-
-    case BattlegroundSystem.port(state.guid, action, return_to) do
-      {:ok, world, {x, y, z, orientation}} ->
-        GenServer.cast(self(), {:start_teleport, x, y, z, orientation, world})
-
-      _ ->
-        :ok
+    if action == 1 and Deserter.active?(character) do
+      BattlegroundSystem.port(state.guid, 0, nil)
+      send_deserter_error()
+    else
+      enter_or_decline(state, action)
     end
 
     send_status(state)
   end
 
   def port(state, _action), do: state
+
+  defp enter_or_decline(state, action) do
+    case BattlegroundSystem.port(state.guid, action, return_destination(state.character)) do
+      {:ok, world, {x, y, z, orientation}} ->
+        GenServer.cast(self(), {:start_teleport, x, y, z, orientation, world})
+
+      _ ->
+        :ok
+    end
+  end
+
+  def apply_deserter(%{character: %Character{} = character} = state) do
+    spell = SpellLoader.load(Deserter.spell_id())
+    {character, events} = Deserter.apply(character, spell, Time.now())
+    %{state | character: EventSink.emit(character, events)}
+  end
 
   def leave(%{ready: true, character: %Character{} = character} = state) do
     case BattlegroundSystem.leave(state.guid, character.movement_block.position) do
@@ -291,7 +307,7 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
   defp join_group(state, map_id, instance_id) do
     case PartySystem.group_of(state.guid) do
       %Group{leader: leader, members: members} when leader == state.guid ->
-        queue_group_members(members, map_id, instance_id)
+        queue_group_members(state, members, map_id, instance_id)
 
       %Group{} ->
         {:error, :not_leader}
@@ -306,27 +322,43 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
       guid: guid,
       name: character.internal.name,
       team: Battleground.team_for_race(character.unit.race),
-      level: character.unit.level
+      level: character.unit.level,
+      deserter?: Deserter.active?(character),
+      in_battleground?: battleground_world?(character.internal.world)
     }
   end
 
   defp snapshot(%{guid: guid}) do
-    case Metadata.query(guid, [:name, :race, :level]) do
-      %{name: name, race: race, level: level} ->
-        %{guid: guid, name: name, team: Battleground.team_for_race(race), level: level}
+    case {Metadata.query(guid, [:name, :race, :level, :aura_stacks]), World.position(guid)} do
+      {%{name: name, race: race, level: level} = metadata, {world, _, _, _}} ->
+        %{
+          guid: guid,
+          name: name,
+          team: Battleground.team_for_race(race),
+          level: level,
+          deserter?: Map.has_key?(Map.get(metadata, :aura_stacks, %{}), Deserter.spell_id()),
+          in_battleground?: battleground_world?(world)
+        }
 
       _missing ->
         nil
     end
   end
 
+  defp battleground_world?(%WorldRef{instance_id: id, map_id: map_id}) when is_integer(id),
+    do: not is_nil(Rules.for_map(map_id))
+
+  defp battleground_world?(_world), do: false
+
+  defp send_deserter_error, do: Network.send_packet(%Message.SmsgGroupJoinedBattleground{result: -2})
+
   defp collect_snapshots(players) do
     if Enum.any?(players, &is_nil/1), do: :error, else: {:ok, players}
   end
 
-  defp queue_group_members(members, map_id, instance_id) do
+  defp queue_group_members(state, members, map_id, instance_id) do
     members
-    |> Enum.map(&snapshot/1)
+    |> Enum.map(fn member -> if member.guid == state.guid, do: snapshot(state), else: snapshot(member) end)
     |> collect_snapshots()
     |> case do
       {:ok, players} -> queue_players(players, map_id, instance_id)

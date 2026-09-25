@@ -198,6 +198,8 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
     send_to(match, :all, %Message.SmsgBattlegroundPlayerLeft{guid: guid}, except: guid)
   end
 
+  defp emit_effect(_match, %Effects.ApplyDeserter{guid: guid}), do: Entity.battleground_deserted(guid)
+
   defp emit_effect(match, %Effects.ResurrectPlayers{guids: guids}) do
     Enum.each(guids, fn guid ->
       case Map.get(match.players, guid) do

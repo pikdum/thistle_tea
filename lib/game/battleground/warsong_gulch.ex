@@ -104,13 +104,14 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
   def leave(%__MODULE__{} = match, guid, position, dropped_guid) do
     result = drop_carried_flag(match, guid, position, dropped_guid)
 
-    case Map.pop(result.match.players, guid) do
-      {nil, _players} ->
+    case Map.get(result.match.players, guid) do
+      nil ->
         result
 
-      {%Player{} = player, players} ->
-        effects = result.effects ++ remove_carried_aura(player, result.match) ++ player_left_effects(player)
-        %{result | match: %{result.match | players: players}, effects: effects}
+      %Player{} = player ->
+        departure = Roster.leave(result.match, guid)
+        effects = result.effects ++ remove_carried_aura(player, result.match) ++ departure.effects
+        %{result | match: departure.match, effects: effects}
     end
   end
 
@@ -483,11 +484,6 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
       _none -> []
     end
   end
-
-  defp player_left_effects(%Player{status: status, guid: guid}) when status in [:inside, :offline],
-    do: [%Effects.PlayerLeft{guid: guid}]
-
-  defp player_left_effects(%Player{}), do: []
 
   defp announce(broadcast_text_id, audience, actor_guid \\ nil) do
     %Effects.Announce{broadcast_text_id: broadcast_text_id, audience: audience, actor_guid: actor_guid}

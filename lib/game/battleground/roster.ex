@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Battleground.Roster do
   @moduledoc "Shared pure player admission, combat credit, resurrection queues, and honor bookkeeping."
 
   alias ThistleTea.Game.Battleground.Defeat
+  alias ThistleTea.Game.Battleground.Deserter
   alias ThistleTea.Game.Battleground.Effects
   alias ThistleTea.Game.Battleground.Player
   alias ThistleTea.Game.Battleground.Result
@@ -24,6 +25,7 @@ defmodule ThistleTea.Game.Battleground.Roster do
 
       {%Player{} = player, players} ->
         effects = if player.status in [:inside, :offline], do: [%Effects.PlayerLeft{guid: guid}], else: []
+        effects = if Deserter.earned?(match, player), do: effects ++ [%Effects.ApplyDeserter{guid: guid}], else: effects
         match = %{match | players: players, resurrection_queue: MapSet.delete(match.resurrection_queue, guid)}
         %Result{match: match, effects: effects}
     end

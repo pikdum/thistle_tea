@@ -62,6 +62,19 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
   end
 
   describe "join_group/3" do
+    test "rejects the whole group when any member is a deserter or already inside", %{server: server} do
+      for {flag, reason} <- [{:deserter?, :deserter}, {:in_battleground?, :already_inside}] do
+        players = [alliance(1), Map.put(alliance(2), flag, true)]
+        assert {:error, ^reason} = BattlegroundSystem.join_group(players, 489, server)
+        assert BattlegroundSystem.status(1, server).status == :none
+        assert BattlegroundSystem.status(2, server).status == :none
+      end
+
+      assert :ok = BattlegroundSystem.join_group([alliance(1), alliance(2)], 489, server)
+      assert BattlegroundSystem.status(1, server).status == :wait_queue
+      assert BattlegroundSystem.status(2, server).status == :wait_queue
+    end
+
     test "routes quest donations and revalidates serialized blacksmith upgrades", %{server: server} do
       assert :ok = BattlegroundSystem.join(%{alliance(1) | level: 60}, 30, server)
       assert :ok = BattlegroundSystem.join(%{horde(2) | level: 60}, 30, server)

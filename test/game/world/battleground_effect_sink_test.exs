@@ -14,6 +14,14 @@ defmodule ThistleTea.Game.World.BattlegroundEffectSinkTest do
   alias ThistleTea.Game.WorldRef
 
   describe "emit/2" do
+    test "delivers departure penalties to the departing player's owner" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      Entity.register(guid)
+      match = %WarsongGulch{world: WorldRef.instance(489, 7), client_instance_id: 7, bracket: 5, template: %Template{}}
+      assert :ok = EffectSink.emit(match, [%Effects.ApplyDeserter{guid: guid}])
+      assert_receive {:"$gen_cast", :battleground_deserted}
+    end
+
     test "schedules random-delay timers on the explicitly supplied match owner" do
       parent = self()
       owner = spawn(fn -> receive do: (message -> send(parent, {:owner_received, message})) end)
