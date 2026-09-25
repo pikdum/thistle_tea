@@ -86,6 +86,30 @@ defmodule ThistleTea.Game.Battleground.AlteracValleyTest do
     end
   end
 
+  describe "supply_allowed?/3" do
+    test "all supply variants follow their mine through capture, recapture, and reclamation", %{match: match} do
+      for {mine_id, entries} <- [{0, [178_785, 178_788, 178_789]}, {1, [178_784, 178_786, 178_787]}] do
+        captured = AlteracValley.creature_died(match, defeat(46 + mine_id, 1, 9, 2), 0)
+        recaptured = AlteracValley.creature_died(captured.match, defeat(46 + mine_id, 2, 10, 0), 1)
+        reclaimed = AlteracValley.handle_timer(recaptured.match, {:mine_reclaim, mine_id, 2}, 1_200_001)
+
+        for entry <- entries do
+          refute AlteracValley.supply_allowed?(match, 1, entry)
+          assert AlteracValley.supply_allowed?(captured.match, 1, entry)
+          refute AlteracValley.supply_allowed?(captured.match, 2, entry)
+          refute AlteracValley.supply_allowed?(captured.match, 3, entry)
+          refute AlteracValley.supply_allowed?(captured.match, 99, entry)
+          refute AlteracValley.supply_allowed?(%{captured.match | phase: :ended}, 1, entry)
+          refute AlteracValley.supply_allowed?(recaptured.match, 1, entry)
+          assert AlteracValley.supply_allowed?(recaptured.match, 2, entry)
+          refute AlteracValley.supply_allowed?(reclaimed.match, 2, entry)
+        end
+
+        refute AlteracValley.supply_allowed?(captured.match, 1, 123)
+      end
+    end
+  end
+
   describe "creature_died/3" do
     test "captures mines, rejects duplicates and obsolete bosses, and gates supply loot", %{match: match} do
       refute AlteracValley.supply_allowed?(match, 1, 178_785)

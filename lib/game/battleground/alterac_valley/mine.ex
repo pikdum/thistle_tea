@@ -28,6 +28,10 @@ defmodule ThistleTea.Game.Battleground.AlteracValley.Mine do
 
   def events(%__MODULE__{id: id} = mine), do: [{46 + id, event_state(mine)}, {50 + id, event_state(mine)}]
 
+  def supply_mine_id(entry) when entry in [178_785, 178_788, 178_789], do: 0
+  def supply_mine_id(entry) when entry in [178_784, 178_786, 178_787], do: 1
+  def supply_mine_id(_entry), do: nil
+
   def supply_allowed?(%__MODULE__{owner: team}, team) when team in [:alliance, :horde], do: true
   def supply_allowed?(%__MODULE__{}, _team), do: false
 

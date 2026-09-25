@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
   Builds loot-policy actors from player-owned state or the world read model.
   """
 
+  alias ThistleTea.Game.Battleground.AlteracValley.Mine
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Player
@@ -48,7 +49,7 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
   end
 
   defp access_allowed?(guid, target_guid) do
-    if Guid.entity_type(target_guid) == :game_object and Guid.entry(target_guid) in [178_784, 178_785] do
+    if Guid.entity_type(target_guid) == :game_object and is_integer(Mine.supply_mine_id(Guid.entry(target_guid))) do
       case World.position(target_guid) do
         {%WorldRef{map_id: 30, instance_id: id} = world, _x, _y, _z} when is_integer(id) ->
           Battleground.supply_allowed?(world, guid, Guid.entry(target_guid))

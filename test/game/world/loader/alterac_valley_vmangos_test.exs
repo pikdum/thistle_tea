@@ -5,11 +5,32 @@ defmodule ThistleTea.Game.World.Loader.AlteracValleyVMangosTest do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Battleground.AlteracValley
+  alias ThistleTea.Game.Battleground.AlteracValley.Mine
   alias ThistleTea.Game.Battleground.AlteracValley.Node
 
   @moduletag :vmangos_db
 
   describe "Alterac event catalog" do
+    test "every neutral and faction supply spawn maps to its controlling mine" do
+      supplies =
+        Mangos.Repo.all(
+          from(binding in Mangos.GameObjectBattleground,
+            join: object in Mangos.GameObject,
+            on: object.guid == binding.guid,
+            where: object.map == 30 and binding.event1 in [50, 51],
+            select: {binding.event1, binding.event2, object.id},
+            distinct: true
+          )
+        )
+
+      assert length(supplies) == 6
+
+      for {event, state, entry} <- supplies do
+        assert state in 0..2
+        assert Mine.supply_mine_id(entry) == event - 50
+      end
+    end
+
     test "pins starting nodes, faction marshals, mine variants, and non-clickable destroyed towers" do
       creatures =
         Mangos.Repo.all(

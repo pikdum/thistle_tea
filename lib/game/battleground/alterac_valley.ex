@@ -212,10 +212,10 @@ defmodule ThistleTea.Game.Battleground.AlteracValley do
 
   def graveyard(%__MODULE__{} = match, team, _position), do: Lifecycle.team_graveyard(match.template, team)
 
-  def supply_allowed?(%__MODULE__{phase: :active} = match, guid, entry) when entry in [178_784, 178_785] do
-    case Map.get(match.players, guid) do
-      %Player{status: :inside, team: team} ->
-        Mine.supply_allowed?(Map.fetch!(match.mines, if(entry == 178_785, do: 0, else: 1)), team)
+  def supply_allowed?(%__MODULE__{phase: :active} = match, guid, entry) do
+    case {Mine.supply_mine_id(entry), Map.get(match.players, guid)} do
+      {id, %Player{status: :inside, team: team}} when is_integer(id) ->
+        Mine.supply_allowed?(Map.fetch!(match.mines, id), team)
 
       _ineligible ->
         false
