@@ -75,7 +75,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       flags: unit_flags(ct),
       npc_flags: ct.npc_flags,
       dynamic_flags: ct.dynamic_flags || 0,
-      misc_flags: ct.extra_flags,
+      sheath_state: 1,
+      misc_flags: 0x10,
       bounding_radius: mob_bounding_radius(display_info_addon, effective_scale),
       combat_reach: mob_combat_reach(display_info_addon, effective_scale),
       base_bounding_radius: mob_bounding_radius(display_info_addon, effective_scale),
@@ -558,14 +559,10 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   end
 
   defp virtual_items([_, _, _] = items) do
-    if Enum.all?(items, &is_nil/1) do
-      {nil, nil}
-    else
-      {pack_virtual_item_slot_display(items), pack_virtual_item_info(items)}
-    end
+    {pack_virtual_item_slot_display(items), pack_virtual_item_info(items)}
   end
 
-  defp virtual_items(_items), do: {nil, nil}
+  defp virtual_items(_items), do: {0, <<0::192>>}
 
   defp pack_virtual_item_slot_display([a, b, c]) do
     item_display_id(a) ||| item_display_id(b) <<< 32 ||| item_display_id(c) <<< 64

@@ -24,6 +24,24 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   alias ThistleTea.Game.WorldRef
 
   describe "build/1" do
+    test "projects drawn weapons and aura flags independently of database extra flags" do
+      creature = %Mangos.Creature{
+        guid: 1,
+        id: 2,
+        modelid: 3,
+        curhealth: 10,
+        creature_movement: [],
+        creature_template: %Mangos.CreatureTemplate{entry: 2, name: "Guard", extra_flags: 0x40}
+      }
+
+      mob = Mob.build(creature)
+      assert Unit.bytes_2(mob.unit) == <<1, 0x10, 0, 0>>
+      assert mob.internal.creature.extra_flags == 0x40
+      assert mob.unit.virtual_item_slot_display == 0
+      assert mob.unit.virtual_item_info == <<0::192>>
+      assert Unit.bytes_2(Mob.respawn(mob).unit) == <<1, 0x10, 0, 0>>
+    end
+
     test "retains template mechanic immunity through respawn" do
       creature = %Mangos.Creature{
         guid: 1,
