@@ -2,8 +2,28 @@ defmodule ThistleTea.Game.Network.Message.BattlegroundMessagesTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.Message.Dispatch
+  alias ThistleTea.Game.Network.Opcodes
+  alias ThistleTea.Game.Network.Packet
 
   describe "client decoders" do
+    test "dispatches the build-5875 queue-list payload and preserves group and instance selection" do
+      for group? <- [false, true] do
+        flag = if group?, do: 1, else: 0
+
+        packet = %Packet{
+          opcode: Opcodes.get(:CMSG_BATTLEFIELD_JOIN),
+          payload: <<489::little-size(32), 7::little-size(32), flag>>
+        }
+
+        assert %Message.CmsgBattlefieldJoin{map: 489, instance_id: 7, join_as_group: ^group?} =
+                 Dispatch.to_message(packet)
+      end
+
+      assert %Message.CmsgBattlefieldJoin{map: 489, instance_id: 0, join_as_group: false} =
+               Message.CmsgBattlefieldJoin.from_binary(<<489::little-size(32)>>)
+    end
+
     test "decodes battlemaster queue and port requests" do
       assert %Message.CmsgBattlemasterJoin{
                guid: 42,

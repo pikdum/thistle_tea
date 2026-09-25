@@ -72,8 +72,9 @@ defmodule ThistleTea.Game.Player.BattlegroundsTest do
   end
 
   defp join(state, group?) do
-    message = %Message.CmsgBattlemasterJoin{guid: 0, map: 489, instance_id: 0, join_as_group: group?}
-    Message.CmsgBattlemasterJoin.handle(message, state)
+    flag = if group?, do: 1, else: 0
+    message = Message.CmsgBattlefieldJoin.from_binary(<<489::little-size(32), 0::little-size(32), flag>>)
+    Message.CmsgBattlefieldJoin.handle(message, state)
   end
 
   defp assert_deserter_error do
