@@ -137,28 +137,21 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_orientation: caster_orientation(caster),
       target_guid: target_guid,
       spell: spell,
-      spell_damage_bonus: spell_damage_bonus(caster),
-      spell_damage_versus: TargetSpellPower.snapshot(caster),
       healing_bonus: healing_bonus(caster, spell),
       resistance_penetration: ResistancePenetration.snapshot(caster),
       spell_threat: SpellThreatLoader.get(spell_id(spell)),
-      spell_modifiers: Modifiers.snapshot(caster, spell),
       spell_hit_snapshot: hit_snapshot,
       spell_hit_bonus: SpellResist.hit_bonus(hit_snapshot, spell),
       conditional_crit_modifiers: Critical.snapshot(caster, spell),
-      damage_done_multiplier: WeaponDamage.multiplier(caster, spell.school, attack_weapon(caster, spell)),
-      happiness_multiplier: PetHappiness.damage_multiplier(caster),
-      damage_done_versus: Aura.misc_amounts(caster, :mod_damage_done_versus),
       target_attack_power: TargetAttackPower.snapshot(caster),
-      target_damage: TargetDamage.snapshot(caster),
       crit_damage_versus: Aura.misc_amounts(caster, :mod_crit_percent_versus),
-      effect_damage_multiplier: effect_multiplier(caster, spell, [:all_effects, :damage]),
       effect_healing_multiplier: healing_done_multiplier(caster, spell),
       spell_crit_chance: spell_crit_chance(caster, spell),
       reflect_chance_bonus: Mage.ward_reflect_chance(caster, spell),
       caster_max_health: caster.unit.max_health,
       hit_chance_bonus: CombatRatings.hit_chance(caster, attack_hand(spell))
     }
+    |> with_damage_bonuses(caster, spell)
     |> put_melee_snapshot(caster, spell)
     |> put_combo_points(caster)
     |> SpellThreat.put_context(spell, SpellThreat.projection(caster))
@@ -184,6 +177,20 @@ defmodule ThistleTea.Game.Spell.CastContext do
     |> put_melee_snapshot(caster, spell)
     |> put_combo_points(caster)
     |> SpellThreat.put_context(spell, SpellThreat.projection(caster))
+  end
+
+  def with_damage_bonuses(%__MODULE__{} = context, caster, %Spell{} = spell) do
+    %{
+      context
+      | spell_damage_bonus: spell_damage_bonus(caster),
+        spell_damage_versus: TargetSpellPower.snapshot(caster),
+        spell_modifiers: Modifiers.snapshot(caster, spell),
+        damage_done_multiplier: WeaponDamage.multiplier(caster, spell.school, attack_weapon(caster, spell)),
+        happiness_multiplier: PetHappiness.damage_multiplier(caster),
+        damage_done_versus: Aura.misc_amounts(caster, :mod_damage_done_versus),
+        target_damage: TargetDamage.snapshot(caster),
+        effect_damage_multiplier: effect_multiplier(caster, spell, [:all_effects, :damage])
+    }
   end
 
   defp caster_type(%Character{}), do: :player

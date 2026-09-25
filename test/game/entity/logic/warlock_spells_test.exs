@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   alias ThistleTea.Game.Entity.Logic.DamageSharing
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.CastValidation
@@ -46,10 +47,11 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       context = %CastContext{caster_guid: 1, caster_level: 20, spell_damage_bonus: %{}}
 
-      {result, _events} = SpellEffect.receive(caster, context, spell, 1_000)
+      {result, events} = SpellEffect.receive(caster, context, spell, 1_000)
 
       assert result.unit.health == 61
-      assert result.unit.power1 == 39
+      assert result.unit.power1 == 0
+      assert [%Effects.TriggerSpell{spell_id: 31_818, amount: 39, slot: 0, source_guid: 1, target_guid: 1}] = events
     end
 
     test "improved life tap boosts the mana gained" do
@@ -74,10 +76,64 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       context = %CastContext{caster_guid: 1, caster_level: 20, spell_damage_bonus: %{}}
 
-      {result, _events} = SpellEffect.receive(caster, context, spell, 1_000)
+      {result, events} = SpellEffect.receive(caster, context, spell, 1_000)
 
       assert result.unit.health == 61
-      assert result.unit.power1 == 46
+      assert result.unit.power1 == 0
+      assert [%Effects.TriggerSpell{spell_id: 31_818, amount: 46}] = events
+    end
+
+    test "health costs bypass shields and damage interrupts while honoring spell bonuses" do
+      shield = %Holder{
+        spell: %Spell{id: 17},
+        caster_guid: 1,
+        auras: [%Aura{type: :school_absorb, amount: 500, misc_value: 32}]
+      }
+
+      interrupted = %Holder{
+        spell: %Spell{id: 18, aura_interrupt_flags: 2},
+        caster_guid: 1,
+        auras: [%Aura{type: :dummy}]
+      }
+
+      caster = character(health: 200, power1: 0, max_power1: 200, auras: [shield, interrupted])
+
+      spell = %Spell{
+        id: 1454,
+        script_name: "spell_warlock_life_tap",
+        school: :shadow,
+        effects: [%Effect{type: :dummy, base_points: 20, bonus_coefficient: 0.8}]
+      }
+
+      context = %CastContext{
+        caster_guid: 1,
+        caster_level: 20,
+        spell_damage_bonus: %{shadow: 100},
+        spell_modifiers: [%Aura{type: :add_pct_modifier, misc_value: 14, amount: -50}]
+      }
+
+      {result, [%Effects.TriggerSpell{amount: 90}]} = SpellEffect.receive(caster, context, spell, 1_000)
+      assert result.unit.health == 110
+      assert result.unit.auras == caster.unit.auras
+      assert result.internal.events == caster.internal.events
+    end
+
+    test "validation and execution reject costs that would kill the caster" do
+      caster = character(health: 100, power1: 0, max_power1: 200, equipment_bonuses: %{spell_shadow: 100})
+
+      spell = %Spell{
+        id: 1454,
+        script_name: "spell_warlock_life_tap",
+        school: :shadow,
+        effects: [%Effect{type: :dummy, base_points: 20, bonus_coefficient: 0.8}]
+      }
+
+      assert Warlock.life_tap_cost(caster, spell) == 100
+      assert {:error, :fizzle} = CastValidation.validate(caster, spell, Target.self(1), nil, 1_000)
+      context = %CastContext{caster_guid: 1, caster_level: 20, spell_damage_bonus: %{shadow: 100}}
+      {result, [%Effects.SpellCastFailed{reason: :fizzle}]} = SpellEffect.receive(caster, context, spell, 1_000)
+      assert result.unit.health == 100
+      assert result.unit.power1 == 0
     end
   end
 

@@ -334,7 +334,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   defp check_warlock_resources(caster, %Spell{} = spell) do
-    if Warlock.life_tap?(spell) and (caster.unit.health || 0) <= Warlock.life_tap_cost(spell) do
+    if Warlock.life_tap?(spell) and (caster.unit.health || 0) <= Warlock.life_tap_cost(caster, spell) do
       {:error, :fizzle}
     else
       :ok

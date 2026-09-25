@@ -11,10 +11,11 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Resources
+  alias ThistleTea.Game.Entity.Logic.SpellEffect.Amount
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Modifiers
 
   @spell_family 5
   @immolate_family_mask 0x00000004
@@ -37,22 +38,38 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
   def life_tap?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_warlock_life_tap")
   def life_tap?(_spell), do: false
 
-  def life_tap_cost(%Spell{} = spell) do
+  def life_tap_cost(caster, %Spell{} = spell) do
+    context = %CastContext{caster_guid: caster.object.guid, caster_level: caster.unit.level || 1}
+    context = CastContext.with_damage_bonuses(context, caster, spell)
+
     case Enum.find(spell.effects, &(&1.type == :dummy)) do
-      %Effect{} = effect -> max(Effect.damage_roll(effect), 0)
+      %Effect{} = effect -> life_tap_cost(caster, context, spell, effect)
       _ -> 0
     end
   end
 
-  def life_tap(state, %CastContext{} = context, %Spell{}, %Effect{} = effect, now) do
-    damage = max(Effect.damage_roll(effect) + shadow_bonus(context), 0)
+  def life_tap(state, %CastContext{} = context, %Spell{} = spell, %Effect{} = effect, _now) do
+    damage = life_tap_cost(state, context, spell, effect)
 
     if (state.unit.health || 0) > damage do
-      state = Core.take_damage(state, damage, now, school: :shadow, source: state.object.guid)
-      {Resources.gain_power(state, 0, improved_life_tap_gain(state, damage)), []}
+      state = %{state | unit: %{state.unit | health: state.unit.health - damage}} |> Core.mark_broadcast_update()
+
+      event =
+        Effects.trigger_spell(state.object.guid, context.caster_level, state.object.guid, 31_818,
+          base_points: improved_life_tap_gain(state, damage),
+          effect_index: 0
+        )
+
+      {state, [event]}
     else
-      {state, []}
+      {state, [Effects.spell_cast_failed(spell, :fizzle)]}
     end
+  end
+
+  defp life_tap_cost(state, context, spell, effect) do
+    base = Effect.roll(effect, Spell.level_units(spell, context.caster_level))
+    base = max(Modifiers.value(context.spell_modifiers, :cost, base), 0)
+    Amount.with_damage_bonuses(state, context, spell, effect, base)
   end
 
   @improved_life_tap [18_182, 18_183]
@@ -242,13 +259,4 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
         nil
     end
   end
-
-  defp shadow_bonus(%CastContext{spell_damage_bonus: bonuses}) when is_map(bonuses) do
-    case Map.get(bonuses, :shadow, 0) do
-      bonus when is_number(bonus) -> trunc(bonus)
-      _ -> 0
-    end
-  end
-
-  defp shadow_bonus(_context), do: 0
 end
