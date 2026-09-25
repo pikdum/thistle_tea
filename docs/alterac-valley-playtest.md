@@ -6,9 +6,10 @@ servers and isolated GPU clients. References were
 `BattleGroundMgr.cpp`, and the generated VMangos spawn catalog.
 
 This covers the objective engine: banners, graveyards, towers, mines, captains,
-generals, rewards, and match lifecycle. Resource turn-ins, troop upgrades, and
-player-launched assaults remain future work; this is not full Alterac Valley
-or vanilla feature parity.
+generals, rewards, and match lifecycle. Armor scrap donations and troop upgrades
+now have [separate acceptance coverage](alterac-armor-playtest.md). Other resource
+turn-ins and player-launched assaults remain future work; this is not full
+Alterac Valley or vanilla feature parity.
 
 ## Native gameplay
 
