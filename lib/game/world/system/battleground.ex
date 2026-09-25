@@ -75,6 +75,10 @@ defmodule ThistleTea.Game.World.System.Battleground do
     GenServer.cast(server, {:creature_died, world, defeat})
   end
 
+  def supply_allowed?(%WorldRef{} = world, guid, entry, server \\ __MODULE__) do
+    GenServer.call(server, {:supply_allowed, world, guid, entry})
+  end
+
   def participants(world, server \\ __MODULE__)
 
   def participants(%WorldRef{instance_id: id} = world, server) when is_integer(id) do
@@ -168,7 +172,7 @@ defmodule ThistleTea.Game.World.System.Battleground do
 
   def handle_call({:list, map_id, level}, _from, state) do
     template = state.catalog.template_for_map(map_id)
-    bracket = Battleground.bracket(level)
+    bracket = Battleground.bracket(map_id, level)
 
     instances =
       state.matches
@@ -317,6 +321,18 @@ defmodule ThistleTea.Game.World.System.Battleground do
   end
 
   def handle_call({:match_for_world, world}, _from, state), do: {:reply, Map.get(state.worlds, world), state}
+
+  def handle_call({:supply_allowed, world, guid, entry}, _from, state) do
+    allowed? =
+      case Map.get(state.worlds, world) do
+        nil -> false
+        pid -> Match.supply_allowed?(pid, guid, entry)
+      end
+
+    {:reply, allowed?, state}
+  rescue
+    _error -> {:reply, false, state}
+  end
 
   def handle_call({:spell_context, world, guid}, _from, state) do
     context =
@@ -493,7 +509,7 @@ defmodule ThistleTea.Game.World.System.Battleground do
 
   defp validate_eligibility(players, template) do
     teams = Enum.map(players, & &1.team) |> Enum.uniq()
-    brackets = Enum.map(players, &Battleground.bracket(&1.level)) |> Enum.uniq()
+    brackets = Enum.map(players, &Battleground.bracket(template.map_id, &1.level)) |> Enum.uniq()
 
     cond do
       Enum.any?(players, &(&1.level < template.min_level or &1.level > template.max_level)) ->

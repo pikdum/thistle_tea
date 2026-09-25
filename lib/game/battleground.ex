@@ -22,4 +22,8 @@ defmodule ThistleTea.Game.Battleground do
   def bracket(level) when level in 50..59, do: 4
   def bracket(60), do: 5
   def bracket(_level), do: nil
+
+  def bracket(30, level) when level in 51..60, do: 0
+  def bracket(30, _level), do: nil
+  def bracket(_map_id, level), do: bracket(level)
 end

@@ -18,8 +18,10 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
   alias ThistleTea.Game.World.Loader.Graveyard
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.System.Battleground
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.WorldRef
 
   def for_character(%Character{object: %{guid: guid}} = character, target_guid) do
     condition_context = character_condition_context(character, target_guid)
@@ -29,7 +31,8 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
       group_id: group_id(guid),
       needed_items: Quests.needed_items(character),
       distance: World.distance_between(character, target_guid),
-      condition_context: condition_context
+      condition_context: condition_context,
+      access_allowed?: access_allowed?(guid, target_guid)
     }
   end
 
@@ -39,8 +42,23 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
       group_id: group_id(guid),
       needed_items: needed_items(guid),
       distance: World.distance_between(guid, target_guid),
-      condition_context: remote_condition_context(guid, target_guid)
+      condition_context: remote_condition_context(guid, target_guid),
+      access_allowed?: access_allowed?(guid, target_guid)
     }
+  end
+
+  defp access_allowed?(guid, target_guid) do
+    if Guid.entity_type(target_guid) == :game_object and Guid.entry(target_guid) in [178_784, 178_785] do
+      case World.position(target_guid) do
+        {%WorldRef{map_id: 30, instance_id: id} = world, _x, _y, _z} when is_integer(id) ->
+          Battleground.supply_allowed?(world, guid, Guid.entry(target_guid))
+
+        _outside ->
+          false
+      end
+    else
+      true
+    end
   end
 
   defp group_id(guid) do

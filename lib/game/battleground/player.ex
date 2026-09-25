@@ -14,6 +14,11 @@ defmodule ThistleTea.Game.Battleground.Player do
     flag_captures: 0,
     flag_returns: 0,
     bases_assaulted: 0,
-    bases_defended: 0
+    bases_defended: 0,
+    graveyards_assaulted: 0,
+    graveyards_defended: 0,
+    towers_assaulted: 0,
+    towers_defended: 0,
+    secondary_objectives: 0
   ]
 end

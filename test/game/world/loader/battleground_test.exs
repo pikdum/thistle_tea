@@ -11,6 +11,28 @@ defmodule ThistleTea.Game.World.Loader.BattlegroundTest do
   end
 
   describe "load/5" do
+    test "loads Alterac caves, node graveyards, and creature objective bindings", %{table: table} do
+      row = template(id: 1, min_level: 51, alliance_start_location: 611, horde_start_location: 610)
+
+      locations =
+        Map.new(
+          [169, 610, 611, 689, 690, 729, 749, 750, 751],
+          &{&1, %{location_x: &1 * 1.0, location_y: 0.0, location_z: 0.0}}
+        )
+
+      member = %{map: 30, event1: 62, event2: 0, kind: :creature, db_guid: 150_003, entry: 11_975}
+      assert :ok = BattlegroundLoader.load([row], locations, [], [member], table)
+      loaded = BattlegroundLoader.template_for_map(30, table)
+      assert loaded.min_level == 51
+      assert loaded.alliance_graveyard == {611.0, 0.0, 0.0, 0.0}
+      assert loaded.horde_graveyard == {610.0, 0.0, 0.0, 0.0}
+      assert loaded.node_graveyards[0] == {751.0, 0.0, 0.0, 0.0}
+      assert loaded.node_graveyards[3] == {169.0, 0.0, 0.0, 0.0}
+      assert loaded.node_graveyards[6] == {750.0, 0.0, 0.0, 0.0}
+      assert map_size(loaded.node_graveyards) == 7
+      assert BattlegroundLoader.bindings(30, :creature, 150_003, table) == [member]
+    end
+
     test "keeps the latest supported template and indexes battlemasters and event spawns", %{table: table} do
       templates = [template(patch: 4, min_players_per_team: 2), template(patch: 6, min_players_per_team: 4)]
 

@@ -28,9 +28,18 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
 
   def emit(%{world: _world, players: _players} = match, effects, opts \\ []) when is_list(effects) do
     Enum.each(effects, fn
-      %Effects.StartBuffs{positions: positions} -> Buffs.start(match.world, Keyword.fetch!(opts, :owner), positions)
-      %Effects.StopBuffs{} -> Buffs.stop(match.world)
-      effect -> emit_effect(match, effect)
+      %Effects.StartBuffs{positions: positions} ->
+        Buffs.start(match.world, Keyword.fetch!(opts, :owner), positions)
+
+      %Effects.StopBuffs{} ->
+        Buffs.stop(match.world)
+
+      %Effects.ScheduleTimer{key: key, delays: delays} ->
+        delay = Keyword.get(opts, :choose_delay, &Enum.random/1).(delays)
+        Process.send_after(Keyword.fetch!(opts, :owner), {:battleground_timer, key}, delay)
+
+      effect ->
+        emit_effect(match, effect)
     end)
 
     :ok
@@ -71,6 +80,22 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
 
     packet = battleground_message(replace_actor(text, effect.actor_guid), effect.team, effect.actor_guid)
     send_to(match, :all, packet)
+  end
+
+  defp emit_effect(match, %Effects.ObjectiveAnnouncement{} = effect) do
+    faction = if effect.team == :alliance, do: "Alliance", else: "Horde"
+
+    text =
+      case {effect.kind, effect.action} do
+        {:tower, :captured} -> "The #{faction} has destroyed #{effect.name}!"
+        {:mine, :reclaimed} -> "#{effect.name} has been reclaimed by its original inhabitants!"
+        {:captain, :buff} -> "#{effect.name} rallies the #{faction} troops!"
+        {_kind, :assaulted} -> "The #{faction} has assaulted #{effect.name}!"
+        {_kind, :defended} -> "The #{faction} has defended #{effect.name}!"
+        {_kind, :captured} -> "The #{faction} has taken #{effect.name}!"
+      end
+
+    send_to(match, :all, battleground_message(text, effect.team || :neutral, nil))
   end
 
   defp emit_effect(_match, %Effects.QuestKillCredit{guid: guid, entry: entry}),

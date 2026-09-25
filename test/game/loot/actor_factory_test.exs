@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Loot.ActorFactoryTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Condition
+  alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Condition, as: Evaluator
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
@@ -18,6 +19,30 @@ defmodule ThistleTea.Game.Loot.ActorFactoryTest do
   alias ThistleTea.Game.WorldRef
 
   describe "for_character/2 and for_guid/2" do
+    test "deny mine supply access without an active match reservation" do
+      player_guid = Guid.from_low_guid(:player, unique_guid())
+      target_guid = Guid.from_low_guid(:game_object, 178_785, unique_guid())
+      world = WorldRef.instance(30, unique_guid())
+
+      character = %Character{
+        object: %Object{guid: player_guid},
+        player: %Player{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: world}
+      }
+
+      target = %GameObject{
+        object: %Object{guid: target_guid},
+        internal: %Internal{world: world},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      on_exit(fn -> World.remove_position(target) end)
+      World.update_position(target)
+      refute ActorFactory.for_character(character, target_guid).access_allowed?
+      refute ActorFactory.for_guid(player_guid, target_guid).access_allowed?
+    end
+
     test "use the same authoritative projected distance" do
       player_guid = Guid.from_low_guid(:player, unique_guid())
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())

@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.System.BattlegroundTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Battleground.CreatureDefeat
   alias ThistleTea.Game.Battleground.Defeat
   alias ThistleTea.Game.Battleground.Effects.OperateGates
   alias ThistleTea.Game.Battleground.Effects.Scoreboard
@@ -34,6 +35,10 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
       }
     end
 
+    def template_for_map(30) do
+      %{template_for_map(489) | type_id: 1, map_id: 30, min_level: 51}
+    end
+
     def template_for_map(_map), do: nil
     def gate_entries(_map_id), do: []
     def ghost_gate_entries(_map_id), do: [180_322]
@@ -57,6 +62,40 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
   end
 
   describe "join_group/3" do
+    test "admits levels 51 and 60 to one Alterac match and routes creature objectives", %{server: server} do
+      assert :ok = BattlegroundSystem.join_group([%{alliance(1) | level: 51}, alliance(3)], 30, server)
+      assert :ok = BattlegroundSystem.join(horde(2), 30, server)
+      assert %{status: :wait_join, bracket: 0} = BattlegroundSystem.status(1, server)
+      assert %{status: :wait_join, bracket: 0} = BattlegroundSystem.status(3, server)
+      return_to = {WorldRef.open(0), {0.0, 0.0, 0.0, 0.0}}
+      assert {:ok, world, _position} = BattlegroundSystem.port(1, 1, return_to, server)
+      assert {:ok, ^world, _position} = BattlegroundSystem.port(2, 1, return_to, server)
+      assert world.map_id == 30
+      assert :ok = BattlegroundSystem.debug_start_now(world, server)
+      refute BattlegroundSystem.supply_allowed?(world, 1, 178_785, server)
+
+      defeat = %CreatureDefeat{
+        victim_guid: 100,
+        entry: 11_678,
+        db_guid: 200,
+        incarnation_id: 1,
+        killer_guid: 1,
+        bindings: [%{event1: 46, event2: 2}]
+      }
+
+      BattlegroundSystem.creature_died(world, defeat, server)
+      assert BattlegroundSystem.supply_allowed?(world, 1, 178_785, server)
+      refute BattlegroundSystem.supply_allowed?(world, 2, 178_785, server)
+      refute BattlegroundSystem.supply_allowed?(world, 3, 178_785, server)
+      refute BattlegroundSystem.supply_allowed?(WorldRef.instance(30, 999), 1, 178_785, server)
+      refute BattlegroundSystem.supply_allowed?(world, 1, 178_784, server)
+
+      general = %{defeat | victim_guid: 101, db_guid: 201, incarnation_id: 2, bindings: [%{event1: 62, event2: 0}]}
+      BattlegroundSystem.creature_died(world, general, server)
+      assert %{ended?: true, winner: :alliance} = BattlegroundSystem.scoreboard(world, server)
+      refute BattlegroundSystem.supply_allowed?(world, 1, 178_785, server)
+    end
+
     test "forms an isolated match and admits invited players to faction starts", %{server: server} do
       assert :ok = BattlegroundSystem.join(alliance(1), 489, server)
       assert %{status: :wait_queue, bracket: 5} = BattlegroundSystem.status(1, server)

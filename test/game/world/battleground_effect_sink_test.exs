@@ -14,6 +14,18 @@ defmodule ThistleTea.Game.World.BattlegroundEffectSinkTest do
   alias ThistleTea.Game.WorldRef
 
   describe "emit/2" do
+    test "schedules random-delay timers on the explicitly supplied match owner" do
+      parent = self()
+      owner = spawn(fn -> receive do: (message -> send(parent, {:owner_received, message})) end)
+      on_exit(fn -> Process.exit(owner, :shutdown) end)
+      match = %WarsongGulch{world: WorldRef.instance(489, 7), client_instance_id: 7, bracket: 5, template: %Template{}}
+      effect = %Effects.ScheduleTimer{key: {:captain_buff, :alliance}, delays: [120_000, 180_000]}
+      choose = fn [120_000, 180_000] -> 0 end
+      assert :ok = EffectSink.emit(match, [effect], owner: owner, choose_delay: choose)
+      assert_receive {:owner_received, {:battleground_timer, {:captain_buff, :alliance}}}
+      refute_received {:battleground_timer, _key}
+    end
+
     test "routes timed and trigger exits through the player's resurrection cleanup" do
       guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
       Entity.register(guid)

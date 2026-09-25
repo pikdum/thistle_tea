@@ -56,6 +56,7 @@ defmodule ThistleTea.Game.World.Battleground.Match do
   def world_states(server), do: GenServer.call(server, :world_states)
   def scoreboard(server), do: GenServer.call(server, :scoreboard)
   def spirit_healer_time(server), do: GenServer.call(server, :spirit_healer_time)
+  def supply_allowed?(server, guid, entry), do: GenServer.call(server, {:supply_allowed, guid, entry})
 
   @impl GenServer
   def init(opts) do
@@ -65,7 +66,8 @@ defmodule ThistleTea.Game.World.Battleground.Match do
     Spawns.open(world)
 
     options =
-      Keyword.get(opts, :match_options, []) |> Keyword.put_new_lazy(:weekend?, fn -> 20 in GameEvent.get_events() end)
+      Keyword.get(opts, :match_options, [])
+      |> Keyword.put_new_lazy(:weekend?, fn -> Rules.weekend_event(world.map_id) in GameEvent.get_events() end)
 
     result =
       rules.new(
@@ -155,6 +157,14 @@ defmodule ThistleTea.Game.World.Battleground.Match do
   def handle_call(:spirit_healer_time, _from, state) do
     {:reply, state.rules.next_resurrection_ms(state.match, Time.now()), state}
   end
+
+  def handle_call({:supply_allowed, guid, entry}, _from, %{match: %{world: %{map_id: 30}}} = state) do
+    {:reply, state.rules.supply_allowed?(state.match, guid, entry), state}
+  rescue
+    _error -> {:reply, false, state}
+  end
+
+  def handle_call({:supply_allowed, _guid, _entry}, _from, state), do: {:reply, false, state}
 
   @impl GenServer
   def handle_cast({:player_died, defeat, dropped_guid}, state) do

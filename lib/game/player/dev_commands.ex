@@ -849,8 +849,8 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
   defp battleground_command(state, ["join"]), do: battleground_command(state, ["join", "warsong"])
 
-  defp battleground_command(state, ["join", name]) when name in ["warsong", "arathi"] do
-    map_id = if name == "warsong", do: @warsong_gulch_map_id, else: 529
+  defp battleground_command(state, ["join", name]) when name in ["warsong", "arathi", "alterac"] do
+    map_id = Map.fetch!(%{"warsong" => @warsong_gulch_map_id, "arathi" => 529, "alterac" => 30}, name)
 
     case PlayerBattlegrounds.debug_join_solo(state, map_id) do
       {:ok, state} ->
@@ -883,7 +883,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   end
 
   defp battleground_command(state, _params) do
-    system_message(state, "Invalid command. Use: .battleground <join [warsong|arathi]|start|info|leave>")
+    system_message(state, "Invalid command. Use: .battleground <join [warsong|arathi|alterac]|start|info|leave>")
   end
 
   defp battleground_info_message(%{status: :none}), do: "Battleground: none."

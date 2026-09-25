@@ -18,4 +18,15 @@ defmodule ThistleTea.Game.BattlegroundTest do
       assert Battleground.bracket(61) == nil
     end
   end
+
+  describe "bracket/2" do
+    test "keeps Alterac levels 51 through 60 in one queue" do
+      assert Enum.all?(51..60, &(Battleground.bracket(30, &1) == 0))
+      assert Battleground.bracket(30, 50) == nil
+      assert Battleground.bracket(30, 61) == nil
+      assert Battleground.bracket(489, 59) == 4
+      assert Battleground.bracket(489, 60) == 5
+      assert Battleground.bracket(529, 60) == 5
+    end
+  end
 end

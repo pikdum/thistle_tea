@@ -33,6 +33,22 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
   end
 
   describe "view/2" do
+    test "revoked source access blocks visibility, money, reservations, and a pending transfer" do
+      session = LootSession.new(loot(), nil)
+      allowed = actor(100)
+      denied = %{allowed | access_allowed?: false}
+      token = make_ref()
+      refute LootSession.visible?(session, denied)
+      assert {:error, :no_permission} = LootSession.view(session, denied)
+      assert {:error, :no_permission} = LootSession.take_gold(session, denied)
+      assert {:error, :no_permission} = LootSession.reserve_item(session, denied, 0, token)
+      assert {:ok, _reservation, reserved} = LootSession.reserve_item(session, allowed, 0, token)
+      assert LootSession.validate_commit(reserved, allowed, token) == :ok
+      assert LootSession.validate_commit(reserved, denied, token) == {:error, :no_permission}
+      released = LootSession.release(reserved, token)
+      assert {:ok, %Loot{}} = LootSession.view(released, allowed)
+    end
+
     test "keeps a property's identity through reopen, rolls, and released reservations" do
       property = %ItemProperty{id: 1182, suffix: "of the Bear", enchantments: [72, 69, 0]}
       item = %Loot.Item{slot: 0, item_id: 1608, quality: 2, random_property: property}

@@ -66,6 +66,8 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
     tap_allowed?(projection, actor) and not Loot.empty?(visible_loot(projection, actor))
   end
 
+  def tap_allowed?(_policy, %Actor{access_allowed?: false}), do: false
+
   def tap_allowed?(%{tapped: tapped} = policy, %Actor{} = actor) do
     method = Map.get(policy, :loot_method)
     assigned = Map.get(policy, :assigned_looter)
@@ -131,7 +133,7 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
   def validate_commit(%__MODULE__{} = session, %Actor{} = actor, token) when is_reference(token) do
     case Map.get(session.reservations, token) do
       %Reservation{actor_guid: actor_guid, item: item} when actor_guid == actor.guid ->
-        if condition_allowed?(actor, item), do: :ok, else: {:error, :no_permission}
+        if actor.access_allowed? and condition_allowed?(actor, item), do: :ok, else: {:error, :no_permission}
 
       _missing ->
         {:error, :invalid_reservation}

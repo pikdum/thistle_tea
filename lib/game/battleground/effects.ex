@@ -24,6 +24,18 @@ defmodule ThistleTea.Game.Battleground.Effects do
     defstruct [:event]
   end
 
+  defmodule ScheduleTimer do
+    @moduledoc false
+    @enforce_keys [:key, :delays]
+    defstruct [:key, :delays]
+  end
+
+  defmodule ObjectiveAnnouncement do
+    @moduledoc false
+    @enforce_keys [:name, :kind, :team, :action]
+    defstruct [:name, :kind, :team, :action]
+  end
+
   defmodule NodeAnnouncement do
     @moduledoc false
     @enforce_keys [:node, :team, :action]

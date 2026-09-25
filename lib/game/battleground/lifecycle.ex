@@ -56,6 +56,7 @@ defmodule ThistleTea.Game.Battleground.Lifecycle do
 
   def finish(match, winner, now, effects, scoreboard) do
     match = %{match | phase: {:ended, winner}, ended_at: now, resurrection_queue: MapSet.new()}
+    participants = match.players |> Map.values() |> Enum.filter(&(&1.status == :inside))
 
     %Result{
       match: match,
@@ -64,7 +65,7 @@ defmodule ThistleTea.Game.Battleground.Lifecycle do
           [
             %Effects.UpdateStatus{},
             scoreboard_snapshot(match, scoreboard),
-            %Effects.RewardPlayers{winner: winner, players: Map.values(match.players)}
+            %Effects.RewardPlayers{winner: winner, players: participants}
           ],
       timers: [auto_leave: @auto_leave_ms]
     }

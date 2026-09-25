@@ -42,7 +42,7 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
     templates = Mangos.Repo.all(from(row in Mangos.BattlegroundTemplate, where: row.patch <= @supported_patch))
     battlemasters = Mangos.Repo.all(Mangos.BattlemasterEntry)
     safe_locs = load_safe_locs(templates)
-    event_members = Enum.flat_map([489, 529], &load_event_members/1)
+    event_members = Enum.flat_map([30, 489, 529], &load_event_members/1)
     load(templates, safe_locs, battlemasters, event_members)
   end
 
@@ -142,7 +142,10 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
     lookup(table, {:bindings, map_id, kind, db_guid}) || []
   end
 
-  def broadcast_text_ids, do: @warsong_broadcast_text_ids ++ [10_477, 10_478, 10_479, 10_598, 10_599, 10_633, 10_634]
+  def broadcast_text_ids,
+    do:
+      @warsong_broadcast_text_ids ++
+        [7_335, 7_336, 10_477, 10_478, 10_479, 10_598, 10_599, 10_633, 10_634, 10_638, 10_639, 10_640]
 
   defp template(row, safe_locs) do
     %Template{
@@ -179,18 +182,26 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
     ids =
       templates
       |> Enum.flat_map(&[&1.alliance_start_location, &1.horde_start_location])
-      |> Kernel.++([771, 772, 893, 894, 895, 896, 897, 898, 899])
+      |> Kernel.++([169, 610, 611, 689, 690, 729, 749, 750, 751, 771, 772, 893, 894, 895, 896, 897, 898, 899])
       |> Enum.uniq()
 
     DBC.all(from(loc in WorldSafeLocs, where: loc.id in ^ids))
     |> Map.new(&{&1.id, &1})
   end
 
+  defp graveyard(safe_locs, :alliance, 1), do: safe_location(safe_locs, 611)
+  defp graveyard(safe_locs, :horde, 1), do: safe_location(safe_locs, 610)
   defp graveyard(safe_locs, :alliance, 2), do: safe_location(safe_locs, 771)
   defp graveyard(safe_locs, :horde, 2), do: safe_location(safe_locs, 772)
   defp graveyard(safe_locs, :alliance, 3), do: safe_location(safe_locs, 898)
   defp graveyard(safe_locs, :horde, 3), do: safe_location(safe_locs, 899)
   defp graveyard(_safe_locs, _team, _type_id), do: nil
+
+  defp node_graveyards(safe_locs, 1) do
+    [751, 689, 729, 169, 749, 690, 750]
+    |> Enum.with_index()
+    |> Map.new(fn {id, node} -> {node, safe_location(safe_locs, id)} end)
+  end
 
   defp node_graveyards(safe_locs, 3) do
     [895, 894, 893, 897, 896]
