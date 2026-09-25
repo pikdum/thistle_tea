@@ -1447,6 +1447,17 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
+  def handle_info(%Effects.SummonControlledPet{} = effect, %State{} = state) do
+    case CompanionOwner.summon(state, effect) do
+      %Attachment{} = attachment -> handle_info(attachment, state)
+      nil -> {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Controlled pet summon failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_info(
         %Effects.PetHappinessChanged{source_guid: guid, happiness: happiness},
         %State{character: %Character{}} = state

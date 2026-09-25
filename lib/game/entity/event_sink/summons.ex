@@ -357,6 +357,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
 
   def emit(entity, %Effects.SummonPet{}, _context), do: entity
 
+  def emit(entity, %Effects.SummonControlledPet{} = effect, context) do
+    Context.send(context, effect)
+    entity
+  end
+
   def emit(%Character{} = entity, %Effects.SummonMiniPet{} = effect, context) do
     Context.send(context, effect)
     entity

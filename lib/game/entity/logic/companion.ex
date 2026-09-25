@@ -79,6 +79,10 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
 
   def capture_progress(%Character{} = character, _progress), do: character
 
+  def set_automatic_restore(%Character{} = character, enabled?) when is_boolean(enabled?) do
+    put_relationship(character, %{relationship(character) | restore_automatically?: enabled?})
+  end
+
   def capture_health(%Character{} = character, health) when is_integer(health) and health >= 0 do
     case relationship(character) do
       %Companion{kind: :hunter_pet} = companion -> put_relationship(character, %{companion | health: health})

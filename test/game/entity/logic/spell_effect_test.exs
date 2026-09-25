@@ -1277,6 +1277,53 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
                SpellEffect.receive(target, context, spell, 1_000)
     end
 
+    test "controlled summons execute on the caster with the requested lifetime and destination" do
+      caster = target_fixture()
+      caster = %{caster | movement_block: %{caster.movement_block | position: {1.0, 2.0, 3.0, 0.5}}}
+      context = %CastContext{caster_guid: 1, caster_level: 20}
+      spell = %Spell{id: 513, duration_ms: 60_000, effects: [%Effect{type: :summon, misc_value: 329}]}
+
+      for {destination, position} <- [{nil, {1.0, 2.0, 3.0, -0.5}}, {{4.0, 5.0, 6.0}, {4.0, 5.0, 6.0, -0.5}}] do
+        assert {^caster,
+                [
+                  %Effects.SummonControlledPet{
+                    source_guid: 1,
+                    entry: 329,
+                    spell_id: 513,
+                    duration_ms: 60_000,
+                    position: ^position
+                  }
+                ]} =
+                 SpellEffect.receive(caster, %{context | destination_position: destination}, spell, 1000)
+      end
+
+      permanent = %{spell | duration_ms: -1}
+
+      assert {^caster, [%Effects.SummonControlledPet{duration_ms: 0}]} =
+               SpellEffect.receive(caster, context, permanent, 1000)
+
+      target = %{caster | object: %{caster.object | guid: 2}}
+      assert SpellEffect.receive(target, context, spell, 1000) == {target, []}
+    end
+
+    test "minion summons use the front-left radius and resolve collision only for implicit positions" do
+      caster = target_fixture()
+      context = %CastContext{caster_guid: 1, caster_level: 20}
+      effect = %Effect{type: :summon, misc_value: 12_922, implicit_target_a: :minion_position, radius_yards: 3.0}
+      spell = %Spell{id: 11_939, duration_ms: -1, effects: [effect]}
+
+      assert {^caster, [%Effects.SummonControlledPet{position: {x, y, z, _o}, resolve_collision?: true}]} =
+               SpellEffect.receive(caster, context, spell, 1000)
+
+      assert_in_delta x, 3.0 / :math.sqrt(2), 0.0001
+      assert_in_delta y, x, 0.0001
+      assert z == 0.0
+      context = %{context | destination_position: {1.0, 2.0, 3.0}}
+
+      assert {^caster, [%Effects.SummonControlledPet{position: {1.0, 2.0, 3.0, _o}, resolve_collision?: false}]} =
+               SpellEffect.receive(caster, context, spell, 1000)
+    end
+
     test "call, revive, and dismiss use the stable hunter pet entry" do
       character = dead_character_fixture()
 

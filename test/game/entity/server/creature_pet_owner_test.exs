@@ -3,20 +3,31 @@ defmodule ThistleTea.Game.Entity.Server.CreaturePetOwnerTest do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Server.CreaturePetOwner
+  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
+  alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
+  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Player.Login
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Loader.CreaturePet
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon
+  alias ThistleTea.Game.World.Loader.SummonedPet
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.WorldRef
 
   @entries [990_301, 990_302]
@@ -92,7 +103,41 @@ defmodule ThistleTea.Game.Entity.Server.CreaturePetOwnerTest do
     end
   end
 
-  describe "CreaturePet.build/2" do
+  describe "SummonedPet.build/2" do
+    @tag :namigator_maps
+    test "clips implicit minion positions at terrain while retaining explicit destinations", %{owner: owner} do
+      origin = {-8949.95, -132.49, 83.53}
+
+      owner = %{
+        owner
+        | internal: %{owner.internal | world: WorldRef.open(0)},
+          movement_block: %{owner.movement_block | position: Tuple.insert_at(origin, 3, 0.0)}
+      }
+
+      destination = {-8914.0, -164.0, 82.0, 0.0}
+      request = %{controlled_request(owner) | position: destination, resolve_collision?: true}
+      pet = SummonedPet.build(owner, request)
+      {x, y, z, orientation} = pet.movement_block.position
+      assert orientation == 0.0
+      assert Pathfinding.line_of_sight?(0, origin, {x, y, z})
+      assert abs(x + 8914.0) > 1.0
+      explicit = SummonedPet.build(owner, %{request | resolve_collision?: false})
+      assert explicit.movement_block.position == destination
+    end
+
+    test "controlled pets retain template names and source lifetime at owner level", %{owner: owner} do
+      request = %{controlled_request(owner) | duration_ms: 60_000, position: {4.0, 5.0, 6.0, -0.5}}
+      pet = SummonedPet.build(owner, request)
+      assert pet.movement_block.position == request.position
+      assert pet.unit.level == owner.unit.level
+      assert pet.unit.pet_name_timestamp == 0
+      assert pet.unit.pet_number == 0
+      assert pet.internal.name == "Test Creature Pet"
+      assert pet.internal.spawn.despawn_delay_ms == 60_000
+      assert pet.internal.spawn.despawn_type == 3
+      assert pet.internal.spawn.summoner_guid == owner.object.guid
+    end
+
     test "retains template casting delays and fills resources after pet passives", %{owner: owner} do
       passive = %Spell{
         id: 900_001,
@@ -108,7 +153,7 @@ defmodule ThistleTea.Game.Entity.Server.CreaturePetOwnerTest do
       :ets.insert(Summon, {990_301, prototype})
       :ets.insert(Summon, {{:pet_spellbook, 990_301, 20}, %{active.id => active}})
       :ets.insert(Summon, {{:pet_passives, 990_301, 20}, [passive]})
-      pet = CreaturePet.build(owner, request(owner))
+      pet = SummonedPet.build(owner, request(owner))
       assert pet.unit.base_health == 1000
       assert pet.unit.health == 1100
       assert pet.unit.max_health == 1100
@@ -120,7 +165,7 @@ defmodule ThistleTea.Game.Entity.Server.CreaturePetOwnerTest do
 
     test "scales from owner level with signed offsets and a level-one floor", %{owner: owner} do
       for {offset, level} <- [{0.0, 20}, {-2.9, 18}, {-99.0, 1}] do
-        pet = CreaturePet.build(owner, %{request(owner) | level_offset: offset})
+        pet = SummonedPet.build(owner, %{request(owner) | level_offset: offset})
         assert pet.unit.level == level
         assert pet.unit.base_health == level * 50
         assert pet.unit.health == pet.unit.max_health
@@ -132,7 +177,7 @@ defmodule ThistleTea.Game.Entity.Server.CreaturePetOwnerTest do
     end
 
     test "pet level rows override canonical inputs while zero damage and armor retain template values", %{owner: owner} do
-      base = CreaturePet.build(owner, request(owner))
+      base = SummonedPet.build(owner, request(owner))
 
       stats = %Mangos.PetLevelStats{
         entry: 990_301,
@@ -150,7 +195,7 @@ defmodule ThistleTea.Game.Entity.Server.CreaturePetOwnerTest do
       }
 
       :ets.insert(Summon, {{:pet_stats, 990_301, 20}, stats})
-      pet = CreaturePet.build(owner, request(owner))
+      pet = SummonedPet.build(owner, request(owner))
       assert pet.unit.base_health == 333
       assert pet.unit.health == 333
       assert pet.unit.power1 == 44
@@ -158,11 +203,145 @@ defmodule ThistleTea.Game.Entity.Server.CreaturePetOwnerTest do
       assert pet.unit.base_normal_resistance == base.unit.base_normal_resistance
       assert pet.unit.base_min_damage == base.unit.base_min_damage
       :ets.insert(Summon, {{:pet_stats, 990_301, 20}, %{stats | armor: 50, dmg_min: 7.0, dmg_max: 9.0}})
-      pet = CreaturePet.build(owner, request(owner))
+      pet = SummonedPet.build(owner, request(owner))
       assert pet.unit.base_normal_resistance == 50
       assert pet.unit.base_min_damage == 7.0
       assert pet.unit.base_max_damage == 9.0
     end
+  end
+
+  describe "controlled creature pets" do
+    test "retains the occupied slot for both living and dead pets", %{owner: owner, pid: pid} do
+      send(pid, controlled_request(owner))
+      active = :sys.get_state(pid)
+      guid = Companion.active_guid(active)
+      pet = :sys.get_state(Entity.pid(guid))
+      assert active.unit.summon == guid
+      assert Metadata.get(owner.object.guid).pet_guid == guid
+      assert pet.internal.pet.kind == :creature_pet
+      assert pet.internal.pet.reaction_state == :aggressive
+
+      for dead? <- [false, true] do
+        if dead?, do: kill(pet)
+
+        for entry <- @entries do
+          send(pid, %{controlled_request(owner) | entry: entry})
+          assert Companion.active_guid(:sys.get_state(pid)) == guid
+        end
+      end
+    end
+
+    test "expires during combat and releases the owner's slot", %{owner: owner, pid: pid} do
+      send(pid, %{controlled_request(owner) | duration_ms: 400})
+      active = :sys.get_state(pid)
+      guid = Companion.active_guid(active)
+      child = Entity.pid(guid)
+      monitor = Process.monitor(child)
+      :sys.replace_state(child, fn pet -> %{pet | internal: %{pet.internal | in_combat: true}} end)
+      assert_receive {:DOWN, ^monitor, :process, ^child, _reason}, 1500
+      assert await_slot(pid, nil).unit.summon == 0
+      assert Metadata.get(owner.object.guid).pet_guid == nil
+      assert_removed(guid)
+    end
+  end
+
+  describe "controlled player pets" do
+    setup [:player]
+
+    test "attaches before the next request and publishes the defensive pet bar", %{state: state} do
+      request = controlled_request(state.character)
+      {:noreply, active, {:continue, continuation}} = PlayerServer.handle_info(request, state)
+      guid = Companion.active_guid(active.character)
+      assert active.character.unit.summon == guid
+      pet = :sys.get_state(Entity.pid(guid))
+      assert pet.internal.pet.kind == :summon
+      assert pet.internal.pet.reaction_state == :defensive
+      assert Bitwise.band(pet.unit.flags, 8) == 8
+      assert pet.unit.pet_name_timestamp == 0
+      assert {:noreply, ^active} = PlayerServer.handle_info(request, active)
+      PlayerServer.handle_continue(continuation, active)
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: ^guid, reaction_state: 1}}}
+      kill(pet)
+      assert {:noreply, ^active} = PlayerServer.handle_info(request, active)
+      CompanionOwner.suspend(active)
+      assert_removed(guid)
+    end
+
+    test "restores permanent summons with their original effect after suspension", %{state: state} do
+      request = controlled_request(state.character)
+      cache_spell(request.spell_id, 0)
+      {:noreply, active, _continuation} = PlayerServer.handle_info(request, state)
+      guid = Companion.active_guid(active.character)
+      suspended = CompanionOwner.suspend(active)
+      assert_removed(guid)
+      assert Companion.relationship(suspended.character).restore_automatically?
+      assert Login.restore_companion(suspended) == suspended
+      assert_receive %Effects.SummonControlledPet{duration_ms: 0, position: nil} = restoration
+      {:noreply, restored, _continuation} = PlayerServer.handle_info(restoration, suspended)
+      next = Companion.active_guid(restored.character)
+      assert next != guid
+      pet = :sys.get_state(Entity.pid(next))
+      assert pet.internal.pet.kind == :summon
+      assert pet.unit.pet_name_timestamp == 0
+      CompanionOwner.suspend(restored)
+    end
+
+    test "does not restore a timed summon after suspension", %{state: state} do
+      request = %{controlled_request(state.character) | duration_ms: 60_000}
+      {:noreply, active, _continuation} = PlayerServer.handle_info(request, state)
+      guid = Companion.active_guid(active.character)
+      suspended = CompanionOwner.suspend(active)
+      assert_removed(guid)
+      refute Companion.relationship(suspended.character).restore_automatically?
+      assert Login.restore_companion(suspended) == suspended
+      refute_receive %Effects.SummonControlledPet{}
+    end
+
+    test "timed expiry removes the pet bar and canonical relationship", %{state: state} do
+      request = %{controlled_request(state.character) | duration_ms: 400}
+      {:noreply, active, _continuation} = PlayerServer.handle_info(request, state)
+      guid = Companion.active_guid(active.character)
+      token = active.companion_monitor.token
+      assert_receive {:DOWN, ^token, :process, _pid, _reason} = down, 1500
+      {:noreply, cleared, _continuation} = PlayerServer.handle_info(down, active)
+      assert Companion.active_guid(cleared.character) == nil
+      assert cleared.character.unit.summon == 0
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
+      assert_removed(guid)
+    end
+  end
+
+  defp controlled_request(owner) do
+    %Effects.SummonControlledPet{source_guid: owner.object.guid, entry: 990_301, spell_id: 990_303, duration_ms: 0}
+  end
+
+  defp cache_spell(id, duration) do
+    key = {:spell, id}
+    previous = :ets.lookup(SpellLoader, key)
+    spell = %Spell{id: id, duration_ms: duration, effects: [%Effect{type: :summon, misc_value: 990_301}]}
+    :ets.insert(SpellLoader, {key, spell})
+
+    on_exit(fn ->
+      :ets.delete(SpellLoader, key)
+      :ets.insert(SpellLoader, previous)
+    end)
+  end
+
+  defp player(%{owner: owner}) do
+    guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    Entity.register(guid)
+
+    character = %Character{
+      object: %{owner.object | guid: guid},
+      unit: owner.unit,
+      player: %Player{},
+      movement_block: owner.movement_block,
+      internal: %Internal{world: owner.internal.world, spellbook: %{}, name: "Pet Owner"}
+    }
+
+    Presence.enter(character, %{alive?: true, faction_template: character.unit.faction_template})
+    on_exit(fn -> Presence.leave(character) end)
+    %{state: %State{guid: guid, character: character}}
   end
 
   defp summon(pid, owner) do

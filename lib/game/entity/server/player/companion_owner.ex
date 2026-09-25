@@ -2,10 +2,16 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment do
   @moduledoc false
 
   alias ThistleTea.Game.Entity.Data.Companion
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
+  alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.PetProgression
   alias ThistleTea.Game.Network.Message.SmsgPetNameQueryResponse
 
   @enforce_keys [:kind, :entity_ref, :pid, :spells]
-  defstruct [:kind, :entity_ref, :pid, :spells, :create, :progress, :name_response]
+  defstruct [:kind, :entity_ref, :pid, :spells, :create, :progress, :name_response, restore_automatically?: true]
 
   @type t :: %__MODULE__{
           kind: Companion.kind(),
@@ -13,8 +19,34 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment do
           pid: pid(),
           spells: list(),
           create: term(),
-          name_response: %SmsgPetNameQueryResponse{} | nil
+          name_response: %SmsgPetNameQueryResponse{} | nil,
+          restore_automatically?: boolean()
         }
+
+  def from_pet(%Mob{internal: %{pet: %Pet{} = pet}} = entity, pid, spell_id, spells \\ nil) do
+    %__MODULE__{
+      kind: companion_kind(pet),
+      entity_ref: %EntityRef{guid: entity.object.guid, entry: entity.object.entry, spell_id: spell_id},
+      pid: pid,
+      spells: spells || Map.values(entity.internal.spellbook || %{}),
+      create: Core.update_object(entity),
+      progress: PetProgression.snapshot(entity),
+      restore_automatically?: restore_automatically?(entity.internal.spawn),
+      name_response: %SmsgPetNameQueryResponse{
+        pet_number: entity.unit.pet_number,
+        name: entity.internal.name,
+        timestamp: entity.unit.pet_name_timestamp
+      }
+    }
+  end
+
+  defp restore_automatically?(%Spawn{despawn_delay_ms: delay}) when is_integer(delay) and delay > 0, do: false
+  defp restore_automatically?(_spawn), do: true
+
+  defp companion_kind(%Pet{kind: :hunter}), do: :hunter_pet
+  defp companion_kind(%Pet{kind: :possessed}), do: :possession
+  defp companion_kind(%Pet{kind: :charmed}), do: :charm
+  defp companion_kind(%Pet{}), do: :guardian
 end
 
 defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner.Monitor do
@@ -45,12 +77,32 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner do
   alias ThistleTea.Game.Entity.Data.Companion
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
+  alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Monitor
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
+  alias ThistleTea.Game.World.Loader.SummonedPet
+
+  def summon(
+        %State{character: %Character{object: %{guid: guid}} = character},
+        %Effects.SummonControlledPet{source_guid: guid} = effect
+      ) do
+    if Death.alive?(character) and is_nil(CompanionLogic.active_ref(character)) do
+      pet = SummonedPet.build(character, effect)
+
+      case MobLoader.start_mob(pet) do
+        {:ok, pid} -> Attachment.from_pet(pet, pid, effect.spell_id)
+        _failed -> nil
+      end
+    end
+  end
+
+  def summon(%State{}, _effect), do: nil
 
   def attach(%State{} = state, %Attachment{pid: pid, entity_ref: %EntityRef{} = entity_ref} = attachment) do
     state = replace_previous(state, entity_ref.guid)
@@ -60,6 +112,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner do
       state.character
       |> CompanionLogic.activate(attachment.kind, entity_ref)
       |> CompanionLogic.capture_progress(attachment.progress)
+      |> CompanionLogic.set_automatic_restore(attachment.restore_automatically?)
 
     %{state | character: character, companion_monitor: monitor}
   end

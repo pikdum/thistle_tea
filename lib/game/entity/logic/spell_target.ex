@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   def target_query(_spell, _targets, _modifiers), do: :none
 
   defp non_unit_effect?(%Effect{type: :activate_object}), do: true
+  defp non_unit_effect?(%Effect{type: :summon}), do: true
 
   defp non_unit_effect?(%Effect{type: :persistent_area_aura} = effect),
     do: effect_targets?(effect, [:aoe_enemy_at_channel])

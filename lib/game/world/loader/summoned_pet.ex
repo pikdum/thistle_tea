@@ -1,10 +1,11 @@
-defmodule ThistleTea.Game.World.Loader.CreaturePet do
+defmodule ThistleTea.Game.World.Loader.SummonedPet do
   @moduledoc """
-  Builds a creature's single summoned combat pet from cached pet and creature
-  level data, retaining the template's combat spells and summoned-pet stats.
+  Builds single-slot summoned combat pets from cached pet and creature level
+  data, retaining template spells, owner level, and source lifetime.
   """
 
   alias ThistleTea.DB.Mangos.PetLevelStats
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -13,19 +14,44 @@ defmodule ThistleTea.Game.World.Loader.CreaturePet do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Loader.Summon
+  alias ThistleTea.Game.World.Pathfinding
 
-  def build(%Mob{} = owner, %Effects.SummonPet{entry: entry} = effect) do
+  def build(%Mob{} = owner, %Effects.SummonPet{} = effect) do
     level = max(owner.unit.level + trunc(effect.level_offset), 1)
     {x, y, z, orientation} = owner.movement_block.position
     angle = orientation + :math.pi() / 2
     position = {x + 2.0 * :math.cos(angle), y + 2.0 * :math.sin(angle), z, orientation}
+    build_pet(owner, effect, level, position, [])
+  end
+
+  def build(owner, %Effects.SummonControlledPet{} = effect) when is_struct(owner, Mob) or is_struct(owner, Character) do
+    {x, y, z, orientation} = owner.movement_block.position
+    position = controlled_position(owner, effect, {x, y, z, -orientation})
+    build_pet(owner, effect, owner.unit.level, position, despawn_delay_ms: effect.duration_ms, fixed_name?: true)
+  end
+
+  defp controlled_position(
+         owner,
+         %Effects.SummonControlledPet{resolve_collision?: true, position: {x, y, z, o}},
+         {sx, sy, sz, _o}
+       ) do
+    {x, y, z} = Pathfinding.first_collision_position(owner.internal.world.map_id, {sx, sy, sz}, {x, y, z})
+    {x, y, z, o}
+  end
+
+  defp controlled_position(_owner, %Effects.SummonControlledPet{position: position}, fallback), do: position || fallback
+
+  defp build_pet(owner, effect, level, position, opts) do
+    entry = effect.entry
 
     mob =
       Summon.build(entry, owner.internal.world, position,
         level: level,
         run?: true,
         apply_addon_auras?: false,
-        stat_model: :creature
+        stat_model: :creature,
+        despawn_delay_ms: Keyword.get(opts, :despawn_delay_ms),
+        despawn_type: 3
       )
 
     guid = Guid.from_low_guid(:pet, entry, Guid.low_guid(mob.object.guid))
@@ -42,7 +68,7 @@ defmodule ThistleTea.Game.World.Loader.CreaturePet do
         npc_flags: 0,
         dynamic_flags: 0,
         pet_number: 0,
-        pet_name_timestamp: System.system_time(:second),
+        pet_name_timestamp: if(Keyword.get(opts, :fixed_name?, false), do: 0, else: System.system_time(:second)),
         pet_experience: 0,
         pet_next_level_exp: 1000,
         attack_power_model: if(entry == 416, do: :imp, else: :summoned_pet),
@@ -54,9 +80,9 @@ defmodule ThistleTea.Game.World.Loader.CreaturePet do
 
     pet = %Pet{
       owner_guid: owner.object.guid,
-      kind: :creature_pet,
+      kind: if(is_struct(owner, Character), do: :summon, else: :creature_pet),
       profile: :combat,
-      reaction_state: :aggressive,
+      reaction_state: if(is_struct(owner, Character), do: :defensive, else: :aggressive),
       autocast: MapSet.new(spells, & &1.spell_id)
     }
 

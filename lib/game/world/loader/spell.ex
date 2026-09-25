@@ -674,6 +674,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(92), do: :enchant_held_item
   defp effect_type(17), do: :weapon_damage_noschool
   defp effect_type(27), do: :persistent_area_aura
+  defp effect_type(28), do: :summon
   defp effect_type(58), do: :weapon_damage
   defp effect_type(64), do: :trigger_spell
   defp effect_type(67), do: :heal_max_health

@@ -133,6 +133,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
 
   @summon_control [
     :duel,
+    :summon,
     :summon_pet,
     :summon_mini_pet,
     :summon_guardian,

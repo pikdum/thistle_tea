@@ -74,6 +74,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Player.Trade
   alias ThistleTea.Game.Player.VendorPurchase
   alias ThistleTea.Game.Player.WorldStates
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
@@ -234,7 +235,7 @@ defmodule ThistleTea.Game.Player.Login do
       when kind in [:hunter_pet, :guardian] and is_integer(entry) and entry > 0 and is_integer(spell_id) and
              spell_id > 0 do
     if Death.alive?(character) and not character.internal.companion.dead? do
-      EventSink.emit(character, Effects.summon_pet(character.object.guid, entry, spell_id))
+      EventSink.emit(character, companion_restoration(character, entry, spell_id))
     end
 
     state
@@ -268,6 +269,25 @@ defmodule ThistleTea.Game.Player.Login do
   end
 
   def restore_companion(state), do: state
+
+  defp companion_restoration(character, entry, spell_id) do
+    case SpellLoader.cached(spell_id) do
+      %Spell{effects: effects} ->
+        if Enum.any?(effects, &(&1.type == :summon)) do
+          %Effects.SummonControlledPet{
+            source_guid: character.object.guid,
+            entry: entry,
+            spell_id: spell_id,
+            duration_ms: 0
+          }
+        else
+          Effects.summon_pet(character.object.guid, entry, spell_id)
+        end
+
+      _unknown ->
+        Effects.summon_pet(character.object.guid, entry, spell_id)
+    end
+  end
 
   def refresh_companion(
         %{

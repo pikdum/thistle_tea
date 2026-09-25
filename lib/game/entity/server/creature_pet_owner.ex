@@ -1,7 +1,8 @@
 defmodule ThistleTea.Game.Entity.Server.CreaturePetOwner do
   @moduledoc """
   Owns the monitored process edge of a creature's single combat-pet slot.
-  Live pets block recasting; only a dead pet of the same entry is replaceable.
+  Controlled summons require an empty slot. Summon-pet effects may replace a
+  dead pet of the same entry.
   """
 
   alias ThistleTea.Game.Entity
@@ -12,8 +13,8 @@ defmodule ThistleTea.Game.Entity.Server.CreaturePetOwner do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Loader.CreaturePet
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
+  alias ThistleTea.Game.World.Loader.SummonedPet
   alias ThistleTea.Game.World.Metadata
 
   defmodule Monitor do
@@ -24,25 +25,37 @@ defmodule ThistleTea.Game.Entity.Server.CreaturePetOwner do
 
   def summon(%Mob{object: %{guid: guid}} = owner, %Effects.SummonPet{source_guid: guid} = effect) do
     if not Core.dead?(owner) and not Corpse.removed?(owner) and available?(owner, effect.entry) do
-      pet = CreaturePet.build(owner, effect)
-      owner = dismiss(owner)
-      ref = %EntityRef{guid: pet.object.guid, entry: effect.entry, spell_id: effect.spell_id}
-      owner = owner |> Companion.activate(:guardian, ref) |> publish()
+      start_pet(owner, effect)
+    else
+      owner
+    end
+  end
 
-      case MobLoader.start_mob(pet) do
-        {:ok, pid} ->
-          monitor = %Monitor{token: Process.monitor(pid), pid: pid, guid: ref.guid}
-          %{owner | internal: %{owner.internal | companion_monitor: monitor}}
-
-        _failed ->
-          owner |> Companion.clear() |> publish()
-      end
+  def summon(%Mob{object: %{guid: guid}} = owner, %Effects.SummonControlledPet{source_guid: guid} = effect) do
+    if not Core.dead?(owner) and not Corpse.removed?(owner) and is_nil(Companion.active_ref(owner)) do
+      start_pet(owner, effect)
     else
       owner
     end
   end
 
   def summon(%Mob{} = owner, _effect), do: owner
+
+  defp start_pet(owner, effect) do
+    pet = SummonedPet.build(owner, effect)
+    owner = dismiss(owner)
+    ref = %EntityRef{guid: pet.object.guid, entry: effect.entry, spell_id: effect.spell_id}
+    owner = owner |> Companion.activate(:guardian, ref) |> publish()
+
+    case MobLoader.start_mob(pet) do
+      {:ok, pid} ->
+        monitor = %Monitor{token: Process.monitor(pid), pid: pid, guid: ref.guid}
+        %{owner | internal: %{owner.internal | companion_monitor: monitor}}
+
+      _failed ->
+        owner |> Companion.clear() |> publish()
+    end
+  end
 
   def process_down(%Mob{internal: %{companion_monitor: %Monitor{token: token}}} = owner, token) do
     owner = %{owner | internal: %{owner.internal | companion_monitor: nil}}

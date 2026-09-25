@@ -22,6 +22,21 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   alias ThistleTea.Game.WorldRef
 
   describe "resolve/3" do
+    test "controlled summon destinations execute only on the caster despite a selected enemy" do
+      source = player_guid()
+      enemy = mob_guid()
+      put_spatial_target(:players, source, {0.0, 0.0, 0.0})
+      put_spatial_target(:mobs, enemy, {3.0, 0.0, 0.0})
+
+      for mode <- [:caster_destination, :minion_position] do
+        spell = %Spell{id: 513, effects: [%Effect{type: :summon, implicit_target_a: mode, misc_value: 329}]}
+
+        for target <- [Target.none(), Target.unit(enemy)] do
+          assert SpellTargetResolver.resolve(caster(source, {0.0, 0.0, 0.0}), spell, target) == [source]
+        end
+      end
+    end
+
     test "caps area candidates while retaining an eligible selected target" do
       source = player_guid()
       put_spatial_target(:players, source, {0.0, 0.0, 0.0})

@@ -10,7 +10,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Commands
   alias ThistleTea.Game.Entity.DamageSharing
-  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
@@ -1017,6 +1016,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       {:noreply, state}
   end
 
+  def handle_info(%Effects.SummonControlledPet{} = effect, %Mob{} = state) do
+    {:noreply, CreaturePetOwner.summon(state, effect), {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Controlled pet summon failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   @impl GenServer
   def handle_info({:remove_corpse, token}, %Mob{} = state) do
     {:noreply, state |> Corpse.remove(token) |> Respawn.after_corpse_removed()}
@@ -1284,22 +1291,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_info({:attach_pet, owner_pid, spell_id, pet_spells}, %Mob{internal: %Internal{pet: %Pet{}}} = state)
       when is_pid(owner_pid) do
-    pet_spells = pet_spells || Map.values(state.internal.spellbook || %{})
-
-    attachment = %Attachment{
-      kind: companion_kind(state.internal.pet),
-      entity_ref: %EntityRef{guid: state.object.guid, entry: state.object.entry, spell_id: spell_id},
-      pid: self(),
-      spells: pet_spells,
-      create: Core.update_object(state),
-      progress: PetProgression.snapshot(state),
-      name_response: %Message.SmsgPetNameQueryResponse{
-        pet_number: state.unit.pet_number,
-        name: state.internal.name,
-        timestamp: state.unit.pet_name_timestamp
-      }
-    }
-
+    attachment = Attachment.from_pet(state, self(), spell_id, pet_spells)
     send(owner_pid, attachment)
     {:noreply, state}
   end
@@ -1569,11 +1561,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp control_mode(%Mob{internal: %Internal{pet: %Pet{kind: kind}}}), do: {:pet, kind}
   defp control_mode(%Mob{}), do: :mob
-
-  defp companion_kind(%Pet{kind: :hunter}), do: :hunter_pet
-  defp companion_kind(%Pet{kind: :possessed}), do: :possession
-  defp companion_kind(%Pet{kind: :charmed}), do: :charm
-  defp companion_kind(%Pet{}), do: :guardian
 
   defp control_metadata(%Mob{internal: %Internal{pet: %Pet{} = pet}}) do
     %{owner_guid: pet.owner_guid, pet_profile: pet.profile}

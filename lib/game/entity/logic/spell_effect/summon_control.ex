@@ -21,6 +21,30 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
   alias ThistleTea.Game.Spell.Modifiers
 
   def apply(
+        %{object: %{guid: guid}} = state,
+        %CastContext{caster_guid: guid, destination_position: destination},
+        %Spell{id: spell_id, duration_ms: duration},
+        %Effect{type: :summon, misc_value: entry} = effect,
+        _now
+      )
+      when is_integer(entry) and entry > 0 do
+    {x, y, z, orientation} = state.movement_block.position
+    {x, y, z} = summon_position(effect, destination, {x, y, z}, orientation)
+
+    {state,
+     [
+       %Effects.SummonControlledPet{
+         source_guid: guid,
+         entry: entry,
+         spell_id: spell_id,
+         duration_ms: max(duration || 0, 0),
+         position: {x, y, z, -orientation},
+         resolve_collision?: is_nil(destination) and effect.implicit_target_a == :minion_position
+       }
+     ]}
+  end
+
+  def apply(
         %Character{
           object: %{guid: target_guid},
           movement_block: %{position: {target_x, target_y, _target_z, _target_o}}
@@ -111,7 +135,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
       )
       when is_integer(entry) and entry > 0 do
     {x, y, z, orientation} = state.movement_block.position
-    {x, y, z} = guardian_position(effect, context.destination_position, {x, y, z}, orientation)
+    {x, y, z} = summon_position(effect, context.destination_position, {x, y, z}, orientation)
 
     {state,
      [
@@ -395,9 +419,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
 
   defp wild_object_position(_effect, nil, caster_position, _orientation), do: caster_position
 
-  defp guardian_position(%Effect{}, {x, y, z}, _position, _orientation), do: {x, y, z}
+  defp summon_position(%Effect{}, {x, y, z}, _position, _orientation), do: {x, y, z}
 
-  @guardian_angles %{
+  @summon_angles %{
     :minion_position => 0.25,
     41 => 1.75,
     42 => 1.25,
@@ -409,14 +433,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
     50 => -0.5
   }
 
-  defp guardian_position(%Effect{implicit_target_a: target, radius_yards: radius}, nil, {x, y, z}, orientation)
-       when is_map_key(@guardian_angles, target) and is_number(radius) do
-    offset = Map.fetch!(@guardian_angles, target) * :math.pi()
+  defp summon_position(%Effect{implicit_target_a: target, radius_yards: radius}, nil, {x, y, z}, orientation)
+       when is_map_key(@summon_angles, target) and is_number(radius) do
+    offset = Map.fetch!(@summon_angles, target) * :math.pi()
 
     {x + radius * :math.cos(orientation + offset), y + radius * :math.sin(orientation + offset), z}
   end
 
-  defp guardian_position(_effect, nil, position, _orientation), do: position
+  defp summon_position(_effect, nil, position, _orientation), do: position
 
   defp summon_effect_position(%Effect{implicit_target_a: :minion_position}, _destination, {x, y, z}, orientation) do
     {x + 0.5 * :math.cos(orientation), y + 0.5 * :math.sin(orientation), z}
