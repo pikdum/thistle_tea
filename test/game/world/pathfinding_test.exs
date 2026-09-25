@@ -166,6 +166,11 @@ defmodule ThistleTea.Game.World.PathfindingTest do
   end
 
   describe "get_zone_and_area/2" do
+    test "resolves Alterac Valley graveyards" do
+      assert {2597, _area} = Pathfinding.get_zone_and_area(30, {73.417755, -496.4331, 48.731918})
+      assert {2597, _area} = Pathfinding.get_zone_and_area(30, {-531.2178, -405.2314, 49.5514})
+    end
+
     test "retains the tower area on an unlabelled roof and in the air above it" do
       for z <- [192.51268, 194.6, 220.0] do
         assert Pathfinding.get_zone_and_area(0, {1854.0, -3724.0, z}) == {139, 2263}

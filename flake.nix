@@ -268,7 +268,7 @@
               echo "Building BVH from: ''${data_dir}"
               MapBuilder --data "''${data_dir}" --output "''${out_dir}" --bvh --threads "''${threads}" --logLevel 1
 
-              for map in Azeroth Kalimdor development OrgrimmarInstance Stratholme DeadminesInstance; do
+              for map in Azeroth Kalimdor development OrgrimmarInstance Stratholme DeadminesInstance PVPZone01; do
                 echo "Building ''${map}..."
                 MapBuilder --data "''${data_dir}" --output "''${out_dir}" --map "''${map}" --threads "''${threads}" --logLevel 1
               done
