@@ -50,10 +50,11 @@ Verified behavior:
 - After ending the duel, the mage logged out and reconnected at the same
   location with no stale Flare holder or concealment flags.
 
-An earlier sample showed a temporary hunter-only combat transition without
-damage. A follow-up trace of combat entry functions and player callback returns
-did not reproduce it; its cause remains unconfirmed. This is not counted as a
-verified combat-rule fix.
+Follow-up native tracing reproduced the temporary hunter-only combat transition
+when Flare hit critters. The initial cast incorrectly delivered its persistent
+effects directly to units, invoking the critter spell-hit escape reaction. Ground
+refreshes also invoked ordinary spell-hit callbacks. Both paths are now corrected;
+see [the ground spell combat acceptance](ground-spell-combat-playtest.md).
 
 ## Evidence and validation
 
