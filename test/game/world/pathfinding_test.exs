@@ -81,6 +81,19 @@ defmodule ThistleTea.Game.World.PathfindingTest do
   end
 
   describe "find_random_point_around_circle/3" do
+    test "bounds small-radius samples inside large navigation polygons" do
+      anchor = {16_479.2, 16_468.1, 69.43277740478516}
+
+      points = for _ <- 1..30, do: Pathfinding.find_random_point_around_circle(451, anchor, 2.0)
+      assert Enum.count(points, &is_tuple/1) >= 20
+
+      for {x, y, z} <- points do
+        assert distance({x, y, 0.0}, {elem(anchor, 0), elem(anchor, 1), 0.0}) <= 2.01
+        assert abs(z - elem(anchor, 2)) < 1.0
+        assert Pathfinding.line_of_sight?(451, anchor, {x, y, z})
+      end
+    end
+
     test "accepts an integer script radius" do
       assert {x, y, z} = Pathfinding.find_random_point_around_circle(0, @human_start, 5)
       assert is_float(x) and is_float(y) and is_float(z)

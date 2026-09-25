@@ -30,9 +30,24 @@ defmodule ThistleTea.Game.World.Pathfinding do
     end)
   end
 
-  def find_random_point_around_circle(map_id, {x, y, z}, radius) do
+  def find_random_point_around_circle(map_id, {x, y, z} = anchor, radius) do
     load_adt_at(map_id, {x, y})
-    Namigator.find_random_point_around_circle(map_id, x, y, z, radius * 1.0)
+
+    case Namigator.find_random_point_around_circle(map_id, x, y, z, radius * 1.0) do
+      {px, py, _} = point ->
+        distance = Math.distance({x, y, 0.0}, {px, py, 0.0})
+
+        if distance <= radius do
+          point
+        else
+          fraction = :math.sqrt(:rand.uniform()) * radius / distance
+          destination = {x + (px - x) * fraction, y + (py - y) * fraction, z}
+          walk_hit_position(map_id, anchor, destination)
+        end
+
+      _ ->
+        nil
+    end
   end
 
   def find_path(map_id, start, destination, opts \\ []) do
