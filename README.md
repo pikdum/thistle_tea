@@ -97,6 +97,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Shapeshift cleansing](docs/shapeshift-cleansing-playtest.md), with root and snare removal, daze exceptions, buff interruption, target restrictions, and movement acknowledgements
 - [Transformation appearance](docs/appearance-playtest.md), with disguise priority, model geometry, form scales, creature weapons, reconnect restoration, and Polymorph regeneration
 - ground mounts, mounted speed bonuses, and dismounting on cancellation or swimming
+- [Indoor and outdoor spell rules](docs/spell-environment-playtest.md), with WMO interiors, cast-completion checks, automatic dismounting, and terrain-sensitive form and equipment passives
 - parry haste for player and mob melee swings, including dual-wield timing
 - shield block value from equipment, enchants, and percentage talents, shared by defensive blocks and Shield Slam
 - learned parry and block capabilities, weapon and shield requirements, sheath restrictions, and defense-skill avoidance on the character sheet
