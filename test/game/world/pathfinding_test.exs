@@ -165,6 +165,30 @@ defmodule ThistleTea.Game.World.PathfindingTest do
     end
   end
 
+  describe "outdoors/2" do
+    test "distinguishes Northshire's abbey interior from its exterior" do
+      assert Pathfinding.outdoors(0, @human_start) == true
+      assert Pathfinding.outdoors(0, {-8927.62, -201.787, 80.6824}) == true
+      assert Pathfinding.outdoors(0, {-8914.0, -164.0, 82.0}) == false
+    end
+
+    test "keeps outdoor Stormwind WMO groups distinct from building interiors" do
+      assert Pathfinding.outdoors(0, {-9068.827148, 413.834045, 92.931786}) == true
+      assert Pathfinding.outdoors(0, {-9086.793945, 443.588013, 92.940720}) == true
+      assert Pathfinding.outdoors(0, {-9461.5, 16.19, 56.96}) == false
+    end
+
+    test "finds cave floors beneath terrain and inside global WMO maps" do
+      assert Pathfinding.outdoors(0, {-8664.2421875, -123.19469451904297, 91.81388}) == false
+      assert Pathfinding.outdoors(0, {1573.982666, 262.304504, -59.160473}) == false
+      assert Pathfinding.outdoors(36, {-131.290833, -591.243103, 18.077190}) == false
+    end
+
+    test "returns unknown for unavailable maps" do
+      assert Pathfinding.outdoors(999, {0.0, 0.0, 0.0}) == nil
+    end
+  end
+
   describe "get_zone_and_area/2" do
     test "resolves Alterac Valley graveyards" do
       assert {2597, _area} = Pathfinding.get_zone_and_area(30, {73.417755, -496.4331, 48.731918})

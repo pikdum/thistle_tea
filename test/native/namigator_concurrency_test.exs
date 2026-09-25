@@ -41,6 +41,7 @@ defmodule ThistleTea.Native.NamigatorConcurrencyTest do
       {adt_x, adt_y} = Namigator.load_adt_at(map, x, y)
       assert [_ | _] = expected = path(query, true)
       assert {_, _, _} = expected_hit = walk_hit(query)
+      assert outdoors(query) == true
 
       on_exit(fn -> Namigator.load_adt_at(map, x, y) end)
 
@@ -52,6 +53,7 @@ defmodule ThistleTea.Native.NamigatorConcurrencyTest do
               assert is_nil(result) or result == expected
               hit = walk_hit(query)
               assert is_nil(hit) or hit == expected_hit
+              assert outdoors(query) in [nil, true]
             end
           end)
         end
@@ -60,6 +62,7 @@ defmodule ThistleTea.Native.NamigatorConcurrencyTest do
         assert Namigator.unload_adt(map, trunc(adt_x), trunc(adt_y))
         assert is_nil(path(query, true))
         assert is_nil(walk_hit(query))
+        assert is_nil(outdoors(query))
         assert {^adt_x, ^adt_y} = Namigator.load_adt_at(map, x, y)
       end
 
@@ -76,6 +79,8 @@ defmodule ThistleTea.Native.NamigatorConcurrencyTest do
     Namigator.walk_hit_position(map, sx, sy, sz, gx, gy, gz)
   end
 
+  defp outdoors({map, {x, y, z}, _destination}), do: Namigator.outdoors(map, x, y, z)
+
   defp observation({map, {sx, sy, sz}, {gx, gy, gz}} = query) do
     point = Namigator.find_random_point_around_circle(map, sx, sy, sz, 2.0)
     assert is_nil(point) or match?({x, y, z} when is_float(x) and is_float(y) and is_float(z), point)
@@ -85,6 +90,7 @@ defmodule ThistleTea.Native.NamigatorConcurrencyTest do
       path(query, true),
       Namigator.find_heights(map, sx, sy),
       Namigator.get_zone_and_area(map, sx, sy, sz),
+      outdoors(query),
       Namigator.query_liquid_surface(map, sx, sy, sz),
       Namigator.line_of_sight(map, sx, sy, sz, gx, gy, gz),
       walk_hit(query),

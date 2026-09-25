@@ -46,6 +46,10 @@ defmodule ThistleTea.Native.Namigator do
     with_map(map_id, &get_zone_and_area_native(&1, x, y, z))
   end
 
+  def outdoors(map_id, x, y, z) do
+    with_map(map_id, &outdoors_native(&1, x, y, z))
+  end
+
   def find_random_point_around_circle(map_id, x, y, z, radius) do
     with_map(map_id, &find_random_point_around_circle_native(&1, x, y, z, radius))
   end
@@ -111,6 +115,7 @@ defmodule ThistleTea.Native.Namigator do
 
   defp load_map_native(_out_dir, _map_name), do: :erlang.nif_error(:nif_not_loaded)
   defp get_zone_and_area_native(_map, _x, _y, _z), do: :erlang.nif_error(:nif_not_loaded)
+  defp outdoors_native(_map, _x, _y, _z), do: :erlang.nif_error(:nif_not_loaded)
 
   defp find_random_point_around_circle_native(_map, _x, _y, _z, _radius), do: :erlang.nif_error(:nif_not_loaded)
 

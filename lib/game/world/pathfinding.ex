@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Pathfinding do
   @moduledoc """
   Navigation-mesh queries over the namigator NIF: pathfinding, random points,
-  terrain and liquid heights, and zone/area lookup.
+  terrain and liquid heights, interiors, and zone/area lookup.
   """
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.World.Pathfinding.Aquatic
@@ -16,6 +16,12 @@ defmodule ThistleTea.Game.World.Pathfinding do
       {zone, area} = result when zone in 1..0xFFFFFFFE and area in 1..0xFFFFFFFE -> result
       _unknown -> surface_zone_and_area(map_id, {x, y, z})
     end
+  end
+
+  @doc "Returns true outdoors, false indoors, or nil when map or WMO group metadata is unavailable."
+  def outdoors(map_id, {x, y, z}) do
+    load_adt_at(map_id, {x, y})
+    Namigator.outdoors(map_id, x, y, z)
   end
 
   defp surface_zone_and_area(map_id, {x, y, z}) do

@@ -14,7 +14,7 @@ hop in the [discord](https://discord.gg/dSYsRXHDhb) if you're interested in help
 
 ```bash
 # the devenv shell provides elixir, a C++ toolchain, and namigator (NAMIGATOR_SRC);
-# outside devenv, point NAMIGATOR_SRC at a namigator checkout
+# outside devenv, use the patched source from nix build .#namigator-source
 git clone https://github.com/pikdum/thistle_tea.git
 cd thistle_tea
 mix deps.get
@@ -47,6 +47,9 @@ iex -S mix
 ```
 
 More documentation, like platform-specific setup guides, can be found in the [Wiki](https://github.com/pikdum/thistle_tea/wiki).
+
+Existing navigation bakes need [WMO group metadata](docs/terrain-interiors.md)
+for indoor and outdoor queries. New bakes include it automatically.
 
 ## databases
 

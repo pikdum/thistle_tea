@@ -147,6 +147,16 @@ std::optional<ZoneAndArea> get_zone_and_area_native(ErlNifEnv *,
 }
 FINE_NIF(get_zone_and_area_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
 
+std::optional<bool> outdoors_native(ErlNifEnv *, MapResource map, double x,
+                                   double y, double z) {
+  if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z)) {
+    return std::nullopt;
+  }
+  auto lock = map->acquire_shared();
+  return map->get()->IsOutdoors({f(x), f(y), f(z)});
+}
+FINE_NIF(outdoors_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
+
 std::optional<Point3>
 find_random_point_around_circle_native(ErlNifEnv *, MapResource map, double x,
                                        double y, double z, double radius) {

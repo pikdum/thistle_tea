@@ -1,0 +1,517 @@
+--- a/parser/Wmo/Wmo.hpp
++++ b/parser/Wmo/Wmo.hpp
+@@ -24,6 +24,7 @@
+ 
+     std::vector<math::Vertex> Vertices;
+     std::vector<std::int32_t> Indices;
++    std::vector<std::uint32_t> VertexGroupFlags;
+ 
+     std::vector<math::Vertex> LiquidVertices;
+     std::vector<std::int32_t> LiquidIndices;
+@@ -35,4 +36,4 @@
+ 
+     Wmo(const std::string& path);
+ };
+-} // namespace parser
+\ No newline at end of file
++} // namespace parser
+--- a/parser/Wmo/Wmo.cpp
++++ b/parser/Wmo/Wmo.cpp
+@@ -209,6 +209,7 @@
+                 // add the Vector3
+                 Vertices.push_back(
+                     groupFiles[g]->VerticesChunk->Vertices[vertexIndex]);
++                VertexGroupFlags.push_back(groupFiles[g]->Flags);
+             }
+         }
+ 
+@@ -314,4 +315,4 @@
+ 
+     return std::make_shared<const Doodad>(name);
+ }
+-} // namespace parser
+\ No newline at end of file
++} // namespace parser
+--- a/utility/WmoGroupFlags.hpp
++++ b/utility/WmoGroupFlags.hpp
+@@ -0,0 +1,89 @@
++#pragma once
++
++#include "AABBTree.hpp"
++#include "BinaryStream.hpp"
++
++#include <cstdint>
++#include <filesystem>
++#include <fstream>
++#include <stdexcept>
++#include <vector>
++
++namespace utility
++{
++namespace wmo
++{
++constexpr std::uint32_t GroupFlagsMagic = 0x31464757;
++
++inline std::filesystem::path GroupFlagsPath(const std::filesystem::path& bvh)
++{
++    return bvh.string() + ".groups";
++}
++
++inline std::uint64_t GeometryHash(const math::AABBTree& tree)
++{
++    std::uint64_t hash = 14695981039346656037ULL;
++    auto append = [&hash](const void* data, std::size_t size) {
++        auto bytes = static_cast<const unsigned char*>(data);
++        for (std::size_t i = 0; i < size; ++i)
++        {
++            hash ^= bytes[i];
++            hash *= 1099511628211ULL;
++        }
++    };
++    append(tree.Vertices().data(), tree.Vertices().size() * sizeof(math::Vector3));
++    append(tree.Indices().data(), tree.Indices().size() * sizeof(int));
++    return hash;
++}
++
++inline std::vector<std::uint32_t> ReadGroupFlags(const std::filesystem::path& bvh,
++                                               const math::AABBTree& tree)
++{
++    auto const path = GroupFlagsPath(bvh);
++    if (!std::filesystem::exists(path))
++        return {};
++
++    BinaryStream input(path);
++    if (input.wpos() < 16)
++        throw std::runtime_error("Truncated WMO group metadata: " + path.string());
++
++    std::uint32_t magic, count;
++    std::uint64_t hash;
++    input >> magic >> count >> hash;
++    auto const faceCount = tree.Indices().size() / 3;
++    if (magic != GroupFlagsMagic || count != faceCount || hash != GeometryHash(tree) ||
++        input.wpos() != 16 + sizeof(std::uint32_t) * faceCount)
++        throw std::runtime_error("Invalid WMO group metadata: " + path.string());
++
++    std::vector<std::uint32_t> flags(count);
++    for (auto& value : flags)
++        input >> value;
++    return flags;
++}
++
++inline void WriteGroupFlags(const std::filesystem::path& bvh,
++                           const math::AABBTree& tree,
++                           const std::vector<std::uint32_t>& vertexFlags)
++{
++    BinaryStream output;
++    auto const& indices = tree.Indices();
++    output << GroupFlagsMagic << static_cast<std::uint32_t>(indices.size() / 3) << GeometryHash(tree);
++    for (std::size_t i = 0; i < indices.size(); i += 3)
++    {
++        auto const flags = vertexFlags.at(indices[i]);
++        if (flags != vertexFlags.at(indices[i + 1]) || flags != vertexFlags.at(indices[i + 2]))
++            throw std::runtime_error("WMO triangle crosses group metadata");
++        output << flags;
++    }
++
++    auto const path = GroupFlagsPath(bvh);
++    auto const temporary = path.string() + ".tmp";
++    std::ofstream file(temporary, std::ios::binary | std::ios::trunc);
++    file << output;
++    file.close();
++    if (!file)
++        throw std::runtime_error("Could not write WMO group metadata: " + temporary);
++    std::filesystem::rename(temporary, path);
++}
++}
++}
+--- a/utility/CMakeLists.txt
++++ b/utility/CMakeLists.txt
+@@ -12,6 +12,12 @@
+ 
+ target_include_directories(utility PUBLIC ..)
+ 
++if(BUILD_TESTING)
++    add_executable(WmoGroupFlagsTests WmoGroupFlagsTests.cpp)
++    target_link_libraries(WmoGroupFlagsTests PRIVATE utility ${FILESYSTEM_LIBRARY})
++    add_test(NAME WmoGroupFlagsTests COMMAND WmoGroupFlagsTests)
++endif()
++
+ if (NAMIGATOR_BUILD_C_API)
+     install(TARGETS utility ARCHIVE DESTINATION lib)
+ endif()
+--- a/utility/WmoGroupFlagsTests.cpp
++++ b/utility/WmoGroupFlagsTests.cpp
+@@ -0,0 +1,90 @@
++#include "WmoGroupFlags.hpp"
++
++#include <chrono>
++#include <fstream>
++#include <iostream>
++#include <stdexcept>
++#include <string>
++
++namespace
++{
++void Require(bool condition, const char* message)
++{
++    if (!condition)
++        throw std::runtime_error(message);
++}
++
++template<typename F>
++void Reject(F action, const char* message)
++{
++    try
++    {
++        action();
++    }
++    catch (const std::exception&)
++    {
++        return;
++    }
++    throw std::runtime_error(message);
++}
++
++void Verify(const std::filesystem::path& path)
++{
++    std::vector<math::Vertex> vertices {
++        {3, -1, 0}, {5, -1, 0}, {4, 1, 0},
++        {-5, -1, 0}, {-3, -1, 0}, {-4, 1, 0}
++    };
++    std::vector<int> indices {0, 1, 2, 3, 4, 5};
++    math::AABBTree tree(vertices, indices);
++    Require(utility::wmo::ReadGroupFlags(path, tree).empty(), "Legacy geometry must have unknown group flags");
++
++    utility::wmo::WriteGroupFlags(path, tree, {0x8000, 0x8000, 0x8000, 0x2000, 0x2000, 0x2000});
++    auto const flags = utility::wmo::ReadGroupFlags(path, tree);
++    Require(flags.size() == 2, "Metadata must contain both faces");
++
++    for (auto x : {-4.0f, 4.0f})
++    {
++        math::Ray ray {{x, 0, 1}, {x, 0, -1}};
++        unsigned int face;
++        Require(tree.IntersectRay(ray, &face), "Expected fixture floor");
++        Require(flags.at(face) == (x > 0 ? 0x8000u : 0x2000u), "Group flags must follow reordered collision faces");
++    }
++
++    utility::BinaryStream binary;
++    tree.Serialize(binary);
++    math::AABBTree loaded;
++    Require(loaded.Deserialize(binary), "Geometry roundtrip failed");
++    Require(utility::wmo::ReadGroupFlags(path, loaded) == flags, "Metadata must survive geometry roundtrip");
++
++    vertices[0].Z = 1;
++    math::AABBTree changed(vertices, indices);
++    Reject([&] { utility::wmo::ReadGroupFlags(path, changed); }, "Stale geometry metadata was accepted");
++    Reject([&] { utility::wmo::WriteGroupFlags(path, tree, {0, 0x8000, 0x8000, 0, 0, 0}); }, "Mixed-group face was accepted");
++    Require(utility::wmo::ReadGroupFlags(path, tree) == flags, "Rejected write changed valid metadata");
++
++    auto const metadata = utility::wmo::GroupFlagsPath(path);
++    std::filesystem::resize_file(metadata, 1);
++    Reject([&] { utility::wmo::ReadGroupFlags(path, tree); }, "Truncated header was accepted");
++    utility::wmo::WriteGroupFlags(path, tree, {0, 0, 0, 0, 0, 0});
++    std::filesystem::resize_file(metadata, 20);
++    Reject([&] { utility::wmo::ReadGroupFlags(path, tree); }, "Truncated face metadata was accepted");
++}
++}
++
++int main()
++{
++    auto const nonce = std::chrono::steady_clock::now().time_since_epoch().count();
++    auto const directory = std::filesystem::temp_directory_path() / ("namigator-wmo-test-" + std::to_string(nonce));
++    std::filesystem::create_directory(directory);
++    try
++    {
++        Verify(directory / "fixture.bvh");
++        std::filesystem::remove_all(directory);
++        return 0;
++    }
++    catch (const std::exception& error)
++    {
++        std::cerr << error.what() << " in " << directory << std::endl;
++        return 1;
++    }
++}
+--- a/MapBuilder/MeshBuilder.cpp
++++ b/MapBuilder/MeshBuilder.cpp
+@@ -1,4 +1,5 @@
+ #include "MeshBuilder.hpp"
++#include "utility/WmoGroupFlags.hpp"
+ 
+ #include "BVHConstructor.hpp"
+ #include "Common.hpp"
+@@ -1460,6 +1461,10 @@
+ 
+     std::ofstream of(path, std::ofstream::binary | std::ofstream::trunc);
+     of << o;
++    of.close();
++    if (!of)
++        throw std::runtime_error("Could not write WMO geometry: " + path.string());
++    utility::wmo::WriteGroupFlags(path, aabbTree, wmo.VertexGroupFlags);
+ }
+ 
+ void SerializeDoodad(const parser::Doodad& doodad, const fs::path& path)
+@@ -1472,4 +1477,4 @@
+     std::ofstream of(path, std::ofstream::binary | std::ofstream::trunc);
+     of << doodadOut;
+ }
+-} // namespace meshfiles
+\ No newline at end of file
++} // namespace meshfiles
+--- a/MapBuilder/WmoMetadata.hpp
++++ b/MapBuilder/WmoMetadata.hpp
+@@ -0,0 +1,62 @@
++#pragma once
++
++#include "parser/MpqManager.hpp"
++#include "parser/Wmo/Wmo.hpp"
++#include "utility/AABBTree.hpp"
++#include "utility/BinaryStream.hpp"
++#include "utility/String.hpp"
++#include "utility/WmoGroupFlags.hpp"
++
++#include <filesystem>
++#include <iostream>
++#include <stdexcept>
++
++inline void UpdateWmoMetadata(const std::filesystem::path& data,
++                             const std::filesystem::path& output)
++{
++    auto const directory = output / "BVH";
++    auto const indexPath = directory / "bvh.idx";
++    if (!std::filesystem::is_regular_file(indexPath))
++        throw std::runtime_error("Existing BVH index required: " + indexPath.string());
++
++    parser::sMpqManager.Initialize(data);
++    utility::BinaryStream index(indexPath);
++    std::uint32_t count;
++    index >> count;
++    std::uint32_t updated = 0;
++    std::uint32_t missing = 0;
++
++    for (std::uint32_t i = 0; i < count; ++i)
++    {
++        std::uint32_t size;
++        index >> size;
++        auto const mpq = index.ReadString(size);
++        index >> size;
++        auto const filename = index.ReadString(size);
++        if (utility::lower(std::filesystem::path(mpq).extension().string()) != ".wmo")
++            continue;
++
++        auto const path = directory / filename;
++        if (!std::filesystem::is_regular_file(path))
++        {
++            ++missing;
++            continue;
++        }
++        utility::BinaryStream input(path);
++        math::AABBTree tree;
++        if (!tree.Deserialize(input))
++            throw std::runtime_error("Invalid existing WMO: " + path.string());
++
++        parser::Wmo wmo(mpq);
++        if (tree.Vertices() != wmo.Vertices)
++            throw std::runtime_error("WMO client geometry differs from existing bake: " + mpq);
++
++        utility::wmo::WriteGroupFlags(path, tree, wmo.VertexGroupFlags);
++        ++updated;
++        if (updated % 50 == 0)
++            std::cout << "Updated " << updated << " WMO metadata files" << std::endl;
++    }
++
++    std::cout << "Updated " << updated << " WMO metadata files" << std::endl;
++    std::cout << "Skipped " << missing << " unbaked WMO index entries" << std::endl;
++}
+--- a/MapBuilder/main.cpp
++++ b/MapBuilder/main.cpp
+@@ -1,6 +1,7 @@
+ #include "GameObjectBVHBuilder.hpp"
+ #include "MeshBuilder.hpp"
+ #include "Worker.hpp"
++#include "WmoMetadata.hpp"
+ #include "parser/Adt/Adt.hpp"
+ #include "parser/MpqManager.hpp"
+ #include "parser/Wmo/WmoInstance.hpp"
+@@ -28,6 +29,7 @@
+     o << "  -d/--data <data directory>     -- Path to data directory from "
+          "which to draw input geometry\n";
+     o << "  -m/--map <map name>            -- Which map to produce data for\n";
++    o << "  --wmo-metadata                -- Add group metadata to existing WMO collision files\n";
+     o << "  -b/--bvh                       -- Build line of sight (BVH) data "
+          "for all models eligible for spawning by the server\n";
+     o << "  -g/--gocsv <go csv file>       -- Path to CSV file containing game "
+@@ -50,7 +52,7 @@
+ {
+     std::string dataPath, map, outputPath, goCSVPath;
+     int adtX = -1, adtY = -1, threads = 1, logLevel;
+-    bool bvh = false;
++    bool bvh = false, wmoMetadata = false;
+ 
+     try
+     {
+@@ -64,6 +66,11 @@
+                 bvh = true;
+                 continue;
+             }
++            else if (arg == "--wmo-metadata")
++            {
++                wmoMetadata = true;
++                continue;
++            }
+             else if (arg == "-h" || arg == "--help")
+             {
+                 // when this is requested, don't do anything else
+@@ -110,7 +117,7 @@
+         return EXIT_FAILURE;
+     }
+ 
+-    if (!bvh && map.empty())
++    if (!bvh && !wmoMetadata && map.empty())
+     {
+         std::cerr << "ERROR: Must specify either a map to generate (--map) or "
+                      "the global generation of BVH data (--bvh)"
+@@ -134,6 +141,12 @@
+ 
+     try
+     {
++        if (wmoMetadata)
++        {
++            UpdateWmoMetadata(dataPath, outputPath);
++            return EXIT_SUCCESS;
++        }
++
+         files::create_bvh_output_directory(outputPath);
+ 
+         if (bvh)
+@@ -287,4 +300,4 @@
+               << " tiles) in " << runTime << " seconds." << std::endl;
+ 
+     return EXIT_SUCCESS;
+-}
+\ No newline at end of file
++}
+--- a/pathfind/Model.hpp
++++ b/pathfind/Model.hpp
+@@ -37,6 +37,7 @@
+ // only loaded as needed
+ struct WmoModel : Model
+ {
++    std::vector<std::uint32_t> m_triangleGroupFlags;
+     std::vector<std::vector<DoodadInstance>> m_doodadSets;
+     std::vector<std::vector<std::shared_ptr<DoodadModel>>> m_loadedDoodadSets;
+     std::unordered_map<unsigned int, std::pair<unsigned int, unsigned int>>
+@@ -54,4 +55,4 @@
+     std::string m_modelFilename;
+     std::weak_ptr<WmoModel> m_model;
+ };
+-} // namespace pathfind
+\ No newline at end of file
++} // namespace pathfind
+--- a/pathfind/Map.hpp
++++ b/pathfind/Map.hpp
+@@ -11,6 +11,7 @@
+ 
+ #include <filesystem>
+ #include <memory>
++#include <optional>
+ #include <string>
+ #include <unordered_map>
+ #include <vector>
+@@ -104,7 +105,8 @@
+     bool RayCast(math::Ray& ray, bool doodads) const;
+     bool RayCast(math::Ray& ray, const std::vector<const Tile*>& tiles,
+                  bool doodads, unsigned int* zone = nullptr,
+-                 unsigned int* area = nullptr) const;
++                 unsigned int* area = nullptr,
++                 std::optional<std::uint32_t>* groupFlags = nullptr) const;
+ 
+     // TODO: need mechanism to cleanup expired weak pointers saved in the
+     // containers of this class
+@@ -159,6 +161,8 @@
+     bool ZoneAndArea(const math::Vertex& position, unsigned int& zone,
+                      unsigned int& area) const;
+ 
++    std::optional<bool> IsOutdoors(const math::Vertex& position) const;
++
+     // Returns true when there is line of sight from the start position to
+     // the stop position.  The intended use of this is for spells and NPC
+     // aggro, so doodads and temporary obstacles will be ignored.
+--- a/pathfind/Map.cpp
++++ b/pathfind/Map.cpp
+@@ -1,4 +1,5 @@
+ #include "Map.hpp"
++#include "utility/WmoGroupFlags.hpp"
+ 
+ #include "Common.hpp"
+ #include "NearestPolyQuery.hpp"
+@@ -383,6 +384,9 @@
+     if (!model->m_aabbTree.Deserialize(in))
+         THROW(Result::COULD_NOT_DESERIALIZE_WMO).ErrorCode();
+ 
++    model->m_triangleGroupFlags = utility::wmo::ReadGroupFlags(
++        bvhFilename, model->m_aabbTree);
++
+     std::uint32_t rootId, nameSetCount;
+     in >> rootId >> nameSetCount;
+ 
+@@ -1056,6 +1060,29 @@
+     return true;
+ }
+ 
++std::optional<bool> Map::IsOutdoors(const math::Vertex& position) const
++{
++    auto const tile = GetTile(position.X, position.Y);
++    if (!tile)
++        return std::nullopt;
++
++    math::Vertex origin {position.X, position.Y, position.Z + 1.0f};
++    math::Ray ray {origin, {origin.X, origin.Y, tile->m_bounds.getMinimum().Z - 1.0f}};
++    std::optional<std::uint32_t> flags;
++    auto const hit = RayCast(ray, {tile}, false, nullptr, nullptr, &flags);
++
++    float height;
++    if (GetADTHeight(tile, origin.X, origin.Y, height) &&
++        origin.Z + 2.0f > height && height > ray.GetHitPoint().Z)
++        return true;
++
++    if (!hit)
++        return true;
++    if (!flags)
++        return std::nullopt;
++    return (*flags & 0x8000) != 0;
++}
++
+ bool Map::ZoneAndArea(const math::Vertex& position, unsigned int& zone,
+                       unsigned int& area) const
+ {
+@@ -1132,7 +1159,8 @@
+ }
+ 
+ bool Map::RayCast(math::Ray& ray, const std::vector<const Tile*>& tiles,
+-                  bool doodads, unsigned int* zone, unsigned int* area) const
++                  bool doodads, unsigned int* zone, unsigned int* area,
++                  std::optional<std::uint32_t>* groupFlags) const
+ {
+     auto const& start = ray.GetStartPoint();
+     auto const& end = ray.GetEndPoint();
+@@ -1179,12 +1207,18 @@
+             // if this is a closer hit, update the original ray's distance
+             if (auto model = instance.m_model.lock())
+             {
+-                if (model->m_aabbTree.IntersectRay(rayInverse) &&
++                unsigned int face;
++                if (model->m_aabbTree.IntersectRay(rayInverse, &face) &&
+                     rayInverse.GetDistance() < ray.GetDistance())
+                 {
+                     hit = true;
+                     ray.SetHitPoint(rayInverse.GetDistance());
+ 
++                    if (groupFlags)
++                        *groupFlags = face < model->m_triangleGroupFlags.size()
++                            ? std::optional<std::uint32_t>(model->m_triangleGroupFlags[face])
++                            : std::nullopt;
++
+                     if (area)
+                         *area = AreaZoneForNameSet(*model, instance.m_nameSet).first;
+                     if (zone)

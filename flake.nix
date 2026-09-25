@@ -50,6 +50,11 @@
         let
           pkgs = pkgsFor system;
 
+          namigator-source = import ./nix/namigator-source.nix {
+            inherit pkgs;
+            src = namigator-src;
+          };
+
           mangos-map-extractor = pkgs.stdenv.mkDerivation {
             pname = "mangos-map-extractor";
             version = "mangoszero-${builtins.substring 0 7 mangoszero-server.rev}";
@@ -164,13 +169,15 @@
           namigator-mapbuilder = pkgs.stdenv.mkDerivation {
             pname = "namigator-mapbuilder";
             version = "pikdum-${builtins.substring 0 7 namigator-src.rev}";
-            src = namigator-src;
+            src = namigator-source;
 
             nativeBuildInputs = [ pkgs.cmake ];
             buildInputs = [
               pkgs.zlib
               pkgs.bzip2
             ];
+
+            doCheck = true;
 
             cmakeFlags = [
               "-DNAMIGATOR_BUILD_PYTHON=OFF"
@@ -429,7 +436,7 @@
               cp -r ${thistle-tea-node-modules}/node_modules assets/node_modules
             '';
 
-            NAMIGATOR_SRC = namigator-src;
+            NAMIGATOR_SRC = namigator-source;
 
             preConfigure = ''
               export HOME=$TMPDIR
@@ -474,6 +481,7 @@
             vmangos-db
             dbc-db
             namigator-mapbuilder
+            namigator-source
             maps
             thistle-tea-node-modules
             thistle-tea

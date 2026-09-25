@@ -10,7 +10,10 @@
   dotenv.enable = true;
 
   env.MIX_OS_DEPS_COMPILE_PARTITION_COUNT = 4;
-  env.NAMIGATOR_SRC = inputs.namigator.outPath;
+  env.NAMIGATOR_SRC = import ./nix/namigator-source.nix {
+    inherit pkgs;
+    src = inputs.namigator.outPath;
+  };
 
   # https://devenv.sh/packages/
   packages = [
