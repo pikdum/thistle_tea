@@ -39,7 +39,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackSpeed do
     {amounts, slow} =
       for %Holder{} = holder <- holders || [],
           %Aura{type: type, amount: amount} <- holder.auras,
-          applies?(type, hand) and is_number(amount),
+          applies?(type, hand, unit) and is_number(amount),
           reduce: {[], 0} do
         {amounts, slow} ->
           amount = amount * max(holder.stacks || 1, 1)
@@ -54,20 +54,28 @@ defmodule ThistleTea.Game.Entity.Logic.AttackSpeed do
     Enum.reduce([slow | amounts], equipment_multiplier(unit, hand), &(&2 * factor(&1)))
   end
 
-  defp applies?(:mod_attack_speed, _hand), do: true
-  defp applies?(:mod_melee_haste, hand), do: hand in [:mainhand, :offhand]
-  defp applies?(:mod_ranged_haste, :ranged), do: true
-  defp applies?(_type, _hand), do: false
+  defp applies?(:mod_attack_speed, _hand, _unit), do: true
+  defp applies?(:mod_melee_haste, hand, _unit), do: hand in [:mainhand, :offhand]
+  defp applies?(:mod_ranged_haste, :ranged, _unit), do: true
+  defp applies?(:mod_ranged_ammo_haste, :ranged, unit), do: ammunition_weapon?(unit)
+  defp applies?(_type, _hand, _unit), do: false
 
   defp exclusive_slow?(%Holder{spell: %Spell{} = spell}, :mod_melee_haste, amount),
     do: amount < 0 and not Spell.attribute?(spell, :passive)
 
   defp exclusive_slow?(_holder, _type, _amount), do: false
 
-  defp equipment_multiplier(%Unit{equipment_bonuses: bonuses}, :ranged) when is_map(bonuses),
-    do: factor(Map.get(bonuses, :ranged_haste, 0))
+  defp equipment_multiplier(%Unit{equipment_bonuses: bonuses} = unit, :ranged) when is_map(bonuses) do
+    ammo_haste = if ammunition_weapon?(unit), do: Map.get(bonuses, :ranged_ammo_haste, 0), else: 0
+    factor(Map.get(bonuses, :ranged_haste, 0)) * factor(ammo_haste)
+  end
 
   defp equipment_multiplier(_unit, _hand), do: 1.0
+
+  defp ammunition_weapon?(%Unit{ranged_weapon: %{ammo_type: type}} = unit) when is_integer(type) and type > 0,
+    do: not AttackPower.creature?(unit)
+
+  defp ammunition_weapon?(_unit), do: false
 
   defp factor(amount) when amount >= 0, do: 100 / (100 + amount)
   defp factor(amount), do: (100 - amount) / 100

@@ -107,10 +107,12 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
       }
 
       get_spell = fn 29_414 ->
-        %Spell{effects: [%Effect{type: :apply_aura, aura: :mod_ranged_haste, base_points: 14}]}
+        %Spell{effects: [%Effect{type: :apply_aura, aura: :mod_ranged_ammo_haste, base_points: 15}]}
       end
 
-      assert EquipmentStats.bonuses([quiver], get_spell).ranged_haste == 14
+      bonuses = EquipmentStats.bonuses([quiver], get_spell)
+      assert bonuses.ranged_ammo_haste == 15
+      assert bonuses.ranged_haste == 0
     end
   end
 

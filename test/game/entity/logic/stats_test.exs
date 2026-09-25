@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Spell
 
@@ -339,7 +340,8 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
           ranged_attack_time: 2800,
           base_ranged_min_damage: 20.0,
           base_ranged_max_damage: 30.0,
-          equipment_bonuses: %{ranged_haste: 14}
+          ranged_weapon: %ItemTemplate{ammo_type: 2, subclass: 2},
+          equipment_bonuses: %{ranged_ammo_haste: 14}
       }
 
       recomputed = recompute(unit)

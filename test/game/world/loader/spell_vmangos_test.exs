@@ -561,7 +561,7 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert %Effect{type: :summon_totem, summon_slot: 1, misc_value: 2523} =
                Enum.find(SpellLoader.load(3599).effects, &(&1.type == :summon_totem))
 
-      assert Enum.any?(SpellLoader.load(29_414).effects, &(&1.aura == :mod_ranged_haste))
+      assert Enum.any?(SpellLoader.load(29_414).effects, &(&1.aura == :mod_ranged_ammo_haste))
       assert SpellLoader.load(768).exclusive_category == :shapeshift
       assert SpellLoader.load(13_163).exclusive_category == :hunter_aspect
       assert SpellLoader.load(13_161).exclusive_category == :hunter_aspect

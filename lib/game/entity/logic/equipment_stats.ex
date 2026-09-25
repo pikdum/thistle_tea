@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
                 :attack_power,
                 :ranged_attack_power,
                 :ranged_haste,
+                :ranged_ammo_haste,
                 :shields,
                 :block_chance,
                 :shield_block,
@@ -156,6 +157,9 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
 
       %Effect{type: :apply_aura, aura: :mod_ranged_haste} = effect, acc ->
         add(acc, :ranged_haste, Effect.damage_roll(effect))
+
+      %Effect{type: :apply_aura, aura: :mod_ranged_ammo_haste} = effect, acc ->
+        add(acc, :ranged_ammo_haste, Effect.damage_roll(effect))
 
       %Effect{type: :apply_aura, aura: :mod_shield_block_value} = effect, acc ->
         add(acc, :shield_block, Effect.damage_roll(effect))

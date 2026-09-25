@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentSpells do
     :mod_ranged_attack_power,
     :mod_target_resistance,
     :mod_ranged_haste,
+    :mod_ranged_ammo_haste,
     :mod_shield_block_value,
     :mod_block_percent
   ]

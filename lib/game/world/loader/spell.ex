@@ -817,7 +817,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(138), do: :mod_melee_haste
   defp aura_type(139), do: :force_reaction
   defp aura_type(140), do: :mod_ranged_haste
-  defp aura_type(141), do: :mod_ranged_haste
+  defp aura_type(141), do: :mod_ranged_ammo_haste
   defp aura_type(142), do: :mod_base_resistance_percent
   defp aura_type(143), do: :mod_resistance_exclusive
   defp aura_type(144), do: :safe_fall

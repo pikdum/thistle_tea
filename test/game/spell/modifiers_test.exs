@@ -139,6 +139,7 @@ defmodule ThistleTea.Game.Spell.ModifiersTest do
             {:mod_attack_speed, [3]},
             {:mod_melee_haste, [3]},
             {:mod_ranged_haste, [3]},
+            {:mod_ranged_ammo_haste, [3]},
             {:mod_casting_speed, [3]},
             {:mod_stat, []}
           ] do

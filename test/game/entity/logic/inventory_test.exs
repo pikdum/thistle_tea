@@ -423,6 +423,43 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
   end
 
   describe "auto_equip/6" do
+    test "limits equipped ammunition bags while allowing replacement and storage", %{unit: unit} do
+      assert Inventory.error_code(:can_equip_only_one_quiver) == 33
+      assert Inventory.error_code(:can_equip_only_one_ammo_pouch) == 42
+
+      for {subclass, error} <- [{2, :can_equip_only_one_quiver}, {3, :can_equip_only_one_ammo_pouch}] do
+        template = %ItemTemplate{entry: 990, class: 11, subclass: subclass, inventory_type: 18, container_slots: 6}
+        existing = build_item(98, template)
+        incoming = build_item(99, %{template | entry: 991, subclass: 5 - subclass})
+        player = %Player{bag1: existing.object.guid, inv1: incoming.object.guid, bank_bag_slots: 1}
+        get_item = get_item_fn([existing, incoming])
+
+        assert {:error, ^error, _, _} =
+                 Inventory.auto_equip(player, unit, @prof, @owner, {@bag_0, @backpack_start}, get_item)
+
+        assert {:error, ^error, _, _} =
+                 Inventory.swap(player, unit, @prof, @owner, {@bag_0, @backpack_start}, {@bag_0, 20}, get_item)
+
+        assert {:ok, replacement} =
+                 Inventory.swap(player, unit, @prof, @owner, {@bag_0, @backpack_start}, {@bag_0, 19}, get_item)
+
+        assert replacement.player.bag1 == incoming.object.guid
+        assert replacement.player.inv1 == existing.object.guid
+
+        assert {:ok, moved} =
+                 Inventory.swap(player, unit, @prof, @owner, {@bag_0, 19}, {@bag_0, 20}, get_item)
+
+        assert moved.player.bag1 == 0
+        assert moved.player.bag2 == existing.object.guid
+
+        assert {:ok, banked} =
+                 Inventory.swap(player, unit, @prof, @owner, {@bag_0, @backpack_start}, {@bag_0, 63}, get_item)
+
+        assert banked.player.bag1 == existing.object.guid
+        assert banked.player.bank_bag1 == incoming.object.guid
+      end
+    end
+
     test "enforces earned rank in automatic and explicit equipment placement", %{unit: unit} do
       template = %ItemTemplate{entry: 15_196, inventory_type: 19, required_honor_rank: 5, bonding: 2}
       item = build_item(99, template)

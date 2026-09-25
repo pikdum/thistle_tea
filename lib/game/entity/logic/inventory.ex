@@ -101,12 +101,14 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     not_a_bag: 30,
     can_only_do_with_empty_bags: 31,
     dont_own_that_item: 32,
+    can_equip_only_one_quiver: 33,
     must_purchase_that_bag_slot: 34,
     too_far_away_from_bank: 35,
     item_locked: 36,
     you_are_dead: 38,
     cant_do_right_now: 39,
     int_bag_error: 40,
+    can_equip_only_one_ammo_pouch: 42,
     stackable_cant_be_wrapped: 43,
     equipped_cant_be_wrapped: 44,
     wrapped_cant_be_wrapped: 45,
@@ -1008,7 +1010,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
         validate_equipment_placement(ctx, template, slot)
 
       bag_slot?(slot) ->
-        if template.inventory_type == @invtype_bag, do: :ok, else: {:error, :not_a_bag}
+        validate_bag_placement(ctx, item, template, slot)
 
       bank_bag_slot?(slot) ->
         validate_bank_bag_placement(ctx, item, template, slot)
@@ -1020,6 +1022,24 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
         {:error, :item_doesnt_go_to_slot}
     end
   end
+
+  defp validate_bag_placement(ctx, item, %ItemTemplate{inventory_type: @invtype_bag, class: 11}, slot) do
+    existing =
+      for other_slot <- @bag_slots -- [slot],
+          %Item{} = other <- [item_at(ctx, {@bag_0, other_slot})],
+          other.object.guid != item.object.guid,
+          %ItemTemplate{class: 11} = template <- [Item.template(other)],
+          do: template
+
+    case List.first(existing) do
+      %ItemTemplate{subclass: 3} -> {:error, :can_equip_only_one_ammo_pouch}
+      %ItemTemplate{} -> {:error, :can_equip_only_one_quiver}
+      nil -> :ok
+    end
+  end
+
+  defp validate_bag_placement(_ctx, _item, %ItemTemplate{inventory_type: @invtype_bag}, _slot), do: :ok
+  defp validate_bag_placement(_ctx, _item, _template, _slot), do: {:error, :not_a_bag}
 
   defp validate_bank_bag_placement(ctx, item, template, slot) do
     cond do

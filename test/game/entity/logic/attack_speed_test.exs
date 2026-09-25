@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackSpeedTest do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.AttackSpeed
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Stats
@@ -77,9 +78,47 @@ defmodule ThistleTea.Game.Entity.Logic.AttackSpeedTest do
 
     test "quivers and ranged auras multiply without reducing shot damage", %{unit: unit} do
       base = Stats.recompute(unit)
-      hasted = Stats.recompute(%{unit | equipment_bonuses: %{ranged_haste: 15}, auras: [holder(:mod_ranged_haste, 40)]})
+
+      hasted =
+        Stats.recompute(%{unit | equipment_bonuses: %{ranged_ammo_haste: 15}, auras: [holder(:mod_ranged_haste, 40)]})
+
       assert hasted.ranged_attack_time == trunc(3_000 / 1.15 / 1.4)
       assert hasted.min_ranged_damage == base.min_ranged_damage
+    end
+
+    test "ammunition haste follows bow, gun, thrown, wand, and unequipped transitions", %{unit: unit} do
+      quiver = %{unit | equipment_bonuses: %{ranged_ammo_haste: 15}}
+      aura = %{unit | auras: [holder(:mod_ranged_ammo_haste, 15)]}
+
+      for source <- [quiver, aura] do
+        for {weapon, expected} <- [
+              {%ItemTemplate{ammo_type: 2, subclass: 2}, 2_608},
+              {%ItemTemplate{ammo_type: 3, subclass: 3}, 2_608},
+              {%ItemTemplate{ammo_type: 4, subclass: 16}, 2_608},
+              {%ItemTemplate{ammo_type: 0, subclass: 19}, 3_000},
+              {nil, 3_000}
+            ] do
+          changed = Stats.recompute(%{source | ranged_weapon: weapon})
+          assert changed.ranged_attack_time == expected
+          assert changed.base_ranged_attack_time == 3_000
+          assert Stats.recompute(changed) == changed
+          assert Stats.recompute(%{changed | ranged_weapon: unit.ranged_weapon}).ranged_attack_time == 2_608
+        end
+      end
+
+      creature = %{aura | base_attack_power: 100}
+      assert Stats.recompute(creature).ranged_attack_time == 3_000
+    end
+
+    test "ordinary ranged haste still affects ammunition-free weapons", %{unit: unit} do
+      unit = %{
+        unit
+        | ranged_weapon: %ItemTemplate{ammo_type: 0, subclass: 19},
+          equipment_bonuses: %{ranged_ammo_haste: 15, ranged_haste: 20},
+          auras: [holder(:mod_ranged_haste, 25), holder(:mod_ranged_ammo_haste, 15)]
+      }
+
+      assert Stats.recompute(unit).ranged_attack_time == 2_000
     end
 
     test "forms use their own base period before haste", %{unit: unit} do
@@ -106,6 +145,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackSpeedTest do
         base_melee_attack_time: 2_000,
         base_offhand_attack_time: 1_500,
         base_ranged_attack_time: 3_000,
+        ranged_weapon: %ItemTemplate{ammo_type: 2, subclass: 2},
         base_min_damage: 10.0,
         base_max_damage: 20.0,
         base_offhand_min_damage: 5.0,

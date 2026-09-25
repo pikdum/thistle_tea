@@ -21,7 +21,8 @@ defmodule ThistleTea.Game.Spell.Modifiers do
     mod_attack_speed: :haste,
     mod_casting_speed: :haste,
     mod_melee_haste: :haste,
-    mod_ranged_haste: :haste
+    mod_ranged_haste: :haste,
+    mod_ranged_ammo_haste: :haste
   }
 
   @operations %{

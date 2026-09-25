@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.Loader.EquipmentSpellsDbcTest do
   alias ThistleTea.Game.Spell.ProcRule
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.WorldRef
 
@@ -25,6 +26,50 @@ defmodule ThistleTea.Game.World.Loader.EquipmentSpellsDbcTest do
   setup [:character]
 
   describe "sync_equipment_stats/1" do
+    test "quiver haste follows weapon changes and restores without a duplicate aura", %{character: character} do
+      quiver = %ItemTemplate{
+        entry: 18_714,
+        class: 11,
+        subclass: 2,
+        inventory_type: 18,
+        container_slots: 18,
+        spellid_1: 29_414,
+        spelltrigger_1: 1
+      }
+
+      bow = %ItemTemplate{
+        entry: character.object.guid * 2,
+        class: 2,
+        subclass: 2,
+        inventory_type: 15,
+        ammo_type: 2,
+        delay: 3_000,
+        dmg_min1: 20,
+        dmg_max1: 30
+      }
+
+      wand = %{bow | entry: bow.entry + 1, subclass: 19, inventory_type: 26, ammo_type: 0, delay: 1_500}
+
+      for template <- [bow, wand] do
+        :ets.insert(ItemLoader, {template.entry, template})
+        on_exit(fn -> :ets.delete(ItemLoader, template.entry) end)
+      end
+
+      assert Enum.any?(SpellLoader.load(29_414).effects, &(&1.aura == :mod_ranged_ammo_haste))
+      equipped = character |> equip(:bag1, quiver) |> equip(:ranged, bow) |> Character.sync_equipment_stats()
+      assert equipped.unit.equipment_bonuses.ranged_ammo_haste == 15
+      assert equipped.unit.ranged_attack_time == 2_608
+      assert equipped.unit.auras == []
+      assert Character.sync_equipment_stats(equipped).unit == equipped.unit
+      swapped = equipped |> equip(:ranged, wand) |> Character.sync_equipment_stats()
+      assert swapped.unit.ranged_attack_time == 1_500
+      restored = swapped |> equip(:ranged, bow) |> Character.sync_equipment_stats()
+      assert restored.unit.ranged_attack_time == 2_608
+      removed = Character.sync_equipment_stats(%{restored | player: %{restored.player | bag1: 0}})
+      assert removed.unit.ranged_attack_time == 3_000
+      assert removed.unit.equipment_bonuses.ranged_ammo_haste == 0
+    end
+
     test "loads item crit and dodge and restores them on reconnect", %{character: character} do
       character =
         character
