@@ -71,6 +71,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:remove_aura, spell_id, caster_guid})
   end
 
+  def remove_area_aura(entity, area_guid) do
+    dispatch_cast(entity, {:remove_area_aura, area_guid})
+  end
+
   def remove_spell_auras(entity, spell_ids) when is_list(spell_ids) do
     dispatch_cast(entity, {:remove_spell_auras, spell_ids})
   end

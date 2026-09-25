@@ -537,6 +537,17 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       {:noreply, state}
   end
 
+  def handle_cast({:remove_area_aura, area_guid}, %Mob{} = state) do
+    previous = state
+    {state, events} = Aura.remove_area_aura(state, area_guid, Time.now())
+    state = state |> EventSink.emit(events) |> sync_behavior_tree(previous) |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Area aura removal failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_cast({:remove_spell_auras, spell_ids}, state) when is_list(spell_ids) do
     previous = state
     {state, events} = Aura.remove_spells(state, spell_ids, Time.now())

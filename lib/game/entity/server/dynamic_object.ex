@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.PersistentArea
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AreaEffects
@@ -35,10 +36,14 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
     World.update_position(entity)
     entity = Visibility.join_entity(entity)
 
+    now = Time.now()
+
     state =
       opts
       |> Map.put(:entity, entity)
-      |> Map.put(:expires_at, Time.now() + opts.duration_ms)
+      |> Map.put(:started_at, now)
+      |> Map.put(:expires_at, now + opts.duration_ms)
+      |> Map.put(:recipients, MapSet.new())
 
     Process.send_after(self(), :expire, opts.duration_ms)
 
@@ -58,13 +63,17 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
   end
 
   @impl GenServer
-  def handle_info(:tick, %{entity: entity, tick: tick} = state) do
+  def handle_info(:tick, %{tick: tick} = state) do
     now = Time.now()
 
-    if now < state.expires_at do
-      apply_tick(entity, tick)
-      Process.send_after(self(), :tick, tick.interval_ms)
-    end
+    state =
+      if now < state.expires_at do
+        recipients = apply_tick(state)
+        Process.send_after(self(), :tick, tick.interval_ms)
+        %{state | recipients: MapSet.union(state.recipients, MapSet.new(recipients))}
+      else
+        state
+      end
 
     {:noreply, state}
   rescue
@@ -87,7 +96,11 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
     Visibility.leave_entity(entity)
   end
 
-  def terminate(_reason, %{entity: entity}) do
+  def terminate(_reason, %{entity: entity, recipients: recipients, expires_at: expires_at}) do
+    if Time.now() < expires_at do
+      Enum.each(recipients, &Entity.remove_area_aura(&1, entity.object.guid))
+    end
+
     World.remove_position(entity)
     Visibility.leave_entity(entity)
   end
@@ -101,7 +114,7 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
 
   defp notify_farsight_owner(_entity, _owner_guid), do: nil
 
-  defp apply_tick(%DynamicObject{} = entity, tick) do
+  defp apply_tick(%{entity: entity, tick: tick} = state) do
     %{caster: caster, spell: spell, effect: effect} = tick
     {x, y, z, _o} = entity.movement_block.position
     radius = entity.dynamic_object.radius
@@ -110,35 +123,33 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
       spell
       | cast_time_ms: 0,
         hidden_aura?: not UnitSync.visible?(spell),
-        effects: [%{effect | type: :apply_aura}]
+        effects: [%{effect | type: :apply_aura, semantic: nil}]
     }
 
-    caster
-    |> SpellTargetResolver.resolve_query(tick_spell, {:targeted_aoe, {x, y, z}, radius})
-    |> Enum.each(fn target_guid ->
-      context = %CastContext{
-        caster_guid: caster.object.guid,
-        caster_level: caster_level(caster),
-        target_guid: target_guid,
-        spell: tick_spell
-      }
+    area = %PersistentArea{
+      guid: entity.object.guid,
+      position: {entity.internal.world, x, y, z},
+      radius: radius,
+      started_at: state.started_at,
+      expires_at: state.expires_at
+    }
 
-      Entity.receive_spell(target_guid, context, tick_spell)
+    context = %{CastContext.from_caster(caster, tick_spell, nil) | persistent_area: area}
+    targets = SpellTargetResolver.resolve_query(caster, tick_spell, {:targeted_aoe, {x, y, z}, radius})
+
+    Enum.each(targets, fn target_guid ->
+      Entity.receive_spell(target_guid, %{context | target_guid: target_guid}, tick_spell)
     end)
-  end
 
-  defp caster_level(%{unit: %{level: level}}) when is_integer(level), do: level
-  defp caster_level(_caster), do: 1
+    targets
+  end
 
   def tick_config(caster, %Spell{} = spell, %Effect{} = effect) do
     %{
       caster: caster,
       spell: spell,
       effect: effect,
-      interval_ms: tick_interval(effect)
+      interval_ms: 250
     }
   end
-
-  defp tick_interval(%Effect{amplitude_ms: amp}) when is_integer(amp) and amp > 0, do: amp
-  defp tick_interval(_effect), do: 1_000
 end

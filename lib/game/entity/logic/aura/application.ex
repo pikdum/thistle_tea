@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Spell.Coefficient
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Modifiers
+  alias ThistleTea.Game.Spell.PersistentArea
   alias ThistleTea.Game.Spell.Radius
   alias ThistleTea.Game.Spell.Scripts
 
@@ -79,12 +80,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
           caster_level: context.caster_level,
           caster_faction_template: context.caster_faction_template,
           resistance_penetration: context.resistance_penetration,
-          cast_context: if(Enum.any?(auras, &(&1.type in @context_auras)), do: context),
+          cast_context: if(context.persistent_area || Enum.any?(auras, &(&1.type in @context_auras)), do: context),
           applied_at: now,
-          expires_at: expires_at(now, effective_duration(spell, context)),
+          expires_at: holder_expiry(spell, context, now),
           charges: holder_charges(spell, context.spell_modifiers),
           area_radius: area_radius(spell, context.spell_modifiers),
           next_area_refresh_at: next_area_refresh_at(spell, context, target_guid, now),
+          next_area_check_at: if(context.persistent_area, do: now + 250),
           auras: auras,
           negative?: negative?(spell, auras, context, target_guid)
         }
@@ -514,6 +516,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   defp expires_at(_now, -1), do: -1
   defp expires_at(now, duration_ms) when is_integer(duration_ms), do: now + duration_ms
 
+  defp holder_expiry(_spell, %CastContext{persistent_area: %PersistentArea{expires_at: at}}, _now), do: at
+  defp holder_expiry(spell, context, now), do: expires_at(now, effective_duration(spell, context))
+
   defp effective_duration(%Spell{} = spell, %CastContext{} = context) do
     spell
     |> base_duration(context)
@@ -601,7 +606,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       class_mask: effect.class_mask,
       item_type: effect.item_type,
       amplitude_ms: amplitude_ms,
-      next_tick_at: next_tick(spell, effect, amplitude_ms, now),
+      next_tick_at: next_tick(spell, effect, amplitude_ms, context, now),
       trigger_spell_id: effect.trigger_spell_id
     }
   end
@@ -701,7 +706,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp transfer_multiplier(%Effect{multiple_value: value}, _context), do: value
 
-  defp next_tick(spell, %Effect{} = effect, amplitude_ms, now) do
+  defp next_tick(_spell, %Effect{} = effect, amplitude_ms, %CastContext{persistent_area: %PersistentArea{} = area}, now) do
+    if Effect.periodic?(effect) and is_integer(amplitude_ms) and amplitude_ms > 0,
+      do: PersistentArea.next_tick(area, amplitude_ms, now)
+  end
+
+  defp next_tick(spell, %Effect{} = effect, amplitude_ms, _context, now) do
     if Effect.periodic?(effect) and is_integer(amplitude_ms) and amplitude_ms > 0,
       do: now + Scripts.initial_periodic_delay(spell, amplitude_ms)
   end

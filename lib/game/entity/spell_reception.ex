@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
   alias ThistleTea.Game.Spell.AuraRank
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Combat, as: SpellCombat
+  alias ThistleTea.Game.Spell.PersistentArea
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
@@ -47,8 +48,12 @@ defmodule ThistleTea.Game.Entity.SpellReception do
         else: spell
 
     case spell do
-      nil -> nil
-      spell -> prepare_ranked(target, %{context | spell: spell}, spell, now)
+      nil ->
+        nil
+
+      spell ->
+        if incoming_area_available?(target, context, now),
+          do: prepare_ranked(target, %{context | spell: spell}, spell, now)
     end
   end
 
@@ -149,7 +154,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
     sharing_targets = DamageSharing.targets(target)
 
     for %Holder{} = holder <- holders,
-        periodic_due?(holder, now) or Heartbeat.check_due?(holder, now),
+        periodic_due?(holder, now) or Heartbeat.check_due?(holder, now) or area_check_due?(holder, now),
         into: %{} do
       context =
         holder.cast_context ||
@@ -163,6 +168,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
 
       context = threat_context(target, context, holder.spell)
       context = %{context | damage_sharing_targets: sharing_targets}
+      context = area_context(target, context, now)
 
       context =
         if Heartbeat.check_due?(holder, now),
@@ -184,6 +190,25 @@ defmodule ThistleTea.Game.Entity.SpellReception do
 
   defp periodic_due?(holder, now),
     do: Enum.any?(holder.auras, &(is_integer(&1.next_tick_at) and &1.next_tick_at <= now))
+
+  defp area_check_due?(%Holder{next_area_check_at: at}, now), do: is_integer(at) and at <= now
+
+  defp incoming_area_available?(target, %CastContext{persistent_area: %PersistentArea{} = area}, now) do
+    now < area.expires_at and not is_nil(World.position(area.guid, now)) and
+      PersistentArea.contains?(area, World.position(target, now))
+  end
+
+  defp incoming_area_available?(_target, _context, _now), do: true
+
+  defp area_context(target, %CastContext{persistent_area: %PersistentArea{} = area} = context, now) do
+    available? =
+      (now >= area.expires_at or not is_nil(World.position(area.guid, now))) and
+        PersistentArea.contains?(area, World.position(target, now))
+
+    %{context | area_available?: available?, periodic_hit_roll: Math.random_int(0, 9_999)}
+  end
+
+  defp area_context(_target, context, _now), do: context
 
   def heal(target, %Effects.HealEntity{spell: %Spell{} = spell, amount: amount} = effect) do
     if Death.alive?(target) do
