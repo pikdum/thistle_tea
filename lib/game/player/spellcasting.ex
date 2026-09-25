@@ -372,6 +372,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
         build_target_info(state, spell, targets),
         Time.now(),
         cast_item_guid: cast_item_guid,
+        destination_los?: World.line_of_sight?(character, targets.destination_location),
         count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end,
         equipped_items: equipped_weapon_templates(character),
         spell_focus: focus,

@@ -42,6 +42,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Spell.Battleground
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.CorpseTarget
+  alias ThistleTea.Game.Spell.Destination
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Focus
   alias ThistleTea.Game.Spell.ObjectTargets
@@ -99,7 +100,8 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- Warlock.validate_ritual(spell, Keyword.get(opts, :ritual_context)),
          :ok <- check_reagents(caster, spell, Keyword.get(opts, :count_item)),
          :ok <- check_duel(spell, Keyword.get(opts, :duel_context)),
-         :ok <- CorpseTarget.validate(spell, Keyword.get(opts, :spell_corpse)) do
+         :ok <- CorpseTarget.validate(spell, Keyword.get(opts, :spell_corpse)),
+         :ok <- Destination.validate(caster, spell, targets, Keyword.get(opts, :destination_los?)) do
       if CorpseTarget.required?(spell), do: :ok, else: validate_target(caster, spell, targets, target_info)
     end
   end

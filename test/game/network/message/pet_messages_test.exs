@@ -15,6 +15,8 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Spell.TargetCodec
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
@@ -28,11 +30,43 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
 
   test "pet client messages are registered for dispatch" do
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_ACTION))
+    assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_CAST_SPELL))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_NAME_QUERY))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_RENAME))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_ABANDON))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_SET_ACTION))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_REQUEST_PET_INFO))
+  end
+
+  describe "CMSG_PET_CAST_SPELL" do
+    test "preserves a charmed creature's explicit destination" do
+      guid = Guid.from_low_guid(:mob, 1, 128)
+      Entity.register(guid)
+      on_exit(fn -> Entity.unregister(guid) end)
+      targets = Target.at({12.5, -8.0, 3.0})
+      payload = <<guid::little-size(64), 19_717::little-size(32)>> <> TargetCodec.encode(targets)
+      message = Message.CmsgPetCastSpell.from_binary(payload)
+      character = companion(:charm, guid)
+      state = %{character: character}
+
+      assert Message.CmsgPetCastSpell.handle(message, state) == state
+      controller = character.object.guid
+      assert_receive {:pet_cast, ^controller, 19_717, ^targets}
+    end
+
+    test "decodes self selection relative to the pet and rejects an unowned creature" do
+      guid = Guid.from_low_guid(:mob, 1, 129)
+      Entity.register(guid)
+      on_exit(fn -> Entity.unregister(guid) end)
+      message = Message.CmsgPetCastSpell.from_binary(<<guid::little-size(64), 3110::little-size(32), 0::16>>)
+      state = %{character: companion(:guardian, guid)}
+
+      assert Message.CmsgPetCastSpell.handle(message, state) == state
+      assert_receive {:pet_cast, _, 3110, %Target{selection: {:self, ^guid}}}
+      stranger = %{state | character: companion(:guardian, guid + 1)}
+      assert Message.CmsgPetCastSpell.handle(message, stranger) == stranger
+      refute_receive {:pet_cast, _, _, _}, 0
+    end
   end
 
   describe "CMSG_REQUEST_PET_INFO" do

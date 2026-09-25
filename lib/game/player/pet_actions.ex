@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.Player.PetActions do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Spell.TargetCodec
 
   @act_command 0x07
   @act_reaction 0x06
@@ -24,11 +26,22 @@ defmodule ThistleTea.Game.Player.PetActions do
 
   def handle(%Message.CmsgPetAction{}, state), do: state
 
+  def cast(%{character: %Character{} = character} = state, %Message.CmsgPetCastSpell{} = message) do
+    if Character.controls?(character, message.pet_guid) and Guid.entity_type(message.pet_guid) == :mob do
+      targets = TargetCodec.parse(message.spell_cast_targets, message.pet_guid)
+      dispatch_cast(message.pet_guid, character.object.guid, message.spell_id, targets)
+    end
+
+    state
+  end
+
+  def cast(state, %Message.CmsgPetCastSpell{}), do: state
+
   defp dispatch(pid, controller, %Message.CmsgPetAction{pet_guid: guid} = message) do
     if Guid.entity_type(guid) == :player do
       dispatch_player(pid, controller, message)
     else
-      dispatch_creature(pid, message)
+      dispatch_creature(pid, controller, message)
     end
   end
 
@@ -46,7 +59,7 @@ defmodule ThistleTea.Game.Player.PetActions do
 
   defp dispatch_player(_pid, _controller, _message), do: :ok
 
-  defp dispatch_creature(pid, %Message.CmsgPetAction{
+  defp dispatch_creature(pid, _controller, %Message.CmsgPetAction{
          action_type: @act_command,
          action: action,
          target_guid: target_guid
@@ -54,15 +67,24 @@ defmodule ThistleTea.Game.Player.PetActions do
     send(pid, {:pet_command, command(action), target_guid})
   end
 
-  defp dispatch_creature(pid, %Message.CmsgPetAction{action_type: @act_reaction, action: action}) do
+  defp dispatch_creature(pid, _controller, %Message.CmsgPetAction{action_type: @act_reaction, action: action}) do
     send(pid, {:pet_reaction, reaction(action)})
   end
 
-  defp dispatch_creature(pid, %Message.CmsgPetAction{action: spell_id, target_guid: target_guid}) when spell_id > 0 do
-    send(pid, {:pet_cast, spell_id, target_guid})
+  defp dispatch_creature(pid, controller, %Message.CmsgPetAction{action: spell_id, target_guid: target_guid})
+       when spell_id > 0 do
+    targets = if is_integer(target_guid) and target_guid > 0, do: Target.unit(target_guid), else: Target.none()
+    send(pid, {:pet_cast, controller, spell_id, targets})
   end
 
-  defp dispatch_creature(_pid, _message), do: :ok
+  defp dispatch_creature(_pid, _controller, _message), do: :ok
+
+  defp dispatch_cast(guid, controller, spell_id, targets) do
+    case Entity.pid(guid) do
+      pid when is_pid(pid) -> send(pid, {:pet_cast, controller, spell_id, targets})
+      _ -> :ok
+    end
+  end
 
   defp valid_action?(character, %Message.CmsgPetAction{action_type: @act_command, action: 2, target_guid: target_guid}) do
     cond do

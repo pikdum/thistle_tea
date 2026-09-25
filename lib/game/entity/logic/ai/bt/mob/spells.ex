@@ -164,17 +164,38 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
         %Blackboard{} = blackboard,
         %CreatureSpell{} = entry,
         target_guid,
-        %Context{now: now} = context
+        %Context{} = context
+      )
+      when is_integer(target_guid) and target_guid > 0 do
+    attempt_commanded_cast(state, blackboard, entry, Target.unit(target_guid), context)
+  end
+
+  def attempt_commanded_cast(state, blackboard, entry, targets, context) do
+    attempt_commanded_cast(state, blackboard, entry, targets, context, [])
+  end
+
+  def attempt_commanded_cast(
+        %Mob{} = state,
+        %Blackboard{} = blackboard,
+        %CreatureSpell{} = entry,
+        %Target{} = targets,
+        %Context{now: now} = context,
+        options
       ) do
     spell = lookup_spell(state, entry.spell_id)
+    target_guid = Target.unit_guid(targets)
 
-    with true <- is_integer(target_guid) and not is_nil(spell),
+    with true <- not is_nil(spell),
          true <- flags_allow?(state, entry, target_guid, context),
          {:ok, state} <- release_previous_cast(state, entry),
-         targets = Target.unit(target_guid),
          :ok <-
-           CastValidation.validate(state, spell, targets, build_target_info(state, target_guid, context), now,
-             spell_area: context.spell_area
+           CastValidation.validate(
+             state,
+             spell,
+             targets,
+             build_target_info(state, target_guid, context),
+             now,
+             Keyword.put(options, :spell_area, context.spell_area)
            ) do
       {:ok, {scripted_cast(state, spell, targets, target_guid, context), blackboard}}
     else
@@ -183,6 +204,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
       _ -> {:error, :bad_targets}
     end
   end
+
+  def attempt_commanded_cast(_state, _blackboard, _entry, _targets, _context, _options), do: {:error, :bad_targets}
 
   defp release_previous_cast(%Mob{internal: %Internal{casting: nil}} = state, _entry), do: {:ok, state}
 
@@ -528,6 +551,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     end
   end
 
+  defp build_target_info(%Mob{}, nil, %Context{}), do: nil
   defp build_target_info(%Mob{object: %{guid: guid}}, target_guid, %Context{}) when target_guid == guid, do: :self
 
   defp build_target_info(%Mob{} = state, target_guid, %Context{perception: perception}) do

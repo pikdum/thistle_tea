@@ -19,7 +19,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.SummonEvent
   alias ThistleTea.Game.Entity.EventSink
@@ -32,7 +31,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Guardian, as: GuardianBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.MiniPet
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Passive, as: PassiveBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
@@ -86,6 +84,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Entity.Server.Mob.Flight
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
+  alias ThistleTea.Game.Entity.Server.Mob.PetCasting
   alias ThistleTea.Game.Entity.Server.Mob.Pockets
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
   alias ThistleTea.Game.Entity.Server.Mob.SummonLifecycle
@@ -111,7 +110,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
-  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.System.GameEvent
@@ -1290,22 +1288,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, state, {:continue, :maybe_broadcast}}
   end
 
-  def handle_info(
-        {:pet_cast, spell_id, target_guid},
-        %Mob{internal: %Internal{pet: %Pet{owner_guid: owner_guid}}} = state
-      )
-      when is_integer(spell_id) do
-    state =
-      case pet_cast(state, spell_id, target_guid) do
-        {:ok, state} ->
-          state
-
-        {:error, reason} ->
-          Network.send_packet(%Message.SmsgPetCastFailed{spell_id: spell_id, reason: reason}, owner_guid)
-          state
-      end
-
+  def handle_info({:pet_cast, controller, spell_id, targets}, %Mob{} = state) when is_integer(spell_id) do
+    state = PetCasting.cast(state, controller, spell_id, targets)
     {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet cast failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_info(:summon_despawn, %Mob{} = state) do
@@ -2047,41 +2036,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     case Metadata.query(guid, [:owner_guid]) do
       %{owner_guid: owner_guid} when is_integer(owner_guid) and owner_guid > 0 -> owner_guid
       _ -> guid
-    end
-  end
-
-  defp pet_cast(%Mob{internal: %Internal{spellbook: spellbook}} = state, spell_id, target_guid) do
-    with %Spell{} = spell <- if(Map.has_key?(spellbook, spell_id), do: SpellLoader.load(spell_id)),
-         :ok <- check_pet_spell_target(state, spell, target_guid) do
-      target_guid = if is_integer(target_guid) and target_guid > 0, do: target_guid, else: state.object.guid
-      blackboard = Blackboard.ensure(state.internal.blackboard)
-      entry = %CreatureSpell{spell_id: spell_id, cast_target: if(Spell.harmful?(spell), do: :victim, else: :self)}
-
-      case MobSpells.attempt_commanded_cast(
-             state,
-             blackboard,
-             entry,
-             target_guid,
-             AIEnvironment.context(state, Time.now(), ObservationRequest.actor(target_guid))
-           ) do
-        {:ok, {state, blackboard}} -> {:ok, %{state | internal: %{state.internal | blackboard: blackboard}}}
-        {:error, reason} -> {:error, reason}
-      end
-    else
-      {:error, reason} -> {:error, reason}
-      _ -> {:error, :not_known}
-    end
-  end
-
-  defp check_pet_spell_target(_state, %Spell{} = spell, target_guid) when target_guid in [0, nil] do
-    if Spell.requires_hostile_target?(spell), do: {:error, :bad_implicit_targets}, else: :ok
-  end
-
-  defp check_pet_spell_target(state, %Spell{} = spell, target_guid) do
-    if not Spell.requires_hostile_target?(spell) or Hostility.valid_attack_target?(state, target_guid) do
-      :ok
-    else
-      {:error, :bad_targets}
     end
   end
 end

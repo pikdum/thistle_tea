@@ -391,7 +391,12 @@ defmodule ThistleTea.Game.World do
     end
   end
 
-  def line_of_sight?(_entity, _guid), do: true
+  def line_of_sight?(%{internal: %Internal{}, movement_block: %MovementBlock{}} = entity, {x, y, z}) do
+    {world, sx, sy, sz} = position(entity)
+    Pathfinding.line_of_sight?(world.map_id, {sx, sy, sz}, {x, y, z})
+  end
+
+  def line_of_sight?(_entity, _target), do: true
 
   defp entity_guid(%{object: %{guid: guid}}) when is_integer(guid), do: guid
   defp entity_guid(%{guid: guid}) when is_integer(guid), do: guid

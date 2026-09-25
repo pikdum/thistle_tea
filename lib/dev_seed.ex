@@ -28,6 +28,7 @@ defmodule ThistleTea.DevSeed do
   Marisa du'Paige northeast of the playground retains her root-and-retreat spells.
   A stationary Rockjaw Trogg and wandering Burly Rockjaw Trogg farther north
   support fleeing-faction help alarms without initial assistance recruitment.
+  A Defias Evoker southeast of the playground supports controlled ground spell casts.
   """
   import Ecto.Query
 
@@ -344,6 +345,7 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(599, @base_low_guid + 2100, {x + 160.0, y + 80.0, z}, nil, 30)
     spawn_mob(707, @base_low_guid + 2200, {x + 160.0, y + 150.0, z}, nil, 30)
     spawn_mob(724, @base_low_guid + 2201, {x + 176.0, y + 150.0, z}, nil, 30, wander: 2.0)
+    spawn_mob(1729, @base_low_guid + 2300, {x + 90.0, y - 60.0, z}, nil, 30)
   end
 
   defp seed_game_objects do
