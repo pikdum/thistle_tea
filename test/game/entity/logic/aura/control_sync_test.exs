@@ -18,9 +18,59 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Target
 
   describe "sync/1" do
+    test "control release interrupts prepared casts and clears their global cooldown" do
+      for type <- [:mod_charm, :mod_possess, :mod_possess_pet] do
+        original_pet = if type == :mod_possess_pet, do: %Pet{kind: :hunter, owner_guid: 7}
+
+        mob = %Mob{
+          object: %Object{guid: 20},
+          unit: %Unit{auras: [holder(type)], faction_template: 14},
+          internal: %Internal{pet: original_pet}
+        }
+
+        {controlled, _events} = ControlSync.sync(mob, 0)
+        spell = %Spell{id: 11_829, cast_time_ms: 3_000, gcd_category: 133, gcd_ms: 1_500}
+        cast = Cast.new(spell, Target.at({10.0, 0.0, 0.0}), 0)
+        controlled = %{controlled | internal: %{controlled.internal | casting: cast}}
+        controlled = Cooldowns.trigger_gcd(controlled, spell, 0)
+        assert Cooldowns.on_gcd?(controlled, spell, 500)
+
+        {released, _events} = ControlSync.sync(%{controlled | unit: %{controlled.unit | auras: []}}, 500)
+        assert released.internal.casting == nil
+        refute Cooldowns.on_gcd?(released, spell, 500)
+        assert Enum.any?(released.internal.events, &match?(%Effects.SpellCastFailed{reason: :interrupted}, &1))
+      end
+    end
+
+    test "control release tears down an active channel and its client projection" do
+      mob = %Mob{
+        object: %Object{guid: 20},
+        unit: %Unit{auras: [holder(:mod_charm)], faction_template: 14}
+      }
+
+      {controlled, _events} = ControlSync.sync(mob, 0)
+      spell = %Spell{id: 16_005, attributes: MapSet.new([:channeled]), duration_ms: 8_000}
+      cast = %{Cast.new(spell, Target.at({10.0, 0.0, 0.0}), 0) | phase: :channel_tick}
+
+      controlled = %{
+        controlled
+        | internal: %{controlled.internal | casting: cast},
+          unit: %{controlled.unit | auras: [], channel_spell: spell.id, channel_object: 30}
+      }
+
+      {released, _events} = ControlSync.sync(controlled, 500)
+      assert released.internal.casting == nil
+      assert released.unit.channel_spell == 0
+      assert released.unit.channel_object == 0
+      assert Enum.any?(released.internal.events, &match?(%Effects.ChannelUpdate{channel_time_ms: 0}, &1))
+    end
+
     test "possessing a permanent pet restores its ownership and behavior" do
       holder = holder(:mod_possess_pet)
 

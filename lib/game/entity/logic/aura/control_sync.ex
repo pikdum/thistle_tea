@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
@@ -35,7 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
       match?(%Holder{}, possession) -> sync_possession(mob, possession, internal.pet, guid, now)
       match?(%Pet{possessed?: true}, internal.pet) -> release_possession(mob, internal.pet, now)
       match?(%Holder{}, charm) -> sync_charm(mob, charm, internal.pet, guid, now)
-      match?(%Pet{kind: :charmed}, internal.pet) -> release_charm(mob, internal.pet)
+      match?(%Pet{kind: :charmed}, internal.pet) -> release_charm(mob, internal.pet, now)
       true -> {mob, []}
     end
   end
@@ -99,7 +100,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
     {Core.mark_broadcast_update(mob), events ++ [event]}
   end
 
-  defp release_charm(%Mob{} = mob, %Pet{} = pet) do
+  defp release_charm(%Mob{} = mob, %Pet{} = pet, now) do
+    mob = Casting.interrupt(mob, now)
+
     mob = %{
       mob
       | unit: %{
@@ -215,7 +218,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
   end
 
   defp release_possession(%Mob{} = mob, %Pet{possession_original_kind: nil} = pet, now) do
-    mob = mob |> restore_controlled_unit(pet, nil) |> MovementHandoff.offer(pet.owner_guid, now)
+    mob =
+      mob |> Casting.interrupt(now) |> restore_controlled_unit(pet, nil) |> MovementHandoff.offer(pet.owner_guid, now)
+
     {mob, [Effects.control_released(pet.owner_guid, mob.object.guid)]}
   end
 
@@ -236,7 +241,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
         possessed?: false
     }
 
-    mob = mob |> restore_controlled_unit(pet, restored) |> MovementHandoff.offer(pet.owner_guid, now)
+    mob =
+      mob
+      |> Casting.interrupt(now)
+      |> restore_controlled_unit(pet, restored)
+      |> MovementHandoff.offer(pet.owner_guid, now)
+
     {mob, [Effects.control_released(pet.owner_guid, mob.object.guid)]}
   end
 
