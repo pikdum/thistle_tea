@@ -95,14 +95,20 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     Enum.reduce(@stat_fields, unit, fn {index, field, base_field, bonus_key}, acc ->
       case Map.get(acc, base_field) do
         base when is_integer(base) ->
-          scaled = (base + equipment_bonus(acc, bonus_key)) * aura_stat_multiplier(acc, index, :mod_percent_stat)
-          value = (scaled + aura_stat_bonus(acc, index)) * aura_stat_multiplier(acc, index, :mod_total_stat_percent)
-          struct!(acc, [{field, trunc(value)}])
+          value = scaled_stat(acc, index, base + equipment_bonus(acc, bonus_key))
+          struct!(acc, [{field, value}])
 
         _ ->
           acc
       end
     end)
+  end
+
+  defp scaled_stat(unit, index, base) do
+    {base_numerator, base_denominator} = aura_stat_ratio(unit, index, :mod_percent_stat)
+    {total_numerator, total_denominator} = aura_stat_ratio(unit, index, :mod_total_stat_percent)
+    value = base * base_numerator + aura_stat_bonus(unit, index) * base_denominator
+    div(value * total_numerator, base_denominator * total_denominator)
   end
 
   defp derive_max_health(%Unit{base_health: base_health} = unit) when is_integer(base_health) do
@@ -368,16 +374,16 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     end)
   end
 
-  defp aura_stat_multiplier(%Unit{auras: holders}, index, type) when is_list(holders) do
+  defp aura_stat_ratio(%Unit{auras: holders}, index, type) when is_list(holders) do
     for %Holder{auras: auras, stacks: stacks} <- holders,
         %Aura{type: ^type, amount: amount, misc_value: misc} <- auras,
         is_integer(amount) and (misc == -1 or misc == index),
-        reduce: 1.0 do
-      multiplier -> multiplier * max(100 + amount * max(stacks || 1, 1), 0) / 100
+        reduce: {1, 1} do
+      {numerator, denominator} -> {numerator * max(100 + amount * max(stacks || 1, 1), 0), denominator * 100}
     end
   end
 
-  defp aura_stat_multiplier(_unit, _index, _type), do: 1.0
+  defp aura_stat_ratio(_unit, _index, _type), do: {1, 1}
 
   defp sum_aura_amounts(%Unit{auras: holders}, fun) when is_list(holders) do
     Enum.reduce(holders, 0, fn %Holder{auras: auras} = holder, acc ->

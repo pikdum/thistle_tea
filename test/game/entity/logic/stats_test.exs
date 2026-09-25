@@ -96,6 +96,15 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
       end
     end
 
+    test "preserves exact integer totals when percentage factors have repeating binary fractions" do
+      for type <- [:mod_percent_stat, :mod_total_stat_percent], amount <- [4, 8, 12, 16, 20] do
+        aura = holder([%Aura{type: type, amount: amount, misc_value: 3}])
+        unit = %{mage_unit() | base_intellect: 100, auras: [aura]}
+        assert recompute(unit).intellect == 100 + amount
+        assert recompute(%{unit | base_intellect: 101}).intellect == div(101 * (100 + amount), 100)
+      end
+    end
+
     test "scales a holder's percentage by its remaining stacks" do
       for type <- [:mod_percent_stat, :mod_total_stat_percent] do
         stacked = %{holder([%Aura{type: type, amount: 20, misc_value: 3}]) | stacks: 3}
