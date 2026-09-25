@@ -70,6 +70,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
        triggering_spell_id: nil,
        slot: nil,
        amount: nil,
+       effect_base_points: %{},
        duration_ms: nil,
        hit_context: nil,
        resolve_targets?: false

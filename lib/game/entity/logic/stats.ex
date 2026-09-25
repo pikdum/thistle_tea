@@ -190,7 +190,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   defp derive_attack_power(%Unit{base_strength: base_strength} = unit) when is_integer(base_strength) do
     %{
       unit
-      | attack_power: AttackPower.total(unit, unit_attack_power(unit), :melee),
+      | attack_power: AttackPower.total(unit, melee_attack_power(unit), :melee),
         ranged_attack_power:
           AttackPower.total(unit, ranged_attack_power(unit.class, unit.level, unit.agility || 0), :ranged)
     }
@@ -218,20 +218,20 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
 
   defp creature_stat_attack_power(_unit, _kind), do: 0
 
-  defp unit_attack_power(%Unit{max_power5: capacity, strength: strength}) when is_integer(capacity) and capacity > 0 do
+  def melee_attack_power(%Unit{max_power5: capacity, strength: strength}) when is_integer(capacity) and capacity > 0 do
     max(strength * 2 - 20, 0)
   end
 
-  defp unit_attack_power(%Unit{class: @druid, shapeshift_form: 1} = unit) do
+  def melee_attack_power(%Unit{class: @druid, shapeshift_form: 1} = unit) do
     max((unit.strength || 0) * 2 + (unit.agility || 0) - 20, 0) + predatory_strikes_bonus(unit)
   end
 
-  defp unit_attack_power(%Unit{class: @druid, shapeshift_form: form} = unit) when form in [5, 8] do
+  def melee_attack_power(%Unit{class: @druid, shapeshift_form: form} = unit) when form in [5, 8] do
     melee_attack_power(unit.class, unit.level, unit.strength || 0, unit.agility || 0) +
       predatory_strikes_bonus(unit)
   end
 
-  defp unit_attack_power(%Unit{} = unit) do
+  def melee_attack_power(%Unit{} = unit) do
     melee_attack_power(unit.class, unit.level, unit.strength || 0, unit.agility || 0)
   end
 

@@ -142,17 +142,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
   def resolve(%{object: %{guid: guid}}, %Effects.TriggerSpell{source_guid: source, resolve_targets?: true} = effect)
       when is_integer(source) and source != guid do
-    [
-      Effects.trigger_spell_request(source, effect.spell_id, effect.target_guid,
-        base_points: effect.amount,
-        cast_item_guid: effect.cast_item_guid,
-        effect_index: effect.slot,
-        resolve_targets?: true,
-        extra_attack?: effect.extra_attack?,
-        triggered_by_spell_id: effect.triggering_spell_id,
-        hit_context: effect.hit_context
-      )
-    ]
+    [trigger_request(effect)]
   end
 
   def resolve(entity, %Effects.TriggerSpell{} = effect) do
@@ -183,20 +173,24 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
   defp resolve_trigger(entity, effect, spell) do
     if foreign_owner_required?(entity, effect, spell) do
-      [
-        Effects.trigger_spell_request(effect.source_guid, effect.spell_id, effect.target_guid,
-          base_points: effect.amount,
-          cast_item_guid: effect.cast_item_guid,
-          effect_index: effect.slot,
-          resolve_targets?: true,
-          extra_attack?: effect.extra_attack?,
-          triggered_by_spell_id: effect.triggering_spell_id,
-          hit_context: effect.hit_context
-        )
-      ]
+      [trigger_request(effect)]
     else
       validate_trigger_focus(entity, effect, spell)
     end
+  end
+
+  defp trigger_request(%Effects.TriggerSpell{} = effect) do
+    Effects.trigger_spell_request(effect.source_guid, effect.spell_id, effect.target_guid,
+      base_points: effect.amount,
+      effect_base_points: effect.effect_base_points,
+      cast_item_guid: effect.cast_item_guid,
+      effect_index: effect.slot,
+      duration_ms: effect.duration_ms,
+      resolve_targets?: true,
+      extra_attack?: effect.extra_attack?,
+      triggered_by_spell_id: effect.triggering_spell_id,
+      hit_context: effect.hit_context
+    )
   end
 
   defp foreign_owner_required?(entity, effect, spell) do
@@ -372,21 +366,24 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
   defp apply_trigger_override(nil, _effect), do: nil
 
-  defp apply_trigger_effect_override(%Spell{effects: effects} = spell, %Effects.TriggerSpell{
-         slot: index,
-         amount: amount
-       })
-       when is_integer(index) and is_integer(amount) do
+  defp apply_trigger_effect_override(%Spell{effects: effects} = spell, %Effects.TriggerSpell{} = trigger) do
+    points = custom_effect_points(trigger)
+
     effects =
-      Enum.map(effects, fn
-        %Spell.Effect{index: ^index} = effect -> %{effect | base_points: amount, die_sides: 0, base_dice: 0}
-        effect -> effect
+      Enum.map(effects, fn %Spell.Effect{} = effect ->
+        case Map.get(points, effect.index) do
+          amount when is_integer(amount) -> %{effect | base_points: amount, die_sides: 0, base_dice: 0}
+          _missing -> effect
+        end
       end)
 
     %{spell | effects: effects}
   end
 
-  defp apply_trigger_effect_override(spell, _effect), do: spell
+  defp custom_effect_points(%Effects.TriggerSpell{slot: index, amount: amount, effect_base_points: points})
+       when is_integer(index) and is_integer(amount), do: Map.put(points, index, amount)
+
+  defp custom_effect_points(%Effects.TriggerSpell{effect_base_points: points}), do: points
 
   defp apply_trigger_duration_override(%Spell{} = spell, %Effects.TriggerSpell{duration_ms: duration_ms})
        when is_integer(duration_ms) and duration_ms > 0 do

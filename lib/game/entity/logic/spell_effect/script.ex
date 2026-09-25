@@ -10,9 +10,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.PetTraining
+  alias ThistleTea.Game.Entity.Logic.Racial
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.Shapeshift
   alias ThistleTea.Game.Entity.Logic.Silithyst
+  alias ThistleTea.Game.Entity.Logic.SpellEffect.Amount
   alias ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal
   alias ThistleTea.Game.Entity.Logic.SpellTeaching
   alias ThistleTea.Game.Entity.Logic.Warlock
@@ -105,6 +107,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
 
   defp apply_class_dummy(state, context, spell, effect, :execute, now) do
     DamageHeal.execute(state, context, spell, effect, now)
+  end
+
+  defp apply_class_dummy(state, context, _spell, _effect, :berserking, _now)
+       when state.object.guid == context.caster_guid do
+    Racial.berserking(state)
+  end
+
+  defp apply_class_dummy(state, context, spell, effect, :blood_fury, _now)
+       when state.object.guid == context.caster_guid do
+    Racial.blood_fury(state, Amount.roll(spell, effect, context))
   end
 
   defp apply_class_dummy(state, _context, _spell, _effect, :shapeshift_cleanse, now) do
