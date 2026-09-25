@@ -12,7 +12,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   execution to the supplied owner before selection; final swaps move it to the
   selected owner. Conditions and commands then use the final source and target.
   Triggered casts use the trigger-spell pipeline; normal casts use the caster's
-  mob or player casting machinery.
+  mob or player casting machinery. Failed local target selection, conditions,
+  and normal mob casts honor the abort flag. `execute_steps_with_status/5`
+  exposes termination to direct EventAI actions so their events can retry.
   """
   import Bitwise, only: [&&&: 2, |||: 2, bnot: 1]
 
@@ -112,7 +114,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {state, blackboard}
   end
 
-  defp execute_steps_with_status(state, blackboard, steps, target_guid, context) do
+  def execute_steps_with_status(state, %Blackboard{} = blackboard, steps, target_guid, %Context{} = context)
+      when is_list(steps) do
     Enum.reduce_while(steps, {state, blackboard, :continue}, fn %ScriptStep{} = step, {state, blackboard, :continue} ->
       case dispatch(state, blackboard, step, target_guid, context) do
         {state, blackboard, :terminated} ->
@@ -142,7 +145,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
         dispatch_final(state, blackboard, step, 0, self_guid, context)
 
       true ->
-        {state, blackboard, :continue}
+        failed(state, blackboard, step)
     end
   end
 
@@ -173,11 +176,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
           {state, blackboard, :terminated}
 
         :continue ->
-          {state, blackboard} = execute(state, blackboard, resolved_step(step), target, now, context)
-          {state, blackboard, :continue}
+          execute_command(state, blackboard, resolved_step(step), target, now, context)
       end
     else
-      {state, blackboard, :continue}
+      failed(state, blackboard, step)
     end
   end
 
@@ -188,7 +190,51 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     cond do
       owner == state.object.guid -> dispatch(state, blackboard, resolved_step(step), target, context)
       script_owner?(owner) -> forward(state, blackboard, resolved_step(step), owner, target)
-      true -> {state, blackboard, :continue}
+      true -> failed(state, blackboard, step)
+    end
+  end
+
+  defp failed(state, blackboard, %ScriptStep{abort_on_failure?: true}), do: {state, blackboard, :terminated}
+  defp failed(state, blackboard, %ScriptStep{}), do: {state, blackboard, :continue}
+
+  defp execute_command(state, blackboard, %ScriptStep{command: :cast_spell} = step, target_guid, _now, context) do
+    entry = CreatureSpell.from_script_step(step)
+
+    cond do
+      target_guid in [nil, 0] or entry.spell_id <= 0 ->
+        failed(state, blackboard, step)
+
+      not MobSpells.flags_allow?(state, entry, target_guid, context) ->
+        failed(state, blackboard, step)
+
+      CreatureSpell.flag?(entry, :triggered) ->
+        {trigger_cast(state, entry, target_guid, context), blackboard, :continue}
+
+      is_struct(state, Character) ->
+        {Effects.enqueue(state, Effects.scripted_cast(entry, target_guid)), blackboard, :continue}
+
+      is_struct(state, Mob) ->
+        cast_command(state, blackboard, entry, step, target_guid, context)
+
+      true ->
+        failed(state, blackboard, step)
+    end
+  end
+
+  defp execute_command(state, blackboard, %ScriptStep{command: command}, _target_guid, _now, _context)
+       when command in [:terminate_script, :terminate_condition] do
+    {state, blackboard, :continue}
+  end
+
+  defp execute_command(state, blackboard, step, target_guid, now, context) do
+    {state, blackboard} = execute(state, blackboard, step, target_guid, now, context)
+    {state, blackboard, :continue}
+  end
+
+  defp cast_command(state, blackboard, entry, step, target_guid, context) do
+    case MobSpells.attempt_commanded_cast(state, blackboard, entry, target_guid, context) do
+      {:ok, {state, blackboard}} -> {state, blackboard, :continue}
+      {:error, _reason} -> failed(state, blackboard, step)
     end
   end
 
@@ -550,28 +596,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     case ScriptStep.emote_ids(step) do
       [] -> {state, blackboard}
       emote_ids -> {Effects.enqueue(state, Effects.emote(Random.choice(random, emote_ids))), blackboard}
-    end
-  end
-
-  defp execute(state, blackboard, %ScriptStep{command: :cast_spell} = step, target_guid, _now, %Context{} = context) do
-    entry = CreatureSpell.from_script_step(step)
-    target = resolve_target(state, step, target_guid, context)
-
-    cond do
-      is_nil(target) or entry.spell_id <= 0 ->
-        {state, blackboard}
-
-      not MobSpells.flags_allow?(state, entry, target, context) ->
-        {state, blackboard}
-
-      CreatureSpell.flag?(entry, :triggered) ->
-        {trigger_cast(state, entry, target, context), blackboard}
-
-      is_struct(state, Character) ->
-        {Effects.enqueue(state, Effects.scripted_cast(entry, target)), blackboard}
-
-      true ->
-        MobSpells.attempt_scripted_cast(state, blackboard, entry, target, context)
     end
   end
 

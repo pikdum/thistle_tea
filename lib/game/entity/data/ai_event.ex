@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Data.AIEvent do
             repeatable?: false,
             random_action?: false,
             not_casting?: false,
+            check_result?: false,
             inverse_phase_mask: 0,
             condition_id: 0,
             condition: nil,
@@ -27,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Data.AIEvent do
   @flag_repeatable 0x01
   @flag_random_action 0x02
   @flag_not_casting 0x04
+  @flag_check_result 0x08
 
   def build(row, scripts_by_id) when is_map(row) and is_map(scripts_by_id) do
     actions =
@@ -42,6 +44,7 @@ defmodule ThistleTea.Game.Entity.Data.AIEvent do
       repeatable?: flag?(row.event_flags, @flag_repeatable),
       random_action?: flag?(row.event_flags, @flag_random_action),
       not_casting?: flag?(row.event_flags, @flag_not_casting),
+      check_result?: flag?(row.event_flags, @flag_check_result),
       inverse_phase_mask: int(row.event_inverse_phase_mask, 0),
       condition_id: int(row.condition_id, 0),
       param1: int(row.event_param1, 0),

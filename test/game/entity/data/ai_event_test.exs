@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.Entity.Data.AIEventTest do
             event_type: 1,
             event_inverse_phase_mask: 0,
             event_chance: 100,
-            event_flags: 1,
+            event_flags: 9,
             event_param1: 1_000,
             event_param2: 1_000,
             event_param3: 1_800_000,
@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Entity.Data.AIEventTest do
 
       assert event.event_type == :timer_ooc
       assert event.repeatable?
+      assert event.check_result?
       refute event.random_action?
       assert event.param1 == 1_000
       assert event.actions == [[step]]
@@ -58,6 +59,7 @@ defmodule ThistleTea.Game.Entity.Data.AIEventTest do
         )
 
       assert event.event_type == :aggro
+      refute event.check_result?
       assert event.actions == []
       refute AIEvent.timed?(event)
     end

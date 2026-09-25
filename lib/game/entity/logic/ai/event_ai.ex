@@ -12,7 +12,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   state and the script-controlled phase live on the blackboard: non-repeatable
   events disable until the next combat entry, event timers re-roll from their
   repeat params, and out-of-combat timers re-initialize on evade, matching
-  vmangos `CreatureEventAI` reset semantics.
+  vmangos `CreatureEventAI` reset semantics. Result-checked events re-enable
+  immediately when an action terminates, retrying on the next eligible tick
+  or edge. Each action group still runs independently of earlier failures.
   """
   alias ThistleTea.Game.Entity.Data.AIEvent
   alias ThistleTea.Game.Entity.Data.Component.Internal
@@ -397,7 +399,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
         |> maybe_disable(event, index)
 
       if chance_passes?(event, context.random) do
-        run_actions(state, blackboard, event, invoker_guid, context)
+        {state, blackboard, failed?} = run_actions(state, blackboard, event, invoker_guid, context)
+
+        {state, retry_failed_event(blackboard, event, index, now, failed?)}
       else
         {state, blackboard}
       end
@@ -405,6 +409,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
       _ -> {state, blackboard}
     end
   end
+
+  defp retry_failed_event(blackboard, %AIEvent{check_result?: true}, index, now, true) do
+    blackboard |> enable(index) |> put_timer(index, now)
+  end
+
+  defp retry_failed_event(blackboard, _event, _index, _now, _failed?), do: blackboard
 
   defp condition_met?(_state, nil, _invoker_guid, _context), do: true
 
@@ -421,8 +431,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     actions = if event.random_action?, do: [Random.choice(context.random, event.actions)], else: event.actions
     target_guid = invoker_guid || victim(state)
 
-    Enum.reduce(actions, {state, blackboard}, fn steps, {state, blackboard} ->
-      Script.run(state, blackboard, steps, target_guid, context)
+    Enum.reduce(actions, {state, blackboard, false}, fn steps, {state, blackboard, failed?} ->
+      {state, blackboard, status} = Script.execute_steps_with_status(state, blackboard, steps, target_guid, context)
+      {state, blackboard, failed? or status == :terminated}
     end)
   end
 

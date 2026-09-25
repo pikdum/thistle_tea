@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
             target_self?: false,
             swap_initial?: false,
             swap_final?: false,
+            abort_on_failure?: false,
             buddy_guid: nil,
             game_object_spawn: nil,
             equipment_items: [],
@@ -43,6 +44,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   @flag_swap_initial_targets 0x01
   @flag_swap_final_targets 0x02
   @flag_target_self 0x04
+  @flag_abort_on_failure 0x08
 
   def build(row) when is_map(row) do
     %__MODULE__{
@@ -64,6 +66,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
       target_self?: flag?(row.data_flags, @flag_target_self),
       swap_initial?: flag?(row.data_flags, @flag_swap_initial_targets),
       swap_final?: flag?(row.data_flags, @flag_swap_final_targets),
+      abort_on_failure?: flag?(row.data_flags, @flag_abort_on_failure),
       position: {num(row.x), num(row.y), num(row.z), num(row.o)},
       condition_id: int(row.condition_id)
     }

@@ -31,7 +31,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
           target_type: 0,
           target_param1: 0,
           target_param2: 0,
-          data_flags: 0x04,
+          data_flags: 0x0C,
           x: 1.0,
           y: 2.0,
           z: 3.0,
@@ -43,6 +43,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert step.delay_ms == 3_000
       assert step.target_type == :provided
       assert step.target_self?
+      assert step.abort_on_failure?
       refute step.swap_initial?
       refute step.swap_final?
       assert step.position == {1.0, 2.0, 3.0, 4.0}
