@@ -99,6 +99,23 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.HeartbeatTest do
       assert length(retained.unit.auras) == 1
     end
 
+    test "includes incoming hit modifiers and avoidance in area heartbeat checks", ctx do
+      defense = %Spell{
+        id: 999_123,
+        duration_ms: 60_000,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :mod_attacker_spell_hit_chance, base_points: -10, misc_value: 32},
+          %Effect{index: 1, type: :apply_aura, aura: :mod_aoe_avoidance, base_points: 25}
+        ]
+      }
+
+      {mob, _} = Aura.apply_spell(ctx.mob, ctx.mob.object.guid, 60, defense, 0)
+      spell = %{ctx.spell | effects: Enum.map(ctx.spell.effects, &%{&1 | area_target?: true})}
+      {applied, _} = Aura.apply_spell(mob, ctx.context, spell, 0)
+      holder = Enum.find(applied.unit.auras, &(&1.spell.id == spell.id))
+      assert holder.heartbeat.hit_chance_bp == 6_100
+    end
+
     test "refresh retains its quantile and scales breaks with diminishing returns", ctx do
       spell = %{ctx.spell | mechanic: 7, effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_root}]}
       {player, _} = Aura.apply_spell(ctx.player, ctx.context, spell, 0)

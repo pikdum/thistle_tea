@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Spell.Semantics.Rules do
   ]
   defstruct [
     :binary?,
+    :area_of_effect?,
     :dummy,
     :apply_trigger_spell_id,
     :finish_trigger_spell_id,
@@ -198,6 +199,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
       | effects: effects,
         semantics: %Rules{
           binary?: Spell.binary?(%{spell | semantics: nil}),
+          area_of_effect?: Spell.area_of_effect?(%{spell | semantics: nil}),
           dummy: Scripts.dummy_effect(spell),
           apply_trigger_spell_id: Scripts.apply_trigger(spell),
           finish_trigger_spell_id: Scripts.successful_finish_trigger(spell),

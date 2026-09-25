@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CreatureEntryTest do
   alias ThistleTea.Game.Entity.Data.CreatureArchetype
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Spell
@@ -20,6 +21,28 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CreatureEntryTest do
   setup [:creatures]
 
   describe "handle_cast/2" do
+    test "publishes avoidance on spawn, aura replacement, and respawn", %{mob: mob} do
+      spell = %Spell{
+        id: 999_903,
+        duration_ms: 60_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_aoe_avoidance, base_points: 25}]
+      }
+
+      guid = mob.object.guid
+      {mob, _} = Aura.apply_spell(mob, guid, 20, spell, 0)
+      {:ok, pid} = World.start_entity(mob)
+      assert Metadata.get(guid).aoe_avoidance == 25
+      spell = %{spell | effects: [%{hd(spell.effects) | base_points: 40}]}
+      Entity.receive_spell(guid, %CastContext{caster_guid: guid, caster_level: 20}, spell)
+      GenServer.cast(pid, {:send_update_to, self()})
+      assert_receive {:"$gen_cast", {:send_packet, %UpdateObject{}}}, 1_000
+      assert Metadata.get(guid).aoe_avoidance == 40
+      send(pid, {:script_respawn, true})
+      GenServer.cast(pid, {:send_update_to, self()})
+      assert_receive {:"$gen_cast", {:send_packet, %UpdateObject{}}}, 1_000
+      assert Metadata.get(guid).aoe_avoidance == 0
+    end
+
     test "noncombat spell hits invoke EventAI after reception", %{mob: mob, template: template} do
       spell = %Spell{id: 23_359, effects: [%Effect{index: 0, type: :dummy}]}
       refute Spell.starts_combat?(spell)

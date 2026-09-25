@@ -12,10 +12,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Heartbeat do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
-  alias ThistleTea.Game.Entity.Logic.MechanicResistance
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -122,12 +120,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Heartbeat do
   defp creature_hit_chance(%Mob{} = entity, spell, %CastContext{caster_guid: caster} = context)
        when is_integer(caster) do
     if Spell.attribute?(spell, :heartbeat_resist) and not Enum.any?(spell.effects, &(&1.aura in @creature_exclusions)) do
-      target = %{
-        level: entity.unit.level,
-        attacker_spell_hit_chance: Aura.misc_amounts(entity, :attacker_spell_hit_chance),
-        mechanic_resistance: MechanicResistance.projection(entity),
-        school_resistances: SpellResist.school_resistances(entity)
-      }
+      target = Map.put(SpellResist.defense_snapshot(entity), :level, entity.unit.level)
 
       SpellResist.context_hit_chance_bp(context, spell, target, false)
     end

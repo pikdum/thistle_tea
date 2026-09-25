@@ -1813,14 +1813,12 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         aura_stacks: Aura.spell_stacks(character),
         crowd_controlled?: Aura.crowd_controlled?(character),
         dispel_options: Aura.dispel_options(character),
-        mechanic_resistance: Aura.misc_amounts(character, :mechanic_resistance),
-        school_resistances: SpellResist.school_resistances(character),
         spell_threat: SpellThreat.projection(character),
         dispel_resistance: DispelResistance.projection(character),
-        attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(character),
         reputation: PlayerReputation.projection(character),
         condition_subject: ConditionContext.refresh_subject(character, previous_subject)
       }
+      |> Map.merge(SpellResist.defense_snapshot(character))
       |> Map.merge(detection)
     )
 

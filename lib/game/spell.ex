@@ -106,6 +106,10 @@ defmodule ThistleTea.Game.Spell do
 
   def reflectable?(_spell), do: false
 
+  def area_of_effect?(%__MODULE__{semantics: %{area_of_effect?: area?}}) when is_boolean(area?), do: area?
+
+  def area_of_effect?(%__MODULE__{effects: effects}), do: Enum.any?(effects, & &1.area_target?)
+
   def binary?(%__MODULE__{semantics: %{binary?: binary?}}) when is_boolean(binary?), do: binary?
 
   def binary?(%__MODULE__{dmg_class: 1} = spell) do

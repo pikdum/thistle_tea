@@ -1371,6 +1371,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         :alive?,
         :level,
         :attacker_spell_hit_chance,
+        :aoe_avoidance,
         :mechanic_resistance,
         :school_resistances,
         :no_spell_defense?

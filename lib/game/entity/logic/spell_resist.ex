@@ -66,6 +66,15 @@ defmodule ThistleTea.Game.Entity.Logic.SpellResist do
     base + Modifiers.value(Modifiers.for_spell(modifiers, spell), :resist_miss_chance, 0)
   end
 
+  def defense_snapshot(entity) do
+    %{
+      aoe_avoidance: Aura.flat_amount(entity, :mod_aoe_avoidance),
+      attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(entity),
+      mechanic_resistance: MechanicResistance.projection(entity),
+      school_resistances: school_resistances(entity)
+    }
+  end
+
   def school_resistances(%{unit: %Unit{} = unit}) do
     %{
       1 => unit.holy_resistance || 0,
@@ -108,12 +117,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellResist do
     caster_level = max(context.caster_level || 1, 1)
     target_level = max(Map.get(target, :level) || caster_level, 1)
     target_bonus = Aura.versus_amount(Map.get(target, :attacker_spell_hit_chance), Spell.school_mask(spell))
+    avoidance = if Spell.area_of_effect?(spell), do: Map.get(target, :aoe_avoidance) || 0, else: 0
 
     magic_hit_chance_bp(
       caster_level,
       target_level,
       target_player?,
-      hit_bonus: context.spell_hit_bonus + target_bonus,
+      hit_bonus: context.spell_hit_bonus + target_bonus - avoidance,
       mechanic_resistance: MechanicResistance.chance(Map.get(target, :mechanic_resistance), spell.mechanic),
       binary_resistance: binary_resistance(context, spell, target)
     )

@@ -67,6 +67,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
       Metadata.query(target_guid, [
         :alive?,
         :level,
+        :aoe_avoidance,
         :attacker_spell_hit_chance,
         :mechanic_resistance,
         :school_resistances,
@@ -323,6 +324,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
           :alive?,
           :level,
           :attacker_spell_hit_chance,
+          :aoe_avoidance,
           :mechanic_resistance,
           :school_resistances,
           :no_spell_defense?

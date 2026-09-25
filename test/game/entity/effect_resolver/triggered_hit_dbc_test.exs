@@ -27,6 +27,26 @@ defmodule ThistleTea.Game.Entity.EffectResolver.TriggeredHitDbcTest do
   setup [:entities]
 
   describe "resolve/2" do
+    test "area triggers use each target's current avoidance", %{caster: caster, target: target, other: other} do
+      caster = %{caster | unit: %{caster.unit | auras: []}}
+      Metadata.update(target.object.guid, %{aoe_avoidance: 100})
+      Metadata.update(other.object.guid, %{no_spell_defense?: true})
+      events = resolve(caster, target.object.guid, 1449)
+      target_guid = target.object.guid
+      other_guid = other.object.guid
+      assert [%Effects.SpellGo{hit_guids: [^other_guid], misses: [%{guid: ^target_guid, reason: 2}]} | _] = events
+      delivery = Enum.find(events, &match?(%Effects.DeliverSpell{target_guid: ^target_guid}, &1))
+      assert delivery.cast_context.hit_outcome == :resist
+
+      assert {^target, [%Effects.SpellLogMiss{reason: :resist}]} =
+               SpellEffect.receive(target, delivery.cast_context, delivery.spell, 1_000)
+
+      Metadata.update(target_guid, %{aoe_avoidance: 0})
+      events = resolve(caster, target_guid, 1449)
+      delivery = Enum.find(events, &match?(%Effects.DeliverSpell{target_guid: ^target_guid}, &1))
+      assert delivery.cast_context.hit_outcome == :hit
+    end
+
     test "proc aura triggers are distinguished from periodic aura triggers", %{caster: caster, target: target} do
       for {parent, proc?} <- [{324, true}, {5143, false}] do
         trigger = Effects.trigger_spell(caster.object.guid, 60, target.object.guid, 133, triggered_by_spell_id: parent)

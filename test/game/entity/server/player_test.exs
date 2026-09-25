@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
@@ -737,6 +738,25 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
                Metadata.query(guid, [:undetectable_until, :stealthed?])
 
       assert expires_at > Time.now()
+    end
+
+    test "publishes avoidance changes through the player owner" do
+      guid = System.unique_integer([:positive])
+
+      spell = %Spell{
+        id: 999_902,
+        duration_ms: 60_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_aoe_avoidance, base_points: 25}]
+      }
+
+      {character, _} = AuraLogic.apply_spell(character(guid, health: 80, max_health: 100), guid, 50, spell, 0)
+      Metadata.put(guid, %{})
+      on_exit(fn -> Metadata.delete(guid) end)
+      state = PlayerServer.maybe_broadcast_update(%State{guid: guid, character: character})
+      assert Metadata.get(guid).aoe_avoidance == 25
+      {character, _} = AuraLogic.remove_spells(state.character, [spell.id], 1_000)
+      PlayerServer.maybe_broadcast_update(%{state | character: character})
+      assert Metadata.get(guid).aoe_avoidance == 0
     end
 
     test "cancels an in-flight cast when the character is dead" do

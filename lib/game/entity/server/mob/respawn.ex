@@ -209,7 +209,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   end
 
   defp update_metadata(%Mob{} = state) do
-    Metadata.update(state.object.guid, %{
+    metadata = %{
       bounding_radius: state.unit.bounding_radius,
       combat_reach: state.unit.combat_reach,
       level: state.unit.level,
@@ -224,12 +224,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       detect_range_modifier: Aura.flat_amount(state, :mod_detect_range),
       health_pct: Core.health_pct(state),
       health_deficit: Core.health_deficit(state),
-      orientation: elem(state.movement_block.position, 3),
-      mechanic_resistance: Aura.misc_amounts(state, :mechanic_resistance),
-      school_resistances: SpellResist.school_resistances(state),
-      attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(state)
-    })
+      orientation: elem(state.movement_block.position, 3)
+    }
 
+    Metadata.update(state.object.guid, Map.merge(metadata, SpellResist.defense_snapshot(state)))
     Metadata.update(state.object.guid, Mob.visibility_metadata(state))
     Metadata.update(state.object.guid, StealthDetection.target_metadata(state))
 

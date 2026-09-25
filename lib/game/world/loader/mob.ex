@@ -113,11 +113,9 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         aura_sources: Aura.source_spells(mob),
         aura_stacks: Aura.spell_stacks(mob),
         crowd_controlled?: Aura.crowd_controlled?(mob),
-        dispel_options: Aura.dispel_options(mob),
-        mechanic_resistance: Aura.misc_amounts(mob, :mechanic_resistance),
-        school_resistances: SpellResist.school_resistances(mob),
-        attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(mob)
+        dispel_options: Aura.dispel_options(mob)
       }
+      |> Map.merge(SpellResist.defense_snapshot(mob))
       |> Map.merge(Mob.visibility_metadata(mob))
       |> Map.merge(pet_metadata(mob))
       |> Map.merge(FactionLoader.metadata(mob.unit.faction_template))
