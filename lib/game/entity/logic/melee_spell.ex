@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.MeleeSpell do
   the white swing entirely, casting through the normal spell pipeline.
   """
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
 
   def queue_next_swing(%{internal: %Internal{} = internal} = entity, %Spell{} = spell) do
@@ -18,4 +19,11 @@ defmodule ThistleTea.Game.Entity.Logic.MeleeSpell do
   end
 
   def consume_next_swing(entity), do: {entity, nil}
+
+  def interrupt(%{internal: %Internal{next_swing_spell: %Spell{} = spell} = internal} = entity) do
+    %{entity | internal: %{internal | next_swing_spell: nil}}
+    |> Effects.enqueue(Effects.spell_cast_failed(spell, :interrupted))
+  end
+
+  def interrupt(entity), do: entity
 end

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.PossessionOwnerTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Companion
@@ -27,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.PossessionOwnerTest do
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.WorldRef
@@ -61,6 +63,33 @@ defmodule ThistleTea.Game.Entity.Server.Player.PossessionOwnerTest do
       assert restored.character.unit.auras == []
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgClientControlUpdate{allow_movement?: true}}}
       assert_receive {:controller, {:control_released, _}}
+    end
+  end
+
+  describe "command/4" do
+    test "stops a controlled player's melee without cancelling its ordinary spell", %{state: state, caster: caster} do
+      character = state.character
+      cast = %Cast{spell: %Spell{id: 116}, phase: :preparing}
+
+      character = %{
+        character
+        | unit: %{character.unit | target: 123},
+          internal: %{
+            character.internal
+            | casting: cast,
+              next_swing_spell: %Spell{id: 78},
+              blackboard: %Blackboard{combat: %Blackboard.Combat{auto_attacking: true, attack_started: true}}
+          }
+      }
+
+      state = %{state | character: character}
+      assert PossessionOwner.command(state, caster + 1, :stop_attack, 0) == state
+      stopped = PossessionOwner.command(state, caster, :stop_attack, 0)
+      assert stopped.character.unit.target == 0
+      assert stopped.character.internal.casting == cast
+      assert stopped.character.internal.next_swing_spell == nil
+      refute stopped.character.internal.blackboard.combat.auto_attacking
+      assert stopped.character.internal.broadcast_update?
     end
   end
 

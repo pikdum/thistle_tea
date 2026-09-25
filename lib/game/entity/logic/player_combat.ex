@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Time
@@ -72,20 +73,27 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   def mark_temporary_at_war(character, _faction_id), do: character
 
-  def stop_attack(%Character{object: %{guid: guid}, unit: %Unit{} = unit, internal: %Internal{} = internal} = character) do
-    {character, auto_repeat_effects} = AutoRepeat.cancel(character)
-    blackboard = internal.blackboard |> Blackboard.ensure() |> Blackboard.clear_auto_attack()
-
-    character = %{
-      character
-      | unit: %{unit | target: 0},
-        internal: %{character.internal | blackboard: blackboard}
-    }
-
-    {character, auto_repeat_effects ++ attack_stop_effects(guid, unit.target)}
+  def stop_attack(%Character{} = character) do
+    {character, ranged_effects} = AutoRepeat.cancel(character)
+    {character, melee_effects} = stop_melee_attack(character)
+    {character, ranged_effects ++ melee_effects}
   end
 
   def stop_attack(character), do: {character, []}
+
+  def stop_melee_attack(
+        %Character{object: %{guid: guid}, unit: %Unit{} = unit, internal: %Internal{} = internal} = character
+      ) do
+    blackboard = internal.blackboard |> Blackboard.ensure() |> Blackboard.clear_auto_attack()
+
+    character =
+      %{character | unit: %{unit | target: 0}, internal: %{internal | blackboard: blackboard}}
+      |> MeleeSpell.interrupt()
+
+    {character, attack_stop_effects(guid, unit.target)}
+  end
+
+  def stop_melee_attack(character), do: {character, []}
 
   def disengage(%Character{object: %{guid: guid}} = character) do
     {character, auto_repeat_effects} = AutoRepeat.cancel(character)

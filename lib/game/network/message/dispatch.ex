@@ -108,6 +108,8 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_PET_RENAME: Message.CmsgPetRename,
               CMSG_PET_ABANDON: Message.CmsgPetAbandon,
               CMSG_PET_ACTION: Message.CmsgPetAction,
+              CMSG_PET_STOP_ATTACK: Message.CmsgPetStopAttack,
+              CMSG_PET_CANCEL_AURA: Message.CmsgPetCancelAura,
               CMSG_PET_CAST_SPELL: Message.CmsgPetCastSpell,
               CMSG_PET_UNLEARN: Message.CmsgPetUnlearn,
               CMSG_PET_SET_ACTION: Message.CmsgPetSetAction,

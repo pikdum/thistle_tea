@@ -13,6 +13,8 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
@@ -49,6 +51,32 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
       assert character.internal.in_combat == true
       assert character.internal.last_hostile_time == 1_000
       assert Bitwise.band(character.unit.flags, @unit_flag_in_combat) == @unit_flag_in_combat
+    end
+  end
+
+  describe "stop_melee_attack/1" do
+    test "cancels a queued swing while preserving ranged repetition and ordinary casting" do
+      character = character(in_combat: true, target: 123)
+      cast = %Cast{spell: %Spell{id: 116}, phase: :preparing}
+      shot = %{target_guid: 123, next_at: 4_000}
+
+      character = %{
+        character
+        | internal: %{character.internal | casting: cast, auto_shot: shot, next_swing_spell: %Spell{id: 78}}
+      }
+
+      {stopped, events} = PlayerCombat.stop_melee_attack(character)
+      assert stopped.unit.target == 0
+      assert stopped.internal.in_combat
+      assert stopped.internal.auto_shot == shot
+      assert stopped.internal.casting == cast
+      assert stopped.internal.next_swing_spell == nil
+      assert [%Effects.AttackStop{target_guid: 123}] = events
+
+      assert Enum.any?(
+               stopped.internal.events,
+               &match?(%Effects.SpellCastFailed{spell_id: 78, reason: :interrupted}, &1)
+             )
     end
   end
 

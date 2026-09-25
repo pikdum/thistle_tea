@@ -49,6 +49,39 @@ defmodule ThistleTea.Game.Player.PetActions do
 
   def controls(state, _guid, _request), do: state
 
+  def stop_attack(%{character: %Character{} = character} = state, guid) do
+    with true <- Character.controls?(character, guid),
+         pid when is_pid(pid) <- Entity.pid(guid) do
+      request =
+        if Guid.entity_type(guid) == :player,
+          do: {:controlled_command, character.object.guid, :stop_attack, 0},
+          else: {:pet_stop_attack, character.object.guid}
+
+      send(pid, request)
+    end
+
+    state
+  end
+
+  def stop_attack(state, _guid), do: state
+
+  def cancel_aura(%{character: %Character{} = character} = state, guid, spell) do
+    if Character.controls?(character, guid) and Guid.entity_type(guid) == :mob and
+         is_nil(Companion.possession_guid(character)) and self_mover?(state, character.object.guid) do
+      case Entity.pid(guid) do
+        pid when is_pid(pid) -> send(pid, {:pet_cancel_aura, character.object.guid, spell})
+        _ -> :ok
+      end
+    end
+
+    state
+  end
+
+  def cancel_aura(state, _guid, _spell), do: state
+
+  defp self_mover?(%{active_mover_guid: mover}, guid), do: mover in [nil, guid]
+  defp self_mover?(_state, _guid), do: true
+
   defp dispatch(pid, controller, %Message.CmsgPetAction{pet_guid: guid} = message) do
     if Guid.entity_type(guid) == :player do
       dispatch_player(pid, controller, message)

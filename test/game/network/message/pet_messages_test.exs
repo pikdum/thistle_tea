@@ -31,6 +31,8 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
 
   test "pet client messages are registered for dispatch" do
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_ACTION))
+    assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_STOP_ATTACK))
+    assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_CANCEL_AURA))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_CAST_SPELL))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_NAME_QUERY))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_RENAME))
@@ -38,6 +40,45 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_SET_ACTION))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_SPELL_AUTOCAST))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_REQUEST_PET_INFO))
+  end
+
+  describe "CMSG_PET_STOP_ATTACK" do
+    test "dispatches to an owned creature and a possessed player" do
+      guid = Guid.from_low_guid(:mob, 1, 131)
+      Entity.register(guid)
+      message = Message.CmsgPetStopAttack.from_binary(<<guid::little-size(64)>>)
+      state = %{character: companion(:guardian, guid)}
+      assert Message.CmsgPetStopAttack.handle(message, state) == state
+      assert_receive {:pet_stop_attack, 7}
+      stranger = %{state | character: companion(:guardian, guid + 1)}
+      assert Message.CmsgPetStopAttack.handle(message, stranger) == stranger
+      refute_receive {:pet_stop_attack, _}, 0
+      player = Guid.from_low_guid(:player, 132)
+      Entity.register(player)
+      state = %{character: companion(:possession, player)}
+      assert Message.CmsgPetStopAttack.handle(%{message | pet_guid: player}, state) == state
+      assert_receive {:controlled_command, 7, :stop_attack, 0}
+    end
+  end
+
+  describe "CMSG_PET_CANCEL_AURA" do
+    test "decodes pet aura cancellation and rejects remote possession or a different pet" do
+      guid = Guid.from_low_guid(:mob, 1, 133)
+      Entity.register(guid)
+      message = Message.CmsgPetCancelAura.from_binary(<<guid::little-size(64), 11_767::little-size(32)>>)
+      state = %{character: companion(:guardian, guid)}
+      assert Message.CmsgPetCancelAura.handle(message, state) == state
+      assert_receive {:pet_cancel_aura, 7, 11_767}
+
+      for character <- [companion(:possession, guid), companion(:guardian, guid + 1)] do
+        state = %{character: character}
+        assert Message.CmsgPetCancelAura.handle(message, state) == state
+      end
+
+      remote = Map.put(state, :active_mover_guid, guid)
+      assert Message.CmsgPetCancelAura.handle(message, remote) == remote
+      refute_receive {:pet_cancel_aura, _, _}, 0
+    end
   end
 
   describe "CMSG_PET_CAST_SPELL" do

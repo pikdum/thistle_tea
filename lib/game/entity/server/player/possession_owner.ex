@@ -92,6 +92,12 @@ defmodule ThistleTea.Game.Entity.Server.Player.PossessionOwner do
 
   defp apply_command(state, :dismiss, _target), do: release(state)
 
+  defp apply_command(state, :stop_attack, _target) do
+    {character, events} = PlayerCombat.stop_melee_attack(state.character)
+    character = character |> EventSink.emit(events) |> Core.mark_broadcast_update()
+    %{state | character: character}
+  end
+
   defp apply_command(
          %State{character: %Character{internal: %{possession: %Possession{kind: :charm}}}} = state,
          command,

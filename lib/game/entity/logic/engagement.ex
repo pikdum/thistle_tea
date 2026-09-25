@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Entity.Logic.Threat
 
@@ -161,6 +162,26 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
     entity = Effects.enqueue(entity, Effects.creature_group_event(group_event))
 
     result(previous, entity, reason)
+  end
+
+  def stop_attack(%Mob{} = entity) do
+    previous = entity
+
+    case victim(entity) do
+      nil ->
+        result(previous, entity, :attack_stop)
+
+      target ->
+        blackboard = entity.internal.blackboard |> Blackboard.ensure() |> Blackboard.clear_auto_attack()
+
+        entity =
+          %{entity | unit: %{entity.unit | target: 0}, internal: %{entity.internal | blackboard: blackboard}}
+          |> MeleeSpell.interrupt()
+          |> Effects.enqueue([Effects.attack_stop(entity.object.guid, target), Effects.attacker_lost(target)])
+          |> mark_broadcast_update()
+
+        result(previous, entity, :attack_stop)
+    end
   end
 
   def die(%Mob{} = entity) do

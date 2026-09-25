@@ -2,9 +2,12 @@ defmodule ThistleTea.Game.Player.Attacking do
   @moduledoc "Validates player melee targets and starts the shared attack behavior."
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.Guid
@@ -38,6 +41,26 @@ defmodule ThistleTea.Game.Player.Attacking do
       send_attack_stop(state, target_guid)
     end
   end
+
+  def stop(%{character: %Character{} = character} = state) do
+    {character, events} = PlayerCombat.stop_melee_attack(character)
+    context = Context.new(self())
+    character = character |> EventSink.emit(events, context) |> EventSink.emit_pending(context)
+
+    character |> Core.update_object(:values) |> World.broadcast_packet(character)
+
+    case Map.get(state, :player_tick_ref) do
+      ref when is_reference(ref) -> Process.cancel_timer(ref)
+      _ -> :ok
+    end
+
+    state
+    |> Map.put(:character, character)
+    |> Map.put(:player_tick_ref, nil)
+    |> TickScheduler.ensure_scheduled()
+  end
+
+  def stop(state), do: state
 
   defp maybe_reset_attack_started(%Character{unit: %Unit{target: target}} = character, target_guid)
        when is_integer(target_guid) do

@@ -86,6 +86,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Server.Mob.Flight
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Entity.Server.Mob.PetCasting
+  alias ThistleTea.Game.Entity.Server.Mob.PetCommands
   alias ThistleTea.Game.Entity.Server.Mob.Pockets
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
   alias ThistleTea.Game.Entity.Server.Mob.SummonLifecycle
@@ -1224,6 +1225,26 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   rescue
     error ->
       Logger.error("Creature assistance failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:pet_stop_attack, controller}, %Mob{} = state) do
+    state = state |> PetCommands.stop_attack(controller) |> EventSink.emit_pending() |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet attack stop failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:pet_cancel_aura, controller, spell}, %Mob{} = state) do
+    previous = state
+    state = state |> PetCommands.cancel_aura(controller, spell) |> EventSink.emit_pending()
+    state = state |> sync_behavior_tree(previous) |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet aura cancellation failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 

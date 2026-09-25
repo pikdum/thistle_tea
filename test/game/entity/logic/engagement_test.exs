@@ -11,6 +11,8 @@ defmodule ThistleTea.Game.Entity.Logic.EngagementTest do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
 
   @combat_flag 0x00080000
   @tapped_flag 0x0004
@@ -82,6 +84,56 @@ defmodule ThistleTea.Game.Entity.Logic.EngagementTest do
       assert creature.unit.target == 30
       assert creature.internal.combat_leash.generation == 2
       assert creature.internal.combat_leash.last_extended_at == 3_000
+    end
+  end
+
+  describe "stop_attack/1" do
+    test "stops melee and queued abilities while retaining the rest of the engagement" do
+      %{entity: mob} = Engagement.enter(mob(), 20, 1_000, selection())
+      mob = Engagement.claim(mob, %Tap{player: 20, group_id: 7})
+      casting = %Cast{spell: %Spell{id: 116}, phase: :preparing}
+      blackboard = mob.internal.blackboard
+      blackboard = %{blackboard | combat: %{blackboard.combat | next_attack_at: 12_345}}
+
+      mob = %{
+        mob
+        | internal: %{
+            mob.internal
+            | casting: casting,
+              next_swing_spell: %Spell{id: 78},
+              blackboard: blackboard,
+              events: []
+          }
+      }
+
+      assert %Engagement.Result{
+               entity: stopped,
+               from: :engaged,
+               to: :engaged,
+               previous_victim: 20,
+               victim: nil,
+               victim_changed?: true
+             } = Engagement.stop_attack(mob)
+
+      assert stopped.internal.threat == mob.internal.threat
+      assert stopped.internal.loot == mob.internal.loot
+      assert stopped.internal.combat_leash == mob.internal.combat_leash
+      assert stopped.movement_block == mob.movement_block
+      assert stopped.unit.flags == mob.unit.flags
+      assert stopped.internal.casting == casting
+      assert stopped.internal.blackboard.combat.next_attack_at == 12_345
+      refute stopped.internal.blackboard.combat.attack_started
+      assert stopped.internal.next_swing_spell == nil
+      assert Enum.any?(stopped.internal.events, &match?(%Effects.AttackStop{target_guid: 20}, &1))
+      assert Enum.any?(stopped.internal.events, &match?(%Effects.AttackerLost{target_guid: 20}, &1))
+
+      assert Enum.any?(
+               stopped.internal.events,
+               &match?(%Effects.SpellCastFailed{spell_id: 78, reason: :interrupted}, &1)
+             )
+
+      assert Engagement.stop_attack(stopped).entity == stopped
+      assert Engagement.enter(stopped, 20, 2_000, selection()).entity.unit.target == 20
     end
   end
 
