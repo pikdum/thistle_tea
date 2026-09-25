@@ -103,6 +103,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         detect_range_modifier: Aura.flat_amount(mob, :mod_detect_range),
         in_combat: false,
         rooted?: mob.internal.rooted? == true,
+        root_aura?: Aura.has_aura?(mob, :mod_root),
         health_pct: Core.health_pct(mob),
         health_deficit: Core.health_deficit(mob),
         mana_pct: Core.mana_pct(mob),

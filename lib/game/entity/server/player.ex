@@ -1731,6 +1731,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         insignia: Insignia.projection(character),
         in_combat: character.internal.in_combat == true,
         rooted?: character.internal.rooted? == true,
+        root_aura?: Aura.has_aura?(character, :mod_root),
         health_pct: Core.health_pct(character),
         mana_pct: Core.mana_pct(character),
         power_type: character.unit.power_type,

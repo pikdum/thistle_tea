@@ -1379,6 +1379,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           level: state.unit.level,
           in_combat: state.internal.in_combat == true,
           rooted?: state.internal.rooted? == true,
+          root_aura?: Aura.has_aura?(state, :mod_root),
           health_pct: Core.health_pct(state),
           health_deficit: Core.health_deficit(state),
           mana_pct: Core.mana_pct(state),

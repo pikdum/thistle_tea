@@ -154,6 +154,7 @@ defmodule ThistleTea.Game.Player.Login do
         ghost?: Death.ghost?(c),
         in_combat: c.internal.in_combat == true,
         rooted?: c.internal.rooted? == true,
+        root_aura?: AuraLogic.has_aura?(c, :mod_root),
         health_pct: Core.health_pct(c),
         mana_pct: Core.mana_pct(c),
         shapeshift_form: c.unit.shapeshift_form,

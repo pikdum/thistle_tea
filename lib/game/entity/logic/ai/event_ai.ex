@@ -558,7 +558,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   defp satisfy(state, %AIEvent{event_type: :victim_rooted}, invoker_guid, %Context{perception: perception}) do
     with true <- in_combat?(state),
          target when is_integer(target) <- victim(state),
-         %{rooted?: true} <- Perception.metadata(perception, target) do
+         %{root_aura?: true} <- Perception.metadata(perception, target) do
       {:ok, invoker_guid}
     else
       _ -> :skip

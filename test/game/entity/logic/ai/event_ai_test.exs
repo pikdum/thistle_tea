@@ -367,12 +367,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       rooted = event(:victim_rooted, param1: 10_000, param2: 10_000, repeatable?: true)
       mob = mob(events: [rooted], in_combat: true)
       mob = %{mob | unit: %{mob.unit | target: target}}
-      context = target_context(mob, target, %{rooted?: true})
+      context = target_context(mob, target, %{rooted?: true, root_aura?: true})
 
       {mob, blackboard} = EventAI.tick(mob, Blackboard.new(), 1_000, context)
 
       assert [%Effects.MonsterTalk{}] = mob.internal.events
       assert blackboard.event_ai.timers[0] == 11_000
+    end
+
+    test "movement roots from stun or logout do not fire victim-rooted events" do
+      target = Guid.from_low_guid(:player, 3)
+      rooted = event(:victim_rooted, param1: 10_000, param2: 10_000, repeatable?: true)
+      mob = mob(events: [rooted], in_combat: true)
+      mob = %{mob | unit: %{mob.unit | target: target}}
+      context = target_context(mob, target, %{rooted?: true, root_aura?: false})
+
+      {mob, blackboard} = EventAI.tick(mob, Blackboard.new(), 1_000, context)
+
+      assert mob.internal.events == []
+      refute Map.has_key?(blackboard.event_ai.timers, 0)
     end
 
     test "fires target-mana events from immutable perception" do
