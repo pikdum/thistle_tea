@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Waypoints
@@ -34,6 +35,62 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   setup [:mob]
 
   describe "MOVE_TO completion" do
+    test "random-point moves use the observed destination without treating radius as facing", %{mob: mob} do
+      mob = %{mob | movement_block: %{mob.movement_block | position: {0.0, 0.0, 0.0, 0.0}, run_speed: 7.0}}
+
+      step = %ScriptStep{
+        command: :move_to,
+        datalong: 3,
+        datalong2: 2_000,
+        datalong3: 5,
+        datalong4: 2,
+        dataint: 7,
+        position: {10.0, 0.0, 0.0, 5.0}
+      }
+
+      destination = {11.0, 2.0, 0.5}
+      navigation = Navigation.new(%{{mob.internal.world.map_id, {10.0, 0.0, 0.0}, 5.0} => destination})
+      context = Context.new(100, navigation: navigation)
+      {requested, _} = Script.run(mob, Blackboard.new(), [step], nil, context)
+      assert [intent] = requested.internal.navigation_intents
+      assert intent.destination == destination
+      refute Keyword.has_key?(intent.opts, :face_angle)
+      moved = NavigationResolver.resolve(requested, 100, fn _, _, ^destination, _ -> [destination] end)
+      completed = Movement.sync_position(moved, 2_100)
+      assert {11.0, 2.0, 0.5, facing} = completed.movement_block.position
+      refute facing == 5.0
+      assert %Effects.MovementInform{motion_type: 9, point_id: 7} in completed.internal.events
+    end
+
+    test "random-point moves fall back to the authored center when navigation finds no point", %{mob: mob} do
+      for radius <- [0.0, 0.05, 5.0] do
+        step = %ScriptStep{command: :move_to, datalong: 3, position: {10.0, 20.0, 30.0, radius}}
+        {requested, _} = Script.run(mob, Blackboard.new(), [step], nil, Context.new(0))
+        assert [intent] = requested.internal.navigation_intents
+        assert intent.destination == {10.0, 20.0, 30.0}
+        refute Keyword.has_key?(intent.opts, :face_angle)
+      end
+    end
+
+    test "random-point moves preserve movement inhibition and the force flag", %{mob: mob} do
+      rooted = %{mob | movement_block: %{mob.movement_block | movement_flags: 0x08000000}}
+      step = %ScriptStep{command: :move_to, datalong: 3, position: {10.0, 0.0, 0.0, 5.0}}
+      {blocked, _} = Script.run(rooted, Blackboard.new(), [step], nil, Context.new(0))
+      assert blocked.internal.navigation_intents == []
+      {forced, _} = Script.run(rooted, Blackboard.new(), [%{step | datalong4: 1}], nil, Context.new(0))
+      assert length(forced.internal.navigation_intents) == 1
+      dead = %{mob | unit: %{mob.unit | health: 0}}
+      {blocked, _} = Script.run(dead, Blackboard.new(), [%{step | datalong4: 1}], nil, Context.new(0))
+      assert blocked.internal.navigation_intents == []
+    end
+
+    test "nested scripts request each random region once" do
+      point = %ScriptStep{command: :move_to, datalong: 3, position: {10.0, 0.0, 0.0, 5.0}}
+      nested = %ScriptStep{command: :start_script, sub_scripts: %{7 => [point]}}
+      tiny = %{point | position: {10.0, 0.0, 0.0, 0.05}}
+      assert Script.random_point_requests([point, nested, tiny]) == [{{10.0, 0.0, 0.0}, 5.0}]
+    end
+
     test "preserves point identity, run mode, travel time, and facing", %{mob: mob} do
       mob = %{mob | movement_block: %{mob.movement_block | position: {0.0, 0.0, 0.0, 0.0}, run_speed: 7.0}}
 

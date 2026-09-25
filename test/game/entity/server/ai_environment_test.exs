@@ -53,6 +53,25 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   end
 
   describe "context/3" do
+    @tag :namigator_maps
+    test "prepares random movement regions for EventAI and explicit script continuations" do
+      world = WorldRef.open(1)
+      anchor = {-288.089, -1874.42, 92.743}
+      step = %ScriptStep{command: :move_to, datalong: 3, position: Tuple.insert_at(anchor, 3, 5.0)}
+      event = %AIEvent{event_type: :timer_ooc, actions: [[step]]}
+      actor = mob(world)
+      actor = %{actor | internal: %{actor.internal | creature: %Creature{ai_events: [event]}}}
+      request = Request.new([], 0.0, random_points: [{{-219.482, -1930.82, 93.553}, 5.0}])
+      context = AIEnvironment.context(actor, 0, request)
+      assert map_size(context.navigation.random_points) == 2
+
+      for {{1, {x, y, _}, radius}, point} <- context.navigation.random_points do
+        assert {px, py, pz} = point
+        assert :math.sqrt((px - x) ** 2 + (py - y) ** 2) <= radius
+        assert pz > 90 and pz < 98
+      end
+    end
+
     test "a charmed player observes its controller and every threat candidate" do
       world = WorldRef.open(999)
       caster = Guid.from_low_guid(:mob, 1, 98_190)

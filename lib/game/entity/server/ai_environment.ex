@@ -77,7 +77,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       now: now,
       perception: perception,
       random: random,
-      navigation: navigation(entity, now, perception, random),
+      navigation: navigation(entity, now, perception, random, request.random_points),
       waypoints: WaypointLoader.context(),
       script_conditions: Map.get(condition_results, condition_target, %{}),
       script_conditions_by_target: condition_results,
@@ -510,10 +510,10 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     }
   end
 
-  defp navigation(entity, now, perception, random) do
+  defp navigation(entity, now, perception, random, requested_points) do
     navigation =
       entity
-      |> random_point_requests(now)
+      |> random_point_requests(now, requested_points)
       |> Map.new(fn {map_id, anchor, radius} ->
         {{map_id, anchor, radius},
          Aquatic.random_point(map_id, anchor, radius, NavigationResolver.path_options(entity))}
@@ -528,10 +528,15 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     end
   end
 
-  defp random_point_requests(entity, now) do
+  defp random_point_requests(entity, now, requested_points) do
     wander = if not CreatureMovement.flying?(entity), do: wander_request(entity, now)
+    waypoint_points = Script.random_point_requests(waypoint_steps(entity))
 
-    [wander, Confusion.request(entity, now)]
+    scripts =
+      (requested_points ++ EventAI.random_point_requests(entity) ++ waypoint_points)
+      |> Enum.map(fn {anchor, radius} -> {entity.internal.world.map_id, anchor, radius} end)
+
+    [wander, Confusion.request(entity, now) | scripts]
     |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
   end

@@ -233,7 +233,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
               game_object_radius: Script.game_object_observation_radius(steps),
               script_conditions: Script.conditions(steps),
               script_targets: Script.target_requests(steps),
-              creature_entries: Script.creature_entries(steps)
+              creature_entries: Script.creature_entries(steps),
+              random_points: Script.random_point_requests(steps)
             )
           )
         )
@@ -1172,7 +1173,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
                 game_object_radius: Script.game_object_observation_radius(steps),
                 script_conditions: Script.conditions(steps),
                 script_targets: Script.target_requests(steps),
-                creature_entries: Script.creature_entries(steps)
+                creature_entries: Script.creature_entries(steps),
+                random_points: Script.random_point_requests(steps)
               )
             )
           )

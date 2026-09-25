@@ -97,6 +97,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     |> Script.target_requests()
   end
 
+  def random_point_requests(state) do
+    state
+    |> events()
+    |> Enum.flat_map(fn %AIEvent{actions: actions} -> List.flatten(actions) end)
+    |> Script.random_point_requests()
+  end
+
   def conditions(state) do
     state
     |> events()

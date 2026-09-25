@@ -342,8 +342,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     end
   end
 
-  defp execute(state, blackboard, %ScriptStep{command: :move_to, datalong: 0} = step, _target, _now, %Context{}) do
-    {__MODULE__.MoveTo.apply(state, step), blackboard}
+  defp execute(
+         state,
+         blackboard,
+         %ScriptStep{command: :move_to, datalong: mode} = step,
+         _target,
+         _now,
+         %Context{} = context
+       )
+       when mode in [0, 3] do
+    {__MODULE__.MoveTo.apply(state, step, context), blackboard}
   end
 
   defp execute(
@@ -1590,6 +1598,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
       own = if step.command == :update_entry, do: [step.datalong], else: []
       nested = step.sub_scripts |> Map.values() |> List.flatten() |> creature_entries()
       own ++ nested
+    end)
+    |> Enum.uniq()
+  end
+
+  def random_point_requests(steps) when is_list(steps) do
+    Enum.flat_map(steps, fn %ScriptStep{} = step ->
+      nested = step.sub_scripts |> Map.values() |> List.flatten() |> random_point_requests()
+      __MODULE__.MoveTo.request(step) ++ nested
     end)
     |> Enum.uniq()
   end
