@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   """
   import Bitwise, only: [&&&: 2]
 
+  alias ThistleTea.Game.Entity.Logic.Druid
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Priest
   alias ThistleTea.Game.Entity.Logic.Warlock
@@ -68,6 +69,9 @@ defmodule ThistleTea.Game.Spell.Scripts do
   end
 
   def shapeshift_passives(form), do: Map.get(@shapeshift_passives, form, [])
+
+  defdelegate form_aura_ids(spell), to: Druid
+  defdelegate form_aura_spell(parent, spell), to: Druid
 
   @overpower_family_mask 0x00000004
   @execute_damage_spell 20_647

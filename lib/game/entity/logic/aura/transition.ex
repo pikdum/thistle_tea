@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Aura.Capacity
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.ControlSync
+  alias ThistleTea.Game.Entity.Logic.Aura.HealthSync
   alias ThistleTea.Game.Entity.Logic.Aura.Linked
   alias ThistleTea.Game.Entity.Logic.Aura.ModifierSync
   alias ThistleTea.Game.Entity.Logic.Aura.MountSync
@@ -52,8 +53,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
 
   @cat_form 1
   @feral_forms [1, 5, 8]
-  @leader_of_the_pack 17_007
-  @leader_of_the_pack_aura 24_932
   @furor_talents [17_056, 17_058, 17_059, 17_060, 17_061]
   @furor_energize 17_099
   @furor_rage 17_057
@@ -72,6 +71,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     desired = Silithyst.reconcile(desired)
     desired = StackingProc.reconcile(previous, desired)
     desired = Linked.reconcile(entity, previous, desired, now)
+    desired = Capacity.retain(desired, entity_guid(entity))
+    desired = Enum.filter(desired, &Linked.active?(&1, desired, now))
 
     if desired == previous do
       {entity, []}
@@ -95,6 +96,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     entity =
       entity
       |> put_holders(holders)
+      |> HealthSync.sync(entity.unit)
       |> Appearance.reconcile_equipment(previous, holders)
       |> TauntSync.sync(previous, holders)
       |> ComboPoints.expire(removed, cause)
@@ -263,7 +265,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
         {current, sit_events} =
           current
           |> maybe_reset_shapeshift_power(holder)
-          |> maybe_heal_increased_health(holder)
           |> maybe_interrupt_casting(holder)
           |> maybe_sit(holder)
 
@@ -296,10 +297,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   defp shapeshift_talent_events(%{object: %{guid: guid}, unit: %Unit{} = unit} = entity, %Holder{} = holder) do
     case shapeshift_form_misc(holder) do
       form when form in @feral_forms ->
-        leader_of_the_pack_events(entity, guid, unit.level) ++ furor_events(entity, guid, unit.level, form)
-
-      form when is_integer(form) ->
-        [Effects.remove_aura(guid, guid, @leader_of_the_pack_aura)]
+        furor_events(entity, guid, unit.level, form)
 
       _no_form ->
         []
@@ -311,14 +309,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
       %Aura{type: :mod_shapeshift, misc_value: misc} when is_integer(misc) and misc > 0 -> misc
       _aura -> nil
     end)
-  end
-
-  defp leader_of_the_pack_events(entity, guid, level) do
-    if holder_spell?(entity, @leader_of_the_pack) do
-      [Effects.trigger_spell(guid, level || 1, guid, @leader_of_the_pack_aura)]
-    else
-      []
-    end
   end
 
   defp furor_events(entity, guid, level, form) do
@@ -346,12 +336,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   end
 
   defp furor_chance(_entity), do: 0
-
-  defp holder_spell?(%{unit: %Unit{auras: holders}}, spell_id) when is_list(holders) do
-    Enum.any?(holders, &match?(%Holder{spell: %Spell{id: ^spell_id}}, &1))
-  end
-
-  defp holder_spell?(_entity, _spell_id), do: false
 
   defp maybe_reset_shapeshift_power(%{unit: %Unit{} = unit} = entity, %Holder{} = holder) do
     cond do
@@ -419,18 +403,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   end
 
   defp clear_casting(entity), do: Casting.cancel(entity)
-
-  defp maybe_heal_increased_health(entity, %Holder{auras: auras}) do
-    auras
-    |> Enum.reduce(0, fn
-      %Aura{type: :mod_increase_health, amount: amount}, acc when is_integer(amount) and amount > 0 -> acc + amount
-      _aura, acc -> acc
-    end)
-    |> case do
-      0 -> entity
-      amount -> Core.heal(entity, amount)
-    end
-  end
 
   defp maybe_sit(%{unit: %Unit{stand_state: stand_state} = unit} = entity, %Holder{spell: %Spell{} = spell}) do
     if (spell.aura_interrupt_flags &&& @aura_interrupt_not_seated) != 0 and stand_state != @stand_state_sit do

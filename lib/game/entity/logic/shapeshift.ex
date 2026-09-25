@@ -16,6 +16,15 @@ defmodule ThistleTea.Game.Entity.Logic.Shapeshift do
   @protected_mechanics [1, 2, 5, 8, 12, 13, 18, 20, 23, 24, 27, 30]
   @shapeshifting_cancels 0x00008000
 
+  def form(holders) when is_list(holders) do
+    case forms(holders) do
+      [{_key, form} | _forms] -> form
+      [] -> if Enum.any?(holders, &Holder.has_aura_type?(&1, :mod_stealth)), do: 30, else: 0
+    end
+  end
+
+  def form(_holders), do: 0
+
   def interrupt_holders(previous, desired, target_guid) do
     previous_forms = forms(previous)
     current_forms = forms(desired)

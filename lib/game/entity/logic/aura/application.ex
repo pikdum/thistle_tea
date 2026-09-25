@@ -143,6 +143,17 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     }
   end
 
+  def form_holder(entity, %Spell{} = spell, source, now) do
+    radius = area_radius(spell, Modifiers.snapshot(entity, spell))
+
+    %{
+      linked_holder(entity, spell, source, now)
+      | spell: spell,
+        area_radius: radius,
+        next_area_refresh_at: if(is_number(radius), do: now)
+    }
+  end
+
   defp passive_holder(entity, %Spell{} = spell, now) do
     context = %CastContext{caster_guid: entity.object.guid, caster_level: entity.unit.level || 1}
 

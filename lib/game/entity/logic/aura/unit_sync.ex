@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   alias ThistleTea.Game.Entity.Logic.Aura.PowerCostSync
   alias ThistleTea.Game.Entity.Logic.CombatControl
   alias ThistleTea.Game.Entity.Logic.Empathy
+  alias ThistleTea.Game.Entity.Logic.Shapeshift
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
@@ -87,17 +88,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   end
 
   defp sync_shapeshift(%Unit{auras: holders} = unit) when is_list(holders) do
-    auras = Enum.flat_map(holders, fn %Holder{auras: auras} -> auras end)
-
-    shapeshift =
-      Enum.find_value(auras, fn
-        %Aura{type: :mod_shapeshift, misc_value: misc} when is_integer(misc) and misc > 0 -> misc
-        _ -> nil
-      end)
-
-    stealth = Enum.any?(auras, &(&1.type == :mod_stealth))
-    form = shapeshift || if(stealth, do: 30, else: 0)
-
+    form = Shapeshift.form(holders)
     sync_druid_power(%{unit | shapeshift_form: form}, form)
   end
 

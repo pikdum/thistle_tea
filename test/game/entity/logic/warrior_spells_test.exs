@@ -941,7 +941,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       {entity, _events} = Aura.remove_spells(entity, [buff.id], 5_000)
 
       assert entity.unit.max_health == 100
-      assert entity.unit.health == 80
+      assert entity.unit.health == 50
     end
   end
 

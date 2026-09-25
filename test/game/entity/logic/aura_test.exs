@@ -1324,7 +1324,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
               ]} = Aura.reactions(entity, :spell_hit_dealt, context)
     end
 
-    test "shapeshifting into a feral form procs furor and leader of the pack" do
+    test "shapeshifting into a feral form procs furor" do
       entity = fixture_entity()
 
       furor = %Spell{
@@ -1332,13 +1332,6 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
         name: "Furor",
         duration_ms: -1,
         effects: [%Effect{index: 0, type: :apply_aura, base_points: 99, die_sides: 1, base_dice: 1, aura: :dummy}]
-      }
-
-      leader_of_the_pack = %Spell{
-        id: 17_007,
-        name: "Leader of the Pack",
-        duration_ms: -1,
-        effects: [%Effect{index: 0, type: :apply_aura, base_points: 0, die_sides: 0, aura: :dummy}]
       }
 
       cat_form = %Spell{
@@ -1351,10 +1344,8 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       }
 
       {entity, _events} = apply_spell(entity, 1, 40, furor)
-      {entity, _events} = apply_spell(entity, 1, 40, leader_of_the_pack)
       {_entity, events} = apply_spell(entity, 1, 40, cat_form)
 
-      assert Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 24_932))
       assert Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 17_099))
     end
 

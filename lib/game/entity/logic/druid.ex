@@ -10,11 +10,37 @@ defmodule ThistleTea.Game.Entity.Logic.Druid do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
 
   @druid_family 7
   @rejuvenation_mask 0x10
   @regrowth_mask 0x40
   @enrage_armor_spell 25_503
+  @heart_of_the_wild_icon 240
+  @heart_of_the_wild_forms [24_899, 24_900]
+
+  def form_aura_ids(%Spell{id: 17_007}), do: [24_932]
+
+  def form_aura_ids(%Spell{spell_icon: @heart_of_the_wild_icon, effects: effects}) do
+    if Enum.any?(effects, &match?(%Effect{aura: :mod_total_stat_percent, misc_value: 3}, &1)),
+      do: @heart_of_the_wild_forms,
+      else: []
+  end
+
+  def form_aura_ids(_spell), do: []
+
+  def form_aura_spell(%Holder{auras: auras}, %Spell{id: id} = spell) when id in @heart_of_the_wild_forms do
+    amount =
+      Enum.find_value(auras, 0, fn
+        %Aura{type: :mod_total_stat_percent, misc_value: 3, amount: amount} -> amount
+        _aura -> nil
+      end)
+
+    effects = Enum.map(spell.effects, &%{&1 | base_points: amount, base_dice: 0, die_sides: 0})
+    %{spell | effects: effects}
+  end
+
+  def form_aura_spell(_parent, spell), do: spell
 
   def ferocious_bite?(%Spell{} = spell) do
     Spell.vmangos_script?(spell, "spell_druid_ferocious_bite")

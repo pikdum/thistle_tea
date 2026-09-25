@@ -259,8 +259,20 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> struct!(power_fields(row))
     |> append_shapeshift_passives(radius_lookup)
     |> load_linked_auras(MapSet.put(ancestors, row.id))
+    |> load_form_auras(MapSet.put(ancestors, row.id))
     |> load_passive_dependencies(MapSet.put(ancestors, row.id))
     |> Semantics.compile()
+  end
+
+  defp load_form_auras(%SpellData{} = spell, ancestors) do
+    auras =
+      for id <- Scripts.form_aura_ids(spell),
+          not MapSet.member?(ancestors, id),
+          row = DBC.get(Spell, id),
+          not is_nil(row),
+          do: build(row, ancestors)
+
+    %{spell | form_auras: auras}
   end
 
   defp load_passive_dependencies(%SpellData{} = spell, ancestors) do
