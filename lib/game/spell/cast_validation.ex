@@ -10,6 +10,9 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   import Bitwise, only: [&&&: 2, <<<: 2]
 
   alias ThistleTea.Game.Duel
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Ammunition
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Aura.Dispel
@@ -413,10 +416,21 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     power = if field, do: Map.get(unit, field)
     power = if is_integer(power), do: power, else: 0
 
-    if godmode?(caster) or power >= cost, do: :ok, else: {:error, :no_power}
+    if creature_ignores_power?(caster, power_type) or godmode?(caster) or power >= cost,
+      do: :ok,
+      else: {:error, :no_power}
   end
 
   defp check_power(_caster, _spell), do: :ok
+
+  defp creature_ignores_power?(%Mob{internal: %Internal{pet: nil}}, power_type) when power_type in 1..4, do: true
+
+  defp creature_ignores_power?(%Mob{internal: %Internal{pet: nil}, unit: %Unit{} = unit}, 0),
+    do: (unit.base_mana || unit.max_power1 || 0) == 0
+
+  defp creature_ignores_power?(_caster, _power_type), do: false
+
+  defp check_equipped_item(%Mob{}, _spell, _equipped_items), do: :ok
 
   defp check_equipped_item(caster, %Spell{equipped_item_class: class} = spell, equipped_items)
        when is_integer(class) and class >= 0 and is_list(equipped_items) do

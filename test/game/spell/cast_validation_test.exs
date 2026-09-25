@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
 
   alias ThistleTea.Game.Aura, as: AuraData
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -20,6 +21,61 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
   alias ThistleTea.Game.WorldRef
 
   @now 10_000
+
+  describe "validate/6 creature resources" do
+    test "ordinary creatures can use non-mana abilities without those power pools" do
+      for type <- 1..4 do
+        spell = helpful_spell(mana_cost: 60, power_type: type)
+        assert :ok = CastValidation.validate(caster(), spell, Target.none(), nil, @now)
+      end
+    end
+
+    test "creatures without base mana can cast mana abilities" do
+      npc = caster(power1: 0, max_power1: 0, base_mana: 0)
+      assert :ok = CastValidation.validate(npc, helpful_spell(mana_cost: 60, power_type: 0), Target.none(), nil, @now)
+    end
+
+    test "mana-using creatures still need enough current mana" do
+      for max_mana <- [0, 100] do
+        npc = caster(power1: 0, max_power1: max_mana, base_mana: 100)
+
+        assert {:error, :no_power} =
+                 CastValidation.validate(npc, helpful_spell(mana_cost: 60, power_type: 0), Target.none(), nil, @now)
+      end
+    end
+
+    test "pets and players still require every requested power type" do
+      npc = caster(power1: 0, max_power1: 0, base_mana: 0)
+      pet = %{npc | internal: %{npc.internal | pet: %Pet{owner_guid: 1}}}
+      player = %Character{object: npc.object, unit: npc.unit, internal: npc.internal}
+
+      for source <- [pet, player], type <- 0..4 do
+        spell = helpful_spell(mana_cost: 60, power_type: type)
+        assert {:error, :no_power} = CastValidation.validate(source, spell, Target.none(), nil, @now)
+      end
+    end
+
+    test "creatures require health strictly above a health cost" do
+      npc = caster(health: 60, power1: 0, max_power1: 0, base_mana: 0)
+      spell = helpful_spell(mana_cost: 60, power_type: -2)
+      assert {:error, :no_power} = CastValidation.validate(npc, spell, Target.none(), nil, @now)
+    end
+
+    test "weapon item restrictions apply to player inventories" do
+      npc = caster()
+      player = %Character{object: npc.object, unit: npc.unit, internal: npc.internal}
+      spell = helpful_spell(mana_cost: 0, equipped_item_class: 2, equipped_item_subclass_mask: 0x8000)
+      assert :ok = CastValidation.validate(npc, spell, Target.none(), nil, @now)
+
+      assert {:error, :equipped_item_class} =
+               CastValidation.validate(player, spell, Target.none(), nil, @now)
+
+      assert :ok =
+               CastValidation.validate(player, spell, Target.none(), nil, @now,
+                 equipped_items: [%{class: 2, subclass: 15}]
+               )
+    end
+  end
 
   describe "validate/6 spell areas" do
     test "rejects an out-of-area cast before spending power" do
