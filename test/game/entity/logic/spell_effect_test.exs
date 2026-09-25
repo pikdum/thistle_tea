@@ -118,7 +118,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   defp avoidance_proc_ex(:parry), do: 0x20
   defp avoidance_proc_ex(:block), do: 0x40
 
-  defp assert_avoided_melee_ability_reaction(outcome) do
+  defp assert_avoided_melee_ability_reaction(outcome, class \\ 1) do
     spell = %Spell{
       id: 72,
       school: :physical,
@@ -139,17 +139,30 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       weapon_base_max: 10
     }
 
-    {target, events} =
-      avoided_melee_ability_target(outcome)
-      |> SpellEffect.receive(context, spell, 1_000)
+    target = avoided_melee_ability_target(outcome)
+    target = %{target | unit: %{target.unit | class: class}}
+    {target, events} = SpellEffect.receive(target, context, spell, 1_000)
 
     assert target.unit.health == 100
     assert %Effects.SpellLogMiss{reason: ^outcome} = Enum.find(events, &is_struct(&1, Effects.SpellLogMiss))
     assert %Effects.AttackOutcome{outcome: ^outcome} = Enum.find(events, &is_struct(&1, Effects.AttackOutcome))
     assert %Effects.TriggerSpell{spell_id: 90_002} = Enum.find(events, &is_struct(&1, Effects.TriggerSpell))
+    target
   end
 
   describe "receive/4" do
+    test "parried special attacks open the class-specific reactive window" do
+      rogue = assert_avoided_melee_ability_reaction(:parry, 4)
+      assert rogue.unit.aura_state == 1
+      assert rogue.internal.defense_window.target_guid == 999
+      assert rogue.internal.defense_window.expires_at == 5_000
+
+      hunter = assert_avoided_melee_ability_reaction(:parry, 3)
+      assert hunter.unit.aura_state == 0x40
+      assert hunter.internal.defense_window == nil
+      assert hunter.internal.hunter_parry_window.target_guid == 999
+    end
+
     test "master-targeted auras stay on the owner while caster effects stay on the pet" do
       spell = %Spell{
         id: 99_027,

@@ -282,7 +282,7 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
   describe "validate_reactive/4" do
     test "mongoose bite requires a dodge against the selected target" do
       mongoose = %Spell{script_name: "spell_hunter_mongoose_bite"}
-      hunter = %Character{unit: %Unit{}, internal: %Internal{}}
+      hunter = %Character{unit: %Unit{class: 3, health: 100}, player: %Player{}, internal: %Internal{}}
       hunter = Reactive.mark_defense(hunter, 7, :dodge, 1_000)
 
       assert Hunter.validate_reactive(hunter, mongoose, 7, 2_000) == :ok
@@ -292,7 +292,7 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
 
     test "counterattack requires a parry rather than any defense event" do
       counterattack = %Spell{script_name: "spell_hunter_counterattack"}
-      hunter = %Character{unit: %Unit{}, internal: %Internal{}}
+      hunter = %Character{unit: %Unit{class: 3, health: 100}, player: %Player{}, internal: %Internal{}}
       dodged = Reactive.mark_defense(hunter, 7, :dodge, 1_000)
       parried = Reactive.mark_defense(hunter, 7, :parry, 1_000)
 

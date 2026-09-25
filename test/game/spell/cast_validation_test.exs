@@ -8,8 +8,10 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Area
@@ -21,6 +23,39 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
   alias ThistleTea.Game.WorldRef
 
   @now 10_000
+
+  describe "validate/6 reactive windows" do
+    test "Counterattack requires a current parry against the selected target" do
+      npc = caster(class: 3)
+      hunter = %Character{object: npc.object, unit: npc.unit, player: %Player{}, internal: npc.internal}
+      spell = harmful_spell(caster_aura_state: 7, script_name: "spell_hunter_counterattack")
+
+      assert {:error, :cant_do_that_yet} =
+               CastValidation.validate(hunter, spell, Target.unit(7), hostile_target(), @now)
+
+      hunter = Reactive.mark_defense(hunter, 7, :parry, @now)
+      assert :ok = CastValidation.validate(hunter, spell, Target.unit(7), hostile_target(), @now + 1)
+
+      assert {:error, :bad_targets} =
+               CastValidation.validate(hunter, spell, Target.unit(8), hostile_target(guid: 8), @now + 1)
+
+      assert {:error, :cant_do_that_yet} =
+               CastValidation.validate(hunter, spell, Target.unit(7), hostile_target(), @now + 4_000)
+    end
+
+    test "Riposte remains unavailable after a dodge and becomes usable after a parry" do
+      npc = caster(class: 4)
+      rogue = %Character{object: npc.object, unit: npc.unit, player: %Player{}, internal: npc.internal}
+      spell = harmful_spell(caster_aura_state: 1)
+      rogue = Reactive.mark_defense(rogue, 7, :dodge, @now)
+
+      assert {:error, :cant_do_that_yet} =
+               CastValidation.validate(rogue, spell, Target.unit(7), hostile_target(), @now + 1)
+
+      rogue = Reactive.mark_defense(rogue, 7, :parry, @now + 100)
+      assert :ok = CastValidation.validate(rogue, spell, Target.unit(7), hostile_target(), @now + 101)
+    end
+  end
 
   describe "validate/6 terrain requirements" do
     test "restricts players with known terrain and leaves creatures and unknown terrain unaffected" do

@@ -329,7 +329,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       assert {:error, :cant_do_that_yet} =
                CastValidation.validate(caster, revenge_like(), Target.none(), nil, 1_000)
 
-      caster = Reactive.mark_defense(caster, 1_000)
+      caster = Reactive.mark_defense(caster, 77, :block, 1_000)
 
       assert :ok = CastValidation.validate(caster, revenge_like(), Target.none(), nil, 2_000)
       assert {:error, :cant_do_that_yet} = CastValidation.validate(caster, revenge_like(), Target.none(), nil, 9_000)

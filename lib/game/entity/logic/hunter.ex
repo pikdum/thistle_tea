@@ -33,14 +33,14 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
   def validate_companion(_caster, _spell), do: :ok
 
   def validate_reactive(caster, %Spell{} = spell, target_guid, now) do
-    outcome =
+    window =
       cond do
-        Spell.vmangos_script?(spell, "spell_hunter_mongoose_bite") -> :dodge
-        Spell.vmangos_script?(spell, "spell_hunter_counterattack") -> :parry
+        Spell.vmangos_script?(spell, "spell_hunter_mongoose_bite") -> :defense
+        Spell.vmangos_script?(spell, "spell_hunter_counterattack") -> :hunter_parry
         true -> nil
       end
 
-    if is_nil(outcome) or Reactive.defense_target_active?(caster, target_guid, outcome, now) do
+    if is_nil(window) or Reactive.target_active?(caster, window, target_guid, now) do
       :ok
     else
       {:error, :bad_targets}

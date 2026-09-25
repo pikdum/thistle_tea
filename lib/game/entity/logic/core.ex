@@ -336,7 +336,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   defp prepare_death_state(%{internal: %Internal{}, unit: %Unit{}, movement_block: %MovementBlock{}} = entity, now) do
     entity = Movement.sync_position(entity, now)
     entity = clear_death_engagement(entity)
-    entity = Reactive.consume_combo(entity, now)
+    entity = Reactive.clear(entity, now)
     unit = entity.unit
 
     {entity, aura_events} =

@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerFlags
   alias ThistleTea.Game.Entity.Logic.Pvp
+  alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.SpellThreat
@@ -113,6 +114,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> Buyback.reset()
       |> ItemDurations.restore()
       |> ChatStatus.reset()
+      |> Reactive.clear(Time.now())
       |> Logout.cancel(Time.now())
       |> Emote.reset()
       |> Instances.restore(character_guid)

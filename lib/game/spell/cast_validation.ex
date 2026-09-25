@@ -212,10 +212,15 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   @aura_state_defense 1
   @aura_state_healthless_20 2
+  @aura_state_hunter_parry 7
   @healthless_pct 20
 
   defp check_caster_aura_state(caster, %Spell{caster_aura_state: @aura_state_defense}, now) do
     if Reactive.defense_active?(caster, now), do: :ok, else: {:error, :cant_do_that_yet}
+  end
+
+  defp check_caster_aura_state(caster, %Spell{caster_aura_state: @aura_state_hunter_parry}, now) do
+    if Reactive.active?(caster, :hunter_parry, now), do: :ok, else: {:error, :cant_do_that_yet}
   end
 
   defp check_caster_aura_state(_caster, _spell, _now), do: :ok
