@@ -240,7 +240,10 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.SpellCastFailed{} = effect, context) do
     result = %{
       Message.SmsgCastResult.failure(effect.spell_id, effect.reason)
-      | required_spell_focus: effect.required_focus_id
+      | required_spell_focus: effect.required_focus_id,
+        area: effect.required_area,
+        equipped_item_class: effect.equipped_item_class,
+        equipped_item_subclass_mask: effect.equipped_item_subclass_mask
     }
 
     Context.send_packet(context, result)

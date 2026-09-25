@@ -6,6 +6,19 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResultTest do
   alias ThistleTea.Game.Spell.Area
 
   describe "to_binary/1" do
+    test "encodes ID-only failures with unknown requirements" do
+      for {reason, payload} <- [
+            requires_area: <<0::little-size(32)>>,
+            requires_spell_focus: <<0::little-size(32)>>,
+            equipped_item_class: <<-1::little-size(32), 0::little-size(32), 0::little-size(32)>>
+          ] do
+        code = SmsgCastResult.reason_code(reason)
+
+        assert SmsgCastResult.to_binary(SmsgCastResult.failure(123, reason)) ==
+                 <<123::little-size(32), 2, code>> <> payload
+      end
+    end
+
     test "includes the required area and safely encodes rules without a named area" do
       spell = %Spell{id: 6298, area_rules: [%Area{area_id: 148}]}
 

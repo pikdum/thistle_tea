@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
   alias __MODULE__, as: Effects
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Area
   alias ThistleTea.Game.Spell.Target
 
   def creature_group_event(event), do: %Effects.CreatureGroupEvent{event: event}
@@ -187,7 +188,14 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
   end
 
   def spell_cast_failed(%Spell{} = spell, reason) when is_atom(reason) do
-    %Effects.SpellCastFailed{spell_id: spell.id, reason: reason, required_focus_id: spell.required_focus_id}
+    %Effects.SpellCastFailed{
+      spell_id: spell.id,
+      reason: reason,
+      required_focus_id: spell.required_focus_id,
+      required_area: Area.required_area(spell),
+      equipped_item_class: spell.equipped_item_class,
+      equipped_item_subclass_mask: spell.equipped_item_subclass_mask
+    }
   end
 
   def spell_cast_failed(spell_id, reason) when is_integer(spell_id) and is_atom(reason) do

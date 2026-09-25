@@ -92,11 +92,11 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     :spell,
     :result,
     :reason,
-    :required_spell_focus,
-    :area,
-    :equipped_item_class,
-    :equipped_item_subclass_mask,
-    :equipped_item_inventory_type_mask
+    required_spell_focus: 0,
+    area: 0,
+    equipped_item_class: -1,
+    equipped_item_subclass_mask: 0,
+    equipped_item_inventory_type_mask: 0
   ]
 
   def failure(%Spell{} = spell, reason) when is_atom(reason) do

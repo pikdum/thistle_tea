@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Area
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World
@@ -40,6 +41,29 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   end
 
   describe "emit/2" do
+    test "preserves spell requirements through queued cast failures" do
+      character = %Character{
+        object: %Object{guid: unique_guid()},
+        internal: %Internal{world: WorldRef.instance(30, 1)},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      spell = %Spell{
+        id: 23_693,
+        area_rules: [%Area{area_id: 2597}],
+        required_focus_id: 3,
+        equipped_item_class: 2,
+        equipped_item_subclass_mask: 16
+      }
+
+      for reason <- [:requires_area, :requires_spell_focus, :equipped_item_class] do
+        EventSink.emit(character, Effects.spell_cast_failed(spell, reason), Context.new(self()))
+        assert_received {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{} = result}}
+        assert result == Message.SmsgCastResult.failure(spell, reason)
+        assert is_binary(Message.SmsgCastResult.to_binary(result))
+      end
+    end
+
     test "routes combo point awards to their caster and uses the explicit local owner" do
       caster_guid = unique_guid()
       award = %Effects.AddComboPoints{source_guid: caster_guid, target_guid: 99, amount: 2}
