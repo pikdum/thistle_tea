@@ -68,6 +68,28 @@ defmodule ThistleTea.Game.Player.CharactersTest do
       assert character.unit.power1 == character.unit.max_power1
     end
 
+    test "splits oversized starting quantities into legal item instances" do
+      cache_templates([template(6265, []), template(117, stackable: 20)])
+      assert {:ok, character} = Characters.create(character("Legalstacks", [{6265, 5}, {117, 45}]))
+      items = Inventory.owned_items(character.player, &ItemStore.get/1)
+      assert items |> Enum.filter(&(&1.object.entry == 6265)) |> Enum.map(& &1.item.stack_count) == [1, 1, 1, 1, 1]
+
+      assert items |> Enum.filter(&(&1.object.entry == 117)) |> Enum.map(& &1.item.stack_count) |> Enum.sort() == [
+               5,
+               20,
+               20
+             ]
+
+      refute_received {:"$gen_cast", {:send_packet, _packet}}
+    end
+
+    test "rejects an oversized starting grant atomically when its legal stacks cannot fit" do
+      cache_templates([template(6265, [])])
+      assert {:ok, character} = Characters.create(character("Nostackroom", [{6265, 17}]))
+      assert Inventory.count_entry(character.player, 6265, &ItemStore.get/1) == 0
+      assert :ets.tab2list(ItemStore) |> Enum.reject(fn {key, _value} -> key == :counter end) == []
+    end
+
     test "ignores missing starting item templates" do
       cache_templates([template(6948, inventory_type: 0)])
 

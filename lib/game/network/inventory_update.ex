@@ -32,18 +32,18 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
 
   def apply(state, result, placement \\ nil)
 
+  def apply(%Character{} = character, {:ok, %ChangeSet{} = change_set}, _placement) do
+    commit_items(change_set)
+    %{character | player: change_set.player}
+  end
+
   def apply(state, {:ok, %Player{} = player}, placement) do
     apply(state, {:ok, %{player: player, items: [], destroyed: []}}, placement)
   end
 
   def apply(state, {:ok, %ChangeSet{} = change_set}, _placement) do
     old_counts = Quests.quest_item_counts(state.character)
-    destroyed = ChangeSet.destroyed_items(change_set)
-    changed = ChangeSet.changed_items(change_set)
-    placed = ChangeSet.placed_items(change_set)
-
-    Enum.each(destroyed, fn item -> ItemStore.delete(item.object.guid) end)
-    Enum.each(changed ++ placed, &ItemStore.put/1)
+    commit_items(change_set)
 
     apply_committed(state, change_set, old_counts)
   end
@@ -85,6 +85,11 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
   def apply(state, {:error, error, item1_guid, item2_guid}, _placement) do
     send_failure(error, item1_guid, item2_guid)
     state
+  end
+
+  defp commit_items(%ChangeSet{} = change_set) do
+    Enum.each(ChangeSet.destroyed_items(change_set), fn item -> ItemStore.delete(item.object.guid) end)
+    Enum.each(ChangeSet.changed_items(change_set) ++ ChangeSet.placed_items(change_set), &ItemStore.put/1)
   end
 
   def apply_committed(state, %ChangeSet{} = change_set, old_counts, outgoing \\ []) do

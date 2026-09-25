@@ -6,8 +6,11 @@ defmodule ThistleTea.Game.Player.Characters do
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Proficiency
+  alias ThistleTea.Game.Network.InventoryUpdate
+  alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -86,15 +89,30 @@ defmodule ThistleTea.Game.Player.Characters do
     assign_item({item_id, 1}, character, get_template)
   end
 
-  defp assign_item({item_id, amount}, %Character{object: %{guid: owner_guid}} = character, get_template)
-       when is_integer(amount) and amount > 0 do
-    case ItemStore.create(item_id, owner: owner_guid, stack_count: amount, get_template: get_template) do
-      %Item{} = item -> equip_or_store_starting_item(character, item)
-      _ -> character
+  defp assign_item({item_id, amount}, %Character{} = character, get_template) when is_integer(amount) and amount > 0 do
+    case get_template.(item_id) do
+      %ItemTemplate{} = template -> assign_template(character, template, amount)
+      _missing -> character
     end
   end
 
   defp assign_item(_item, character, _get_template), do: character
+
+  defp assign_template(%Character{} = character, %ItemTemplate{} = template, count) do
+    if count <= max(template.stackable || 1, 1) do
+      item = ItemStore.create(template, owner: character.object.guid, stack_count: count)
+      equip_or_store_starting_item(character, item)
+    else
+      assign_stacks(character, template, count)
+    end
+  end
+
+  defp assign_stacks(%Character{} = character, %ItemTemplate{} = template, count) do
+    case Items.plan_store(character, template, count) do
+      {:ok, changes, _position} -> InventoryUpdate.apply(character, {:ok, changes})
+      {:error, _reason} -> character
+    end
+  end
 
   defp equip_or_store_starting_item(%Character{} = character, %Item{} = item) do
     case equip_starting_item(character, item) do
