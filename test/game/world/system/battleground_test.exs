@@ -200,6 +200,41 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
     end
 
+    test "queue cancellation preserves admitted players and their exit destinations", %{server: server} do
+      assert :ok = BattlegroundSystem.join(alliance(1), 489, server)
+      assert :ok = BattlegroundSystem.join(horde(2), 489, server)
+      return_to = {WorldRef.open(0), {10.0, 20.0, 30.0, 0.5}}
+      assert {:ok, world, _position} = BattlegroundSystem.port(1, 1, return_to, server)
+      assert {:ok, ^world, _position} = BattlegroundSystem.port(2, 1, return_to, server)
+      pid = BattlegroundSystem.match_for_world(world, server)
+      ref = Process.monitor(pid)
+
+      assert :ok = BattlegroundSystem.port(1, 0, nil, server)
+      assert :ok = BattlegroundSystem.leave_queue(2, server)
+      assert %{status: :in_progress} = BattlegroundSystem.status(1, server)
+      assert %{status: :in_progress} = BattlegroundSystem.status(2, server)
+      assert Map.keys(Match.snapshot(pid).players) |> Enum.sort() == [1, 2]
+
+      assert {:ok, ^return_to} = BattlegroundSystem.leave(1, {1.0, 2.0, 3.0, 4.0}, server)
+      assert Map.keys(Match.snapshot(pid).players) == [2]
+      assert {:ok, ^return_to} = BattlegroundSystem.leave(2, {5.0, 6.0, 7.0, 8.0}, server)
+      assert BattlegroundSystem.match_for_world(world, server) == nil
+      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
+    end
+
+    test "queue cancellation releases an outstanding invitation", %{server: server} do
+      assert :ok = BattlegroundSystem.join(alliance(1), 489, server)
+      assert {:ok, _status} = BattlegroundSystem.debug_start_queued(1, server)
+      world = WorldRef.instance(489, 1)
+      pid = BattlegroundSystem.match_for_world(world, server)
+      ref = Process.monitor(pid)
+
+      assert :ok = BattlegroundSystem.leave_queue(1, server)
+      assert %{status: :none} = BattlegroundSystem.status(1, server)
+      assert BattlegroundSystem.match_for_world(world, server) == nil
+      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
+    end
+
     test "ignores stopped matches before their monitor notifications arrive", %{server: server} do
       assert :ok = BattlegroundSystem.join(alliance(1), 489, server)
       assert :ok = BattlegroundSystem.join(horde(2), 489, server)

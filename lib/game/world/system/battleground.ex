@@ -204,7 +204,7 @@ defmodule ThistleTea.Game.World.System.Battleground do
   end
 
   def handle_call({:leave_queue, guid}, _from, state) do
-    {:reply, :ok, remove_player(state, guid, nil)}
+    {:reply, :ok, cancel_reservation(state, guid)}
   end
 
   def handle_call({:list, map_id, level}, _from, state) do
@@ -264,17 +264,7 @@ defmodule ThistleTea.Game.World.System.Battleground do
   end
 
   def handle_call({:port, guid, 0, _return_to}, _from, state) do
-    state =
-      case Map.get(state.players, guid) do
-        {:invited, pid, _team} ->
-          :ok = Match.leave(pid, guid, nil, dropped_flag_guid())
-          remove_player(state, guid, pid)
-
-        _status ->
-          remove_player(state, guid, nil)
-      end
-
-    {:reply, :ok, state}
+    {:reply, :ok, cancel_reservation(state, guid)}
   end
 
   def handle_call({:port, guid, 1, return_to}, _from, state) do
@@ -681,6 +671,20 @@ defmodule ThistleTea.Game.World.System.Battleground do
         worlds: Map.put(state.worlds, world, pid),
         next_instance_id: instance_id + 1
     }
+  end
+
+  defp cancel_reservation(state, guid) do
+    case Map.get(state.players, guid) do
+      {:invited, pid, _team} ->
+        :ok = Match.leave(pid, guid, nil, dropped_flag_guid())
+        remove_player(state, guid, pid)
+
+      {:queued, _key, _joined_at} ->
+        remove_player(state, guid, nil)
+
+      _status ->
+        state
+    end
   end
 
   defp remove_player(state, guid, expected_pid) do
