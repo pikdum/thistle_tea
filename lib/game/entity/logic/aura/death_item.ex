@@ -1,15 +1,26 @@
 defmodule ThistleTea.Game.Entity.Logic.Aura.DeathItem do
   @moduledoc """
-  Creates DBC-defined death items for eligible aura casters when a tapped
-  creature crosses the living-to-dead health transition.
+  Captures death-item rewards before death removes their auras. Soul Shards
+  require a non-gray honor or experience target and, for creatures, a tap.
+  Other death items use only their spell-defined item and quantity.
   """
+
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Experience
+  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Spell
+
+  defmodule Victim do
+    @moduledoc false
+    defstruct [:level, :tap, player?: false, shard_target?: true]
+  end
 
   def enqueue_rewards(entity, old_health, new_health)
 
@@ -20,38 +31,57 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.DeathItem do
 
   def enqueue_rewards(entity, _old_health, _new_health), do: entity
 
-  def reward_events(%{
-        unit: %Unit{level: victim_level, auras: holders},
-        internal: %Internal{loot: %Loot{tapped_by: %{player: tapped_player}}}
-      })
-      when is_integer(victim_level) and is_list(holders) and is_integer(tapped_player) do
+  def reward_events(%{unit: %Unit{auras: holders}} = entity) when is_list(holders) do
+    victim = victim(entity)
+
     holders
-    |> Enum.flat_map(&holder_rewards(&1, tapped_player, victim_level))
-    |> Enum.uniq_by(fn {caster_guid, _item_type, _count} -> caster_guid end)
-    |> Enum.map(fn {caster_guid, item_type, count} -> Effects.create_item(caster_guid, item_type, count) end)
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {holder, index} -> holder_rewards(holder, victim, index) end)
+    |> Enum.uniq_by(fn {key, _reward} -> key end)
+    |> Enum.map(fn {_key, reward} -> reward end)
   end
 
   def reward_events(_entity), do: []
 
-  defp holder_rewards(
-         %Holder{caster_guid: caster_guid, caster_level: caster_level, auras: auras},
-         caster_guid,
-         victim_level
-       )
-       when is_integer(caster_level) and caster_level > 0 and victim_level > 0 do
-    if victim_level > Experience.gray_level(caster_level) do
-      Enum.flat_map(auras, &aura_reward(&1, caster_guid))
-    else
-      []
-    end
+  def eligible?(%Effects.DeathItemReward{item_id: 6265, victim: %Victim{} = victim}, caster_level, tapped?)
+      when is_integer(caster_level) and caster_level > 0 and is_integer(victim.level) do
+    victim.shard_target? and victim.level > Experience.gray_level(caster_level) and (victim.player? or tapped?)
   end
 
-  defp holder_rewards(_holder, _tapped_player, _victim_level), do: []
+  def eligible?(%Effects.DeathItemReward{item_id: 6265}, _caster_level, _tapped?), do: false
+  def eligible?(%Effects.DeathItemReward{}, _caster_level, _tapped?), do: true
 
-  defp aura_reward(%Aura{type: :channel_death_item, item_type: item_type, amount: amount}, caster_guid)
-       when is_integer(item_type) and item_type > 0 do
-    [{caster_guid, item_type, max(amount || 0, 1)}]
+  defp victim(%{unit: %Unit{level: level}, player: %Player{}}), do: %Victim{level: level, player?: true}
+
+  defp victim(%{unit: %Unit{level: level}, internal: %Internal{} = internal} = entity) do
+    %Victim{
+      level: level,
+      tap: tap(internal.loot),
+      shard_target?:
+        not pet?(entity) and is_nil(internal.totem) and
+          not match?(%Creature{experience_multiplier: multiplier} when multiplier == 0, internal.creature)
+    }
   end
 
-  defp aura_reward(_aura, _caster_guid), do: []
+  defp pet?(%{object: %{guid: guid}}) when is_integer(guid), do: Guid.high_guid(guid) == Guid.high_guid(:pet)
+  defp pet?(_entity), do: false
+
+  defp tap(%Loot{tapped_by: tap}), do: tap
+  defp tap(_loot), do: nil
+
+  defp holder_rewards(%Holder{spell: %Spell{} = spell, caster_guid: caster, auras: auras}, victim, holder_index) do
+    auras
+    |> Enum.with_index()
+    |> Enum.flat_map(fn
+      {%Aura{type: :channel_death_item, item_type: item, amount: count}, index}
+      when is_integer(item) and item > 0 and is_integer(count) and count > 0 ->
+        key = if spell.spell_family == 5, do: {:warlock, caster}, else: {holder_index, index}
+        [{key, %Effects.DeathItemReward{target_guid: caster, item_id: item, count: count, victim: victim}}]
+
+      _aura ->
+        []
+    end)
+  end
+
+  defp holder_rewards(_holder, _victim, _index), do: []
 end

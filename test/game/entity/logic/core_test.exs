@@ -290,46 +290,33 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   end
 
   describe "take_damage_with_absorb/4 death items" do
-    test "rewards one DBC-defined item to an eligible tapped caster" do
+    test "captures one warlock reward before aura cleanup and only on the lethal transition" do
       holder = %Holder{
-        spell: %Spell{id: 17_876},
+        spell: %Spell{id: 17_877, spell_family: 5},
         caster_guid: 777,
         caster_level: 10,
-        auras: [%Aura{type: :channel_death_item, item_type: 6265, amount: 0}]
-      }
-
-      duplicate = %{holder | spell: %Spell{id: 17_877}}
-      entity = damageable(health: 30)
-      unit = %{entity.unit | level: 10, auras: [holder, duplicate]}
-      internal = %{entity.internal | loot: %Loot{tapped_by: %{player: 777}}}
-
-      {entity, _absorbed} =
-        Core.take_damage_with_absorb(%{entity | unit: unit, internal: internal}, 30, 1_000, source: 777)
-
-      assert Enum.any?(
-               entity.internal.events,
-               &match?(%Effects.GiveItem{target_guid: 777, item_id: 6265, count: 1}, &1)
-             )
-    end
-
-    test "does not reward death items for gray or differently tapped creatures" do
-      holder = %Holder{
-        spell: %Spell{id: 17_876},
-        caster_guid: 777,
-        caster_level: 60,
         auras: [%Aura{type: :channel_death_item, item_type: 6265, amount: 1}]
       }
 
-      for {victim_level, tapped_player} <- [{50, 777}, {60, 778}] do
-        entity = damageable(health: 30)
-        unit = %{entity.unit | level: victim_level, auras: [holder]}
-        internal = %{entity.internal | loot: %Loot{tapped_by: %{player: tapped_player}}}
+      duplicate = %{holder | spell: %Spell{id: 1120, spell_family: 5}}
+      entity = damageable(health: 30)
+      unit = %{entity.unit | level: 10, auras: [holder, duplicate]}
+      internal = %{entity.internal | loot: %Loot{tapped_by: %{player: 777}}}
+      entity = %{entity | unit: unit, internal: internal}
+      {alive, _absorbed} = Core.take_damage_with_absorb(entity, 29, 1_000, source: 777)
+      refute Enum.any?(alive.internal.events, &is_struct(&1, Effects.DeathItemReward))
 
-        {entity, _absorbed} =
-          Core.take_damage_with_absorb(%{entity | unit: unit, internal: internal}, 30, 1_000, source: 777)
+      {dead, _absorbed} = Core.take_damage_with_absorb(alive, 1, 1_001, source: 777)
+      assert dead.unit.auras == []
 
-        refute Enum.any?(entity.internal.events, &is_struct(&1, Effects.GiveItem))
-      end
+      assert [%Effects.DeathItemReward{target_guid: 777, item_id: 6265, count: 1} = reward] =
+               Enum.filter(dead.internal.events, &is_struct(&1, Effects.DeathItemReward))
+
+      assert reward.victim.level == 10
+      assert reward.victim.tap == %{player: 777}
+
+      {dead, _absorbed} = Core.take_damage_with_absorb(dead, 1, 1_002, source: 777)
+      assert Enum.count(dead.internal.events, &is_struct(&1, Effects.DeathItemReward)) == 1
     end
   end
 
