@@ -10,6 +10,8 @@ defmodule ThistleTea.Game.Entity.Logic.WeaponBonusesTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.AttackTable
+  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Aura.Dispel
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.CombatSkills
@@ -176,6 +178,65 @@ defmodule ThistleTea.Game.Entity.Logic.WeaponBonusesTest do
   end
 
   describe "damage_range/1 and offhand_damage_range/1" do
+    test "stacked damage follows application, cap, dispel, and expiry", %{character: character} do
+      spell = %Spell{
+        id: 900_001,
+        stack_amount: 3,
+        dispel_type: 1,
+        duration_ms: 1_000,
+        effects: [%Spell.Effect{type: :apply_aura, aura: :mod_damage_percent_done, base_points: 20, misc_value: 127}]
+      }
+
+      stacked =
+        Enum.reduce(1..4, character, fn count, current ->
+          {current, _events} = AuraLogic.apply_spell(current, 1, 60, spell, count * 100)
+          multiplier = 1 + min(count, 3) * 0.2
+          {damage, damage} = Combat.damage_range(current)
+          assert_in_delta damage, 100 * multiplier, 0.0001
+
+          assert_in_delta CastContext.from_caster(current, %Spell{id: 2, school: :fire}, 2).damage_done_multiplier,
+                          multiplier,
+                          0.0001
+
+          current
+        end)
+
+      {dispelled, _events, [900_001]} = Dispel.apply(stacked, 1, 500, :positive, 1)
+      assert Combat.damage_range(dispelled) == {140.0, 140.0}
+      assert Combat.offhand_damage_range(dispelled) == {70.0, 70.0}
+      {expired, _events} = AuraLogic.expire_due(dispelled, 1_400)
+      assert Combat.damage_range(expired) == {100.0, 100.0}
+      assert CastContext.from_caster(expired, %Spell{id: 2, school: :fire}, 2).damage_done_multiplier == 1.0
+    end
+
+    test "stacked reductions clamp to zero and independent bonuses multiply", %{character: character} do
+      reduction = %{bonus(:mod_damage_percent_done, -20, 7) | stacks: 3}
+      increase = %{bonus(:mod_damage_percent_done, 25, nil) | stacks: 2}
+      character = with_auras(character, [reduction, increase])
+      {damage, damage} = Combat.damage_range(character)
+      assert_in_delta damage, 60.0, 0.0001
+      assert Combat.offhand_damage_range(character) == {75.0, 75.0}
+      capped = with_auras(character, [%{reduction | stacks: 10}, increase])
+      assert Combat.damage_range(capped) == {0.0, 0.0}
+      assert Combat.offhand_damage_range(capped) == {75.0, 75.0}
+    end
+
+    @tag :dbc_db
+    test "loaded Growth applies each stack to physical attacks only", %{character: character} do
+      spell = SpellLoader.load(24_086)
+      assert spell.stack_amount == 10
+
+      grown =
+        Enum.reduce(1..3, character, fn n, entity ->
+          {entity, _events} = AuraLogic.apply_spell(entity, 1, 60, spell, n)
+          entity
+        end)
+
+      assert Combat.damage_range(grown) == {175.0, 175.0}
+      assert Combat.offhand_damage_range(grown) == {87.5, 87.5}
+      assert CastContext.from_caster(grown, %Spell{id: 2, school: :fire}, 2).damage_done_multiplier == 1.0
+    end
+
     test "weapon restrictions filter flat and percentage damage for each hand", %{character: character} do
       character = with_auras(character, [bonus(:mod_damage_percent_done, 50, 15), bonus(:mod_damage_done, 4, 7)])
       assert Combat.damage_range(character) == {104.0, 104.0}

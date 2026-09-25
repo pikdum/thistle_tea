@@ -37,7 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.WeaponDamage do
         %Aura{type: :mod_damage_percent_done, amount: amount, misc_value: mask} <- holder.auras,
         is_integer(amount) and is_integer(mask) and (mask &&& Spell.school_mask(school)) != 0,
         reduce: 1.0 do
-      multiplier -> multiplier * max(100 + amount, 0) / 100
+      multiplier -> multiplier * max(100 + amount * max(holder.stacks || 1, 1), 0) / 100
     end
   end
 

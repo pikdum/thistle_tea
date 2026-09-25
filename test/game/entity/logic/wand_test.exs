@@ -67,6 +67,19 @@ defmodule ThistleTea.Game.Entity.Logic.WandTest do
   end
 
   describe "receive/4" do
+    test "stacked school bonuses agree across displayed damage, snapshot, and landed hit", context do
+      %{caster: caster, target: target, spell: spell} = context
+      bonus = %{holder(:mod_damage_percent_done, 10, 4) | stacks: 3}
+      caster = %{caster | unit: Stats.recompute(%{caster.unit | auras: [bonus]})}
+      assert caster.unit.min_ranged_damage == 130
+      assert caster.unit.max_ranged_damage == 130
+      cast = guaranteed_hit(caster, spell)
+      assert cast.damage_done_multiplier == 1.3
+      {damaged, events} = SpellEffect.receive(target, cast, cast.spell, 0)
+      assert damaged.unit.health == 870
+      assert [%Effects.SpellDamage{damage: 130}] = damage_events(events)
+    end
+
     test "bypasses armor and melee avoidance, uses ranged procs and 150 percent criticals", context do
       %{caster: caster, target: target, spell: spell} = context
       cast = guaranteed_hit(caster, spell)
