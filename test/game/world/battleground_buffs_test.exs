@@ -34,13 +34,14 @@ defmodule ThistleTea.Game.World.BattlegroundBuffsTest do
           respawn_ms: 100
         )
 
+      manager_monitor = Process.monitor(manager)
       on_exit(fn -> Process.exit(owner, :shutdown) end)
       assert_receive {:pickup, first, ^world, 179_871, ^position}
       send(first, :consume)
       refute_receive {:pickup, _, _, _, _}, 30
       assert_receive {:pickup, second, ^world, 179_904, ^position}, 1_000
       second_monitor = Process.monitor(second)
-      manager_monitor = Process.monitor(manager)
+      assert :sys.get_state(manager).running == %{0 => second}
       send(owner, :stop)
       assert_receive {:DOWN, ^manager_monitor, :process, ^manager, :normal}
       assert_receive {:DOWN, ^second_monitor, :process, ^second, :shutdown}
