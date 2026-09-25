@@ -99,6 +99,57 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunityTest do
   end
 
   describe "apply_spell/5" do
+    test "dispel immunity purges matching concealment and blocks its return until expiry", %{entity: entity} do
+      stealth = concealment(5, :mod_stealth)
+      invisibility = concealment(6, :mod_invisibility)
+      {entity, _events} = Aura.apply_spell(entity, 1, 10, stealth, 0)
+      {entity, _events} = Aura.apply_spell(entity, 1, 10, invisibility, 0)
+      immunity = protection(:dispel_immunity, 5, [:immunity_purges_effect])
+      {entity, _events} = Aura.apply_spell(entity, 2, 10, immunity, 100)
+
+      refute Aura.has_spell?(entity, stealth.id)
+      refute Aura.has_aura?(entity, :mod_stealth)
+      assert Aura.has_spell?(entity, invisibility.id)
+
+      {entity, _events} = Aura.apply_spell(entity, 1, 10, stealth, 200)
+      refute Aura.has_spell?(entity, stealth.id)
+
+      {entity, _events} = Aura.tick(entity, 1_100)
+      {entity, _events} = Aura.apply_spell(entity, 1, 10, stealth, 1_101)
+      assert Aura.has_spell?(entity, stealth.id)
+    end
+
+    test "one immunity spell can purge both stealth and invisibility", %{entity: entity} do
+      {entity, _events} = Aura.apply_spell(entity, 1, 10, concealment(5, :mod_stealth), 0)
+      {entity, _events} = Aura.apply_spell(entity, 1, 10, concealment(6, :mod_invisibility), 0)
+      immunity = protection(:dispel_immunity, 5, [:immunity_purges_effect])
+      invisibility_immunity = %{hd(immunity.effects) | index: 1, misc_value: 6}
+      immunity = %{immunity | effects: immunity.effects ++ [invisibility_immunity]}
+      {entity, _events} = Aura.apply_spell(entity, 2, 10, immunity, 100)
+
+      refute Aura.has_aura?(entity, :mod_stealth)
+      refute Aura.has_aura?(entity, :mod_invisibility)
+      assert Enum.map(entity.unit.auras, & &1.spell.id) == [immunity.id]
+    end
+
+    test "dispel immunity without the purge attribute retains existing concealment", %{entity: entity} do
+      stealth = concealment(5, :mod_stealth)
+      {entity, _events} = Aura.apply_spell(entity, 1, 10, stealth, 0)
+      {entity, _events} = Aura.apply_spell(entity, 2, 10, protection(:dispel_immunity, 5), 100)
+      before = Enum.find(entity.unit.auras, &(&1.spell.id == stealth.id))
+      {entity, _events} = Aura.apply_spell(entity, 1, 10, stealth, 200)
+
+      assert Enum.find(entity.unit.auras, &(&1.spell.id == stealth.id)) == before
+    end
+
+    test "dispel type zero never purges spells without a dispel type", %{entity: entity} do
+      {entity, _events} = Aura.apply_spell(entity, 1, 10, stun(), 0)
+      immunity = protection(:dispel_immunity, 0, [:immunity_purges_effect])
+      {entity, _events} = Aura.apply_spell(entity, 2, 10, immunity, 100)
+
+      assert Aura.has_aura?(entity, :mod_stun)
+    end
+
     test "purging removes the whole matching holder and clears control", %{entity: entity} do
       {entity, _events} = Aura.apply_spell(entity, 2, 10, stun(), 0)
       assert Aura.has_aura?(entity, :mod_stun)
@@ -183,6 +234,15 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunityTest do
       duration_ms: 5_000,
       school: :physical,
       effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_stun, implicit_target_a: :target_enemy}]
+    }
+  end
+
+  defp concealment(dispel_type, aura_type) do
+    %Spell{
+      id: 10 + dispel_type,
+      dispel_type: dispel_type,
+      duration_ms: 5_000,
+      effects: [%Effect{index: 0, type: :apply_aura, aura: aura_type, base_points: 10, implicit_target_a: :caster}]
     }
   end
 end

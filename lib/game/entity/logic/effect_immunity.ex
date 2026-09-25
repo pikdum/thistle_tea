@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.Entity.Logic.EffectImmunity do
   @moduledoc """
-  Aura-state and spell-effect immunity from active holders and creature defaults.
+  Aura-state, dispel-type, and spell-effect immunity from active holders and creature defaults.
   Immunity filters individual effects and optionally purges matching holders.
   """
 
@@ -49,7 +49,11 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunity do
   def purge(holders, %Holder{spell: spell, auras: auras}) do
     if Spell.attribute?(spell, :immunity_purges_effect) do
       types = for %Aura{type: :state_immunity, misc_value: type} <- auras, not is_nil(type), do: type
-      Enum.reject(holders, &Holder.has_any_type?(&1, types))
+
+      dispel_types =
+        for %Aura{type: :dispel_immunity, misc_value: type} <- auras, is_integer(type) and type > 0, do: type
+
+      Enum.reject(holders, &(Holder.has_any_type?(&1, types) or &1.spell.dispel_type in dispel_types))
     else
       holders
     end
