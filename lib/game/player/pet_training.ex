@@ -74,8 +74,7 @@ defmodule ThistleTea.Game.Player.PetTraining do
   def learn(%State{character: %Character{} = character} = state, %Effects.LearnPetSpell{} = effect) do
     case request(character, :learn_pet_spell, effect.target_guid, effect.spell) do
       {:ok, spells, control} ->
-        companion = %{Companion.relationship(character) | autocast: control.autocast}
-        character = %{character | internal: %{character.internal | companion: companion}}
+        character = Companion.remember_controls(character, effect.target_guid, control)
         Network.send_packet(Message.SmsgPetSpells.for_pet(effect.target_guid, spells, control))
         %{state | character: character}
 

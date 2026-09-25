@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.Entity.Data.Companion do
     dead?: false,
     restore_automatically?: true,
     reaction_state: :defensive,
+    action_bar: %{},
     autocast: MapSet.new()
   ]
 
@@ -55,6 +56,7 @@ defmodule ThistleTea.Game.Entity.Data.Companion do
           dead?: boolean(),
           restore_automatically?: boolean(),
           reaction_state: :passive | :defensive | :aggressive,
+          action_bar: %{optional(non_neg_integer()) => {non_neg_integer(), non_neg_integer()}},
           autocast: MapSet.t(non_neg_integer())
         }
 

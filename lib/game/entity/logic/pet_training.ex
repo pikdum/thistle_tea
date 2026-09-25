@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.PetTraining do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.PetControls
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
   alias ThistleTea.Game.Entity.Logic.PetSpellModifiers
   alias ThistleTea.Game.Spell
@@ -54,7 +55,12 @@ defmodule ThistleTea.Game.Entity.Logic.PetTraining do
       cost = cost(pet, ability, abilities)
       {pet, removed} = Aura.remove_spells(pet, Enum.map(previous, & &1.id), now)
       spellbook = pet.internal.spellbook |> Map.drop(Enum.map(previous, & &1.id)) |> Map.put(spell.id, spell)
-      control = replace_controls(pet.internal.pet, previous, spell, pet.internal.spellbook)
+
+      control =
+        pet.internal.pet
+        |> replace_controls(previous, spell, pet.internal.spellbook)
+        |> PetControls.normalize(spellbook)
+
       creature = %{pet.internal.creature | spells: action_spells(spellbook)}
       pet = %{pet | internal: %{pet.internal | spellbook: spellbook, pet: control, creature: creature}}
       pet = pet |> PetLoyalty.spend_training_points(cost) |> Effects.enqueue(removed)
@@ -145,32 +151,16 @@ defmodule ThistleTea.Game.Entity.Logic.PetTraining do
     autocast = Enum.reduce(ids, pet.autocast, &MapSet.delete(&2, &1))
     autocast = if enabled?, do: MapSet.put(autocast, spell.id), else: autocast
 
+    pet = PetControls.normalize(pet, spellbook)
+
     action_bar =
-      pet
-      |> existing_action_bar(spellbook)
+      pet.action_bar
       |> Map.new(fn {slot, {id, type}} ->
         {slot, {if(id in ids, do: spell.id, else: id), type}}
       end)
       |> insert_action(spell)
 
     %{pet | autocast: autocast, action_bar: action_bar}
-  end
-
-  defp existing_action_bar(pet, spellbook) do
-    placed = MapSet.new(pet.action_bar, fn {_slot, {id, _type}} -> id end)
-
-    defaults =
-      spellbook
-      |> action_spells()
-      |> Enum.take(4)
-      |> Enum.with_index(3)
-      |> Map.new(fn {entry, slot} ->
-        type = if MapSet.member?(pet.autocast, entry.spell_id), do: 0xC1, else: 0x81
-        id = if MapSet.member?(placed, entry.spell_id), do: 0, else: entry.spell_id
-        {slot, {id, type}}
-      end)
-
-    3..6 |> Map.new(&{&1, {0, 0x81}}) |> Map.merge(defaults) |> Map.merge(pet.action_bar)
   end
 
   defp insert_action(bar, spell) do

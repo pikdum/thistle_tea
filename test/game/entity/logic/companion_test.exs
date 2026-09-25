@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.CompanionTest do
   alias ThistleTea.Game.Entity.Data.Companion, as: CompanionData
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Companion
@@ -18,7 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.CompanionTest do
         |> Companion.capture_health(77)
         |> Companion.capture_happiness(750_000)
         |> Companion.remember_reaction(44, :passive)
-        |> Companion.set_autocast([%{action: 14_920, action_type: 0xC1}])
+        |> Companion.remember_controls(44, %Pet{autocast: MapSet.new([14_920]), action_bar: %{6 => {14_920, 0xC1}}})
 
       original = Companion.relationship(character)
       ref = %EntityRef{guid: 44, entry: 416, spell_id: 1002}
@@ -104,25 +105,27 @@ defmodule ThistleTea.Game.Entity.Logic.CompanionTest do
     end
   end
 
-  describe "set_autocast/2" do
+  describe "remember_controls/3" do
     test "preserves enabled spells across suspension and reactivation" do
       character =
         character_with_pet()
-        |> Companion.set_autocast([%{action: 14_920, action_type: 0xC1}])
+        |> Companion.remember_controls(44, %Pet{autocast: MapSet.new([14_920]), action_bar: %{6 => {14_920, 0xC1}}})
         |> Companion.suspend()
         |> Companion.activate(:hunter_pet, %EntityRef{guid: 55, entry: 416, spell_id: 688})
 
       assert Companion.autocast(character) == MapSet.new([14_920])
+      assert Companion.relationship(character).action_bar == %{6 => {14_920, 0xC1}}
     end
 
     test "resets enabled spells when a different companion is activated" do
       character =
         character_with_pet()
-        |> Companion.set_autocast([%{action: 14_920, action_type: 0xC1}])
+        |> Companion.remember_controls(44, %Pet{autocast: MapSet.new([14_920]), action_bar: %{6 => {14_920, 0xC1}}})
         |> Companion.suspend()
         |> Companion.activate(:hunter_pet, %EntityRef{guid: 55, entry: 417, spell_id: 688})
 
       assert Companion.autocast(character) == MapSet.new()
+      assert Companion.relationship(character).action_bar == %{}
     end
   end
 

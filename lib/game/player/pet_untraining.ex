@@ -60,12 +60,11 @@ defmodule ThistleTea.Game.Player.PetUntraining do
       case Entity.call(guid, {:unlearn_pet, character.object.guid, character.player.coinage, maximum_cost}) do
         {:ok, cost, progress, spells, control} ->
           character = Companion.capture_progress(character, progress)
-          companion = %{Companion.relationship(character) | autocast: control.autocast}
+          character = Companion.remember_controls(character, guid, control)
 
           character = %{
             character
-            | player: %{character.player | coinage: character.player.coinage - cost},
-              internal: %{character.internal | companion: companion}
+            | player: %{character.player | coinage: character.player.coinage - cost}
           }
 
           character = Core.mark_broadcast_update(character)

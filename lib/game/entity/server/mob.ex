@@ -61,6 +61,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.MovementHandoff
+  alias ThistleTea.Game.Entity.Logic.PetControls
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
   alias ThistleTea.Game.Entity.Logic.PetNaming
@@ -726,6 +727,22 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
+  def handle_call({:pet_controls, owner, request}, _from, %Mob{} = state) do
+    case PetControls.update(state, owner, request) do
+      {:ok, updated} ->
+        blackboard = updated.internal.blackboard |> Blackboard.ensure() |> Blackboard.reset_spells()
+        updated = %{updated | internal: %{updated.internal | blackboard: blackboard}} |> wake_ai_tick()
+        {:reply, {:ok, Map.values(updated.internal.spellbook), updated.internal.pet}, updated}
+
+      error ->
+        {:reply, error, state}
+    end
+  rescue
+    error ->
+      Logger.error("Pet controls failed: #{Exception.message(error)}")
+      {:reply, {:error, :unavailable}, state}
+  end
+
   def handle_call(:threat_table, _from, %Mob{} = state) do
     {:reply, {:ok, %{victim: state.unit.target, entries: Threat.entries(state)}}, state}
   end
@@ -1229,20 +1246,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     }
 
     {:noreply, EventSink.emit(state, effect)}
-  end
-
-  def handle_info({:pet_set_actions, actions}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
-    state = PetBT.set_actions(state, actions)
-    blackboard = state.internal.blackboard |> Blackboard.ensure() |> Blackboard.reset_spells()
-    state = %{state | internal: %{state.internal | blackboard: blackboard}} |> wake_ai_tick()
-    {:noreply, state}
-  end
-
-  def handle_info({:pet_restore_autocast, autocast}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
-    state = PetBT.restore_autocast(state, autocast)
-    blackboard = state.internal.blackboard |> Blackboard.ensure() |> Blackboard.reset_spells()
-    state = %{state | internal: %{state.internal | blackboard: blackboard}} |> wake_ai_tick()
-    {:noreply, state}
   end
 
   def handle_info({:attach_pet, owner_pid, spell_id, pet_spells}, %Mob{internal: %Internal{pet: %Pet{}}} = state)

@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Entity.Data.Companion
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
@@ -51,6 +52,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Test.PetControlOwner
 
   @moduletag :dbc_db
 
@@ -924,7 +926,8 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       }
 
       update = update_object(:unit, pet_guid)
-      attachment = companion_attachment(pet_guid, update, self())
+      pet_pid = start_supervised!({PetControlOwner, control: %Pet{owner_guid: guid}})
+      attachment = companion_attachment(pet_guid, update, pet_pid)
 
       assert {:noreply, attached, {:continue, {:finish_companion_attach, ^attachment}}} =
                PlayerServer.handle_info(attachment, state)
@@ -939,15 +942,15 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
 
       assert MapSet.member?(attached.tracked_entities, pet_guid)
       assert %CompanionMonitor{pid: pid, entity_ref: %EntityRef{guid: ^pet_guid}} = attached.companion_monitor
-      assert pid == self()
+      assert pid == pet_pid
       assert_receive {:"$gen_cast", {:write_packet, %Packet{}}}
       refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: ^pet_guid}}}, 0
 
       assert {:noreply, completed} =
                PlayerServer.handle_continue({:finish_companion_attach, attachment}, attached)
 
-      assert_receive {:pet_restore_autocast, autocast}
-      assert autocast == MapSet.new()
+      assert completed.character.internal.companion.autocast == MapSet.new()
+      assert map_size(completed.character.internal.companion.action_bar) == 10
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: ^pet_guid}}}
 
       assert {:noreply, ^completed} =
@@ -968,7 +971,8 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       }
 
       update = update_object(:unit, pet_guid)
-      attachment = companion_attachment(pet_guid, update, self())
+      pet_pid = start_supervised!({PetControlOwner, control: %Pet{owner_guid: guid}})
+      attachment = companion_attachment(pet_guid, update, pet_pid)
 
       assert {:noreply, visible} =
                PlayerServer.handle_cast({:send_packet, update}, state)

@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
   alias ThistleTea.Game.Player.PetExperience
   alias ThistleTea.Game.Player.Pets
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
+  alias ThistleTea.Test.PetControlOwner
 
   setup [:build_reward_context]
 
@@ -105,22 +106,26 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
 
       assert {:noreply, ^pet} = MobServer.handle_info({:attach_pet, self(), 1515, []}, pet)
       assert_receive %Attachment{} = attachment
-      ready = %{state | ready: true}
-      assert CompanionVisibility.finish_attachment(ready, attachment) == ready
-      assert_receive {:pet_restore_autocast, _}
+      pet_pid = start_supervised!({PetControlOwner, control: pet.internal.pet})
+      attachment = %{attachment | pid: pet_pid}
+      ready = %{state | ready: true, guid: character.object.guid}
+      completed = CompanionVisibility.finish_attachment(ready, attachment)
+      assert map_size(completed.character.internal.companion.action_bar) == 10
       assert_receive {:"$gen_cast", {:send_packet, first}}
       assert %SmsgPetSpells{} = first
       assert_receive {:"$gen_cast", {:send_packet, second}}
       assert %SmsgPetNameQueryResponse{pet_number: ^number, name: "Boar", timestamp: 123} = second
     end
 
-    test "projects the retained passive stance on the client pet bar", %{character: character} do
+    test "projects the restored pet stance on the client pet bar", %{character: character, pet: pet} do
       character = Companion.capture_reaction(character, :passive)
       entity_ref = Companion.active_ref(character)
-      attachment = %Attachment{kind: :hunter_pet, entity_ref: entity_ref, pid: self(), spells: []}
-      state = %State{character: character}
-      assert CompanionVisibility.finish_attachment(state, attachment) == state
-      assert_receive {:pet_restore_autocast, _}
+      control = %{pet.internal.pet | reaction_state: :passive}
+      pet_pid = start_supervised!({PetControlOwner, control: control})
+      attachment = %Attachment{kind: :hunter_pet, entity_ref: entity_ref, pid: pet_pid, spells: []}
+      state = %State{character: character, guid: character.object.guid}
+      completed = CompanionVisibility.finish_attachment(state, attachment)
+      assert completed.character.internal.companion.reaction_state == :passive
       assert_receive {:"$gen_cast", {:send_packet, %SmsgPetSpells{reaction_state: 0}}}
     end
   end

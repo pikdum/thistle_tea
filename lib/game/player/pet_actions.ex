@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Player.PetActions do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -36,6 +37,17 @@ defmodule ThistleTea.Game.Player.PetActions do
   end
 
   def cast(state, %Message.CmsgPetCastSpell{}), do: state
+
+  def controls(%{character: %Character{} = character} = state, guid, request) do
+    with true <- Character.controls?(character, guid) and Guid.entity_type(guid) == :mob,
+         {:ok, _spells, control} <- Entity.call(guid, {:pet_controls, character.object.guid, request}) do
+      %{state | character: Companion.remember_controls(character, guid, control)}
+    else
+      _ -> state
+    end
+  end
+
+  def controls(state, _guid, _request), do: state
 
   defp dispatch(pid, controller, %Message.CmsgPetAction{pet_guid: guid} = message) do
     if Guid.entity_type(guid) == :player do

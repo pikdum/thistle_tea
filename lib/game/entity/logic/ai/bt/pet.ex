@@ -36,8 +36,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   @follow_prediction_ms 500
   @follow_tick_ms 100
   @idle_delay_ms 500
-  @act_enabled 0xC1
-  @act_disabled 0x81
 
   def tree do
     BT.selector([
@@ -140,23 +138,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   end
 
   def reaction(%Mob{} = state, _reaction), do: state
-
-  def set_actions(%Mob{} = state, actions) when is_list(actions) do
-    Enum.reduce(actions, state, &set_action/2)
-  end
-
-  def set_actions(%Mob{} = state, _actions), do: state
-
-  def restore_autocast(
-        %Mob{internal: %Internal{pet: %Pet{} = pet, spellbook: spellbook} = internal} = state,
-        %MapSet{} = autocast
-      )
-      when is_map(spellbook) do
-    autocast = MapSet.intersection(autocast, MapSet.new(Map.keys(spellbook)))
-    %{state | internal: %{internal | pet: %{pet | autocast: autocast}}}
-  end
-
-  def restore_autocast(%Mob{} = state, %MapSet{}), do: state
 
   defp dead?(%Mob{internal: %Internal{pet: %Pet{broken?: true}}}, _blackboard), do: true
   defp dead?(state, _blackboard), do: Core.dead?(state)
@@ -324,26 +305,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   defp follow_with_context(%Mob{} = state, destination, orientation, velocity, %Context{} = context) do
     Navigation.follow(state, destination, orientation, velocity, context)
   end
-
-  defp set_action(
-         %{position: position, action: spell_id, action_type: action_type},
-         %Mob{internal: %Internal{pet: %Pet{} = pet, spellbook: spellbook} = internal} = state
-       )
-       when position in 0..9 and is_integer(spell_id) and is_integer(action_type) do
-    if spell_id == 0 or Map.has_key?(spellbook, spell_id) do
-      autocast = update_autocast(pet.autocast, spell_id, action_type)
-      pet = %{pet | action_bar: Map.put(pet.action_bar, position, {spell_id, action_type}), autocast: autocast}
-      %{state | internal: %{internal | pet: pet}}
-    else
-      state
-    end
-  end
-
-  defp set_action(_action, state), do: state
-
-  defp update_autocast(autocast, spell_id, @act_enabled) when spell_id > 0, do: MapSet.put(autocast, spell_id)
-  defp update_autocast(autocast, spell_id, @act_disabled) when spell_id > 0, do: MapSet.delete(autocast, spell_id)
-  defp update_autocast(autocast, _spell_id, _action_type), do: autocast
 
   defp xyz({x, y, z, _o}), do: {x, y, z}
 end

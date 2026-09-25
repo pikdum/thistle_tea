@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
   alias ThistleTea.Game.Entity.Data.Companion
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.PetName
@@ -18,8 +19,6 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
 
   @summon_kinds [:hunter_pet, :guardian]
   @control_kinds [:enslaved, :charm, :possession]
-  @act_enabled 0xC1
-  @act_disabled 0x81
 
   def activate(%Mob{} = entity, :guardian, %EntityRef{} = entity_ref) do
     put_relationship(entity, %Companion{kind: :guardian, status: {:active, entity_ref}, reaction_state: :aggressive})
@@ -38,7 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
 
   def activate(%Character{} = character, kind, %EntityRef{} = entity_ref)
       when kind in @summon_kinds or kind in @control_kinds do
-    autocast = activation_autocast(relationship(character), kind, entity_ref.entry)
+    {autocast, action_bar} = activation_controls(relationship(character), kind, entity_ref.entry)
     happiness = if kind == :hunter_pet and entry(character) == entity_ref.entry, do: relationship(character).happiness
     progress = if kind == :hunter_pet and entry(character) == entity_ref.entry, do: relationship(character).progress
     reaction = if entry(character) == entity_ref.entry, do: relationship(character).reaction_state, else: :defensive
@@ -50,6 +49,7 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
       name: retained_name(character, kind, entity_ref.entry),
       health: retained_health(character, entity_ref.entry),
       autocast: autocast,
+      action_bar: action_bar,
       happiness: happiness,
       progress: progress,
       reaction_state: reaction
@@ -210,19 +210,14 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
     put_relationship(character, companion)
   end
 
-  def set_autocast(%Character{} = character, actions) when is_list(actions) do
-    case relationship(character) do
-      %Companion{kind: kind, status: {:active, %EntityRef{}}, autocast: autocast} = companion
-      when kind in @summon_kinds ->
-        companion = %{companion | autocast: Enum.reduce(actions, autocast, &update_autocast/2)}
-        put_relationship(character, companion)
-
-      %Companion{} ->
-        character
+  def remember_controls(%Character{} = character, guid, %Pet{} = control) do
+    if controls?(character, guid) do
+      companion = %{relationship(character) | autocast: control.autocast, action_bar: control.action_bar}
+      put_relationship(character, companion)
+    else
+      character
     end
   end
-
-  def set_autocast(%Character{} = character, _actions), do: character
 
   def autocast(%Character{} = character) do
     case relationship(character) do
@@ -330,15 +325,15 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
     |> project()
   end
 
-  defp activation_autocast(%Companion{kind: kind, status: status, autocast: %MapSet{} = autocast}, kind, entry) do
+  defp activation_controls(%Companion{kind: kind, status: status, autocast: autocast, action_bar: bar}, kind, entry) do
     case status do
-      {:active, %EntityRef{entry: ^entry}} -> autocast
-      {:suspended, ^entry, _spell_id} -> autocast
-      _ -> MapSet.new()
+      {:active, %EntityRef{entry: ^entry}} -> {autocast, bar}
+      {:suspended, ^entry, _spell_id} -> {autocast, bar}
+      _ -> {MapSet.new(), %{}}
     end
   end
 
-  defp activation_autocast(%Companion{}, _kind, _entry), do: MapSet.new()
+  defp activation_controls(%Companion{}, _kind, _entry), do: {MapSet.new(), %{}}
 
   defp activation_number(character, :hunter_pet, entity_ref) do
     number = if entry(character) == entity_ref.entry, do: relationship(character).pet_number
@@ -356,12 +351,4 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
   end
 
   defp retained_name(_character, _kind, _entry), do: nil
-
-  defp update_autocast(%{action: spell_id, action_type: @act_enabled}, autocast)
-       when is_integer(spell_id) and spell_id > 0, do: MapSet.put(autocast, spell_id)
-
-  defp update_autocast(%{action: spell_id, action_type: @act_disabled}, autocast)
-       when is_integer(spell_id) and spell_id > 0, do: MapSet.delete(autocast, spell_id)
-
-  defp update_autocast(_action, autocast), do: autocast
 end

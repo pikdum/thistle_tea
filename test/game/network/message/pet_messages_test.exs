@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Test.PetControlOwner
 
   describe "SMSG_PET_BROKEN" do
     test "encodes the empty vanilla notification" do
@@ -35,6 +36,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_RENAME))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_ABANDON))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_SET_ACTION))
+    assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_SPELL_AUTOCAST))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_REQUEST_PET_INFO))
   end
 
@@ -102,6 +104,8 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       pet_guid = Guid.from_low_guid(:mob, 1, 123)
       Entity.register(pet_guid)
       on_exit(fn -> Entity.unregister(pet_guid) end)
+      Entity.unregister(pet_guid)
+      start_supervised!({PetControlOwner, guid: pet_guid, spells: [%Spell{id: 11_778}]})
       data = 11_778 + Bitwise.bsl(0xC1, 24)
 
       message =
@@ -111,7 +115,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
 
       updated = Message.CmsgPetSetAction.handle(message, state)
       assert Companion.autocast(updated.character) == MapSet.new([11_778])
-      assert_receive {:pet_set_actions, [%{position: 3, action: 11_778, action_type: 0xC1}]}
+      assert Companion.relationship(updated.character).action_bar[3] == {11_778, 0xC1}
     end
 
     test "dispatches action-bar changes to a charmed unit" do
@@ -126,8 +130,28 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
 
       state = %{character: companion(:charm, controlled_guid)}
 
-      assert Message.CmsgPetSetAction.handle(message, state) == state
-      assert_receive {:pet_set_actions, [%{action: 3110}]}
+      Entity.unregister(controlled_guid)
+      start_supervised!({PetControlOwner, guid: controlled_guid, spells: [%Spell{id: 3110}]})
+      updated = Message.CmsgPetSetAction.handle(message, state)
+      assert Companion.autocast(updated.character) == MapSet.new([3110])
+    end
+  end
+
+  describe "CMSG_PET_SPELL_AUTOCAST" do
+    test "saves only settings accepted by the current creature owner" do
+      guid = Guid.from_low_guid(:mob, 1, 127)
+      start_supervised!({PetControlOwner, guid: guid, spells: [%Spell{id: 3110}]})
+      state = %{character: companion(:guardian, guid)}
+      message = Message.CmsgPetSpellAutocast.from_binary(<<guid::little-size(64), 3110::little-size(32), 1>>)
+      updated = Message.CmsgPetSpellAutocast.handle(message, state)
+      assert Companion.autocast(updated.character) == MapSet.new([3110])
+      assert Companion.relationship(updated.character).action_bar[3] == {3110, 0xC1}
+      invalid = %{message | spell_id: 999}
+      assert Message.CmsgPetSpellAutocast.handle(invalid, updated) == updated
+      stranger = %{state | character: companion(:guardian, guid + 1)}
+      assert Message.CmsgPetSpellAutocast.handle(message, stranger) == stranger
+      disabled = Message.CmsgPetSpellAutocast.handle(%{message | enabled?: false}, updated)
+      assert Companion.autocast(disabled.character) == MapSet.new()
     end
   end
 

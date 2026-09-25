@@ -6,12 +6,12 @@ defmodule ThistleTea.Game.Player.CompanionVisibility do
   restoration ordering.
   """
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.PacketSink
   alias ThistleTea.Game.Entity.Server.Player.State
-  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
@@ -28,14 +28,20 @@ defmodule ThistleTea.Game.Player.CompanionVisibility do
     state
   end
 
-  def finish_attachment(%State{} = state, %Attachment{entity_ref: entity_ref, pid: pid, spells: spells} = attachment) do
-    autocast = Companion.autocast(state.character)
-    if Guid.entity_type(entity_ref.guid) == :mob, do: send(pid, {:pet_restore_autocast, autocast})
-    packet = Message.SmsgPetSpells.for_pet(entity_ref.guid, spells, autocast)
-    reaction = Companion.relationship(state.character).reaction_state
-    Network.send_packet(%{packet | reaction_state: reaction_code(reaction)})
-    send_name_response(attachment.name_response)
-    state
+  def finish_attachment(%State{} = state, %Attachment{entity_ref: ref, pid: pid} = attachment) do
+    companion = Companion.relationship(state.character)
+    request = {:restore, companion.action_bar, companion.autocast}
+
+    case Entity.call(pid, {:pet_controls, state.guid, request}) do
+      {:ok, spells, control} ->
+        character = Companion.remember_controls(state.character, ref.guid, control)
+        Network.send_packet(Message.SmsgPetSpells.for_pet(ref.guid, spells, control))
+        send_name_response(attachment.name_response)
+        %{state | character: character}
+
+      _ ->
+        state
+    end
   end
 
   def clear(%State{} = state) do
@@ -64,8 +70,4 @@ defmodule ThistleTea.Game.Player.CompanionVisibility do
        when is_integer(number) and number > 0, do: Network.send_packet(packet)
 
   defp send_name_response(_missing), do: :ok
-
-  defp reaction_code(:passive), do: 0
-  defp reaction_code(:defensive), do: 1
-  defp reaction_code(:aggressive), do: 2
 end

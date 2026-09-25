@@ -111,6 +111,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_PET_CAST_SPELL: Message.CmsgPetCastSpell,
               CMSG_PET_UNLEARN: Message.CmsgPetUnlearn,
               CMSG_PET_SET_ACTION: Message.CmsgPetSetAction,
+              CMSG_PET_SPELL_AUTOCAST: Message.CmsgPetSpellAutocast,
               CMSG_REQUEST_PET_INFO: Message.CmsgRequestPetInfo,
               MSG_LIST_STABLED_PETS: Message.MsgListStabledPetsClient,
               CMSG_STABLE_PET: Message.CmsgStablePet,

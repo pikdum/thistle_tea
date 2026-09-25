@@ -2,27 +2,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetSetAction do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PET_SET_ACTION
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Logic.Companion
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Player.PetActions
 
   defstruct [:pet_guid, actions: []]
 
   @impl ClientMessage
-  def handle(%__MODULE__{pet_guid: pet_guid, actions: actions}, %{character: %Character{} = character} = state) do
-    if Character.controls?(character, pet_guid) and Guid.entity_type(pet_guid) == :mob do
-      case Entity.pid(pet_guid) do
-        pid when is_pid(pid) -> send(pid, {:pet_set_actions, actions})
-        _ -> :ok
-      end
-
-      %{state | character: Companion.set_autocast(character, actions)}
-    else
-      state
-    end
+  def handle(%__MODULE__{pet_guid: guid, actions: actions}, state) do
+    PetActions.controls(state, guid, {:actions, actions})
   end
-
-  def handle(%__MODULE__{}, state), do: state
 
   @impl ClientMessage
   def from_binary(
