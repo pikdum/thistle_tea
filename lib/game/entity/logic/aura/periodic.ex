@@ -439,6 +439,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
         source_owner: holder.caster_owner_guid,
         reflected_by: holder.reflected_by_guid,
         periodic: true,
+        source_level: caster_level,
+        resistance_penetration: holder.resistance_penetration,
+        damage_sharing_targets: cast_context(holder).damage_sharing_targets,
         threat_multiplier: SpellThreat.multiplier(cast_context(holder))
       )
 

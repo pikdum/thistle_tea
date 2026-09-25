@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.DamageSharing
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
@@ -183,7 +184,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       assert [%Holder{spell: %Spell{id: 25_228}, slot: slot, caster_guid: 2}] = warlock.unit.auras
       assert is_integer(slot)
 
-      assert {70, {2, 30}} = AuraLogic.damage_redirect(warlock, 100, :physical)
+      assert {70, [%Effects.SharedDamage{target_guid: 2, damage: 30}]} =
+               DamageSharing.split(warlock, 100, :physical, 1_000, damage_sharing_targets: MapSet.new([2]))
     end
   end
 
@@ -672,7 +674,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
           %{character | unit: %{character.unit | auras: [holder]}}
         end)
 
-      assert AuraLogic.damage_redirect(linked, 100, :shadow) == {70, {2, 30}}
+      assert {70, [%Effects.SharedDamage{target_guid: 2, damage: 30}]} =
+               DamageSharing.split(linked, 100, :shadow, 1_000, damage_sharing_targets: MapSet.new([2]))
     end
 
     test "applies the pet-cast link aura to its owner" do
@@ -692,7 +695,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       context = %CastContext{caster_guid: 2, caster_level: 40, target_role: :caster}
       {owner, _events} = SpellEffect.receive(character(), context, spell, 1_000)
 
-      assert AuraLogic.damage_redirect(owner, 100, :shadow) == {70, {2, 30}}
+      assert {70, [%Effects.SharedDamage{target_guid: 2, damage: 30}]} =
+               DamageSharing.split(owner, 100, :shadow, 1_000, damage_sharing_targets: MapSet.new([2]))
     end
   end
 

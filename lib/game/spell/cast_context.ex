@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   damage/healing bonuses, and for melee abilities the weapon/attack-power
   numbers — so effects apply consistently even after the caster's state
   changes. The receiving owner refreshes threat modifiers when the spell lands
-  and caster availability for periodic life drains.
+  and recipient availability for damage sharing and periodic life drains.
   """
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
@@ -86,6 +86,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :heartbeat_sample,
     :heartbeat_roll,
     :feign_death,
+    damage_sharing_targets: MapSet.new(),
     triggered_by_aura?: false,
     triggered_by_proc?: false,
     caster_available?: true,

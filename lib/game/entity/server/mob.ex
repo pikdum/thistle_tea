@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Commands
+  alias ThistleTea.Game.Entity.DamageSharing
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
@@ -637,7 +638,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_cast({:receive_attack, %{caster: caster} = attack}, state) do
     state = engage_combat(state, caster)
 
-    {state, events} = Combat.receive_attack(state, attack, Time.now())
+    {state, events} =
+      Combat.receive_attack(state, attack, Time.now(), damage_sharing_targets: DamageSharing.targets(state))
 
     state =
       state
@@ -658,6 +660,24 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> wake_ai_tick()
 
     {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
+  def handle_cast({:receive_shared_damage, %Effects.SharedDamage{} = transfer}, %Mob{} = state) do
+    previous = state
+
+    state =
+      state
+      |> DamageSharing.receive(transfer, Time.now())
+      |> then(&react_to_spell_damage(&1, &1.internal.events, previous))
+      |> EventSink.emit_pending()
+      |> sync_behavior_tree(previous)
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Shared damage failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   @impl GenServer

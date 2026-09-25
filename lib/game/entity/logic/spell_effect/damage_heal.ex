@@ -244,6 +244,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         source_owner: context.caster_owner_guid,
         reflected_by: context.reflected_by_guid,
         periodic: Keyword.get(opts, :periodic?, false),
+        source_level: context.caster_level,
+        resistance_penetration: context.resistance_penetration,
+        damage_sharing_targets: context.damage_sharing_targets,
         triggered_by_proc?: context.triggered_by_proc?,
         threat_multiplier: SpellThreat.multiplier(context, crit?)
       )
@@ -481,6 +484,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         source_owner: context.caster_owner_guid,
         reflected_by: context.reflected_by_guid,
         threat_multiplier: SpellThreat.multiplier(context, context.melee_crit?),
+        source_level: context.caster_level,
+        resistance_penetration: context.resistance_penetration,
+        damage_sharing_targets: context.damage_sharing_targets,
         triggered_by_proc?: context.triggered_by_proc?
       )
 

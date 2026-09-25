@@ -16,6 +16,15 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
     {:DurabilityLoss, [:target_guid, :mode, :amount, :scope], [death?: false, caster_guid: nil, spell_id: nil]},
     {:EnvironmentalDamage, [:type, :damage], [absorbed: 0, resisted: 0]},
     {:DeliverAttack, [:target_guid, :attack], []},
+    {:SharedDamage, [:target_guid, :source_guid, :world, :spell, :school, :damage, :kind],
+     [
+       source_level: 1,
+       source_owner_guid: nil,
+       reflected_by_guid: nil,
+       damage_spell: nil,
+       periodic?: false,
+       resistance_penetration: []
+     ]},
     {:AdvanceCombatSkill, [:target_guid, :skill_id], []},
     {:PvpContact, [:target_guid, :role, :other, :now], [combat?: true]},
     {:PvpFlagsChanged, [:enabled?], []},

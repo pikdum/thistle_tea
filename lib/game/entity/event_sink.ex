@@ -72,6 +72,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.CallAssistance,
     Effects.CallForHelp,
     Effects.DeliverAttack,
+    Effects.SharedDamage,
     Effects.PvpContact,
     Effects.PvpFlagsChanged,
     Effects.DropNearbyThreatResolved,

@@ -88,6 +88,14 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
     entity
   end
 
+  def emit(entity, %Effects.SharedDamage{} = effect, context) do
+    if effect.target_guid == entity.object.guid,
+      do: Context.cast(context, {:receive_shared_damage, effect}),
+      else: Entity.receive_shared_damage(effect.target_guid, effect)
+
+    entity
+  end
+
   def emit(entity, %Effects.AttackStart{source_guid: source_guid, target_guid: target_guid}, _context)
       when is_integer(source_guid) and is_integer(target_guid) do
     %Message.SmsgAttackstart{

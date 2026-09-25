@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Battleground.Resurrection, as: BattlegroundResurrection
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Commands
+  alias ThistleTea.Game.Entity.DamageSharing
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
@@ -311,7 +312,10 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
         true ->
           character = PlayerCombat.mark_attacked(character, now, PlayerReputation.faction_id(attack.caster))
-          {character, events} = Combat.receive_attack(character, attack, now)
+
+          {character, events} =
+            Combat.receive_attack(character, attack, now, damage_sharing_targets: DamageSharing.targets(character))
+
           EventSink.emit(character, events)
       end
 
@@ -330,6 +334,20 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def handle_cast({:receive_heal, amount}, %{character: %Character{} = character} = state) do
     character = SpellReception.heal(character, amount)
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast(
+        {:receive_shared_damage, %Effects.SharedDamage{} = transfer},
+        %{character: %Character{} = character} = state
+      ) do
+    character = DamageSharing.receive(character, transfer, Time.now())
+    if not Core.dead?(character), do: notify_defensive_pet(character, transfer.source_guid)
+    state = TickScheduler.schedule_now(%{state | character: character})
+    {:noreply, state, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Shared damage failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:pvp_contact, %Effects.PvpContact{} = effect}, %{character: %Character{} = character} = state) do

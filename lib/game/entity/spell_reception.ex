@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
   """
 
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.DamageSharing
   alias ThistleTea.Game.Entity.EffectResolver.Pvp
   alias ThistleTea.Game.Entity.FeignDeath
   alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
@@ -58,7 +59,8 @@ defmodule ThistleTea.Game.Entity.SpellReception do
   def apply_prepared(target, nil, _now), do: {target, []}
 
   def apply_prepared(target, %Prepared{resolution: resolution, decision: decision, spell: spell}, now) do
-    context = resolution.context
+    context = %{resolution.context | damage_sharing_targets: DamageSharing.targets(target)}
+    resolution = %{resolution | context: context}
 
     contacts =
       Pvp.spell_contacts(target, context.caster_guid, target.object.guid, spell, resolution.outcome,
@@ -144,6 +146,8 @@ defmodule ThistleTea.Game.Entity.SpellReception do
         World.line_of_sight?(target, context.caster_guid)
 
   def aura_contexts(%{unit: %{auras: holders}} = target, now) when is_list(holders) do
+    sharing_targets = DamageSharing.targets(target)
+
     for %Holder{} = holder <- holders,
         periodic_due?(holder, now) or Heartbeat.check_due?(holder, now),
         into: %{} do
@@ -158,6 +162,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
           }
 
       context = threat_context(target, context, holder.spell)
+      context = %{context | damage_sharing_targets: sharing_targets}
 
       context =
         if Heartbeat.check_due?(holder, now),

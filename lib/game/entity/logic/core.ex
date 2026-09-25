@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.CorpseReclaim
   alias ThistleTea.Game.Entity.Logic.Critter
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
+  alias ThistleTea.Game.Entity.Logic.DamageSharing
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Durability
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -40,7 +41,6 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Combat, as: SpellCombat
 
   @spirit_of_redemption_talent 20_711
@@ -91,7 +91,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     {entity, absorbed}
   end
 
-  @doc "Returns the updated entity, damage after received modifiers and redirection, and absorbed damage."
+  @doc "Returns the updated entity, damage after received modifiers, and damage prevented by absorption and sharing."
   def take_damage_with_mitigation(entity, damage, now, opts \\ [])
 
   def take_damage_with_mitigation(%{internal: %Internal{godmode: true}} = entity, _damage, _now, _opts),
@@ -99,7 +99,8 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   def take_damage_with_mitigation(entity, damage, now, opts)
       when is_number(damage) and damage > 0 and is_integer(now) do
-    if DamageImmunity.immune?(entity, Keyword.get(opts, :school, :physical), Keyword.get(opts, :spell)) do
+    if Keyword.get(opts, :shared_damage) != :unmitigated and
+         DamageImmunity.immune?(entity, Keyword.get(opts, :school, :physical), Keyword.get(opts, :spell)) do
       {entity, damage, damage}
     else
       take_unblocked_damage(entity, damage, now, opts)
@@ -177,14 +178,19 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   defp mitigate_damage(entity, damage, school, now, opts) do
-    if Keyword.get(opts, :environmental?, false) do
-      {entity, damage, damage}
-    else
-      damage = scale_damage_taken(entity, damage, school)
-      {damage, redirect} = Aura.damage_redirect(entity, damage, school)
-      entity = enqueue_redirect(entity, redirect, Keyword.get(opts, :source), school)
-      {entity, remaining} = Aura.absorb_damage(entity, damage, school, now)
-      {entity, damage, remaining}
+    cond do
+      Keyword.get(opts, :environmental?, false) or Keyword.get(opts, :shared_damage) == :unmitigated ->
+        {entity, damage, damage}
+
+      Keyword.get(opts, :shared_damage) == :absorb ->
+        {entity, remaining} = Aura.absorb_damage(entity, damage, school, now)
+        {entity, damage, remaining}
+
+      true ->
+        damage = scale_damage_taken(entity, damage, school)
+        {entity, remaining} = Aura.absorb_damage(entity, damage, school, now)
+        {remaining, transfers} = DamageSharing.split(entity, remaining, school, now, opts)
+        {Effects.enqueue(entity, transfers), damage, remaining}
     end
   end
 
@@ -218,28 +224,6 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   defp enqueue_duel_outcome(entity, _outcome), do: entity
-
-  defp enqueue_redirect(entity, {target_guid, amount}, source_guid, school) when is_integer(amount) and amount > 0 do
-    spell = %Spell{
-      id: 6940,
-      name: "Blessing of Sacrifice",
-      school: school,
-      effects: [
-        %Spell.Effect{index: 0, type: :school_damage, base_points: amount, implicit_target_a: :target_enemy}
-      ]
-    }
-
-    context = %CastContext{
-      caster_guid: source_guid,
-      caster_level: 1,
-      target_guid: target_guid,
-      spell: spell
-    }
-
-    Effects.enqueue(entity, Effects.deliver_spell(target_guid, context, spell))
-  end
-
-  defp enqueue_redirect(entity, _redirect, _source_guid, _school), do: entity
 
   defp scale_damage_taken(entity, damage, school) when is_integer(damage) and damage > 0 do
     case Aura.percent_multiplier(entity, :mod_damage_percent_taken, Spell.school_mask(school)) do

@@ -445,21 +445,24 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
       sacrifice = %Holder{
         spell: %Spell{id: 6940, name: "Blessing of Sacrifice"},
         caster_guid: 7,
-        auras: [%Aura{type: :split_damage_flat, amount: 44, misc_value: 0x7F}]
+        auras: [%Aura{type: :split_damage_flat, amount: 45, misc_value: 0x7F}]
       }
 
       target = character([sacrifice])
-      damaged = Core.take_damage(target, 100, 1_000, school: :shadow, source: 9)
+
+      damaged =
+        Core.take_damage(target, 100, 1_000, school: :shadow, source: 9, damage_sharing_targets: MapSet.new([7]))
 
       assert damaged.unit.health == 45
 
       assert Enum.any?(
                damaged.internal.events,
                &match?(
-                 %Effects.DeliverSpell{
+                 %Effects.SharedDamage{
                    target_guid: 7,
-                   cast_context: %CastContext{caster_guid: 9},
-                   spell: %Spell{id: 6940, effects: [%Spell.Effect{base_points: 45}]}
+                   source_guid: 9,
+                   damage: 45,
+                   spell: %Spell{id: 6940}
                  },
                  &1
                )

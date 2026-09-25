@@ -123,6 +123,8 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:receive_attack, attack})
   end
 
+  def receive_shared_damage(entity, effect), do: dispatch_cast(entity, {:receive_shared_damage, effect})
+
   def attack_outcome(entity, payload) do
     dispatch_cast(entity, {:attack_outcome, payload})
   end

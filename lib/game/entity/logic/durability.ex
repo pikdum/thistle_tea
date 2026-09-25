@@ -14,12 +14,11 @@ defmodule ThistleTea.Game.Entity.Logic.Durability do
 
   def on_damage(%{object: %{guid: guid}} = entity, previous_health, remaining, new_health, opts)
       when previous_health > 0 and remaining > 0 do
-    spell = Keyword.get(opts, :spell)
     source = Keyword.get(opts, :source)
     environmental? = Keyword.get(opts, :environmental?, false)
     applicable? = new_health == 0 or (not environmental? and is_integer(source) and source > 0 and source != guid)
 
-    if not applicable? or (new_health == 0 and no_death_loss?(spell, Keyword.get(opts, :spell_id))) do
+    if not applicable? or (new_health == 0 and not death_loss?(opts)) do
       entity
     else
       Effects.enqueue(entity, %Effects.DurabilityDamage{
@@ -31,6 +30,11 @@ defmodule ThistleTea.Game.Entity.Logic.Durability do
   end
 
   def on_damage(entity, _previous_health, _remaining, _new_health, _opts), do: entity
+
+  defp death_loss?(opts) do
+    Keyword.get(opts, :death_durability_loss?, true) and
+      not no_death_loss?(Keyword.get(opts, :spell), Keyword.get(opts, :spell_id))
+  end
 
   defp no_death_loss?(_spell, 27_965), do: true
   defp no_death_loss?(%Spell{} = spell, _id), do: Spell.attribute?(spell, :no_durability_loss)

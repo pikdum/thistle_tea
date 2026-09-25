@@ -165,7 +165,10 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
         Core.take_damage_with_mitigation(entity, result.damage, now,
           school: attack_school(attack),
           source: Map.get(attack, :caster, 0),
+          source_level: Map.get(attack, :caster_level, 1),
+          resistance_penetration: Map.get(attack, :resistance_penetration, []),
           source_owner: Map.get(attack, :caster_owner_guid),
+          damage_sharing_targets: Keyword.get(opts, :damage_sharing_targets, MapSet.new()),
           threat_multiplier: Map.get(attack, :threat_multiplier, 1.0)
         )
       else
