@@ -210,7 +210,7 @@ defmodule ThistleTea.Game.Entity.Server.CreaturePetOwnerTest do
     end
   end
 
-  describe "controlled creature pets" do
+  describe "summon/2 with controlled creature pets" do
     test "retains the occupied slot for both living and dead pets", %{owner: owner, pid: pid} do
       send(pid, controlled_request(owner))
       active = :sys.get_state(pid)
@@ -245,7 +245,7 @@ defmodule ThistleTea.Game.Entity.Server.CreaturePetOwnerTest do
     end
   end
 
-  describe "controlled player pets" do
+  describe "handle_info/2 with controlled player pets" do
     setup [:player]
 
     test "attaches before the next request and publishes the defensive pet bar", %{state: state} do
