@@ -10,16 +10,22 @@ defmodule ThistleTea.Game.Entity.Logic.Shapeshift do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Passive
 
   @cleansing_forms [1, 2, 3, 4, 5, 8, 31]
   @protected_mechanics [1, 2, 5, 8, 12, 13, 18, 20, 23, 24, 27, 30]
   @shapeshifting_cancels 0x00008000
 
-  def interrupt_holders(previous, desired) do
+  def interrupt_holders(previous, desired, target_guid) do
     previous_forms = forms(previous)
     current_forms = forms(desired)
     entered = current_forms -- previous_forms
     exited = previous_forms -- current_forms
+
+    desired =
+      if exited == [],
+        do: desired,
+        else: Enum.reject(desired, &(&1.caster_guid == target_guid and Passive.removed_on_shape_lost?(&1.spell)))
 
     desired =
       if Enum.any?(entered ++ exited, fn {_key, form} -> form in @cleansing_forms end),

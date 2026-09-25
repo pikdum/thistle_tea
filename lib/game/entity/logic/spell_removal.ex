@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellRemoval do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Language
+  alias ThistleTea.Game.Entity.Logic.PassiveSpells
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.SpellSkills
@@ -14,18 +15,21 @@ defmodule ThistleTea.Game.Entity.Logic.SpellRemoval do
   def remove(%Character{} = character, spell_ids, now) when is_list(spell_ids) and is_integer(now) do
     previous_skills = granted_skills(character)
     previous_ranks = SpellSkills.grants(character.internal.spellbook || %{})
-    {character, aura_events} = AuraLogic.remove_spells(character, spell_ids, now)
-    character = Effects.enqueue(character, aura_events)
     internal = character.internal
+    spellbook = Map.drop(internal.spellbook || %{}, spell_ids)
+    removed_ids = Enum.uniq(spell_ids ++ PassiveSpells.removed_ids(internal.spellbook, spellbook))
 
     character = %{
       character
       | internal: %{
           internal
           | spells: (internal.spells || []) -- spell_ids,
-            spellbook: Map.drop(internal.spellbook || %{}, spell_ids)
+            spellbook: spellbook
         }
     }
+
+    {character, aura_events} = AuraLogic.remove_spells(character, removed_ids, now)
+    character = Effects.enqueue(character, aura_events)
 
     current_skills = granted_skills(character)
     current_ranks = SpellSkills.grants(character.internal.spellbook || %{})

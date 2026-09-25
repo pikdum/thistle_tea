@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEnvironment do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.PassiveSpells
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Environment
 
@@ -39,19 +40,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEnvironment do
   end
 
   defp restore_passives(character, now) do
-    (character.internal.spellbook || %{})
-    |> Map.values()
-    |> Enum.filter(&Environment.outdoor_passive?/1)
-    |> Enum.sort_by(& &1.id)
-    |> Enum.reduce(character, fn spell, character ->
-      if invalid?(character, spell) or Aura.has_spell?(character, spell.id) do
-        character
-      else
-        {character, events} =
-          Aura.apply_spell(character, character.object.guid, character.unit.level || 1, spell, now)
-
-        Effects.enqueue(character, events)
-      end
-    end)
+    {character, events} = PassiveSpells.restore(character, now, :outdoors)
+    Effects.enqueue(character, events)
   end
 end

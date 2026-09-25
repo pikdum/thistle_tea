@@ -60,6 +60,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.ModelGeometry, as: ModelGeometryLoader
   alias ThistleTea.Game.World.Loader.NpcText, as: NpcTextLoader
   alias ThistleTea.Game.World.Loader.PageText, as: PageTextLoader
+  alias ThistleTea.Game.World.Loader.PassiveSpell, as: PassiveSpellLoader
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Game.World.Loader.PetSpells, as: PetSpellsLoader
   alias ThistleTea.Game.World.Loader.PetTraining, as: PetTrainingLoader
@@ -230,6 +231,7 @@ defmodule ThistleTea.Application do
     SpellChainLoader.init()
     SpellEffectOverrideLoader.init()
     SpellPetAuraLoader.init()
+    PassiveSpellLoader.init()
     SpellAreaLoader.init()
     SpellObjectTargetLoader.init()
     SpellProcEventLoader.init()
@@ -312,6 +314,7 @@ defmodule ThistleTea.Application do
 
     with {:ok, pid} <- Supervisor.start_link(children, opts) do
       if !test do
+        PassiveSpellLoader.load_all()
         SpellAreaLoader.load_all()
         SpellChainLoader.load_abilities()
         CreatureGroupLoader.load_all()

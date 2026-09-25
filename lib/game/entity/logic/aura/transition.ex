@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Logic.FeignDeath
+  alias ThistleTea.Game.Entity.Logic.PassiveSpells
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Entity.Logic.Shapeshift
   alias ThistleTea.Game.Entity.Logic.Silithyst
@@ -64,7 +65,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
       when is_list(desired) and cause in @causes and is_integer(now) do
     previous = if is_list(unit.auras), do: unit.auras, else: []
     desired = Capacity.retain(desired, entity_guid(entity))
-    desired = Shapeshift.interrupt_holders(previous, desired)
+    desired = Shapeshift.interrupt_holders(previous, desired, entity_guid(entity))
     desired = MountSync.interrupt_holders(previous, desired)
     desired = StealthSync.interrupt_holders(previous, desired)
     desired = FeignDeath.interrupt_holders(previous, desired)
@@ -76,7 +77,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
       {entity, []}
     else
       holders = assign_slots(previous, desired, entity_guid(entity))
-      reconcile(entity, previous, holders, cause, now)
+      {entity, events} = reconcile(entity, previous, holders, cause, now)
+
+      if (unit.shapeshift_form || 0) == (entity.unit.shapeshift_form || 0) do
+        {entity, events}
+      else
+        {entity, passive_events} = PassiveSpells.restore(entity, now, :form)
+        {entity, events ++ passive_events}
+      end
     end
   end
 

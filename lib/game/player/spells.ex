@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Player.Spells do
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.PassiveSpells
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.SpellBook
@@ -24,7 +25,6 @@ defmodule ThistleTea.Game.Player.Spells do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
-  alias ThistleTea.Game.Spell.Environment
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
@@ -88,10 +88,14 @@ defmodule ThistleTea.Game.Player.Spells do
 
       {all_ids, events} ->
         spellbook = SpellLoader.build_spellbook(all_ids)
+        removed_ids = PassiveSpells.removed_ids(internal.spellbook, spellbook)
 
         character =
           %{character | internal: %{internal | spells: all_ids, spellbook: spellbook}}
           |> learn_skills(all_ids -- existing_ids)
+
+        {character, aura_events} = AuraLogic.remove_spells(character, removed_ids, Time.now())
+        character = Effects.enqueue(character, aura_events)
 
         {character, reward_events} = learn_spells(character, skill_rewards(character), attempted)
         {character, events ++ reward_events}
@@ -136,19 +140,9 @@ defmodule ThistleTea.Game.Player.Spells do
     send_proficiencies(character)
   end
 
-  def apply_passives(%Character{internal: %{spellbook: spellbook}} = character, now)
-      when is_map(spellbook) and is_integer(now) do
-    spellbook
-    |> Map.values()
-    |> Enum.filter(&(passive_aura_spell?(&1) and Environment.validate(&1, character.internal.outdoors?) == :ok))
-    |> Enum.reduce(character, fn spell, character ->
-      if AuraLogic.has_spell?(character, spell.id) do
-        character
-      else
-        apply_aura_spell(character, spell, now)
-      end
-    end)
-    |> CombatRatings.sync()
+  def apply_passives(%Character{} = character, now) when is_integer(now) do
+    {character, events} = PassiveSpells.restore(character, now)
+    character |> Effects.enqueue(events) |> CombatRatings.sync()
   end
 
   def apply_passives(character, _now), do: character
@@ -169,10 +163,6 @@ defmodule ThistleTea.Game.Player.Spells do
   end
 
   def apply_default_auras(character, _now), do: character
-
-  defp passive_aura_spell?(%Spell{} = spell) do
-    Spell.attribute?(spell, :passive) and (spell.stances || 0) == 0 and Spell.aura_effects(spell) != []
-  end
 
   defp apply_aura_spell(%Character{} = character, %Spell{} = spell, now) do
     {character, events} =

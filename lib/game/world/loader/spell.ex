@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
+  alias ThistleTea.Game.World.Loader.PassiveSpell, as: PassiveSpellLoader
   alias ThistleTea.Game.World.Loader.SpellAppearance
   alias ThistleTea.Game.World.Loader.SpellArea, as: SpellAreaLoader
   alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
@@ -208,6 +209,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       name: row.name_en_gb,
       spell_icon: row.spell_icon,
       spell_visual: row.spell_visual_0,
+      hidden_aura?: row.attributes == 0x80 and row.duration == 21,
       script_name: SpellScriptNameLoader.get(row.id),
       proc_rule: SpellProcEventLoader.get(row.id),
       school: school(row.school),
@@ -257,7 +259,19 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> struct!(power_fields(row))
     |> append_shapeshift_passives(radius_lookup)
     |> load_linked_auras(MapSet.put(ancestors, row.id))
+    |> load_passive_dependencies(MapSet.put(ancestors, row.id))
     |> Semantics.compile()
+  end
+
+  defp load_passive_dependencies(%SpellData{} = spell, ancestors) do
+    dependencies =
+      for id <- PassiveSpellLoader.get(spell.id),
+          not MapSet.member?(ancestors, id),
+          row = DBC.get(Spell, id),
+          not is_nil(row),
+          do: build(row, ancestors)
+
+    %{spell | passive_dependencies: dependencies}
   end
 
   defp load_linked_auras(%SpellData{effects: effects} = spell, ancestors) do

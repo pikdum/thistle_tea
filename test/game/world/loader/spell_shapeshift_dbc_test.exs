@@ -40,8 +40,8 @@ defmodule ThistleTea.Game.World.Loader.SpellShapeshiftDbcTest do
       water_walk = holder(SpellLoader.load(546))
       cat = holder(SpellLoader.load(768))
       moonkin = holder(SpellLoader.load(24_858))
-      assert Shapeshift.interrupt_holders([water_walk], [cat, water_walk]) == [cat]
-      assert Shapeshift.interrupt_holders([water_walk], [moonkin, water_walk]) == [moonkin, water_walk]
+      assert Shapeshift.interrupt_holders([water_walk], [cat, water_walk], 7) == [cat]
+      assert Shapeshift.interrupt_holders([water_walk], [moonkin, water_walk], 7) == [moonkin, water_walk]
       assert {:error, :bad_targets} = Shapeshift.validate_target(nil, water_walk.spell, %{shapeshift_form: 1})
       assert :ok = Shapeshift.validate_target(nil, water_walk.spell, %{shapeshift_form: 31})
     end

@@ -75,6 +75,7 @@ defmodule ThistleTea.Game.Spell do
     attributes: MapSet.new(),
     effects: [],
     linked_auras: [],
+    passive_dependencies: [],
     script_steps: [],
     reagents: []
   ]
