@@ -121,7 +121,7 @@ defmodule ThistleTea.Game.Entity.Logic.DamageImmunityTest do
 
         if type == :periodic_mana_leech do
           assert target.unit.power1 == 80
-          assert %Effects.GrantPower{target_guid: 2, misc_value: 0, amount: 20} in events
+          assert [%Effects.LeechPower{source_guid: 2, power_type: 0, amount: 20}] = events
         else
           assert target.unit.health == 80
         end

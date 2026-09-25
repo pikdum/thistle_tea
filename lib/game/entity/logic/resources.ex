@@ -297,4 +297,11 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
   def current_power(%{unit: %Unit{power4: power}}, 3), do: power || 0
   def current_power(%{unit: %Unit{power5: power}}, 4), do: power || 0
   def current_power(_entity, _power_type), do: 0
+
+  def max_power(%{unit: %Unit{max_power1: power}}, 0), do: power || 0
+  def max_power(%{unit: %Unit{max_power2: power}}, 1), do: power || 0
+  def max_power(%{unit: %Unit{max_power3: power}}, 2), do: power || 0
+  def max_power(%{unit: %Unit{max_power4: power}}, 3), do: power || 0
+  def max_power(%{unit: %Unit{max_power5: power}}, 4), do: power || 0
+  def max_power(_entity, _power_type), do: 0
 end

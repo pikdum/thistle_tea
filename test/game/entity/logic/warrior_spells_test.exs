@@ -831,7 +831,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
       {caster, events} = SpellEffect.receive(caster, context, spell, 1_000)
 
-      assert events == []
+      assert [%Effects.SpellEnergize{source_guid: 5, target_guid: 5, spell_id: 100, power_type: 1, amount: 90}] = events
       assert caster.unit.power2 == 90
     end
 

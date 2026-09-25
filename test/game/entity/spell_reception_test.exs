@@ -140,6 +140,44 @@ defmodule ThistleTea.Game.Entity.SpellReceptionTest do
   end
 
   describe "aura_contexts/2" do
+    test "mana drains stop when their caster dies, leaves the world, or disappears", ctx do
+      spell = %Spell{
+        id: 5138,
+        school: :shadow,
+        duration_ms: 6_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :periodic_mana_leech,
+            base_points: 10,
+            misc_value: 0,
+            multiple_value: 1.0,
+            amplitude_ms: 1_000
+          }
+        ]
+      }
+
+      target = %{ctx.target | unit: %{ctx.target.unit | power_type: 0, power1: 100, max_power1: 100}}
+      {target, _} = AuraLogic.apply_spell(target, ctx.caster, 60, spell, 0)
+      Metadata.put(ctx.caster, %{alive?: true})
+      SpatialHash.update(:mobs, ctx.caster, target.internal.world, 0.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:mobs, ctx.caster) end)
+      {target, [%Effects.LeechPower{amount: 10}]} = projected_tick(target, 1_000)
+      assert target.unit.power1 == 90
+
+      Metadata.update(ctx.caster, %{alive?: false})
+      {target, []} = projected_tick(target, 2_000)
+      Metadata.update(ctx.caster, %{alive?: true})
+      SpatialHash.update(:mobs, ctx.caster, WorldRef.open(1), 0.0, 0.0, 0.0)
+      {target, []} = projected_tick(target, 3_000)
+      SpatialHash.remove(:mobs, ctx.caster)
+      Metadata.delete(ctx.caster)
+      {target, []} = projected_tick(target, 4_000)
+      assert target.unit.power1 == 90
+      assert AuraLogic.next_event_at(target) == 5_000
+    end
+
     test "supplies a fresh roll for a due creature heartbeat without periodic effects", ctx do
       [holder] = ctx.target.unit.auras
       holder = %{holder | expires_at: 20_000, heartbeat: %Heartbeat{next_check_at: 5_000, hit_chance_bp: 0}}

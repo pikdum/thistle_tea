@@ -148,9 +148,13 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:drain_power, power_type})
   end
 
-  def grant_power(entity, power_type, amount) do
-    dispatch_cast(entity, {:grant_power, power_type, amount})
+  def grant_power(entity, effect) do
+    dispatch_cast(entity, {:grant_power, effect})
   end
+
+  def leech_power(entity, effect), do: dispatch_cast(entity, {:leech_power, effect})
+
+  def add_threat(entity, effect), do: dispatch_cast(entity, {:add_threat, effect})
 
   def add_combo_points(entity, award) do
     dispatch_cast(entity, {:add_combo_points, award})

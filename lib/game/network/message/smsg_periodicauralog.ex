@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgPeriodicauralog do
   @obs_mod_health 20
   @obs_mod_mana 21
   @periodic_energize 24
+  @periodic_mana_leech 64
 
   defstruct target: 0,
             caster: 0,
@@ -38,6 +39,13 @@ defmodule ThistleTea.Game.Network.Message.SmsgPeriodicauralog do
         misc_value = normalize_integer(Map.get(aura, :misc_value, 0))
         <<value::little-size(32), misc_value::little-size(32), amount::little-size(32)>>
 
+      @periodic_mana_leech ->
+        power = normalize_integer(Map.get(aura, :misc_value, 0))
+        multiplier = Map.get(aura, :multiplier, 0.0)
+
+        <<@periodic_mana_leech::little-size(32), power::little-size(32), amount::little-size(32),
+          multiplier::little-float-size(32)>>
+
       value ->
         <<value::little-size(32)>>
     end
@@ -49,6 +57,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgPeriodicauralog do
   defp aura_type(:obs_mod_health), do: @obs_mod_health
   defp aura_type(:obs_mod_mana), do: @obs_mod_mana
   defp aura_type(:periodic_energize), do: @periodic_energize
+  defp aura_type(:periodic_mana_leech), do: @periodic_mana_leech
   defp aura_type(value) when is_integer(value) and value >= 0, do: value
   defp aura_type(_value), do: 0
 

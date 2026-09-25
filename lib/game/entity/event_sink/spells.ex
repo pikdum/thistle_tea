@@ -20,6 +20,48 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
   @spell_hit_type_crit 0x2
 
+  def emit(entity, %Effects.SpellPowerDrain{} = effect, _context) do
+    %Message.SmsgSpelllogexecute{
+      caster: effect.source_guid,
+      spell_id: effect.spell_id,
+      logs: [{:power_drain, effect.target_guid, effect.amount, effect.power_type, effect.multiplier}]
+    }
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
+  def emit(%{object: %{guid: guid}} = entity, %Effects.LeechPower{source_guid: guid} = effect, context) do
+    Context.cast(context, {:leech_power, effect})
+    entity
+  end
+
+  def emit(entity, %Effects.LeechPower{} = effect, _context) do
+    Entity.leech_power(effect.source_guid, effect)
+    entity
+  end
+
+  def emit(entity, %Effects.AddThreat{} = effect, _context) do
+    if Guid.entity_type(effect.target_guid) == :mob do
+      Entity.add_threat(effect.target_guid, effect)
+    end
+
+    entity
+  end
+
+  def emit(entity, %Effects.SpellEnergize{} = effect, _context) do
+    %Message.SmsgSpellenergizelog{
+      caster: effect.source_guid,
+      target: effect.target_guid,
+      spell_id: effect.spell_id,
+      power_type: effect.power_type,
+      amount: effect.amount
+    }
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
   def emit(entity, %Effects.SpellInterrupted{} = effect, _context) do
     %Message.SmsgSpelllogexecute{
       caster: effect.source_guid,
@@ -171,7 +213,8 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
         %{
           aura_type: effect.aura_type,
           amount: effect.amount || 0,
-          misc_value: effect.misc_value || 0
+          misc_value: effect.misc_value || 0,
+          multiplier: effect.multiplier
         }
       ]
     }
@@ -446,11 +489,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
     entity
   end
 
-  def emit(entity, %Effects.GrantPower{} = effect, _context) do
-    if Guid.entity_type(effect.target_guid) == :player do
-      Entity.grant_power(effect.target_guid, effect.misc_value, effect.amount)
-    end
+  def emit(%{object: %{guid: guid}} = entity, %Effects.GrantPower{target_guid: guid} = effect, context) do
+    Context.cast(context, {:grant_power, effect})
+    entity
+  end
 
+  def emit(entity, %Effects.GrantPower{} = effect, _context) do
+    Entity.grant_power(effect.target_guid, effect)
     entity
   end
 

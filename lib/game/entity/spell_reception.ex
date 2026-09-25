@@ -179,7 +179,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
           else: context
 
       context =
-        if Holder.has_any_type?(holder, [:periodic_leech, :periodic_health_funnel]) do
+        if Holder.has_any_type?(holder, [:periodic_leech, :periodic_health_funnel, :periodic_mana_leech]) do
           %{context | caster_available?: caster_available?(target, holder.caster_guid, now)}
         else
           context

@@ -884,7 +884,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       assert target.unit.power2 == 100
       assert target.internal.broadcast_update? == true
-      assert events == []
+
+      assert [%Effects.SpellEnergize{source_guid: 1, target_guid: 1, spell_id: 2687, power_type: 1, amount: 100}] =
+               events
     end
 
     test "trigger spell effects return trigger events" do
@@ -1391,7 +1393,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       assert pet.unit.power2 == 100
       assert pet.unit.power5 == 116_501
-      assert events == []
+      assert [%Effects.SpellPowerDrain{power_type: 4, amount: 49_999, multiplier: +0.0}] = events
     end
 
     test "growl adds threat for the pet rather than its owner" do

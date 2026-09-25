@@ -58,6 +58,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.PlayerFlags
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
+  alias ThistleTea.Game.Entity.Logic.PowerLeech
+  alias ThistleTea.Game.Entity.Logic.PowerRestoration
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
@@ -375,9 +377,24 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   end
 
-  def handle_cast({:grant_power, power_type, amount}, %{character: %Character{} = character} = state) do
-    character = Resources.gain_power(character, power_type, amount)
+  def handle_cast({:grant_power, %Effects.GrantPower{} = grant}, %{character: %Character{} = character} = state) do
+    {character, events} = PowerRestoration.apply(character, grant, Time.now())
+    character = character |> Effects.enqueue(events) |> EventSink.emit_pending(EventContext.new(self()))
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Power restoration failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:leech_power, %Effects.LeechPower{} = leech}, %{character: %Character{} = character} = state) do
+    {character, events} = PowerLeech.restore(character, leech, :rand.uniform())
+    character = character |> Effects.enqueue(events) |> EventSink.emit_pending(EventContext.new(self()))
+    {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Power leech failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast(

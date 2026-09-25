@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.HealingReceived
   alias ThistleTea.Game.Entity.Logic.PowerBurn
+  alias ThistleTea.Game.Entity.Logic.PowerLeech
   alias ThistleTea.Game.Entity.Logic.ResistancePenetration
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellResist
@@ -33,6 +34,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.PersistentArea
   alias ThistleTea.Game.Spell.PersistentArea.Check
+
+  @aura_interrupt_damage 0x02
 
   @harmful_periodics [
     :periodic_damage,
@@ -240,7 +243,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   defp tick_checked_aura(entity, holder, aura, now), do: tick_aura(entity, holder, aura, now)
 
   defp unavailable_drain_caster?(%Holder{cast_context: %CastContext{caster_available?: false}}, %Aura{type: type}),
-    do: type in [:periodic_leech, :periodic_health_funnel]
+    do: type in [:periodic_leech, :periodic_health_funnel, :periodic_mana_leech]
 
   defp unavailable_drain_caster?(_holder, _aura), do: false
 
@@ -380,38 +383,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_mana_leech, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
-    {entity, events} =
-      if entity.unit.power_type == (aura.misc_value || 0) do
-        available = max(entity.unit.power1 || 0, 0)
-        drained = min(max(aura.amount, 0), available)
-        entity = %{entity | unit: %{entity.unit | power1: available - drained}}
+    {entity, events} = PowerLeech.periodic(entity, cast_context(holder), holder.spell, aura)
 
-        multiplier = if is_number(aura.multiple_value) and aura.multiple_value > 0, do: aura.multiple_value, else: 1.0
-        gained = trunc(drained * multiplier)
+    {entity, interrupted} =
+      if events == [],
+        do: {entity, []},
+        else: Lifecycle.remove_with_interrupt_flags(entity, @aura_interrupt_damage, now)
 
-        events =
-          if drained > 0 do
-            [
-              Effects.grant_power(holder.caster_guid, 0, gained),
-              Effects.periodic_aura_log(
-                holder.caster_guid,
-                entity.object.guid,
-                holder.spell,
-                :periodic_energize,
-                drained,
-                misc_value: 0
-              )
-            ]
-          else
-            []
-          end
-
-        {entity, events}
-      else
-        {entity, []}
-      end
-
-    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events ++ interrupted}
   end
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_trigger_spell, next_tick_at: at} = aura, now)

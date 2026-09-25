@@ -4,6 +4,14 @@ defmodule ThistleTea.Game.Network.Message.SmsgSpelllogexecuteTest do
   alias ThistleTea.Game.Network.Message.SmsgSpelllogexecute
 
   describe "to_binary/1" do
+    test "encodes resource drains with a full victim GUID and conversion multiplier" do
+      message = %SmsgSpelllogexecute{caster: 0x0102, spell_id: 18_220, logs: [{:power_drain, 0x0304, 150, 0, 0.5}]}
+
+      assert SmsgSpelllogexecute.to_binary(message) ==
+               <<3, 2, 1, 18_220::little-size(32), 1::little-size(32), 8::little-size(32), 1::little-size(32),
+                 0x0304::little-size(64), 150::little-size(32), 0::little-size(32), 0.5::little-float-size(32)>>
+    end
+
     test "encodes the interrupted spell and full victim GUID" do
       message = %SmsgSpelllogexecute{caster: 0x0102, spell_id: 2139, logs: [{:interrupt_cast, 0x0304, 133}]}
 

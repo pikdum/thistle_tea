@@ -15,6 +15,11 @@ defmodule ThistleTea.Game.Network.Message.SmsgSpelllogexecute do
     <<19::little-size(32), 1::little-size(32), target::little-size(64), count::little-size(32)>>
   end
 
+  defp encode_log({:power_drain, target, amount, power, multiplier}) do
+    <<8::little-size(32), 1::little-size(32), target::little-size(64), amount::little-size(32), power::little-size(32),
+      multiplier::little-float-size(32)>>
+  end
+
   defp encode_log({:interrupt_cast, target, interrupted_spell}) do
     <<68::little-size(32), 1::little-size(32), target::little-size(64), interrupted_spell::little-size(32)>>
   end

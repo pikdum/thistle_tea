@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.SummonEvent
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.EventSink.Context, as: EventContext
   alias ThistleTea.Game.Entity.KillReward
   alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
   alias ThistleTea.Game.Entity.Logic.AI.BT
@@ -68,6 +69,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.PetSpellModifiers
   alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.PetUntraining
+  alias ThistleTea.Game.Entity.Logic.PowerLeech
+  alias ThistleTea.Game.Entity.Logic.PowerRestoration
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.SpellResist
@@ -589,6 +592,46 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state = SpellReception.heal(state, amount)
     {:noreply, state, {:continue, :maybe_broadcast}}
   end
+
+  def handle_cast({:grant_power, %Effects.GrantPower{} = grant}, %Mob{} = state) do
+    {state, events} = PowerRestoration.apply(state, grant, Time.now())
+    state = state |> Effects.enqueue(events) |> EventSink.emit_pending(EventContext.new(self()))
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Power restoration failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:leech_power, %Effects.LeechPower{} = leech}, %Mob{} = state) do
+    {state, events} = PowerLeech.restore(state, leech, :rand.uniform())
+    state = state |> Effects.enqueue(events) |> EventSink.emit_pending(EventContext.new(self()))
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Power leech failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:add_threat, %Effects.AddThreat{} = effect}, %Mob{internal: %Internal{in_combat: true}} = state) do
+    if Hostility.valid_hostile_target?(state, effect.source_guid) do
+      state =
+        state
+        |> Threat.add(effect.source_guid, effect.amount)
+        |> EventSink.emit_pending(EventContext.new(self()))
+        |> wake_ai_tick()
+
+      {:noreply, state}
+    else
+      {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Power leech threat failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:add_threat, %Effects.AddThreat{}}, state), do: {:noreply, state}
 
   @impl GenServer
   def handle_cast({:heal_threat, healer_guid, healed_guid, amount}, %Mob{internal: %Internal{in_combat: true}} = state)

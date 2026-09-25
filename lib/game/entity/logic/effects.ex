@@ -107,7 +107,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
       spell_id: spell.id,
       aura_type: aura_type,
       amount: amount,
-      misc_value: Keyword.get(opts, :misc_value, 0)
+      misc_value: Keyword.get(opts, :misc_value, 0),
+      multiplier: Keyword.get(opts, :multiplier, 0.0)
     }
   end
 

@@ -634,12 +634,12 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert [%Holder{auras: [%AuraData{next_tick_at: 2_000}]}] = entity.unit.auras
       {entity, events} = Aura.tick(entity, 2_000)
       assert entity.unit.power1 == 10
-      assert %Effects.GrantPower{target_guid: 999, misc_value: 0, amount: 40} in events
+      assert [%Effects.LeechPower{source_guid: 999, power_type: 0, amount: 20, multiplier: 2.0}] = events
       {entity, events} = Aura.tick(entity, 3_000)
       assert entity.unit.power1 == 0
-      assert %Effects.GrantPower{target_guid: 999, misc_value: 0, amount: 20} in events
+      assert [%Effects.LeechPower{source_guid: 999, power_type: 0, amount: 10, multiplier: 2.0}] = events
       {_entity, events} = Aura.tick(entity, 4_000)
-      refute Enum.any?(events, &match?(%Effects.GrantPower{}, &1))
+      assert [%Effects.LeechPower{amount: 0}] = events
     end
 
     test "restores mana and logs periodic energize ticks" do

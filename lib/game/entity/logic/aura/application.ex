@@ -53,7 +53,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   @ignite_dot 12_654
   @ignite_max_stacks 5
 
-  @context_auras [:periodic_power_burn, :periodic_trigger_spell, :proc_trigger_spell, :damage_shield, :feign_death]
+  @context_auras [
+    :periodic_mana_leech,
+    :periodic_power_burn,
+    :periodic_trigger_spell,
+    :proc_trigger_spell,
+    :damage_shield,
+    :feign_death
+  ]
 
   def apply_spell(entity, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
     if CreatureImmunity.spell?(entity, context, spell),
