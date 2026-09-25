@@ -70,7 +70,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.PetUntraining
   alias ThistleTea.Game.Entity.Logic.Pvp
-  alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.SpellThreat
@@ -472,9 +471,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {state, events} = SpellReception.apply_prepared(state, prepared, now)
 
     state =
-      if SpellEffect.successful_hit?(events), do: eventai_spell_hit(state, caster_guid, spell), else: state
-
-    notify_spell_hit_target(caster_guid, state.object.guid, spell, events)
+      if SpellReception.cast_hit?(prepared, events) do
+        notify_spell_hit_target(caster_guid, state.object.guid, spell)
+        eventai_spell_hit(state, caster_guid, spell)
+      else
+        state
+      end
 
     state =
       state
@@ -1918,14 +1920,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp eventai_spell_hit_target(%Mob{} = state, _target_guid, _spell, _now), do: state
 
-  defp notify_spell_hit_target(caster_guid, target_guid, %Spell{} = spell, events)
-       when is_integer(caster_guid) and is_integer(target_guid) and is_list(events) do
-    if Guid.entity_type(caster_guid) == :mob and SpellEffect.successful_hit?(events) do
+  defp notify_spell_hit_target(caster_guid, target_guid, %Spell{} = spell)
+       when is_integer(caster_guid) and is_integer(target_guid) do
+    if Guid.entity_type(caster_guid) == :mob do
       Entity.spell_hit_target(caster_guid, target_guid, spell)
     end
   end
 
-  defp notify_spell_hit_target(_caster_guid, _target_guid, _spell, _events), do: :ok
+  defp notify_spell_hit_target(_caster_guid, _target_guid, _spell), do: :ok
 
   defp react_to_spell_damage(state, _events, %Mob{internal: %Internal{in_combat: true}}), do: state
 

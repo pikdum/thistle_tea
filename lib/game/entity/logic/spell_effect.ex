@@ -120,7 +120,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   def apply_prepared(target, %Resolution{context: context, spell: spell} = resolution, now) do
     {target, events} = apply_resolved_effects(target, resolution, now)
-    target = if successful_hit?(events), do: Critter.spell_hit(target, context.caster_guid, spell, now), else: target
+
+    target =
+      if cast_hit?(resolution, events), do: Critter.spell_hit(target, context.caster_guid, spell, now), else: target
+
     {target, events}
   end
 
@@ -186,6 +189,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   def successful_hit?(events) when is_list(events) do
     Enum.all?(events, &(not is_struct(&1, Effects.SpellLogMiss)))
   end
+
+  def cast_hit?(%Resolution{outcome: :hit, context: %CastContext{persistent_area: nil}}, events),
+    do: successful_hit?(events)
+
+  def cast_hit?(_resolution, _events), do: false
 
   def receive_outcome(target, caster_guid, %Spell{} = spell, :resist, now)
       when is_integer(caster_guid) and is_integer(now) do

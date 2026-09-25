@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.DynamicObject
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
@@ -27,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Entity.Logic.Rest, as: RestLogic
   alias ThistleTea.Game.Entity.Logic.Transport
+  alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Monitor, as: CompanionMonitor
@@ -45,8 +47,10 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.PersistentArea
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Metadata
@@ -717,6 +721,45 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
                  {:receive_spell, %CastContext{caster_guid: 2, hit_outcome: :resist}, spell},
                  state
                )
+    end
+
+    test "notifies a creature caster only for cast hits, not ground aura refreshes" do
+      caster_guid = Guid.runtime(:mob, 990_514)
+      EntityRegistry.register(caster_guid)
+      character = character(System.unique_integer([:positive]), health: 100, max_health: 100)
+
+      spell = %Spell{
+        id: 999_904,
+        duration_ms: 60_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :dispel_immunity, misc_value: 5}]
+      }
+
+      dynamic = DynamicObject.build(caster_guid, character.internal.world, spell, {0.0, 0.0, 0.0}, 10.0)
+      World.update_position(dynamic)
+      on_exit(fn -> World.remove_position(dynamic) end)
+      now = Time.now()
+
+      area = %PersistentArea{
+        guid: dynamic.object.guid,
+        position: World.position(dynamic),
+        radius: 10.0,
+        started_at: now,
+        expires_at: now + 60_000
+      }
+
+      context = %CastContext{caster_guid: caster_guid, caster_level: 60, persistent_area: area}
+      state = %State{character: character}
+
+      assert {:noreply, state, {:continue, :maybe_broadcast_update}} =
+               PlayerServer.handle_cast({:receive_spell, context, spell}, state)
+
+      assert [%{auras: [%{persistent_area: ^area}]}] = state.character.unit.auras
+      refute_receive {:"$gen_cast", {:spell_hit_target, _, _}}
+
+      context = %{context | persistent_area: nil}
+      PlayerServer.handle_cast({:receive_spell, context, spell}, state)
+      target_guid = character.object.guid
+      assert_receive {:"$gen_cast", {:spell_hit_target, ^target_guid, ^spell}}
     end
 
     test "syncs detection metadata before projecting a pending update" do

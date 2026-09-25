@@ -96,6 +96,9 @@ defmodule ThistleTea.Game.Entity.SpellReception do
   def starts_combat?(%Prepared{decision: %{combat?: combat?}}), do: combat?
   def starts_combat?(_prepared), do: false
 
+  def cast_hit?(%Prepared{resolution: resolution}, events), do: SpellEffect.cast_hit?(resolution, events)
+  def cast_hit?(_prepared, _events), do: false
+
   defp prepare_ranked(target, context, spell, now) do
     context = FeignDeath.prepare(target, context, spell, now)
     context = threat_context(target, context, spell)

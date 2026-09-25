@@ -5,14 +5,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CreatureEntryTest do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.AIEvent
   alias ThistleTea.Game.Entity.Data.CreatureArchetype
+  alias ThistleTea.Game.Entity.Data.DynamicObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.PersistentArea
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.CreatureArchetype, as: ArchetypeLoader
   alias ThistleTea.Game.World.Metadata
@@ -46,12 +50,51 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CreatureEntryTest do
     test "noncombat spell hits invoke EventAI after reception", %{mob: mob, template: template} do
       spell = %Spell{id: 23_359, effects: [%Effect{index: 0, type: :dummy}]}
       refute Spell.starts_combat?(spell)
+      caster_guid = Guid.runtime(:mob, 990_513)
+      EntityRegistry.register(caster_guid)
       {:ok, pid} = World.start_entity(with_spell_hit(mob, template, spell))
-      Entity.receive_spell(mob.object.guid, %CastContext{caster_guid: 1, caster_level: 60}, spell)
+      Entity.receive_spell(mob.object.guid, %CastContext{caster_guid: caster_guid, caster_level: 60}, spell)
       GenServer.cast(pid, {:send_update_to, self()})
       assert_receive {:"$gen_cast", {:send_packet, %UpdateObject{object: %{entry: entry}}}}, 1_000
       assert entry == template.entry
       assert Metadata.get(mob.object.guid).in_combat == false
+      target_guid = mob.object.guid
+      assert_receive {:"$gen_cast", {:spell_hit_target, ^target_guid, ^spell}}, 1_000
+    end
+
+    test "ground aura refreshes apply without recipient or caster spell-hit callbacks", %{mob: mob, template: template} do
+      spell = %Spell{
+        id: 23_359,
+        duration_ms: 60_000,
+        attributes: MapSet.new([:no_threat, :no_initial_threat]),
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :dispel_immunity, misc_value: 5}]
+      }
+
+      caster_guid = Guid.runtime(:mob, 990_513)
+      EntityRegistry.register(caster_guid)
+      {x, y, z, _orientation} = mob.movement_block.position
+      dynamic = DynamicObject.build(caster_guid, mob.internal.world, spell, {x, y, z}, 10.0)
+      World.update_position(dynamic)
+      on_exit(fn -> World.remove_position(dynamic) end)
+      now = Time.now()
+
+      area = %PersistentArea{
+        guid: dynamic.object.guid,
+        position: World.position(dynamic),
+        radius: 10.0,
+        started_at: now,
+        expires_at: now + 60_000
+      }
+
+      context = %CastContext{caster_guid: caster_guid, caster_level: 60, persistent_area: area}
+      {:ok, pid} = World.start_entity(with_spell_hit(mob, template, spell))
+      Entity.receive_spell(mob.object.guid, context, spell)
+      Entity.receive_spell(mob.object.guid, context, spell)
+      GenServer.cast(pid, {:send_update_to, self()})
+      assert_receive {:"$gen_cast", {:send_packet, %UpdateObject{object: %{entry: entry}}}}, 1_000
+      assert entry == mob.object.entry
+      assert [%{auras: [%{persistent_area: ^area}]}] = :sys.get_state(pid).unit.auras
+      refute_receive {:"$gen_cast", {:spell_hit_target, _, _}}
     end
 
     test "resisted spells do not invoke spell-hit transformations", %{mob: mob, template: template} do

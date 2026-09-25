@@ -62,7 +62,6 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Rest
-  alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.SpellThreat
@@ -2073,15 +2072,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         else: character
 
     {character, events} = SpellReception.apply_prepared(character, prepared, now)
-    notify_spell_hit_target(caster, character.object.guid, spell, events)
+    if SpellReception.cast_hit?(prepared, events), do: notify_spell_hit_target(caster, character.object.guid, spell)
     {EventSink.emit(character, events), combat?}
   end
 
-  defp notify_spell_hit_target(caster, target_guid, %Spell{} = spell, events)
-       when is_integer(target_guid) and is_list(events) do
+  defp notify_spell_hit_target(caster, target_guid, %Spell{} = spell) when is_integer(target_guid) do
     caster_guid = spell_caster_guid(caster)
 
-    if Guid.entity_type(caster_guid) == :mob and SpellEffect.successful_hit?(events) do
+    if Guid.entity_type(caster_guid) == :mob do
       Entity.spell_hit_target(caster_guid, target_guid, spell)
     end
   end

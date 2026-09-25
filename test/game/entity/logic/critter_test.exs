@@ -32,6 +32,8 @@ defmodule ThistleTea.Game.Entity.Logic.CritterTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.PersistentArea
+  alias ThistleTea.Game.Spell.PersistentArea.Check
   alias ThistleTea.Game.WorldRef
 
   setup [:mob]
@@ -97,6 +99,66 @@ defmodule ThistleTea.Game.Entity.Logic.CritterTest do
   end
 
   describe "SpellEffect.receive/4" do
+    test "ground dispel immunity refreshes do not trigger escape or threat", %{mob: mob} do
+      flare = %{
+        spell(:dispel_immunity)
+        | attributes: MapSet.new([:no_threat, :no_initial_threat]),
+          effects: [
+            %Effect{
+              index: 0,
+              type: :apply_aura,
+              aura: :dispel_immunity,
+              misc_value: 5,
+              implicit_target_a: :target_enemy
+            }
+          ]
+      }
+
+      context = ground_context(mob, flare)
+      threat = mob.internal.threat
+
+      mob =
+        Enum.reduce([1_000, 1_250, 1_500], mob, fn now, mob ->
+          {mob, _events} = SpellEffect.receive(mob, context, flare, now)
+          mob
+        end)
+
+      assert [%Holder{auras: [%{type: :dispel_immunity, persistent_area: area}]}] = mob.unit.auras
+      assert area == context.persistent_area
+      assert mob.unit.health == 20
+      assert mob.internal.blackboard.critter == nil
+      assert mob.internal.threat == threat
+      refute mob.internal.in_combat
+      assert Bitwise.band(mob.unit.flags, 0x800000) == 0
+    end
+
+    test "ground damage triggers escape when the first tick lands", %{mob: mob} do
+      dot = %{
+        spell(:periodic_damage)
+        | effects: [
+            %Effect{
+              index: 0,
+              type: :apply_aura,
+              aura: :periodic_damage,
+              base_points: 1,
+              amplitude_ms: 1_000,
+              implicit_target_a: :target_enemy
+            }
+          ]
+      }
+
+      context = ground_context(mob, dot)
+      {mob, _events} = SpellEffect.receive(mob, context, dot, 1_000)
+      assert mob.internal.blackboard.critter == nil
+      context = %{context | area_checks: %{context.persistent_area.guid => %Check{hit_roll: 0}}}
+      {mob, events} = Aura.tick(mob, 2_000, %{{dot.id, 1, nil} => context})
+      assert mob.unit.health == 19
+      assert mob.internal.blackboard.critter.escape_at == 32_000
+      assert mob.internal.blackboard.combat.flee_until == 32_000
+      assert mob.internal.in_combat
+      assert Enum.any?(events, &match?(%Effects.SpellDamage{damage: 1}, &1))
+    end
+
     test "a harmful debuff triggers escape without health loss", %{mob: mob} do
       {mob, _events} = SpellEffect.receive(mob, 1, spell(:mod_attack_power), 1_000)
       assert mob.unit.health == 20
@@ -292,6 +354,21 @@ defmodule ThistleTea.Game.Entity.Logic.CritterTest do
       perception: Perception.new(now, nil, %{1 => observation}, %{}),
       navigation: %{Navigation.direct() | fear_point: {-16.0, 0.0, 0.0}}
     )
+  end
+
+  defp ground_context(mob, spell) do
+    %CastContext{
+      caster_guid: 1,
+      caster_level: 1,
+      spell: spell,
+      persistent_area: %PersistentArea{
+        guid: Guid.from_low_guid(:dynamic_object, 1),
+        position: {mob.internal.world, 0.0, 0.0, 0.0},
+        radius: 10.0,
+        started_at: 1_000,
+        expires_at: 61_000
+      }
+    }
   end
 
   defp mob(_context) do
