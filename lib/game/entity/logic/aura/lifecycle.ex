@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura.AreaSources
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Dispel
   alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
@@ -21,8 +22,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Spell.PersistentArea
 
   @aura_interrupt_damage 0x02
   @aura_interrupt_cast 0x01
@@ -49,9 +48,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   def self_duration_events(_entity, _now), do: []
 
   def expire_due(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) do
-    {kept, expired} = Enum.split_with(holders, &Holder.alive?(&1, now))
+    kept = holders |> AreaSources.expire(now) |> Enum.filter(&Holder.alive?(&1, now))
 
-    if expired == [] do
+    if kept == holders do
       {entity, []}
     else
       transition(entity, kept, :expired, now)
@@ -160,12 +159,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   def remove_source_spell(entity, _spell_id, _caster_guid, _now), do: {entity, []}
 
   def remove_area_aura(%{unit: %Unit{auras: holders}} = entity, area_guid, now) do
-    kept =
-      Enum.reject(holders || [], fn
-        %Holder{cast_context: %CastContext{persistent_area: %PersistentArea{guid: ^area_guid}}} -> true
-        _holder -> false
-      end)
-
+    kept = AreaSources.remove(holders || [], area_guid)
     transition(entity, kept, :removed, now)
   end
 

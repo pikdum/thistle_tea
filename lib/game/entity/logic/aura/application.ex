@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura.AreaSources
   alias ThistleTea.Game.Entity.Logic.Aura.Capacity
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
@@ -80,7 +81,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
           caster_level: context.caster_level,
           caster_faction_template: context.caster_faction_template,
           resistance_penetration: context.resistance_penetration,
-          cast_context: if(context.persistent_area || Enum.any?(auras, &(&1.type in @context_auras)), do: context),
+          cast_context: retained_context(context, auras),
           applied_at: now,
           expires_at: holder_expiry(spell, context, now),
           charges: holder_charges(spell, context.spell_modifiers),
@@ -427,7 +428,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
             auras: carry_tick_times(old.auras, incoming.auras)
         }
 
-        List.replace_at(existing, index, refreshed)
+        List.replace_at(existing, index, AreaSources.merge(old, refreshed))
     end
   end
 
@@ -519,6 +520,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   defp holder_expiry(_spell, %CastContext{persistent_area: %PersistentArea{expires_at: at}}, _now), do: at
   defp holder_expiry(spell, context, now), do: expires_at(now, effective_duration(spell, context))
 
+  defp retained_context(context, auras) do
+    if context.persistent_area || Enum.any?(auras, &(&1.type in @context_auras)),
+      do: %{context | persistent_area: nil}
+  end
+
   defp effective_duration(%Spell{} = spell, %CastContext{} = context) do
     spell
     |> base_duration(context)
@@ -607,6 +613,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       item_type: effect.item_type,
       amplitude_ms: amplitude_ms,
       next_tick_at: next_tick(spell, effect, amplitude_ms, context, now),
+      persistent_area: context.persistent_area,
       trigger_spell_id: effect.trigger_spell_id
     }
   end

@@ -168,7 +168,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
 
       context = threat_context(target, context, holder.spell)
       context = %{context | damage_sharing_targets: sharing_targets}
-      context = area_context(target, context, now)
+      context = area_context(target, holder, context, now)
 
       context =
         if Heartbeat.check_due?(holder, now),
@@ -200,15 +200,20 @@ defmodule ThistleTea.Game.Entity.SpellReception do
 
   defp incoming_area_available?(_target, _context, _now), do: true
 
-  defp area_context(target, %CastContext{persistent_area: %PersistentArea{} = area} = context, now) do
-    available? =
-      (now >= area.expires_at or not is_nil(World.position(area.guid, now))) and
-        PersistentArea.contains?(area, World.position(target, now))
+  defp area_context(target, %Holder{auras: auras}, context, now) do
+    position = World.position(target, now)
 
-    %{context | area_available?: available?, periodic_hit_roll: Math.random_int(0, 9_999)}
+    checks =
+      for %{persistent_area: %PersistentArea{} = area} <- auras, into: %{} do
+        available? =
+          (now >= area.expires_at or not is_nil(World.position(area.guid, now))) and
+            PersistentArea.contains?(area, position)
+
+        {area.guid, %PersistentArea.Check{available?: available?, hit_roll: Math.random_int(0, 9_999)}}
+      end
+
+    %{context | area_checks: checks}
   end
-
-  defp area_context(_target, context, _now), do: context
 
   def heal(target, %Effects.HealEntity{spell: %Spell{} = spell, amount: amount} = effect) do
     if Death.alive?(target) do

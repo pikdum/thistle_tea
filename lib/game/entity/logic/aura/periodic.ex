@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AttackDamageTaken
+  alias ThistleTea.Game.Entity.Logic.Aura.AreaSources
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
@@ -31,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.PersistentArea
+  alias ThistleTea.Game.Spell.PersistentArea.Check
 
   @harmful_periodics [
     :periodic_damage,
@@ -99,9 +101,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp remove_unavailable_areas(entity, now, contexts) do
     holders =
-      Enum.reject(entity.unit.auras, fn holder ->
+      Enum.flat_map(entity.unit.auras, fn holder ->
         context = Map.get(contexts, {holder.spell.id, holder.caster_guid, holder.item_source}, holder.cast_context)
-        match?(%CastContext{persistent_area: %PersistentArea{}, area_available?: false}, context)
+        AreaSources.retain_available(holder, context)
       end)
 
     Transition.run(entity, %Change{holders: holders, cause: :removed, now: now})
@@ -187,8 +189,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_checked_aura(
          entity,
-         %Holder{cast_context: %CastContext{persistent_area: %PersistentArea{expires_at: expires_at}}},
-         %Aura{next_tick_at: at} = aura,
+         _holder,
+         %Aura{persistent_area: %PersistentArea{expires_at: expires_at}, next_tick_at: at} = aura,
          _now
        )
        when is_integer(at) and at > expires_at do
@@ -244,11 +246,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp persistent_area_missed?(
          entity,
-         %Holder{
-           spell: %Spell{dmg_class: 1} = spell,
-           cast_context: %CastContext{persistent_area: %PersistentArea{}} = context
-         },
-         %Aura{type: type}
+         %Holder{spell: %Spell{dmg_class: 1} = spell, cast_context: %CastContext{} = context},
+         %Aura{type: type, persistent_area: %PersistentArea{guid: guid}}
        )
        when type in [
               :periodic_damage,
@@ -263,7 +262,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
         no_spell_defense?: CreatureFlags.has?(entity, :no_spell_defense)
       })
 
-    opts = if is_integer(context.periodic_hit_roll), do: [roll: context.periodic_hit_roll], else: []
+    check = Map.get(context.area_checks, guid, %Check{})
+    opts = if is_integer(check.hit_roll), do: [roll: check.hit_roll], else: []
     not SpellResist.context_hit?(context, spell, target, match?(%Character{}, entity), opts)
   end
 
@@ -623,7 +623,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   defp advance_tick(_last_tick, _amplitude_ms, now), do: now + 1_000
 
   defp holder_event_times(%Holder{} = holder) do
-    tick_times = Heartbeat.event_times(holder) ++ Enum.flat_map(holder.auras, &aura_tick_time/1)
+    tick_times = Heartbeat.event_times(holder) ++ Enum.flat_map(holder.auras, &aura_event_times/1)
 
     tick_times =
       if is_integer(holder.next_area_refresh_at), do: [holder.next_area_refresh_at | tick_times], else: tick_times
@@ -638,6 +638,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     end
   end
 
-  defp aura_tick_time(%Aura{next_tick_at: at}) when is_integer(at), do: [at]
-  defp aura_tick_time(_), do: []
+  defp aura_event_times(%Aura{next_tick_at: at, persistent_area: area}) do
+    times = if is_integer(at), do: [at], else: []
+    if area, do: [area.expires_at | times], else: times
+  end
 end

@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PersistentAreaTest do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.PersistentArea
+  alias ThistleTea.Game.Spell.PersistentArea.Check
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -26,6 +27,65 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PersistentAreaTest do
   setup [:ground_spell]
 
   describe "tick/3" do
+    test "separately delivered ground effects coexist and expire with their own sources", ctx do
+      second = ground_effect(ctx, 1, 5.0, 2_000)
+      {target, _} = Aura.apply_spell(ctx.target, ctx.context, ctx.spell, 0)
+      {target, _} = Aura.apply_spell(target, second, second.spell, 10)
+      {target, _} = Aura.apply_spell(target, ctx.context, ctx.spell, 250)
+      {target, _} = Aura.apply_spell(target, second, second.spell, 260)
+
+      assert [%Holder{expires_at: 4_000} = holder] = ground_holders(target)
+      assert Enum.map(holder.auras, & &1.index) == [0, 1]
+      assert Enum.map(holder.spell.effects, & &1.index) == [0, 1]
+      assert holder.cast_context.persistent_area == nil
+
+      contexts = %{{ctx.spell.id, ctx.context.caster_guid, nil} => ground_checks(holder, 0)}
+      {target, _} = Aura.tick(target, 2_000, contexts)
+      assert target.unit.health == 800
+      assert [%Holder{auras: [%{index: 0}]} = holder] = ground_holders(target)
+      assert Enum.map(holder.spell.effects, & &1.index) == [0]
+      assert Enum.map(holder.cast_context.spell.effects, & &1.index) == [0]
+
+      {target, _} = Aura.remove_area_aura(target, second.persistent_area.guid, 2_100)
+      assert length(ground_holders(target)) == 1
+      {target, _} = Aura.remove_area_aura(target, ctx.area.guid, 2_100)
+      assert ground_holders(target) == []
+    end
+
+    test "each ground effect rolls independently", ctx do
+      second = ground_effect(ctx, 1, 5.0, 2_000)
+      {target, _} = Aura.apply_spell(ctx.target, ctx.context, ctx.spell, 0)
+      {target, _} = Aura.apply_spell(target, second, second.spell, 10)
+
+      context = %{
+        ctx.context
+        | area_checks: %{
+            ctx.area.guid => %Check{hit_roll: 9_999},
+            second.persistent_area.guid => %Check{hit_roll: 0}
+          }
+      }
+
+      {target, events} = Aura.tick(target, 1_000, %{{ctx.spell.id, ctx.context.caster_guid, nil} => context})
+      assert target.unit.health == 900
+      assert Enum.count(events, &match?(%Effects.SpellLogMiss{reason: :resist}, &1)) == 1
+      assert Enum.count(events, &match?(%Effects.SpellDamage{periodic?: true}, &1)) == 1
+      assert Enum.all?(hd(ground_holders(target)).auras, &(&1.next_tick_at == 2_000))
+    end
+
+    test "overlapping sources retain an existing effect until it leaves", ctx do
+      overlap = ground_effect(ctx, 0, 5.0, 5_000)
+      {target, _} = Aura.apply_spell(ctx.target, ctx.context, ctx.spell, 0)
+      {target, _} = Aura.apply_spell(target, overlap, overlap.spell, 250)
+      assert [%Holder{expires_at: 4_000, auras: [%{persistent_area: area}]}] = ground_holders(target)
+      assert area.guid == ctx.area.guid
+
+      {target, _} = Aura.remove_area_aura(target, ctx.area.guid, 500)
+      {target, _} = Aura.apply_spell(target, overlap, overlap.spell, 750)
+      {target, _} = Aura.remove_area_aura(target, ctx.area.guid, 800)
+      assert [%Holder{expires_at: 5_000, auras: [%{persistent_area: area}]}] = ground_holders(target)
+      assert area.guid == overlap.persistent_area.guid
+    end
+
     test "rolls each ground damage tick without removing a resisted holder", ctx do
       {target, _} = Aura.apply_spell(ctx.target, ctx.context, ctx.spell, 0)
       {target, events} = tick(target, ctx.context, 1_000, 8_000)
@@ -67,6 +127,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PersistentAreaTest do
     test "source cancellation cannot remove a replacement area", ctx do
       {target, _} = Aura.apply_spell(ctx.target, ctx.context, ctx.spell, 0)
       replacement = %{ctx.context | persistent_area: %{ctx.area | guid: ctx.area.guid + 1}}
+      {target, _} = Aura.remove_area_aura(target, ctx.area.guid, 100)
       {target, _} = Aura.apply_spell(target, replacement, ctx.spell, 250)
       {target, _} = Aura.remove_area_aura(target, ctx.area.guid, 500)
       assert length(ground_holders(target)) == 1
@@ -77,6 +138,34 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PersistentAreaTest do
   end
 
   describe "aura_contexts/2" do
+    test "leaving one footprint retains the other effect and its damage", ctx do
+      second = ground_effect(ctx, 1, 5.0, 4_000)
+      {target, _} = Aura.apply_spell(ctx.target, ctx.context, ctx.spell, 0)
+      {target, _} = Aura.apply_spell(target, second, second.spell, 10)
+      target = %{target | movement_block: %{target.movement_block | position: {7.0, 0.0, 0.0, 0.0}}}
+      {target, _} = Aura.tick(target, 250, SpellReception.aura_contexts(target, 250))
+      assert [%Holder{auras: [%{index: 0}]}] = ground_holders(target)
+      {target, _} = tick(target, ctx.context, 1_000, 0)
+      assert target.unit.health == 900
+    end
+
+    test "nonperiodic ground effects are removed independently when a source disappears", ctx do
+      second = ground_effect(ctx, 1, 5.0, 4_000)
+      first = ground_immunity(ctx.context, 5)
+      second = ground_immunity(second, 6)
+      {target, _} = Aura.apply_spell(ctx.target, first, first.spell, 0)
+      {target, _} = Aura.apply_spell(target, second, second.spell, 10)
+      assert Enum.map(hd(ground_holders(target)).auras, & &1.misc_value) == [5, 6]
+
+      World.remove_position(ctx.dynamic)
+      {target, _} = Aura.tick(target, 250, SpellReception.aura_contexts(target, 250))
+      assert [%Holder{auras: [%{index: 1, misc_value: 6}]}] = ground_holders(target)
+      assert Aura.next_event_at(target) == 500
+      {target, _} = Aura.tick(target, 4_000, SpellReception.aura_contexts(target, 4_000))
+      assert ground_holders(target) == []
+      assert Aura.next_event_at(target) == nil
+    end
+
     test "leaving the footprint, changing worlds, or losing the source removes the holder before damage", ctx do
       {target, _} = Aura.apply_spell(ctx.target, ctx.context, ctx.spell, 0)
       moved = %{target | movement_block: %{target.movement_block | position: {20.0, 0.0, 0.0, 0.0}}}
@@ -101,8 +190,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PersistentAreaTest do
       contexts = SpellReception.aura_contexts(target, 4_005)
       key = {ctx.spell.id, ctx.context.caster_guid, nil}
       context = Map.fetch!(contexts, key)
-      assert context.area_available?
-      {target, _} = Aura.tick(target, 4_005, %{key => %{context | periodic_hit_roll: 0}})
+      assert context.area_checks[ctx.area.guid].available?
+      context = %{context | area_checks: %{ctx.area.guid => %Check{hit_roll: 0}}}
+      {target, _} = Aura.tick(target, 4_005, %{key => context})
       assert target.unit.health == 900
       assert ground_holders(target) == []
     end
@@ -135,6 +225,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PersistentAreaTest do
 
       Metadata.put(target_guid, %{
         alive?: true,
+        stealthed?: true,
+        invisibility: %{0 => 100},
         unit_flags: 0,
         faction_template: %FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}
       })
@@ -171,8 +263,30 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PersistentAreaTest do
   defp ground_holders(target), do: Enum.filter(target.unit.auras, &(&1.spell.id == 991_555))
 
   defp tick(target, context, now, roll) do
-    contexts = %{{context.spell.id, context.caster_guid, nil} => %{context | periodic_hit_roll: roll}}
+    checks = if context.persistent_area, do: %{context.persistent_area.guid => %Check{hit_roll: roll}}, else: %{}
+    contexts = %{{context.spell.id, context.caster_guid, nil} => %{context | area_checks: checks}}
     Aura.tick(target, now, contexts)
+  end
+
+  defp ground_checks(holder, roll) do
+    checks = Map.new(holder.auras, &{&1.persistent_area.guid, %Check{hit_roll: roll}})
+    %{holder.cast_context | area_checks: checks}
+  end
+
+  defp ground_effect(ctx, index, radius, expires_at) do
+    effect = %{hd(ctx.spell.effects) | index: index}
+    spell = %{ctx.spell | effects: [effect]}
+    dynamic = DynamicObject.build(ctx.context.caster_guid, ctx.target.internal.world, spell, {0.0, 0.0, 0.0}, radius)
+    World.update_position(dynamic)
+    on_exit(fn -> World.remove_position(dynamic) end)
+    area = %{ctx.area | guid: dynamic.object.guid, radius: radius, expires_at: expires_at}
+    %{ctx.context | spell: spell, persistent_area: area}
+  end
+
+  defp ground_immunity(context, dispel_type) do
+    effect = %{hd(context.spell.effects) | aura: :dispel_immunity, misc_value: dispel_type, amplitude_ms: nil}
+    spell = %{context.spell | effects: [effect], attributes: MapSet.new([:immunity_purges_effect])}
+    %{context | spell: spell}
   end
 
   defp ground_spell(_context) do
