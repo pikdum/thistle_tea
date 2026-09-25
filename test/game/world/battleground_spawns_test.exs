@@ -28,6 +28,21 @@ defmodule ThistleTea.Game.World.BattlegroundSpawnsTest do
 
   setup [:world_copy]
 
+  describe "stop_respawns/2" do
+    test "disables future activation without asking the pool to remove living members", %{world: world} do
+      assert Spawns.allowed?(world, {:game_object, 1}, Catalog)
+      assert :ok = Spawns.stop_respawns(world, 0)
+      refute Spawns.allowed?(world, {:game_object, 1}, Catalog)
+      assert Spawns.allowed?(world, {:creature, 99}, Catalog)
+      refute_received {:suspend, _, _}
+      refute_received {:resume, _, _}
+
+      Spawns.set_event(world, 0, 0, Catalog, Pool)
+      assert Spawns.allowed?(world, {:game_object, 1}, Catalog)
+      assert_receive {:resume, ^world, {:game_object, 1}}
+    end
+  end
+
   describe "set_event/5" do
     test "switches all members once and keeps a shared aura eligible in either contested state", %{world: world} do
       assert Spawns.allowed?(world, {:game_object, 1}, Catalog)

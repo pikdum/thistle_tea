@@ -18,6 +18,12 @@ defmodule ThistleTea.Game.Battleground.Effects do
     defstruct [:event, :state]
   end
 
+  defmodule StopEventRespawns do
+    @moduledoc false
+    @enforce_keys [:event]
+    defstruct [:event]
+  end
+
   defmodule NodeAnnouncement do
     @moduledoc false
     @enforce_keys [:node, :team, :action]

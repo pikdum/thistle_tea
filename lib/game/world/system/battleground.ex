@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.System.Battleground do
   use GenServer
 
   alias ThistleTea.Game.Battleground
+  alias ThistleTea.Game.Battleground.CreatureDefeat
   alias ThistleTea.Game.Battleground.Defeat
   alias ThistleTea.Game.Battleground.Effects.Scoreboard
   alias ThistleTea.Game.Battleground.Lifecycle
@@ -17,6 +18,8 @@ defmodule ThistleTea.Game.World.System.Battleground do
   alias ThistleTea.Game.World.Battleground.Supervisor, as: MatchSupervisor
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.WorldRef
+
+  require Logger
 
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: Keyword.get(opts, :name, __MODULE__))
@@ -66,6 +69,10 @@ defmodule ThistleTea.Game.World.System.Battleground do
 
   def player_died(%WorldRef{} = world, %Defeat{} = defeat, server \\ __MODULE__) do
     GenServer.cast(server, {:player_died, world, defeat})
+  end
+
+  def creature_died(%WorldRef{} = world, %CreatureDefeat{} = defeat, server \\ __MODULE__) do
+    GenServer.cast(server, {:creature_died, world, defeat})
   end
 
   def participants(world, server \\ __MODULE__)
@@ -371,6 +378,15 @@ defmodule ThistleTea.Game.World.System.Battleground do
     end
 
     {:noreply, state}
+  end
+
+  def handle_cast({:creature_died, world, defeat}, state) do
+    if pid = Map.get(state.worlds, world), do: Match.creature_died(pid, defeat)
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("Battleground creature death routing failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:queue_resurrection, world, guid}, state) do

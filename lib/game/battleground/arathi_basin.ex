@@ -118,6 +118,8 @@ defmodule ThistleTea.Game.Battleground.ArathiBasin do
 
   def player_died(%__MODULE__{} = match, %Defeat{}, _dropped_guid), do: %Result{match: match}
 
+  def creature_died(%__MODULE__{} = match, _defeat, _now), do: %Result{match: match}
+
   def handle_timer(%__MODULE__{phase: :countdown} = match, :start_one_minute, _now),
     do: %Result{match: match, effects: [announce(10_477)]}
 

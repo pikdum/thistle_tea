@@ -20,6 +20,10 @@ defmodule ThistleTea.Game.World.Battleground.Spawns do
 
   def close(%WorldRef{} = world), do: :ets.delete(__MODULE__, world)
 
+  def stop_respawns(%WorldRef{} = world, event) do
+    select_event(world, event, nil)
+  end
+
   def allowed?(%WorldRef{map_id: map_id} = world, {kind, db_guid}, catalog \\ Catalog) do
     case catalog.bindings(map_id, kind, db_guid) do
       [] -> true
@@ -28,7 +32,7 @@ defmodule ThistleTea.Game.World.Battleground.Spawns do
   end
 
   def set_event(%WorldRef{} = world, event, state, catalog \\ Catalog, pool \\ SpawnPool) do
-    :ets.insert(__MODULE__, {world, Map.put(events(world), event, state)})
+    select_event(world, event, state)
 
     world.map_id
     |> catalog.event_members(event)
@@ -41,6 +45,11 @@ defmodule ThistleTea.Game.World.Battleground.Spawns do
         else: pool.suspend_spawn(world, key)
     end)
 
+    :ok
+  end
+
+  defp select_event(world, event, state) do
+    :ets.insert(__MODULE__, {world, Map.put(events(world), event, state)})
     :ok
   end
 

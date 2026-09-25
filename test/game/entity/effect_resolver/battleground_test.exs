@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.BattlegroundTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Corpse
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EffectResolver.Battleground
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -68,5 +69,72 @@ defmodule ThistleTea.Game.Entity.EffectResolver.BattlegroundTest do
       assert [%Effects.PlayerDefeated{source_guid: 2, count_death?: true}] =
                Enum.filter(victim.internal.events, &is_struct(&1, Effects.PlayerDefeated))
     end
+
+    test "captures an objective incarnation and attributes a pet kill to its admitted owner" do
+      world = WorldRef.instance(30, 1)
+      pet = Guid.from_low_guid(:pet, 1, 1)
+      victim = objective(world)
+      binding = %{event1: 46, event2: 2}
+
+      opts = [
+        bindings: fn 30, :creature, 100 -> [binding] end,
+        metadata: fn ^pet -> %{owner_guid: 1} end,
+        participants: fn ^world -> %{1 => %{team: :alliance}} end
+      ]
+
+      effect = %Effects.CreatureDefeated{source_guid: pet}
+
+      assert [%Effects.BattlegroundCreatureDeath{world: ^world, defeat: defeat}] =
+               Battleground.resolve(victim, effect, opts)
+
+      assert defeat.victim_guid == victim.object.guid
+      assert defeat.entry == 11_678
+      assert defeat.db_guid == 100
+      assert defeat.incarnation_id == 9
+      assert defeat.killer_guid == 1
+      assert defeat.bindings == [binding]
+
+      assert Battleground.resolve(victim, effect, Keyword.put(opts, :participants, fn _world -> %{} end)) == []
+      assert Battleground.resolve(victim, effect, Keyword.put(opts, :bindings, fn _, _, _ -> [] end)) == []
+      assert Battleground.resolve(victim, %{effect | source_guid: nil}, opts) == []
+
+      assert Battleground.resolve(
+               victim,
+               %{effect | source_guid: victim.object.guid},
+               Keyword.put(opts, :metadata, fn _guid -> %{} end)
+             ) == []
+    end
+
+    test "ordinary world kills and summons bypass battleground lookups" do
+      effect = %Effects.CreatureDefeated{source_guid: 1}
+      opts = [bindings: fn _, _, _ -> flunk("unexpected catalog lookup") end]
+      assert Battleground.resolve(objective(WorldRef.open(30)), effect, opts) == []
+      victim = objective(WorldRef.instance(30, 1))
+      victim = %{victim | internal: %{victim.internal | creature: %Internal.Creature{}}}
+      assert Battleground.resolve(victim, effect, opts) == []
+    end
+
+    test "a creature death is emitted once and retains its killer after corpse damage" do
+      victim = objective(WorldRef.instance(30, 1))
+      victim = victim |> Core.take_damage(10, 100, source: 1) |> Core.take_damage(10, 101, source: 2)
+
+      assert [%Effects.CreatureDefeated{source_guid: 1}] =
+               Enum.filter(victim.internal.events, &is_struct(&1, Effects.CreatureDefeated))
+
+      assert victim.internal.killed_by == 1
+    end
+  end
+
+  defp objective(world) do
+    %Mob{
+      object: %Object{guid: Guid.from_low_guid(:mob, 11_678, 100), entry: 11_678},
+      unit: %Unit{health: 10, max_health: 10},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+      internal: %Internal{
+        world: world,
+        creature: %Internal.Creature{db_guid: 100},
+        spawn: %Internal.Spawn{incarnation_id: 9}
+      }
+    }
   end
 end

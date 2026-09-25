@@ -53,6 +53,10 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
     Spawns.set_event(match.world, event, state)
   end
 
+  defp emit_effect(match, %Effects.StopEventRespawns{event: event}) do
+    Spawns.stop_respawns(match.world, event)
+  end
+
   defp emit_effect(match, %Effects.NodeAnnouncement{} = effect) do
     node = Enum.at(["Stables", "Blacksmith", "Farm", "Lumber Mill", "Gold Mine"], effect.node)
     faction = if effect.team == :alliance, do: "Alliance", else: "Horde"

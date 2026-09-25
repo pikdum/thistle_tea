@@ -18,6 +18,8 @@ defmodule ThistleTea.Game.World.Battleground.Match do
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.GameEvent
 
+  require Logger
+
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts)
 
   def child_spec(opts) do
@@ -40,6 +42,8 @@ defmodule ThistleTea.Game.World.Battleground.Match do
   def player_died(server, defeat, dropped_guid) do
     GenServer.cast(server, {:player_died, defeat, dropped_guid})
   end
+
+  def creature_died(server, defeat), do: GenServer.cast(server, {:creature_died, defeat})
 
   def disconnect(server, guid, position, dropped_guid) do
     GenServer.cast(server, {:disconnect, guid, position, dropped_guid})
@@ -157,6 +161,14 @@ defmodule ThistleTea.Game.World.Battleground.Match do
     dropped_guid = dropped_flag_guid(state, defeat.victim_guid, dropped_guid)
     result = state.rules.player_died(state.match, defeat, dropped_guid)
     {:noreply, apply_result(state, result)}
+  end
+
+  def handle_cast({:creature_died, defeat}, state) do
+    {:noreply, apply_result(state, state.rules.creature_died(state.match, defeat, Time.now()))}
+  rescue
+    error ->
+      Logger.error("Battleground creature death failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:disconnect, guid, position, dropped_guid}, state) do

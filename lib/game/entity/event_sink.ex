@@ -225,6 +225,11 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  defp emit_resolved(entity, %Effects.BattlegroundCreatureDeath{world: world, defeat: defeat}, _context) do
+    Battleground.creature_died(world, defeat)
+    entity
+  end
+
   defp emit_resolved(entity, %Effects.CancelBattlegroundResurrection{world: world, guid: guid}, _context) do
     Battleground.cancel_resurrection(world, guid)
     entity

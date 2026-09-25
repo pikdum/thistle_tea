@@ -47,6 +47,23 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
       [{pool, _value}] = Registry.lookup(SpawnPool.Registry, key)
       {first, _ref} = :sys.get_state(pool).running[member]
       runtime_guid = :sys.get_state(first).object.guid
+
+      BattlegroundSpawns.stop_respawns(world, 0)
+      send(pool, {:reactivate, member})
+      GenServer.cast(pool, {:refresh, []})
+      assert SpawnPool.status(key).running == [member]
+      assert EntityRegistry.whereis(runtime_guid) == first
+
+      send(first, :chest_respawn)
+      await_absent(runtime_guid)
+      send(pool, {:reactivate, member})
+      GenServer.cast(pool, {:refresh, []})
+      assert SpawnPool.status(key).running == []
+
+      BattlegroundSpawns.set_event(world, 0, 3)
+      await_pool_running(key, [member])
+      assert :sys.get_state(pool).running[member] |> elem(0) != first
+
       BattlegroundSpawns.set_event(world, 0, 4)
       await_absent(runtime_guid)
       send(pool, {:reactivate, member})
