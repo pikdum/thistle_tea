@@ -23,6 +23,8 @@ defmodule ThistleTea.DevSeed do
   Six closely grouped Prairie Wolf Alphas farther west support area target-limit testing.
   A Highperch Soarer circles above the northeast field, alongside a stationary
   Bloodseeker Bat, for flight, corpse landing, and respawn testing.
+  Two Horde Laborers east of the playground retain their low-health assistance
+  event, with their initial aggro shout disabled, to isolate retreat and recruitment.
   """
   import Ecto.Query
 
@@ -331,6 +333,10 @@ defmodule ThistleTea.DevSeed do
 
     spawn_mob(6139, @base_low_guid + 1900, {x + 90.0, y + 50.0, z}, nil, 30, altitude: 18.0, wander: 10.0)
     spawn_mob(11_368, @base_low_guid + 1901, {x + 90.0, y + 10.0, z}, nil, 30, altitude: 18.0)
+
+    for {offset, index} <- [{160.0, 0}, {184.0, 1}] do
+      spawn_mob(14_718, @base_low_guid + 2000 + index, {x + offset, y, z}, nil, 30, ai_events: [:hp])
+    end
   end
 
   defp seed_game_objects do
@@ -385,6 +391,7 @@ defmodule ThistleTea.DevSeed do
           creature
           |> MobLoader.load_creature()
           |> Mob.build()
+          |> select_ai_events(Keyword.get(opts, :ai_events))
 
         mob = %{mob | internal: %{mob.internal | loot: %{mob.internal.loot | override: loot_override}}}
         MobLoader.start_mob(mob)
@@ -392,5 +399,12 @@ defmodule ThistleTea.DevSeed do
       _ ->
         Logger.warning("Debug seed: creature #{entry} has no spawn row, skipping")
     end
+  end
+
+  defp select_ai_events(mob, nil), do: mob
+
+  defp select_ai_events(%Mob{internal: %{creature: creature}} = mob, types) do
+    events = Enum.filter(creature.ai_events, &(&1.event_type in types))
+    %{mob | internal: %{mob.internal | creature: %{creature | ai_events: events}}}
   end
 end

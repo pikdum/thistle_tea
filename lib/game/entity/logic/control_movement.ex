@@ -121,17 +121,17 @@ defmodule ThistleTea.Game.Entity.Logic.ControlMovement do
     flags = (unit.flags || 0) &&& bnot(@confused_flag ||| @fleeing_flag)
     alive? = not is_number(unit.health) or unit.health > 0
     flags = if alive? and has?(holders, :mod_confuse), do: flags ||| @confused_flag, else: flags
-    fleeing? = feared?(holders) or (critter_fleeing?(entity) and not has?(holders, :prevent_fleeing))
+    fleeing? = feared?(holders) or (scripted_fleeing?(entity) and not has?(holders, :prevent_fleeing))
     flags = if alive? and fleeing?, do: flags ||| @fleeing_flag, else: flags
     %{entity | unit: %{unit | flags: flags}}
   end
 
   def sync_flags(%{unit: %Unit{auras: holders}} = entity), do: sync_flags(entity, holders || [])
 
-  defp critter_fleeing?(%{internal: %Internal{blackboard: %Blackboard{critter: memory} = blackboard}})
-       when not is_nil(memory), do: Blackboard.fleeing?(blackboard)
+  defp scripted_fleeing?(%{internal: %Internal{blackboard: %Blackboard{} = blackboard}}),
+    do: Blackboard.fleeing?(blackboard)
 
-  defp critter_fleeing?(_entity), do: false
+  defp scripted_fleeing?(_entity), do: false
 
   defp key(_holders, nil), do: nil
 

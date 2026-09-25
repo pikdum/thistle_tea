@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.AttackSchool
+  alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.FeignDeath
@@ -271,7 +272,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
 
   def emit(%Mob{} = entity, %Effects.CallAssistance{target_guid: target_guid}, context)
       when is_integer(target_guid) and target_guid > 0 do
-    Context.send_after(context, {:call_assistance, target_guid}, CallForHelp.assist_delay_ms())
+    helpers = CallForHelp.capture(entity, target_guid)
+
+    if helpers != [] do
+      message = {:call_assistance, target_guid, helpers, CombatLeash.reference(entity)}
+      Context.send_after(context, message, CallForHelp.assist_delay_ms())
+    end
+
     entity
   end
 

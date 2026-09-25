@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Data.DynamicObject, as: DataDynamicObject
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Assistance
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CastPushback
   alias ThistleTea.Game.Entity.Logic.Combat
@@ -49,7 +50,12 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   @spirit_of_redemption_duration_ms 15_000
 
   def update_object(entity, update_type \\ :create_object2)
-  def update_object(%Mob{} = entity, update_type), do: update_object(entity, update_type, :unit)
+
+  def update_object(%Mob{} = entity, update_type) do
+    entity = %{entity | unit: %{entity.unit | target: Assistance.visible_target(entity)}}
+    update_object(entity, update_type, :unit)
+  end
+
   def update_object(%GameObject{} = entity, update_type), do: update_object(entity, update_type, :game_object)
   def update_object(%Corpse{} = entity, update_type), do: update_object(entity, update_type, :corpse)
 

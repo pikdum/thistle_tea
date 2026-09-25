@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Patrol
+  alias ThistleTea.Game.Entity.Logic.AI.BT.SeekAssistance
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
@@ -108,6 +109,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         SpellBT.casting_sequence()
       ]),
       BT.action(&eventai_step/3),
+      BT.action(&SeekAssistance.tick/3),
       BT.action(&Flee.tick/3),
       BT.sequence([
         BT.condition(&aggro_check_ready?/3),

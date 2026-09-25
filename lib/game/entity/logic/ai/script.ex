@@ -28,7 +28,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Waypoints
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Flee
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
+  alias ThistleTea.Game.Entity.Logic.Assistance
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionEvaluator
@@ -51,8 +53,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   require Logger
 
-  @flee_duration_ms 7_000
-  @flee_text "%s attempts to run away in fear!"
   @max_phase 31
   @unit_flag_player_controlled 0x00000008
   @scripted_event_commands [
@@ -80,7 +80,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     :random_game_object_with_entry
   ]
 
-  def flee_duration_ms, do: @flee_duration_ms
+  def flee_duration_ms, do: Flee.duration_ms()
 
   def run(state, %Blackboard{} = blackboard, steps, target_guid, now) when is_list(steps) and is_integer(now) do
     run(state, blackboard, steps, target_guid, Context.new(now))
@@ -884,6 +884,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     end
   end
 
+  defp execute(state, blackboard, %ScriptStep{command: :flee, datalong: seek}, _target, _now, %Context{} = context) do
+    Flee.start(state, blackboard, context, seek != 0)
+  end
+
   defp execute(state, blackboard, %ScriptStep{} = step, target_guid, now, %Context{}) do
     execute(state, blackboard, step, target_guid, now)
   end
@@ -1127,10 +1131,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {state, blackboard}
   end
 
-  defp execute(state, blackboard, %ScriptStep{command: :flee}, _target_guid, now) do
-    flee(state, blackboard, now)
-  end
-
   defp execute(state, blackboard, %ScriptStep{command: :move_to} = step, _target_guid, _now) do
     Logger.debug("Script #{step.script_id}: move_to coordinate type #{step.datalong} unsupported, skipping")
     {state, blackboard}
@@ -1301,18 +1301,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp set_facing_angle(state, _angle), do: state
-
-  defp flee(%{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, now)
-       when is_integer(target) and target > 0 do
-    if Core.dead?(state) do
-      {state, blackboard}
-    else
-      state = Effects.enqueue(state, Effects.monster_talk(@flee_text, :text_emote, target))
-      {state, Blackboard.start_flee(blackboard, target, @flee_duration_ms, now)}
-    end
-  end
-
-  defp flee(state, blackboard, _now), do: {state, blackboard}
 
   defp trigger_cast(
          %{object: %{guid: guid}, unit: %Unit{level: level}} = state,
@@ -1621,6 +1609,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
        when entry > 0 do
     positive_radius(radius, @default_buddy_radius)
   end
+
+  defp step_observation_radius(%ScriptStep{command: :flee, datalong: seek}) when seek != 0, do: Assistance.seek_radius()
 
   defp step_observation_radius(%ScriptStep{}), do: 0.0
 

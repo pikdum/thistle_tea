@@ -1,119 +1,88 @@
 defmodule ThistleTea.Game.World.CallForHelp do
   @moduledoc """
-  Aggro chaining (vmangos CallAssistance / CallForHelp): finds eligible allied
-  mobs near a mob that entered combat — or is being dragged from its spawn —
-  and asks them to join the fight against its attacker.
-
-  `assist/2` is the one-shot on-aggro scan (strict same-faction, fixed radius,
-  fired after a reaction delay); `pulse/2` is the periodic in-combat scan
-  (friendly factions, `call_for_help_range` radius). Both only recruit mobs
-  whose faction template carries the respond-to-call-for-help flag; the
-  recruited mob re-validates the target in its own process.
+  Captures nearby helpers for delayed assistance and delivers immediate calls
+  for help. Recipients revalidate their own eligibility before joining combat.
   """
-  import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Assistance
   alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
 
-  @assist_radius 10.0
-  @assist_delay_ms 1_500
-  @unit_flag_not_selectable 0x02000000
+  def assist_delay_ms, do: Assistance.delay_ms()
 
-  def assist_delay_ms, do: @assist_delay_ms
+  def capture(%Mob{internal: %Internal{pet: nil, creature: %Creature{call_for_help_range: range}}} = state, target_guid)
+      when is_number(range) and range > 0 do
+    helpers(state, target_guid, Assistance.call_radius(), :same_faction)
+  end
+
+  def capture(_state, _target_guid), do: []
 
   def assist(%Mob{} = state, target_guid) when is_integer(target_guid) and target_guid > 0 do
-    notify_helpers(state, target_guid, @assist_radius, :same_faction)
+    recruit(state, target_guid, capture(state, target_guid), :same_faction)
   end
 
   def assist(_state, _target_guid), do: :ok
 
-  def pulse(%Mob{internal: %Internal{creature: %Creature{call_for_help_range: range}}} = state, target_guid)
-      when is_number(range) and range > 0 and is_integer(target_guid) and target_guid > 0 do
-    notify_helpers(state, target_guid, range, :friendly)
+  def deliver(%Mob{} = state, target_guid, helpers, source) do
+    if state.internal.in_combat == true and state.unit.health > 0 and CombatLeash.reference(state) == source do
+      recruit(state, target_guid, helpers, :same_faction)
+    end
+
+    :ok
+  end
+
+  def pulse(%Mob{internal: %Internal{creature: %Creature{call_for_help_range: range}}} = state, target_guid) do
+    pulse(state, target_guid, range)
   end
 
   def pulse(_state, _target_guid), do: :ok
 
   def pulse(%Mob{} = state, target_guid, radius)
       when is_integer(target_guid) and target_guid > 0 and is_number(radius) and radius > 0 do
-    notify_helpers(state, target_guid, radius, :friendly)
+    recruit(state, target_guid, helpers(state, target_guid, radius, :friendly), :friendly)
   end
 
   def pulse(_state, _target_guid, _radius), do: :ok
 
-  defp notify_helpers(%Mob{object: %{guid: caller_guid}} = state, target_guid, radius, faction_check) do
-    case metadata_faction(caller_guid) do
-      %FactionTemplate{} = caller_faction ->
-        enemy_faction = metadata_faction(target_guid)
+  defp helpers(state, target_guid, radius, faction_check) do
+    caller = Assistance.faction(Metadata.get(state.object.guid))
+    enemy = Assistance.faction(Metadata.get(target_guid))
 
-        state
-        |> World.nearby_mobs(radius)
-        |> Enum.each(&maybe_recruit(state, &1, target_guid, caller_faction, enemy_faction, faction_check))
+    state
+    |> World.nearby_mobs(radius)
+    |> Enum.flat_map(fn {guid, _distance} ->
+      if guid != state.object.guid and Assistance.eligible?(Metadata.get(guid), caller, enemy, faction_check) and
+           World.line_of_sight?(state, guid), do: [guid], else: []
+    end)
+  end
 
-      _ ->
-        :ok
-    end
+  defp recruit(state, target_guid, helpers, faction_check) do
+    caller = Assistance.faction(Metadata.get(state.object.guid))
+    enemy = Assistance.faction(Metadata.get(target_guid))
+
+    Enum.each(helpers, fn guid ->
+      if same_world?(state, guid) and Assistance.eligible?(Metadata.get(guid), caller, enemy, faction_check) do
+        notify_helper(state, guid, target_guid, faction_check)
+      end
+    end)
 
     :ok
   end
 
-  defp maybe_recruit(state, {helper_guid, _distance}, target_guid, caller_faction, enemy_faction, faction_check) do
-    if eligible_helper?(helper_guid, caller_faction, enemy_faction, faction_check) and
-         World.line_of_sight?(state, helper_guid) do
-      case faction_check do
-        :same_faction -> Entity.assist_attack(helper_guid, target_guid, CombatLeash.reference(state))
-        :friendly -> Entity.assist_attack(helper_guid, target_guid)
-      end
+  defp notify_helper(state, guid, target_guid, :same_faction),
+    do: Entity.assist_attack(guid, target_guid, CombatLeash.reference(state))
+
+  defp notify_helper(_state, guid, target_guid, :friendly), do: Entity.assist_attack(guid, target_guid)
+
+  defp same_world?(state, guid) do
+    case World.position(guid) do
+      {world, _, _, _} -> world == state.internal.world
+      _ -> false
     end
   end
-
-  defp metadata_faction(guid) do
-    case Metadata.query(guid, [:faction_template]) do
-      %{faction_template: %FactionTemplate{} = faction_template} -> faction_template
-      _ -> nil
-    end
-  end
-
-  defp eligible_helper?(helper_guid, caller_faction, enemy_faction, faction_check) do
-    helper_guid
-    |> Metadata.query([:alive?, :faction_template, :unit_flags, :owner_guid])
-    |> eligible_metadata?(caller_faction, enemy_faction, faction_check)
-  end
-
-  defp eligible_metadata?(
-         %{alive?: true, faction_template: %FactionTemplate{} = helper_faction} = helper,
-         caller_faction,
-         enemy_faction,
-         faction_check
-       ) do
-    Map.get(helper, :owner_guid) == nil and
-      selectable?(Map.get(helper, :unit_flags)) and
-      FactionTemplate.responds_to_call_for_help?(helper_faction) and
-      allied?(helper_faction, caller_faction, faction_check) and
-      not friendly_to_enemy?(helper_faction, enemy_faction)
-  end
-
-  defp eligible_metadata?(_helper, _caller_faction, _enemy_faction, _faction_check), do: false
-
-  defp selectable?(flags) when is_integer(flags), do: (flags &&& @unit_flag_not_selectable) == 0
-  defp selectable?(_flags), do: true
-
-  defp allied?(%FactionTemplate{id: id}, %FactionTemplate{id: id}, _faction_check), do: true
-
-  defp allied?(helper_faction, caller_faction, :friendly) do
-    FactionTemplate.friendly_to?(helper_faction, caller_faction)
-  end
-
-  defp allied?(_helper_faction, _caller_faction, _faction_check), do: false
-
-  defp friendly_to_enemy?(helper_faction, %FactionTemplate{} = enemy_faction) do
-    FactionTemplate.friendly_to?(helper_faction, enemy_faction)
-  end
-
-  defp friendly_to_enemy?(_helper_faction, _enemy_faction), do: false
 end

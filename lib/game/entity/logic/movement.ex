@@ -236,7 +236,8 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
     running = Keyword.get(opts, :run?, running)
     velocity = Keyword.get(opts, :velocity)
-    speed = movement_speed(velocity, running, run_speed, walk_speed)
+    speed_type = Keyword.get(opts, :speed_type, if(running, do: :run_speed, else: :walk_speed))
+    speed = movement_speed(velocity, speed_type == :run_speed, run_speed, walk_speed)
     opts = Keyword.put(opts, :run?, running)
 
     duration =
@@ -250,7 +251,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
     source =
       if !(is_number(velocity) and velocity > 0),
-        do: {if(running, do: :run_speed, else: :walk_speed), speed}
+        do: {speed_type, speed}
 
     %{entity | internal: %{entity.internal | movement_speed: source}}
   end

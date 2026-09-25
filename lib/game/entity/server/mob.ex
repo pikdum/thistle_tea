@@ -7,8 +7,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   """
   use GenServer
 
-  import Bitwise, only: [&&&: 2]
-
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Commands
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
@@ -43,6 +41,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.AI.TickPlan
   alias ThistleTea.Game.Entity.Logic.Appearance
+  alias ThistleTea.Game.Entity.Logic.Assistance
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
@@ -117,7 +116,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   require Logger
 
   @ai_tick_retry_ms 1_000
-  @creature_flag_extra_no_assist 0x00010000
   @summon_despawn_retry_ms 10_000
 
   def child_spec(%Mob{internal: %Internal{totem: %Totem{}}} = state) do
@@ -160,7 +158,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> Map.merge(control_metadata(state))
     )
 
-    state = sync_orientation_metadata(state)
+    state = sync_perception_metadata(state)
     World.update_position(state)
     state = Visibility.join_entity(state)
     CreatureGroups.register(state, self())
@@ -401,7 +399,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         %Mob{internal: %Internal{in_combat: false, pet: nil, totem: nil}} = state
       )
       when is_integer(target_guid) do
-    if can_assist?(state) and Hostility.valid_attack_target?(state, target_guid) do
+    if Assistance.available?(state) and Hostility.valid_attack_target?(state, target_guid) do
       state =
         state
         |> engage_combat(target_guid, call_assistance: false, leash_source: source)
@@ -1112,17 +1110,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     end
   end
 
-  def handle_info({:call_assistance, target_guid}, %Mob{internal: %Internal{in_combat: true}} = state)
-      when is_integer(target_guid) do
-    if not Core.dead?(state) and not Corpse.removed?(state) do
-      CallForHelp.assist(state, target_guid)
-    end
-
+  def handle_info({:call_assistance, target_guid, helpers, source}, %Mob{} = state) do
+    CallForHelp.deliver(state, target_guid, helpers, source)
     {:noreply, state}
-  end
-
-  def handle_info({:call_assistance, _target_guid}, state) do
-    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("Creature assistance failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_info({:pet_command, :dismiss, _target_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
@@ -1281,7 +1275,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state = %{state | movement_block: movement_block, unit: %{state.unit | stand_state: 0}}
 
     World.update_position(state)
-    sync_orientation_metadata(state)
+    sync_perception_metadata(state)
     state = Visibility.refresh_entity(state)
 
     observers = World.tracking_players(state)
@@ -1341,7 +1335,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> sync_owner_pvp()
       |> maybe_finalize_death()
       |> broadcast_if_pending()
-      |> sync_orientation_metadata()
+      |> sync_perception_metadata()
       |> schedule_movement_completion()
 
     {:noreply, state}
@@ -1399,15 +1393,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp modify_flags(value, flags, :add), do: Bitwise.bor(value, flags)
   defp modify_flags(value, flags, :remove), do: Bitwise.band(value, Bitwise.bnot(flags))
 
-  defp sync_orientation_metadata(
+  defp sync_perception_metadata(
          %Mob{object: %{guid: guid}, movement_block: %MovementBlock{position: {_x, _y, _z, orientation}}} = state
        )
        when is_integer(guid) and is_number(orientation) do
-    Metadata.update(guid, %{orientation: orientation})
+    Metadata.update(guid, %{orientation: orientation, assistance_available?: Assistance.available?(state)})
     state
   end
 
-  defp sync_orientation_metadata(%Mob{} = state), do: state
+  defp sync_perception_metadata(%Mob{} = state), do: state
 
   @impl GenServer
   def terminate(_reason, state) do
@@ -1743,17 +1737,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       state
     end
   end
-
-  defp can_assist?(%Mob{} = state) do
-    not Mob.critter?(state) and not Core.dead?(state) and not Corpse.removed?(state) and not no_assist_flag?(state)
-  end
-
-  defp no_assist_flag?(%Mob{internal: %Internal{creature: %Creature{extra_flags: extra_flags}}})
-       when is_integer(extra_flags) do
-    (extra_flags &&& @creature_flag_extra_no_assist) != 0
-  end
-
-  defp no_assist_flag?(%Mob{}), do: false
 
   defp maybe_eventai_enter_combat(%Mob{} = state, true, _caster, _now), do: state
 
