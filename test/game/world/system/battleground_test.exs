@@ -195,7 +195,30 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
       assert :ok = BattlegroundSystem.port(1, 0, nil, server)
       refute_receive {:DOWN, ^ref, :process, ^pid, _reason}, 50
       assert :ok = BattlegroundSystem.port(2, 0, nil, server)
+      assert BattlegroundSystem.match_for_world(world, server) == nil
+      assert %{instances: []} = BattlegroundSystem.list(489, 60, server)
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
+    end
+
+    test "ignores stopped matches before their monitor notifications arrive", %{server: server} do
+      assert :ok = BattlegroundSystem.join(alliance(1), 489, server)
+      assert :ok = BattlegroundSystem.join(horde(2), 489, server)
+      world = WorldRef.instance(489, 1)
+      pid = BattlegroundSystem.match_for_world(world, server)
+      join_ref = make_ref()
+      list_ref = make_ref()
+
+      :sys.suspend(server)
+      send(server, {:"$gen_call", {self(), join_ref}, {:join_group, [alliance(3)], 489, 0}})
+      send(server, {:"$gen_call", {self(), list_ref}, {:list, 489, 60}})
+      GenServer.stop(pid, :normal)
+      :sys.resume(server)
+
+      assert_receive {^join_ref, :ok}
+      assert_receive {^list_ref, %{instances: []}}
+      assert %{status: :wait_queue} = BattlegroundSystem.status(3, server)
+      assert BattlegroundSystem.match_for_world(world, server) == nil
+      assert Process.alive?(server)
     end
   end
 

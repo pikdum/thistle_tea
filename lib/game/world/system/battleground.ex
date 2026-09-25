@@ -599,16 +599,20 @@ defmodule ThistleTea.Game.World.System.Battleground do
     state.matches
     |> Enum.sort_by(fn {_pid, info} -> info.client_instance_id end)
     |> Enum.find_value(:not_found, fn {pid, info} ->
-      match = Match.snapshot(pid)
-      team_count = Enum.count(match.players, fn {_guid, player} -> player.team == team end)
       desired? = desired_instance_id == 0 or info.client_instance_id == desired_instance_id
 
-      if info.world.map_id == map_id and info.bracket == bracket and desired? and
-           match.phase in [:countdown, :active] and
-           team_count + group_size <= info.template.max_players_per_team do
+      with true <- info.world.map_id == map_id and info.bracket == bracket and desired?,
+           {:ok, match} <- joinable_snapshot(pid),
+           true <- team_has_room?(match, team, group_size, info.template.max_players_per_team) do
         {:ok, pid}
+      else
+        _ -> nil
       end
     end)
+  end
+
+  defp team_has_room?(match, team, group_size, maximum) do
+    Enum.count(match.players, fn {_guid, player} -> player.team == team end) + group_size <= maximum
   end
 
   defp invite_players(state, pid, reservations) do
@@ -621,11 +625,29 @@ defmodule ThistleTea.Game.World.System.Battleground do
   end
 
   defp joinable_for_either_team?(pid, info) do
-    match = Match.snapshot(pid)
-    maximum = info.template.max_players_per_team
-    alliance = Enum.count(match.players, fn {_guid, player} -> player.team == :alliance end)
-    horde = Enum.count(match.players, fn {_guid, player} -> player.team == :horde end)
-    match.phase in [:countdown, :active] and (alliance < maximum or horde < maximum)
+    case joinable_snapshot(pid) do
+      {:ok, match} ->
+        maximum = info.template.max_players_per_team
+        alliance = Enum.count(match.players, fn {_guid, player} -> player.team == :alliance end)
+        horde = Enum.count(match.players, fn {_guid, player} -> player.team == :horde end)
+        alliance < maximum or horde < maximum
+
+      :error ->
+        false
+    end
+  end
+
+  defp joinable_snapshot(pid) do
+    case Match.snapshot(pid) do
+      %{phase: phase, players: players} = match
+      when phase in [:countdown, :active] and map_size(players) > 0 ->
+        {:ok, match}
+
+      _ ->
+        :error
+    end
+  catch
+    :exit, _reason -> :error
   end
 
   defp start_match(state, map_id, bracket, template, reservations) do
@@ -669,12 +691,27 @@ defmodule ThistleTea.Game.World.System.Battleground do
 
       status ->
         if is_nil(expected_pid) or match_pid(status) == expected_pid do
-          %{state | players: Map.delete(state.players, guid)}
+          state = %{state | players: Map.delete(state.players, guid)}
+          retire_empty_match(state, expected_pid)
         else
           state
         end
     end
   end
+
+  defp retire_empty_match(state, pid) when is_pid(pid) do
+    has_players? = Enum.any?(state.players, fn {_guid, status} -> match_pid(status) == pid end)
+
+    case {Map.get(state.matches, pid), has_players?} do
+      {%{world: world}, false} ->
+        %{state | matches: Map.delete(state.matches, pid), worlds: Map.delete(state.worlds, world)}
+
+      _ ->
+        state
+    end
+  end
+
+  defp retire_empty_match(state, _pid), do: state
 
   defp status_for(state, guid) do
     case Map.get(state.players, guid) do
