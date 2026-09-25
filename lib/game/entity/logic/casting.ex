@@ -1386,8 +1386,14 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp spell_miss_reason(_spell), do: @spell_miss_reason_resist
 
   defp apply_initial_impacts(character, %Cast{spell: %Spell{} = spell} = casting, now) do
-    effects = Enum.reject(spell.effects, &Spell.channel_ticked_effect?(spell, &1))
-    apply_impacts(character, %{casting | spell: %{spell | effects: effects}}, casting.resolution.impacts, now)
+    case Enum.reject(spell.effects, &(&1.type == :persistent_area_aura)) do
+      [] when spell.effects != [] ->
+        character
+
+      effects ->
+        effects = Enum.reject(effects, &Spell.channel_ticked_effect?(spell, &1))
+        apply_impacts(character, %{casting | spell: %{spell | effects: effects}}, casting.resolution.impacts, now)
+    end
   end
 
   defp apply_channel_tick_effects(

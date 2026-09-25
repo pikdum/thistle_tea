@@ -31,6 +31,21 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
   end
 
   describe "target_query/2" do
+    test "ground-only aura effects do not select unit hits or enlarge direct impact radii" do
+      area = %Effect{
+        type: :persistent_area_aura,
+        implicit_target_a: :aoe_enemy_at_channel,
+        radius_yards: 20.0
+      }
+
+      targets = Target.at({3.0, 0.0, 0.0})
+      assert SpellTarget.target_query(%Spell{effects: [area]}, targets) == :none
+
+      damage = %Effect{type: :school_damage, implicit_target_a: :aoe_enemy_at_dest, radius_yards: 5.0}
+      spell = %Spell{effects: [damage, area]}
+      assert SpellTarget.target_query(spell, targets) == {:targeted_aoe, {3.0, 0.0, 0.0}, 5.0}
+    end
+
     test "friendly source areas ignore an enemy selection and distinguish explicit source positions" do
       effect = %Effect{
         type: :heal,

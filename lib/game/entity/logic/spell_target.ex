@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   def target_query(spell, targets, modifiers \\ [])
 
   def target_query(%Spell{} = spell, %Target{} = targets, modifiers) do
-    effects = Enum.reject(spell.effects, &(&1.type == :activate_object))
+    effects = Enum.reject(spell.effects, &non_unit_effect?/1)
 
     if effects == [] and spell.effects != [],
       do: :none,
@@ -31,6 +31,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   end
 
   def target_query(_spell, _targets, _modifiers), do: :none
+
+  defp non_unit_effect?(%Effect{type: :activate_object}), do: true
+
+  defp non_unit_effect?(%Effect{type: :persistent_area_aura} = effect),
+    do: effect_targets?(effect, [:aoe_enemy_at_channel])
+
+  defp non_unit_effect?(_effect), do: false
 
   defp unit_target_query(spell, targets, modifiers) do
     radius = Radius.maximum(spell.effects, modifiers)

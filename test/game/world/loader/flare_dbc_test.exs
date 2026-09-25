@@ -9,16 +9,46 @@ defmodule ThistleTea.Game.World.Loader.FlareDbcTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Casting
+  alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.PersistentArea
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
   @moduletag :dbc_db
 
   describe "load/1" do
+    test "Flare has no unit impacts, while Flamestrike keeps its initial damage" do
+      {caster, target_guid} = casting_scene()
+
+      for {spell_id, expected_direct_types} <- [{1543, []}, {26_573, []}, {2120, [:school_damage]}] do
+        spell = SpellLoader.load(spell_id)
+        cast = Cast.new(spell, Target.at({3.0, 0.0, 0.0}), 1_000)
+        result = Casting.complete(caster, cast, 1_000)
+        areas = Enum.filter(result.internal.events, &is_struct(&1, Effects.SpawnAreaEffect))
+        deliveries = Enum.filter(result.internal.events, &is_struct(&1, Effects.DeliverSpell))
+        assert length(areas) == Enum.count(spell.effects, &(&1.type == :persistent_area_aura))
+
+        if expected_direct_types == [] do
+          assert deliveries == []
+        else
+          assert [%Effects.DeliverSpell{target_guid: ^target_guid, spell: direct}] = deliveries
+          assert Enum.map(direct.effects, & &1.type) == expected_direct_types
+        end
+
+        assert %Effects.SpellGo{hit_guids: hits} = Enum.find(result.internal.events, &is_struct(&1, Effects.SpellGo))
+        if spell_id == 1543, do: assert(hits == []), else: assert(hits == [target_guid])
+      end
+    end
+
     test "Flare reveals both concealment types and protects only for its source lifetime" do
       flare = SpellLoader.load(1543)
       assert Spell.attribute?(flare, :immunity_purges_effect)
@@ -83,5 +113,38 @@ defmodule ThistleTea.Game.World.Loader.FlareDbcTest do
       internal: %Internal{world: WorldRef.open(0)},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
+  end
+
+  defp casting_scene do
+    guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+    target_guid = Guid.runtime(:mob, 721)
+    world = WorldRef.instance(0, System.unique_integer([:positive]))
+    caster = target()
+
+    caster = %{
+      caster
+      | object: %{caster.object | guid: guid},
+        unit: %{caster.unit | power1: 1_000, max_power1: 1_000, power_type: 0},
+        internal: %{caster.internal | world: world}
+    }
+
+    Metadata.put(guid, %{alive?: true, unit_flags: 0, faction_template: %FactionTemplate{id: 1, faction_group: 1}})
+
+    Metadata.put(target_guid, %{
+      alive?: true,
+      unit_flags: 0,
+      level: 1,
+      faction_template: %FactionTemplate{id: 17, faction_group: 8, enemy_group: 1}
+    })
+
+    SpatialHash.insert(:mobs, target_guid, world, 3.0, 0.0, 0.0)
+
+    on_exit(fn ->
+      SpatialHash.remove(:mobs, target_guid)
+      Metadata.delete(guid)
+      Metadata.delete(target_guid)
+    end)
+
+    {caster, target_guid}
   end
 end
