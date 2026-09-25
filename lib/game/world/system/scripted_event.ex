@@ -65,7 +65,15 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   def condition_results(_world, _source_guid, _target_guid, []), do: %{}
 
   def condition_results(world, source_guid, target_guid, conditions) when is_list(conditions) do
-    GenServer.call(__MODULE__, {:condition_results, WorldRef.coerce(world), source_guid, target_guid, conditions})
+    world
+    |> condition_results_by_target(source_guid, %{target_guid => conditions})
+    |> Map.fetch!(target_guid)
+  end
+
+  def condition_results_by_target(_world, _source_guid, groups) when map_size(groups) == 0, do: %{}
+
+  def condition_results_by_target(world, source_guid, groups) when is_map(groups) do
+    GenServer.call(__MODULE__, {:condition_results_by_target, WorldRef.coerce(world), source_guid, groups})
   end
 
   def target_results(_world, []), do: %{}
@@ -78,11 +86,15 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   def init(state), do: {:ok, state}
 
   @impl GenServer
-  def handle_call({:condition_results, world, source_guid, target_guid, conditions}, _from, events) do
+  def handle_call({:condition_results_by_target, world, source_guid, groups}, _from, events) do
     results =
-      Map.new(conditions, fn
-        %Condition{} = condition ->
-          {condition_key(condition), condition_result(condition, events, world, source_guid, target_guid)}
+      Map.new(groups, fn {target_guid, conditions} ->
+        results =
+          Map.new(conditions, fn %Condition{} = condition ->
+            {condition_key(condition), condition_result(condition, events, world, source_guid, target_guid)}
+          end)
+
+        {target_guid, results}
       end)
 
     {:reply, results, events}

@@ -204,6 +204,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     end
   end
 
+  def handle_cast({:start_script, steps, target_guid, world}, %Mob{internal: %{world: world}} = state) do
+    handle_cast({:start_script, steps, target_guid}, state)
+  end
+
+  def handle_cast({:start_script, _steps, _target_guid, _world}, %Mob{} = state), do: {:noreply, state}
+
   def handle_cast({:start_script, steps, target_guid}, %Mob{} = state)
       when is_list(steps) and is_integer(target_guid) do
     now = Time.now()
@@ -1106,6 +1112,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         {:noreply, state}
     end
   end
+
+  def handle_info({:ai_script_steps, steps, target_guid, world}, %Mob{internal: %{world: world}} = state) do
+    handle_info({:ai_script_steps, steps, target_guid}, state)
+  end
+
+  def handle_info({:ai_script_steps, _steps, _target_guid, _world}, %Mob{} = state), do: {:noreply, state}
 
   def handle_info({:ai_script_steps, steps, target_guid}, %Mob{} = state) do
     if Corpse.removed?(state) do

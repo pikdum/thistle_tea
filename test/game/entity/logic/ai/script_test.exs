@@ -644,7 +644,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert [%Effects.Emote{emote_id: 11}] = mob.internal.events
     end
 
-    test "swap-initial steps are skipped", %{mob: mob} do
+    test "swap-initial steps without a supplied source are skipped", %{mob: mob} do
       step = %ScriptStep{command: :emote, datalong: 11, swap_initial?: true}
 
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
@@ -1036,6 +1036,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
     test "teleport_to is an in-order movement barrier for a server-controlled mob", %{mob: mob} do
       world = WorldRef.instance(329, 77)
       destination = {4068.74, -3535.97, 122.825, 2.47837}
+      mob = %{mob | unit: %{mob.unit | target: Guid.from_low_guid(:player, 42)}}
 
       mob =
         mob

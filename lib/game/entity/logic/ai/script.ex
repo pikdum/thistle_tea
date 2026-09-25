@@ -8,11 +8,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   events, swapping the unit display id for morphs, recursing into resolved
   generic scripts for start-script steps, and mutating the blackboard phase,
   gait, or flee state — steps with a failing condition are skipped, and
-  unsupported commands are logged and skipped. Steps flagged to swap final
-  targets run on the resolved buddy creature instead: they are rewritten to
-  provided-target form and forwarded to the buddy's owning process, matching
-  vmangos source/target swap semantics. Triggered casts use the trigger-spell
-  pipeline; normal casts use the caster's mob or player casting machinery.
+  unsupported commands are logged and skipped. Initial target swaps move
+  execution to the supplied owner before selection; final swaps move it to the
+  selected owner. Conditions and commands then use the final source and target.
+  Triggered casts use the trigger-spell pipeline; normal casts use the caster's
+  mob or player casting machinery.
   """
   import Bitwise, only: [&&&: 2, |||: 2, bnot: 1]
 
@@ -80,6 +80,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     :nearest_game_object_with_entry,
     :random_game_object_with_entry
   ]
+  @null_source_target_types @entry_target_types ++
+                              [
+                                :creature_with_guid,
+                                :game_object_with_guid,
+                                :map_event_source,
+                                :map_event_target,
+                                :map_event_extra_target
+                              ]
 
   def flee_duration_ms, do: Flee.duration_ms()
 
@@ -106,12 +114,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp execute_steps_with_status(state, blackboard, steps, target_guid, context) do
     Enum.reduce_while(steps, {state, blackboard, :continue}, fn %ScriptStep{} = step, {state, blackboard, :continue} ->
-      case termination(state, step, target_guid, context) do
-        {:terminate, state} ->
+      case dispatch(state, blackboard, step, target_guid, context) do
+        {state, blackboard, :terminated} ->
           {:halt, {state, blackboard, :terminated}}
 
-        :continue ->
-          {state, blackboard} = dispatch(state, blackboard, step, target_guid, context)
+        {state, blackboard, :continue} ->
           {:cont, {state, blackboard, :continue}}
       end
     end)
@@ -120,20 +127,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   defp dispatch(
          %{object: %{guid: self_guid}} = state,
          blackboard,
-         %ScriptStep{swap_final?: true} = step,
+         %ScriptStep{swap_initial?: true} = step,
          target_guid,
          %Context{} = context
        ) do
-    case resolve_target(state, step, target_guid, context) do
-      ^self_guid ->
-        dispatch(state, blackboard, %{step | swap_final?: false}, target_guid, context)
+    cond do
+      target_guid == self_guid ->
+        dispatch(state, blackboard, %{step | swap_initial?: false}, self_guid, context)
 
-      buddy_guid when is_integer(buddy_guid) and buddy_guid > 0 ->
-        forward_to_buddy(state, blackboard, step, buddy_guid, target_guid)
+      script_owner?(target_guid) ->
+        forward(state, blackboard, %{step | swap_initial?: false, delay_ms: 0}, target_guid, self_guid)
 
-      _ ->
-        {state, blackboard}
+      step.swap_final? and step.target_type in @null_source_target_types ->
+        dispatch_final(state, blackboard, step, 0, self_guid, context)
+
+      true ->
+        {state, blackboard, :continue}
     end
+  end
+
+  defp dispatch(state, blackboard, %ScriptStep{swap_final?: true} = step, target_guid, %Context{} = context) do
+    dispatch_final(state, blackboard, step, state.object.guid, target_guid, context)
   end
 
   defp dispatch(
@@ -145,25 +159,36 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
        )
        when command in @game_object_owner_commands and
               target_type in [:nearest_game_object_with_entry, :game_object_with_guid] do
-    case resolve_target(state, step, target_guid, context) do
-      buddy_guid when is_integer(buddy_guid) and buddy_guid > 0 ->
-        forward_to_buddy(state, blackboard, step, buddy_guid, target_guid)
-
-      _missing ->
-        {state, blackboard}
-    end
-  end
-
-  defp dispatch(state, blackboard, %ScriptStep{swap_initial?: true} = step, _target_guid, %Context{}) do
-    Logger.debug("Script #{step.script_id}: swap-initial-targets unsupported, skipping")
-    {state, blackboard}
+    dispatch_final(state, blackboard, step, state.object.guid, target_guid, context)
   end
 
   defp dispatch(state, blackboard, %ScriptStep{} = step, target_guid, %Context{now: now} = context) do
-    if condition_met?(state, step.condition, target_guid, context) do
-      execute(state, blackboard, step, target_guid, now, context)
+    selected = resolve_target(state, %{step | target_self?: false}, target_guid, context)
+    target = if step.target_self?, do: state.object.guid, else: selected
+
+    if (step.target_type == :provided or selected not in [nil, 0]) and
+         condition_met?(state, step.condition, target, context) do
+      case termination(state, step, target, context) do
+        {:terminate, state} ->
+          {state, blackboard, :terminated}
+
+        :continue ->
+          {state, blackboard} = execute(state, blackboard, resolved_step(step), target, now, context)
+          {state, blackboard, :continue}
+      end
     else
-      {state, blackboard}
+      {state, blackboard, :continue}
+    end
+  end
+
+  defp dispatch_final(state, blackboard, step, source_guid, target_guid, context) do
+    owner = resolve_target(state, %{step | target_self?: false}, target_guid, context)
+    target = if step.target_self?, do: owner, else: source_guid
+
+    cond do
+      owner == state.object.guid -> dispatch(state, blackboard, resolved_step(step), target, context)
+      script_owner?(owner) -> forward(state, blackboard, resolved_step(step), owner, target)
+      true -> {state, blackboard, :continue}
     end
   end
 
@@ -176,30 +201,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     |> Kernel.==(:met)
   end
 
-  defp forward_to_buddy(
-         %{object: %{guid: self_guid}} = state,
-         blackboard,
-         %ScriptStep{} = step,
-         buddy_guid,
-         target_guid
-       ) do
-    if Guid.entity_type(buddy_guid) in [:mob, :game_object] do
-      forwarded = %{
-        step
-        | swap_initial?: false,
-          swap_final?: false,
-          target_self?: false,
-          target_type: :provided,
-          delay_ms: 0
-      }
-
-      provided = if step.swap_initial?, do: target_guid, else: self_guid
-      {Effects.enqueue(state, Effects.forward_script_steps(buddy_guid, [forwarded], provided)), blackboard}
-    else
-      Logger.debug("Script #{step.script_id}: swap-final target is not a creature, skipping")
-      {state, blackboard}
-    end
+  defp resolved_step(%ScriptStep{} = step) do
+    %{step | swap_initial?: false, swap_final?: false, target_self?: false, target_type: :provided, delay_ms: 0}
   end
+
+  defp forward(state, blackboard, step, owner_guid, target_guid),
+    do: {Effects.enqueue(state, Effects.forward_script_steps(owner_guid, [step], target_guid)), blackboard, :continue}
+
+  defp script_owner?(guid) when is_integer(guid) and guid > 0,
+    do: Guid.entity_type(guid) in [:mob, :player, :game_object]
+
+  defp script_owner?(_guid), do: false
 
   defp schedule_delayed(state, [], _target_guid), do: state
 
@@ -521,7 +533,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp execute(
-         %Mob{} = state,
+         state,
          blackboard,
          %ScriptStep{command: :talk} = step,
          target_guid,
@@ -714,6 +726,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
        ) do
     case resolve_target(state, step, target_guid, context) do
       guid when is_integer(guid) and guid > 0 and guid != state.object.guid ->
+        state = face_observed_target(state, guid, context.perception)
         {Effects.enqueue(state, Effects.set_facing({:target, guid})), blackboard}
 
       _ ->
@@ -1311,6 +1324,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp set_facing_angle(state, _angle), do: state
 
+  defp face_observed_target(%{internal: %{world: world}} = state, guid, perception) do
+    case Perception.position(perception, guid) do
+      {^world, x, y, _z} -> Movement.face_towards(state, {x, y})
+      _missing -> state
+    end
+  end
+
   defp trigger_cast(
          %{object: %{guid: guid}, unit: %Unit{level: level}} = state,
          %CreatureSpell{} = entry,
@@ -1370,9 +1390,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     buddy_guid
   end
 
-  defp resolve_target(state, %ScriptStep{target_type: :provided}, provided) do
-    provided || victim(state)
-  end
+  defp resolve_target(_state, %ScriptStep{target_type: :provided}, provided), do: provided
 
   defp resolve_target(state, %ScriptStep{target_type: target_type}, _provided)
        when target_type in [

@@ -236,6 +236,12 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
+  def handle_cast({:start_script, steps, target_guid, world}, %State{character: %{internal: %{world: world}}} = state) do
+    handle_cast({:start_script, steps, target_guid}, state)
+  end
+
+  def handle_cast({:start_script, _steps, _target_guid, _world}, %State{} = state), do: {:noreply, state}
+
   def handle_cast({:start_script, steps, target_guid}, %State{character: %Character{}} = state)
       when is_list(steps) and is_integer(target_guid) do
     {:noreply, run_script(state, steps, target_guid), {:continue, :maybe_broadcast_update}}
@@ -1033,6 +1039,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       Logger.error("taxi path crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, state}
   end
+
+  def handle_info(
+        {:ai_script_steps, steps, target_guid, world},
+        %State{character: %{internal: %{world: world}}} = state
+      ) do
+    handle_info({:ai_script_steps, steps, target_guid}, state)
+  end
+
+  def handle_info({:ai_script_steps, _steps, _target_guid, _world}, %State{} = state), do: {:noreply, state}
 
   def handle_info({:ai_script_steps, steps, target_guid}, %State{character: %Character{}} = state)
       when is_list(steps) and is_integer(target_guid) do

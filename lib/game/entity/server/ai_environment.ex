@@ -65,9 +65,12 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
              is_number(requested_game_object_radius) and requested_game_object_radius >= 0 and is_list(options) do
     conditions = all_conditions(entity, request)
     requirements = Requirements.plan(conditions)
-    condition_results = script_condition_results(entity, condition_groups(entity, request))
+    script_targets = script_target_results(entity, request.script_targets)
+    observed_actors = actors ++ Map.values(script_targets)
+    perception = perception(entity, now, observed_actors, requested_radius, requested_game_object_radius)
+    groups = condition_groups(entity, request, perception, conditions)
+    condition_results = script_condition_results(entity, groups)
     condition_target = explicit_actor(actors) || event_ai_target(entity)
-    perception = perception(entity, now, actors, requested_radius, requested_game_object_radius)
     random = random()
 
     %Context{
@@ -78,7 +81,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       waypoints: WaypointLoader.context(),
       script_conditions: Map.get(condition_results, condition_target, %{}),
       script_conditions_by_target: condition_results,
-      script_targets: script_target_results(entity, request.script_targets),
+      script_targets: script_targets,
       condition_now: local_time(),
       condition_area: condition_area(entity, requirements),
       spell_area: spell_area(entity),
@@ -255,20 +258,31 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
 
   defp script_condition_results(%{object: %{guid: source_guid}, internal: %Internal{world: world}}, groups)
        when is_map(groups) do
-    Map.new(groups, fn {target_guid, conditions} ->
-      {target_guid, ScriptedEvent.condition_results(world, source_guid, target_guid, conditions)}
-    end)
+    ScriptedEvent.condition_results_by_target(world, source_guid, groups)
   end
 
   defp script_condition_results(_entity, _groups), do: %{}
 
-  defp condition_groups(entity, request) do
+  defp condition_groups(entity, request, perception, conditions) do
     actor = explicit_actor(request.actors)
 
     %{}
     |> put_condition_group(actor, request.script_conditions)
     |> put_condition_group(actor || event_ai_target(entity), event_ai_conditions(entity))
     |> put_condition_group(nil, waypoint_conditions(entity))
+    |> put_selected_condition_groups(perception, conditions)
+  end
+
+  defp put_selected_condition_groups(groups, perception, conditions) do
+    case Requirements.environment_conditions(conditions) do
+      [] ->
+        groups
+
+      environmental ->
+        Enum.reduce(Map.keys(perception.entities), groups, fn guid, groups ->
+          Map.update(groups, guid, environmental, &Enum.uniq(&1 ++ environmental))
+        end)
+    end
   end
 
   defp put_condition_group(groups, target_guid, conditions) do

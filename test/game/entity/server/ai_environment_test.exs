@@ -14,11 +14,14 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.Possession
+  alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request
+  alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
@@ -256,7 +259,42 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
       context = AIEnvironment.context(mob, 1_000)
 
       assert context.script_conditions == %{3 => :met}
-      assert context.script_conditions_by_target == %{victim_guid => %{3 => :met}}
+      assert context.script_conditions_by_target[victim_guid] == %{3 => :met}
+    end
+
+    test "selected targets receive their own immutable condition facts" do
+      world = WorldRef.instance(999, 98_040)
+      provided = Guid.from_low_guid(:player, 98_040)
+      selected = Guid.from_low_guid(:player, 98_041)
+      object = Guid.from_low_guid(:game_object, 21_145, 98_042)
+      condition = %Condition{entry: 4, type: :nearby_game_object, value1: 21_145, value2: 10}
+      put_actor(:players, provided, world, 100.0)
+      put_actor(:players, selected, world, 5.0)
+      SpatialHash.update(:game_objects, object, world, 6.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        remove_actor(:players, provided)
+        remove_actor(:players, selected)
+        SpatialHash.remove(:game_objects, object)
+      end)
+
+      step = %ScriptStep{
+        command: :emote,
+        datalong: 1,
+        target_type: :nearest_player,
+        target_param1: 30,
+        condition: condition
+      }
+
+      request = Request.new([provided], 30.0, script_conditions: [condition])
+      entity = mob(world)
+      entity = %{entity | internal: %{entity.internal | creature: %Creature{}}}
+      context = AIEnvironment.context(entity, 1_000, request)
+      assert context.script_conditions_by_target[provided] == %{4 => :unmet}
+      assert context.script_conditions_by_target[selected] == %{4 => :met}
+      SpatialHash.remove(:game_objects, object)
+      {updated, _} = Script.run(entity, Blackboard.new(), [step], provided, context)
+      assert [%Effects.Emote{emote_id: 1}] = updated.internal.events
     end
 
     test "requests scripted map-event facts from their owner" do

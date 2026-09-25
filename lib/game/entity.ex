@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity do
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.WorldRef
 
   def register(guid), do: EntityRegistry.register(guid)
   def unregister(guid), do: EntityRegistry.unregister(guid)
@@ -217,6 +218,10 @@ defmodule ThistleTea.Game.Entity do
 
   def start_script(entity, steps, target_guid) when is_list(steps) and is_integer(target_guid) do
     dispatch_cast(entity, {:start_script, steps, target_guid})
+  end
+
+  def start_script(entity, steps, target_guid, %WorldRef{} = world) when is_list(steps) and is_integer(target_guid) do
+    dispatch_cast(entity, {:start_script, steps, target_guid, world})
   end
 
   def script_event(entity, event_id, data, invoker_guid \\ nil)
