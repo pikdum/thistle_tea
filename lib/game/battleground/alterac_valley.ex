@@ -185,6 +185,8 @@ defmodule ThistleTea.Game.Battleground.AlteracValley do
         &1.graveyards_defended,
         &1.towers_assaulted,
         &1.towers_defended,
+        &1.mines_captured,
+        &1.leaders_killed,
         &1.secondary_objectives
       ]
     )

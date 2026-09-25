@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Battleground.AlteracValley.Creatures do
   alias ThistleTea.Game.Battleground.Lifecycle
   alias ThistleTea.Game.Battleground.Player
   alias ThistleTea.Game.Battleground.Result
+  alias ThistleTea.Game.Battleground.Roster
 
   @alliance_events [48, 52, 53, 54, 55, 61, 66, 68]
   @horde_events [49, 56, 57, 58, 59, 62, 67, 69]
@@ -23,6 +24,7 @@ defmodule ThistleTea.Game.Battleground.AlteracValley.Creatures do
          %{event1: event, event2: state} <- Enum.find(defeat.bindings, &(&1.event1 in @objective_events)),
          true <- eligible?(match, event, state, team) do
       match = %{match | defeated_incarnations: MapSet.put(match.defeated_incarnations, incarnation)}
+      match = credit_defeat(match, event, defeat.killer_guid)
       defeat_objective(match, event, team, now)
     else
       _ineligible -> %Result{match: match}
@@ -150,6 +152,14 @@ defmodule ThistleTea.Game.Battleground.AlteracValley.Creatures do
     {match, rewards} = Rewards.objective(match, team, :commander, now)
     %Result{match: match, effects: rewards}
   end
+
+  defp credit_defeat(match, event, guid) when event in [46, 47],
+    do: Roster.update_player(match, guid, &%{&1 | mines_captured: &1.mines_captured + 1})
+
+  defp credit_defeat(match, event, guid) when event in [48, 49, 61, 62, 68, 69] or event in 52..59,
+    do: Roster.update_player(match, guid, &%{&1 | leaders_killed: &1.leaders_killed + 1})
+
+  defp credit_defeat(match, _event, _guid), do: match
 
   defp record_event(match, event), do: %{match | defeated_events: MapSet.put(match.defeated_events, event)}
 end

@@ -19,6 +19,8 @@ defmodule ThistleTea.Game.Battleground.Player do
     graveyards_defended: 0,
     towers_assaulted: 0,
     towers_defended: 0,
+    mines_captured: 0,
+    leaders_killed: 0,
     secondary_objectives: 0
   ]
 end

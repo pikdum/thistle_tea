@@ -10,9 +10,14 @@ defmodule ThistleTea.Game.Entity.Server.GameObjectTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
+  alias ThistleTea.Game.Entity.Data.Lock
+  alias ThistleTea.Game.Entity.Data.Lock.Requirement
   alias ThistleTea.Game.Entity.Server.GameObject, as: GameObjectServer
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Network.Message.SmsgGameobjectResetState
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
 
@@ -48,6 +53,32 @@ defmodule ThistleTea.Game.Entity.Server.GameObjectTest do
   end
 
   describe "handle_cast/2" do
+    test "creates slow-opening banners before resetting the recipient's interaction cache" do
+      lock_id = 9_000_000 + System.unique_integer([:positive])
+      :ets.insert(LockLoader, {lock_id, %Lock{id: lock_id, requirements: [%Requirement{type: :skill, index: 17}]}})
+      on_exit(fn -> :ets.delete(LockLoader, lock_id) end)
+
+      template = %GameObjectTemplate{entry: 178_943, type: 1, flags: 0, size: 1.0, data: [0, lock_id]}
+      banner = GameObject.build_summoned(template, WorldRef.instance(999, lock_id), {0.0, 0.0, 0.0, 0.0})
+      guid = banner.object.guid
+      pid = start_supervised!({GameObjectServer, banner})
+
+      for _projection <- 1..2 do
+        Entity.request_update_from(pid, self())
+        assert_receive {:"$gen_cast", {:send_packet, created}}
+        assert %UpdateObject{update_type: :create_object2, object: %{guid: ^guid}} = created
+        assert_receive {:"$gen_cast", {:send_packet, reset}}
+        assert %SmsgGameobjectResetState{guid: ^guid} = reset
+        assert SmsgGameobjectResetState.to_binary(reset) == <<guid::little-size(64)>>
+      end
+
+      :ets.insert(LockLoader, {lock_id, %Lock{id: lock_id, requirements: [%Requirement{type: :skill, index: 1}]}})
+      Entity.request_update_from(pid, self())
+      assert_receive {:"$gen_cast", {:send_packet, %UpdateObject{}}}
+      :sys.get_state(pid)
+      refute_received {:"$gen_cast", {:send_packet, %SmsgGameobjectResetState{}}}
+    end
+
     test "buttons trigger the nearest linked trap in the same copy" do
       entry = 9_000_000 + rem(System.unique_integer([:positive]), 1_000_000)
       world = WorldRef.instance(999, entry)

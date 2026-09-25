@@ -12,6 +12,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Summon
   alias ThistleTea.Game.Entity.Data.Component.Internal.Trap
   alias ThistleTea.Game.Entity.Data.GameObject
+  alias ThistleTea.Game.Entity.Data.Lock
+  alias ThistleTea.Game.Entity.Data.Lock.Requirement
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -38,6 +40,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgFishNotHooked
   alias ThistleTea.Game.Network.Message.SmsgGameobjectCustomAnim
+  alias ThistleTea.Game.Network.Message.SmsgGameobjectResetState
   alias ThistleTea.Game.Network.Message.SmsgPlayObjectSound
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
@@ -47,6 +50,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.GameObjectScript, as: GameObjectScriptLoader
+  alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
@@ -92,7 +96,12 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     Core.update_object(state)
     |> Network.send_packet(pid)
 
+    reset_banner_interaction(state, pid)
     {:noreply, state}
+  rescue
+    error ->
+      Logger.error("Game object update failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:battleground_hide_game_object}, state) do
@@ -730,6 +739,20 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   defp spend_charge(state), do: state
+
+  defp reset_banner_interaction(%GameObject{internal: %{gathering: %{lock_id: lock_id}}} = state, pid) do
+    case LockLoader.get(lock_id) do
+      %Lock{requirements: requirements} ->
+        if Enum.any?(requirements, &match?(%Requirement{type: :skill, index: 17}, &1)) do
+          Network.send_packet(%SmsgGameobjectResetState{guid: state.object.guid}, pid)
+        end
+
+      _missing ->
+        :ok
+    end
+  end
+
+  defp reset_banner_interaction(%GameObject{}, _pid), do: :ok
 
   defp broadcast_if_pending(%GameObject{internal: %Internal{broadcast_update?: true} = internal} = state) do
     publish_condition_metadata(state)

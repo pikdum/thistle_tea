@@ -6,9 +6,24 @@ defmodule ThistleTea.Game.Battleground.AlteracValleyTest do
   alias ThistleTea.Game.Battleground.CreatureDefeat
   alias ThistleTea.Game.Battleground.Effects
   alias ThistleTea.Game.Battleground.Template
+  alias ThistleTea.Game.Network.Message.MsgPvpLogData
   alias ThistleTea.Game.WorldRef
 
   setup [:active_match]
+
+  describe "scoreboard/1" do
+    test "encodes seven ordered objective fields for build 5875", %{match: match} do
+      match = put_in(match.players[1].mines_captured, 2)
+      match = put_in(match.players[1].leaders_killed, 3)
+      match = put_in(match.players[1].secondary_objectives, 4)
+      [player | _] = AlteracValley.scoreboard(match)
+      message = %MsgPvpLogData{players: [player]}
+
+      assert <<0, 1::little-size(32), 1::little-size(64), _scores::binary-size(20), 7::little-size(32),
+               0::little-size(32), 0::little-size(32), 0::little-size(32), 0::little-size(32), 2::little-size(32),
+               3::little-size(32), 4::little-size(32)>> = MsgPvpLogData.to_binary(message)
+    end
+  end
 
   describe "use_game_object/7" do
     test "stops graveyard respawns during assault and restores them on defense", %{match: match} do
@@ -28,7 +43,7 @@ defmodule ThistleTea.Game.Battleground.AlteracValleyTest do
       assert AlteracValley.handle_timer(defended.match, {:banner, 2, 1}, 2_000).effects == []
       assert AlteracValley.handle_timer(defended.match, {:capture, 2, 1}, 300_000).match == defended.match
 
-      assert [%{fields: [0, 1, 0, 0, 0]}, %{fields: [1, 0, 0, 0, 0]}, %{fields: [0, 0, 0, 0, 0]}] =
+      assert [%{fields: [0, 1, 0, 0, 0, 0, 0]}, %{fields: [1, 0, 0, 0, 0, 0, 0]}, %{fields: [0, 0, 0, 0, 0, 0, 0]}] =
                AlteracValley.scoreboard(defended.match)
     end
 
@@ -77,6 +92,8 @@ defmodule ThistleTea.Game.Battleground.AlteracValleyTest do
       neutral = defeat(46, 1, 9, 2)
       captured = AlteracValley.creature_died(match, neutral, 1_000)
       assert captured.match.mines[0].owner == :alliance
+      assert captured.match.players[1].mines_captured == 1
+      assert captured.match.players[2].mines_captured == 0
       assert %Effects.SetEvent{event: 46, state: 0} in captured.effects
       assert %Effects.SetEvent{event: 50, state: 0} in captured.effects
       assert %Effects.QuestKillCredit{guid: 1, entry: 13_796} in captured.effects
@@ -91,9 +108,11 @@ defmodule ThistleTea.Game.Battleground.AlteracValleyTest do
 
       recaptured = AlteracValley.creature_died(captured.match, defeat(46, 2, 10, 0), 3_000)
       assert recaptured.match.mines[0].owner == :horde
+      assert recaptured.match.players[2].mines_captured == 1
       assert AlteracValley.handle_timer(recaptured.match, {:mine_reclaim, 0, 1}, 1_201_000).effects == []
       reclaimed = AlteracValley.handle_timer(recaptured.match, {:mine_reclaim, 0, 2}, 1_203_000)
       assert reclaimed.match.mines[0].owner == nil
+      assert reclaimed.match.players[2].mines_captured == 1
       assert %Effects.SetEvent{event: 46, state: 2} in reclaimed.effects
       refute AlteracValley.supply_allowed?(reclaimed.match, 2, 178_785)
     end
@@ -103,6 +122,7 @@ defmodule ThistleTea.Game.Battleground.AlteracValleyTest do
       assert %Effects.TeamSpell{team: :horde, spell_id: 22_751} in before.effects
       killed = AlteracValley.creature_died(match, defeat(49, 1), 120_001)
       assert killed.match.players[1].bonus_honor == 594
+      assert killed.match.players[1].leaders_killed == 1
       assert %Effects.StopEventRespawns{event: 49} in killed.effects
       assert %Effects.SetEvent{event: 64, state: 0} in killed.effects
       assert AlteracValley.handle_timer(killed.match, {:captain_buff, :horde}, 300_000).effects == []
@@ -117,6 +137,7 @@ defmodule ThistleTea.Game.Battleground.AlteracValleyTest do
     test "commanders are one-time objectives while lieutenant incarnations may respawn", %{match: match} do
       commander = AlteracValley.creature_died(match, defeat(57, 1), 0)
       assert commander.match.players[1].bonus_honor == 198
+      assert commander.match.players[1].leaders_killed == 1
       assert %Effects.QuestKillCredit{guid: 1, entry: 13_154} in commander.effects
       assert AlteracValley.creature_died(commander.match, defeat(57, 1, 2), 1).effects == []
 
@@ -125,6 +146,7 @@ defmodule ThistleTea.Game.Battleground.AlteracValleyTest do
       assert AlteracValley.creature_died(lieutenant.match, defeat(69, 1), 3).effects == []
       respawn = AlteracValley.creature_died(lieutenant.match, defeat(69, 1, 2), 4)
       assert respawn.match.players[1].bonus_honor == 594
+      assert respawn.match.players[1].leaders_killed == 3
     end
 
     test "enemy general death ends the match and includes survival rewards in the final scoreboard", %{match: match} do
