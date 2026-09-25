@@ -64,6 +64,14 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
 
   def tick(entity, _now), do: entity
 
+  def next_tick_at(%Character{internal: %Internal{} = internal}) do
+    [expires_at(internal.defense_window), expires_at(internal.hunter_parry_window), internal.combo_expires_at]
+    |> Enum.filter(&is_integer/1)
+    |> Enum.min(fn -> nil end)
+  end
+
+  def next_tick_at(_entity), do: nil
+
   def sync(%{unit: %Unit{} = unit} = entity, now) do
     preserved = (unit.aura_state || 0) &&& bnot(@reactive_mask)
 
@@ -152,6 +160,9 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
 
   defp expire_window(%ReactiveWindow{expires_at: expires_at}, now) when now >= expires_at, do: nil
   defp expire_window(window, _now), do: window
+
+  defp expires_at(%ReactiveWindow{expires_at: at}), do: at
+  defp expires_at(nil), do: nil
 
   defp window_kind(@rogue, :dodge), do: nil
   defp window_kind(@hunter, :parry), do: :hunter_parry

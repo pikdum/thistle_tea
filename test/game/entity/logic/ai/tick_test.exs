@@ -6,10 +6,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.ReactiveWindow
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Spell.Cast
 
   describe "mob_delay/3" do
@@ -86,6 +88,39 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
   end
 
   describe "player_delay/3" do
+    test "wakes for each reactive expiry even after combat ends" do
+      character = fixture()
+
+      character = %{
+        character
+        | internal: %{
+            character.internal
+            | defense_window: %ReactiveWindow{target_guid: 77, expires_at: 1_050},
+              hunter_parry_window: %ReactiveWindow{target_guid: 78, expires_at: 1_075}
+          }
+      }
+
+      assert Tick.needs_tick?(character)
+      assert Tick.player_delay(character, {:running, 2_000}, 1_000) == 50
+
+      character = Reactive.tick(character, 1_050)
+      assert character.unit.aura_state == 0x40
+      assert Tick.needs_tick?(character)
+      assert Tick.player_delay(character, {:running, 2_000}, 1_050) == 25
+      assert Tick.player_delay(character, {:running, 2_000}, 1_080) == 0
+
+      character = Reactive.tick(character, 1_080)
+      assert character.unit.aura_state == 0
+      refute Tick.needs_tick?(character)
+    end
+
+    test "Overpower's temporary combo target has an expiry deadline" do
+      character = fixture()
+      character = %{character | internal: %{character.internal | combo_expires_at: 1_050}}
+      assert Tick.needs_tick?(character)
+      assert Tick.player_delay(character, {:running, 2_000}, 1_000) == 50
+    end
+
     test "uses the tree's running delay when no regen is due sooner" do
       character = fixture(in_combat: true, target: 42)
 

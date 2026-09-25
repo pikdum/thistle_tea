@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
   alias ThistleTea.Game.Entity.Logic.Pvp
+  alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Entity.Logic.Rest
   alias ThistleTea.Game.Entity.Logic.TemporarySummon
@@ -52,13 +53,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   def needs_tick?(character),
     do:
       Breathing.needs_tick?(character) or Regen.needs_regen?(character) or Intoxication.needs_tick?(character) or
-        Pvp.needs_tick?(character) or not is_nil(Rest.next_tick_at(character))
+        Pvp.needs_tick?(character) or not is_nil(Rest.next_tick_at(character)) or
+        not is_nil(Reactive.next_tick_at(character))
 
   def plan(entity, status, now) when is_integer(now) do
     TickPlan.new(now)
     |> schedule_status(status)
     |> schedule_extra_attacks(entity)
     |> schedule_aura(entity)
+    |> schedule_reactive(entity)
     |> schedule_regen(entity)
     |> schedule_pet_happiness(entity)
     |> schedule_pet_loyalty(entity)
@@ -74,6 +77,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   defp schedule_movement(plan, entity) do
     case Movement.completion_at(entity) do
       at when is_integer(at) -> TickPlan.schedule_at(plan, :movement, at)
+      _ -> plan
+    end
+  end
+
+  defp schedule_reactive(plan, entity) do
+    case Reactive.next_tick_at(entity) do
+      at when is_integer(at) -> TickPlan.schedule_at(plan, :reactive, at)
       _ -> plan
     end
   end
