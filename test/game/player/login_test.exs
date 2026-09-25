@@ -79,7 +79,7 @@ defmodule ThistleTea.Game.Player.LoginTest do
 
       landed = put_in(state.character.internal.taxi_flight, nil)
       assert Login.restore_companion(landed) == landed
-      assert_receive %Attachment{entity_ref: %{entry: 416, guid: pet_guid}}
+      assert_receive %Attachment{entity_ref: %{entry: 416, guid: pet_guid}}, 1_000
       on_exit(fn -> World.stop_entity(pet_guid) end)
     end
 
