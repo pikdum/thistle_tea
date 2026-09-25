@@ -18,11 +18,13 @@ defmodule ThistleTea.Game.Battleground.AlteracValleyTest do
       assert {{:capture, 2, 1}, 300_000} in attacked.timers
       assert {{:banner, 2, 1}, 1_000} in attacked.timers
       assert attacked.match.players[2].graveyards_assaulted == 1
+      assert [%Effects.QuestKillCredit{guid: 2, entry: 13_756}] == quest_credits(attacked)
 
       defended = use_node(attacked.match, 2, 1, 1_000)
       assert %Effects.SetEvent{event: 17, state: 0} in defended.effects
       assert {{:banner, 2, 2}, 5_000} in defended.timers
       assert defended.match.players[1].graveyards_defended == 1
+      assert quest_credits(defended) == []
       assert AlteracValley.handle_timer(defended.match, {:banner, 2, 1}, 2_000).effects == []
       assert AlteracValley.handle_timer(defended.match, {:capture, 2, 1}, 300_000).match == defended.match
 
@@ -34,6 +36,7 @@ defmodule ThistleTea.Game.Battleground.AlteracValleyTest do
       attacked = use_node(match, 11, 1, 0)
       assert %Effects.StopEventRespawns{event: 26} in attacked.effects
       assert %Effects.StopEventRespawns{event: 34} in attacked.effects
+      assert [%Effects.QuestKillCredit{guid: 1, entry: 13_778}] == quest_credits(attacked)
       captured = AlteracValley.handle_timer(attacked.match, {:capture, 11, 1}, 300_000)
       assert captured.match.nodes[11].destroyed?
       assert captured.match.players[1].towers_assaulted == 1
@@ -42,10 +45,18 @@ defmodule ThistleTea.Game.Battleground.AlteracValleyTest do
       assert %Effects.SetEvent{event: 26, state: 1} in captured.effects
       assert %Effects.SetEvent{event: 34, state: 0} in captured.effects
       assert %Effects.RewardReputation{team: :alliance, faction_id: 730, amount: 12} in captured.effects
-      assert %Effects.QuestKillCredit{guid: 1, entry: 13_778} in captured.effects
-      refute %Effects.QuestKillCredit{guid: 3, entry: 13_778} in captured.effects
+      assert quest_credits(captured) == []
       assert AlteracValley.handle_timer(captured.match, {:capture, 11, 1}, 400_000).effects == []
       assert use_node(captured.match, 11, 2, 400_000).match == captured.match
+    end
+
+    test "requires an enemy graveyard for assault quest credit", %{match: match} do
+      neutral = use_node(match, 3, 1, 0)
+      assert quest_credits(neutral) == []
+      captured = AlteracValley.handle_timer(neutral.match, {:capture, 3, 1}, 300_000)
+      assert quest_credits(captured) == []
+      attacked = use_node(captured.match, 3, 2, 301_000)
+      assert [%Effects.QuestKillCredit{guid: 2, entry: 13_756}] == quest_credits(attacked)
     end
 
     test "rejects preparation, absent players, stale banners, and unrelated objects", %{match: match} do
@@ -190,6 +201,8 @@ defmodule ThistleTea.Game.Battleground.AlteracValleyTest do
     match = Enum.reduce([1, 2], match, &AlteracValley.enter(&2, &1, destination).match)
     %{match: AlteracValley.handle_timer(match, :start, 0).match}
   end
+
+  defp quest_credits(result), do: Enum.filter(result.effects, &is_struct(&1, Effects.QuestKillCredit))
 
   defp use_node(match, node, guid, now) do
     bindings = [%{event1: node, event2: Node.event_state(match.nodes[node])}]

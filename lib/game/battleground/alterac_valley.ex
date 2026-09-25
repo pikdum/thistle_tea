@@ -226,7 +226,7 @@ defmodule ThistleTea.Game.Battleground.AlteracValley do
     match = %{match | nodes: Map.put(match.nodes, node.id, node)}
     match = credit_node(match, guid, node.kind, action)
     team = node.point.assaulting || node.point.owner
-    {match, rewards} = node_rewards(match, node, action, now)
+    {match, rewards} = node_rewards(match, node, action, guid, now)
     delay = if action == :assaulted, do: 1_000, else: 5_000
     captures = if action == :assaulted, do: [{{:capture, node.id, node.point.revision}, Node.capture_ms()}], else: []
 
@@ -253,15 +253,17 @@ defmodule ThistleTea.Game.Battleground.AlteracValley do
     end)
   end
 
-  defp node_rewards(match, %Node{kind: :tower, point: point}, :captured, now) do
-    {match, rewards} = Rewards.objective(match, point.owner, :tower, now)
-    {match, rewards ++ Rewards.quest_credit(match, point.owner, 13_778)}
+  defp node_rewards(match, %Node{kind: :tower, point: point}, :captured, _guid, now) do
+    Rewards.objective(match, point.owner, :tower, now)
   end
 
-  defp node_rewards(match, %Node{kind: :graveyard, point: point}, :captured, _now),
-    do: {match, Rewards.quest_credit(match, point.owner, 13_756)}
+  defp node_rewards(match, %Node{kind: kind, point: %{owner: owner}}, :assaulted, guid, _now)
+       when owner in [:alliance, :horde] do
+    entry = if kind == :tower, do: 13_778, else: 13_756
+    {match, [%Effects.QuestKillCredit{guid: guid, entry: entry}]}
+  end
 
-  defp node_rewards(match, _node, _action, _now), do: {match, []}
+  defp node_rewards(match, _node, _action, _guid, _now), do: {match, []}
 
   defp credit_node(match, guid, :graveyard, :assaulted),
     do: Roster.update_player(match, guid, &%{&1 | graveyards_assaulted: &1.graveyards_assaulted + 1})
