@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Creature do
     :spell_list_id,
     :template_unit_flags,
     :default_equipment,
+    :scale_override,
     :experience_multiplier,
     :extra_flags,
     :static_flags,

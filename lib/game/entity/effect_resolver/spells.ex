@@ -155,7 +155,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   end
 
   def resolve(entity, %Effects.TriggerSpell{} = effect) do
-    with %Spell{} = loaded <- SpellLoader.load(effect.spell_id),
+    with %Spell{} = loaded <- trigger_spell(entity, effect.spell_id),
          %Spell{} = spell <- loaded |> scripted_proc_spell(effect) |> apply_trigger_override(effect),
          false <- effect.extra_attack? and ExtraAttacks.spell?(spell) do
       resolve_trigger(entity, effect, spell)
@@ -174,6 +174,11 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
     [%{effect | cast_context: context, delay_ms: projectile_delay_ms(entity, effect)}]
   end
+
+  defp trigger_spell(%{internal: %{spellbook: spellbook}}, id) when is_map(spellbook),
+    do: Map.get(spellbook, id) || SpellLoader.cached(id)
+
+  defp trigger_spell(_entity, id), do: SpellLoader.cached(id)
 
   defp resolve_trigger(entity, effect, spell) do
     if foreign_owner_required?(entity, effect, spell) do

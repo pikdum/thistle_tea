@@ -22,6 +22,17 @@ defmodule ThistleTea.Game.World.System.GameEvent do
     GenServer.call(server, :get_events)
   end
 
+  def init_cache do
+    :ets.new(__MODULE__, [:named_table, :public, read_concurrency: true])
+  end
+
+  def active_events(server \\ __MODULE__) do
+    case :ets.lookup(__MODULE__, server) do
+      [{^server, events}] -> events
+      [] -> []
+    end
+  end
+
   def status(server \\ __MODULE__) do
     GenServer.call(server, :status)
   end
@@ -34,6 +45,10 @@ defmodule ThistleTea.Game.World.System.GameEvent do
     GenServer.call(server, {:set_events, events})
   end
 
+  def set_active(event, active?, server \\ __MODULE__) when is_integer(event) and is_boolean(active?) do
+    GenServer.call(server, {:set_active, event, active?})
+  end
+
   def subscribe(%{internal: %Internal{event: event}}), do: subscribe(event)
 
   def subscribe(event) when is_integer(event) do
@@ -44,12 +59,22 @@ defmodule ThistleTea.Game.World.System.GameEvent do
 
   @impl GenServer
   def init(opts) do
+    Process.flag(:trap_exit, true)
     schedule = load_schedule(opts)
     now = Keyword.get(opts, :now, &DateTime.utc_now/0)
 
     on_change = Keyword.get(opts, :on_change, &apply_events/2)
 
-    state = %{events: MapSet.new(), schedule: schedule, now: now, on_change: on_change, timer_ref: nil}
+    state = %{
+      name: Keyword.get(opts, :name, __MODULE__),
+      events: MapSet.new(),
+      schedule: schedule,
+      now: now,
+      on_change: on_change,
+      timer_ref: nil
+    }
+
+    publish_events(state)
     {:ok, sync_schedule(state)}
   end
 
@@ -64,8 +89,21 @@ defmodule ThistleTea.Game.World.System.GameEvent do
 
   @impl GenServer
   def handle_call({:set_events, new_events}, _from, %{events: old_events} = state) do
+    state = publish_events(%{state | events: new_events})
     state.on_change.(new_events, old_events)
-    {:reply, :ok, %{state | events: new_events}}
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:set_active, event, active?}, _from, state) do
+    if Enum.any?(state.schedule.entries, &(&1.id == event)) do
+      previous = state.events
+      events = if active?, do: MapSet.put(previous, event), else: MapSet.delete(previous, event)
+      state = publish_events(%{state | events: events})
+      if events != previous, do: state.on_change.(events, previous)
+      {:reply, :ok, state}
+    else
+      {:reply, {:error, :unknown_event}, state}
+    end
   end
 
   @impl GenServer
@@ -88,13 +126,20 @@ defmodule ThistleTea.Game.World.System.GameEvent do
     current_time = now.()
     scheduled_events = MapSet.new(Schedule.active_events(schedule, current_time))
 
-    if scheduled_events != state.events do
-      state.on_change.(scheduled_events, state.events)
-    end
+    previous = state.events
+    state = publish_events(%{state | events: scheduled_events})
+    if scheduled_events != previous, do: state.on_change.(scheduled_events, previous)
 
-    %{state | events: scheduled_events}
-    |> schedule_next_transition(current_time)
+    schedule_next_transition(state, current_time)
   end
+
+  defp publish_events(state) do
+    :ets.insert(__MODULE__, {state.name, Enum.sort(state.events)})
+    state
+  end
+
+  @impl GenServer
+  def terminate(_reason, state), do: :ets.delete(__MODULE__, state.name)
 
   defp schedule_next_transition(state, now) do
     case Schedule.next_transition(state.schedule, now) do
@@ -137,6 +182,12 @@ defmodule ThistleTea.Game.World.System.GameEvent do
   end
 
   defp apply_events(new_events, old_events) do
+    changed = MapSet.union(MapSet.difference(new_events, old_events), MapSet.difference(old_events, new_events))
+
+    Enum.each(changed, fn event ->
+      Phoenix.PubSub.broadcast(ThistleTea.PubSub, "creature_event:#{event}", :creature_events_changed)
+    end)
+
     notify(new_events, old_events)
     SpawnPool.refresh_all(MapSet.to_list(new_events))
   end
@@ -145,8 +196,6 @@ defmodule ThistleTea.Game.World.System.GameEvent do
     start = MapSet.difference(new_events, old_events)
     stop = MapSet.difference(old_events, new_events)
 
-    # not implemented yet
-    # but some models change depending on current event
     Enum.each(start, &notify(&1, {:event_start, &1}))
 
     # despawn

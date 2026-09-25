@@ -158,7 +158,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".debug item duration <entry> <seconds> - set an owned timed item's remaining lifetime",
       ".debug pet [loyalty|happiness <delta>] - inspect or adjust your hunter pet",
       ".debug spells - learn class trainer spells up to your level",
-      ".debug events - show active events and the next scheduled change",
+      ".debug events [start|stop <id>] - inspect or temporarily change world events",
       ".debug explore - unlock every world-map area",
       ".debug taxi - unlock every flight path",
       ".debug transport - show the attached or nearest transport",
@@ -325,13 +325,8 @@ defmodule ThistleTea.Game.Player.DevCommands do
     |> handled()
   end
 
-  def run(state, ".debug events" <> _) do
-    %{active: active, next: next} = GameEvent.status()
-
-    state
-    |> system_message("Active events: #{event_labels(active)}")
-    |> system_message(next_event_message(next))
-    |> handled()
+  def run(state, ".debug events" <> params) do
+    state |> world_events_command(String.split(params, trim: true)) |> handled()
   end
 
   def run(state, ".debug explore" <> _) do
@@ -1386,6 +1381,25 @@ defmodule ThistleTea.Game.Player.DevCommands do
   end
 
   defp debug_spell_ids(_state), do: []
+
+  defp world_events_command(state, []) do
+    %{active: active, next: next} = GameEvent.status()
+
+    state
+    |> system_message("Active events: #{event_labels(active)}")
+    |> system_message(next_event_message(next))
+  end
+
+  defp world_events_command(state, [action, id]) when action in ["start", "stop"] do
+    with {event, ""} <- Integer.parse(id),
+         :ok <- GameEvent.set_active(event, action == "start") do
+      system_message(state, "Event #{event} updated until the next scheduled event change.")
+    else
+      _ -> system_message(state, "Unknown world event.")
+    end
+  end
+
+  defp world_events_command(state, _params), do: system_message(state, "Usage: .debug events [start|stop <id>]")
 
   defp next_event_message(nil), do: "No more scheduled event changes."
 

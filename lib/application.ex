@@ -36,6 +36,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.BroadcastText, as: BroadcastTextLoader
   alias ThistleTea.Game.World.Loader.ClassSpell, as: ClassSpellLoader
   alias ThistleTea.Game.World.Loader.CreatureArchetype, as: CreatureArchetypeLoader
+  alias ThistleTea.Game.World.Loader.CreatureEvent, as: CreatureEventLoader
   alias ThistleTea.Game.World.Loader.CreatureGroup, as: CreatureGroupLoader
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
@@ -218,6 +219,8 @@ defmodule ThistleTea.Application do
     GossipLoader.init()
     CreatureTemplateLoader.init()
     CreatureArchetypeLoader.init()
+    CreatureEventLoader.init()
+    GameEventSystem.init_cache()
     FactionLoader.init()
     ExplorationLoader.init()
     GameObjectTemplateLoader.init()
@@ -372,6 +375,7 @@ defmodule ThistleTea.Application do
         PetSpellsLoader.load_all()
         TaxiLoader.load_all()
         CreatureArchetypeLoader.load_all()
+        CreatureEventLoader.load_all()
 
         OutdoorPvpSystem.configure_towers(
           Towers.new(CaptureEnvironment.templates()),

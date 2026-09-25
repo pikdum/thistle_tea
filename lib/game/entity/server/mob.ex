@@ -79,6 +79,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Totems
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.AIEnvironment
+  alias ThistleTea.Game.Entity.Server.CreatureEventEnvironment
   alias ThistleTea.Game.Entity.Server.CreaturePetOwner
   alias ThistleTea.Game.Entity.Server.GuardianOwner
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
@@ -144,6 +145,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state = Incarnation.ensure(state)
     state = sync_owner_pvp(state)
     now = Time.now()
+    state = CreatureEventEnvironment.initialize(state, now)
     blackboard = RegenBT.initialize(state, Blackboard.new(), now)
     state = BT.init(state, behavior_tree(state), blackboard)
 
@@ -157,6 +159,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> Map.put(:school_resistances, SpellResist.school_resistances(state))
       |> Map.put(:spell_threat, SpellThreat.projection(state))
       |> Map.merge(control_metadata(state))
+      |> Map.merge(Mob.visibility_metadata(state))
+      |> Map.merge(FactionLoader.metadata(state.unit.faction_template))
+      |> Map.put(:level, state.unit.level)
     )
 
     state = sync_perception_metadata(state)
@@ -166,6 +171,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
     state =
       state
+      |> EventSink.emit_pending()
       |> EventAI.with_blackboard(&EventAI.on_spawned(&1, &2, now, AIEnvironment.context(&1, now)))
       |> NavigationResolver.resolve(now)
       |> EventSink.emit_pending()
@@ -1304,6 +1310,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       :pooled -> {:noreply, state}
       :unpooled -> stop_after_event(state)
     end
+  end
+
+  def handle_info(:creature_events_changed, %Mob{} = state) do
+    previous = state
+    state = state |> CreatureEventEnvironment.reconcile(Time.now()) |> sync_behavior_tree(previous) |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Creature world-event update failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
   end
 
   def handle_info({:event_start, _event}, state) do

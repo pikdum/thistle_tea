@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEntry do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.CreatureArchetype
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Appearance
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Aura.ObjectSync
   alias ThistleTea.Game.Entity.Logic.Core
@@ -15,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEntry do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.Reactive
+  alias ThistleTea.Game.Entity.Logic.ScriptEquipment
 
   @retained_unit_fields [
     :charm,
@@ -57,6 +59,17 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEntry do
   def apply(%Mob{object: %{entry: entry}} = mob, %CreatureArchetype{entry: entry}, _now), do: mob
 
   def apply(%Mob{} = mob, %CreatureArchetype{} = template, now) when is_integer(now) do
+    template =
+      if template.creature.spell_list_id in [nil, 0],
+        do: %{template | creature: %{template.creature | spells: mob.internal.creature.spells}},
+        else: template
+
+    replace(mob, template, now)
+  end
+
+  def apply(%Mob{} = mob, _template, _now), do: mob
+
+  def replace(%Mob{} = mob, %CreatureArchetype{} = template, now) when is_integer(now) do
     previous = mob
     spawn = remember_template(mob)
     mob = remove_template_auras(mob, now)
@@ -82,6 +95,8 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEntry do
     mob
     |> apply_template_auras(now)
     |> then(&%{&1 | unit: Aura.sync_unit(&1.unit)})
+    |> ScriptEquipment.reset()
+    |> then(&Appearance.reconcile_equipment(&1, [], &1.unit.auras))
     |> preserve_resources(previous)
     |> ObjectSync.sync()
     |> sync_movement()
@@ -89,8 +104,6 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEntry do
     |> Reactive.sync_health()
     |> Core.mark_broadcast_update()
   end
-
-  def apply(%Mob{} = mob, _template, _now), do: mob
 
   def restore(%Mob{internal: %{spawn: %Spawn{original_template: %CreatureArchetype{} = template} = spawn}} = mob) do
     %{
@@ -142,8 +155,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEntry do
         addon_source: current.addon_source
     }
 
-    template = if current.addon_source == :spawn, do: %{template | addon_auras: current.addon_auras}, else: template
-    if template.spell_list_id in [nil, 0], do: %{template | spells: current.spells}, else: template
+    if current.addon_source == :spawn, do: %{template | addon_auras: current.addon_auras}, else: template
   end
 
   defp loot_config(%Loot{} = current, %Loot{} = template) do

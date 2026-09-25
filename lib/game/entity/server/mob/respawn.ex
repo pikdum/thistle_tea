@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Entity.Server.AIEnvironment
+  alias ThistleTea.Game.Entity.Server.CreatureEventEnvironment
   alias ThistleTea.Game.Entity.Server.FormationEnvironment
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
@@ -163,6 +164,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       |> EventSink.emit_pending()
       |> Incarnation.renew()
       |> Mob.respawn()
+      |> CreatureEventEnvironment.reconcile(now)
       |> at_position(position)
       |> TemporaryFaction.after_respawn()
       |> Mob.apply_addon_auras(now)

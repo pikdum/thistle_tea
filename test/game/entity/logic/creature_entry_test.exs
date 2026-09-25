@@ -227,6 +227,11 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEntryTest do
       assert Random.weighted_choice(Random.fixed(0.999), [{1, :a}, {3, :b}]) == :b
       assert Random.weighted_choice(Random.fixed(), []) == nil
     end
+
+    test "selects the final interval when the runtime float reaches one" do
+      random = %{Random.fixed() | float: fn -> 1.0 end}
+      assert Random.weighted_choice(random, [{1, :a}, {3, :b}]) == :b
+    end
   end
 
   defp creatures(_context) do

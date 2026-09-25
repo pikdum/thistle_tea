@@ -183,6 +183,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
           school_immune_mask: ct.school_immune_mask,
           damage_school: ct.damage_school,
           rank: ct.rank,
+          scale_override: ct.scale,
           civilian?: ct.civilian == 1,
           racial_leader?: ct.racial_leader == 1,
           family: ct.family,
@@ -347,7 +348,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         movement_options: nil,
         behavior_tree: nil,
         broadcast_update?: false,
-        spawn: %{spawn_state | respawn_ref: nil, respawn_pending?: false},
+        spawn: %{spawn_state | respawn_ref: nil, respawn_pending?: false, event_data: nil},
         loot: %{loot | session: nil, pockets: nil, skinned?: false, corpse_removed?: false, corpse_token: nil}
     }
 
