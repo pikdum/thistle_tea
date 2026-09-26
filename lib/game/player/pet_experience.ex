@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.Player.PetExperience do
 
   def reward_kill(
         %Character{} = character,
-        %Mob{internal: %Internal{pet: nil, creature: %Creature{} = creature}} = victim,
+        %Mob{internal: %Internal{pet: nil, creature: %Creature{}}} = victim,
         xp,
         mode
       )
@@ -27,12 +27,7 @@ defmodule ThistleTea.Game.Player.PetExperience do
       reward =
         case mode do
           :solo ->
-            {:solo, victim.unit.level,
-             [
-               experience_multiplier: creature.experience_multiplier,
-               extra_flags: creature.extra_flags,
-               elite?: Experience.elite_rank?(creature.rank)
-             ]}
+            {:solo, victim.unit.level, Experience.kill_options(victim)}
 
           {:group, max_level} ->
             {:group, xp, max_level}

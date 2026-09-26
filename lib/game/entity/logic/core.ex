@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.CorpseReclaim
   alias ThistleTea.Game.Entity.Logic.Critter
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
+  alias ThistleTea.Game.Entity.Logic.DamageOrigin
   alias ThistleTea.Game.Entity.Logic.DamageSharing
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Durability
@@ -79,6 +80,8 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     if dead?(entity) do
       entity
     else
+      entity = DamageOrigin.record(entity, entity.unit.health, entity.unit.health, source: entity.object.guid)
+
       %{entity | unit: %{entity.unit | health: 0}, internal: %{entity.internal | killed_by: entity.object.guid}}
       |> sync_health()
       |> prepare_death_state(now)
@@ -117,6 +120,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       entity = CombatLeash.on_damage(entity, now, opts)
       school = Keyword.get(opts, :school, :physical)
       {entity, damage, remaining} = mitigate_damage(entity, damage, school, now, opts)
+      entity = DamageOrigin.record(entity, health, remaining, opts)
       damage_threat = remaining * Keyword.get(opts, :threat_multiplier, 1.0)
       %{unit: unit} = entity
       duel_outcome = duel_lethal_outcome(entity, health, remaining, opts)

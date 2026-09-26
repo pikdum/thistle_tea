@@ -107,7 +107,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PocketsTest do
     test "death closes pockets without losing pending transfers or corpse loot", %{mob: mob, actor: actor} do
       {{:ok, _}, mob} = Pockets.open(mob, actor, 60)
       {{:ok, reservation}, mob} = Pockets.interact(mob, actor, {:reserve_item, 0}, self())
-      mob = %{mob | unit: %{mob.unit | health: 0}}
+
+      mob = %{
+        mob
+        | unit: %{mob.unit | health: 0},
+          internal: %{mob.internal | damage_origin: %{mob.internal.damage_origin | player: 100}}
+      }
+
       mob = Corpse.prepare(mob, actor.guid)
       assert Pockets.pending?(mob)
       assert Corpse.pending?(mob)

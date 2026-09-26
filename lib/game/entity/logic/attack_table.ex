@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.CombatWeapon
+  alias ThistleTea.Game.Entity.Logic.ControlOwner
   alias ThistleTea.Game.Entity.Logic.CreatureType
   alias ThistleTea.Game.Entity.Logic.Daze
   alias ThistleTea.Game.Entity.Logic.Disarm
@@ -65,7 +66,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     %{
       caster_level: unit.level || 1,
       spell_school_mask: Spell.school_mask(AttackSchool.melee(attacker)),
-      caster_owner_guid: caster_owner_guid(attacker),
+      caster_owner_guid: ControlOwner.guid(attacker),
       caster_player?: player?(attacker),
       caster_class: unit.class,
       dual_wield_penalty?: offhand_weapon?(attacker) and not physical_spell_active?(attacker),
@@ -100,10 +101,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
 
   defp physical_cast?(%{spell: %Spell{} = spell}), do: (Spell.school_mask(spell) &&& 1) != 0
   defp physical_cast?(_cast), do: false
-
-  defp caster_owner_guid(%{internal: %{pet: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid
-  defp caster_owner_guid(%{object: %{guid: guid}}) when is_integer(guid), do: guid
-  defp caster_owner_guid(_attacker), do: nil
 
   defp attack_damage_multipliers(attacker) do
     happiness = PetHappiness.damage_multiplier(attacker)

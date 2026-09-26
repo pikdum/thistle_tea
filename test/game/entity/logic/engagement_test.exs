@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.EngagementTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.DamageOrigin
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -174,7 +175,12 @@ defmodule ThistleTea.Game.Entity.Logic.EngagementTest do
       target = 20
       %Engagement.Result{entity: mob} = Engagement.enter(mob(), target, 1_000, selection())
       mob = Engagement.claim(mob, %Tap{player: target})
-      mob = %{mob | unit: %{mob.unit | health: 0}}
+
+      mob = %{
+        mob
+        | unit: %{mob.unit | health: 0},
+          internal: %{mob.internal | damage_origin: %DamageOrigin{player: 100}}
+      }
 
       %Engagement.Result{entity: mob, from: :engaged, to: :dead, reason: :death} = Engagement.die(mob)
 

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Honor.CreatureTest do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.DamageOrigin
   alias ThistleTea.Game.Entity.Data.Honor.Award
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EffectResolver.Honor, as: HonorResolver
@@ -107,6 +108,7 @@ defmodule ThistleTea.Game.Entity.Logic.Honor.CreatureTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         internal: %Internal{
           creature: %Creature{civilian?: true, experience_multiplier: 1.0},
+          damage_origin: %DamageOrigin{player: 100},
           loot: %Loot{tapped_by: %Tap{player: 1, group_id: 10}}
         }
       }

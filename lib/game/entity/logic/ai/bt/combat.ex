@@ -372,7 +372,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
     %{
       caster: guid,
-      caster_owner_guid: caster_owner_guid(state),
       min_damage: min_damage,
       max_damage: max_damage,
       threat_multiplier: Aura.percent_multiplier(state, :mod_threat, Spell.school_mask(AttackSchool.melee(state)))
@@ -380,10 +379,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     |> Map.merge(AttackTable.attacker_context(state, hand))
     |> Map.merge(CombatSkills.snapshot(state, hand))
   end
-
-  defp caster_owner_guid(%{internal: %{pet: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid
-  defp caster_owner_guid(%{internal: %{possession: %{caster_guid: owner_guid}}}), do: owner_guid
-  defp caster_owner_guid(%{object: %{guid: guid}}), do: guid
 
   defp queue_queued_spell_go(%{object: %{guid: guid}} = state, %{id: spell_id}, target, targets)
        when is_integer(guid) and is_integer(spell_id) and is_integer(target) and is_list(targets) do

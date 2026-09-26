@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
   alias ThistleTea.Game.Entity.Data.Component.Internal.ObjectAction
   alias ThistleTea.Game.Entity.Data.Component.Internal.Scripts
   alias ThistleTea.Game.Entity.Data.CorpseReclaim
+  alias ThistleTea.Game.Entity.Data.DamageOrigin
   alias ThistleTea.Game.Entity.Data.Honor.Damage, as: HonorDamage
   alias ThistleTea.Game.Entity.Data.PetStable
   alias ThistleTea.Game.Entity.Data.Pvp
@@ -107,6 +108,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     pet_stable: %PetStable{},
     pvp: %Pvp{},
     honor_damage: %HonorDamage{},
+    damage_origin: %DamageOrigin{},
     talent_reset: %TalentReset{},
     forgotten_skills: %{},
     rest_bonus: 0.0,

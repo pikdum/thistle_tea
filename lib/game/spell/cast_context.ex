@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.CombatSkills
   alias ThistleTea.Game.Entity.Logic.CombatWeapon
+  alias ThistleTea.Game.Entity.Logic.ControlOwner
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.PetHappiness
@@ -127,7 +128,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
     %__MODULE__{
       caster_guid: guid,
-      caster_owner_guid: caster_owner_guid(caster),
+      caster_owner_guid: ControlOwner.guid(caster),
       caster_level: level,
       caster_type: caster_type(caster),
       caster_totem?: caster_totem?(caster),
@@ -160,7 +161,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   def from_caster(%{object: %{guid: guid}} = caster, spell, target_guid) when is_integer(guid) do
     %__MODULE__{
       caster_guid: guid,
-      caster_owner_guid: caster_owner_guid(caster),
+      caster_owner_guid: ControlOwner.guid(caster),
       caster_level: 1,
       caster_type: caster_type(caster),
       caster_totem?: caster_totem?(caster),
@@ -199,9 +200,6 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defp caster_totem?(%{internal: %{totem: totem}}), do: not is_nil(totem)
   defp caster_totem?(_caster), do: false
-
-  defp caster_owner_guid(%{internal: %{pet: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid
-  defp caster_owner_guid(%{object: %{guid: guid}}) when is_integer(guid), do: guid
 
   defp caster_faction_template(%{unit: %{faction_template: faction_template}}), do: faction_template
   defp caster_faction_template(_caster), do: nil

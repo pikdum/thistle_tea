@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.DeathItemTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.DamageOrigin
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EffectResolver.DeathItem
   alias ThistleTea.Game.Entity.Logic.Aura.DeathItem, as: DeathItemLogic
@@ -123,7 +124,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.DeathItemTest do
     mob = %{
       mob
       | unit: %{mob.unit | level: 10, auras: [holder()]},
-        internal: %{mob.internal | loot: %Loot{tapped_by: %Tap{player: 7}}}
+        internal: %{mob.internal | loot: %Loot{tapped_by: %Tap{player: 7}}, damage_origin: %DamageOrigin{player: 100}}
     }
 
     [reward] = DeathItemLogic.reward_events(mob)

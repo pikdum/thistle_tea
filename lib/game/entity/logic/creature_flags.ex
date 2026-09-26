@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureFlags do
     immune_to_npc: 0x00000040,
     sessile: 0x00000100,
     uninteractible: 0x00000200,
+    corpse_raid: 0x00001000,
     no_defense: 0x00004000,
     no_spell_defense: 0x00008000,
     no_melee: 0x00100000,

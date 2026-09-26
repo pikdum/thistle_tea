@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.KillReward do
 
   alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.DamageOrigin
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.GroupReward
@@ -18,6 +19,15 @@ defmodule ThistleTea.Game.Entity.KillReward do
   alias ThistleTea.Game.World.System.Party
 
   def selection(%Mob{} = mob, source, opts \\ []) do
+    if DamageOrigin.loot_allowed?(mob) do
+      tapped_selection(mob, source, opts)
+    else
+      metadata = Keyword.get(opts, :metadata, &Metadata.query(&1, [:owner_guid]))
+      if guid = controlling_player(source, metadata), do: {:solo, guid}
+    end
+  end
+
+  defp tapped_selection(%Mob{} = mob, source, opts) do
     group_of = Keyword.get(opts, :group_of, &Party.group_of/1)
     group = Keyword.get(opts, :group, &Party.group/1)
     metadata = Keyword.get(opts, :metadata, &Metadata.query(&1, [:owner_guid]))
@@ -54,18 +64,13 @@ defmodule ThistleTea.Game.Entity.KillReward do
     metadata = Keyword.get(opts, :metadata, &Metadata.query(&1, [:level, :alive?, :ghost?]))
     position = Keyword.get(opts, :position, &World.position/1)
     tagger = original_tagger(mob)
-    creature = mob.internal.creature
 
     group.members
     |> Enum.map(& &1.guid)
     |> then(&Enum.uniq([tagger | &1]))
     |> Enum.reject(&is_nil/1)
     |> Enum.flat_map(&group_member(mob, &1, tagger, metadata, position))
-    |> GroupReward.plan(mob.unit.level,
-      experience_multiplier: creature.experience_multiplier,
-      extra_flags: creature.extra_flags,
-      elite?: Experience.elite_rank?(creature.rank)
-    )
+    |> GroupReward.plan(mob.unit.level, Experience.kill_options(mob))
   end
 
   defp original_tagger(%Mob{internal: %{loot: %{tapped_by: %Tap{player: guid}}}}), do: guid

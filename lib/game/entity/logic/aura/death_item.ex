@@ -12,6 +12,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.DeathItem do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.DamageOrigin
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Guid
@@ -58,10 +60,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.DeathItem do
       level: level,
       tap: tap(internal.loot),
       shard_target?:
-        not pet?(entity) and is_nil(internal.totem) and
+        not pet?(entity) and is_nil(internal.totem) and damage_eligible?(entity) and
           not match?(%Creature{experience_multiplier: multiplier} when multiplier == 0, internal.creature)
     }
   end
+
+  defp damage_eligible?(%Mob{} = mob), do: DamageOrigin.loot_allowed?(mob)
+  defp damage_eligible?(_entity), do: true
 
   defp pet?(%{object: %{guid: guid}}) when is_integer(guid), do: Guid.high_guid(guid) == Guid.high_guid(:pet)
   defp pet?(_entity), do: false

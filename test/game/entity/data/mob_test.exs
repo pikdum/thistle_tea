@@ -631,7 +631,8 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
 
       mob = dead_mob(mob_guid, killed_by: killer, death_finalized?: false)
       tap = %Tap{player: tagger}
-      mob = %{mob | internal: %{mob.internal | loot: %{mob.internal.loot | tapped_by: tap}}}
+      origin = %{mob.internal.damage_origin | player: 100}
+      mob = %{mob | internal: %{mob.internal | loot: %{mob.internal.loot | tapped_by: tap}, damage_origin: origin}}
 
       assert {:noreply, %Mob{}} = MobServer.handle_continue(:maybe_broadcast, mob)
       assert_receive {:"$gen_cast", {:reward_kill, %Mob{object: %Object{guid: ^mob_guid}}}}

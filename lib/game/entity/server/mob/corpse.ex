@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   alias ThistleTea.Game.Entity.Logic.AI.Script.Run, as: ScriptRun
   alias ThistleTea.Game.Entity.Logic.Aura.SingleTarget
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.DamageOrigin
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
@@ -51,15 +52,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   @corpse_decay_ms 300_000
   @corpse_decay_elite_ms 600_000
 
-  def prepare(%Mob{internal: %Internal{loot: %InternalLoot{} = internal_loot} = internal} = state, target) do
-    state = Pockets.close(state)
-    loot = generate_loot(internal_loot, quest_item_filter(state, target))
-    session = LootSession.new(loot, internal_loot.tapped_by)
-
+  def prepare(%Mob{internal: %Internal{} = internal} = state, target) do
     state =
       state
-      |> put_session(session)
-      |> setup_group_loot(target)
+      |> Pockets.close()
+      |> prepare_loot(target)
       |> maybe_set_lootable_flag()
 
     token = make_ref()
@@ -68,6 +65,19 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     state
     |> put_internal_loot(%{state.internal.loot | corpse_token: token})
     |> publish_skinning()
+  end
+
+  defp prepare_loot(%Mob{internal: %Internal{loot: %InternalLoot{} = internal_loot}} = state, target) do
+    if DamageOrigin.loot_allowed?(state) do
+      loot = generate_loot(internal_loot, quest_item_filter(state, target))
+      session = LootSession.new(loot, internal_loot.tapped_by)
+
+      state
+      |> put_session(session)
+      |> setup_group_loot(target)
+    else
+      state |> put_session(nil) |> clear_lootable_flag()
+    end
   end
 
   def skin(%Mob{} = state, %Actor{} = actor, skill, opts \\ []) do

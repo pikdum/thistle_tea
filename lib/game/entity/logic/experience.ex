@@ -3,12 +3,25 @@ defmodule ThistleTea.Game.Entity.Logic.Experience do
 
   import Bitwise, only: [&&&: 2]
 
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.DamageOrigin
+
   @no_xp_at_kill 0x00000040
   @group_reward_distance 74.0
 
   def group_reward_distance, do: @group_reward_distance
 
   def elite_rank?(rank), do: rank in [1, 2, 3]
+
+  def kill_options(%Mob{internal: %{creature: %Creature{} = creature}} = mob) do
+    [
+      experience_multiplier: creature.experience_multiplier,
+      damage_multiplier: DamageOrigin.xp_multiplier(mob),
+      extra_flags: creature.extra_flags,
+      elite?: elite_rank?(creature.rank)
+    ]
+  end
 
   def gain_xp(entity, amount, opts)
 
@@ -117,11 +130,17 @@ defmodule ThistleTea.Game.Entity.Logic.Experience do
     else
       xp = base_gain(player_level, mob_level)
       xp = if Keyword.get(opts, :elite?, false), do: xp * 2, else: xp
-      trunc(xp * experience_multiplier(Keyword.get(opts, :experience_multiplier, 1.0)))
+      xp = xp * experience_multiplier(Keyword.get(opts, :experience_multiplier, 1.0))
+      round_xp(xp * Keyword.get(opts, :damage_multiplier, 1.0))
     end
   end
 
   def kill_xp(_player_level, _mob_level, _opts), do: 0
+
+  defp round_xp(xp) do
+    whole = trunc(xp)
+    if xp - whole == 0.5, do: whole + rem(whole, 2), else: round(xp)
+  end
 
   def base_gain(player_level, mob_level) when mob_level >= player_level do
     level_diff = min(mob_level - player_level, 4)

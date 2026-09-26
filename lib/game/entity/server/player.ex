@@ -2076,16 +2076,12 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp maybe_reward_kill_reputation(state, _victim), do: state
 
-  defp kill_xp(%Character{unit: %Unit{level: player_level}} = character, %{
-         unit: %Unit{level: mob_level},
-         internal: %Internal{creature: %Creature{} = creature}
-       }) do
+  defp kill_xp(
+         %Character{unit: %Unit{level: player_level}} = character,
+         %{unit: %Unit{level: mob_level}, internal: %Internal{creature: %Creature{}}} = victim
+       ) do
     if Death.alive?(character) do
-      Experience.kill_xp(player_level, mob_level,
-        experience_multiplier: creature.experience_multiplier,
-        extra_flags: creature.extra_flags,
-        elite?: Experience.elite_rank?(creature.rank)
-      )
+      Experience.kill_xp(player_level, mob_level, Experience.kill_options(victim))
     else
       0
     end

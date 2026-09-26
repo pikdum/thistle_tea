@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.DamageOrigin
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
@@ -45,6 +46,30 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
   end
 
   describe "prepare/2" do
+    test "suppresses items and money after insufficient player damage", %{killer: killer} do
+      cache_loot_rows([grey_row()])
+      corpse = mob(killer)
+      internal = %{corpse.internal | damage_origin: %DamageOrigin{player: 35, npc: 65}}
+      internal = %{internal | loot: %{internal.loot | min_gold: 10, max_gold: 10}}
+      corpse = %{corpse | internal: internal, unit: %{corpse.unit | dynamic_flags: @dynamic_flag_lootable}}
+      prepared = Corpse.prepare(corpse, killer)
+      assert (prepared.unit.dynamic_flags &&& @dynamic_flag_lootable) == 0
+      assert prepared.internal.loot.session == nil
+      assert {{:error, :no_loot}, _} = Corpse.view(prepared, actor(killer))
+      assert {{:error, :no_loot}, _} = Corpse.take_gold(prepared, actor(killer))
+    end
+
+    test "keeps full loot above the contribution cutoff", %{killer: killer} do
+      cache_loot_rows([grey_row()])
+      corpse = mob(killer)
+      internal = %{corpse.internal | damage_origin: %DamageOrigin{player: 36, npc: 64}}
+      internal = %{internal | loot: %{internal.loot | min_gold: 10, max_gold: 10}}
+      prepared = Corpse.prepare(%{corpse | internal: internal}, killer)
+      assert {{:ok, loot}, _} = Corpse.view(prepared, actor(killer))
+      assert [%{item_id: @grey_item_id}] = loot.items
+      assert loot.gold == 10
+    end
+
     test "leaves a quest-only corpse unlootable when the killer does not need the drop", %{killer: killer} do
       cache_loot_rows([quest_row()])
       Metadata.put(killer, %{needed_quest_items: MapSet.new()})
@@ -201,6 +226,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{
         world: %WorldRef{map_id: 0},
+        damage_origin: %DamageOrigin{player: 10},
         spawn: %Spawn{},
         loot: %InternalLoot{id: @loot_id, min_gold: 0, max_gold: 0, tapped_by: %{player: killer, group_id: nil}}
       }

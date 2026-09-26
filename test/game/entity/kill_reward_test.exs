@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.KillRewardTest do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Corpse
+  alias ThistleTea.Game.Entity.Data.DamageOrigin
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.KillReward
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
@@ -19,10 +20,9 @@ defmodule ThistleTea.Game.Entity.KillRewardTest do
   setup [:reward_context]
 
   describe "selection/3" do
-    test "keeps the original group after its tagger joins another group" do
+    test "keeps the original group after its tagger joins another group", %{mob: mob} do
       old_group = %Group{id: 10, members: [%Member{guid: 2}]}
       new_group = %Group{id: 20, members: [%Member{guid: 1}]}
-      mob = %Mob{internal: %Internal{loot: %Loot{tapped_by: %Tap{player: 1, group_id: 10}}}}
       opts = [group: fn 10 -> old_group end, group_of: fn 1 -> new_group end]
       assert KillReward.selection(mob, 3, opts) == {:group, old_group}
 
@@ -30,6 +30,16 @@ defmodule ThistleTea.Game.Entity.KillRewardTest do
       assert KillReward.selection(mob, 3, opts) == {:group, new_group}
       opts = Keyword.put(opts, :group_of, fn _guid -> nil end)
       assert KillReward.selection(mob, 3, opts) == {:solo, 1}
+    end
+
+    test "insufficient contribution credits only a player killing blow", %{mob: mob} do
+      mob = %{mob | internal: %{mob.internal | damage_origin: %DamageOrigin{player: 35, npc: 65}}}
+      npc = Guid.from_low_guid(:mob, 1, 1)
+      pet = Guid.from_low_guid(:pet, 1, 1)
+      opts = [metadata: fn guid -> if guid == pet, do: %{owner_guid: 3} end]
+      assert KillReward.selection(mob, 3, opts) == {:solo, 3}
+      assert KillReward.selection(mob, pet, opts) == {:solo, 3}
+      assert KillReward.selection(mob, npc, opts) == nil
     end
 
     test "resolves pet killing blows when the creature was not tagged" do
@@ -76,6 +86,12 @@ defmodule ThistleTea.Game.Entity.KillRewardTest do
   end
 
   describe "group_rewards/3" do
+    test "reduces the base reward before sharing it", %{mob: mob, opts: opts} do
+      mob = %{mob | internal: %{mob.internal | damage_origin: %DamageOrigin{player: 50, npc: 50}}}
+      group = %Group{members: [%Member{guid: 1}, %Member{guid: 2}]}
+      assert [%Award{guid: 1, xp: 24}, %Award{guid: 2, xp: 24}] = KillReward.group_rewards(mob, group, opts)
+    end
+
     test "includes the departed tagger once without crediting their new party", %{mob: mob, opts: opts} do
       group = %Group{members: [%Member{guid: 2}]}
       assert [%Award{guid: 1, xp: 47}, %Award{guid: 2, xp: 47}] = KillReward.group_rewards(mob, group, opts)
@@ -137,6 +153,7 @@ defmodule ThistleTea.Game.Entity.KillRewardTest do
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{
         world: world,
+        damage_origin: %DamageOrigin{player: 100},
         creature: %Creature{experience_multiplier: 1.0},
         loot: %Loot{tapped_by: %Tap{player: 1, group_id: 10}}
       }

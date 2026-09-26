@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.DamageOrigin
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.PetLevel
   alias ThistleTea.Game.Entity.Data.PetProgress
@@ -36,7 +37,7 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
     test "routes solo XP to the active pet using creature reward modifiers", %{character: character, victim: victim} do
       PetExperience.reward_kill(character, victim, 295, :solo)
       assert_receive {:reward_pet_kill, 1, 60, {:solo, 50, opts}}
-      assert opts == [experience_multiplier: 1.0, extra_flags: 0, elite?: false]
+      assert opts == [experience_multiplier: 1.0, damage_multiplier: 0.5, extra_flags: 0, elite?: false]
     end
 
     test "forwards the group share without rested XP", %{character: character, victim: victim} do
@@ -142,7 +143,10 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
 
     victim = %Mob{
       unit: %Unit{level: 50},
-      internal: %Internal{creature: %Creature{experience_multiplier: 1.0, extra_flags: 0, rank: 0}}
+      internal: %Internal{
+        creature: %Creature{experience_multiplier: 1.0, extra_flags: 0, rank: 0},
+        damage_origin: %DamageOrigin{player: 50, npc: 50}
+      }
     }
 
     pet = %Mob{

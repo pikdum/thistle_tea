@@ -11,12 +11,14 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.DamageOrigin, as: DamageTotals
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.Entity.Logic.ControlMovement
+  alias ThistleTea.Game.Entity.Logic.DamageOrigin
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
@@ -146,6 +148,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
       | in_combat: false,
         running: if(blackboard.critter, do: blackboard.critter.previous_running, else: entity.internal.running),
         loot: clear_tap(entity.internal.loot, clear_tap?),
+        damage_origin: if(reason == :death, do: entity.internal.damage_origin, else: %DamageTotals{}),
         blackboard: clear_combat_memory(blackboard)
     }
 
@@ -185,7 +188,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   end
 
   def die(%Mob{} = entity) do
-    leave(entity, :death, clear_tap?: false)
+    leave(entity, :death, clear_tap?: not DamageOrigin.loot_allowed?(entity))
   end
 
   def reset(%Mob{} = entity) do
@@ -200,6 +203,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
         temporary_threat: %{},
         last_hostile_time: nil,
         loot: clear_tap(entity.internal.loot, true),
+        damage_origin: %DamageTotals{},
         blackboard: nil
     }
 
