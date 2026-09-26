@@ -29,8 +29,8 @@ Reference rules are in `refs/vmangos/src/game/Objects/Player.cpp`
 
 The feature covers breath and drowning. [Ocean fatigue](fatigue-playtest.md)
 now uses separately extracted terrain liquid flags. [Lava exposure](lava-playtest.md)
-uses terrain and WMO liquid metadata. Naxxramas slime's special spell remains
-separate work; ordinary slime has no generic damage pulse in the reference.
+uses terrain and WMO liquid metadata. [Liquid spells](liquid-spells-playtest.md)
+handle Naxxramas slime; ordinary slime has no generic damage pulse in the reference.
 
 ## Follow-up fixes
 

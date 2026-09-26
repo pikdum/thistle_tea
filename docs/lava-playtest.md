@@ -19,8 +19,8 @@ allowlist entries were added.
 Reference: VMangos `8f4e608450460efe1e38743e4da74397d4773a3a`, `Player.cpp`
 (`UpdateMirrorTimers`, environmental flags, expiration pulses), `MirrorTimer.cpp`,
 `World.cpp`, and the vmap extractor's `wmo.cpp`. Ordinary slime has no generic
-damage pulse there. Naxxramas liquid entry 21 is retained in metadata, but its
-special spell 28801 is separate work.
+damage pulse there. Naxxramas liquid entry 21 applies spell 28801 through the
+separate [liquid-spell lifecycle](liquid-spells-playtest.md).
 
 ## Liquid data
 

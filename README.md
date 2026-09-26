@@ -49,7 +49,11 @@ iex -S mix
 More documentation, like platform-specific setup guides, can be found in the [Wiki](https://github.com/pikdum/thistle_tea/wiki).
 
 Existing navigation bakes need [WMO metadata](docs/terrain-interiors.md)
-for indoor and outdoor queries and WMO lava. New bakes include it automatically.
+for indoor and outdoor queries, WMO lava, and spell-bearing liquids. New bakes include it automatically.
+
+Naxxramas uses the client map name `Stratholme Raid`. It is included in new
+`.#maps` bakes; existing installations need to generate that map before testing
+[liquid spells](docs/liquid-spells-playtest.md).
 
 Ocean fatigue and outdoor lava also need terrain liquid data. New map bakes include it; existing
 bakes can add it without rebuilding navigation:
@@ -198,6 +202,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Creature-specific flat damage](docs/creature-damage-playtest.md), including Beastslayer and Elemental Slayer enchants across weapon attacks, spells, and periodic damage
 - quests
 - [Quest dependencies](docs/quest-dependencies-playtest.md), with signed and alternative prerequisites, exclusive groups, chains, breadcrumbs, profession requirements, and live NPC marker refreshes
+- [Quest reward spells](docs/liquid-spells-playtest.md), with caster selection, hidden automatic quest rewards, and native Naxxramas attunement
 - [Quest sharing](docs/quest-sharing-playtest.md), with party confirmations, eligibility feedback, inherited timers, source-item lifecycle, and stale-offer cleanup
 - [Item-started quests](docs/item-quests-playtest.md), with owned starter validation, atomic item exchanges, retained objectives, full-bag rejection, and party confirmation
 - [Game-object questgivers](docs/game-object-quests-playtest.md), with per-player activation, native quest chains, conditioned gossip, and scripted player casts
@@ -221,6 +226,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - underwater breath timers, drowning, water-breathing effects, and extended breath reserves
 - [ocean fatigue, coastal recovery, exhaustion damage, transport protection, and graveyard rescue for ghosts](docs/fatigue-playtest.md)
 - [Lava exposure](docs/lava-playtest.md), with outdoor and WMO liquids, contact grace, fire resistance, shield depletion, and death cleanup
+- [Liquid spells](docs/liquid-spells-playtest.md), with Naxxramas slime, periodic nature damage, stat penalties, exit recovery, and reconnect restoration
 - swimming speed bonuses and snare updates, synchronized with the player and nearby observers
 - gossip + trainers
 - [Innkeeper home binding](docs/home-binding-playtest.md), with confirmation, retained home locations, Hearthstones, Astral Recall, and replacement Hearthstones
