@@ -1,13 +1,16 @@
 defmodule ThistleTea.Game.Entity.Logic.WeaponDamage do
   @moduledoc """
-  Weapon-dependent damage inputs and aura multipliers shared by displayed
-  ranged damage and attack snapshots.
+  Weapon-dependent aura bonuses for displayed damage and attack snapshots.
+  Player ranges include physical flat bonuses when canonical weapon damage
+  is available. Creatures resolve these bonuses with their attack school.
   """
   import Bitwise, only: [&&&: 2, <<<: 2]
 
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.AttackPower
+  alias ThistleTea.Game.Entity.Logic.CombatWeapon
   alias ThistleTea.Game.Spell
 
   def wand?(%{subclass: 19}), do: true
@@ -54,6 +57,22 @@ defmodule ThistleTea.Game.Entity.Logic.WeaponDamage do
   end
 
   def flat_bonus(_entity, _school, _weapon), do: 0
+
+  def projected_flat_bonus(%Unit{} = unit, hand) do
+    {minimum, maximum} = base_range(unit, hand)
+    weapon = CombatWeapon.usable(%{unit: unit}, hand)
+
+    if is_number(minimum) and is_number(maximum) and maximum > 0 and not AttackPower.creature?(unit) and
+         not wand?(weapon) do
+      flat_bonus(%{unit: unit}, :physical, weapon)
+    else
+      0
+    end
+  end
+
+  defp base_range(unit, :mainhand), do: {unit.base_min_damage, unit.base_max_damage}
+  defp base_range(unit, :offhand), do: {unit.base_offhand_min_damage, unit.base_offhand_max_damage}
+  defp base_range(unit, :ranged), do: {unit.base_ranged_min_damage, unit.base_ranged_max_damage}
 
   defp applies?(%Spell{equipped_item_class: class}, _weapon) when class in [-1, nil], do: true
   defp applies?(%Spell{} = spell, weapon), do: fits?(weapon, spell)

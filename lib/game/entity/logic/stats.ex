@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     |> derive_max_energy()
     |> derive_attack_power()
     |> derive_weapon_damage()
+    |> derive_flat_weapon_damage()
     |> derive_happiness_damage()
     |> AttackSpeed.recompute()
     |> CastSpeed.recompute()
@@ -51,6 +52,29 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   end
 
   defp derive_happiness_damage(%Unit{} = unit), do: unit
+
+  defp derive_flat_weapon_damage(%Unit{} = unit) do
+    Enum.reduce(
+      [
+        {:mainhand, :min_damage, :max_damage},
+        {:offhand, :min_offhand_damage, :max_offhand_damage},
+        {:ranged, :min_ranged_damage, :max_ranged_damage}
+      ],
+      unit,
+      fn {hand, min_field, max_field}, current ->
+        bonus = WeaponDamage.projected_flat_bonus(current, hand)
+
+        if bonus == 0 do
+          current
+        else
+          struct!(current, [
+            {min_field, max(Map.fetch!(current, min_field) + bonus, 0)},
+            {max_field, max(Map.fetch!(current, max_field) + bonus, 0)}
+          ])
+        end
+      end
+    )
+  end
 
   def stamina_health_bonus(stamina) when stamina < 20, do: stamina
   def stamina_health_bonus(stamina), do: 20 + (stamina - 20) * 10

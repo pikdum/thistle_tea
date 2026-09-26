@@ -114,7 +114,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   defp outgoing_damage_range(entity, {min_damage, max_damage}, hand) do
     weapon = CombatWeapon.usable(entity, hand)
     school = AttackSchool.melee(entity)
-    flat = WeaponDamage.flat_bonus(entity, school, weapon)
+    flat = WeaponDamage.flat_bonus(entity, school, weapon) - WeaponDamage.projected_flat_bonus(entity.unit, hand)
     happiness = PetHappiness.damage_multiplier(entity)
     flat = if happiness == 1.0, do: flat, else: flat * happiness
 

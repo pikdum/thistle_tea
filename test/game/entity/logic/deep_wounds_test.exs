@@ -40,7 +40,9 @@ defmodule ThistleTea.Game.Entity.Logic.DeepWoundsTest do
         ]
       }
 
-      warrior = %{warrior | unit: %{warrior.unit | auras: [holder]}}
+      warrior = %{warrior | unit: Stats.recompute(%{warrior.unit | auras: [holder]})}
+      assert warrior.unit.min_damage == 110
+      assert warrior.unit.max_damage == 150
       assert Warrior.deep_wounds_tick(warrior, spell(12_868), 0) == 23
     end
 

@@ -10,11 +10,13 @@ defmodule ThistleTea.Game.Entity.Logic.DepletingAuraTest do
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Aura.Change
+  alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
+  alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -37,6 +39,14 @@ defmodule ThistleTea.Game.Entity.Logic.DepletingAuraTest do
 
       strength = cast(character, 24_661, 0)
       assert WeaponDamage.flat_bonus(strength, :physical, nil) == 40
+      assert strength.unit.min_damage == 140
+      assert strength.unit.min_offhand_damage == 80
+      assert strength.unit.min_ranged_damage == 120
+      assert Combat.damage_range(strength) == {140, 190}
+      assert Combat.offhand_damage_range(strength) == {40, 45}
+      assert Stats.recompute(strength.unit) == strength.unit
+      snapshot = CastContext.from_caster(strength, attack_spell(2), 2)
+      assert snapshot.weapon_base_min == 100
       armor = cast(character, 24_574, 0)
       assert armor.unit.normal_resistance == 2_100
       assert Skills.defense_value(armor) == 330
@@ -47,6 +57,22 @@ defmodule ThistleTea.Game.Entity.Logic.DepletingAuraTest do
       assert shield.unit.normal_resistance == 100
     end
 
+    test "physical bonuses do not create damage ranges for empty weapon slots", %{character: character} do
+      unit = %{
+        character.unit
+        | base_offhand_min_damage: 0,
+          base_offhand_max_damage: 0,
+          base_ranged_min_damage: 0,
+          base_ranged_max_damage: 0
+      }
+
+      buffed = cast(%{character | unit: unit}, 24_661, 0)
+      assert buffed.unit.min_offhand_damage == 0
+      assert buffed.unit.max_offhand_damage == 0
+      assert buffed.unit.min_ranged_damage == 0
+      assert Combat.offhand_damage_range(buffed) == nil
+    end
+
     test "Restless Strength spends once for each landed melee or ranged attack", %{character: character} do
       buffed = cast(character, 24_661, 0)
 
@@ -55,6 +81,8 @@ defmodule ThistleTea.Game.Entity.Logic.DepletingAuraTest do
         spent = AttackFeedback.receive(buffed, payload, nil, 1_000)
         assert holder(spent, 24_662).stacks == 19
         assert WeaponDamage.flat_bonus(spent, :physical, nil) == 38
+        assert spent.unit.min_damage == 138
+        assert Combat.damage_range(spent) == {138, 188}
       end
 
       for {spell, type} <- [
@@ -174,6 +202,7 @@ defmodule ThistleTea.Game.Entity.Logic.DepletingAuraTest do
           assert removed.unit.auras == []
           assert Skills.defense_value(removed) == 300
           assert removed.unit.normal_resistance == 100
+          assert removed.unit.min_damage == 100
         end
 
         deadline = buff(parent).duration_ms
@@ -231,6 +260,12 @@ defmodule ThistleTea.Game.Entity.Logic.DepletingAuraTest do
           max_health: 100,
           level: 60,
           class: 8,
+          base_min_damage: 100,
+          base_max_damage: 150,
+          base_offhand_min_damage: 40,
+          base_offhand_max_damage: 50,
+          base_ranged_min_damage: 80,
+          base_ranged_max_damage: 100,
           auras: [],
           normal_resistance: 100,
           base_normal_resistance: 100,
