@@ -134,6 +134,7 @@ defmodule ThistleTea.Game.World.Loader.FlareDbcTest do
       alive?: true,
       unit_flags: 0,
       level: 1,
+      no_spell_defense?: true,
       faction_template: %FactionTemplate{id: 17, faction_group: 8, enemy_group: 1}
     })
 
