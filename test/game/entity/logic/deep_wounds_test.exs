@@ -19,16 +19,16 @@ defmodule ThistleTea.Game.Entity.Logic.DeepWoundsTest do
 
   setup [:warrior]
 
-  describe "deep_wounds_tick/2" do
+  describe "deep_wounds_tick/4" do
     test "scales all ranks from average damage including attack power", %{warrior: warrior} do
       assert warrior.unit.min_damage == 100
       assert warrior.unit.max_damage == 140
 
       for {id, expected} <- [{12_162, 6}, {12_850, 12}, {12_868, 18}] do
-        assert Warrior.deep_wounds_tick(warrior, spell(id)) == expected
+        assert Warrior.deep_wounds_tick(warrior, spell(id), 0) == expected
       end
 
-      assert Warrior.deep_wounds_tick(warrior, spell(1)) == nil
+      assert Warrior.deep_wounds_tick(warrior, spell(1), 0) == nil
     end
 
     test "includes applicable flat and percentage weapon bonuses", %{warrior: warrior} do
@@ -41,17 +41,17 @@ defmodule ThistleTea.Game.Entity.Logic.DeepWoundsTest do
       }
 
       warrior = %{warrior | unit: %{warrior.unit | auras: [holder]}}
-      assert Warrior.deep_wounds_tick(warrior, spell(12_868)) == 23
+      assert Warrior.deep_wounds_tick(warrior, spell(12_868), 0) == 23
     end
 
     test "uses an earlier offhand swing with its normal damage penalty", %{warrior: warrior} do
       blackboard = %Blackboard{}
       blackboard = %{blackboard | combat: %{blackboard.combat | next_attack_at: 4_000, next_offhand_attack_at: 3_000}}
       warrior = %{warrior | internal: %{warrior.internal | blackboard: blackboard}}
-      assert Warrior.deep_wounds_tick(warrior, spell(12_868)) == 3
+      assert Warrior.deep_wounds_tick(warrior, spell(12_868), 0) == 3
 
       broken = %{warrior | player: %{warrior.player | broken_equipment: [:offhand]}}
-      assert Warrior.deep_wounds_tick(broken, spell(12_868)) == 18
+      assert Warrior.deep_wounds_tick(broken, spell(12_868), 0) == 18
     end
 
     test "uses mainhand when timers are tied or it is due first", %{warrior: warrior} do
@@ -64,7 +64,36 @@ defmodule ThistleTea.Game.Entity.Logic.DeepWoundsTest do
         }
 
         warrior = %{warrior | internal: %{warrior.internal | blackboard: blackboard}}
-        assert Warrior.deep_wounds_tick(warrior, spell(12_868)) == 18
+        assert Warrior.deep_wounds_tick(warrior, spell(12_868), 0) == 18
+      end
+    end
+
+    test "honors the triggering hand after its swing timer resets", %{warrior: warrior} do
+      blackboard = %Blackboard{}
+
+      for {main_at, offhand_at} <- [{-8_000, -9_000}, {-9_000, -8_000}] do
+        blackboard = %{
+          blackboard
+          | combat: %{blackboard.combat | next_attack_at: main_at, next_offhand_attack_at: offhand_at}
+        }
+
+        warrior = %{warrior | internal: %{warrior.internal | blackboard: blackboard}}
+        assert Warrior.deep_wounds_tick(warrior, spell(12_868), -10_000, :mainhand) == 18
+        assert Warrior.deep_wounds_tick(warrior, spell(12_868), -10_000, :offhand) == 3
+      end
+    end
+
+    test "compares remaining durations with unset or expired timers", %{warrior: warrior} do
+      for {main_at, offhand_at, expected} <- [{-8_000, 0, 3}, {0, -8_000, 18}, {-11_000, -12_000, 18}] do
+        blackboard = %Blackboard{}
+
+        blackboard = %{
+          blackboard
+          | combat: %{blackboard.combat | next_attack_at: main_at, next_offhand_attack_at: offhand_at}
+        }
+
+        warrior = %{warrior | internal: %{warrior.internal | blackboard: blackboard}}
+        assert Warrior.deep_wounds_tick(warrior, spell(12_868), -10_000) == expected
       end
     end
   end
@@ -72,9 +101,9 @@ defmodule ThistleTea.Game.Entity.Logic.DeepWoundsTest do
   describe "apply/5" do
     test "dispatches the snapshotted bleed through the source owner", %{warrior: warrior} do
       spell = spell(12_868)
-      context = CastContext.from_caster(warrior, spell, 2)
+      context = snapshot(warrior, spell, 2)
       changed = %{warrior | unit: %{warrior.unit | attack_power: 1_400} |> Stats.recompute()}
-      assert Warrior.deep_wounds_tick(changed, spell) > context.deep_wounds_tick
+      assert Warrior.deep_wounds_tick(changed, spell, 0) > context.deep_wounds_tick
       target = %{warrior | object: %Object{guid: 2}}
 
       assert {^target,
@@ -95,13 +124,17 @@ defmodule ThistleTea.Game.Entity.Logic.DeepWoundsTest do
     test "rejects missing snapshots and dead recipients", %{warrior: warrior} do
       spell = spell(12_868)
       dead = %{warrior | unit: %{warrior.unit | health: 0}}
-      context = CastContext.from_caster(warrior, spell, 1)
+      context = snapshot(warrior, spell, 1)
       assert {^dead, []} = Script.apply(dead, context, spell, hd(spell.effects), 0)
       assert {^warrior, []} = Script.apply(warrior, %CastContext{}, spell, hd(spell.effects), 0)
     end
   end
 
-  defp spell(id), do: %Spell{id: id, effects: [%Effect{index: 0, type: :dummy, implicit_target_a: :single_enemy}]}
+  defp spell(id), do: %Spell{id: id, effects: [%Effect{index: 0, type: :dummy, implicit_target_a: :target_enemy}]}
+
+  defp snapshot(caster, spell, target) do
+    %{CastContext.from_caster(caster, spell, target) | deep_wounds_tick: Warrior.deep_wounds_tick(caster, spell, 0)}
+  end
 
   defp warrior(_context) do
     weapon = %{class: 2, subclass: 7, inventory_type: 13}

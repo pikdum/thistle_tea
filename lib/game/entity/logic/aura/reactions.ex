@@ -348,7 +348,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
           :unhandled -> generic_outgoing_melee_reaction(holder, owner_guid, victim_guid, context)
         end
 
-      {holder, Enum.map(events, &extra_attack_origin(&1, context))}
+      {holder, Enum.map(events, &melee_proc_origin(&1, context))}
     else
       {holder, []}
     end
@@ -361,10 +361,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   defp weapon_allowed?(%Spell{} = spell, %{weapon: weapon}), do: WeaponDamage.fits?(weapon, spell)
   defp weapon_allowed?(_spell, _context), do: true
 
-  defp extra_attack_origin(%Effects.TriggerSpell{} = effect, context),
-    do: %{effect | extra_attack?: Map.get(context, :extra_attack?, false)}
+  defp melee_proc_origin(%Effects.TriggerSpell{} = effect, context),
+    do: %{effect | extra_attack?: Map.get(context, :extra_attack?, false), attack_hand: Map.get(context, :attack_hand)}
 
-  defp extra_attack_origin(effect, _context), do: effect
+  defp melee_proc_origin(effect, _context), do: effect
 
   defp generic_outgoing_melee_reaction(
          %Holder{} = holder,

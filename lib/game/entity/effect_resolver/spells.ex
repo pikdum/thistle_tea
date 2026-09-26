@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.Logic.StealthDetection
+  alias ThistleTea.Game.Entity.Logic.Warrior
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -190,6 +191,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
       requires_living_target?: effect.requires_living_target?,
       extra_attack?: effect.extra_attack?,
       triggered_by_spell_id: effect.triggering_spell_id,
+      attack_hand: effect.attack_hand,
       hit_context: effect.hit_context
     )
   end
@@ -416,6 +418,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
     %{
       CastContext.from_caster(entity, spell, effect.target_guid)
       | target_hostile?: Spell.requires_hostile_target?(spell),
+        deep_wounds_tick: Warrior.deep_wounds_tick(entity, spell, Time.now(), effect.attack_hand),
         triggered?: true,
         cast_item_guid: effect.cast_item_guid,
         extra_attack?: effect.extra_attack?,

@@ -74,6 +74,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
        target_role: nil,
        extra_attack?: false,
        triggering_spell_id: nil,
+       attack_hand: nil,
        slot: nil,
        amount: nil,
        effect_base_points: %{},

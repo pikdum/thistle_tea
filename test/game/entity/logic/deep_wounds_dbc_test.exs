@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.DeepWoundsDbcTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EffectResolver.Spells
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
@@ -73,7 +74,39 @@ defmodule ThistleTea.Game.Entity.Logic.DeepWoundsDbcTest do
       caster = with_talent(caster, 12_867)
       spell = SpellLoader.load(11_567)
       assert trigger(caster, target, :normal, spell) == nil
-      assert %Effects.TriggerSpell{spell_id: 12_868} = trigger(caster, target, :crit, spell)
+      assert %Effects.TriggerSpell{spell_id: 12_868, attack_hand: :mainhand} = trigger(caster, target, :crit, spell)
+    end
+
+    test "delayed swing feedback retains the hand that dealt the critical hit", %{caster: caster, target: target} do
+      caster = with_talent(caster, 12_867)
+      blackboard = %Blackboard{}
+      now = System.monotonic_time(:millisecond)
+
+      blackboard = %{
+        blackboard
+        | combat: %{blackboard.combat | next_attack_at: now + 2_000, next_offhand_attack_at: now + 200}
+      }
+
+      caster = %{
+        caster
+        | unit: %{
+            caster.unit
+            | offhand_weapon: caster.unit.mainhand_weapon,
+              min_offhand_damage: 20.0,
+              max_offhand_damage: 40.0
+          },
+          internal: %{caster.internal | blackboard: blackboard}
+      }
+
+      for {hand, amount} <- [{:mainhand, 18}, {:offhand, 2}] do
+        trigger = trigger(caster, target, :crit, nil, hand)
+        assert trigger.attack_hand == hand
+        routed = %{trigger | resolve_targets?: true}
+        assert [%Effects.TriggerSpellRequest{opts: opts}] = Spells.resolve(target, routed)
+        assert opts[:attack_hand] == hand
+        dummy = deliver(caster, trigger)
+        assert dummy.cast_context.deep_wounds_tick == amount
+      end
     end
 
     test "refresh replaces the old bleed and death clears its remaining ticks", %{caster: caster, target: target} do
@@ -114,8 +147,8 @@ defmodule ThistleTea.Game.Entity.Logic.DeepWoundsDbcTest do
     caster
   end
 
-  defp trigger(caster, target, outcome, spell \\ nil) do
-    payload = %{victim_guid: target.object.guid, outcome: outcome, damage: 100}
+  defp trigger(caster, target, outcome, spell \\ nil, hand \\ :mainhand) do
+    payload = %{victim_guid: target.object.guid, outcome: outcome, damage: 100, hand: hand}
     caster = AttackFeedback.receive(caster, payload, spell, 0)
     {_, events} = Effects.drain(caster)
     Enum.find(events, &is_struct(&1, Effects.TriggerSpell))

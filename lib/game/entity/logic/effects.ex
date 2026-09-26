@@ -566,6 +566,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
       cast_item_guid: Keyword.get(opts, :cast_item_guid),
       extra_attack?: Keyword.get(opts, :extra_attack?, false),
       triggering_spell_id: Keyword.get(opts, :triggered_by_spell_id),
+      attack_hand: Keyword.get(opts, :attack_hand),
       slot: Keyword.get(opts, :effect_index),
       amount: Keyword.get(opts, :base_points),
       effect_base_points: Keyword.get(opts, :effect_base_points, %{}),

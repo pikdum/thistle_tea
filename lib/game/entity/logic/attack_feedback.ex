@@ -116,6 +116,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
         damage: Map.get(payload, :damage, 0),
         proc_damage: Map.get(payload, :proc_damage, Map.get(payload, :damage, 0)),
         attack_time_ms: attack_time_ms(entity, hand),
+        attack_hand: proc_attack_hand(spell, hand),
         weapon: CombatWeapon.usable(entity, hand),
         extra_attack?: Map.get(payload, :extra_attack?, false),
         now: now
@@ -125,6 +126,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   end
 
   defp trigger_melee_procs(entity, _payload, _spell, _now), do: entity
+
+  defp proc_attack_hand(nil, hand), do: hand
+  defp proc_attack_hand(%Spell{} = spell, hand), do: if(Spell.attribute?(spell, :on_next_swing), do: hand)
 
   defp attack_time_ms(entity, :offhand), do: AttackSpeed.base_ms(entity.unit, :offhand)
   defp attack_time_ms(entity, _hand), do: AttackSpeed.base_ms(entity.unit, :mainhand)

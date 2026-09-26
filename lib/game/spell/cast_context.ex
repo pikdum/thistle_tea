@@ -26,7 +26,6 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
   alias ThistleTea.Game.Entity.Logic.TargetDamage
   alias ThistleTea.Game.Entity.Logic.TargetSpellPower
-  alias ThistleTea.Game.Entity.Logic.Warrior
   alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Critical
@@ -142,7 +141,6 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_orientation: caster_orientation(caster),
       target_guid: target_guid,
       target_triggers: TargetTrigger.snapshot(caster, spell),
-      deep_wounds_tick: Warrior.deep_wounds_tick(caster, spell),
       spell: spell,
       healing_bonus: healing_bonus(caster, spell),
       resistance_penetration: ResistancePenetration.snapshot(caster),
@@ -177,7 +175,6 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_orientation: caster_orientation(caster),
       target_guid: target_guid,
       target_triggers: TargetTrigger.snapshot(caster, spell),
-      deep_wounds_tick: Warrior.deep_wounds_tick(caster, spell),
       spell: spell,
       conditional_crit_modifiers: Critical.snapshot(caster, spell),
       reflect_chance_bonus: Mage.ward_reflect_chance(caster, spell),
