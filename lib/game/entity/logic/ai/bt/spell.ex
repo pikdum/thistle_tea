@@ -20,11 +20,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   def casting?(%{internal: %Internal{casting: %Cast{}}}, _blackboard), do: true
   def casting?(_entity, _blackboard), do: false
 
-  def cast_tick(entity, %Blackboard{} = blackboard, now) when is_integer(now) do
+  def cast_tick(%{internal: %Internal{} = internal} = entity, %Blackboard{} = blackboard, now) when is_integer(now) do
+    entity = %{entity | internal: %{internal | blackboard: blackboard}}
+
     case Casting.advance(entity, now) do
-      {:waiting, entity, delay_ms} -> {{:running, delay_ms}, entity, blackboard}
-      {:finished, entity} -> {:success, entity, blackboard}
-      {:idle, entity} -> {:failure, entity, blackboard}
+      {:waiting, entity, delay_ms} -> {{:running, delay_ms}, entity, entity.internal.blackboard}
+      {:finished, entity} -> {:success, entity, entity.internal.blackboard}
+      {:idle, entity} -> {:failure, entity, entity.internal.blackboard}
     end
   end
 

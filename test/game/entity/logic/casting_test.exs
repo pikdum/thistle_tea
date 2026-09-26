@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
@@ -257,6 +258,32 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   end
 
   describe "cast_tick/3" do
+    test "retains cast completion changes and memory from preceding behavior nodes" do
+      spell = %Spell{id: 118, aura_interrupt_flags: 2, attributes: MapSet.new([:cancels_auto_attack_combat])}
+      resolution = %{channel_resolution() | hits: [9]}
+      casting = %{Cast.new(spell, Target.unit(9), 1_000) | phase: :finish, resolution: resolution}
+
+      blackboard =
+        Blackboard.new()
+        |> Blackboard.enable_auto_attack(%TargetRef{guid: 9})
+        |> Blackboard.put_next_at(:next_attack_at, 2_000, 1_000)
+        |> Blackboard.put_next_at(:next_chase_at, 500, 1_000)
+
+      entity = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, target: 9},
+        internal: %Internal{casting: casting, blackboard: Blackboard.new()}
+      }
+
+      assert {:success, finished, memory} = SpellBT.cast_tick(entity, blackboard, 1_000)
+      refute memory.combat.auto_attacking
+      assert memory.combat.next_attack_at == 3_000
+      assert memory.navigation.next_chase_at == 1_500
+      assert finished.internal.blackboard == memory
+      assert finished.internal.casting == nil
+      assert Enum.any?(finished.internal.events, &match?(%Effects.AttackStop{target_guid: 9}, &1))
+    end
+
     test "upkeep expiry preserves the channel's completion tick" do
       for now <- [21_000, 21_050] do
         mob = channel_aura_fixture(21_000)
