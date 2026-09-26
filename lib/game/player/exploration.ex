@@ -5,8 +5,8 @@ defmodule ThistleTea.Game.Player.Exploration do
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Exploration, as: ExplorationLogic
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
@@ -39,7 +39,6 @@ defmodule ThistleTea.Game.Player.Exploration do
         %{
           ready: true,
           character: %Character{
-            unit: %Unit{health: health},
             internal: %{world: world},
             movement_block: %MovementBlock{position: {x, y, z, _orientation}}
           }
@@ -50,7 +49,7 @@ defmodule ThistleTea.Game.Player.Exploration do
         state = Weather.refresh(state, zone_id)
         state = OutdoorPvp.update_zone(state, zone_id)
         state = Pvp.update_territory(state, zone_id, area_id)
-        if health > 0, do: discover_area(state, area_id), else: state
+        discover_area(state, area_id)
 
       _unknown ->
         zone = Rest.default_zone(world.map_id)
@@ -65,7 +64,8 @@ defmodule ThistleTea.Game.Player.Exploration do
   def check_current(state), do: state
 
   def discover_area(%{character: %Character{} = character} = state, area_id) do
-    with %AreaTable{area_bit: area_bit, exploration_level: area_level} <- ExplorationLoader.area(area_id),
+    with true <- Death.alive?(character),
+         %AreaTable{area_bit: area_bit, exploration_level: area_level} <- ExplorationLoader.area(area_id),
          {:ok, character} <- ExplorationLogic.discover(character, area_bit) do
       xp = ExplorationLogic.experience(character.unit.level, area_level, @max_level, &ExplorationLoader.base_xp/1)
       {character, level_ups} = if xp > 0, do: Stats.gain_xp(character, xp), else: {character, []}

@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Player.ExplorationTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Exploration, as: ExplorationLogic
   alias ThistleTea.Game.Network.Message.SmsgExplorationExperience
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Exploration
@@ -44,12 +45,32 @@ defmodule ThistleTea.Game.Player.ExplorationTest do
       assert Exploration.discover_area(state, 9) == state
       refute_receive {:"$gen_cast", _message}
     end
+
+    test "preserves discovery for a living return after death or spirit release" do
+      area_id = 900_000
+      :ets.insert(ExplorationLoader, {{:area, area_id}, %AreaTable{id: area_id, area_bit: 126, exploration_level: 0}})
+      on_exit(fn -> :ets.delete(ExplorationLoader, {:area, area_id}) end)
+      alive = character()
+      dead = %{alive | unit: %{alive.unit | health: 0}}
+      ghost = %{alive | unit: %{alive.unit | health: 1}, player: %{alive.player | flags: 0x10}}
+
+      for character <- [dead, ghost] do
+        state = %{guid: @character_id, character: character}
+        assert Exploration.discover_area(state, area_id) == state
+        refute ExplorationLogic.explored?(state.character, 126)
+        refute_received {:"$gen_cast", _packet}
+      end
+
+      state = Exploration.discover_area(%{guid: @character_id, character: alive}, area_id)
+      assert ExplorationLogic.explored?(state.character, 126)
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgExplorationExperience{area_id: ^area_id}}}
+    end
   end
 
   defp character do
     %Character{
       id: @character_id,
-      unit: %Unit{level: 1},
+      unit: %Unit{level: 1, health: 100},
       player: %Player{},
       internal: %Internal{}
     }
