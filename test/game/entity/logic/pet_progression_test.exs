@@ -109,7 +109,8 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgressionTest do
       assert PetProgression.reward(pet, {:solo, 12, [elite?: true]}) == 204
       assert PetProgression.reward(pet, {:solo, 1, []}) == 0
       assert PetProgression.reward(pet, {:solo, 8, [extra_flags: 0x40]}) == 0
-      assert PetProgression.reward(pet, {:group, 17}) == 17
+      assert PetProgression.reward(pet, {:group, 17, pet.unit.level}) == 17
+      assert PetProgression.reward(pet, {:group, 17, pet.unit.level - 1}) == 0
     end
   end
 

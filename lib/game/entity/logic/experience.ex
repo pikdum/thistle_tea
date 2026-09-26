@@ -63,11 +63,15 @@ defmodule ThistleTea.Game.Entity.Logic.Experience do
   def group_rate(count) when is_integer(count) and count > 5, do: max(1.0 - count * 0.05, 0.01)
   def group_rate(_count), do: 1.0
 
-  def group_shares(members, mob_level, opts \\ [])
+  def group_shares(members, mob_level, opts \\ []) do
+    Enum.map(group_rewards(members, mob_level, opts), &{&1.guid, &1.xp})
+  end
 
-  def group_shares([], _mob_level, _opts), do: []
+  def group_rewards(members, mob_level, opts \\ [])
 
-  def group_shares(members, mob_level, opts) do
+  def group_rewards([], _mob_level, _opts), do: []
+
+  def group_rewards(members, mob_level, opts) do
     levels = Enum.map(members, & &1.level)
     sum_level = Enum.sum(levels)
     max_level = Enum.max(levels)
@@ -81,12 +85,19 @@ defmodule ThistleTea.Game.Entity.Logic.Experience do
     rate = group_rate(length(members))
 
     Enum.map(members, fn %{guid: guid, level: level} ->
-      {guid, member_share(base, rate, level, sum_level, max_level, not_gray_max_level)}
+      share = member_share(base, rate, level, sum_level, max_level, not_gray_max_level)
+
+      %{
+        guid: guid,
+        xp: if(is_integer(not_gray_max_level) and level <= not_gray_max_level, do: share, else: 0),
+        pet_xp: share,
+        pet_max_level: not_gray_max_level
+      }
     end)
   end
 
   defp member_share(base, rate, level, sum_level, max_level, not_gray_max_level)
-       when is_integer(not_gray_max_level) and base > 0 and level <= not_gray_max_level do
+       when is_integer(not_gray_max_level) and base > 0 do
     share = base * rate * level / sum_level
 
     if max_level == not_gray_max_level do

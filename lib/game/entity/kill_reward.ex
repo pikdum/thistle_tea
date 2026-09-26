@@ -4,9 +4,12 @@ defmodule ThistleTea.Game.Entity.KillReward do
   presence. Experience, quest credit, and creature honor share this selection.
   """
 
+  alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
   alias ThistleTea.Game.Entity.Logic.Experience
+  alias ThistleTea.Game.Entity.Logic.GroupReward
+  alias ThistleTea.Game.Entity.Logic.GroupReward.Member
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Party.Group
@@ -34,7 +37,7 @@ defmodule ThistleTea.Game.Entity.KillReward do
   def eligible_members(%Mob{} = mob, %Group{} = group, opts \\ []) do
     nearby = Keyword.get(opts, :nearby, &World.nearby_players/2)
     metadata = Keyword.get(opts, :metadata, &Metadata.query(&1, [:level, :alive?]))
-    members = MapSet.new(group.members, & &1.guid)
+    members = group.members |> MapSet.new(& &1.guid) |> MapSet.put(original_tagger(mob))
 
     mob
     |> nearby.(Experience.group_reward_distance())
@@ -45,6 +48,37 @@ defmodule ThistleTea.Game.Entity.KillReward do
         _ineligible -> []
       end
     end)
+  end
+
+  def group_rewards(%Mob{} = mob, %Group{} = group, opts \\ []) do
+    metadata = Keyword.get(opts, :metadata, &Metadata.query(&1, [:level, :alive?, :ghost?]))
+    position = Keyword.get(opts, :position, &World.position/1)
+    tagger = original_tagger(mob)
+    creature = mob.internal.creature
+
+    group.members
+    |> Enum.map(& &1.guid)
+    |> then(&Enum.uniq([tagger | &1]))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.flat_map(&group_member(mob, &1, tagger, metadata, position))
+    |> GroupReward.plan(mob.unit.level,
+      experience_multiplier: creature.experience_multiplier,
+      extra_flags: creature.extra_flags,
+      elite?: Experience.elite_rank?(creature.rank)
+    )
+  end
+
+  defp original_tagger(%Mob{internal: %{loot: %{tapped_by: %Tap{player: guid}}}}), do: guid
+  defp original_tagger(%Mob{}), do: nil
+
+  defp group_member(mob, guid, tagger, metadata, position) do
+    with %{level: level, alive?: alive?, ghost?: ghost?} when is_integer(level) and level > 0 <- metadata.(guid),
+         location when not is_nil(location) <- position.(guid),
+         true <- in_range?(mob, location) or (not alive? and in_range?(mob, position.(Corpse.guid_for(guid)))) do
+      [%Member{guid: guid, level: level, alive?: alive?, ghost?: ghost?, original_tagger?: guid == tagger}]
+    else
+      _ineligible -> []
+    end
   end
 
   def controlling_player(guid, metadata) when is_integer(guid) and guid > 0 do

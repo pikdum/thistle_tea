@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.PetLevel
@@ -40,8 +41,8 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
 
     test "forwards the group share without rested XP", %{character: character, victim: victim} do
       character = %{character | internal: %{character.internal | rest_bonus: 10_000.0}}
-      PetExperience.reward_kill(character, victim, 137, :group)
-      assert_receive {:reward_pet_kill, 1, 60, {:group, 137}}
+      PetExperience.reward_kill(character, victim, 137, {:group, 60})
+      assert_receive {:reward_pet_kill, 1, 60, {:group, 137, 60}}
     end
 
     test "ignores grey kills, dead owners, suspended pets and controlled victims", %{
@@ -49,7 +50,8 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
       victim: victim
     } do
       PetExperience.reward_kill(character, victim, 0, :solo)
-      PetExperience.reward_kill(%{character | unit: %{character.unit | health: 0}}, victim, 100, :group)
+      PetExperience.reward_kill(%{character | unit: %{character.unit | health: 0}}, victim, 100, {:group, 60})
+      PetExperience.reward_kill(%{character | player: %Player{flags: 0x10}}, victim, 100, {:group, 60})
       PetExperience.reward_kill(Companion.suspend(character), victim, 100, :solo)
       PetExperience.reward_kill(character, %{victim | internal: %{victim.internal | pet: %Pet{}}}, 100, :solo)
       refute_receive {:reward_pet_kill, _, _, _}
@@ -61,7 +63,7 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
       character: character,
       pet: pet
     } do
-      reward = {:reward_pet_kill, 1, 60, {:group, 137}}
+      reward = {:reward_pet_kill, 1, 60, {:group, 137, 60}}
       assert {:noreply, updated, {:continue, :maybe_broadcast}} = MobServer.handle_info(reward, pet)
       assert updated.unit.pet_experience == 137
       assert updated.internal.broadcast_update?
@@ -73,9 +75,9 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
     end
 
     test "rejects a different owner and stops granting experience after pet death", %{pet: pet} do
-      assert {:noreply, ^pet} = MobServer.handle_info({:reward_pet_kill, 9, 60, {:group, 137}}, pet)
+      assert {:noreply, ^pet} = MobServer.handle_info({:reward_pet_kill, 9, 60, {:group, 137, 60}}, pet)
       dead = %{pet | unit: %{pet.unit | health: 0}}
-      assert {:noreply, ^dead, _} = MobServer.handle_info({:reward_pet_kill, 1, 60, {:group, 137}}, dead)
+      assert {:noreply, ^dead, _} = MobServer.handle_info({:reward_pet_kill, 1, 60, {:group, 137, 60}}, dead)
     end
   end
 

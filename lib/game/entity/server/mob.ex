@@ -52,7 +52,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
-  alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
@@ -2072,18 +2071,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state
   end
 
-  defp reward_group_kill(%Mob{internal: %Internal{} = internal, unit: %Unit{} = unit} = state, group) do
-    eligible = KillReward.eligible_members(state, group)
-
-    opts = [
-      experience_multiplier: internal.creature.experience_multiplier,
-      extra_flags: internal.creature.extra_flags,
-      elite?: Experience.elite_rank?(internal.creature.rank)
-    ]
-
-    eligible
-    |> Experience.group_shares(unit.level, opts)
-    |> Enum.each(fn {guid, xp} -> Entity.reward_kill_share(guid, state, xp) end)
+  defp reward_group_kill(%Mob{} = state, group) do
+    state
+    |> KillReward.group_rewards(group)
+    |> Enum.each(&Entity.reward_kill_share(&1.guid, state, &1))
   end
 
   defp attacker_count(guid) do

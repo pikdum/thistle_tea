@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerKillRewardTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.GroupReward.Award
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
@@ -42,10 +43,16 @@ defmodule ThistleTea.Game.Entity.Server.PlayerKillRewardTest do
       }
 
       state = %State{guid: player_guid, character: character}
-      assert {:noreply, state} = PlayerServer.handle_cast({:reward_kill_share, victim, 100}, state)
+
+      assert {:noreply, state} =
+               PlayerServer.handle_cast(
+                 {:reward_kill_share, victim, %Award{xp: 100, pet_xp: 100, pet_max_level: 60, quest?: true}},
+                 state
+               )
+
       assert state.character.player.xp == 0
       assert state.character.internal.rest_bonus == 1_000.0
-      assert_receive {:reward_pet_kill, ^player_guid, 60, {:group, 100}}
+      assert_receive {:reward_pet_kill, ^player_guid, 60, {:group, 100, 60}}
       refute_received {:"$gen_cast", {:send_packet, %SmsgLogXpgain{}}}
     end
   end

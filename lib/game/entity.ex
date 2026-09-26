@@ -220,8 +220,8 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:reward_kill, victim})
   end
 
-  def reward_kill_share(entity, victim, xp) do
-    dispatch_cast(entity, {:reward_kill_share, victim, xp})
+  def reward_kill_share(entity, victim, award) do
+    dispatch_cast(entity, {:reward_kill_share, victim, award})
   end
 
   def start_script(entity, steps, target_guid) when is_list(steps) and is_integer(target_guid) do

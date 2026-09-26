@@ -48,6 +48,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.FeignDeath
+  alias ThistleTea.Game.Entity.Logic.GroupReward
+  alias ThistleTea.Game.Entity.Logic.GroupReward.Award
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.Inventory
@@ -614,13 +616,22 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     state = apply_kill_reward(state, victim, xp)
     PetExperience.reward_kill(state.character, victim, xp, :solo)
     {:noreply, state}
+  rescue
+    error ->
+      Logger.error("Kill reward failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   @impl GenServer
-  def handle_cast({:reward_kill_share, victim, xp}, %{character: %Character{}} = state) do
-    state = apply_kill_reward(state, victim, xp)
-    PetExperience.reward_kill(state.character, victim, xp, :group)
+  def handle_cast({:reward_kill_share, victim, %Award{} = award}, %{character: %Character{} = character} = state) do
+    award = GroupReward.for_recipient(award, character)
+    state = apply_kill_reward(state, victim, award.xp, award.quest?)
+    PetExperience.reward_kill(state.character, victim, award.pet_xp, {:group, award.pet_max_level})
     {:noreply, state}
+  rescue
+    error ->
+      Logger.error("Group kill reward failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   @impl GenServer
@@ -2022,7 +2033,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     %{state | character: EventSink.emit(character, events)}
   end
 
-  defp apply_kill_reward(state, victim, xp) do
+  defp apply_kill_reward(state, victim, xp, quest? \\ true) do
     character = Reactive.clear_combo_target(state.character, victim.object.guid)
     state = %{state | character: character}
 
@@ -2049,9 +2060,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
     state
     |> maybe_reward_kill_reputation(victim)
-    |> Quests.credit_kill_entry(victim.object.entry, victim.object.guid)
+    |> maybe_reward_kill_quest(victim, quest?)
     |> maybe_broadcast_update()
   end
+
+  defp maybe_reward_kill_quest(state, victim, true) do
+    Quests.credit_kill_entry(state, victim.object.entry, victim.object.guid)
+  end
+
+  defp maybe_reward_kill_quest(state, _victim, false), do: state
 
   defp maybe_reward_kill_reputation(state, %{internal: %Internal{pet: nil}} = victim) do
     PlayerReputation.reward_kill(state, victim.object.entry, victim.unit.level)
@@ -2059,16 +2076,19 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp maybe_reward_kill_reputation(state, _victim), do: state
 
-  defp kill_xp(%Character{unit: %Unit{health: health, level: player_level}}, %{
+  defp kill_xp(%Character{unit: %Unit{level: player_level}} = character, %{
          unit: %Unit{level: mob_level},
          internal: %Internal{creature: %Creature{} = creature}
-       })
-       when health > 0 do
-    Experience.kill_xp(player_level, mob_level,
-      experience_multiplier: creature.experience_multiplier,
-      extra_flags: creature.extra_flags,
-      elite?: Experience.elite_rank?(creature.rank)
-    )
+       }) do
+    if Death.alive?(character) do
+      Experience.kill_xp(player_level, mob_level,
+        experience_multiplier: creature.experience_multiplier,
+        extra_flags: creature.extra_flags,
+        elite?: Experience.elite_rank?(creature.rank)
+      )
+    else
+      0
+    end
   end
 
   defp kill_xp(_character, _victim), do: 0
