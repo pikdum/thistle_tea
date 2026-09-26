@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Server.WildTrapDbcTest do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.Loader.Faction
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
@@ -27,6 +28,55 @@ defmodule ThistleTea.Game.Entity.Server.WildTrapDbcTest do
   @moduletag :dbc_db
 
   describe "trap activation" do
+    test "owned Frost Trap creates ticking areas with complete caster snapshots" do
+      owner_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      Entity.register(target_guid)
+
+      target = %Character{
+        object: %Object{guid: target_guid},
+        internal: %Internal{world: WorldRef.open(999)},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      World.update_position(target)
+      Metadata.put(owner_guid, Map.merge(Faction.metadata(14), %{alive?: true, pvp?: true}))
+      Metadata.put(target_guid, Map.merge(Faction.metadata(1), %{alive?: true, pvp?: true}))
+
+      template = %GameObjectTemplate{
+        entry: 950_005,
+        type: 6,
+        size: 1.0,
+        faction: 14,
+        flags: 0,
+        data: [0, 50, 0, 13_810, 1, 0, 0, 0]
+      }
+
+      trap = GameObject.build_summoned(template, target.internal.world, {0.0, 0.0, 0.0, 0.0}, summoned_by: owner_guid)
+      {:ok, pid} = World.start_entity(trap)
+
+      on_exit(fn ->
+        World.stop_entity(trap.object.guid)
+        Enum.each(AreaEffects.pids(owner_guid, 13_810), &World.stop_entity/1)
+        World.remove_position(target)
+        Metadata.delete(owner_guid)
+        Metadata.delete(target_guid)
+      end)
+
+      send(pid, {:script_activate_object, target_guid})
+
+      for index <- [0, 1] do
+        assert_receive {:"$gen_cast",
+                        {:receive_spell, %CastContext{caster_guid: ^owner_guid, persistent_area: area},
+                         %Spell{id: 13_810, effects: [%{index: ^index}]}}},
+                       1_000
+
+        assert area.radius == 10.0
+      end
+
+      assert length(AreaEffects.pids(owner_guid, 13_810)) == 2
+    end
+
     test "a world-loaded campfire discovers a nearby player and delivers environmental fire" do
       player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
       Entity.register(player_guid)

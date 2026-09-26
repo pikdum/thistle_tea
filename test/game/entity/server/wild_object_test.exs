@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Server.WildObjectTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Loot
@@ -88,6 +89,65 @@ defmodule ThistleTea.Game.Entity.Server.WildObjectTest do
       assert TrapServer.ready?(%Trap{ready_at: 2_000}, 2_000)
       refute TrapServer.ready?(%Trap{depleted?: true}, 5_000)
     end
+  end
+
+  describe "target/1" do
+    setup [:trap_targets]
+
+    test "ignores idle neutral creatures but triggers when they enter combat", %{trap: trap, target: target} do
+      assert TrapServer.target(trap) == nil
+      Metadata.update(target.object.guid, %{in_combat: true})
+      assert TrapServer.target(trap) == target.object.guid
+      Metadata.update(target.object.guid, %{alive?: false})
+      assert TrapServer.target(trap) == nil
+    end
+
+    test "triggers on hostile creatures outside combat", %{trap: trap, target: target} do
+      Metadata.update(target.object.guid, %{faction_template: %FactionTemplate{faction: 2, faction_group: 4}})
+      assert TrapServer.target(trap) == target.object.guid
+    end
+
+    test "does not flag an unflagged owner through an enemy player", %{trap: trap, target: target, caster: caster} do
+      World.remove_position(target)
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      player = %{caster | object: %Object{guid: guid}}
+      World.update_position(player)
+      Metadata.put(guid, %{alive?: true, pvp?: true, faction_template: %FactionTemplate{faction: 2, faction_group: 4}})
+
+      on_exit(fn ->
+        World.remove_position(player)
+        Metadata.delete(guid)
+      end)
+
+      assert TrapServer.target(trap) == nil
+      Metadata.update(caster.object.guid, %{pvp?: true})
+      assert TrapServer.target(trap) == guid
+    end
+  end
+
+  defp trap_targets(%{caster: caster}) do
+    guid = Guid.from_low_guid(:mob, 721, System.unique_integer([:positive]))
+    target = %Mob{object: %Object{guid: guid}, internal: caster.internal, movement_block: caster.movement_block}
+    World.update_position(target)
+    Metadata.put(guid, %{alive?: true, in_combat: false, faction_template: %FactionTemplate{faction: 3}})
+
+    Metadata.put(caster.object.guid, %{
+      alive?: true,
+      faction_template: %FactionTemplate{faction: 1, faction_group: 2, enemy_group: 4}
+    })
+
+    trap = %GameObject{
+      internal: %{caster.internal | trap: %Trap{owner_guid: caster.object.guid, radius: 3}},
+      movement_block: caster.movement_block
+    }
+
+    on_exit(fn ->
+      World.remove_position(target)
+      Metadata.delete(guid)
+      Metadata.delete(caster.object.guid)
+    end)
+
+    %{trap: trap, target: target}
   end
 
   defp templates(_context) do

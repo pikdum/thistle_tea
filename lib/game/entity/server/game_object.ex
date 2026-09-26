@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Ritual
   alias ThistleTea.Game.Entity.Data.Component.Internal.Summon
   alias ThistleTea.Game.Entity.Data.Component.Internal.Trap
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Lock
   alias ThistleTea.Game.Entity.Data.Lock.Requirement
@@ -731,7 +732,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   defp trap_caster(state, owner_guid, level) do
     %{
       object: %{guid: owner_guid || state.object.guid},
-      unit: %{level: level},
+      unit: %Unit{level: level},
       internal: %Internal{world: state.internal.world},
       movement_block: state.movement_block
     }

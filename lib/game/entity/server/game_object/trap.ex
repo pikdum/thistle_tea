@@ -73,10 +73,17 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Trap do
        (:players |> World.nearby_units_exact(world, {x, y, z}, radius)))
     |> Enum.map(&elem(&1, 0))
     |> Enum.reject(&(&1 == owner_guid))
-    |> Enum.find(&Hostility.valid_attack_target?(source, &1))
+    |> Enum.find(&eligible_target?(source, &1))
   end
 
   def target(_state), do: nil
+
+  defp eligible_target?(source, guid) do
+    in_combat? = match?(%{in_combat: true}, Metadata.query(guid, [:in_combat]))
+
+    Hostility.valid_attack_target?(source, guid) and Hostility.can_attack_without_flagging?(source, guid) and
+      (in_combat? or Hostility.hostile?(source, guid))
+  end
 
   def consume(%Trap{charges: 1}), do: :depleted
 
