@@ -99,7 +99,9 @@ stopped after acceptance.
 No error-level server logs appeared. Two Call Pet attempts on the dead boar
 correctly returned `targets_dead`. An unrelated Stratholme patrol logged
 unsupported script command 90 (`START_SCRIPT_ON_GROUP`); it was identified for
-the immediate follow-up. The XP run does not establish support for that command.
+the immediate follow-up and is now covered by
+[group-script implementation and acceptance](group-scripts-playtest.md).
+The XP run itself does not establish support for that command.
 
 Final XP gates: `mix test.all` passed 6,323 tests;
 `mix compile --warnings-as-errors` passed; `mix credo --strict` found no issues.
