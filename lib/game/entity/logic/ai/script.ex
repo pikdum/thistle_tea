@@ -48,6 +48,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.GameObjectActions
+  alias ThistleTea.Game.Entity.Logic.Guardians
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
@@ -255,6 +256,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp execute_command(state, blackboard, %ScriptStep{command: :start_script_on_group} = step, _target, _now, _context) do
+    failed(state, blackboard, step)
+  end
+
+  defp execute_command(
+         %{unit: %Unit{}} = state,
+         blackboard,
+         %ScriptStep{command: :remove_guardians, datalong: entry},
+         _target,
+         _now,
+         _context
+       )
+       when is_integer(entry) and entry >= 0 do
+    state = if entry == 0, do: Guardians.dismiss_all(state), else: Guardians.dismiss_entry(state, entry)
+    {state, blackboard, :continue}
+  end
+
+  defp execute_command(state, blackboard, %ScriptStep{command: :remove_guardians} = step, _target, _now, _context) do
     failed(state, blackboard, step)
   end
 

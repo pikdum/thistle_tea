@@ -31,6 +31,10 @@ defmodule ThistleTea.Game.Entity.Logic.Guardians do
   def dismiss_all(%{internal: %Internal{}} = entity), do: dismiss(entity, active(entity))
   def dismiss_all(entity), do: entity
 
+  def dismiss_entry(%{internal: %Internal{}} = entity, entry) when is_integer(entry) and entry > 0 do
+    dismiss(entity, Enum.filter(active(entity), &(&1.entry == entry)))
+  end
+
   defp dismiss(entity, refs) do
     Enum.reduce(refs, entity, fn %EntityRef{guid: guid}, entity ->
       entity |> removed(guid) |> Effects.enqueue(%Effects.DespawnEntity{target_guid: guid})

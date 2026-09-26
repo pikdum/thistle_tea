@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Server.GuardianOwnerTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Guardians
   alias ThistleTea.Game.Entity.Server.GuardianOwner
@@ -28,6 +29,26 @@ defmodule ThistleTea.Game.Entity.Server.GuardianOwnerTest do
   setup [:templates, :owner]
 
   describe "summon/3" do
+    test "scripts remove selected child owners and their world projections", %{owner: owner} do
+      creature = Summon.build(990_202, owner.internal.world, owner.movement_block.position)
+      {:ok, pid} = MobLoader.start_mob(creature)
+      send(pid, %{request() | count: 2})
+      send(pid, %{request() | entry: 990_202})
+      active = :sys.get_state(pid)
+      matching = Enum.filter(Guardians.active(active), &(&1.entry == 990_201))
+      [other] = Enum.filter(Guardians.active(active), &(&1.entry == 990_202))
+      assert length(matching) == 2
+      step = %ScriptStep{command: :remove_guardians, datalong: 990_201}
+      Entity.start_script(creature.object.guid, [step], 0)
+      remaining = :sys.get_state(pid)
+      assert Guardians.active(remaining) == [other]
+      Enum.each(matching, &assert_removed(&1.guid))
+      assert Entity.online?(other.guid)
+      Entity.start_script(creature.object.guid, [%{step | datalong: 0}], 0)
+      assert :sys.get_state(pid).internal.guardians == %{}
+      assert_removed(other.guid)
+    end
+
     test "multiple guardians coexist and direct casts toggle only their entry", %{owner: owner} do
       {active, monitors} = GuardianOwner.summon(owner, %{}, %{request() | count: 2})
       first = Guardians.active(active)

@@ -4,6 +4,10 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
 
   describe "build/1" do
+    test "decodes guardian removal" do
+      assert row(56) |> ScriptStep.build() |> Map.fetch!(:command) == :remove_guardians
+    end
+
     test "decodes creature entry changes" do
       assert row(27) |> ScriptStep.build() |> Map.fetch!(:command) == :update_entry
     end
