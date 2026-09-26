@@ -119,6 +119,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def requires_combo_target?(_spell), do: false
 
   def dummy_effect(%Spell{id: @last_stand}), do: :last_stand
+  def dummy_effect(%Spell{id: id}) when id in [12_162, 12_850, 12_868], do: :deep_wounds
   def dummy_effect(%Spell{id: 20_572}), do: :blood_fury
   def dummy_effect(%Spell{spell_family: 0, spell_icon: 1661}), do: :berserking
   def dummy_effect(%Spell{id: 29_518}), do: :silithyst_pickup

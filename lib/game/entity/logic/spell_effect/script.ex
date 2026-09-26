@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
   alias ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal
   alias ThistleTea.Game.Entity.Logic.SpellTeaching
   alias ThistleTea.Game.Entity.Logic.Warlock
+  alias ThistleTea.Game.Entity.Logic.Warrior
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -107,6 +108,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
 
   defp apply_class_dummy(state, context, spell, effect, :execute, now) do
     DamageHeal.execute(state, context, spell, effect, now)
+  end
+
+  defp apply_class_dummy(state, context, _spell, _effect, :deep_wounds, _now) do
+    Warrior.deep_wounds(state, context)
   end
 
   defp apply_class_dummy(state, context, _spell, _effect, :berserking, _now)

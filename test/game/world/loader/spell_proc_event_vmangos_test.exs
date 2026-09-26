@@ -14,6 +14,14 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   end
 
   describe "get/1" do
+    test "Deep Wounds stores its critical-only rule on the first talent rank" do
+      assert %ProcRule{proc_ex: 2} = SpellProcEvent.get(12_834)
+
+      for id <- [12_849, 12_867] do
+        assert Mangos.Repo.get_by(Mangos.SpellProcEvent, entry: id) == nil
+      end
+    end
+
     test "class-script procs retain their spell-family and periodic restrictions" do
       for {id, family, mask, flags, outcome, chance} <- [
             {11_185, 3, 0x80, 0x50000, 0, 0.0},
