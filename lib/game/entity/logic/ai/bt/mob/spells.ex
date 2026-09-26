@@ -10,7 +10,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
@@ -21,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
   alias ThistleTea.Game.Entity.Logic.AI.BT.Distancing
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Pet.Autocast
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
@@ -86,13 +86,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     end
   end
 
-  def try_cast(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now, random: random} = context) do
+  def try_cast(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now, random: random} = context, options \\ []) do
     spells = spell_entries(state)
     blackboard = ensure_spell_timers(blackboard, spells, now, random)
 
     if Blackboard.ready_for?(blackboard, :next_spell_list_at, now) do
       blackboard = Blackboard.put_next_at(blackboard, :next_spell_list_at, @list_tick_ms, now)
-      attempt_ready_spells(state, blackboard, spells, context)
+      attempt_ready_spells(state, blackboard, spells, context, options)
     else
       {:failure, state, blackboard}
     end
@@ -102,11 +102,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     state = halt_movement(state, now)
     delay_ms = max(Blackboard.delay_until(blackboard, :next_spell_list_at, now), 1)
     {BT.running(min(delay_ms, @list_tick_ms), :spell_list), state, blackboard}
-  end
-
-  defp spell_entries(%Mob{internal: %Internal{pet: %Pet{autocast: autocast}, creature: %Creature{spells: spells}}})
-       when is_list(spells) do
-    Enum.filter(spells, &MapSet.member?(autocast, &1.spell_id))
   end
 
   defp spell_entries(%Mob{internal: %Internal{creature: %Creature{spells: spells}}}) when is_list(spells) do
@@ -127,9 +122,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     end
   end
 
-  defp attempt_ready_spells(%Mob{} = state, %Blackboard{} = blackboard, spells, %Context{} = context) do
+  defp attempt_ready_spells(%Mob{} = state, %Blackboard{} = blackboard, spells, %Context{} = context, options) do
     spells
     |> Enum.with_index()
+    |> Enum.filter(fn {entry, _index} -> not Keyword.get(options, :self_only?, false) or entry.cast_target == :self end)
     |> Enum.reduce_while({:failure, state, blackboard}, fn {entry, index}, {_status, state, blackboard} ->
       attempt_if_ready(state, blackboard, entry, index, context)
     end)
@@ -248,6 +244,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
         {:skip, state, blackboard}
 
       not flags_allow?(state, entry, target_guid, context) ->
+        {:skip, state, blackboard}
+
+      not Autocast.allowed?(state, spell, target_guid, context) ->
         {:skip, state, blackboard}
 
       true ->

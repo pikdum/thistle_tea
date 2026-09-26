@@ -112,6 +112,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         orientation: elem(mob.movement_block.position, 3),
         aura_sources: Aura.source_spells(mob),
         aura_stacks: Aura.spell_stacks(mob),
+        aura_effects: Aura.effect_keys(mob),
         crowd_controlled?: Aura.crowd_controlled?(mob),
         dispel_options: Aura.dispel_options(mob)
       }

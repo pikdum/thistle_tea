@@ -56,7 +56,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.SummonLifecycle do
         in_combat: mob.internal.in_combat,
         health_pct: Core.health_pct(mob),
         mana_pct: Core.mana_pct(mob),
-        aura_stacks: Aura.spell_stacks(mob)
+        aura_stacks: Aura.spell_stacks(mob),
+        aura_effects: Aura.effect_keys(mob)
       })
 
     %Observation{

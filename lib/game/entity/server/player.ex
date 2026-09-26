@@ -1904,6 +1904,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         contested_pvp?: PlayerFlags.contested_pvp?(character),
         aura_sources: Aura.source_spells(character),
         aura_stacks: Aura.spell_stacks(character),
+        aura_effects: Aura.effect_keys(character),
         crowd_controlled?: Aura.crowd_controlled?(character),
         dispel_options: Aura.dispel_options(character),
         spell_threat: SpellThreat.projection(character),

@@ -168,6 +168,7 @@ defmodule ThistleTea.Game.Player.Login do
         duel_started?: Dueling.active?(c),
         reputation: PlayerReputation.projection(c),
         aura_stacks: AuraLogic.spell_stacks(c),
+        aura_effects: AuraLogic.effect_keys(c),
         crowd_controlled?: AuraLogic.crowd_controlled?(c),
         mechanic_resistance: AuraLogic.misc_amounts(c, :mechanic_resistance),
         school_resistances: SpellResist.school_resistances(c),

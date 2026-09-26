@@ -192,6 +192,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def spell_stacks(_entity), do: %{}
 
+  def effect_keys(%{unit: %Unit{auras: holders}}) when is_list(holders) do
+    for %Holder{spell: %Spell{id: spell_id}, auras: auras} <- holders,
+        %Aura{index: index} <- auras,
+        into: MapSet.new(),
+        do: {spell_id, index}
+  end
+
+  def effect_keys(_entity), do: MapSet.new()
+
   def crowd_controlled?(%{unit: %Unit{auras: holders}} = entity) when is_list(holders) do
     frozen?(entity) or Fear.active?(entity) or
       Enum.any?(holders, &(Holder.charm?(&1) or Holder.has_any_type?(&1, @crowd_control_aura_types)))

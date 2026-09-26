@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.PetTest do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -15,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.PetTest do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
@@ -22,6 +24,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.PetTest do
   @now 10_000
 
   describe "tree/0" do
+    test "an idle pet finishes preparing its self buff before following" do
+      state = pet_beside_owner(1)
+      spell = %Spell{id: 10, cast_time_ms: 1_000, mana_cost: 0, effects: []}
+      creature = %Internal.Creature{spells: [%CreatureSpell{spell_id: spell.id, cast_target: :self}]}
+
+      state = %{
+        state
+        | unit: %{state.unit | health: 100, max_health: 100, level: 10, auras: []},
+          internal: %{
+            state.internal
+            | creature: creature,
+              spellbook: %{spell.id => spell},
+              pet: %{state.internal.pet | autocast: MapSet.new([spell.id])}
+          }
+      }
+
+      assert {{:running, 1_000, :casting}, casting} = BT.tick(PetBT.tree(), state, Context.new(@now))
+      assert casting.internal.casting.spell.id == spell.id
+      refute Enum.any?(casting.internal.events, &is_struct(&1, Effects.DespawnSelf))
+    end
+
     test "aggressive pets ignore neutral and obstructed units and acquire hostile players" do
       state = pet_beside_owner(1)
 

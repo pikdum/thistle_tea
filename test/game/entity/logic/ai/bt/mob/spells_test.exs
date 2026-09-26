@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World.Metadata
@@ -26,6 +27,63 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
   defp context(state), do: AIEnvironment.context(state, 1_000)
 
   describe "try_cast/3" do
+    test "pet autocast toggles preserve the indices of delayed spells" do
+      first = %{instant_self_buff() | id: 1}
+      second = %{instant_self_buff() | id: 2}
+
+      state =
+        fixture_mob(
+          spells: [entry(1, cast_target: :self), entry(2, cast_target: :self)],
+          spellbook: %{1 => first, 2 => second}
+        )
+
+      state = %{state | internal: %{state.internal | pet: %Internal.Pet{autocast: MapSet.new([2])}}}
+      memory = %Blackboard{spells: %Blackboard.Spells{timers: %{0 => 1_000, 1 => 5_000}}}
+      assert {:failure, unchanged, memory} = MobSpells.try_cast(state, memory, context(state))
+      assert unchanged.internal.events == []
+      assert memory.spells.timers == %{0 => 1_000, 1 => 5_000}
+    end
+
+    test "idle pets skip unavailable self buffs and cast the next eligible spell" do
+      first = %{instant_self_buff() | id: 1, recovery_time_ms: 10_000}
+      second = %{instant_self_buff() | id: 2}
+
+      state =
+        fixture_mob(
+          spells: [entry(1, cast_target: :self), entry(2, cast_target: :self)],
+          spellbook: %{1 => first, 2 => second}
+        )
+
+      state = %{
+        state
+        | internal: %{state.internal | in_combat: false, pet: %Internal.Pet{autocast: MapSet.new([1, 2])}}
+      }
+
+      state = Cooldowns.start(state, first, 500)
+      assert {:failure, casted, _memory} = MobSpells.try_cast(state, Blackboard.new(), context(state), self_only?: true)
+      assert Enum.any?(casted.internal.events, &match?(%Effects.SpellStart{spell_id: 2}, &1))
+      refute Enum.any?(casted.internal.events, &match?(%Effects.SpellStart{spell_id: 1}, &1))
+    end
+
+    test "manual commands can cast a buff that autocast reserves for combat" do
+      spell = %{instant_self_buff() | duration_ms: 15_000, recovery_time_ms: 30_000}
+      entry = entry(spell.id, cast_target: :self)
+      state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
+
+      state = %{
+        state
+        | internal: %{state.internal | in_combat: false, pet: %Internal.Pet{autocast: MapSet.new([spell.id])}}
+      }
+
+      assert {:failure, unchanged, _memory} = MobSpells.try_cast(state, Blackboard.new(), context(state))
+      assert unchanged.internal.events == []
+
+      assert {:ok, {casted, _memory}} =
+               MobSpells.attempt_commanded_cast(state, Blackboard.new(), entry, state.object.guid, context(state))
+
+      assert Enum.any?(casted.internal.events, &is_struct(&1, Effects.SpellStart))
+    end
+
     test "instant casts preserve swing resets alongside spell-list timers" do
       spell = %{instant_self_buff() | interrupt_flags: 8}
       entry = entry(spell.id, cast_target: :self, delay_repeat_min_ms: 4_000, delay_repeat_max_ms: 4_000)

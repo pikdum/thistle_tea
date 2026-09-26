@@ -1305,6 +1305,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       state = state |> PetBT.command(:attack, target_guid) |> wake_ai_tick()
       {:noreply, state, {:continue, :maybe_broadcast}}
     end
+  rescue
+    error ->
+      Logger.error("Pet automatic attack failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_info({:force_attack, target_guid}, %Mob{} = state) when is_integer(target_guid) do
@@ -1576,6 +1580,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           unit_flags: state.unit.flags,
           aura_sources: Aura.source_spells(state),
           aura_stacks: Aura.spell_stacks(state),
+          aura_effects: Aura.effect_keys(state),
           crowd_controlled?: Aura.crowd_controlled?(state),
           dispel_options: Aura.dispel_options(state),
           spell_threat: SpellThreat.projection(state)

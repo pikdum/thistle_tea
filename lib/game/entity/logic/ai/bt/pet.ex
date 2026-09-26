@@ -5,11 +5,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   """
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
@@ -57,7 +55,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
           BT.action(&chase_target/3)
         ])
       ]),
-      BT.action(&cast_missing_self_buff/3),
+      BT.action(&autocast_self_spell/3),
       BT.sequence([BT.condition(&aggressive?/2), BT.action(&acquire_aggressive_target/3)]),
       BT.action(&Distraction.tick/3),
       BT.sequence([BT.condition(&should_follow?/2), BT.action(&follow_owner/3)]),
@@ -65,37 +63,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
     ])
   end
 
-  defp cast_missing_self_buff(%Mob{object: %{guid: guid}} = state, blackboard, %Context{} = context) do
-    case next_self_buff(state) do
-      %CreatureSpell{} = entry ->
-        {state, blackboard} = MobSpells.attempt_scripted_cast(state, blackboard, entry, guid, context)
-        {:failure, state, blackboard}
-
-      _no_buff ->
-        {:failure, state, blackboard}
-    end
+  defp autocast_self_spell(%Mob{} = state, blackboard, %Context{} = context) do
+    MobSpells.try_cast(state, blackboard, context, self_only?: true)
   end
-
-  defp next_self_buff(
-         %Mob{internal: %Internal{pet: %Pet{autocast: autocast}, creature: %Creature{spells: spells}}} = state
-       )
-       when is_list(spells) do
-    Enum.find(spells, fn
-      %CreatureSpell{spell_id: spell_id, cast_target: :self} ->
-        MapSet.member?(autocast, spell_id) and not holds_spell?(state, spell_id)
-
-      _entry ->
-        false
-    end)
-  end
-
-  defp next_self_buff(_state), do: nil
-
-  defp holds_spell?(%Mob{unit: %Unit{auras: holders}}, spell_id) when is_list(holders) do
-    Enum.any?(holders, &(&1.spell.id == spell_id))
-  end
-
-  defp holds_spell?(_state, _spell_id), do: false
 
   def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :stay, _target_guid) do
     position = xyz(state.movement_block.position)
