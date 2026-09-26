@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.ClassScript
+  alias ThistleTea.Game.Entity.Logic.Aura.ProcSpell
   alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -197,7 +198,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         source_guid = holder.caster_guid || owner_guid
 
         proc_events =
-          Enum.map(proc_auras, &proc_event(&1, holder, source_guid, attacker_guid))
+          Enum.flat_map(proc_auras, &proc_events(&1, holder, source_guid, attacker_guid, context))
 
         {replace_or_delete(holders, holder, mark_proc(holder, Map.get(context, :now))), events ++ proc_events}
     end
@@ -259,7 +260,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
     proc_events =
       if is_integer(victim_guid) do
-        Enum.map(trigger_auras(holder), &proc_event(&1, holder, owner_guid, victim_guid)) ++
+        Enum.flat_map(trigger_auras(holder), &proc_events(&1, holder, owner_guid, victim_guid, context)) ++
           ClassScript.events(holder, owner_guid, context)
       else
         []
@@ -289,12 +290,20 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     end)
   end
 
-  defp proc_event(%Aura{type: :proc_trigger_damage, index: index}, %Holder{spell: spell}, _source, target) do
-    Effects.proc_damage(target, spell, index)
+  defp proc_events(%Aura{type: :proc_trigger_damage, index: index}, %Holder{spell: spell}, _source, target, _context) do
+    [Effects.proc_damage(target, spell, index)]
   end
 
-  defp proc_event(%Aura{type: :proc_trigger_spell, trigger_spell_id: spell_id}, %Holder{} = holder, source, target) do
-    Effects.trigger_spell(source, holder.caster_level || 1, target, spell_id, triggered_by_spell_id: holder.spell.id)
+  defp proc_events(
+         %Aura{type: :proc_trigger_spell, trigger_spell_id: spell_id},
+         %Holder{} = holder,
+         source,
+         target,
+         context
+       ) do
+    source
+    |> Effects.trigger_spell(holder.caster_level || 1, target, spell_id, triggered_by_spell_id: holder.spell.id)
+    |> ProcSpell.resolve(holder, context)
   end
 
   defp replace_or_delete(holders, holder, nil), do: List.delete(holders, holder)
@@ -339,7 +348,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
     shield? = proc_ready?(holder, now) and Proc.shield_outcome_allowed?(holder.spell, context)
 
-    events = Enum.flat_map(holder.auras, &reaction_event(&1, holder, owner_guid, attacker_guid, proc?, shield?))
+    events =
+      Enum.flat_map(holder.auras, &reaction_event(&1, holder, owner_guid, attacker_guid, proc?, shield?, context))
+
     {if(proc?, do: mark_proc(holder, now), else: holder), events}
   end
 
@@ -384,7 +395,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
     if proc? do
       events =
-        Enum.map(proc_auras, &proc_event(&1, holder, owner_guid, victim_guid))
+        Enum.flat_map(proc_auras, &proc_events(&1, holder, owner_guid, victim_guid, context))
 
       {mark_proc(holder, now), events}
     else
@@ -415,9 +426,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
          owner_guid,
          attacker_guid,
          true,
-         _shield?
+         _shield?,
+         context
        ) do
-    [proc_event(aura, holder, owner_guid, attacker_guid)]
+    proc_events(aura, holder, owner_guid, attacker_guid, context)
   end
 
   defp reaction_event(
@@ -426,10 +438,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
          owner_guid,
          attacker_guid,
          _proc?,
-         shield?
+         shield?,
+         context
        )
        when is_integer(spell_id) and spell_id > 0 do
-    if shield?, do: trigger_reaction_events(holder, spell_id, owner_guid, attacker_guid), else: []
+    if shield?, do: trigger_reaction_events(holder, spell_id, owner_guid, attacker_guid, context), else: []
   end
 
   defp reaction_event(
@@ -438,10 +451,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
          owner_guid,
          attacker_guid,
          proc?,
-         _shield?
+         _shield?,
+         context
        )
        when is_integer(spell_id) and spell_id > 0 do
-    if proc?, do: trigger_reaction_events(holder, spell_id, owner_guid, attacker_guid), else: []
+    if proc?, do: trigger_reaction_events(holder, spell_id, owner_guid, attacker_guid, context), else: []
   end
 
   defp reaction_event(
@@ -450,7 +464,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
          _owner_guid,
          attacker_guid,
          _proc?,
-         shield?
+         shield?,
+         _context
        )
        when shield? and is_integer(amount) and amount > 0 do
     spell = %{
@@ -463,21 +478,21 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     [Effects.deliver_spell(attacker_guid, context, spell)]
   end
 
-  defp reaction_event(_aura, _holder, _owner_guid, _attacker_guid, _proc?, _shield?), do: []
+  defp reaction_event(_aura, _holder, _owner_guid, _attacker_guid, _proc?, _shield?, _context), do: []
 
-  defp trigger_reaction_events(%Holder{} = holder, spell_id, owner_guid, attacker_guid) do
+  defp trigger_reaction_events(%Holder{} = holder, spell_id, owner_guid, attacker_guid, context) do
     aura_owner_guid = holder.caster_guid || owner_guid
 
     {source_guid, target_guid, trigger_spell_id} =
       Scripts.incoming_proc_trigger(holder.spell, spell_id, aura_owner_guid, attacker_guid)
 
     if is_integer(trigger_spell_id) do
-      [
-        Effects.trigger_spell(source_guid, holder.caster_level || 1, target_guid, trigger_spell_id,
-          triggered_by_spell_id: holder.spell.id,
-          hit_context: holder.cast_context
-        )
-      ]
+      source_guid
+      |> Effects.trigger_spell(holder.caster_level || 1, target_guid, trigger_spell_id,
+        triggered_by_spell_id: holder.spell.id,
+        hit_context: holder.cast_context
+      )
+      |> ProcSpell.resolve(holder, context)
     else
       []
     end

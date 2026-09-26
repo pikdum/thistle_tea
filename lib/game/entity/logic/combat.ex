@@ -311,7 +311,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
         proc_type: proc_type,
         outcome: outcome,
         proc_ex: result.proc_ex,
-        damage: result.damage,
+        damage: max(result.damage - Map.get(attack, :absorb, 0), 0),
         absorbed: Map.get(attack, :absorb, 0),
         spell: Map.get(attack, :spell),
         triggering_spell_id: Map.get(attack, :spell_id),

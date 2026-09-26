@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   use ExUnit.Case, async: false
 
+  import Ecto.Query
+
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Spell.ProcRule
   alias ThistleTea.Game.World.Loader.SpellProcEvent
@@ -14,6 +16,27 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   end
 
   describe "get/1" do
+    test "Blessed Recovery inherits its critical-only restriction from the first talent rank" do
+      assert %ProcRule{proc_ex: 2, proc_flags: 0} = SpellProcEvent.get(27_811)
+
+      for id <- [27_815, 27_816] do
+        assert Mangos.Repo.get_by(Mangos.SpellProcEvent, entry: id) == nil
+      end
+
+      for id <- [27_813, 27_817, 27_818, 26_470] do
+        template =
+          Mangos.Repo.one(
+            from(s in Mangos.SpellTemplate,
+              where: s.entry == ^id and s.build <= 5875,
+              order_by: [desc: s.build],
+              limit: 1
+            )
+          )
+
+        assert template.effect_bonus_coefficient_0 == 0.0
+      end
+    end
+
     test "Deep Wounds stores its critical-only rule on the first talent rank" do
       assert %ProcRule{proc_ex: 2} = SpellProcEvent.get(12_834)
 

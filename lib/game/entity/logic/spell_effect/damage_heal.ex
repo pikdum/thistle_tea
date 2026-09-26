@@ -181,7 +181,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   end
 
   def avoided_melee_ability_reactions(state, context, spell, outcome, now) do
-    incoming_melee_ability_reactions(state, context, spell, outcome, now)
+    incoming_melee_ability_reactions(state, context, spell, outcome, 0, now)
   end
 
   defp weapon_effect?(%Effect{type: type}), do: type in @weapon_effect_types
@@ -506,7 +506,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
   defp melee_ability_reactions(state, %CastContext{} = context, %Spell{} = spell, damage, now) when damage > 0 do
     outcome = if context.melee_crit?, do: :crit, else: :normal
-    incoming_melee_ability_reactions(state, context, spell, outcome, now)
+    incoming_melee_ability_reactions(state, context, spell, outcome, damage, now)
   end
 
   defp melee_ability_reactions(state, _context, _spell, _damage, _now), do: {state, []}
@@ -516,7 +516,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     trunc(Modifiers.value(context.spell_modifiers, :crit_damage_bonus, bonus))
   end
 
-  defp incoming_melee_ability_reactions(state, %CastContext{} = context, %Spell{} = spell, outcome, now) do
+  defp incoming_melee_ability_reactions(state, %CastContext{} = context, %Spell{} = spell, outcome, damage, now) do
     if Core.dead?(state) do
       {state, []}
     else
@@ -525,6 +525,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         attacker_position: attack_position(context.caster_position),
         proc_type: taken_attack_proc_type(spell),
         outcome: outcome,
+        damage: damage,
         spell: spell,
         now: now
       })
