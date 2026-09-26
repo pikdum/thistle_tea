@@ -55,6 +55,7 @@ defmodule ThistleTea.Game.World.Loader.SpellBestialWrathDbcTest do
         for child <- children do
           assert child.caster_guid == 1
           assert child.linked_from == {Holder.key(parent), 1_000}
+          assert child.expires_at == parent.expires_at
         end
       end
     end
@@ -88,6 +89,18 @@ defmodule ThistleTea.Game.World.Loader.SpellBestialWrathDbcTest do
   end
 
   describe "expire_due/2" do
+    test "boosts protect through the parent's full duration", %{pet: pet, wrath: wrath} do
+      {protected, _} = Aura.apply_spell(pet, 1, 50, wrath, 1_000)
+      polymorph = SpellLoader.load(118)
+
+      for now <- [16_000, 18_999] do
+        {still_active, _} = Aura.expire_due(protected, now)
+        assert Enum.map(still_active.unit.auras, & &1.spell.id) == [wrath.id | @boosts]
+        {_received, events} = SpellEffect.receive(still_active, 3, polymorph, now)
+        assert [%Effects.SpellLogMiss{spell_id: 118, reason: :immune}] = events
+      end
+    end
+
     test "expiry clears every boost and permits control again", %{pet: pet, wrath: wrath} do
       {protected, _} = Aura.apply_spell(pet, 1, 50, wrath, 1_000)
       {expired, _} = Aura.expire_due(protected, 19_000)

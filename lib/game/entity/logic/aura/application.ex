@@ -187,7 +187,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         nil
 
       auras ->
-        %{build_holder(entity, context, spell, auras, now) | linked_from: {Holder.key(parent), parent.applied_at}}
+        %{
+          build_holder(entity, context, spell, auras, now)
+          | linked_from: {Holder.key(parent), parent.applied_at},
+            expires_at: parent.expires_at
+        }
     end
   end
 

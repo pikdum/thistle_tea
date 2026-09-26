@@ -112,6 +112,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.LinkedTest do
       assert boost.caster_level == 50
       assert boost.linked_from == {Holder.key(root), 1_000}
       assert boost.triggered?
+      assert boost.expires_at == root.expires_at
 
       form = %Spell{id: 103, effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_shapeshift, misc_value: 1}]}
       {shifted, _} = Aura.apply_spell(active, 1, 60, form, 2_000)
@@ -137,7 +138,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.LinkedTest do
       {refreshed, _} = Aura.apply_spell(removed, 2, 50, parent, 4_000)
       assert [root, boost] = refreshed.unit.auras
       assert boost.linked_from == {Holder.key(root), 4_000}
-      assert boost.expires_at == 24_000
+      assert boost.expires_at == 16_000
     end
   end
 
