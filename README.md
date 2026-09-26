@@ -48,10 +48,10 @@ iex -S mix
 
 More documentation, like platform-specific setup guides, can be found in the [Wiki](https://github.com/pikdum/thistle_tea/wiki).
 
-Existing navigation bakes need [WMO group metadata](docs/terrain-interiors.md)
-for indoor and outdoor queries. New bakes include it automatically.
+Existing navigation bakes need [WMO metadata](docs/terrain-interiors.md)
+for indoor and outdoor queries and WMO lava. New bakes include it automatically.
 
-Ocean fatigue also needs terrain liquid data. New map bakes include it; existing
+Ocean fatigue and outdoor lava also need terrain liquid data. New map bakes include it; existing
 bakes can add it without rebuilding navigation:
 
 ```bash
@@ -220,6 +220,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Environmental fire damage](docs/environmental-fire-playtest.md), with world campfires, resistance, shield depletion, combat-log feedback, and death durability loss
 - underwater breath timers, drowning, water-breathing effects, and extended breath reserves
 - [ocean fatigue, coastal recovery, exhaustion damage, transport protection, and graveyard rescue for ghosts](docs/fatigue-playtest.md)
+- [Lava exposure](docs/lava-playtest.md), with outdoor and WMO liquids, contact grace, fire resistance, shield depletion, and death cleanup
 - swimming speed bonuses and snare updates, synchronized with the player and nearby observers
 - gossip + trainers
 - [Innkeeper home binding](docs/home-binding-playtest.md), with confirmation, retained home locations, Hearthstones, Astral Recall, and replacement Hearthstones

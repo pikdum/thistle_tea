@@ -31,6 +31,14 @@ hash, and one group flag per collision triangle in the serialized tree's order.
 Writes use a temporary file followed by a rename. The runtime rejects malformed
 or mismatched sidecars. Legacy bakes without sidecars remain loadable.
 
+The same command now writes `<WMO>.bvh.liquids` sidecars for
+[lava exposure](lava-playtest.md). These retain MLIQ surface triangles, hidden
+tiles, and normalized liquid entries independently of the navigation mesh.
+Each file has a format signature, triangle count, and geometry hash. Runtime
+queries transform liquid triangles with the WMO instance and reject surfaces
+below the player's collision floor. Missing sidecars return no WMO liquid;
+terrain liquid sampling remains available.
+
 Outside the devenv shell, obtain the matching source with
 `nix build .#namigator-source --no-link --print-out-paths` and set `NAMIGATOR_SRC`
 to the resulting path before compiling the NIF.
@@ -38,10 +46,14 @@ to the resulting path before compiling the NIF.
 ## Verification
 
 `nix build .#namigator-mapbuilder` runs the native metadata tests, covering face
-order, geometry roundtrips, missing sidecars, stale geometry, truncated metadata,
-and rejected writes preserving valid metadata.
+order, geometry roundtrips, liquid entry normalization, sloped surfaces, hidden
+tiles, missing sidecars, stale geometry, truncated metadata, and rejected writes
+preserving valid metadata.
 
 `mix test test/game/world/pathfinding_test.exs test/native/namigator_concurrency_test.exs --include namigator_maps`
 covers Northshire Abbey, Goldshire's inn, outdoor Stormwind groups, an Elwynn
 mine, Undercity, Deadmines, unavailable maps, concurrent queries, and ADT unloads.
 These tests require an upgraded or freshly generated bake.
+
+`mix test test/game/entity/server/player_lava_maps_test.exs --include namigator_maps`
+also checks Blackrock Mountain lava below its bridge and outdoor lava contact.
