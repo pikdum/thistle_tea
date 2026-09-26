@@ -44,6 +44,11 @@ defmodule ThistleTea.Game.Aura.Holder do
 
   @type t :: %__MODULE__{}
 
+  def spend_stack(%__MODULE__{stacks: stacks} = holder) when is_integer(stacks) and stacks > 1,
+    do: %{holder | stacks: stacks - 1}
+
+  def spend_stack(%__MODULE__{}), do: nil
+
   def charm?(%__MODULE__{spell: %Spell{id: 28_410}} = holder), do: has_any_type?(holder, [:mod_charm, :aoe_charm])
 
   def charm?(%__MODULE__{} = holder), do: has_aura_type?(holder, :mod_charm)

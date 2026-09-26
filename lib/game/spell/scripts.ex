@@ -134,6 +134,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
     do: {:guardian_trinket, Map.fetch!(@guardian_trinkets, id)}
 
   @script_dummy_effects %{
+    "spell_brittle_armor_dummy" => {:trigger_spell, 24_575},
+    "spell_mercurial_shield_dummy" => {:trigger_spell, 26_464},
     "spell_paladin_judgement_of_command_dummy" => :judgement_of_command,
     "spell_warrior_execute_dummy" => :execute,
     "spell_hunter_readiness" => :hunter_cooldowns,

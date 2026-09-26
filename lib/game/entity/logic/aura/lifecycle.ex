@@ -59,6 +59,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
 
   def expire_due(entity, _now), do: {entity, []}
 
+  def remove_stack(%{unit: %Unit{auras: holders}} = entity, spell_id, now) when is_list(holders) do
+    remaining =
+      holders
+      |> Enum.map(fn holder -> if holder.spell.id == spell_id, do: Holder.spend_stack(holder), else: holder end)
+      |> Enum.reject(&is_nil/1)
+
+    transition(entity, remaining, :removed, now)
+  end
+
   def remove_on_evade(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) do
     {kept, removed} = Enum.split_with(holders, &keep_on_evade?(&1, entity))
     if removed == [], do: {entity, []}, else: transition(entity, kept, :removed, now)

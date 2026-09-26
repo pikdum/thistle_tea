@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Spell.ProcRule
   alias ThistleTea.Game.World.Loader.SpellProcEvent
+  alias ThistleTea.Game.World.Loader.SpellScriptName
   alias ThistleTea.Game.World.Loader.SpellThreat
 
   @moduletag :vmangos_db
@@ -17,6 +18,17 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   end
 
   describe "get/1" do
+    test "depleting trinkets use their dummy scripts and unmodified DBC proc flags" do
+      SpellScriptName.init()
+      SpellScriptName.load_all()
+      assert SpellScriptName.get(29_284) == "spell_brittle_armor_dummy"
+      assert SpellScriptName.get(29_286) == "spell_mercurial_shield_dummy"
+
+      for id <- [24_661, 24_574, 26_463] do
+        assert SpellProcEvent.get(id) == nil
+      end
+    end
+
     test "ranged equipment procs use their supported-build PPM rates" do
       for {id, rate} <- [{23_578, 2.0}, {26_480, 10.0}] do
         assert %ProcRule{ppm_rate: ^rate, custom_chance: chance} = SpellProcEvent.get(id)

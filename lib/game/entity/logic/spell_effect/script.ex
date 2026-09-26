@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Druid
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -90,10 +91,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
     end
   end
 
-  def apply(state, %CastContext{}, spell, %Effect{type: :script_effect}, _now) do
-    case Warlock.healthstone_item(state, spell) do
-      item_id when is_integer(item_id) and item_id > 0 -> {state, [Effects.create_item(item_id, 1)]}
-      _ -> {state, []}
+  def apply(state, %CastContext{}, spell, %Effect{type: :script_effect}, now) do
+    cond do
+      aura_id = StackingProc.removal_spell(spell) -> Aura.remove_stack(state, aura_id, now)
+      item_id = Warlock.healthstone_item(state, spell) -> {state, [Effects.create_item(item_id, 1)]}
+      true -> {state, []}
     end
   end
 
@@ -108,6 +110,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
 
   defp apply_class_dummy(state, context, spell, effect, :execute, now) do
     DamageHeal.execute(state, context, spell, effect, now)
+  end
+
+  defp apply_class_dummy(state, context, _spell, %Effect{index: 0}, {:trigger_spell, id}, _now) do
+    event =
+      Effects.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, id,
+        cast_item_guid: context.cast_item_guid,
+        hit_context: context
+      )
+
+    {state, [event]}
   end
 
   defp apply_class_dummy(state, context, _spell, _effect, :deep_wounds, _now) do

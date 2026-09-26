@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Entity.Logic.Aura.ProcSpell
   alias ThistleTea.Game.Entity.Logic.Aura.ReactiveArmor
   alias ThistleTea.Game.Entity.Logic.Aura.Script
+  alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
@@ -101,20 +102,20 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
       when is_list(holders) and is_integer(victim_guid) and is_integer(now) and is_atom(outcome) and
              proc_type in [:deal_melee_swing, :deal_melee_ability] do
     {holders, events} =
-      Enum.map_reduce(holders, [], fn %Holder{} = holder, events ->
-        {holder, holder_events} =
-          outgoing_melee_reaction(
-            entity,
-            holder,
-            owner_guid,
-            victim_guid,
-            context
-          )
+      Enum.reduce(holders, {holders, []}, fn %Holder{} = original, {current, events} ->
+        case Enum.find(current, &(Holder.key(&1) == Holder.key(original))) do
+          nil ->
+            {current, events}
 
-        {holder, events ++ holder_events}
+          holder ->
+            {current, holder_events} =
+              outgoing_melee_reaction(entity, current, holder, owner_guid, victim_guid, context)
+
+            {current, events ++ holder_events}
+        end
       end)
 
-    {entity, removal_events} = transition_holders(entity, Enum.reject(holders, &is_nil/1), context)
+    {entity, removal_events} = transition_holders(entity, holders, context)
     {entity, events ++ removal_events}
   end
 
@@ -363,17 +364,28 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     {if(proc?, do: mark_proc(holder, now), else: holder), events}
   end
 
-  defp outgoing_melee_reaction(entity, %Holder{} = holder, owner_guid, victim_guid, context) do
+  defp outgoing_melee_reaction(entity, holders, %Holder{} = holder, owner_guid, victim_guid, context) do
     if ProcEquipment.allowed?(entity, holder.spell, context) and extra_attack_allowed?(holder.spell, context) do
-      {holder, events} =
-        case Script.outgoing_melee(entity, holder, owner_guid, victim_guid, context) do
-          {:handled, updated_holder, events} -> {updated_holder, events}
-          :unhandled -> generic_outgoing_melee_reaction(entity, holder, owner_guid, victim_guid, context)
+      {holders, events} =
+        case StackingProc.outgoing_melee(entity, holders, holder, context) do
+          {:handled, updated, events} ->
+            {updated, events}
+
+          :unhandled ->
+            {updated, events} = ordinary_melee_reaction(entity, holder, owner_guid, victim_guid, context)
+            {replace_or_delete(holders, holder, updated), events}
         end
 
-      {holder, Enum.map(events, &melee_proc_origin(&1, context))}
+      {holders, Enum.map(events, &melee_proc_origin(&1, context))}
     else
-      {holder, []}
+      {holders, []}
+    end
+  end
+
+  defp ordinary_melee_reaction(entity, holder, owner_guid, victim_guid, context) do
+    case Script.outgoing_melee(entity, holder, owner_guid, victim_guid, context) do
+      {:handled, updated, events} -> {updated, events}
+      :unhandled -> generic_outgoing_melee_reaction(entity, holder, owner_guid, victim_guid, context)
     end
   end
 
