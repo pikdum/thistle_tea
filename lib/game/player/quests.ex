@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Player.Gossip
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.QuestGiver
+  alias ThistleTea.Game.Player.QuestRewards
   alias ThistleTea.Game.Player.QuestSharing
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
@@ -383,8 +384,13 @@ defmodule ThistleTea.Game.Player.Quests do
     end
   end
 
-  defp turn_in(state, npc_guid, %Quest{} = quest, %ChangeSet{} = change_set, rewards) do
-    {:ok, quest_log} = QuestLog.remove(change_set.player.quest_log, quest.id)
+  defp turn_in(state, npc_guid, %Quest{} = quest, %ChangeSet{} = change_set, rewards, announce? \\ true) do
+    quest_log =
+      case QuestLog.remove(change_set.player.quest_log, quest.id) do
+        {:ok, quest_log} -> quest_log
+        {:error, :not_active} -> change_set.player.quest_log
+      end
+
     rewarded = MapSet.put(change_set.player.rewarded_quests, quest.id)
 
     {xp, money} = quest_reward(quest, state.character.unit.level)
@@ -398,13 +404,14 @@ defmodule ThistleTea.Game.Player.Quests do
     {character, level_ups} = PlayerStats.gain_xp(state.character, xp)
     Enum.each(level_ups, fn level_up -> Network.send_packet(struct(Message.SmsgLevelupInfo, level_up)) end)
 
-    Network.send_packet(%Message.SmsgQuestgiverQuestComplete{quest: quest, xp: xp, money: money})
+    if announce?, do: Network.send_packet(%Message.SmsgQuestgiverQuestComplete{quest: quest, xp: xp, money: money})
     state = put_character(state, character)
     state = Battlegrounds.quest_rewarded(state, quest.id)
     state = PlayerReputation.reward_quest(state, quest)
     state = Mail.send_quest_reward(state, npc_guid, quest)
     state = run_quest_script(state, npc_guid, quest.complete_script_steps)
-    send_next_quest(state, npc_guid, quest)
+    state = QuestRewards.cast_spell(state, quest, npc_guid)
+    if announce?, do: send_next_quest(state, npc_guid, quest)
     state
   end
 
@@ -705,12 +712,28 @@ defmodule ThistleTea.Game.Player.Quests do
     state
   end
 
-  def credit_event(%{character: %Character{player: %{quest_log: quest_log}}} = state, quest_id)
-      when is_map(quest_log) do
-    explore_area(state, quest_id)
+  def credit_event(%{character: %Character{}} = state, quest_id) do
+    case QuestLoader.get(quest_id) do
+      %Quest{} = quest ->
+        if Quest.auto_rewarded?(quest), do: auto_reward(state, quest), else: explore_area(state, quest_id)
+
+      _missing ->
+        state
+    end
   end
 
   def credit_event(state, _quest_id), do: state
+
+  defp auto_reward(%{character: character} = state, quest) do
+    with true <- QuestRequirements.can_auto_reward?(quest, ctx(character)),
+         {:ok, choice} <- validate_reward_choice(quest, 0),
+         :ok <- validate_required_money(quest, character),
+         {:ok, changes, rewards} <- plan_turn_in_inventory(character, quest, choice) do
+      turn_in(state, character.object.guid, quest, changes, rewards, false)
+    else
+      _unavailable -> state
+    end
+  end
 
   def credit_scripted_event(state, quest_id, true, distance, world_object_guid) do
     case party_members(state.guid) do

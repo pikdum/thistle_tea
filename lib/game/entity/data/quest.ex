@@ -64,6 +64,7 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
     reward_money_max_level: 0,
     reward_xp: 0,
     reward_spell: 0,
+    reward_spell_cast: 0,
     reward_mail_template_id: 0,
     reward_mail_delay_secs: 0,
     reward_mail_money: 0,
@@ -80,6 +81,11 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
   def party_accept?(%__MODULE__{flags: flags}), do: Bitwise.band(flags || 0, 0x2) != 0
 
   def repeatable?(%__MODULE__{special_flags: flags}), do: Bitwise.band(flags || 0, 0x1) != 0
+
+  def auto_rewarded?(%__MODULE__{flags: flags}), do: Bitwise.band(flags || 0, 0x400) != 0
+
+  def reward_spell_id(%__MODULE__{reward_spell_cast: id}) when id > 0, do: id
+  def reward_spell_id(%__MODULE__{reward_spell: id}), do: id
 
   def build(%Mangos.QuestTemplate{} = row) do
     %__MODULE__{
@@ -135,6 +141,7 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
       reward_money_max_level: row.rew_money_max_level,
       reward_xp: row.rew_xp,
       reward_spell: row.rew_spell,
+      reward_spell_cast: row.rew_spell_cast,
       reward_mail_template_id: abs(row.rew_mail_template_id),
       reward_mail_delay_secs: row.rew_mail_delay_secs,
       reward_mail_money: row.rew_mail_money,

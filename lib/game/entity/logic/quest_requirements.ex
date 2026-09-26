@@ -34,6 +34,13 @@ defmodule ThistleTea.Game.Entity.Logic.QuestRequirements do
   def can_take?(%Quest{} = quest, ctx), do: can_take(quest, ctx) == :ok
   def can_take?(%Quest{} = quest, ctx, condition_result), do: can_take(quest, ctx, condition_result) == :ok
 
+  def can_auto_reward?(%Quest{} = quest, ctx) do
+    Quest.auto_rewarded?(quest) and not rewarded?(quest, ctx) and
+      ctx.level >= quest.min_level and race_allowed?(quest, ctx.race) and
+      class_allowed?(quest, ctx.class) and skill_met?(quest, ctx) and
+      prerequisites_met?(dependencies(quest).prerequisites, ctx)
+  end
+
   def base_can_take(%Quest{} = quest, ctx) do
     [
       {QuestLog.active?(ctx.quest_log, quest.id), :already_active},

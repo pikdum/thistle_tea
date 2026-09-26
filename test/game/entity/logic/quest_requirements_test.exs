@@ -17,6 +17,35 @@ defmodule ThistleTea.Game.Entity.Logic.QuestRequirementsTest do
     })
   end
 
+  describe "can_auto_reward?/2" do
+    test "uses flag-quest requirements without requiring a free log slot or reputation" do
+      quest = %Quest{
+        id: 50,
+        flags: 0x400,
+        min_level: 10,
+        required_min_reputation_faction: 1,
+        required_min_reputation_value: 42_000
+      }
+
+      full = Map.new(0..19, &{&1, %QuestLog.Entry{quest_id: &1 + 1}})
+      assert QuestRequirements.can_auto_reward?(quest, ctx(quest_log: full))
+      refute QuestRequirements.can_auto_reward?(%{quest | flags: 0}, ctx())
+      refute QuestRequirements.can_auto_reward?(quest, ctx(level: 9))
+      refute QuestRequirements.can_auto_reward?(quest, ctx(rewarded_quests: MapSet.new([50])))
+    end
+
+    test "checks class race skill and signed prerequisites" do
+      quest = %Quest{id: 50, flags: 0x400}
+      refute QuestRequirements.can_auto_reward?(%{quest | required_races: 2}, ctx())
+      refute QuestRequirements.can_auto_reward?(%{quest | required_classes: 2}, ctx())
+      refute QuestRequirements.can_auto_reward?(%{quest | required_skill: 185, required_skill_value: 1}, ctx())
+      refute QuestRequirements.can_auto_reward?(%{quest | prev_quest_id: 49}, ctx())
+      assert QuestRequirements.can_auto_reward?(%{quest | prev_quest_id: 49}, ctx(rewarded_quests: MapSet.new([49])))
+      {:ok, log} = QuestLog.add(%{}, 49)
+      assert QuestRequirements.can_auto_reward?(%{quest | prev_quest_id: -49}, ctx(quest_log: log))
+    end
+  end
+
   describe "can_take/2" do
     test "passes a plain quest" do
       assert QuestRequirements.can_take(%Quest{id: 1}, ctx()) == :ok

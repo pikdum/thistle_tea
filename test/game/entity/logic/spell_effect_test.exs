@@ -330,17 +330,20 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       refute SpellEffect.successful_hit?([Effects.spell_log_miss(99, 1, spell.id, :immune)])
     end
 
-    test "emits quest event credit for quest-complete effects" do
+    test "credits the recipient of quest-complete effects" do
       spell = %Spell{
         id: 10_617,
         effects: [%Effect{index: 0, type: :quest_complete, misc_value: 2561}]
       }
 
       context = %CastContext{caster_guid: 99, caster_level: 10}
+      target = dead_character_fixture()
+      target = %{target | unit: %{target.unit | health: 100}}
+      {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
 
-      {_target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
-
-      assert [%Effects.QuestEventCredit{player_guid: 99, quest_id: 2561}] = events
+      assert [%Effects.QuestEventCredit{player_guid: guid, quest_id: 2561}] = events
+      assert guid == target.object.guid
+      assert {_target, []} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
     end
 
     test "school reflection returns a harmful spell to its caster" do

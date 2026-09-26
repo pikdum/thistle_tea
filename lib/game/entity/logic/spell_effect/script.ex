@@ -53,9 +53,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
     end
   end
 
-  def apply(state, %CastContext{} = context, _spell, %Effect{type: :quest_complete, misc_value: quest_id}, _now)
+  def apply(%Character{} = state, %CastContext{}, _spell, %Effect{type: :quest_complete, misc_value: quest_id}, _now)
       when is_integer(quest_id) and quest_id > 0 do
-    {state, [Effects.quest_event_credit(context.caster_guid, quest_id)]}
+    {state, [Effects.quest_event_credit(state.object.guid, quest_id)]}
   end
 
   def apply(

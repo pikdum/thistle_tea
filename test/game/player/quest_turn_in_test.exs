@@ -18,6 +18,8 @@ defmodule ThistleTea.Game.Player.QuestTurnInTest do
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage
   alias ThistleTea.Game.Network.Message.SmsgItemPushResult
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Battleground.Match
   alias ThistleTea.Game.World.CharacterStore
@@ -27,6 +29,7 @@ defmodule ThistleTea.Game.Player.QuestTurnInTest do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.ItemProperty, as: PropertyLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.WorldRef
@@ -177,6 +180,28 @@ defmodule ThistleTea.Game.Player.QuestTurnInTest do
   end
 
   describe "choose_reward/4" do
+    test "casts the reward only after committing items and never on duplicate turn-in", context do
+      spell_id = 98_700_000 + context.id
+      quest = %{QuestLoader.get(context.quest_id) | reward_spell_cast: spell_id}
+      :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
+      spell = %Spell{id: spell_id, effects: [%Effect{type: :learn_spell}]}
+      :ets.insert(SpellLoader, {{:spell, spell_id}, spell})
+      on_exit(fn -> :ets.delete(SpellLoader, {:spell, spell_id}) end)
+
+      missing = state(context, completed_player(quest.id, []))
+      assert Quests.choose_reward(missing, context.npc_guid, quest.id, 0) == missing
+      refute_receive {:"$gen_cast", {:trigger_spell, _, _, _}}
+
+      items = Enum.map(1..2, fn _ -> ItemStore.create(@required_entry, owner: context.player_guid) end)
+      ready = state(context, completed_player(quest.id, items))
+      rewarded = Quests.choose_reward(ready, context.npc_guid, quest.id, 0)
+      assert MapSet.member?(rewarded.character.player.rewarded_quests, quest.id)
+      assert_receive {:"$gen_cast", {:trigger_spell, ^spell_id, target, []}}
+      assert target == context.player_guid
+      assert Quests.choose_reward(rewarded, context.npc_guid, quest.id, 0) == rewarded
+      refute_receive {:"$gen_cast", {:trigger_spell, _, _, _}}
+    end
+
     test "credits the match only after a successful inventory commit and ignores duplicate reward requests", context do
       quest_id = 6_781
       quest = %{QuestLoader.get(context.quest_id) | id: quest_id}
