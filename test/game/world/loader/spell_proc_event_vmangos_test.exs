@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Spell.ProcRule
   alias ThistleTea.Game.World.Loader.SpellProcEvent
+  alias ThistleTea.Game.World.Loader.SpellThreat
 
   @moduletag :vmangos_db
 
@@ -16,6 +17,24 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   end
 
   describe "get/1" do
+    test "Shadowguard ranks share an absorb-capable cooldown and cause no damage threat" do
+      assert %ProcRule{proc_ex: 0x403, cooldown_ms: 3_500} = SpellProcEvent.get(18_137)
+      SpellThreat.init()
+      SpellThreat.load_all()
+
+      for {id, trigger} <- [
+            {18_137, 28_377},
+            {19_308, 28_378},
+            {19_309, 28_379},
+            {19_310, 28_380},
+            {19_311, 28_381},
+            {19_312, 28_382}
+          ] do
+        assert %{first_spell: 18_137} = Mangos.Repo.get_by(Mangos.SpellChain, spell_id: id)
+        assert SpellThreat.get(trigger) == %{threat: 0.0, multiplier: 0.0}
+      end
+    end
+
     test "Blessed Recovery inherits its critical-only restriction from the first talent rank" do
       assert %ProcRule{proc_ex: 2, proc_flags: 0} = SpellProcEvent.get(27_811)
 

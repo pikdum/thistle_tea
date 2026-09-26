@@ -547,7 +547,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
 
       {entity, events} = Aura.reactions(entity, :hit_taken, %{attacker_guid: 999})
 
-      assert Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 28_376))
+      assert Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 28_377))
       assert entity.unit.auras == []
     end
 
@@ -557,7 +557,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
 
       {entity, events} = Combat.receive_attack(entity, %{caster: 999, damage: 5}, 2_000, roll: 9_999)
 
-      assert Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 28_376))
+      assert Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 28_377))
       assert [%Holder{charges: 2}] = entity.unit.auras
     end
 

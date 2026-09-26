@@ -22,6 +22,22 @@ defmodule ThistleTea.Game.Entity.Logic.ProcSpellTest do
   setup [:character]
 
   describe "resolve/4" do
+    test "Shadowguard resolves every rank without losing the attacker or proc source" do
+      for {id, trigger} <- [
+            {18_137, 28_377},
+            {19_308, 28_378},
+            {19_309, 28_379},
+            {19_310, 28_380},
+            {19_311, 28_381},
+            {19_312, 28_382}
+          ] do
+        event = Effects.trigger_spell(1, 60, 2, 28_376, triggered_by_spell_id: id)
+        holder = %Holder{spell: %Spell{id: id}}
+        assert [%Effects.TriggerSpell{} = resolved] = ProcSpell.resolve(event, holder, %{})
+        assert resolved == %{event | spell_id: trigger, requires_living_target?: true}
+      end
+    end
+
     test "Pyroclasm divides each rank's chance across channel ticks" do
       for {id, chance} <- [{18_096, 13}, {18_073, 26}],
           {spell, ticks} <- [

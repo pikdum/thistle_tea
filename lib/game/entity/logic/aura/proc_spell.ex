@@ -14,8 +14,21 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ProcSpell do
   @persistent_shield_absorb 26_470
   @pyroclasm %{18_096 => 13, 18_073 => 26}
   @pyroclasm_stun 18_093
+  @shadowguard %{
+    18_137 => 28_377,
+    19_308 => 28_378,
+    19_309 => 28_379,
+    19_310 => 28_380,
+    19_311 => 28_381,
+    19_312 => 28_382
+  }
 
   def resolve(event, holder, context, roll \\ &:rand.uniform/0)
+
+  def resolve(%Effects.TriggerSpell{} = event, %Holder{spell: %Spell{id: id}}, _context, _roll)
+      when is_map_key(@shadowguard, id) do
+    [%{event | spell_id: Map.fetch!(@shadowguard, id), requires_living_target?: true}]
+  end
 
   def resolve(%Effects.TriggerSpell{} = event, %Holder{spell: %Spell{id: id}}, context, roll)
       when is_map_key(@pyroclasm, id) do
