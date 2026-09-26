@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.EffectResolver.Pvp
   alias ThistleTea.Game.Entity.Logic.Aura.ProcDamage
+  alias ThistleTea.Game.Entity.Logic.Aura.TriggeredLifetime
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Entity.Logic.SpellResist
@@ -433,18 +434,20 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
         cast_item_guid: effect.cast_item_guid,
         extra_attack?: effect.extra_attack?,
         triggered_by_aura?: is_integer(effect.triggering_spell_id),
+        required_aura_source: required_aura_source(entity, effect, spell),
         triggered_by_proc?: triggered_by_proc?(effect),
         target_role: effect.target_role
     }
   end
 
-  defp trigger_context(_entity, %Effects.TriggerSpell{} = effect, spell) do
+  defp trigger_context(entity, %Effects.TriggerSpell{} = effect, spell) do
     %CastContext{
       caster_guid: effect.source_guid,
       triggered?: true,
       cast_item_guid: effect.cast_item_guid,
       extra_attack?: effect.extra_attack?,
       triggered_by_aura?: is_integer(effect.triggering_spell_id),
+      required_aura_source: required_aura_source(entity, effect, spell),
       triggered_by_proc?: triggered_by_proc?(effect),
       caster_level: effect.source_level || 1,
       target_guid: effect.target_guid,
@@ -454,6 +457,17 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
     }
     |> inherit_hit_context(effect.hit_context, spell)
   end
+
+  defp required_aura_source(
+         %{object: %{guid: guid}} = entity,
+         %Effects.TriggerSpell{target_guid: guid, triggering_spell_id: id},
+         %Spell{duration_ms: -1} = spell
+       )
+       when is_integer(id) do
+    TriggeredLifetime.source(entity, trigger_spell(entity, id), spell)
+  end
+
+  defp required_aura_source(_entity, _effect, _spell), do: nil
 
   defp inherit_hit_context(%CastContext{caster_guid: guid} = context, %CastContext{caster_guid: guid} = source, spell) do
     bonus =

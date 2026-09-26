@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Aura.StealthSync
   alias ThistleTea.Game.Entity.Logic.Aura.TauntSync
   alias ThistleTea.Game.Entity.Logic.Aura.ThreatSync
+  alias ThistleTea.Game.Entity.Logic.Aura.TriggeredLifetime
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Aura.ViewpointSync
   alias ThistleTea.Game.Entity.Logic.Casting
@@ -72,7 +73,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     desired = StackingProc.reconcile(previous, desired)
     desired = Linked.reconcile(entity, previous, desired, now)
     desired = Capacity.retain(desired, entity_guid(entity))
-    desired = Enum.filter(desired, &Linked.active?(&1, desired, now))
+    desired = retain_active_sources(previous, desired, now)
 
     if desired == previous do
       {entity, []}
@@ -87,6 +88,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
         {entity, events ++ passive_events}
       end
     end
+  end
+
+  defp retain_active_sources(previous, desired, now) do
+    retained =
+      desired |> Enum.filter(&Linked.active?(&1, desired, now)) |> then(&TriggeredLifetime.reconcile(previous, &1))
+
+    if retained == desired, do: desired, else: retain_active_sources(previous, retained, now)
   end
 
   defp reconcile(entity, previous, holders, cause, now) do

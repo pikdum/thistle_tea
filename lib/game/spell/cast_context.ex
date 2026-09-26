@@ -89,6 +89,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :heartbeat_sample,
     :heartbeat_roll,
     :persistent_area,
+    :required_aura_source,
     :feign_death,
     damage_sharing_targets: MapSet.new(),
     triggered_by_aura?: false,

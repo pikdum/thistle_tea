@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Logic.Aura.SingleTarget
   alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
+  alias ThistleTea.Game.Entity.Logic.Aura.TriggeredLifetime
   alias ThistleTea.Game.Entity.Logic.CreatureImmunity
   alias ThistleTea.Game.Entity.Logic.DiminishingReturns
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
@@ -63,9 +64,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   ]
 
   def apply_spell(entity, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
-    if CreatureImmunity.spell?(entity, context, spell),
-      do: {entity, []},
-      else: apply_unblocked_spell(entity, context, spell, now)
+    if not TriggeredLifetime.source_alive?(entity, context.required_aura_source, now) or
+         CreatureImmunity.spell?(entity, context, spell),
+       do: {entity, []},
+       else: apply_unblocked_spell(entity, context, spell, now)
   end
 
   defp apply_unblocked_spell(entity, context, spell, now) do
