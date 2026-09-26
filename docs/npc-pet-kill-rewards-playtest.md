@@ -71,11 +71,13 @@ An initial teleport used an unsafe height and fell below terrain; that attempt
 awarded nothing. The measured kill used the stable shrine position
 `2328, 242, 153.8218`. WoW process 1280502 used amdgpu, with its graphics
 counter increasing from 2,040,295,224 to 32,003,845,808 ns.
+The helper-owned client and retained BEAM server were stopped afterward.
 
 No error-level or spell-validation logs appeared. Evade exposed unsupported
-script command 56, `REMOVE_GUARDIANS`, in script 366401; this was selected for
-the immediate follow-up. Earlier guardian departure does not prove that
-command worked.
+script command 56, `REMOVE_GUARDIANS`, in script 366401. The immediate
+[guardian cleanup follow-up](guardian-script-cleanup-playtest.md) implemented
+and tested it in a fresh native encounter. Earlier guardian departure in this
+XP session does not prove that command worked.
 
 Evidence: `/tmp/thistle-npc-pet-{tests,compile,credo,server}.log`,
 `/tmp/thistle-npc-pet-{tamed,ready,death,after-succubus,guardian-death,logout,reconnected}.txt`,
