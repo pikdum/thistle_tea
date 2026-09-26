@@ -17,6 +17,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ProcSpell do
   @persistent_shield_absorb 26_470
   @pyroclasm %{18_096 => 13, 18_073 => 26}
   @pyroclasm_stun 18_093
+  @lightning_shield %{
+    324 => 26_364,
+    325 => 26_365,
+    905 => 26_366,
+    945 => 26_367,
+    8134 => 26_369,
+    10_431 => 26_370,
+    10_432 => 26_363
+  }
   @shadowguard %{
     18_137 => 28_377,
     19_308 => 28_378,
@@ -25,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ProcSpell do
     19_311 => 28_381,
     19_312 => 28_382
   }
+  @retaliation_spells Map.merge(@lightning_shield, @shadowguard)
 
   def resolve(event, holder, context, roll \\ &:rand.uniform/0)
 
@@ -36,8 +46,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ProcSpell do
   end
 
   def resolve(%Effects.TriggerSpell{} = event, %Holder{spell: %Spell{id: id}}, _context, _roll)
-      when is_map_key(@shadowguard, id) do
-    [%{event | spell_id: Map.fetch!(@shadowguard, id), requires_living_target?: true}]
+      when is_map_key(@retaliation_spells, id) do
+    [%{event | spell_id: Map.fetch!(@retaliation_spells, id), requires_living_target?: true}]
   end
 
   def resolve(%Effects.TriggerSpell{} = event, %Holder{spell: %Spell{id: id}}, context, roll)
