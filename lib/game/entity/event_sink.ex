@@ -65,6 +65,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.AttackNotInRange,
     Effects.AttackBadFacing,
     Effects.AttackOutcome,
+    Effects.KillOutcome,
     Effects.AttackStart,
     Effects.AttackStop,
     Effects.AttackerGained,

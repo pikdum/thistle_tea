@@ -201,6 +201,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
     entity
   end
 
+  def emit(entity, %Effects.KillOutcome{} = effect, _context) do
+    Entity.kill_outcome(effect.target_guid, effect.victim)
+    entity
+  end
+
   def emit(entity, %Effects.AttackerGained{target_guid: target_guid}, _context) do
     Metadata.increment(target_guid, :attacker_count)
     entity

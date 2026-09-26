@@ -54,7 +54,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.Inventory
-  alias ThistleTea.Game.Entity.Logic.KillCredit
+  alias ThistleTea.Game.Entity.Logic.KillFeedback
   alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Logic.Loot.Reservation
   alias ThistleTea.Game.Entity.Logic.MovementHandoff
@@ -472,6 +472,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   end
 
+  def handle_cast({:kill_outcome, %KillFeedback.Victim{} = victim}, %{character: %Character{} = character} = state) do
+    character = KillFeedback.receive(character, victim, Time.now())
+    {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Kill proc failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_cast({:spell_outcome, payload}, %{character: %Character{} = character} = state) do
     spell = spellbook_spell(character, Map.get(payload, :spell_id))
     character = SpellFeedback.receive(character, payload, spell, Time.now())
@@ -614,7 +623,6 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_cast({:reward_kill, victim}, %{character: %Character{} = character} = state) do
     xp = kill_xp(character, victim)
-    state = if xp > 0 and not KillCredit.pet?(victim), do: trigger_kill_procs(state, victim), else: state
     state = apply_kill_reward(state, victim, xp)
     PetExperience.reward_kill(state.character, victim, xp, :solo)
     {:noreply, state}
@@ -2029,11 +2037,6 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     do: Casting.cancel(character, Time.now())
 
   defp cancel_released_channel(character, _spell_id), do: character
-
-  defp trigger_kill_procs(state, victim) do
-    {character, events} = Aura.reactions(state.character, :kill, %{victim_guid: victim.object.guid, now: Time.now()})
-    %{state | character: EventSink.emit(character, events)}
-  end
 
   defp apply_kill_reward(state, victim, xp, quest? \\ true) do
     character = Reactive.clear_combo_target(state.character, victim.object.guid)

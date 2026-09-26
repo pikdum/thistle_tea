@@ -22,6 +22,10 @@ defmodule ThistleTea.Game.Spell.Proc do
     if absorbed > 0, do: mask ||| @absorb, else: mask
   end
 
+  def eligible?(%Spell{} = proc_spell, _triggering_spell, :kill, outcome) do
+    proc_flag?(proc_spell, :kill) and kill_outcome_allowed?(proc_spell.proc_rule, outcome)
+  end
+
   def eligible?(%Spell{} = proc_spell, %Spell{} = triggering_spell, proc_type, outcome) do
     caster_proc_allowed?(triggering_spell, proc_type) and proc_flag?(proc_spell, proc_type) and
       school_allowed?(proc_spell.proc_rule, triggering_spell) and
@@ -62,14 +66,19 @@ defmodule ThistleTea.Game.Spell.Proc do
     ] or not Spell.attribute?(spell, :suppress_caster_procs)
   end
 
-  def roll?(spell, attack_time_ms \\ nil, roll \\ &:rand.uniform/0)
+  def roll?(spell, attack_time_ms \\ nil, roll \\ &:rand.uniform/0, modifier \\ &Function.identity/1)
 
-  def roll?(%Spell{} = spell, attack_time_ms, roll) when is_function(roll, 0) do
-    chance = proc_chance(spell, attack_time_ms)
+  def roll?(%Spell{} = spell, attack_time_ms, roll, modifier) when is_function(roll, 0) and is_function(modifier, 1) do
+    chance = modifier.(proc_chance(spell, attack_time_ms))
     chance >= 100 or (chance > 0 and roll.() * 100 <= chance)
   end
 
-  def roll?(_spell, _attack_time_ms, _roll), do: false
+  def roll?(_spell, _attack_time_ms, _roll, _modifier), do: false
+
+  defp kill_outcome_allowed?(%ProcRule{proc_ex: proc_ex}, outcome) when is_integer(proc_ex),
+    do: (proc_ex &&& @cast_end) == (outcome_mask(outcome) &&& @cast_end)
+
+  defp kill_outcome_allowed?(_rule, outcome), do: (outcome_mask(outcome) &&& @cast_end) == 0
 
   defp proc_flag?(%Spell{proc_rule: %ProcRule{proc_flags: flags}}, proc_type) when flags > 0,
     do: proc_flag?(flags, proc_type)

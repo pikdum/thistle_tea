@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Proc
   alias ThistleTea.Game.Spell.Scripts
 
@@ -143,7 +144,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
       when is_list(holders) and is_integer(victim_guid) do
     {holders, events} =
       Enum.reduce(holders, {holders, []}, fn %Holder{} = holder, {current_holders, events} ->
-        kill_proc_transition(current_holders, events, holder, owner_guid, context)
+        kill_proc_transition(entity, current_holders, events, holder, owner_guid, context)
       end)
 
     {entity, removal_events} = transition_holders(entity, holders, context)
@@ -215,10 +216,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     end)
   end
 
-  defp kill_proc_transition(holders, events, holder, owner_guid, context) do
+  defp kill_proc_transition(entity, holders, events, holder, owner_guid, context) do
+    modifier = &Modifiers.value(entity, holder.spell, :chance_of_success, &1)
+
     proc? =
       proc_ready?(holder, Map.get(context, :now)) and
-        Proc.eligible?(holder.spell, nil, :kill, :normal) and Proc.roll?(holder.spell)
+        Proc.eligible?(holder.spell, nil, :kill, :normal) and Proc.roll?(holder.spell, nil, &:rand.uniform/0, modifier)
 
     if proc? do
       generic_outgoing_spell_proc(holders, events, holder, owner_guid, context)

@@ -55,6 +55,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.KillCredit
+  alias ThistleTea.Game.Entity.Logic.KillFeedback
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
@@ -731,6 +732,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> wake_ai_tick()
 
     {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
+  def handle_cast({:kill_outcome, %KillFeedback.Victim{} = victim}, %Mob{} = state) do
+    state = state |> KillFeedback.receive(victim, Time.now()) |> EventSink.emit_pending() |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Kill proc failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:receive_shared_damage, %Effects.SharedDamage{} = transfer}, %Mob{} = state) do

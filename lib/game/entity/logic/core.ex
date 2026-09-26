@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Honor.Combat, as: HonorCombat
   alias ThistleTea.Game.Entity.Logic.Intoxication
   alias ThistleTea.Game.Entity.Logic.KillCredit
+  alias ThistleTea.Game.Entity.Logic.KillFeedback
   alias ThistleTea.Game.Entity.Logic.MiniPet
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.MovementStats
@@ -133,6 +134,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       entity = %{entity | unit: %{unit | health: new_health}}
       entity = enqueue_duel_outcome(entity, duel_outcome)
       entity = Aura.enqueue_death_item_rewards(entity, health, new_health)
+      entity = KillFeedback.capture(entity, health, new_health, Keyword.get(opts, :source))
       entity = HonorCombat.on_damage(entity, health, remaining, new_health, now, opts)
       entity = maybe_enqueue_defeat(entity, health, new_health, opts)
 

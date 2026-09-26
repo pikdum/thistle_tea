@@ -220,6 +220,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:reward_kill, victim})
   end
 
+  def kill_outcome(entity, victim) do
+    dispatch_cast(entity, {:kill_outcome, victim})
+  end
+
   def reward_kill_share(entity, victim, award) do
     dispatch_cast(entity, {:reward_kill_share, victim, award})
   end
