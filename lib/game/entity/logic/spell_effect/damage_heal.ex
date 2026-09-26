@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   alias ThistleTea.Game.Spell.Critical
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Modifiers
+  alias ThistleTea.Game.Spell.Proc
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
 
@@ -181,7 +182,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   end
 
   def avoided_melee_ability_reactions(state, context, spell, outcome, now) do
-    incoming_melee_ability_reactions(state, context, spell, outcome, 0, now)
+    hit = %{outcome: outcome, damage: 0, absorbed: 0, proc_ex: Proc.hit_mask(outcome, 0, 0)}
+    incoming_melee_ability_reactions(state, context, spell, hit, now)
   end
 
   defp weapon_effect?(%Effect{type: type}), do: type in @weapon_effect_types
@@ -265,28 +267,50 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
       if context.proc_damage? or Keyword.get(opts, :periodic?, false) do
         {state, []}
       else
-        spell_taken_reactions(state, context, spell, damage - absorbed, crit?, opts, now)
+        spell_taken_reactions(state, context, event, opts, now)
       end
 
     {state, [event | reaction_events]}
   end
 
-  defp spell_taken_reactions(state, %CastContext{caster_guid: caster_guid}, spell, damage, crit?, opts, now)
+  defp spell_taken_reactions(
+         state,
+         %CastContext{caster_guid: caster_guid},
+         %Effects.SpellDamage{damage: damage} = event,
+         opts,
+         now
+       )
        when is_integer(caster_guid) and is_integer(damage) and damage > 0 do
-    proc_type = taken_spell_proc_type(spell, opts)
+    proc_type = taken_spell_proc_type(event.spell, opts)
     reaction = if proc_type == :take_ranged_ability, do: :hit_taken, else: :spell_hit_taken
 
-    Aura.reactions(state, reaction, %{
-      attacker_guid: caster_guid,
-      spell: spell,
-      proc_type: proc_type,
-      outcome: if(crit?, do: :crit, else: :normal),
-      damage: damage,
-      now: now
-    })
+    if Core.dead?(state) do
+      {state, []}
+    else
+      context =
+        Map.merge(damage_hit_context(event), %{
+          attacker_guid: caster_guid,
+          spell: event.spell,
+          proc_type: proc_type,
+          now: now
+        })
+
+      Aura.reactions(state, reaction, context)
+    end
   end
 
-  defp spell_taken_reactions(state, _context, _spell, _damage, _crit?, _opts, _now), do: {state, []}
+  defp spell_taken_reactions(state, _context, _event, _opts, _now), do: {state, []}
+
+  defp damage_hit_context(%Effects.SpellDamage{} = event) do
+    outcome = if event.crit?, do: :crit, else: :normal
+
+    %{
+      outcome: outcome,
+      damage: max(event.damage - event.absorbed, 0),
+      absorbed: event.absorbed,
+      proc_ex: Proc.hit_mask(outcome, event.damage, event.absorbed)
+    }
+  end
 
   defp versus_damage_multiplier(state, %CastContext{damage_done_versus: pairs}) do
     max(100 + Aura.versus_amount(pairs, CreatureType.mask(state)), 0) / 100
@@ -500,35 +524,36 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         proc_type: dealt_attack_proc_type(spell)
       )
 
-    {state, reaction_events} = melee_ability_reactions(state, context, spell, damage - absorbed, now)
+    {state, reaction_events} = melee_ability_reactions(state, context, event, now)
     {state, [event | reaction_events]}
   end
 
-  defp melee_ability_reactions(state, %CastContext{} = context, %Spell{} = spell, damage, now) when damage > 0 do
-    outcome = if context.melee_crit?, do: :crit, else: :normal
-    incoming_melee_ability_reactions(state, context, spell, outcome, damage, now)
+  defp melee_ability_reactions(state, %CastContext{} = context, %Effects.SpellDamage{damage: damage} = event, now)
+       when damage > 0 do
+    incoming_melee_ability_reactions(state, context, event.spell, damage_hit_context(event), now)
   end
 
-  defp melee_ability_reactions(state, _context, _spell, _damage, _now), do: {state, []}
+  defp melee_ability_reactions(state, _context, _event, _now), do: {state, []}
 
   defp weapon_crit_bonus(context, spell, damage) do
     bonus = if Spell.wand?(spell), do: damage * 0.5, else: damage * 1.0
     trunc(Modifiers.value(context.spell_modifiers, :crit_damage_bonus, bonus))
   end
 
-  defp incoming_melee_ability_reactions(state, %CastContext{} = context, %Spell{} = spell, outcome, damage, now) do
+  defp incoming_melee_ability_reactions(state, %CastContext{} = context, %Spell{} = spell, hit, now) do
     if Core.dead?(state) do
       {state, []}
     else
-      Aura.reactions(state, :hit_taken, %{
-        attacker_guid: context.caster_guid,
-        attacker_position: attack_position(context.caster_position),
-        proc_type: taken_attack_proc_type(spell),
-        outcome: outcome,
-        damage: damage,
-        spell: spell,
-        now: now
-      })
+      reaction_context =
+        Map.merge(hit, %{
+          attacker_guid: context.caster_guid,
+          attacker_position: attack_position(context.caster_position),
+          proc_type: taken_attack_proc_type(spell),
+          spell: spell,
+          now: now
+        })
+
+      Aura.reactions(state, :hit_taken, reaction_context)
     end
   end
 

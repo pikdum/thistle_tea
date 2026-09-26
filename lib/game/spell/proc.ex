@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.Spell.Proc do
   @trigger_always 0x10000
   @cast_end 0x80000
 
-  def melee_hit_mask(outcome, damage, absorbed) do
+  def hit_mask(outcome, damage, absorbed) do
     mask = outcome_mask(outcome)
     mask = if outcome == :block and damage > 0, do: mask ||| @normal_hit, else: mask
     if absorbed > 0, do: mask ||| @absorb, else: mask
@@ -161,8 +161,8 @@ defmodule ThistleTea.Game.Spell.Proc do
 
   def shield_outcome_allowed?(_spell, %{outcome: :block}), do: true
 
-  def shield_outcome_allowed?(_spell, %{damage: damage, absorbed: absorbed} = context) do
-    damage > absorbed and shield_outcome_allowed?(nil, context.outcome)
+  def shield_outcome_allowed?(_spell, %{damage: damage} = context) do
+    damage > 0 and shield_outcome_allowed?(nil, context.outcome)
   end
 
   def shield_outcome_allowed?(_spell, %{outcome: outcome}), do: shield_outcome_allowed?(nil, outcome)

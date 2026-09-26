@@ -155,11 +155,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   def reactions(entity, _event, _context), do: {entity, []}
 
   defp incoming_spell_transition(holders, events, holder, owner_guid, attacker_guid, context) do
-    %{spell: triggering_spell, proc_type: proc_type, outcome: outcome} = context
+    %{spell: triggering_spell, proc_type: proc_type} = context
 
     proc? =
       not self_proc?(holder, triggering_spell) and proc_ready?(holder, Map.get(context, :now)) and
-        Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and Proc.roll?(holder.spell)
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and Proc.roll?(holder.spell)
 
     if proc? do
       apply_incoming_spell_proc(holders, events, holder, owner_guid, attacker_guid, context)

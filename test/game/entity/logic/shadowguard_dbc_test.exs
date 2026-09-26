@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.ShadowguardDbcTest do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.ProcRule
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellChain
@@ -33,6 +34,20 @@ defmodule ThistleTea.Game.Entity.Logic.ShadowguardDbcTest do
   ]
 
   setup [:catalog, :combatants]
+
+  describe "receive/4" do
+    test "a spell absorbed by Power Word Shield still consumes a Shadowguard charge", context do
+      {priest, _} = Aura.apply_spell(context.priest, 1, 60, SpellLoader.load(19_312), 0)
+      {priest, _} = Aura.apply_spell(priest, 1, 60, SpellLoader.load(17), 0)
+      bolt = SpellLoader.load(686)
+      cast_context = %CastContext{caster_guid: context.attacker.object.guid, caster_level: 60}
+      {priest, events} = SpellEffect.receive(priest, cast_context, bolt, 1_000)
+      assert priest.unit.health == 5_000
+      assert Enum.any?(events, &match?(%Effects.SpellDamage{damage: damage, absorbed: damage} when damage > 0, &1))
+      assert Enum.count(events, &match?(%Effects.TriggerSpell{spell_id: 28_382}, &1)) == 1
+      assert Enum.find(priest.unit.auras, &(&1.spell.id == 19_312)).charges == 2
+    end
+  end
 
   describe "receive_attack/4" do
     test "all ranks damage the attacker through triggered delivery without damage threat", context do
@@ -103,7 +118,8 @@ defmodule ThistleTea.Game.Entity.Logic.ShadowguardDbcTest do
       end)
 
     for {table, key, value} <- [
-          {SpellProcEvent, 18_137, %ProcRule{proc_ex: 0x403, cooldown_ms: 3_500}} | chains ++ triggers
+          {SpellProcEvent, 18_137, %ProcRule{proc_ex: 0x403, cooldown_ms: 3_500}}
+          | chains ++ triggers ++ [{SpellChain, {:chain, 17}, nil}, {SpellChain, {:chain, 686}, nil}]
         ] do
       previous = :ets.lookup(table, key)
       :ets.insert(table, {key, value})

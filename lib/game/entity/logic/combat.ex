@@ -177,7 +177,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
     result =
       result
-      |> Map.put(:proc_ex, Proc.melee_hit_mask(result.outcome, result.damage, absorbed))
+      |> Map.put(:proc_ex, Proc.hit_mask(result.outcome, result.damage, absorbed))
       |> Map.put(:damage, damage)
 
     attack =

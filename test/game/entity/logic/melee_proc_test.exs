@@ -112,6 +112,16 @@ defmodule ThistleTea.Game.Entity.Logic.MeleeProcTest do
       assert triggered_ids(events) == [9_001]
     end
 
+    test "partially absorbed hits still trigger damage shields", %{attacker: attacker, defender: defender} do
+      for absorbed <- [40, 60, 99] do
+        {updated, events} =
+          Combat.receive_attack(with_absorb(defender, absorbed), attack(attacker, 100), 1_000, roll: 9_999)
+
+        assert updated.unit.health == 400 + absorbed
+        assert Enum.sort(triggered_ids(events)) == [9_001, 9_003]
+      end
+    end
+
     test "incoming proc cooldowns hold charges until the next eligible hit", %{attacker: attacker, defender: defender} do
       [incoming | _] = defender.unit.auras
       incoming = %{incoming | spell: %{incoming.spell | proc_rule: %ProcRule{cooldown_ms: 1_000}}}

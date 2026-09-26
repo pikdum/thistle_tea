@@ -187,6 +187,28 @@ defmodule ThistleTea.Game.Entity.Logic.ProcSpellTest do
   end
 
   describe "apply/5" do
+    test "absorbed spell and weapon ability hits retain their incoming proc outcome", %{character: character} do
+      for dmg_class <- [1, 2, 3], absorbed <- [0, 40, 100] do
+        proc = %Spell{
+          id: 903,
+          proc_type_mask: 0x202A8,
+          proc_chance: 100,
+          proc_charges: 3,
+          proc_rule: %ProcRule{proc_ex: 0x400},
+          effects: [%Effect{index: 0, type: :apply_aura, aura: :proc_trigger_spell, trigger_spell_id: 904}]
+        }
+
+        target = character |> with_aura(proc) |> with_aura(absorb(absorbed))
+        effect = %Effect{index: 0, type: :school_damage, base_points: 100}
+        spell = %Spell{id: 905, school: :physical, dmg_class: dmg_class, effects: [effect]}
+        context = %CastContext{caster_guid: 2, caster_level: 60, spell: spell}
+        {target, events} = DamageHeal.apply(target, context, spell, effect, 0)
+        assert target.unit.health == 4_900 + absorbed
+        assert Enum.any?(events, &match?(%Effects.TriggerSpell{spell_id: 904}, &1)) == absorbed > 0
+        assert Enum.find(target.unit.auras, &(&1.spell.id == proc.id)).charges == if(absorbed > 0, do: 2, else: 3)
+      end
+    end
+
     test "melee ability feedback retains its damage after absorption", %{character: character} do
       character = character |> with_aura(recovery()) |> with_aura(absorb(100))
       effect = %Effect{index: 0, type: :school_damage, base_points: 200}
