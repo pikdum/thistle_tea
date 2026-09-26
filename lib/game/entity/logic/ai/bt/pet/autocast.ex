@@ -9,10 +9,65 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.Autocast do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Target
 
   @stunned 0x00040000
+
+  def candidates(%{object: %{guid: guid}, internal: %{pet: %Pet{owner_guid: owner}}} = pet, %Spell{} = spell, context) do
+    pet
+    |> recipient_candidates(spell, context, guid, owner)
+    |> Enum.filter(&(is_integer(&1) and &1 > 0))
+    |> Enum.uniq()
+    |> Enum.filter(&available?(pet, &1, context))
+  end
+
+  defp recipient_candidates(pet, spell, context, guid, owner) do
+    allies = Enum.uniq(context.pet_allies ++ [owner, guid])
+    enemies = enemy_candidates(pet, context)
+
+    case SpellTarget.target_query(spell, Target.unit(guid)) do
+      :caster -> [guid]
+      :caster_master -> [owner]
+      {:party_aoe, radius} -> within_radius(allies, pet, radius, context)
+      {:caster_aoe, radius} -> within_radius([pet.unit.target], pet, radius, context)
+      {:caster_cone, radius} -> within_radius([pet.unit.target], pet, radius, context)
+      {:party_unit, _} -> allies
+      _ -> if Spell.harmful?(spell), do: [pet.unit.target], else: enemies ++ allies
+    end
+  end
+
+  defp enemy_candidates(%{object: %{guid: guid}, internal: %{pet: %Pet{owner_guid: owner}}} = pet, context) do
+    attackers =
+      context.perception.entities
+      |> Enum.flat_map(fn
+        {target, %{metadata: %{victim_guid: victim}}} when victim in [guid, owner] -> [target]
+        _ -> []
+      end)
+      |> Enum.sort()
+
+    owner_target = Map.get(Perception.metadata(context.perception, owner) || %{}, :victim_guid)
+    [pet.unit.target, owner_target | attackers]
+  end
+
+  defp within_radius(allies, pet, radius, context) do
+    Enum.filter(allies, fn guid ->
+      guid == pet.object.guid or
+        case Perception.distance(context.perception, guid) do
+          distance when is_number(distance) -> distance <= radius
+          _ -> false
+        end
+    end)
+  end
+
+  defp available?(%{object: %{guid: guid}}, guid, _context), do: true
+
+  defp available?(%{internal: %{world: world}}, guid, %Context{perception: perception}) do
+    match?(%{alive?: true}, Perception.metadata(perception, guid)) and
+      match?({^world, _, _, _}, Perception.position(perception, guid))
+  end
 
   def allowed?(%{internal: %{pet: %Pet{autocast: enabled}}} = pet, %Spell{} = spell, target_guid, %Context{} = context) do
     target = target_snapshot(pet, target_guid, context)

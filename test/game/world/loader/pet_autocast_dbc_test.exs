@@ -10,12 +10,33 @@ defmodule ThistleTea.Game.World.Loader.PetAutocastDbcTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet.Autocast
+  alias ThistleTea.Game.Entity.Logic.SpellTarget
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.WorldRef
 
   @moduletag :dbc_db
 
   describe "load/1" do
+    test "every pet Fire Shield and Devour Magic rank retains its selectable recipients" do
+      for id <- [2_947, 8_316, 8_317, 11_770, 11_771] do
+        spell = SpellLoader.load(id)
+        assert SpellTarget.target_query(spell, Target.unit(42)) == {:party_unit, 42}
+        refute Spell.harmful?(spell)
+        assert spell.spell_visual == 289
+        assert Spell.family_flag?(spell, 5, 0x00800000)
+        assert spell.range_yards == 30.0
+      end
+
+      for id <- [19_505, 19_731, 19_734, 19_736] do
+        spell = SpellLoader.load(id)
+        assert SpellTarget.target_query(spell, Target.unit(42)) == {:unit, 42}
+        assert [%{type: :dispel, implicit_target_a: :any_unit, misc_value: 1}] = spell.effects
+        refute Spell.harmful?(spell)
+      end
+    end
+
     test "Dash and Dive wait for combat and do not fire within melee reach" do
       for id <- [23_099, 23_109, 23_110, 23_145, 23_147, 23_148] do
         spell = SpellLoader.load(id)

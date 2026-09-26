@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
@@ -40,6 +41,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   @injured_default_threshold 50
 
   def list_tick_ms, do: @list_tick_ms
+
+  def observation_radius(%Mob{internal: %Internal{pet: %Pet{}, spellbook: spellbook}}) when is_map(spellbook) do
+    Enum.reduce(spellbook, 0.0, fn {_id, spell}, radius -> max(radius, spell.range_yards || 0.0) end)
+  end
 
   def observation_radius(%Mob{internal: %Internal{creature: %Creature{spells: spells}, spellbook: spellbook}})
       when is_list(spells) and is_map(spellbook) do
@@ -375,6 +380,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   defp lookup_spell(_state, _spell_id), do: nil
 
+  def resolve_target(%Mob{internal: %Internal{pet: %Pet{}}} = state, _entry, %Spell{} = spell, %Context{} = context) do
+    state
+    |> Autocast.candidates(spell, context)
+    |> Enum.find(fn guid ->
+      Autocast.allowed?(state, spell, guid, context) and
+        CastValidation.validate_target(state, spell, Target.unit(guid), build_target_info(state, guid, context)) == :ok
+    end)
+  end
+
   def resolve_target(%Mob{object: %{guid: guid}}, %CreatureSpell{cast_target: :self}, _spell, %Context{}) do
     guid
   end
@@ -578,6 +592,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
           friendly?: Hostility.friendly?(source, metadata),
           attackable?: Hostility.attackable?(source, metadata),
           creature_type: Map.get(metadata, :creature_type),
+          dispel_options: Map.get(metadata, :dispel_options, MapSet.new()),
+          aura_sources: Map.get(metadata, :aura_sources, MapSet.new()),
+          health_pct: Map.get(metadata, :health_pct),
+          power_type: Map.get(metadata, :power_type),
+          level: Map.get(metadata, :level),
           combat_reach: Map.get(metadata, :combat_reach),
           orientation: Map.get(metadata, :orientation),
           position: Perception.position(perception, target_guid),

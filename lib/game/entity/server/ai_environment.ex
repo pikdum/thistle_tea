@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Server.FormationEnvironment
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.SpellReception
+  alias ThistleTea.Game.Party
   alias ThistleTea.Game.Player.Movement, as: PlayerMovement
   alias ThistleTea.Game.Spell.Area
   alias ThistleTea.Game.Time
@@ -48,6 +49,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Pathfinding.Aquatic
   alias ThistleTea.Game.World.SpellAreas
+  alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.System.ScriptedEvent
 
   @pet_observation_radius 20.0
@@ -66,7 +68,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     conditions = all_conditions(entity, request)
     requirements = Requirements.plan(conditions)
     script_targets = script_target_results(entity, request.script_targets)
-    observed_actors = actors ++ Map.values(script_targets)
+    pet_allies = pet_allies(entity)
+    observed_actors = actors ++ pet_allies ++ Map.values(script_targets)
     perception = perception(entity, now, observed_actors, requested_radius, requested_game_object_radius)
     groups = condition_groups(entity, request, perception, conditions)
     condition_results = script_condition_results(entity, groups)
@@ -90,6 +93,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       instance_data: instance_data(entity, requirements, options),
       formation: FormationEnvironment.snapshot(entity, now),
       shared_leash_time: CombatLeashes.last_extended_at(entity),
+      pet_allies: pet_allies,
       aura_contexts: SpellReception.aura_contexts(entity, now),
       creature_archetypes: creature_archetypes(entity, request.creature_entries)
     }
@@ -97,6 +101,21 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
 
   defp liquid_surface(%Character{} = character), do: PlayerMovement.liquid_surface(character)
   defp liquid_surface(_entity), do: nil
+
+  defp pet_allies(%Mob{object: %{guid: guid}, internal: %Internal{pet: %Pet{owner_guid: owner}}}) do
+    members =
+      case PartySystem.group_of(owner) do
+        %Party.Group{} = group -> Enum.map(Party.subgroup_members(group, owner), & &1.guid)
+        _ -> []
+      end
+
+    [guid, owner | members]
+    |> Enum.filter(&(is_integer(&1) and &1 > 0))
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  defp pet_allies(_entity), do: []
 
   defp spell_area(%{internal: %{spellbook: spellbook}} = entity) when is_map(spellbook) do
     if Enum.any?(Map.values(spellbook), &Area.restricted?/1), do: SpellAreas.context(entity)
@@ -241,7 +260,9 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
          internal: %Internal{pet: %Pet{owner_guid: owner_guid}, threat: threat},
          unit: %Unit{target: target}
        }) do
-    [owner_guid, target | threat_guids(threat)]
+    owner = Metadata.get(owner_guid) || %{}
+
+    [owner_guid, target, Map.get(owner, :victim_guid) | threat_guids(threat)]
     |> Enum.filter(&(is_integer(&1) and &1 > 0))
   end
 

@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
     :instance_data,
     :formation,
     :shared_leash_time,
+    pet_allies: [],
     aura_contexts: %{},
     creature_archetypes: %{}
   ]
@@ -59,6 +60,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
       instance_data: Keyword.get(opts, :instance_data),
       formation: Keyword.get(opts, :formation),
       shared_leash_time: Keyword.get(opts, :shared_leash_time),
+      pet_allies: Keyword.get(opts, :pet_allies, []),
       aura_contexts: Keyword.get(opts, :aura_contexts, %{}),
       creature_archetypes: Keyword.get(opts, :creature_archetypes, %{})
     }
