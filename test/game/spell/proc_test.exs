@@ -161,7 +161,7 @@ defmodule ThistleTea.Game.Spell.ProcTest do
 
       assert Proc.roll?(spell, 2_000, fn -> 0.1 end)
       refute Proc.roll?(spell, 2_000, fn -> 0.2 end)
-      refute Proc.roll?(spell, nil, fn -> 0.0 end)
+      assert Proc.roll?(spell, nil, fn -> 1.0 end)
     end
 
     test "prefers VMangos custom chance over DBC chance" do

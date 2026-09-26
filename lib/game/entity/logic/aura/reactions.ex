@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.ClassScript
   alias ThistleTea.Game.Entity.Logic.Aura.HealingPower
+  alias ThistleTea.Game.Entity.Logic.Aura.ProcChance
   alias ThistleTea.Game.Entity.Logic.Aura.ProcEquipment
   alias ThistleTea.Game.Entity.Logic.Aura.ProcSpell
   alias ThistleTea.Game.Entity.Logic.Aura.ReactiveArmor
@@ -18,7 +19,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Proc
   alias ThistleTea.Game.Spell.Scripts
 
@@ -119,7 +119,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   end
 
   def reactions(
-        %{object: %{guid: owner_guid}, unit: %Unit{auras: holders}} = entity,
+        %{unit: %Unit{auras: holders}} = entity,
         :spell_hit_taken,
         %{attacker_guid: attacker_guid, spell: %Spell{}, proc_type: proc_type, outcome: outcome} = context
       )
@@ -133,7 +133,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
     {holders, events} =
       Enum.reduce(holders, {holders, []}, fn %Holder{} = holder, {current_holders, events} ->
-        incoming_spell_transition(current_holders, events, holder, owner_guid, attacker_guid, context)
+        incoming_spell_transition(current_holders, events, holder, entity, attacker_guid, context)
       end)
 
     {entity, removal_events} = transition_holders(entity, holders, context)
@@ -157,15 +157,16 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
   def reactions(entity, _event, _context), do: {entity, []}
 
-  defp incoming_spell_transition(holders, events, holder, owner_guid, attacker_guid, context) do
+  defp incoming_spell_transition(holders, events, holder, entity, attacker_guid, context) do
     %{spell: triggering_spell, proc_type: proc_type} = context
 
     proc? =
       not self_proc?(holder, triggering_spell) and proc_ready?(holder, Map.get(context, :now)) and
-        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and Proc.roll?(holder.spell)
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and
+        ProcChance.roll?(entity, holder.spell, :incoming, context)
 
     if proc? do
-      apply_incoming_spell_proc(holders, events, holder, owner_guid, attacker_guid, context)
+      apply_incoming_spell_proc(holders, events, holder, entity.object.guid, attacker_guid, context)
     else
       {holders, events}
     end
@@ -221,11 +222,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   end
 
   defp kill_proc_transition(entity, holders, events, holder, owner_guid, context) do
-    modifier = &Modifiers.value(entity, holder.spell, :chance_of_success, &1)
-
     proc? =
       ProcEquipment.allowed?(entity, holder.spell, context) and proc_ready?(holder, Map.get(context, :now)) and
-        Proc.eligible?(holder.spell, nil, :kill, :normal) and Proc.roll?(holder.spell, nil, &:rand.uniform/0, modifier)
+        Proc.eligible?(holder.spell, nil, :kill, :normal) and ProcChance.roll?(entity, holder.spell, :outgoing, context)
 
     if proc? do
       generic_outgoing_spell_proc(holders, events, holder, owner_guid, context)
@@ -238,7 +237,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     proc? =
       ProcEquipment.allowed?(entity, holder.spell, context) and not self_proc?(holder, triggering_spell) and
         proc_ready?(holder, Map.get(context, :now)) and
-        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and Proc.roll?(holder.spell)
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and
+        ProcChance.roll?(entity, holder.spell, :outgoing, context)
 
     if proc? do
       apply_outgoing_proc(holders, events, holder, entity.object.guid, context)
@@ -342,17 +342,18 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         {updated_holder, events}
 
       :unhandled ->
-        generic_incoming_reaction(holder, owner_guid, attacker_guid, context)
+        generic_incoming_reaction(entity, holder, owner_guid, attacker_guid, context)
     end
   end
 
-  defp generic_incoming_reaction(%Holder{} = holder, owner_guid, attacker_guid, context) do
+  defp generic_incoming_reaction(entity, %Holder{} = holder, owner_guid, attacker_guid, context) do
     %{spell: triggering_spell, proc_type: proc_type} = context
     now = Map.get(context, :now, 0)
 
     proc? =
       Holder.has_any_type?(holder, @charge_consuming_on_hit) and proc_ready?(holder, now) and
-        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and Proc.roll?(holder.spell)
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and
+        ProcChance.roll?(entity, holder.spell, :incoming, context)
 
     shield? = proc_ready?(holder, now) and Proc.shield_outcome_allowed?(holder.spell, context)
 
@@ -365,9 +366,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   defp outgoing_melee_reaction(entity, %Holder{} = holder, owner_guid, victim_guid, context) do
     if ProcEquipment.allowed?(entity, holder.spell, context) and extra_attack_allowed?(holder.spell, context) do
       {holder, events} =
-        case Script.outgoing_melee(holder, owner_guid, victim_guid, context) do
+        case Script.outgoing_melee(entity, holder, owner_guid, victim_guid, context) do
           {:handled, updated_holder, events} -> {updated_holder, events}
-          :unhandled -> generic_outgoing_melee_reaction(holder, owner_guid, victim_guid, context)
+          :unhandled -> generic_outgoing_melee_reaction(entity, holder, owner_guid, victim_guid, context)
         end
 
       {holder, Enum.map(events, &melee_proc_origin(&1, context))}
@@ -385,6 +386,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   defp melee_proc_origin(effect, _context), do: effect
 
   defp generic_outgoing_melee_reaction(
+         entity,
          %Holder{} = holder,
          owner_guid,
          victim_guid,
@@ -395,7 +397,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     proc? =
       proc_auras != [] and proc_ready?(holder, now) and
         Proc.eligible?(holder.spell, Map.get(context, :spell), proc_type, context) and
-        Proc.roll?(holder.spell, Map.get(context, :attack_time_ms))
+        ProcChance.roll?(entity, holder.spell, :outgoing, context)
 
     if proc? do
       events =

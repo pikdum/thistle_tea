@@ -17,6 +17,13 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   end
 
   describe "get/1" do
+    test "ranged equipment procs use their supported-build PPM rates" do
+      for {id, rate} <- [{23_578, 2.0}, {26_480, 10.0}] do
+        assert %ProcRule{ppm_rate: ^rate, custom_chance: chance} = SpellProcEvent.get(id)
+        assert chance == 0.0
+      end
+    end
+
     test "healing set procs restrict their triggering spell families" do
       assert %ProcRule{spell_family: 10, family_mask_0: 0xC0006000, proc_flags: 0, proc_ex: 0} =
                SpellProcEvent.get(28_789)

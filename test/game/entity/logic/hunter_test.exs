@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Aura.ProcChance
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hunter
@@ -166,7 +167,7 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
   end
 
   describe "Improved Aspect of the Hawk" do
-    test "snapshots the aura-107 rank as the aspect's ranged proc chance" do
+    test "keeps the aspect's base chance and applies the current aura-107 rank at proc time" do
       talent = %Spell{
         id: 19_556,
         spell_family: 9,
@@ -209,7 +210,8 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
       {character, _events} = Aura.apply_spell(character, context, aspect, 1_000)
 
       aspect_holder = Enum.find(character.unit.auras, &match?(%Holder{spell: %Spell{id: 13_165}}, &1))
-      assert aspect_holder.spell.proc_chance == 5
+      assert aspect_holder.spell.proc_chance == 0
+      assert ProcChance.chance(character, aspect, :outgoing, %{}) == 5
 
       aspect_holder = %{aspect_holder | spell: %{aspect_holder.spell | proc_chance: 100}}
 

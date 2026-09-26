@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
 
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Battleground.Resurrection, as: BattlegroundResurrection
+  alias ThistleTea.Game.Entity.Logic.Aura.ProcChance
   alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Paladin
@@ -126,7 +127,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
     end
   end
 
-  def outgoing_melee(%Holder{spell: %Spell{id: id}} = holder, owner_guid, victim_guid, context)
+  def outgoing_melee(entity, %Holder{spell: %Spell{id: id}} = holder, owner_guid, victim_guid, context)
       when id in @sweeping_strikes and is_integer(owner_guid) and is_integer(victim_guid) do
     damage = Map.get(context, :proc_damage, Map.get(context, :damage, 0))
     triggering_spell_id = Map.get(context, :triggering_spell_id)
@@ -135,7 +136,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
 
     proc? =
       is_integer(damage) and damage > 1 and triggering_spell_id not in @sweeping_strikes_loop_spells and
-        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and Proc.roll?(holder.spell)
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and
+        ProcChance.roll?(entity, holder.spell, :outgoing, context)
 
     if proc? do
       radius = if triggering_spell_id == @whirlwind, do: @whirlwind_radius, else: @melee_radius
@@ -146,7 +148,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
     end
   end
 
-  def outgoing_melee(_holder, _owner_guid, _victim_guid, _context), do: :unhandled
+  def outgoing_melee(_entity, _holder, _owner_guid, _victim_guid, _context), do: :unhandled
 
   def incoming_melee(entity, %Holder{spell: %Spell{id: @retaliation}} = holder, owner_guid, attacker_guid, context)
       when is_integer(owner_guid) and is_integer(attacker_guid) do
@@ -155,7 +157,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
 
     proc? =
       attacker_in_front?(entity, Map.get(context, :attacker_position)) and not stunned?(entity) and
-        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and Proc.roll?(holder.spell)
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and
+        ProcChance.roll?(entity, holder.spell, :incoming, context)
 
     if proc? do
       event = Effects.trigger_spell(owner_guid, holder.caster_level || 1, attacker_guid, @retaliation_strike)

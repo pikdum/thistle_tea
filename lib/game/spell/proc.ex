@@ -83,7 +83,7 @@ defmodule ThistleTea.Game.Spell.Proc do
   def roll?(spell, attack_time_ms \\ nil, roll \\ &:rand.uniform/0, modifier \\ &Function.identity/1)
 
   def roll?(%Spell{} = spell, attack_time_ms, roll, modifier) when is_function(roll, 0) and is_function(modifier, 1) do
-    chance = modifier.(proc_chance(spell, attack_time_ms))
+    chance = modifier.(chance(spell, attack_time_ms))
     chance >= 100 or (chance > 0 and roll.() * 100 <= chance)
   end
 
@@ -202,13 +202,14 @@ defmodule ThistleTea.Game.Spell.Proc do
   defp outcome_mask(:reflect), do: 0x800
   defp outcome_mask(_outcome), do: 0
 
-  defp proc_chance(%Spell{proc_rule: %ProcRule{ppm_rate: ppm}}, attack_time_ms)
-       when ppm > 0 and is_number(attack_time_ms) and attack_time_ms > 0 do
-    min(ppm * attack_time_ms / 600, 100.0)
+  def chance(spell, attack_time_ms \\ nil)
+
+  def chance(%Spell{proc_rule: %ProcRule{ppm_rate: ppm}}, attack_time_ms)
+      when ppm > 0 and is_number(attack_time_ms) and attack_time_ms > 0 do
+    ppm * attack_time_ms / 600
   end
 
-  defp proc_chance(%Spell{proc_rule: %ProcRule{ppm_rate: ppm}}, _attack_time_ms) when ppm > 0, do: 0
-  defp proc_chance(%Spell{proc_rule: %ProcRule{custom_chance: chance}}, _attack_time_ms) when chance > 0, do: chance
-  defp proc_chance(%Spell{proc_chance: chance}, _attack_time_ms) when is_number(chance), do: chance
-  defp proc_chance(_spell, _attack_time_ms), do: 0
+  def chance(%Spell{proc_rule: %ProcRule{custom_chance: chance}}, _attack_time_ms) when chance > 0, do: chance
+  def chance(%Spell{proc_chance: chance}, _attack_time_ms) when is_number(chance), do: chance
+  def chance(_spell, _attack_time_ms), do: 0
 end

@@ -8,7 +8,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   queued on-next-swing spell generate no rage.
   """
   alias ThistleTea.Game.Aura.Holder
-  alias ThistleTea.Game.Entity.Logic.AttackSpeed
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Paladin
@@ -118,7 +117,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
         triggering_spell_id: Map.get(payload, :spell_id),
         damage: Map.get(payload, :damage, 0),
         proc_damage: Map.get(payload, :proc_damage, Map.get(payload, :damage, 0)),
-        attack_time_ms: attack_time_ms(entity, hand),
         attack_hand: proc_attack_hand(spell, hand),
         hand: hand,
         extra_attack?: Map.get(payload, :extra_attack?, false),
@@ -132,9 +130,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
 
   defp proc_attack_hand(nil, hand), do: hand
   defp proc_attack_hand(%Spell{} = spell, hand), do: if(Spell.attribute?(spell, :on_next_swing), do: hand)
-
-  defp attack_time_ms(entity, :offhand), do: AttackSpeed.base_ms(entity.unit, :offhand)
-  defp attack_time_ms(entity, _hand), do: AttackSpeed.base_ms(entity.unit, :mainhand)
 
   defp mark_reactives(entity, %{outcome: :dodge, victim_guid: victim_guid}, now) do
     Reactive.mark_dodging_target(entity, victim_guid, now)

@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ProcEquipment do
   def allowed?(_entity, _spell, _context), do: true
 
   defp equipped?(character, %Spell{equipped_item_class: 2} = spell, context) do
-    case CombatWeapon.usable(character, hand(context)) do
+    case CombatWeapon.usable(character, attack_hand(context)) do
       %{class: 2, subclass: subclass} -> matches_subclass?(spell, subclass)
       _weapon -> false
     end
@@ -25,18 +25,18 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ProcEquipment do
 
   defp equipped?(_character, _spell, _context), do: true
 
-  defp hand(%{hand: hand}) when hand in [:mainhand, :offhand, :ranged], do: hand
-  defp hand(%{attack_hand: hand}) when hand in [:mainhand, :offhand, :ranged], do: hand
+  def attack_hand(%{hand: hand}) when hand in [:mainhand, :offhand, :ranged], do: hand
+  def attack_hand(%{attack_hand: hand}) when hand in [:mainhand, :offhand, :ranged], do: hand
 
-  defp hand(%{spell: %Spell{dmg_class: 2} = spell}) do
+  def attack_hand(%{spell: %Spell{dmg_class: 2} = spell}) do
     if Spell.attribute?(spell, :requires_offhand_weapon), do: :offhand, else: :mainhand
   end
 
-  defp hand(%{spell: %Spell{} = spell}) do
+  def attack_hand(%{spell: %Spell{} = spell}) do
     if Spell.ranged_ability?(spell) or Spell.attribute?(spell, :auto_repeat), do: :ranged, else: :mainhand
   end
 
-  defp hand(_context), do: :mainhand
+  def attack_hand(_context), do: :mainhand
 
   defp matches_subclass?(%Spell{equipped_item_subclass_mask: mask}, subclass)
        when is_integer(mask) and is_integer(subclass) and subclass >= 0 do
