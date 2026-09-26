@@ -77,33 +77,36 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         {entity, []}
 
       auras ->
-        target_guid = entity.object.guid
-
-        holder = %Holder{
-          spell: spell,
-          caster_guid: context.caster_guid,
-          caster_totem?: context.caster_totem?,
-          cast_item_guid: context.cast_item_guid,
-          triggered?: context.triggered?,
-          cooldown_started_at: context.cooldown_started_at,
-          caster_owner_guid: context.caster_owner_guid,
-          reflected_by_guid: context.reflected_by_guid,
-          caster_level: context.caster_level,
-          caster_faction_template: context.caster_faction_template,
-          resistance_penetration: context.resistance_penetration,
-          cast_context: retained_context(context, auras),
-          applied_at: now,
-          expires_at: holder_expiry(spell, context, now),
-          charges: holder_charges(spell, context.spell_modifiers),
-          area_radius: area_radius(spell, context.spell_modifiers),
-          next_area_refresh_at: next_area_refresh_at(spell, context, target_guid, now),
-          next_area_check_at: if(context.persistent_area, do: now + 250),
-          auras: auras,
-          negative?: negative?(spell, auras, context, target_guid)
-        }
-
+        holder = build_holder(entity, context, spell, auras, now)
         do_apply(entity, Heartbeat.prepare(entity, holder, context), context, now)
     end
+  end
+
+  defp build_holder(entity, context, spell, auras, now) do
+    target_guid = entity.object.guid
+
+    %Holder{
+      spell: spell,
+      caster_guid: context.caster_guid,
+      caster_totem?: context.caster_totem?,
+      cast_item_guid: context.cast_item_guid,
+      triggered?: context.triggered?,
+      cooldown_started_at: context.cooldown_started_at,
+      caster_owner_guid: context.caster_owner_guid,
+      reflected_by_guid: context.reflected_by_guid,
+      caster_level: context.caster_level,
+      caster_faction_template: context.caster_faction_template,
+      resistance_penetration: context.resistance_penetration,
+      cast_context: retained_context(context, auras),
+      applied_at: now,
+      expires_at: holder_expiry(spell, context, now),
+      charges: holder_charges(spell, context.spell_modifiers),
+      area_radius: area_radius(spell, context.spell_modifiers),
+      next_area_refresh_at: next_area_refresh_at(spell, context, target_guid, now),
+      next_area_check_at: if(context.persistent_area, do: now + 250),
+      auras: auras,
+      negative?: negative?(spell, auras, context, target_guid)
+    }
   end
 
   def apply_spell(entity, caster_guid, caster_level, %Spell{} = spell, now) when is_integer(now) do
@@ -166,6 +169,26 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         area_radius: radius,
         next_area_refresh_at: if(is_number(radius), do: now)
     }
+  end
+
+  def boost_holder(entity, %Spell{} = spell, %Holder{} = parent, now) do
+    context = %CastContext{
+      spell: spell,
+      caster_guid: parent.caster_guid,
+      caster_level: parent.caster_level,
+      caster_owner_guid: parent.caster_owner_guid,
+      caster_faction_template: parent.caster_faction_template,
+      target_guid: entity.object.guid,
+      triggered?: true
+    }
+
+    case build_auras(entity, context, spell, now) do
+      [] ->
+        nil
+
+      auras ->
+        %{build_holder(entity, context, spell, auras, now) | linked_from: {Holder.key(parent), parent.applied_at}}
+    end
   end
 
   defp passive_holder(entity, %Spell{} = spell, now) do

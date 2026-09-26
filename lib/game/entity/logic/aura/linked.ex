@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Entity.Logic.Aura.Linked do
-  @moduledoc "Reconciles linked holders and form-dependent boosts with the parent applications that own them."
+  @moduledoc "Reconciles linked holders and spell-specific boosts with the parent applications that own them."
 
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
@@ -17,7 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Linked do
       MapSet.new(
         for parent <- previous,
             {spell, kind} <- linked_spells(parent, previous_form),
-            kind == :passive or previous_form == form,
+            kind != :form or previous_form == form,
             do: link_key(parent, spell)
       )
 
@@ -55,7 +55,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Linked do
       |> Enum.flat_map(fn {spell, kind} ->
         key = link_key(parent, spell)
 
-        child = retained_child(retained, requested, key, entity, {spell, kind}, now)
+        child = retained_child(retained, requested, key, entity, {parent, spell, kind}, now)
 
         if child, do: expand(child, entity, requested, retained, form, now), else: []
       end)
@@ -70,19 +70,26 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Linked do
     end
   end
 
-  defp build_child(entity, {spell, :passive}, source, now), do: Application.linked_holder(entity, spell, source, now)
-  defp build_child(entity, {spell, :form}, source, now), do: Application.form_holder(entity, spell, source, now)
+  defp build_child(entity, {_parent, spell, :passive}, source, now),
+    do: Application.linked_holder(entity, spell, source, now)
+
+  defp build_child(entity, {_parent, spell, :form}, source, now),
+    do: Application.form_holder(entity, spell, source, now)
+
+  defp build_child(entity, {parent, spell, :boost}, _source, now),
+    do: Application.boost_holder(entity, spell, parent, now)
 
   defp linked_spells(%Holder{spell: %Spell{linked_auras: spells}, auras: auras} = parent, form) do
     ids = for %Aura{type: :linked_aura, trigger_spell_id: id} <- auras, do: id
     passive = for spell <- spells, spell.id in ids, do: {spell, :passive}
+    boosts = for spell <- parent.spell.boost_auras, do: {spell, :boost}
 
     conditional =
       for spell <- parent.spell.form_auras,
           form > 0 and Spell.shapeshift_cast_error(spell, form) == :ok,
           do: {Scripts.form_aura_spell(parent, spell), :form}
 
-    passive ++ conditional
+    passive ++ boosts ++ conditional
   end
 
   defp link_key(%Holder{} = parent, %Spell{id: id}), do: {{Holder.key(parent), parent.applied_at}, id}

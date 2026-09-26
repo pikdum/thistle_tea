@@ -102,6 +102,45 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.LinkedTest do
     end
   end
 
+  describe "boost_holder/4" do
+    test "boosts retain their spell and original caster across form changes", %{character: character, child: child} do
+      parent = boost_parent(child)
+      {active, _} = Aura.apply_spell(character, 2, 50, parent, 1_000)
+      assert [root, boost] = active.unit.auras
+      assert boost.spell == child
+      assert boost.caster_guid == 2
+      assert boost.caster_level == 50
+      assert boost.linked_from == {Holder.key(root), 1_000}
+      assert boost.triggered?
+
+      form = %Spell{id: 103, effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_shapeshift, misc_value: 1}]}
+      {shifted, _} = Aura.apply_spell(active, 1, 60, form, 2_000)
+      assert Enum.find(shifted.unit.auras, &(&1.spell.id == child.id)) == boost
+    end
+
+    test "boosts leave on every parent-removal cause", %{character: character, child: child} do
+      {active, _} = Aura.apply_spell(character, 2, 50, boost_parent(child), 1_000)
+      [_root, boost] = active.unit.auras
+
+      for cause <- Change.causes() do
+        {removed, _} = Aura.transition(active, %Change{holders: [boost], cause: cause, now: 2_000})
+        assert removed.unit.auras == []
+      end
+    end
+
+    test "a removed boost waits for a new parent application", %{character: character, child: child} do
+      parent = boost_parent(child)
+      {active, _} = Aura.apply_spell(character, 2, 50, parent, 1_000)
+      {removed, _} = Aura.remove_spells(active, [child.id], 2_000)
+      {removed, _} = Aura.tick(removed, 3_000)
+      assert Enum.map(removed.unit.auras, & &1.spell.id) == [parent.id]
+      {refreshed, _} = Aura.apply_spell(removed, 2, 50, parent, 4_000)
+      assert [root, boost] = refreshed.unit.auras
+      assert boost.linked_from == {Holder.key(root), 4_000}
+      assert boost.expires_at == 24_000
+    end
+  end
+
   describe "expire_due/2" do
     test "parent expiry removes longer-lived passive children", %{character: character, parent: parent} do
       {active, _} = Aura.apply_spell(character, 1, 60, parent, 1_000)
@@ -159,4 +198,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.LinkedTest do
   end
 
   defp link_effect(id), do: %Effect{index: 1, type: :apply_aura, aura: :linked_aura, trigger_spell_id: id}
+
+  defp boost_parent(child) do
+    %Spell{
+      id: 100,
+      duration_ms: 12_000,
+      effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_scale, base_points: 50}],
+      boost_auras: [child]
+    }
+  end
 end

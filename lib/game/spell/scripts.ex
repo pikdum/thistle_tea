@@ -70,6 +70,9 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def shapeshift_passives(form), do: Map.get(@shapeshift_passives, form, [])
 
+  def boost_aura_ids(%Spell{id: 19_574, spell_family: @spell_family_hunter}), do: [24_395, 24_396, 24_397, 26_592]
+  def boost_aura_ids(_spell), do: []
+
   defdelegate form_aura_ids(spell), to: Druid
   defdelegate form_aura_spell(parent, spell), to: Druid
 
