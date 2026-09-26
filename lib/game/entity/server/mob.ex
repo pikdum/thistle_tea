@@ -723,7 +723,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:attack_outcome, payload}, %Mob{} = state) do
-    spell = spellbook_spell(state, Map.get(payload, :spell_id))
+    spell = Map.get(payload, :spell) || spellbook_spell(state, Map.get(payload, :spell_id))
 
     state =
       state

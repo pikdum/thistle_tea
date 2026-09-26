@@ -191,9 +191,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
       victim_guid: effect.source_guid,
       outcome: effect.outcome,
       proc_ex: effect.proc_ex,
+      proc_origin: effect.proc_origin,
       damage: effect.damage,
       proc_damage: effect.proc_damage,
       spell_id: effect.spell_id,
+      spell: effect.spell,
       hand: effect.hand,
       extra_attack?: effect.extra_attack?
     })

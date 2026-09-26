@@ -42,6 +42,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
       proc_damage: Keyword.get(opts, :proc_damage),
       periodic?: Keyword.get(opts, :periodic?, false),
       triggered_by_proc?: Keyword.get(opts, :triggered_by_proc?, false),
+      proc_origin: Keyword.get(opts, :proc_origin, :cast),
       proc_type: Keyword.get(opts, :proc_type, spell_damage_proc_type(opts)),
       resisted: Keyword.get(opts, :resisted, 0),
       absorbed: Keyword.get(opts, :absorbed, 0),
@@ -62,6 +63,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
       spell: spell,
       school: spell.school,
       damage: healing,
+      proc_origin: Keyword.get(opts, :proc_origin, :cast),
       periodic?: Keyword.get(opts, :periodic?, false),
       proc_type: Keyword.get(opts, :proc_type, spell_heal_proc_type(opts)),
       crit?: crit?

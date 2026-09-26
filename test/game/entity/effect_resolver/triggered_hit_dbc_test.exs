@@ -14,9 +14,12 @@ defmodule ThistleTea.Game.Entity.EffectResolver.TriggeredHitDbcTest do
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Proc
+  alias ThistleTea.Game.Spell.ProcRule
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -27,6 +30,47 @@ defmodule ThistleTea.Game.Entity.EffectResolver.TriggeredHitDbcTest do
   setup [:entities]
 
   describe "resolve/2" do
+    test "Arcane Missiles snapshots its bonus before the child cast spends one Unstable Power stack", %{
+      caster: caster,
+      target: target
+    } do
+      spell = %{SpellLoader.load(24_659) | proc_rule: %ProcRule{proc_ex: 0x80000}}
+
+      holder = %Holder{
+        spell: spell,
+        caster_guid: caster.object.guid,
+        stacks: 12,
+        auras: [%Aura{type: :mod_damage_done, amount: 17, misc_value: 126}]
+      }
+
+      caster = %{caster | unit: %{caster.unit | auras: [holder]}}
+      trigger = Effects.trigger_spell(caster.object.guid, 60, target.object.guid, 7_268, triggered_by_spell_id: 5143)
+      events = Spells.resolve(caster, trigger)
+      delivery = Enum.find(events, &is_struct(&1, Effects.DeliverSpell))
+      assert delivery.cast_context.spell_damage_bonus.arcane == 204
+
+      assert [%Effects.SpellCastCompleted{proc_origin: :aura_or_item} = completion] =
+               Enum.filter(events, &is_struct(&1, Effects.SpellCastCompleted))
+
+      payload = %{
+        outcome: :cast_end,
+        proc_type: Proc.cast_type(completion.spell),
+        proc_origin: completion.proc_origin,
+        victim_guid: target.object.guid
+      }
+
+      caster = SpellFeedback.receive(caster, payload, completion.spell, 1_000)
+      assert hd(caster.unit.auras).stacks == 11
+      delivery = caster |> Spells.resolve(trigger) |> Enum.find(&is_struct(&1, Effects.DeliverSpell))
+      assert delivery.cast_context.spell_damage_bonus.arcane == 187
+    end
+
+    test "an area trigger emits one completion across multiple recipients", %{caster: caster, target: target} do
+      events = resolve(caster, target.object.guid, 1449)
+      assert Enum.count(events, &is_struct(&1, Effects.DeliverSpell)) == 2
+      assert Enum.count(events, &is_struct(&1, Effects.SpellCastCompleted)) == 1
+    end
+
     test "triggered Chilled snapshots Frostbite and sends its root request through the caster", %{
       caster: caster,
       target: target

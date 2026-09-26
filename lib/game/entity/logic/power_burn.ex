@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.PowerBurn do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Combat, as: SpellCombat
   alias ThistleTea.Game.Spell.Modifiers
+  alias ThistleTea.Game.Spell.ProcOrigin
 
   def apply(entity, %CastContext{} = context, %Spell{} = spell, amount, effect, now, opts \\ []) do
     if Core.dead?(entity) do
@@ -37,6 +38,8 @@ defmodule ThistleTea.Game.Entity.Logic.PowerBurn do
   end
 
   defp apply_damage(entity, context, spell, 0, _now, opts) do
+    origin = if Keyword.get(opts, :periodic?, false), do: :cast, else: ProcOrigin.classify(spell, context)
+    opts = Keyword.put(opts, :proc_origin, origin)
     {entity, [Effects.spell_damage(context.caster_guid, entity.object.guid, spell, 0, opts)]}
   end
 

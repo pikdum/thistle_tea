@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Proc
+  alias ThistleTea.Game.Spell.ProcOrigin
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
 
@@ -128,7 +129,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     crit? = heal_crit?(context, spell)
     healing = if crit?, do: healing + div(healing, 2), else: healing
     events = SpellThreat.heal_events(state, context, spell, healing)
-    heal_event = Effects.spell_heal(context.caster_guid, state.object.guid, spell, healing, crit?)
+
+    heal_event =
+      Effects.spell_heal(context.caster_guid, state.object.guid, spell, healing, crit?,
+        proc_origin: ProcOrigin.classify(spell, context)
+      )
 
     {Core.heal(state, healing), swiftmend_events ++ events ++ [heal_event]}
   end
@@ -136,7 +141,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   def apply(state, %CastContext{} = context, spell, %Effect{type: :heal_max_health}, _now) do
     healing = HealingReceived.amount(state, context.caster_max_health || state.unit.max_health || 0)
     events = SpellThreat.heal_events(state, context, spell, healing)
-    heal_event = Effects.spell_heal(context.caster_guid, state.object.guid, spell, healing, false)
+
+    heal_event =
+      Effects.spell_heal(context.caster_guid, state.object.guid, spell, healing, false,
+        proc_origin: ProcOrigin.classify(spell, context)
+      )
+
     {Core.heal(state, healing), events ++ [heal_event]}
   end
 
@@ -218,6 +228,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   def apply_damage_amount(state, %CastContext{} = context, %Spell{} = spell, amount, now, opts \\ []) do
     opts = if context.proc_damage?, do: Keyword.put(opts, :proc_type, nil), else: opts
     opts = Keyword.put(opts, :triggered_by_proc?, context.triggered_by_proc?)
+    origin = if Keyword.get(opts, :periodic?, false), do: :cast, else: ProcOrigin.classify(spell, context)
+    opts = Keyword.put(opts, :proc_origin, origin)
     rolled = amount
 
     rolled =
@@ -308,6 +320,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
       outcome: outcome,
       damage: max(event.damage - event.absorbed, 0),
       absorbed: event.absorbed,
+      proc_origin: event.proc_origin,
       proc_ex: Proc.hit_mask(outcome, event.damage, event.absorbed)
     }
   end
@@ -520,6 +533,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         crit?: context.melee_crit? || false,
         resisted: resisted,
         proc_damage: proc_damage,
+        proc_origin: ProcOrigin.classify(spell, context),
         triggered_by_proc?: context.triggered_by_proc?,
         proc_type: dealt_attack_proc_type(spell)
       )
@@ -550,6 +564,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
           attacker_position: attack_position(context.caster_position),
           proc_type: taken_attack_proc_type(spell),
           spell: spell,
+          proc_origin: ProcOrigin.classify(spell, context),
           now: now
         })
 

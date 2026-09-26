@@ -14,12 +14,30 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   alias ThistleTea.Game.Player.Projectile
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
+  alias ThistleTea.Game.Spell.Proc
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.SingleTargetAuras
   alias ThistleTea.Game.World.SpellMagnets
 
   @spell_hit_type_crit 0x2
+
+  def emit(entity, %Effects.SpellCastCompleted{} = effect, context) do
+    payload = %{
+      victim_guid: effect.target_guid,
+      outcome: :cast_end,
+      proc_origin: effect.proc_origin,
+      proc_type: Proc.cast_type(effect.spell),
+      spell_id: effect.spell.id,
+      spell: effect.spell
+    }
+
+    if effect.source_guid == entity.object.guid,
+      do: Context.cast(context, {:spell_outcome, payload}),
+      else: Entity.spell_outcome(effect.source_guid, payload)
+
+    entity
+  end
 
   def emit(entity, %Effects.SpellPowerDrain{} = effect, _context) do
     %Message.SmsgSpelllogexecute{
@@ -563,6 +581,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
       outcome: if(effect.crit?, do: :crit, else: :normal),
       damage: max((effect.damage || 0) - (absorbed || 0), 0),
       proc_type: proc_type,
+      proc_origin: effect.proc_origin,
       spell_id: effect.spell_id,
       spell: effect.spell
     }

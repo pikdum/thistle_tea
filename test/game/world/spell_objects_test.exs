@@ -174,8 +174,11 @@ defmodule ThistleTea.Game.World.SpellObjectsTest do
           target_guid: caster.object.guid
         })
 
-      assert [%Effects.SpellGo{hit_guids: [^guid]}, %Effects.ApplyGameObjectAction{target_guid: ^guid, action: 1}] =
-               effects
+      assert [
+               %Effects.SpellGo{hit_guids: [^guid]},
+               %Effects.ApplyGameObjectAction{target_guid: ^guid, action: 1},
+               %Effects.SpellCastCompleted{spell: %{id: 18_655}, proc_origin: :cast}
+             ] = effects
 
       assert [%Effects.TriggerSpellRequest{source_guid: 123}] =
                EffectResolver.resolve(caster, %Effects.TriggerSpell{

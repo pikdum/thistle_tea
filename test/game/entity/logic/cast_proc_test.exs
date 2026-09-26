@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastProcTest do
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.CastResolution
   alias ThistleTea.Game.Spell.CastResolution.Costs
   alias ThistleTea.Game.Spell.CastResolution.Followups
@@ -25,6 +26,16 @@ defmodule ThistleTea.Game.Entity.Logic.CastProcTest do
   setup [:caster]
 
   describe "complete/3" do
+    test "triggered channels honor aura origin and the NOT_A_PROC exception", %{caster: caster} do
+      cast = launch_cast()
+      cast = %{cast | triggered?: true, trigger_context: %CastContext{triggered?: true, triggered_by_aura?: true}}
+      assert hd(Casting.complete(caster, cast, 1_000).unit.auras).charges == 3
+      cast = %{cast | spell: %{cast.spell | attributes: MapSet.new([:not_a_proc, :channeled])}, channel_ms: 3_000}
+      result = Casting.complete(caster, cast, 1_000)
+      assert hd(result.unit.auras).charges == 2
+      assert triggers(result) == [9_001]
+    end
+
     test "all area recipients snapshot Unstable Power before its one-stack reduction", %{caster: caster} do
       holder = %{
         hd(caster.unit.auras)

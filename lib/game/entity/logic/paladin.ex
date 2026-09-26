@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Proc
   alias ThistleTea.Game.Spell.Scripts
 
   @righteousness_damage_spells %{
@@ -106,12 +107,19 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
     end
   end
 
-  def trigger_seal(entity, %{outcome: outcome, victim_guid: victim_guid}) when outcome in [:normal, :crit] do
+  def trigger_seal(entity, payload, spell \\ nil)
+
+  def trigger_seal(entity, %{outcome: outcome, victim_guid: victim_guid} = payload, spell)
+      when outcome in [:normal, :crit] do
     case active_seal(entity) do
       %Holder{spell: %Spell{id: seal_id}} = holder ->
-        case Map.get(@righteousness_damage_spells, seal_id) do
-          spell_id when is_integer(spell_id) -> trigger_righteousness(entity, holder, victim_guid, spell_id)
-          _other_seal -> entity
+        proc_type = if is_struct(spell, Spell), do: :deal_melee_ability, else: :deal_melee_swing
+        spell_id = Map.get(@righteousness_damage_spells, seal_id)
+
+        if is_integer(spell_id) and Proc.origin_allowed?(holder.spell, spell, proc_type, payload) do
+          trigger_righteousness(entity, holder, victim_guid, spell_id)
+        else
+          entity
         end
 
       _no_seal ->
@@ -119,7 +127,7 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
     end
   end
 
-  def trigger_seal(entity, _payload), do: entity
+  def trigger_seal(entity, _payload, _spell), do: entity
 
   def active_seal?(entity), do: not is_nil(active_seal(entity))
 

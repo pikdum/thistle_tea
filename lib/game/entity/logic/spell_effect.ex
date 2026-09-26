@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Chain
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.ProcOrigin
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
   alias ThistleTea.Game.Spell.TargetTrigger
@@ -91,6 +92,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         spell: spell,
         proc_type: :take_harmful_spell,
         outcome: :reflect,
+        proc_origin: ProcOrigin.classify(spell, context),
         damage: 0,
         now: now
       })
@@ -202,10 +204,15 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   def receive_outcome(target, caster_guid, %Spell{} = spell, :resist, now)
       when is_integer(caster_guid) and is_integer(now) do
+    receive_outcome(target, %CastContext{caster_guid: caster_guid}, spell, :resist, now)
+  end
+
+  def receive_outcome(target, %CastContext{} = context, %Spell{} = spell, :resist, now) when is_integer(now) do
     Aura.reactions(target, :spell_hit_taken, %{
-      attacker_guid: caster_guid,
+      attacker_guid: context.caster_guid,
       spell: spell,
       proc_type: :take_harmful_spell,
+      proc_origin: ProcOrigin.classify(spell, context),
       outcome: :resist,
       damage: 0,
       now: now
@@ -216,8 +223,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp outcome_reactions(target, %CastContext{proc_damage?: true}, _spell, _outcome, _now), do: {target, []}
 
-  defp outcome_reactions(target, %CastContext{caster_guid: caster_guid}, spell, outcome, now),
-    do: receive_outcome(target, caster_guid, spell, outcome, now)
+  defp outcome_reactions(target, %CastContext{} = context, spell, outcome, now),
+    do: receive_outcome(target, context, spell, outcome, now)
 
   defp immune_to_spell?(target, %CastContext{caster_guid: caster_guid} = context, %Spell{} = spell) do
     CreatureImmunity.spell?(target, context, spell) or
@@ -324,7 +331,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
     case result.outcome do
       :resist ->
-        {target, reactions} = receive_outcome(target, context.caster_guid, spell, :resist, now)
+        {target, reactions} = outcome_reactions(target, context, spell, :resist, now)
         {target, melee_avoid_events(target, context, spell, :resist) ++ reactions}
 
       outcome when outcome in [:miss, :dodge, :parry, :block] ->
@@ -339,12 +346,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
           if Spell.melee_ability?(spell) do
             events ++
               [
-                Effects.attack_outcome(
-                  context.caster_guid,
+                spell_attack_outcome(
+                  context,
                   target.object.guid,
                   if(successful_hit?(events), do: result.outcome, else: :resist),
                   dealt_damage(events),
-                  spell.id,
+                  spell,
                   dealt_proc_damage(events)
                 )
               ]
@@ -487,8 +494,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp melee_avoid_events(%{object: %{guid: target_guid}}, %CastContext{} = context, spell, outcome) do
     [
       Effects.spell_log_miss(context.caster_guid, target_guid, spell.id, outcome),
-      Effects.attack_outcome(context.caster_guid, target_guid, outcome, 0, spell.id)
+      spell_attack_outcome(context, target_guid, outcome, 0, spell)
     ]
+  end
+
+  defp spell_attack_outcome(context, target_guid, outcome, damage, spell, proc_damage \\ nil) do
+    event = Effects.attack_outcome(context.caster_guid, target_guid, outcome, damage, spell.id, proc_damage)
+    %{event | spell: spell, proc_origin: ProcOrigin.classify(spell, context)}
   end
 
   defp dealt_damage(events) do

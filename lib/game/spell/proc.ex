@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Spell.Proc do
   import Bitwise, only: [&&&: 2, |||: 2]
 
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.ProcOrigin
   alias ThistleTea.Game.Spell.ProcRule
 
   @normal_hit 0x1
@@ -27,18 +28,24 @@ defmodule ThistleTea.Game.Spell.Proc do
   end
 
   def eligible?(%Spell{} = proc_spell, %Spell{} = triggering_spell, proc_type, outcome) do
-    caster_proc_allowed?(triggering_spell, proc_type) and proc_flag?(proc_spell, proc_type) and
+    origin_allowed?(proc_spell, triggering_spell, proc_type, outcome) and proc_flag?(proc_spell, proc_type) and
       school_allowed?(proc_spell.proc_rule, triggering_spell) and
       family_allowed?(proc_spell.proc_rule, triggering_spell) and
       outcome_allowed?(proc_spell.proc_rule, proc_type, outcome)
   end
 
   def eligible?(%Spell{} = proc_spell, nil, proc_type, outcome) do
-    proc_flag?(proc_spell, proc_type) and school_allowed?(proc_spell.proc_rule, nil) and
+    origin_allowed?(proc_spell, nil, proc_type, outcome) and proc_flag?(proc_spell, proc_type) and
+      school_allowed?(proc_spell.proc_rule, nil) and
       outcome_allowed?(proc_spell.proc_rule, proc_type, outcome)
   end
 
   def eligible?(_proc_spell, _triggering_spell, _proc_type, _outcome), do: false
+
+  def origin_allowed?(proc_spell, triggering_spell, proc_type, context) do
+    ProcOrigin.allowed?(proc_spell, triggering_spell, context) and
+      direction_allowed?(triggering_spell, proc_type)
+  end
 
   def cast_type(%Spell{} = spell) do
     cond do
@@ -51,8 +58,15 @@ defmodule ThistleTea.Game.Spell.Proc do
     end
   end
 
-  defp caster_proc_allowed?(spell, proc_type) do
-    proc_type not in [
+  defp direction_allowed?(%Spell{} = spell, proc_type) do
+    attribute = if outgoing?(proc_type), do: :suppress_caster_procs, else: :suppress_target_procs
+    not Spell.attribute?(spell, attribute)
+  end
+
+  defp direction_allowed?(_spell, _proc_type), do: true
+
+  defp outgoing?(proc_type) do
+    proc_type in [
       :deal_melee_swing,
       :deal_melee_ability,
       :deal_ranged_attack,
@@ -63,7 +77,7 @@ defmodule ThistleTea.Game.Spell.Proc do
       :deal_helpful_spell,
       :deal_helpful_ability,
       :deal_helpful_periodic
-    ] or not Spell.attribute?(spell, :suppress_caster_procs)
+    ]
   end
 
   def roll?(spell, attack_time_ms \\ nil, roll \\ &:rand.uniform/0, modifier \\ &Function.identity/1)

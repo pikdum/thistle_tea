@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Modifiers
+  alias ThistleTea.Game.Spell.ProcOrigin
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @flametongue_damage_spell 10_444
@@ -48,13 +49,14 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
 
   defp trigger_proc(entity, victim_guid, %{proc_spell: %Spell{} = spell} = proc, extra_attack?) do
     if flametongue_proc?(spell) do
-      trigger_flametongue(entity, victim_guid, spell, proc.attack_time_ms)
+      trigger_flametongue(entity, victim_guid, spell, proc)
     else
       target_guid = if Spell.harmful?(spell), do: victim_guid, else: entity.object.guid
 
       Effects.enqueue(
         entity,
         Effects.trigger_spell(entity.object.guid, entity.unit.level || 1, target_guid, spell.id,
+          cast_item_guid: Map.get(proc, :item_guid),
           extra_attack?: extra_attack?
         )
       )
@@ -65,6 +67,7 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
     Effects.enqueue(
       entity,
       Effects.trigger_spell(entity.object.guid, entity.unit.level || 1, victim_guid, proc.effect.spell_id,
+        cast_item_guid: Map.get(proc, :item_guid),
         extra_attack?: extra_attack?
       )
     )
@@ -72,16 +75,30 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
 
   defp flametongue_proc?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_shaman_flametongue_proc_dummy")
 
-  defp trigger_flametongue(entity, victim_guid, proc_spell, attack_time_ms) do
+  defp trigger_flametongue(entity, victim_guid, proc_spell, proc) do
     with %Spell{} = damage_spell <- SpellLoader.load(@flametongue_damage_spell),
          %Effect{} = effect <- List.first(proc_spell.effects),
          %Effect{} = damage_effect <- List.first(damage_spell.effects) do
       context = CastContext.from_caster(entity, proc_spell, victim_guid)
       fire_bonus = Map.get(context.spell_damage_bonus, :fire, 0)
-      damage = flametongue_damage(Effect.damage_roll(effect), fire_bonus, attack_time_ms)
+      damage = flametongue_damage(Effect.damage_roll(effect), fire_bonus, proc.attack_time_ms)
       spell = %{damage_spell | effects: [%{damage_effect | base_points: damage, die_sides: 0}]}
-      cast_context = %{CastContext.from_caster(entity, spell, victim_guid) | spell_damage_bonus: %{}}
-      Effects.enqueue(entity, Effects.deliver_spell(victim_guid, cast_context, spell))
+
+      cast_context = %{
+        CastContext.from_caster(entity, spell, victim_guid)
+        | spell_damage_bonus: %{},
+          triggered?: true,
+          cast_item_guid: Map.get(proc, :item_guid)
+      }
+
+      completion = %Effects.SpellCastCompleted{
+        source_guid: entity.object.guid,
+        target_guid: victim_guid,
+        spell: spell,
+        proc_origin: ProcOrigin.classify(spell, cast_context)
+      }
+
+      Effects.enqueue(entity, [Effects.deliver_spell(victim_guid, cast_context, spell), completion])
     else
       _ -> entity
     end

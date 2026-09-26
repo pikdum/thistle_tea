@@ -36,6 +36,29 @@ defmodule ThistleTea.Game.Entity.Logic.ShadowguardDbcTest do
   setup [:catalog, :combatants]
 
   describe "receive/4" do
+    test "Lightning Shield retaliation cannot counter-proc Shadowguard", context do
+      {priest, _} = Aura.apply_spell(context.priest, 1, 60, SpellLoader.load(19_312), 0)
+      lightning = Effects.trigger_spell(context.attacker.object.guid, 60, 1, 26_364, triggered_by_spell_id: 10_394)
+      delivery = context.attacker |> Spells.resolve(lightning) |> Enum.find(&is_struct(&1, Effects.DeliverSpell))
+      cast = %{delivery.cast_context | hit_outcome: :hit}
+      {hit, events} = SpellEffect.receive(priest, cast, delivery.spell, 1_000)
+      assert hit.unit.health < priest.unit.health
+      assert hd(hit.unit.auras).charges == 3
+      refute Enum.any?(events, &is_struct(&1, Effects.TriggerSpell))
+      assert Enum.any?(events, &match?(%Effects.SpellDamage{proc_origin: :suppressed}, &1))
+
+      {hit, events} =
+        SpellEffect.receive(
+          hit,
+          %CastContext{caster_guid: context.attacker.object.guid, caster_level: 60},
+          SpellLoader.load(8042),
+          5_000
+        )
+
+      assert hd(hit.unit.auras).charges == 2
+      assert Enum.any?(events, &match?(%Effects.TriggerSpell{spell_id: 28_382}, &1))
+    end
+
     test "a spell absorbed by Power Word Shield still consumes a Shadowguard charge", context do
       {priest, _} = Aura.apply_spell(context.priest, 1, 60, SpellLoader.load(19_312), 0)
       {priest, _} = Aura.apply_spell(priest, 1, 60, SpellLoader.load(17), 0)

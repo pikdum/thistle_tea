@@ -41,6 +41,26 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   end
 
   describe "emit/2" do
+    test "cast completion reaches only the explicit caster owner with its proc origin" do
+      guid = unique_guid()
+      caster = %Character{object: %Object{guid: guid}}
+      spell = %Spell{id: 7_268, dmg_class: 1, effects: [%Effect{type: :school_damage}]}
+      effect = %Effects.SpellCastCompleted{source_guid: guid, target_guid: 99, spell: spell, proc_origin: :aura_or_item}
+      EventSink.emit(caster, effect)
+      refute_received {:"$gen_cast", {:spell_outcome, _}}
+      EventSink.emit(caster, effect, Context.new(self()))
+
+      assert_received {:"$gen_cast",
+                       {:spell_outcome,
+                        %{
+                          spell: ^spell,
+                          victim_guid: 99,
+                          outcome: :cast_end,
+                          proc_type: :deal_harmful_spell,
+                          proc_origin: :aura_or_item
+                        }}}
+    end
+
     test "preserves spell requirements through queued cast failures" do
       character = %Character{
         object: %Object{guid: unique_guid()},
@@ -211,16 +231,28 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       }
 
       spell = %Spell{id: 774, school: :nature}
-      heal = Effects.spell_heal(caster_guid, target_guid, spell, 25, false, periodic?: true)
+      heal = Effects.spell_heal(caster_guid, target_guid, spell, 25, false, proc_origin: :suppressed)
       EventSink.emit(target, heal)
 
       assert_receive {:"$gen_cast",
-                      {:spell_outcome, %{spell: ^spell, victim_alive?: true, victim_power_type: 3, victim_class: 11}}}
+                      {:spell_outcome,
+                       %{
+                         spell: ^spell,
+                         victim_alive?: true,
+                         victim_power_type: 3,
+                         victim_class: 11,
+                         proc_origin: :suppressed
+                       }}}
 
       dead = %{target | unit: %{target.unit | health: 0, power_type: 1}}
-      damage = Effects.spell_damage(caster_guid, target_guid, %Spell{id: 172, school: :shadow}, 25)
+
+      damage =
+        Effects.spell_damage(caster_guid, target_guid, %Spell{id: 172, school: :shadow}, 25, proc_origin: :aura_or_item)
+
       EventSink.emit(dead, damage)
-      assert_receive {:"$gen_cast", {:spell_outcome, %{victim_alive?: false, victim_power_type: 1}}}
+
+      assert_receive {:"$gen_cast",
+                      {:spell_outcome, %{victim_alive?: false, victim_power_type: 1, proc_origin: :aura_or_item}}}
 
       EventSink.emit(%{target | object: %Object{guid: caster_guid}}, heal)
       assert_receive {:"$gen_cast", {:spell_outcome, payload}}

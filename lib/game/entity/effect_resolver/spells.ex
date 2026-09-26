@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Spell.Combat, as: SpellCombat
   alias ThistleTea.Game.Spell.Focus
   alias ThistleTea.Game.Spell.ObjectTargets
+  alias ThistleTea.Game.Spell.ProcOrigin
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
@@ -317,7 +318,16 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
       end)
 
     actions = Enum.flat_map(ObjectTargets.actions(spell, objects), &resolve(entity, &1))
-    [launch | deliveries ++ actions]
+    context = trigger_context(entity, effect, spell)
+
+    completion = %Effects.SpellCastCompleted{
+      source_guid: context.caster_guid,
+      target_guid: context.target_guid,
+      spell: spell,
+      proc_origin: ProcOrigin.classify(spell, context)
+    }
+
+    [launch | deliveries ++ actions ++ [completion]]
   end
 
   defp living_target?(%{object: %{guid: guid}, unit: %Unit{health: health}}, guid),

@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Proc
   alias ThistleTea.Game.Spell.Scripts
 
   @avoided_rage_factor 0.75
@@ -28,7 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
     |> apply_power_feedback(payload, spell)
     |> apply_finisher_feedback(payload, spell, now)
     |> trigger_blade_flurry(payload, spell)
-    |> Paladin.trigger_seal(payload)
+    |> Paladin.trigger_seal(payload, spell)
     |> trigger_melee_procs(payload, spell, now)
     |> mark_reactives(payload, now)
   end
@@ -72,7 +73,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
        when is_integer(damage) do
     proc_damage = Map.get(payload, :proc_damage, damage)
     proc_type = if match?(%Spell{}, spell), do: :deal_melee_ability, else: :deal_melee_swing
-    damage_spell_id = blade_flurry_damage_spell(entity, proc_type)
+    damage_spell_id = blade_flurry_damage_spell(entity, proc_type, spell, payload)
 
     if is_integer(proc_damage) and proc_damage > 0 and is_integer(damage_spell_id) do
       Effects.enqueue(entity, Effects.blade_flurry(victim_guid, proc_damage, damage_spell_id))
@@ -83,15 +84,17 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
 
   defp trigger_blade_flurry(entity, _payload, _spell), do: entity
 
-  defp blade_flurry_damage_spell(%{unit: %{auras: holders}}, proc_type) when is_list(holders) do
+  defp blade_flurry_damage_spell(%{unit: %{auras: holders}}, proc_type, triggering_spell, payload)
+       when is_list(holders) do
     Enum.find_value(holders, fn %Holder{spell: spell} ->
-      if Rogue.blade_flurry?(spell) and Spell.procs_on?(spell, proc_type) do
+      if Rogue.blade_flurry?(spell) and Spell.procs_on?(spell, proc_type) and
+           Proc.origin_allowed?(spell, triggering_spell, proc_type, payload) do
         blade_flurry_trigger_id(spell)
       end
     end)
   end
 
-  defp blade_flurry_damage_spell(_entity, _proc_type), do: nil
+  defp blade_flurry_damage_spell(_entity, _proc_type, _triggering_spell, _payload), do: nil
 
   defp blade_flurry_trigger_id(%Spell{effects: effects}) do
     Enum.find_value(effects, fn
@@ -110,6 +113,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
         victim_guid: victim_guid,
         outcome: outcome,
         proc_ex: Map.get(payload, :proc_ex),
+        proc_origin: Map.get(payload, :proc_origin, :cast),
         proc_type: proc_type,
         spell: spell,
         triggering_spell_id: Map.get(payload, :spell_id),

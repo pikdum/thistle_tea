@@ -982,6 +982,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex3, 0x00010000, :suppress_caster_procs)
     |> add_if(attrs_ex3, 0x00020000, :suppress_target_procs)
     |> add_if(attrs_ex3, 0x00040000, :always_hit)
+    |> add_if(attrs_ex3, 0x04000000, :can_proc_from_procs)
     |> add_if(attrs_ex1, 0x00000020, :allow_while_stealthed)
     |> add_if(attrs_ex1, 0x00000080, :no_reflection)
     |> add_if(attrs_ex1, 0x00000100, :only_peaceful_targets)

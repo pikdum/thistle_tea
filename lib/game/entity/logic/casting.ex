@@ -51,6 +51,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.Proc
+  alias ThistleTea.Game.Spell.ProcOrigin
   alias ThistleTea.Game.Spell.Radius
   alias ThistleTea.Game.Spell.Requirements
   alias ThistleTea.Game.Spell.Scripts
@@ -555,25 +556,22 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp consume_spell_modifiers(character, %Cast{}, _now), do: character
 
-  defp cast_complete_procs(character, %Cast{triggered?: true}, _now), do: character
-
   defp cast_complete_procs(character, %Cast{spell: spell} = cast, now) do
-    if is_integer(cast.cast_item_guid) and not Spell.harmful?(spell) do
-      character
-    else
-      target = cast.resolution.followups.selected_unit_guid || character.object.guid
+    target = cast.resolution.followups.selected_unit_guid || character.object.guid
+    context = cast.trigger_context || %CastContext{caster_guid: character.object.guid}
+    context = %{context | triggered?: cast.triggered?, cast_item_guid: cast.cast_item_guid}
 
-      {character, events} =
-        AuraLogic.reactions(character, :spell_cast_completed, %{
-          spell: spell,
-          proc_type: Proc.cast_type(spell),
-          outcome: :cast_end,
-          victim_guid: target,
-          now: now
-        })
+    {character, events} =
+      AuraLogic.reactions(character, :spell_cast_completed, %{
+        spell: spell,
+        proc_type: Proc.cast_type(spell),
+        proc_origin: ProcOrigin.classify(spell, context),
+        outcome: :cast_end,
+        victim_guid: target,
+        now: now
+      })
 
-      Effects.enqueue(character, events)
-    end
+    Effects.enqueue(character, events)
   end
 
   defp consume_unavoidable_finisher(character, %Cast{spell: %Spell{} = spell}, now) do
