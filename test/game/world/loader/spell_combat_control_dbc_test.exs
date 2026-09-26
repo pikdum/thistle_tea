@@ -18,6 +18,19 @@ defmodule ThistleTea.Game.World.Loader.SpellCombatControlDbcTest do
   @moduletag :dbc_db
 
   describe "load/1" do
+    test "pet attacks and player openers retain their separate initiation flags" do
+      for id <- [2_649, 16_827, 17_253] do
+        assert Spell.attribute?(SpellLoader.load(id), :initiates_combat)
+      end
+
+      assert Spell.attribute?(SpellLoader.load(53), :initiate_combat_post_cast)
+
+      for id <- [3_110, 6_358, 23_099, 24_450] do
+        refute Spell.attribute?(SpellLoader.load(id), :initiates_combat)
+        refute Spell.attribute?(SpellLoader.load(id), :initiate_combat_post_cast)
+      end
+    end
+
     test "ordinary casts and instant combat spells reset swings while exempt shots do not" do
       blackboard = Blackboard.new() |> Blackboard.put_next_at(:next_attack_at, 250, 1_000)
       entity = %Mob{unit: %Unit{base_attack_time: 2_400}, internal: %Internal{blackboard: blackboard}}

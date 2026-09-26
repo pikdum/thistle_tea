@@ -1293,8 +1293,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     end
   rescue
     error ->
-      Logger.error("Creature charge attack failed: #{Exception.message(error)}")
+      Logger.error("Creature automatic attack failed: #{Exception.message(error)}")
       {:noreply, state}
+  end
+
+  def handle_info({:force_attack, target_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state)
+      when is_integer(target_guid) do
+    if Core.dead?(state) or Corpse.removed?(state) do
+      {:noreply, state}
+    else
+      state = state |> PetBT.command(:attack, target_guid) |> wake_ai_tick()
+      {:noreply, state, {:continue, :maybe_broadcast}}
+    end
   end
 
   def handle_info({:force_attack, target_guid}, %Mob{} = state) when is_integer(target_guid) do

@@ -357,7 +357,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       entity
       |> queue_successful_finish_trigger(casting)
       |> queue_quest_cast_credit(casting, resolution)
-      |> CastingCombat.finish(casting.spell)
+      |> CastingCombat.finish(casting.spell, Target.unit_guid(casting.targets))
       |> consume_unavoidable_finisher(casting, now)
 
     if Cast.channeled?(casting) do

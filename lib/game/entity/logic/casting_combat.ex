@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingCombat do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Combat
@@ -26,9 +27,24 @@ defmodule ThistleTea.Game.Entity.Logic.CastingCombat do
 
   def launch(entity, %Cast{}, _now), do: entity
 
-  def finish(entity, %Spell{} = spell) do
-    if Spell.attribute?(spell, :cancels_auto_attack_combat), do: stop_attacks(entity), else: entity
+  def finish(entity, %Spell{} = spell, target_guid \\ nil) do
+    cond do
+      Spell.attribute?(spell, :cancels_auto_attack_combat) -> stop_attacks(entity)
+      initiates_attack?(spell) -> command_pet_attack(entity, target_guid)
+      true -> entity
+    end
   end
+
+  defp initiates_attack?(spell) do
+    Spell.attribute?(spell, :initiates_combat) or Spell.attribute?(spell, :initiate_combat_post_cast)
+  end
+
+  defp command_pet_attack(%Mob{internal: %Internal{pet: %Pet{kind: kind, possessed?: false}}} = entity, target_guid)
+       when kind in [:hunter, :summon] and is_integer(target_guid) and target_guid > 0 do
+    Effects.enqueue(entity, %Effects.PetSpellAttack{target_guid: target_guid})
+  end
+
+  defp command_pet_attack(entity, _target_guid), do: entity
 
   defp reset_swings(entity, now) do
     blackboard =

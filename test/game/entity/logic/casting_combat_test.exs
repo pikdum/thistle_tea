@@ -96,6 +96,40 @@ defmodule ThistleTea.Game.Entity.Logic.CastingCombatTest do
     end
   end
 
+  describe "finish/3" do
+    test "attack attributes command pets but leave ordinary casters unchanged", context do
+      pet = %{context.mob | internal: %{context.mob.internal | pet: %Internal.Pet{kind: :hunter}}}
+
+      for attribute <- [:initiates_combat, :initiate_combat_post_cast] do
+        spell = %Spell{id: 17_253, attributes: MapSet.new([attribute])}
+        finished = CastingCombat.finish(pet, spell, 77)
+        assert [%Effects.PetSpellAttack{target_guid: 77}] = finished.internal.events
+        assert CastingCombat.finish(pet, spell, nil) == pet
+        assert CastingCombat.finish(pet, spell, 0) == pet
+        assert CastingCombat.finish(context.mob, spell, 77) == context.mob
+        assert CastingCombat.finish(context.player, spell, 77) == context.player
+      end
+    end
+
+    test "attack cancellation takes precedence over initiation", %{mob: mob} do
+      pet = %{mob | internal: %{mob.internal | pet: %Internal.Pet{kind: :hunter}}}
+      spell = %{stop_spell() | attributes: MapSet.new([:cancels_auto_attack_combat, :initiates_combat])}
+      finished = CastingCombat.finish(pet, spell, 77)
+      assert finished.unit.target == 0
+      refute Enum.any?(finished.internal.events, &is_struct(&1, Effects.PetSpellAttack))
+    end
+
+    test "triggered completion commands the explicit target without depending on a hit", %{mob: mob} do
+      pet = %{mob | internal: %{mob.internal | pet: %Internal.Pet{kind: :hunter}}}
+      spell = %Spell{id: 17_253, attributes: MapSet.new([:initiates_combat])}
+      payload = %{victim_guid: 77, outcome: :resist, proc_type: :deal_harmful_spell, proc_origin: :aura_or_item}
+      hit = SpellFeedback.receive(pet, payload, spell, 2_000)
+      assert hit.internal.events == []
+      finished = SpellFeedback.receive(pet, %{payload | outcome: :cast_end}, spell, 2_000)
+      assert [%Effects.PetSpellAttack{target_guid: 77}] = finished.internal.events
+    end
+  end
+
   describe "spell lifecycle" do
     test "cancelling a stopping spell preserves melee attack intent", %{player: player} do
       spell = %{stop_spell() | cast_time_ms: 1_000, interrupt_flags: 8}

@@ -17,7 +17,13 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   alias ThistleTea.Game.Entity.Logic.Emote
   alias ThistleTea.Game.World.Loader.Emote, as: EmoteLoader
 
-  @combat_requests [Effects.BladeFlurry, Effects.DropNearbyThreat, Effects.FeignDeathApplied, Effects.SecondaryMelee]
+  @combat_requests [
+    Effects.BladeFlurry,
+    Effects.DropNearbyThreat,
+    Effects.FeignDeathApplied,
+    Effects.PetSpellAttack,
+    Effects.SecondaryMelee
+  ]
   @movement_requests [
     Effects.Charge,
     Effects.Leap,

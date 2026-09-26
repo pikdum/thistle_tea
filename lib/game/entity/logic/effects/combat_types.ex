@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
     {:PvpFlagsChanged, [:enabled?], []},
     {:AttackStart, [:source_guid, :target_guid], []},
     {:StartAttack, [:target_guid], [target_ref: nil]},
+    {:PetSpellAttack, [:target_guid], []},
     {:AttackStop, [:source_guid, :target_guid], []},
     {:DuelDefeat, [:source_guid, :target_guid], []},
     {:DuelInterrupted, [:target_guid], []},

@@ -6,6 +6,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob.ChargeAttackTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.EffectResolver
+  alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.EventSink.Context
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
   alias ThistleTea.Game.Guid
@@ -16,6 +20,23 @@ defmodule ThistleTea.Game.Entity.Server.Mob.ChargeAttackTest do
   setup [:entities]
 
   describe "handle_info/2" do
+    test "a completed pet spell orders a passive pet to attack through its owner", context do
+      pet = %Internal.Pet{kind: :hunter, reaction_state: :passive, command_state: :stay}
+      creature = %{context.creature | internal: %{context.creature.internal | pet: pet}}
+      effect = %Effects.PetSpellAttack{target_guid: context.target.guid}
+      assert [%Effects.StartAttack{target_ref: target}] = EffectResolver.resolve(creature, effect)
+      assert target == context.target
+      assert EventSink.emit(creature, effect, Context.new(self())) == creature
+      assert_receive {:force_attack, ^target} = command
+
+      assert {:noreply, started, {:continue, :maybe_broadcast}} = MobServer.handle_info(command, creature)
+      assert started.internal.pet.command_state == :attack
+      assert started.internal.pet.reaction_state == :passive
+      assert started.unit.target == target.guid
+      assert started.internal.in_combat
+      Process.cancel_timer(started.internal.ai_tick_ref)
+    end
+
     test "arrival enters the shared engagement lifecycle", %{creature: creature, target: target} do
       assert {:noreply, started, {:continue, :maybe_broadcast}} =
                MobServer.handle_info({:force_attack, target}, creature)

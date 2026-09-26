@@ -5,14 +5,23 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Combat do
   alias ThistleTea.Game.Entity.EffectResolver.Spells
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.StealthDetection
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Metadata
 
   @drop_threat_radius 250
+
+  def resolve(_entity, %Effects.PetSpellAttack{target_guid: guid}) do
+    case Metadata.get(guid) do
+      %{alive?: true} = metadata -> [Effects.attack_start(TargetRef.new(guid, metadata))]
+      _missing -> []
+    end
+  end
 
   def resolve(%Character{} = entity, %Effects.DropNearbyThreat{}) do
     target_guids =
