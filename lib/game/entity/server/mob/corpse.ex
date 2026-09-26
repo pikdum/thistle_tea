@@ -550,8 +550,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   end
 
   defp tap_group(%Mob{internal: %Internal{loot: %InternalLoot{} = internal_loot}}) do
-    with %{player: player} <- internal_loot.tapped_by,
-         %Party.Group{} = group <- PartySystem.group_of(player) do
+    with %{player: player, group_id: group_id} <- internal_loot.tapped_by,
+         %Party.Group{} = group <- PartySystem.group(group_id) || PartySystem.group_of(player) do
       group
     else
       _ -> nil

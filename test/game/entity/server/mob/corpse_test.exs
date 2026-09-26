@@ -19,6 +19,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.WorldRef
 
   @dynamic_flag_lootable 0x0001
@@ -184,6 +186,41 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
     end
   end
 
+  describe "group loot preparation" do
+    setup [:changed_group]
+
+    test "uses the original group's loot policy after its tagger leaves", %{
+      corpse: corpse,
+      group: group,
+      killer: killer,
+      new_group: new_group
+    } do
+      cache_loot_rows([grey_row()])
+      prepared = Corpse.prepare(corpse, killer)
+      session = prepared.internal.loot.session
+      assert session.loot_method == 1
+      assert session.assigned_looter in Enum.map(group.members, & &1.guid)
+      assert PartySystem.group(new_group.id).looter == 0
+      looter = %{actor(session.assigned_looter) | group_id: group.id}
+      assert {{:ok, _}, _} = Corpse.view(prepared, looter)
+      assert {{:error, :no_permission}, _} = Corpse.view(prepared, %{actor(killer) | group_id: new_group.id})
+    end
+
+    test "an NPC kill below the cutoff does not rotate either group's looter", %{
+      corpse: corpse,
+      group: group,
+      killer: killer,
+      new_group: new_group
+    } do
+      cache_loot_rows([grey_row()])
+      corpse = %{corpse | internal: %{corpse.internal | damage_origin: %DamageOrigin{player: 35, npc: 65}}}
+      prepared = Corpse.prepare(corpse, killer)
+      assert prepared.internal.loot.session == nil
+      assert PartySystem.group(group.id).looter == 0
+      assert PartySystem.group(new_group.id).looter == 0
+    end
+  end
+
   describe "remove/2" do
     test "removes an unlootable corpse without a loot component", %{killer: killer} do
       corpse = mob(killer)
@@ -208,6 +245,33 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
   defp skinning_mob(killer) do
     mob = mob(killer)
     put_in(mob.internal.loot.skinning_id, @loot_id)
+  end
+
+  defp changed_group(%{killer: killer}) do
+    [first, second, new_member] = for _ <- 1..3, do: System.unique_integer([:positive, :monotonic])
+    corpse = mob(killer)
+    :ok = PartySystem.invite(killer, "Tagger", first)
+    {:ok, _} = PartySystem.accept(first, "First")
+    :ok = PartySystem.invite(killer, "Tagger", second)
+    {:ok, _} = PartySystem.accept(second, "Second")
+    {:ok, group} = PartySystem.set_loot(killer, 1, 0, 2)
+    corpse = put_in(corpse.internal.loot.tapped_by.group_id, group.id)
+    {:ok, _} = PartySystem.leave(killer)
+    :ok = PartySystem.invite(killer, "Tagger", new_member)
+    {:ok, new_group} = PartySystem.accept(new_member, "New")
+
+    for guid <- [first, second, killer, new_member] do
+      SpatialHash.insert(:players, guid, corpse.internal.world, 0.0, 0.0, 0.0)
+    end
+
+    on_exit(fn ->
+      for guid <- [first, second, killer, new_member] do
+        PartySystem.leave(guid)
+        SpatialHash.remove(:players, guid)
+      end
+    end)
+
+    %{corpse: corpse, group: PartySystem.group(group.id), new_group: new_group}
   end
 
   defp cache_loot_rows(rows), do: :ets.insert(LootLoader, {{:creature, @loot_id}, rows})
