@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.SpellReception
   alias ThistleTea.Game.Party
+  alias ThistleTea.Game.Player.LiquidSpells
   alias ThistleTea.Game.Player.Movement, as: PlayerMovement
   alias ThistleTea.Game.Spell.Area
   alias ThistleTea.Game.Time
@@ -75,6 +76,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     condition_results = script_condition_results(entity, groups)
     condition_target = explicit_actor(actors) || event_ai_target(entity)
     random = random()
+    liquid = PlayerMovement.terrain_liquid(entity)
 
     %Context{
       now: now,
@@ -89,7 +91,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       condition_area: condition_area(entity, requirements),
       spell_area: spell_area(entity),
       liquid_surface: liquid_surface(entity),
-      terrain_liquid: PlayerMovement.terrain_liquid(entity),
+      terrain_liquid: liquid,
+      liquid_spell: LiquidSpells.context(entity, liquid),
       body_height: PlayerMovement.body_height(entity),
       instance_data: instance_data(entity, requirements, options),
       formation: FormationEnvironment.snapshot(entity, now),

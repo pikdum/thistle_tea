@@ -20,4 +20,10 @@ defmodule ThistleTea.Game.Terrain.Liquid do
   def magma?(_liquid), do: false
 
   def touching?(%__MODULE__{surface: surface}, z), do: trunc((surface - z - 0.01) * 10) > -1
+
+  def spell_id(%__MODULE__{entry: 21, surface: surface}, z) do
+    if trunc((surface - z - 0.01) * 10) > 0, do: 28_801
+  end
+
+  def spell_id(_liquid, _z), do: nil
 end

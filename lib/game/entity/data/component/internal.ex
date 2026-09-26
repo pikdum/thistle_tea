@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :name,
     :area,
     :outdoors?,
+    :liquid_spell_id,
     :spells,
     :spellbook,
     :casting,

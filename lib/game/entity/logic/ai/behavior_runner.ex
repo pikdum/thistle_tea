@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Totem, as: TotemBT
   alias ThistleTea.Game.Entity.Logic.Charge
   alias ThistleTea.Game.Entity.Logic.CombatLeash
+  alias ThistleTea.Game.Entity.Logic.LiquidSpells
   alias ThistleTea.Game.Entity.Logic.TemporarySummon
   alias ThistleTea.Game.Entity.Logic.UnreachableTarget
 
@@ -51,6 +52,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
   end
 
   defp maintain(entity, %Context{now: now} = context) do
+    entity = LiquidSpells.reconcile(entity, context.liquid_spell, now)
     blackboard = Blackboard.ensure(entity.internal.blackboard)
     {:failure, entity, blackboard} = AuraBT.tick(entity, blackboard, context)
     {:failure, entity, blackboard} = RegenBT.tick(entity, blackboard, now)

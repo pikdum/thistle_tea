@@ -16,7 +16,8 @@ defmodule ThistleTea.Native.Namigator do
     {36, "DeadminesInstance"},
     {451, "development"},
     {389, "OrgrimmarInstance"},
-    {329, "Stratholme"}
+    {329, "Stratholme"},
+    {533, "Stratholme Raid"}
   ]
 
   def load_nif do

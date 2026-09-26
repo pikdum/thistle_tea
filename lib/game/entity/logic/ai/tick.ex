@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   alias ThistleTea.Game.Entity.Logic.Fatigue
   alias ThistleTea.Game.Entity.Logic.Intoxication
   alias ThistleTea.Game.Entity.Logic.LavaExposure
+  alias ThistleTea.Game.Entity.Logic.LiquidSpells
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
@@ -54,7 +55,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
 
   def needs_tick?(character),
     do:
-      Breathing.needs_tick?(character) or Fatigue.needs_tick?(character) or
+      Breathing.needs_tick?(character) or Fatigue.needs_tick?(character) or LiquidSpells.active?(character) or
         not is_nil(LavaExposure.next_tick_at(character)) or Regen.needs_regen?(character) or
         Intoxication.needs_tick?(character) or Pvp.needs_tick?(character) or not is_nil(Rest.next_tick_at(character)) or
         not is_nil(Reactive.next_tick_at(character))

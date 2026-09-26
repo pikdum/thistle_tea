@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.Entity.Logic.Falling
   alias ThistleTea.Game.Entity.Logic.Fatigue
   alias ThistleTea.Game.Entity.Logic.LavaExposure
+  alias ThistleTea.Game.Entity.Logic.LiquidSpells, as: LiquidSpellLogic
   alias ThistleTea.Game.Entity.Logic.MovementHandoff
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Logic.SafePosition
@@ -32,6 +33,7 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
+  alias ThistleTea.Game.Player.LiquidSpells
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Spell
@@ -161,6 +163,7 @@ defmodule ThistleTea.Game.Player.Movement do
     )
     |> Fatigue.update(liquid, now, :rand.uniform(max(character.unit.level || 1, 1)) - 1)
     |> LavaExposure.update(liquid, now, 604 + :rand.uniform(6), :rand.uniform(100) - 1)
+    |> then(&LiquidSpellLogic.reconcile(&1, LiquidSpells.context(&1, liquid), now))
   end
 
   def synchronize_environment(%State{character: %Character{} = character} = state) do
