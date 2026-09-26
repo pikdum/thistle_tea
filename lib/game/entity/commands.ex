@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Entity.Commands.ChargePathResolved do
   @moduledoc false
   @enforce_keys [:path, :duration_ms, :started_at]
-  defstruct [:path, :duration_ms, :started_at]
+  defstruct [:path, :duration_ms, :started_at, :attack_target, swing_delay_ms: 0]
 end
 
 defmodule ThistleTea.Game.Entity.Commands.FarsightStarted do

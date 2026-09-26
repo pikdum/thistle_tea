@@ -975,6 +975,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @aura_is_debuff, :negative)
       |> add_if(attrs, @cant_cancel, :cant_cancel)
       |> add_if(attrs, @cooldown_on_event, :cooldown_on_event)
+      |> add_if(attrs, 0x00100000, :cancels_auto_attack_combat)
       |> add_if(attrs, 0x20000000, :no_immunities)
       |> add_if(attrs, 0x40000000, :heartbeat_resist)
 

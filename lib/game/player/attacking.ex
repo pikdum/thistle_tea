@@ -19,8 +19,16 @@ defmodule ThistleTea.Game.Player.Attacking do
 
   require Logger
 
+  def start_selected(%{target: guid, character: %Character{} = character} = state, %TargetRef{guid: guid} = target) do
+    metadata = Metadata.query(guid, [:alive?, :incarnation_id]) || %{}
+
+    if not Core.dead?(character) and TargetRef.active?(target, metadata), do: start(state, guid), else: state
+  end
+
+  def start_selected(state, %TargetRef{}), do: state
+
   def start(%{character: character} = state, target_guid) do
-    Logger.info("CMSG_ATTACKSWING: #{target_guid}")
+    Logger.info("Starting melee attack: #{target_guid}")
 
     if valid_attack_target?(state, target_guid) do
       target_ref = TargetRef.new(target_guid, Metadata.query(target_guid, [:incarnation_id]) || %{})

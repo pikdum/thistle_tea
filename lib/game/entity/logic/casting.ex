@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.CastSpeed
+  alias ThistleTea.Game.Entity.Logic.Charge
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Disarm
@@ -309,6 +310,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> break_stealth(casting, now)
       |> interrupt_completion_auras(casting, now)
       |> PetLearning.used(casting.spell)
+      |> queue_charge(casting)
 
     casting = Cast.transition(casting, :impact)
     entity |> put_cast(casting) |> advance_phase(casting, now)
@@ -329,7 +331,6 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> queue_skinning(casting)
       |> queue_remove_insignia(casting)
       |> queue_disenchant(casting)
-      |> queue_charge(casting)
       |> release_paladin_seal(casting, resolution.hits, now)
       |> apply_initial_impacts(casting, now)
       |> consume_spell_modifiers(casting, now)
@@ -539,7 +540,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
          resolution: %CastResolution{followups: %Followups{selected_unit_guid: unit_guid}}
        }) do
     if is_integer(unit_guid) and unit_guid > 0 and Enum.any?(spell.effects, &(&1.type == :charge)) do
-      Effects.enqueue(character, Effects.charge(unit_guid))
+      Effects.enqueue(character, Effects.charge(unit_guid, attack_on_arrival?: Charge.attack_on_arrival?(spell)))
     else
       character
     end

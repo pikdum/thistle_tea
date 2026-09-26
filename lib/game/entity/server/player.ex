@@ -72,6 +72,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.SpellThreat
   alias ThistleTea.Game.Entity.Logic.StealthDetection
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Entity.Server.GuardianOwner
@@ -100,6 +101,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Party.MemberStats
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
   alias ThistleTea.Game.Player.Ammunition
+  alias ThistleTea.Game.Player.Attacking
   alias ThistleTea.Game.Player.Auction.ClientProjection, as: AuctionProjection
   alias ThistleTea.Game.Player.Battlegrounds
   alias ThistleTea.Game.Player.CompanionVisibility
@@ -1288,6 +1290,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   rescue
     error ->
       Logger.error("Player charge failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:force_attack, %TargetRef{} = target}, %State{} = state) do
+    {:noreply, Attacking.start_selected(state, target)}
+  rescue
+    error ->
+      Logger.error("Player forced attack failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 

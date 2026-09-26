@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Entity.EffectResolver.Pvp
   alias ThistleTea.Game.Entity.Logic.Aura.ProcDamage
   alias ThistleTea.Game.Entity.Logic.Aura.TriggeredLifetime
+  alias ThistleTea.Game.Entity.Logic.Charge
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Entity.Logic.SpellResist
@@ -333,7 +334,11 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
     movement =
       if is_integer(Target.unit_guid(selection)) and Enum.any?(spell.effects, &(&1.type == :charge)),
-        do: Movement.resolve(entity, Effects.charge(Target.unit_guid(selection))),
+        do:
+          Movement.resolve(
+            entity,
+            Effects.charge(Target.unit_guid(selection), attack_on_arrival?: Charge.attack_on_arrival?(spell))
+          ),
         else: []
 
     [launch | movement ++ deliveries ++ actions ++ [completion]]

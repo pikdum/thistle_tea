@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Movement do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement, as: MovementLogic
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -24,7 +25,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Movement do
           internal: %Internal{world: world, taxi_flight: nil},
           movement_block: %{position: {x, y, z, _o}}
         } = entity,
-        %Effects.Charge{target_guid: target_guid}
+        %Effects.Charge{target_guid: target_guid} = effect
       ) do
     with false <- Core.dead?(entity) or MovementLogic.blocked?(entity) or target_guid == entity.object.guid,
          {^world, tx, ty, tz} <- World.position(target_guid),
@@ -40,7 +41,21 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Movement do
 
       {dx, dy, dz} = List.last(path)
       destination = {dx, dy, dz, charge_facing({x, y}, {dx, dy})}
-      [Effects.charge_resolved(path, duration_ms, destination)]
+      metadata = Metadata.get(target_guid) || %{}
+      target = if effect.attack_on_arrival?, do: TargetRef.new(target_guid, metadata)
+
+      radius =
+        (entity.unit.bounding_radius || Unit.default_bounding_radius()) +
+          (Map.get(metadata, :bounding_radius) || Unit.default_bounding_radius())
+
+      distance = max(Math.distance({x, y, z}, {tx, ty, tz}) - radius, 0)
+
+      [
+        Effects.charge_resolved(path, duration_ms, destination,
+          attack_target: target,
+          swing_delay_ms: trunc(200 + 40 * distance)
+        )
+      ]
     else
       _no_path -> []
     end

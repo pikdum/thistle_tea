@@ -32,7 +32,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
     {:PvpContact, [:target_guid, :role, :other, :now], [combat?: true]},
     {:PvpFlagsChanged, [:enabled?], []},
     {:AttackStart, [:source_guid, :target_guid], []},
-    {:StartAttack, [:target_guid], []},
+    {:StartAttack, [:target_guid], [target_ref: nil]},
     {:AttackStop, [:source_guid, :target_guid], []},
     {:DuelDefeat, [:source_guid, :target_guid], []},
     {:DuelInterrupted, [:target_guid], []},

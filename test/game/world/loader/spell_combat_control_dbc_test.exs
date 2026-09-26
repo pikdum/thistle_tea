@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.World.Loader.SpellCombatControlDbcTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Charge
   alias ThistleTea.Game.Entity.Logic.CombatControl
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -11,6 +12,21 @@ defmodule ThistleTea.Game.World.Loader.SpellCombatControlDbcTest do
   @moduletag :dbc_db
 
   describe "load/1" do
+    test "charge spells retain their automatic attack and cancellation rules" do
+      for id <- [100, 6_178, 11_578, 20_252, 13_119] do
+        spell = SpellLoader.load(id)
+        assert Enum.any?(spell.effects, &(&1.type == :charge))
+        assert Charge.attack_on_arrival?(spell)
+      end
+
+      for id <- [13_711, 22_641] do
+        spell = SpellLoader.load(id)
+        assert Enum.any?(spell.effects, &(&1.type == :charge))
+        assert Spell.attribute?(spell, :cancels_auto_attack_combat)
+        refute Charge.attack_on_arrival?(spell)
+      end
+    end
+
     test "area charm retains the vanilla spell-specific activation rule" do
       for id <- [26_740, 28_225, 28_410] do
         spell = SpellLoader.load(id)

@@ -78,6 +78,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.SpellThreat
   alias ThistleTea.Game.Entity.Logic.StealthDetection
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Logic.Totems
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
@@ -1277,6 +1278,22 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   rescue
     error ->
       Logger.error("ai_script_steps crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:force_attack, %TargetRef{guid: guid} = target}, %Mob{} = state) do
+    metadata = Metadata.query(guid, [:alive?, :incarnation_id]) || %{}
+    world = state.internal.world
+
+    if TargetRef.active?(target, metadata) and
+         match?({^world, _, _, _}, World.position(guid)) and Hostility.attackable?(state, guid) do
+      handle_info({:force_attack, guid}, state)
+    else
+      {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Creature charge attack failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 

@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
   """
   alias __MODULE__, as: Effects
   alias ThistleTea.Game.Entity.Data.CreatureSpell
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Area
   alias ThistleTea.Game.Spell.Target
@@ -83,8 +84,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.GrantPower{target_guid: target_guid, misc_value: power_type, amount: amount}
   end
 
-  def charge(target_guid) when is_integer(target_guid) do
-    %Effects.Charge{target_guid: target_guid}
+  def charge(target_guid, opts \\ []) when is_integer(target_guid) do
+    %Effects.Charge{target_guid: target_guid, attack_on_arrival?: Keyword.get(opts, :attack_on_arrival?, false)}
   end
 
   def spell_log_miss(source_guid, target_guid, spell_id, reason)
@@ -416,9 +417,15 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     }
   end
 
-  def charge_resolved(path, duration_ms, {_x, _y, _z, _o} = destination)
+  def charge_resolved(path, duration_ms, {_x, _y, _z, _o} = destination, opts \\ [])
       when is_list(path) and is_integer(duration_ms) do
-    %Effects.ChargeResolved{path: path, duration_ms: duration_ms, destination: destination}
+    %Effects.ChargeResolved{
+      path: path,
+      duration_ms: duration_ms,
+      destination: destination,
+      attack_target: Keyword.get(opts, :attack_target),
+      swing_delay_ms: Keyword.get(opts, :swing_delay_ms, 0)
+    }
   end
 
   def leap({_x, _y, _z, _o} = position) do
@@ -704,6 +711,10 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
 
   def attack_start(target_guid) when is_integer(target_guid) do
     %Effects.StartAttack{target_guid: target_guid}
+  end
+
+  def attack_start(%TargetRef{guid: guid} = target) do
+    %Effects.StartAttack{target_guid: guid, target_ref: target}
   end
 
   def forward_script_steps(target_guid, steps, source_guid) when is_integer(target_guid) and is_list(steps) do

@@ -48,9 +48,17 @@ defmodule ThistleTea.Game.Entity.EffectResolver.ChargeTest do
         assert_in_delta x, -8965.45, 0.1
         assert_in_delta y, -132.49, 0.1
         assert_in_delta movement.duration_ms, 646, 2
+        assert movement.attack_target.guid == context.target.object.guid
+        assert movement.swing_delay_ms == 968
         assert [%Effects.TriggerSpellRequest{source_guid: source}] = EffectResolver.resolve(context.target, trigger)
         assert source == caster.object.guid
       end
+    end
+
+    test "nonattacking charges still carry the swing delay without an arrival attack", context do
+      [movement] = EffectResolver.resolve(context.character, Effects.charge(context.target.object.guid))
+      assert movement.attack_target == nil
+      assert movement.swing_delay_ms == 968
     end
 
     test "charges reject dead, rooted and taxi casters and targets in another world", context do

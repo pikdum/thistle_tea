@@ -850,7 +850,10 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
       character = Casting.complete(character, 1_000)
 
-      assert Enum.any?(character.internal.events, &(is_struct(&1, Effects.Charge) and &1.target_guid == 9))
+      assert Enum.any?(
+               character.internal.events,
+               &match?(%Effects.Charge{target_guid: 9, attack_on_arrival?: true}, &1)
+             )
     end
   end
 

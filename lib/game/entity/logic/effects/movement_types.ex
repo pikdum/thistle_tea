@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.MovementTypes do
 
   effects = [
     {:BindHome, [:binder_guid], []},
-    {:Charge, [:target_guid], []},
+    {:Charge, [:target_guid], [attack_on_arrival?: false]},
     {:ClientControlChanged, [:allow_movement?], []},
     {:MovementStopped, [], []},
     {:MovementInform, [:motion_type, :point_id], []},
@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.MovementTypes do
     {:TeleportHome, [], []},
     {:Leap, [:position], []},
     {:TeleportToSpellTarget, [:spell_id], []},
-    {:ChargeResolved, [:path, :duration_ms, :destination], []},
+    {:ChargeResolved, [:path, :duration_ms, :destination], [attack_target: nil, swing_delay_ms: 0]},
     {:SetFacing, [:facing], []}
   ]
 

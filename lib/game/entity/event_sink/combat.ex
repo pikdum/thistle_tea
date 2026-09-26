@@ -282,9 +282,9 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
     entity
   end
 
-  def emit(entity, %Effects.StartAttack{target_guid: target_guid}, context)
+  def emit(entity, %Effects.StartAttack{target_guid: target_guid, target_ref: target_ref}, context)
       when is_integer(target_guid) and target_guid > 0 do
-    Context.send(context, {:force_attack, target_guid})
+    Context.send(context, {:force_attack, target_ref || target_guid})
     entity
   end
 

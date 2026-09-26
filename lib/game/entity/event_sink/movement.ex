@@ -224,7 +224,9 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
     command = %Commands.ChargePathResolved{
       path: effect.path,
       duration_ms: effect.duration_ms,
-      started_at: Time.now()
+      started_at: Time.now(),
+      attack_target: effect.attack_target,
+      swing_delay_ms: effect.swing_delay_ms
     }
 
     Context.send(context, command)

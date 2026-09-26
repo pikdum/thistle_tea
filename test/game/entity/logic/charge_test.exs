@@ -11,12 +11,14 @@ defmodule ThistleTea.Game.Entity.Logic.ChargeTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
   alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Charge
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.WorldRef
@@ -31,6 +33,28 @@ defmodule ThistleTea.Game.Entity.Logic.ChargeTest do
   end
 
   describe "start/2" do
+    test "adds the delay to both player swings without resetting their remaining cooldown" do
+      for now <- [1_000, -100_000], initial <- [0, nil, now - 1, now + 500] do
+        player = hd(entities())
+        blackboard = %Blackboard{}
+
+        blackboard = %{
+          blackboard
+          | combat: %{blackboard.combat | next_attack_at: initial, next_offhand_attack_at: now + 900}
+        }
+
+        player = %{player | internal: %{player.internal | blackboard: blackboard}}
+        started = Charge.start(player, %{command() | started_at: now, swing_delay_ms: 1_000})
+        expected = if initial == now + 500, do: 1_500, else: 1_000
+        assert Blackboard.delay_until(started.internal.blackboard, :next_attack_at, now) == expected
+        assert Blackboard.delay_until(started.internal.blackboard, :next_offhand_attack_at, now) == 1_900
+      end
+
+      creature = List.last(entities())
+      started = Charge.start(creature, %{command() | swing_delay_ms: 1_000})
+      assert started.internal.blackboard == creature.internal.blackboard
+    end
+
     test "a queued charge cannot move a newly dead or rooted owner" do
       for entity <- entities() do
         dead = %{entity | unit: %{entity.unit | health: 0}}
@@ -42,6 +66,39 @@ defmodule ThistleTea.Game.Entity.Logic.ChargeTest do
   end
 
   describe "reconcile/2" do
+    test "successful arrival requests one attack on the original target lifetime" do
+      target = %TargetRef{guid: 2, incarnation_id: 7}
+
+      for entity <- entities() do
+        charging = Charge.start(entity, %{command() | attack_target: target})
+        refute Enum.any?(charging.internal.events, &is_struct(&1, Effects.StartAttack))
+        arrived = Charge.reconcile(charging, 2_000)
+
+        assert [%Effects.StartAttack{target_ref: ^target}] =
+                 Enum.filter(arrived.internal.events, &is_struct(&1, Effects.StartAttack))
+
+        assert Charge.reconcile(arrived, 2_001) == arrived
+      end
+    end
+
+    test "cancelled, superseded, dead and prematurely ended charges cannot start attacks" do
+      target = %TargetRef{guid: 2, incarnation_id: 7}
+
+      for entity <- entities() do
+        charging = Charge.start(entity, %{command() | attack_target: target})
+
+        for ended <- [
+              Charge.cancel(charging, 1_500),
+              Charge.finish(charging, 1_500),
+              Core.take_damage(charging, 100, 1_500),
+              Movement.move_along_path(charging, [{30.0, 0.0, 0.0}], [], 1_500)
+            ] do
+          arrived = Charge.reconcile(ended, 2_000)
+          refute Enum.any?(arrived.internal.events, &is_struct(&1, Effects.StartAttack))
+        end
+      end
+    end
+
     test "player and creature charges defer new roots and stuns until arrival" do
       for entity <- entities(), type <- [:mod_root, :mod_stun] do
         charging = Charge.start(entity, command())
@@ -93,6 +150,16 @@ defmodule ThistleTea.Game.Entity.Logic.ChargeTest do
         assert released.movement_block == moved.movement_block
         assert Movement.moving?(released, 2_000)
       end
+    end
+  end
+
+  describe "attack_on_arrival?/1" do
+    test "only hostile spells without the cancellation attribute start attacks" do
+      enemy = %Spell{effects: [%Effect{type: :charge, implicit_target_a: :target_enemy}]}
+      friend = %Spell{effects: [%Effect{type: :charge, implicit_target_a: :target_ally}]}
+      assert Charge.attack_on_arrival?(enemy)
+      refute Charge.attack_on_arrival?(friend)
+      refute Charge.attack_on_arrival?(%{enemy | attributes: MapSet.new([:cancels_auto_attack_combat])})
     end
   end
 
