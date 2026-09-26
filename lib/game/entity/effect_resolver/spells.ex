@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   @moduledoc false
 
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.EffectResolver.Movement
   alias ThistleTea.Game.Entity.EffectResolver.Pvp
   alias ThistleTea.Game.Entity.Logic.Aura.ProcDamage
   alias ThistleTea.Game.Entity.Logic.Aura.TriggeredLifetime
@@ -194,13 +195,15 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
       extra_attack?: effect.extra_attack?,
       triggered_by_spell_id: effect.triggering_spell_id,
       attack_hand: effect.attack_hand,
-      hit_context: effect.hit_context
+      hit_context: effect.hit_context,
+      target_role: effect.target_role
     )
   end
 
   defp foreign_owner_required?(entity, effect, spell) do
     is_integer(effect.source_guid) and effect.source_guid != entity.object.guid and
-      (Spell.attribute?(spell, :channeled) or Chain.spell?(spell) or ObjectTargets.required?(spell) or
+      (Enum.any?(spell.effects, &(&1.type == :charge)) or
+         Spell.attribute?(spell, :channeled) or Chain.spell?(spell) or ObjectTargets.required?(spell) or
          Area.restricted?(spell) or
          (Focus.required?(spell) and Guid.entity_type(effect.source_guid) == :player))
   end
@@ -328,7 +331,12 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
       proc_origin: ProcOrigin.classify(spell, context)
     }
 
-    [launch | deliveries ++ actions ++ [completion]]
+    movement =
+      if is_integer(Target.unit_guid(selection)) and Enum.any?(spell.effects, &(&1.type == :charge)),
+        do: Movement.resolve(entity, Effects.charge(Target.unit_guid(selection))),
+        else: []
+
+    [launch | movement ++ deliveries ++ actions ++ [completion]]
   end
 
   defp living_target?(%{object: %{guid: guid}, unit: %Unit{health: health}}, guid),
@@ -418,6 +426,9 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   end
 
   defp apply_trigger_duration_override(spell, _effect), do: spell
+
+  defp triggered_target(_entity, %Effects.TriggerSpell{target_role: role, target_guid: guid}, _spell)
+       when role in [:caster, :other, :pet], do: guid
 
   defp triggered_target(%{object: %{guid: guid}} = entity, %Effects.TriggerSpell{source_guid: guid} = effect, spell) do
     SpellTarget.redirect_trigger_target(entity, effect.target_guid, spell)

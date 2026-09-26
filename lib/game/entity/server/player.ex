@@ -1285,6 +1285,10 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   @impl GenServer
   def handle_info(%Commands.ChargePathResolved{} = command, %{character: %Character{}} = state) do
     {:noreply, ServerMovement.start(state, command)}
+  rescue
+    error ->
+      Logger.error("Player charge failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_info(%Commands.FarsightStarted{guid: guid} = command, %{character: %Character{} = character} = state) do

@@ -130,6 +130,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.ServerMovementTest do
         state = ServerMovement.reconcile(state)
         on_exit(fn -> World.remove_position(state.character) end)
         assert state.server_movement == nil
+        assert state.character.internal.charge == nil
         assert ServerMovement.finish(state, token, 1_100) == state
       end
     end
@@ -166,6 +167,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.ServerMovementTest do
 
     character = %Character{
       object: %Object{guid: guid},
+      unit: %Unit{health: 100, max_health: 100, auras: []},
       internal: %Internal{world: WorldRef.open(0), spline_id: 0, running: true},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, movement_flags: 0, run_speed: 7.0, walk_speed: 2.5}
     }

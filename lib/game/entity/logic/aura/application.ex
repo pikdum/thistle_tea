@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Logic.Aura.Capacity
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
+  alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.SingleTarget
   alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
@@ -67,7 +68,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     if not TriggeredLifetime.source_alive?(entity, context.required_aura_source, now) or
          CreatureImmunity.spell?(entity, context, spell),
        do: {entity, []},
-       else: apply_unblocked_spell(entity, context, spell, now)
+       else: Script.instant_application(entity, context, spell) || apply_unblocked_spell(entity, context, spell, now)
   end
 
   defp apply_unblocked_spell(entity, context, spell, now) do

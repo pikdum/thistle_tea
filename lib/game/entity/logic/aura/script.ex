@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   alias ThistleTea.Game.Entity.Logic.Aura.ProcChance
   alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Engineering
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Priest
   alias ThistleTea.Game.Entity.Logic.Silithyst
@@ -28,6 +29,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   @whirlwind 1680
   @melee_radius 5.0
   @whirlwind_radius 8.0
+
+  def instant_application(entity, context, %Spell{id: 13_139}), do: Engineering.net_backfire(entity, context)
+  def instant_application(_entity, _context, _spell), do: nil
 
   def after_remove(entity, holders, cause) when is_list(holders) do
     Enum.flat_map(holders, fn holder ->

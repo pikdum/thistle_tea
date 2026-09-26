@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.ServerMovement do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.BoundaryResult
+  alias ThistleTea.Game.Entity.Logic.Charge
   alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
@@ -25,7 +26,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.ServerMovement do
   def reconcile(%State{character: character, server_movement: %__MODULE__{timer_ref: ref}} = state) do
     if ControlMovement.active?(character) or PlayerPossession.active?(character) do
       Process.cancel_timer(ref)
-      %{state | server_movement: nil}
+      %{state | character: Charge.release(character, Time.now()), server_movement: nil}
     else
       state
     end
@@ -58,21 +59,27 @@ defmodule ThistleTea.Game.Entity.Server.Player.ServerMovement do
 
   def start(%State{} = state, %Commands.ChargePathResolved{} = command, now \\ Time.now()) do
     state = cancel(state, now)
-    character = BoundaryResult.apply(state.character, command)
+    character = state.character |> BoundaryResult.apply(command) |> EventSink.emit_pending()
     World.update_position(character)
 
+    schedule(%{state | character: character}, command, now)
+  end
+
+  defp schedule(%State{character: %{internal: %{charge: nil}}} = state, _command, _now), do: state
+
+  defp schedule(state, command, now) do
     token = make_ref()
     delay = max(command.started_at + command.duration_ms - now, 0)
     timer_ref = Process.send_after(self(), {:server_movement_arrived, token}, delay)
 
-    %{state | character: character, server_movement: %__MODULE__{token: token, timer_ref: timer_ref}}
+    %{state | server_movement: %__MODULE__{token: token, timer_ref: timer_ref}}
   end
 
   def finish(state, token, now \\ Time.now())
 
   def finish(%State{server_movement: %__MODULE__{token: token, timer_ref: timer_ref}} = state, token, now) do
     Process.cancel_timer(timer_ref)
-    character = Movement.finish(state.character, now)
+    character = state.character |> Charge.finish(now) |> EventSink.emit_pending()
     World.update_position(character)
     %{state | character: character, server_movement: nil}
   end
@@ -85,7 +92,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.ServerMovement do
 
     character =
       state.character
-      |> Movement.stop(now)
+      |> Charge.cancel(now)
       |> ControlMovement.reset_navigation()
       |> EventSink.emit_pending()
 
@@ -94,7 +101,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.ServerMovement do
 
   def cancel(%State{character: %Character{internal: %{movement_start_time: started}} = character} = state, now)
       when is_integer(started) do
-    character = character |> Movement.stop(now) |> ControlMovement.reset_navigation() |> EventSink.emit_pending()
+    character = character |> Charge.cancel(now) |> ControlMovement.reset_navigation() |> EventSink.emit_pending()
     %{state | character: character}
   end
 

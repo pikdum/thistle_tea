@@ -44,6 +44,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Assistance
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.BoundaryResult
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.ControlMovement
@@ -1440,6 +1441,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_info({:event_start, _event}, state) do
     {:noreply, state}
+  end
+
+  def handle_info(%Commands.ChargePathResolved{} = command, %Mob{} = state) do
+    state |> BoundaryResult.apply(command) |> run_ai_tick()
+  rescue
+    error ->
+      Logger.error("Creature charge failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   defp apply_controlled_move(%Mob{} = state, payload, opcode, owner_guid) do

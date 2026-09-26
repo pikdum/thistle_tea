@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Charge
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
@@ -41,7 +42,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
 
     has_root? =
       logout_rooted?(entity) or corpse_rooted?(entity) or
-        Enum.any?(holders, &(Holder.has_aura_type?(&1, :mod_root) or Holder.has_aura_type?(&1, :mod_stun)))
+        (not Charge.active?(entity, now) and Enum.any?(holders, &immobilizing_holder?/1))
 
     new_flags =
       if has_root?,
@@ -61,6 +62,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
   end
 
   defp sync_movement_flags(entity, _now), do: {entity, []}
+
+  defp immobilizing_holder?(holder),
+    do: Holder.has_aura_type?(holder, :mod_root) or Holder.has_aura_type?(holder, :mod_stun)
 
   defp rooted?(%{internal: internal}) when is_struct(internal), do: internal.rooted? == true
   defp rooted?(_entity), do: false

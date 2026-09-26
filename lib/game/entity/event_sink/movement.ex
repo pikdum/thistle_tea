@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -219,19 +220,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
 
   def emit(entity, %Effects.MonsterMove{}, _context), do: entity
 
-  def emit(%Character{} = entity, %Effects.ChargeResolved{} = effect, context) do
-    movement_block = %{
-      entity.movement_block
-      | spline_nodes: effect.path,
-        duration: effect.duration_ms,
-        spline_flags: 0x100
-    }
-
-    entity
-    |> then(&%{&1 | movement_block: movement_block})
-    |> Message.SmsgMonsterMove.build()
-    |> World.broadcast_packet(entity)
-
+  def emit(%{unit: %Unit{}} = entity, %Effects.ChargeResolved{} = effect, context) do
     command = %Commands.ChargePathResolved{
       path: effect.path,
       duration_ms: effect.duration_ms,

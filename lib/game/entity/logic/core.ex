@@ -360,6 +360,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     internal = %{
       internal
       | running: false,
+        charge: nil,
         fall: nil,
         navigation_intents: [],
         events: Enum.reject(internal.events, &is_struct(&1, Effects.MonsterMove)),

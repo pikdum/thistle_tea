@@ -6,24 +6,34 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Movement do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.HomeBind
+  alias ThistleTea.Game.Entity.Logic.Charge
+  alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Movement, as: MovementLogic
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpellMovement
 
-  @charge_speed 25.0
-
   def resolve(
-        %Character{internal: %Internal{world: world}, movement_block: %{position: {x, y, z, _o}}},
+        %{
+          unit: %Unit{},
+          internal: %Internal{world: world, taxi_flight: nil},
+          movement_block: %{position: {x, y, z, _o}}
+        } = entity,
         %Effects.Charge{target_guid: target_guid}
       ) do
-    with {^world, tx, ty, tz} <- World.position(target_guid),
-         path when is_list(path) and path != [] <- charge_path(world.map_id, {x, y, z}, {tx, ty, tz}) do
+    with false <- Core.dead?(entity) or MovementLogic.blocked?(entity) or target_guid == entity.object.guid,
+         {^world, tx, ty, tz} <- World.position(target_guid),
+         speed when speed > 0 <- min((entity.movement_block.run_speed || 7.0) * 4, 24.0),
+         path when is_list(path) and path != [] <-
+           charge_path(entity, target_guid, world.map_id, {x, y, z}, {tx, ty, tz}) do
       duration_ms =
         [{x, y, z} | path]
-        |> Math.movement_duration(@charge_speed)
+        |> Math.movement_duration(speed)
         |> Kernel.*(1_000)
         |> trunc()
         |> max(1)
@@ -106,8 +116,21 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Movement do
     Pathfinding.first_collision_position(map, {x, y, z}, destination)
   end
 
-  defp charge_path(map, from, to) do
-    Pathfinding.find_path(map, from, to, allow_steep: true)
+  defp charge_path(entity, target_guid, map, from, to) do
+    metadata = Metadata.get(target_guid) || %{}
+
+    reach =
+      Combat.melee_reach(
+        entity.unit.combat_reach || Unit.default_combat_reach(),
+        Map.get(metadata, :combat_reach) || Unit.default_combat_reach()
+      )
+
+    with true <- Math.distance(from, to) > reach,
+         path when is_list(path) <- Pathfinding.find_path(map, from, to, allow_steep: true) do
+      Charge.approach_path(path, from, to, reach - 0.5)
+    else
+      _ -> nil
+    end
   rescue
     _error -> nil
   end

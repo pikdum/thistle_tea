@@ -555,7 +555,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
 
     test "teleports cancel projected server movement" do
       guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      character = character(guid, health: 100, max_health: 100)
+      character = character(guid, health: 100, max_health: 100, auras: [])
       started_at = Time.now()
 
       state =

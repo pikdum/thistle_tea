@@ -78,6 +78,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :safe_position,
     :movement_speed,
     :movement_options,
+    :charge,
     :fall,
     :breath,
     :pending_resurrect,

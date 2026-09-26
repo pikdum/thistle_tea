@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.SeekAssistance
   alias ThistleTea.Game.Entity.Logic.AI.BT.Totem, as: TotemBT
+  alias ThistleTea.Game.Entity.Logic.Charge
   alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.Entity.Logic.TemporarySummon
   alias ThistleTea.Game.Entity.Logic.UnreachableTarget
@@ -41,7 +42,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
     BT.tick(tree, entity, context)
   end
 
-  defp tick_entity(tree, entity, context), do: BT.tick(tree, maintain(entity, context), context)
+  defp tick_entity(tree, entity, context) do
+    entity = maintain(entity, context)
+
+    if Charge.active?(entity, context.now),
+      do: {BT.running(max(entity.internal.charge.arrives_at - context.now, 1), :charge), entity},
+      else: BT.tick(tree, entity, context)
+  end
 
   defp maintain(entity, %Context{now: now} = context) do
     blackboard = Blackboard.ensure(entity.internal.blackboard)
@@ -50,6 +57,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
     entity = %{entity | internal: %{entity.internal | blackboard: blackboard}}
 
     entity
+    |> Charge.reconcile(now)
     |> SeekAssistance.maintain(context)
     |> Distancing.maintain(context)
     |> CombatLeash.maintain(now)

@@ -54,6 +54,8 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   def remaining_move_duration(_entity, _now), do: 0
 
+  def completion_at(%{internal: %Internal{charge: %{arrives_at: at}}}) when is_integer(at), do: at
+
   def completion_at(%{internal: %Internal{movement_start_time: started, movement_options: opts}, movement_block: mb})
       when is_integer(started) and is_list(opts) do
     if Keyword.has_key?(opts, :movement_inform) or Keyword.get(opts, :falling?, false), do: started + mb.duration

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.BoundaryResultTest do
   describe "apply/2" do
     test "applies a resolved charge path atomically" do
       character = %Character{
+        unit: %Unit{health: 100, auras: []},
         internal: %Internal{spline_id: 4},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
