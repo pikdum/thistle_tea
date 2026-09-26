@@ -10,6 +10,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ProcSpell do
   alias ThistleTea.Game.Spell
 
   @blessed_recovery %{27_811 => 27_813, 27_815 => 27_817, 27_816 => 27_818}
+  @mana_drain 27_522
+  @mana_drain_energize 29_471
+  @mana_drain_leech 27_526
   @persistent_shield 26_467
   @persistent_shield_absorb 26_470
   @pyroclasm %{18_096 => 13, 18_073 => 26}
@@ -24,6 +27,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ProcSpell do
   }
 
   def resolve(event, holder, context, roll \\ &:rand.uniform/0)
+
+  def resolve(%Effects.TriggerSpell{} = event, %Holder{spell: %Spell{id: @mana_drain}}, _context, _roll) do
+    [
+      %{event | spell_id: @mana_drain_energize, target_guid: event.source_guid, requires_living_target?: true},
+      %{event | spell_id: @mana_drain_leech, requires_living_target?: true}
+    ]
+  end
 
   def resolve(%Effects.TriggerSpell{} = event, %Holder{spell: %Spell{id: id}}, _context, _roll)
       when is_map_key(@shadowguard, id) do

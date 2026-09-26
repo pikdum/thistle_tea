@@ -22,6 +22,14 @@ defmodule ThistleTea.Game.Entity.Logic.ProcSpellTest do
   setup [:character]
 
   describe "resolve/4" do
+    test "Mana Drain independently energizes the wearer and drains the attacked target" do
+      event = Effects.trigger_spell(1, 60, 2, 18_350, triggered_by_spell_id: 27_522, cast_item_guid: 99)
+      holder = %Holder{spell: %Spell{id: 27_522}}
+      assert [energize, drain] = ProcSpell.resolve(event, holder, %{})
+      assert energize == %{event | spell_id: 29_471, target_guid: 1, requires_living_target?: true}
+      assert drain == %{event | spell_id: 27_526, requires_living_target?: true}
+    end
+
     test "Shadowguard resolves every rank without losing the attacker or proc source" do
       for {id, trigger} <- [
             {18_137, 28_377},
@@ -116,6 +124,45 @@ defmodule ThistleTea.Game.Entity.Logic.ProcSpellTest do
   end
 
   describe "reactions/3" do
+    test "Mana Drain follows successful melee and ranged attacks", %{character: character} do
+      character = with_aura(character, mana_drain())
+
+      for {event, type} <- [
+            {:melee_hit_dealt, :deal_melee_swing},
+            {:melee_hit_dealt, :deal_melee_ability},
+            {:spell_hit_dealt, :deal_ranged_attack},
+            {:spell_hit_dealt, :deal_ranged_ability}
+          ] do
+        context = %{victim_guid: 2, spell: %Spell{id: 900}, proc_type: type, outcome: :normal, now: 0}
+
+        assert {_,
+                [
+                  %Effects.TriggerSpell{target_guid: 1, spell_id: 29_471},
+                  %Effects.TriggerSpell{target_guid: 2, spell_id: 27_526}
+                ]} = Aura.reactions(character, event, context)
+
+        for outcome <- [:miss, :dodge, :parry, :resist] do
+          assert {^character, []} = Aura.reactions(character, event, %{context | outcome: outcome})
+        end
+      end
+
+      for type <- [:deal_harmful_spell, :deal_harmful_periodic, :deal_helpful_spell] do
+        context = %{victim_guid: 2, spell: %Spell{id: 900}, proc_type: type, outcome: :normal, now: 0}
+        assert {^character, []} = Aura.reactions(character, :spell_hit_dealt, context)
+      end
+    end
+
+    test "a proc producing two spells spends one charge and shares one cooldown", %{character: character} do
+      spell = %{mana_drain() | proc_charges: 2, proc_rule: %ProcRule{cooldown_ms: 1_000}}
+      character = with_aura(character, spell)
+      context = %{victim_guid: 2, proc_type: :deal_melee_swing, outcome: :normal, now: 0}
+      {character, [_, _]} = Aura.reactions(character, :melee_hit_dealt, context)
+      assert [%{charges: 1, next_proc_at: 1_000}] = character.unit.auras
+      assert {^character, []} = Aura.reactions(character, :melee_hit_dealt, %{context | now: 999})
+      {character, [_, _]} = Aura.reactions(character, :melee_hit_dealt, %{context | now: 1_000})
+      assert character.unit.auras == []
+    end
+
     test "only critical weapon attacks trigger Blessed Recovery", %{character: character} do
       character = with_aura(character, recovery())
 
@@ -218,6 +265,15 @@ defmodule ThistleTea.Game.Entity.Logic.ProcSpellTest do
       assert damaged.unit.health == 4_700
       assert Enum.any?(events, &match?(%Effects.TriggerSpell{spell_id: 27_818, amount: 25}, &1))
     end
+  end
+
+  defp mana_drain do
+    %Spell{
+      id: 27_522,
+      proc_type_mask: 0x154,
+      proc_chance: 100,
+      effects: [%Effect{index: 0, type: :apply_aura, aura: :proc_trigger_spell, trigger_spell_id: 18_350}]
+    }
   end
 
   defp recovery(id \\ 27_816, percent \\ 25) do
