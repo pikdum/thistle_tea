@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Logic.SafePosition
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
+  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.MovementControl
@@ -156,6 +157,13 @@ defmodule ThistleTea.Game.Player.Movement do
     )
     |> Fatigue.update(terrain_liquid(character), now, :rand.uniform(max(character.unit.level || 1, 1)) - 1)
   end
+
+  def synchronize_environment(%State{character: %Character{} = character} = state) do
+    character = character |> Breathing.synchronize() |> Fatigue.synchronize() |> EventSink.emit_pending()
+    %{state | character: character}
+  end
+
+  def synchronize_environment(state), do: state
 
   def interrupt_attacks(character, false, _now), do: character
   def interrupt_attacks(character, true, now), do: AutoRepeat.interrupt(character, now)

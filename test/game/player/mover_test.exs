@@ -10,7 +10,9 @@ defmodule ThistleTea.Game.Player.MoverTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Possession
+  alias ThistleTea.Game.Entity.Logic.Breathing
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.Fatigue
   alias ThistleTea.Game.Entity.Logic.MovementHandoff
   alias ThistleTea.Game.Entity.Logic.SafePosition
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
@@ -31,6 +33,31 @@ defmodule ThistleTea.Game.Player.MoverTest do
   setup [:player]
 
   describe "select/2" do
+    test "restores active mirror bars after loading without resetting reserves or damage", %{state: state} do
+      breath = %Breathing{remaining: 25_000, duration: 240_000, updated_at: 1000, scale: 10}
+      fatigue = %Fatigue{remaining: 0, updated_at: 1000, next_damage_at: 2000}
+      state = put_in(state.character.internal.breath, breath)
+      state = put_in(state.character.internal.fatigue, fatigue)
+
+      assert Mover.select(state, state.guid + 1) == state
+      refute_received {:"$gen_cast", {:send_packet, %Message.SmsgStartMirrorTimer{}}}
+
+      for _ <- 1..2 do
+        restored = Mover.select(state, state.guid)
+        assert restored == state
+
+        assert_receive {:"$gen_cast",
+                        {:send_packet,
+                         %Message.SmsgStartMirrorTimer{timer: 1, remaining: 25_000, duration: 240_000, scale: 10}}}
+
+        assert_receive {:"$gen_cast",
+                        {:send_packet,
+                         %Message.SmsgStartMirrorTimer{timer: 0, remaining: 0, duration: 60_000, scale: -1}}}
+
+        refute_received {:"$gen_cast", {:send_packet, %Message.SmsgEnvironmentalDamageLog{}}}
+      end
+    end
+
     test "acknowledgements cannot select a unit outside current control", %{state: state, other: other} do
       assert Mover.select(state, other) == state
       controlled = control(state, other)

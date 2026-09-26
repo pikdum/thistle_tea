@@ -18,7 +18,9 @@ defmodule ThistleTea.Game.Player.Mover do
 
   def select(%State{} = state, guid) when is_integer(guid) and guid > 0 do
     if expected_guid(state) == guid do
-      %{state | active_mover_guid: guid, client_mover_guid: guid} |> enter_world()
+      %{state | active_mover_guid: guid, client_mover_guid: guid}
+      |> enter_world()
+      |> Movement.synchronize_environment()
     else
       state
     end

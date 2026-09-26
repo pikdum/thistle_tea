@@ -22,6 +22,11 @@ defmodule ThistleTea.Game.Entity.Logic.Breathing do
   def needs_tick?(%Character{movement_block: %MovementBlock{} = movement}), do: MovementBlock.swimming?(movement)
   def needs_tick?(_entity), do: false
 
+  def synchronize(%Character{internal: %Internal{breath: %__MODULE__{} = timer}} = character),
+    do: project(character, timer)
+
+  def synchronize(character), do: character
+
   def update(%Character{} = character, liquid_surface, now, damage_bonus \\ 0, body_height \\ 2.0) do
     depth = depth(character, liquid_surface)
     submerged? = depth > body_height * scale(character)

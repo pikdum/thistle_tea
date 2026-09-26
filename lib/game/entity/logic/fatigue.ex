@@ -18,6 +18,11 @@ defmodule ThistleTea.Game.Entity.Logic.Fatigue do
   def needs_tick?(%Character{internal: %Internal{fatigue: %__MODULE__{}}}), do: true
   def needs_tick?(_entity), do: false
 
+  def synchronize(%Character{internal: %Internal{fatigue: %__MODULE__{} = timer}} = character),
+    do: project(character, timer)
+
+  def synchronize(character), do: character
+
   def update(%Character{} = character, liquid, now, damage_bonus \\ 0) do
     cond do
       is_nil(liquid) or protected?(character) or dead_body?(character) -> stop(character)
