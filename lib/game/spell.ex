@@ -246,12 +246,14 @@ defmodule ThistleTea.Game.Spell do
     same_chain?(spell1, spell2) and is_integer(rank1) and is_integer(rank2) and rank1 > rank2
   end
 
-  def same_exclusive_category?(%__MODULE__{id: id1, exclusive_category: cat1}, %__MODULE__{
-        id: id2,
-        exclusive_category: cat2
-      }) do
-    id1 != id2 and not is_nil(cat1) and cat1 == cat2
+  def exclusive_with?(%__MODULE__{id: id1, exclusive_category: cat1}, %__MODULE__{id: id2, exclusive_category: cat2}) do
+    id1 != id2 and exclusive_categories?(cat1, cat2)
   end
+
+  defp exclusive_categories?(:food_and_drink, category), do: category in [:food, :drink, :food_and_drink]
+  defp exclusive_categories?(category, :food_and_drink), do: category in [:food, :drink]
+  defp exclusive_categories?(category, category) when not is_nil(category), do: true
+  defp exclusive_categories?(_first, _second), do: false
 
   def school_mask(%__MODULE__{school: school}), do: school_mask(school)
   def school_mask(:physical), do: school_mask_index(0)
