@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Spell.Radius
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Slow
+  alias ThistleTea.Game.Spell.StackRules
 
   @negative_auras [
     :periodic_power_burn,
@@ -241,6 +242,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       blocked_by_stronger_slow?(existing, holder.spell) ->
         {entity, []}
 
+      blocked_by_group?(existing, holder.spell) ->
+        {entity, []}
+
       blocked_by_mechanic_immunity?(existing, holder.spell) ->
         consume_mechanic_immunity(entity, holder.spell, now)
 
@@ -259,6 +263,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   defp blocked_by_stronger_slow?(holders, spell) do
     Enum.any?(holders, fn
       %Holder{linked_from: nil, spell: existing} -> Slow.blocks?(existing, spell)
+      _holder -> false
+    end)
+  end
+
+  defp blocked_by_group?(holders, spell) do
+    Enum.any?(holders, fn
+      %Holder{linked_from: nil, spell: existing} -> StackRules.relation(existing, spell) == :block
       _holder -> false
     end)
   end
@@ -322,7 +333,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
        ) do
     cond do
       control_conflict?(existing, incoming) -> true
-      exclusive_category_conflict?(existing, incoming) -> true
+      spell_conflict?(existing, incoming) -> true
       shapeshift? and Holder.has_aura_type?(existing, :mod_shapeshift) -> true
       mount_conflict?(existing, incoming) -> true
       other_caster_same_spell?(existing, incoming) -> replaces_same_spell?(existing, incoming)
@@ -332,6 +343,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   end
 
   defp control_conflict?(existing, incoming), do: Holder.control?(existing) and Holder.control?(incoming)
+
+  defp spell_conflict?(existing, incoming) do
+    StackRules.relation(existing.spell, incoming.spell) == :replace or exclusive_category_conflict?(existing, incoming)
+  end
 
   defp other_caster_same_spell?(existing, incoming),
     do: existing.spell.id == incoming.spell.id and existing.caster_guid != incoming.caster_guid

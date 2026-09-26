@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Spell do
     :previous_in_chain,
     :rank,
     :exclusive_category,
+    :stack_rules,
     spell_family: 0,
     spell_level: 0,
     base_level: 0,

@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride, as: SpellEffectOverrideLoader
   alias ThistleTea.Game.World.Loader.SpellElixir, as: SpellElixirLoader
+  alias ThistleTea.Game.World.Loader.SpellGroup, as: SpellGroupLoader
   alias ThistleTea.Game.World.Loader.SpellObjectTarget, as: SpellObjectTargetLoader
   alias ThistleTea.Game.World.Loader.SpellProcEvent, as: SpellProcEventLoader
   alias ThistleTea.Game.World.Loader.SpellScript, as: SpellScriptLoader
@@ -240,6 +241,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       attributes:
         attributes(row.attributes, row.attributes_ex1, row.attributes_ex2, row.attributes_ex3, row.attributes_ex4),
       exclusive_category: Scripts.exclusive_category(row, SpellElixirLoader.get(row.id)),
+      stack_rules: SpellGroupLoader.get(row.id),
       spell_family: row.spell_class_set || 0,
       family_flags_0: row.spell_class_mask_0 || 0,
       family_flags_1: row.spell_class_mask_1 || 0,
@@ -404,6 +406,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       | first_in_chain: first_spell,
         previous_in_chain: Map.get(chain, :prev_spell),
         rank: rank,
+        stack_rules: SpellGroupLoader.get(spell.id, first_spell),
         proc_rule: spell.proc_rule || SpellProcEventLoader.get(first_spell)
     }
   end

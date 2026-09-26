@@ -48,6 +48,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Spell.Focus
   alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.Scripts
+  alias ThistleTea.Game.Spell.StackRules
   alias ThistleTea.Game.Spell.Stealth
   alias ThistleTea.Game.Spell.Target
 
@@ -88,6 +89,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- Hunter.validate_reactive(caster, spell, Target.unit_guid(targets), now),
          :ok <- check_combo_target(caster, spell, targets, now),
          :ok <- check_stronger_rank(caster, spell, targets),
+         :ok <- check_stronger_group(caster, spell, targets, target_info),
          :ok <- check_mechanic_immunity(caster, spell, targets, target_info),
          :ok <- check_dispel_immunity(caster, spell, targets),
          :ok <- check_special_aura_requirements(caster, spell),
@@ -303,6 +305,17 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     else
       :ok
     end
+  end
+
+  defp check_stronger_group(caster, spell, targets, target_info) do
+    sources =
+      cond do
+        self_target?(caster, Target.unit_guid(targets)) -> AuraLogic.source_spells(caster)
+        is_map(target_info) -> Map.get(target_info, :aura_sources, MapSet.new())
+        true -> MapSet.new()
+      end
+
+    StackRules.validate(spell, sources)
   end
 
   defp check_mechanic_immunity(caster, %Spell{} = spell, %Target{} = targets, target_info) do

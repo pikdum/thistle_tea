@@ -72,6 +72,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride, as: SpellEffectOverrideLoader
   alias ThistleTea.Game.World.Loader.SpellElixir, as: SpellElixirLoader
+  alias ThistleTea.Game.World.Loader.SpellGroup, as: SpellGroupLoader
   alias ThistleTea.Game.World.Loader.SpellObjectTarget, as: SpellObjectTargetLoader
   alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
   alias ThistleTea.Game.World.Loader.SpellProcEvent, as: SpellProcEventLoader
@@ -233,6 +234,7 @@ defmodule ThistleTea.Application do
     SpellChainLoader.init()
     SpellEffectOverrideLoader.init()
     SpellElixirLoader.init()
+    SpellGroupLoader.init()
     SpellPetAuraLoader.init()
     PassiveSpellLoader.init()
     SpellAreaLoader.init()
@@ -368,6 +370,7 @@ defmodule ThistleTea.Application do
         TransportLoader.load_all()
         SpellEffectOverrideLoader.load_all()
         SpellElixirLoader.load_all()
+        SpellGroupLoader.load_all()
         SpellLoader.load_target_positions()
         SpellPetAuraLoader.load_all()
         SpellObjectTargetLoader.load_all()
