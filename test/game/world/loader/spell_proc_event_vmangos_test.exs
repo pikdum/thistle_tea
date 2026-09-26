@@ -17,6 +17,14 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   end
 
   describe "get/1" do
+    test "healing set procs restrict their triggering spell families" do
+      assert %ProcRule{spell_family: 10, family_mask_0: 0xC0006000, proc_flags: 0, proc_ex: 0} =
+               SpellProcEvent.get(28_789)
+
+      assert %ProcRule{spell_family: 0, family_mask_0: 0xC0, proc_flags: 0, proc_ex: 0} =
+               SpellProcEvent.get(28_823)
+    end
+
     test "Shadowguard ranks share an absorb-capable cooldown and cause no damage threat" do
       assert %ProcRule{proc_ex: 0x403, cooldown_ms: 3_500} = SpellProcEvent.get(18_137)
       SpellThreat.init()

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.ClassScript
+  alias ThistleTea.Game.Entity.Logic.Aura.HealingPower
   alias ThistleTea.Game.Entity.Logic.Aura.ProcSpell
   alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
@@ -261,7 +262,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     proc_events =
       if is_integer(victim_guid) do
         Enum.flat_map(trigger_auras(holder), &proc_events(&1, holder, owner_guid, victim_guid, context)) ++
-          ClassScript.events(holder, owner_guid, context)
+          ClassScript.events(holder, owner_guid, context) ++ HealingPower.events(holder, owner_guid, context)
       else
         []
       end
@@ -279,7 +280,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   end
 
   defp spends_charge_without_trigger?(%Holder{charges: charges} = holder) do
-    is_integer(charges) and not Holder.has_any_type?(holder, [:override_class_scripts | @modifier_auras])
+    is_integer(charges) and not HealingPower.supported?(holder.spell) and
+      not Holder.has_any_type?(holder, [:override_class_scripts | @modifier_auras])
   end
 
   defp trigger_auras(%Holder{auras: auras}) do

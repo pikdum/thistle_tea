@@ -573,7 +573,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   defp notify_spell_outcome(_entity, _effect, _absorbed), do: :ok
 
   defp target_facts(%{object: %{guid: guid}, unit: %Unit{} = unit}, guid) do
-    %{victim_alive?: is_integer(unit.health) and unit.health > 0, victim_power_type: unit.power_type}
+    %{
+      victim_alive?: is_integer(unit.health) and unit.health > 0,
+      victim_power_type: unit.power_type,
+      victim_class: unit.class
+    }
   end
 
   defp target_facts(_entity, _target_guid), do: %{}
