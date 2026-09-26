@@ -64,6 +64,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
     cond do
       trigger_id = Priest.shield_trigger_id(spell) -> trigger_id
       Spell.vmangos_script?(spell, "spell_paladin_bubble") -> Paladin.forbearance_id()
+      Spell.vmangos_script?(spell, "spell_first_aid") -> 11_196
       true -> nil
     end
   end

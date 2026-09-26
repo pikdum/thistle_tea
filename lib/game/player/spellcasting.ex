@@ -572,6 +572,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
            :combat_reach,
            :aura_sources,
            :dispel_options,
+           :friendly_mechanic_immunities,
            :area
          ]) do
       nil ->
@@ -607,6 +608,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
           orientation: Map.get(metadata, :orientation),
           aura_sources: Map.get(metadata, :aura_sources, MapSet.new()),
           dispel_options: Map.get(metadata, :dispel_options, MapSet.new()),
+          friendly_mechanic_immunities: Map.get(metadata, :friendly_mechanic_immunities, MapSet.new()),
           area: Map.get(metadata, :area),
           los?: World.line_of_sight?(character, guid)
         }

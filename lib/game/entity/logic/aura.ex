@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   alias ThistleTea.Game.Entity.Logic.Aura.Reactions
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
+  alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Spell
 
@@ -29,6 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defdelegate transition(entity, change), to: Transition, as: :run
   defdelegate blocked_by_stronger_rank?(entity_or_holders, spell), to: AuraApplication
   defdelegate mechanic_immune?(entity, spell), to: AuraApplication
+  defdelegate friendly_mechanics(entity), to: EffectImmunity
   defdelegate consume_mechanic_immunity(entity, spell, now), to: AuraApplication
   defdelegate dispel_immune?(entity, spell), to: AuraApplication
 

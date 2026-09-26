@@ -88,7 +88,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- Hunter.validate_reactive(caster, spell, Target.unit_guid(targets), now),
          :ok <- check_combo_target(caster, spell, targets, now),
          :ok <- check_stronger_rank(caster, spell, targets),
-         :ok <- check_mechanic_immunity(caster, spell, targets),
+         :ok <- check_mechanic_immunity(caster, spell, targets, target_info),
          :ok <- check_dispel_immunity(caster, spell, targets),
          :ok <- check_special_aura_requirements(caster, spell),
          :ok <- check_warlock_resources(caster, spell),
@@ -305,15 +305,25 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     end
   end
 
-  defp check_mechanic_immunity(caster, %Spell{} = spell, %Target{} = targets) do
+  defp check_mechanic_immunity(caster, %Spell{} = spell, %Target{} = targets, target_info) do
     unit_guid = Target.unit_guid(targets)
 
-    if self_target?(caster, unit_guid) and AuraLogic.mechanic_immune?(caster, spell) do
-      {:error, :immune}
+    immune? =
+      if self_target?(caster, unit_guid),
+        do: AuraLogic.mechanic_immune?(caster, spell),
+        else: target_mechanic_immune?(target_info, spell)
+
+    if immune? do
+      {:error, if(Spell.harmful?(spell), do: :immune, else: :target_aurastate)}
     else
       :ok
     end
   end
+
+  defp target_mechanic_immune?(%{friendly_mechanic_immunities: mechanics}, spell),
+    do: EffectImmunity.blocks_friendly_mechanic?(mechanics, spell)
+
+  defp target_mechanic_immune?(_target_info, _spell), do: false
 
   defp check_dispel_immunity(caster, %Spell{} = spell, %Target{} = targets) do
     unit_guid = Target.unit_guid(targets)

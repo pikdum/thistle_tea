@@ -45,6 +45,26 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunity do
 
   def mechanic?(_holder, _spell), do: false
 
+  def friendly_mechanics(%{unit: %Unit{auras: holders}}) when is_list(holders) do
+    for holder <- holders,
+        applies_to_polarity?(holder, false),
+        %Aura{type: :mechanic_immunity, misc_value: mechanic} <- holder.auras,
+        is_integer(mechanic) and mechanic > 0,
+        into: MapSet.new(),
+        do: mechanic
+  end
+
+  def friendly_mechanics(_entity), do: MapSet.new()
+
+  def blocks_friendly_mechanic?(%MapSet{} = mechanics, %Spell{} = spell) do
+    not Spell.harmful?(spell) and
+      not Spell.attribute?(spell, :no_immunities) and
+      not Spell.attribute?(spell, :ignore_caster_and_target_restrictions) and
+      MapSet.member?(mechanics, spell.mechanic)
+  end
+
+  def blocks_friendly_mechanic?(_mechanics, _spell), do: false
+
   def purge_new(previous, desired) do
     applications = MapSet.new(previous, &application_key/1)
 

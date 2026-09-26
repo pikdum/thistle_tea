@@ -114,7 +114,8 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         aura_stacks: Aura.spell_stacks(mob),
         aura_effects: Aura.effect_keys(mob),
         crowd_controlled?: Aura.crowd_controlled?(mob),
-        dispel_options: Aura.dispel_options(mob)
+        dispel_options: Aura.dispel_options(mob),
+        friendly_mechanic_immunities: Aura.friendly_mechanics(mob)
       }
       |> Map.merge(SpellResist.defense_snapshot(mob))
       |> Map.merge(Mob.visibility_metadata(mob))

@@ -19,6 +19,36 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunityTest do
 
   setup [:entity]
 
+  describe "friendly_mechanics/1" do
+    test "projects only immunity that applies to helpful spells", %{entity: entity} do
+      for {attributes, expected} <- [
+            {[], MapSet.new()},
+            {[:negative], MapSet.new([16])},
+            {[:immunity_to_hostile_and_friendly_effects], MapSet.new([16])}
+          ] do
+        {protected, _} = Aura.apply_spell(entity, 1, 10, protection(:mechanic_immunity, 16, attributes), 0)
+        assert EffectImmunity.friendly_mechanics(protected) == expected
+        {expired, _} = Aura.expire_due(protected, 1000)
+        assert EffectImmunity.friendly_mechanics(expired) == MapSet.new()
+      end
+    end
+  end
+
+  describe "blocks_friendly_mechanic?/2" do
+    test "preserves immunity bypasses and hostile hit resolution" do
+      mechanics = MapSet.new([16])
+      spell = %Spell{mechanic: 16, effects: [%Effect{type: :heal, implicit_target_a: :target_ally}]}
+      assert EffectImmunity.blocks_friendly_mechanic?(mechanics, spell)
+
+      for attribute <- [:no_immunities, :ignore_caster_and_target_restrictions] do
+        refute EffectImmunity.blocks_friendly_mechanic?(mechanics, %{spell | attributes: MapSet.new([attribute])})
+      end
+
+      refute EffectImmunity.blocks_friendly_mechanic?(mechanics, %{spell | mechanic: 19})
+      refute EffectImmunity.blocks_friendly_mechanic?(mechanics, %{stun() | mechanic: 16})
+    end
+  end
+
   describe "receive/4" do
     test "mechanic immunity blocks the whole spell and spends a finite charge", %{entity: entity} do
       entity = protect(entity, :mechanic_immunity, 12)

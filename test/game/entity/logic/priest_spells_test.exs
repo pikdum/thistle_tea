@@ -746,7 +746,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
   end
 
   describe "self-cast immunity validation" do
-    test "recasting Power Word: Shield on self while Weakened Soul is active fails with :immune" do
+    test "rejects shielding a recently shielded caster before costs" do
       caster = dead_player_fixture()
       caster = %{caster | unit: %{caster.unit | health: 100}}
 
@@ -754,7 +754,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
 
       targets = Target.unit(5)
 
-      assert {:error, :immune} =
+      assert {:error, :target_aurastate} =
                CastValidation.validate(caster, power_word_shield_fixture(), targets, :self, 1_000)
     end
   end

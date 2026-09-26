@@ -1916,6 +1916,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         aura_effects: Aura.effect_keys(character),
         crowd_controlled?: Aura.crowd_controlled?(character),
         dispel_options: Aura.dispel_options(character),
+        friendly_mechanic_immunities: Aura.friendly_mechanics(character),
         spell_threat: SpellThreat.projection(character),
         dispel_resistance: DispelResistance.projection(character),
         reputation: PlayerReputation.projection(character),

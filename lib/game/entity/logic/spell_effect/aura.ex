@@ -74,6 +74,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Aura do
          true <- Aura.has_spell?(target, spell.id) do
       [
         Effects.trigger_spell(context.caster_guid, context.caster_level, target.object.guid, trigger_id,
+          cast_item_guid: context.cast_item_guid,
           hit_context: context
         )
       ]

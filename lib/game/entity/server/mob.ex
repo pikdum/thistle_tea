@@ -1583,6 +1583,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           aura_effects: Aura.effect_keys(state),
           crowd_controlled?: Aura.crowd_controlled?(state),
           dispel_options: Aura.dispel_options(state),
+          friendly_mechanic_immunities: Aura.friendly_mechanics(state),
           spell_threat: SpellThreat.projection(state)
         }
         |> Map.merge(SpellResist.defense_snapshot(state))

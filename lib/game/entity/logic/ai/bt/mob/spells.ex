@@ -593,6 +593,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
           attackable?: Hostility.attackable?(source, metadata),
           creature_type: Map.get(metadata, :creature_type),
           dispel_options: Map.get(metadata, :dispel_options, MapSet.new()),
+          friendly_mechanic_immunities: Map.get(metadata, :friendly_mechanic_immunities, MapSet.new()),
           aura_sources: Map.get(metadata, :aura_sources, MapSet.new()),
           health_pct: Map.get(metadata, :health_pct),
           power_type: Map.get(metadata, :power_type),
