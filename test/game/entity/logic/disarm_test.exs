@@ -225,7 +225,7 @@ defmodule ThistleTea.Game.Entity.Logic.DisarmTest do
 
   describe "from_caster/3" do
     test "snapshots unarmed damage and skill for allowed melee abilities", %{character: character} do
-      spell = %Spell{id: 1, school: :physical, dmg_class: 2}
+      spell = %Spell{id: 1, school: :physical, dmg_class: 2, melee_range?: true}
       context = CastContext.from_caster(disarm(character), spell, 2)
       assert context.weapon_base_min == 1.0
       assert context.weapon_base_max == 2.0

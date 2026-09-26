@@ -9,11 +9,42 @@ defmodule ThistleTea.Game.Spell.CastContextTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.World.Loader.Item
 
   describe "from_caster/3" do
+    test "nonweapon abilities use level skill while weapon attacks retain learned skill" do
+      caster = %Character{
+        object: %Object{guid: 5},
+        unit: %Unit{
+          level: 60,
+          class: 1,
+          auras: [],
+          mainhand_weapon: %ItemTemplate{class: 2, subclass: 7},
+          ranged_weapon: %ItemTemplate{class: 2, subclass: 2}
+        },
+        player: %Player{skills: Map.new([43, 45], &{&1, Skills.new_entry(:level, false, 60)})},
+        internal: %Internal{}
+      }
+
+      for class <- [2, 3] do
+        ability = %Spell{id: 900_003, dmg_class: class, school: :physical}
+        context = CastContext.from_caster(caster, ability, 7)
+        assert context.attack_skill == 300
+        assert context.weapon_skill_id == nil
+
+        weapon = CastContext.from_caster(caster, %{ability | equipped_item_class: 2}, 7)
+        assert weapon.attack_skill == 1
+        assert weapon.weapon_skill_id == if(class == 2, do: 43, else: 45)
+      end
+
+      melee = CastContext.from_caster(caster, %Spell{id: 900_004, dmg_class: 2, melee_range?: true}, 7)
+      assert melee.attack_skill == 1
+      assert melee.weapon_skill_id == 43
+    end
+
     test "enchanted weapons retain their normalization and weapon-specific talent bonuses" do
       for {subclass, inventory_type, speed} <- [{7, 13, 2.4}, {15, 13, 1.7}, {8, 17, 3.3}] do
         template = %ItemTemplate{

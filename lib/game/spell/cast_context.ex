@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.ResistancePenetration
+  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.SpellThreat
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
@@ -239,7 +240,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     cond do
       Spell.ranged_attack?(spell) ->
         {min_damage, max_damage} = AttackPower.weapon_range(caster.unit, :ranged)
-        skill = CombatSkills.snapshot(caster, :ranged)
+        skill = attack_skill_snapshot(caster, spell, :ranged)
 
         %{
           context
@@ -257,7 +258,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
       melee_snapshot?(spell) ->
         {min_damage, max_damage} = weapon_range(caster)
-        skill = CombatSkills.snapshot(caster, :mainhand)
+        skill = attack_skill_snapshot(caster, spell, :mainhand)
 
         %{
           context
@@ -284,6 +285,12 @@ defmodule ThistleTea.Game.Spell.CastContext do
   end
 
   defp put_combo_points(context, _caster), do: context
+
+  defp attack_skill_snapshot(caster, %Spell{melee_range?: false, equipped_item_class: class}, _hand) when class != 2 do
+    %{caster_attack_skill: Skills.max_for_level(caster.unit.level || 1), weapon_skill_id: nil}
+  end
+
+  defp attack_skill_snapshot(caster, _spell, hand), do: CombatSkills.snapshot(caster, hand)
 
   defp melee_snapshot?(%Spell{effects: effects} = spell) do
     Spell.melee_ability?(spell) or
