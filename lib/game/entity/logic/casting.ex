@@ -8,11 +8,11 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Ammunition
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
+  alias ThistleTea.Game.Entity.Logic.CastingCombat
   alias ThistleTea.Game.Entity.Logic.CastSpeed
   alias ThistleTea.Game.Entity.Logic.Charge
   alias ThistleTea.Game.Entity.Logic.Companion
@@ -335,6 +335,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> apply_initial_impacts(casting, now)
       |> consume_spell_modifiers(casting, now)
       |> cast_complete_procs(casting, now)
+      |> CastingCombat.launch(casting, now)
 
     if Cast.channeled?(casting) do
       casting = Cast.transition(casting, :channel_tick)
@@ -356,7 +357,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       entity
       |> queue_successful_finish_trigger(casting)
       |> queue_quest_cast_credit(casting, resolution)
-      |> stop_breakable_control_attack(casting, resolution.hits)
+      |> CastingCombat.finish(casting.spell)
       |> consume_unavoidable_finisher(casting, now)
 
     if Cast.channeled?(casting) do
@@ -501,19 +502,6 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp put_cast(%{internal: %Internal{} = internal} = entity, %Cast{} = casting) do
     %{entity | internal: %{internal | casting: casting}}
   end
-
-  defp stop_breakable_control_attack(%Character{} = character, %Cast{spell: %Spell{} = spell}, [target_guid | _]) do
-    if Spell.breaks_on_damage?(spell) do
-      character
-      |> BT.clear_auto_attack()
-      |> then(&%{&1 | internal: %{&1.internal | auto_shot: nil}})
-      |> Effects.enqueue(Effects.attack_stop(character.object.guid, target_guid))
-    else
-      character
-    end
-  end
-
-  defp stop_breakable_control_attack(character, _casting, _hits), do: character
 
   defp queue_successful_finish_trigger(%{object: %{guid: guid}, unit: %{level: level}} = character, %Cast{
          spell: %Spell{} = spell

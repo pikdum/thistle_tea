@@ -1010,6 +1010,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex2, 0x00000020, :auto_repeat)
     |> add_if(attrs_ex2, 0x00002000, :enchant_own_item_only)
     |> add_if(attrs_ex2, 0x00004000, :allow_while_invisible)
+    |> add_if(attrs_ex2, 0x00020000, :do_not_reset_combat_timers)
     |> add_if(attrs_ex2, 0x00400000, :no_initial_threat)
     |> add_if(attrs_ex2, 0x04000000, :no_school_immunities)
     |> add_if(attrs_ex2, @cant_crit_ex2, :cant_crit)

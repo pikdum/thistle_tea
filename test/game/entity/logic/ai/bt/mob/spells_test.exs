@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -25,6 +26,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
   defp context(state), do: AIEnvironment.context(state, 1_000)
 
   describe "try_cast/3" do
+    test "instant casts preserve swing resets alongside spell-list timers" do
+      spell = %{instant_self_buff() | interrupt_flags: 8}
+      entry = entry(spell.id, cast_target: :self, delay_repeat_min_ms: 4_000, delay_repeat_max_ms: 4_000)
+      state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
+      blackboard = Blackboard.new() |> Blackboard.put_next_at(:next_attack_at, 200, 1_000)
+
+      assert {:failure, state, blackboard} = MobSpells.try_cast(state, blackboard, context(state))
+      assert blackboard.combat.next_attack_at == 3_000
+      assert blackboard.spells.timers == %{0 => 5_000}
+      assert blackboard.spells.next_list_at == 2_200
+      assert state.internal.blackboard == blackboard
+    end
+
     test "initializes spell timers from initial delays without casting" do
       spell = fireball()
       entry = entry(spell.id, delay_initial_min_ms: 5_000, delay_initial_max_ms: 5_000)
@@ -161,6 +175,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
   end
 
   describe "attempt_commanded_cast/5" do
+    test "instant attack cancellation survives the commanded cast handoff" do
+      spell = %{instant_self_buff() | attributes: MapSet.new([:cancels_auto_attack_combat])}
+      entry = entry(spell.id, cast_target: :self)
+      state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell}) |> with_target(42)
+
+      blackboard =
+        Blackboard.new()
+        |> Blackboard.enable_auto_attack(%TargetRef{guid: 42})
+        |> Blackboard.put_next_at(:next_attack_at, 700, 1_000)
+
+      assert {:ok, {finished, memory}} =
+               MobSpells.attempt_commanded_cast(state, blackboard, entry, state.object.guid, context(state))
+
+      assert finished.unit.target == 0
+      refute memory.combat.auto_attacking
+      assert memory.combat.next_attack_at == 1_700
+      assert finished.internal.blackboard == memory
+    end
+
     test "positional casts use the target facing from the supplied observation" do
       target_guid = hostile_player(3.0)
       spell = %{fireball() | attributes: MapSet.new([:from_behind])}

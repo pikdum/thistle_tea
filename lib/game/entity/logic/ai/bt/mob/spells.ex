@@ -197,7 +197,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
              now,
              Keyword.put(options, :spell_area, context.spell_area)
            ) do
-      {:ok, {scripted_cast(state, spell, targets, target_guid, context), blackboard}}
+      state = %{state | internal: %{state.internal | blackboard: blackboard}}
+      state = scripted_cast(state, spell, targets, target_guid, context)
+      {:ok, {state, state.internal.blackboard}}
     else
       {:error, reason} -> {:error, reason}
       :busy -> {:error, :spell_in_progress}
@@ -296,6 +298,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
        ) do
     blackboard = Blackboard.put_spell_timer(blackboard, index, roll_repeat_delay(entry, random), now)
     {state, blackboard} = maybe_hold_ranged(state, blackboard, entry)
+    state = %{state | internal: %{state.internal | blackboard: blackboard}}
 
     state =
       state
@@ -303,18 +306,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
       |> Effects.enqueue(Effects.spell_start(state.object.guid, spell.id, spell.cast_time_ms || 0, targets))
       |> Casting.start(spell, targets, now)
 
-    finish_or_schedule(state, blackboard, spell, now)
+    finish_or_schedule(state, spell, now)
   end
 
-  defp finish_or_schedule(%Mob{internal: %Internal{casting: nil}} = state, blackboard, _spell, _now) do
-    {:cast, :failure, state, blackboard}
+  defp finish_or_schedule(%Mob{internal: %Internal{casting: nil}} = state, _spell, _now) do
+    {:cast, :failure, state, state.internal.blackboard}
   end
 
-  defp finish_or_schedule(%Mob{} = state, blackboard, %Spell{} = spell, now) do
+  defp finish_or_schedule(%Mob{} = state, %Spell{} = spell, now) do
     if (spell.cast_time_ms || 0) == 0 and not Spell.attribute?(spell, :channeled) do
-      {:cast, :failure, Casting.complete(state, now), blackboard}
+      state = Casting.complete(state, now)
+      {:cast, :failure, state, state.internal.blackboard}
     else
-      {:cast, BT.running(cast_wake_delay(spell), :casting), state, blackboard}
+      {:cast, BT.running(cast_wake_delay(spell), :casting), state, state.internal.blackboard}
     end
   end
 

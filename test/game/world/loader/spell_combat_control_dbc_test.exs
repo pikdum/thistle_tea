@@ -1,17 +1,50 @@
 defmodule ThistleTea.Game.World.Loader.SpellCombatControlDbcTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.CastingCombat
   alias ThistleTea.Game.Entity.Logic.Charge
   alias ThistleTea.Game.Entity.Logic.CombatControl
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db
 
   describe "load/1" do
+    test "ordinary casts and instant combat spells reset swings while exempt shots do not" do
+      blackboard = Blackboard.new() |> Blackboard.put_next_at(:next_attack_at, 250, 1_000)
+      entity = %Mob{unit: %Unit{base_attack_time: 2_400}, internal: %Internal{blackboard: blackboard}}
+
+      for id <- [133, 635, 118, 122, 20_066] do
+        spell = SpellLoader.load(id)
+        launched = CastingCombat.launch(entity, Cast.new(spell, Target.none(), 1_000), 2_000)
+        assert launched.internal.blackboard.combat.next_attack_at == 4_400
+      end
+
+      for id <- [19_434, 19_503] do
+        spell = SpellLoader.load(id)
+        assert Spell.attribute?(spell, :do_not_reset_combat_timers)
+        assert CastingCombat.launch(entity, Cast.new(spell, Target.none(), 1_000), 2_000) == entity
+      end
+    end
+
+    test "control spells and Vanish stop autoattack through their explicit attribute" do
+      for id <- [118, 1_776, 2_094, 1_856, 20_066, 19_503] do
+        assert Spell.attribute?(SpellLoader.load(id), :cancels_auto_attack_combat)
+      end
+
+      for id <- [122, 339, 5_782, 635, 1_752, 2_098] do
+        refute Spell.attribute?(SpellLoader.load(id), :cancels_auto_attack_combat)
+      end
+    end
+
     test "charge spells retain their automatic attack and cancellation rules" do
       for id <- [100, 6_178, 11_578, 20_252, 13_119] do
         spell = SpellLoader.load(id)
