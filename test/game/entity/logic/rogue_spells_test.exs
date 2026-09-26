@@ -330,6 +330,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
       purge = %Spell{
         id: 18_461,
         duration_ms: 1_000,
+        attributes: MapSet.new([:immunity_purges_effect]),
         effects: [
           %Effect{index: 0, type: :apply_aura, aura: :mechanic_immunity, misc_value: 7},
           %Effect{index: 1, type: :apply_aura, aura: :mechanic_immunity, misc_value: 11}

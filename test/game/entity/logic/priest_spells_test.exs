@@ -123,7 +123,8 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
   end
 
   defp weakened_soul_fixture do
-    aura_spell(6788, :mechanic_immunity, name: "Weakened Soul", duration_ms: 15_000, misc_value: 19)
+    spell = aura_spell(6788, :mechanic_immunity, name: "Weakened Soul", duration_ms: 15_000, misc_value: 19)
+    %{spell | attributes: MapSet.new([:negative])}
   end
 
   defp psychic_scream_fixture do
@@ -173,7 +174,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
       {target, events} = SpellEffect.receive(target, context, power_word_shield_fixture(), 1_000)
 
       refute Aura.has_spell?(target, 17)
-      assert events == []
+      assert [%Effects.SpellLogMiss{source_guid: 999, target_guid: 1, spell_id: 17, reason: :immune}] = events
     end
 
     test "mechanic_immune?/2 reports spells blocked by Weakened Soul" do
@@ -215,14 +216,14 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
       refute Aura.has_spell?(entity, 6346)
     end
 
-    test "removes an existing fear when applied" do
+    test "does not remove an existing fear without the purge attribute" do
       entity = mob_fixture()
       {entity, _events} = Aura.apply_spell(entity, 999, 10, psychic_scream_fixture(), 1_000)
       assert Aura.has_aura?(entity, :mod_fear)
 
       {entity, _events} = Aura.apply_spell(entity, 1, 10, fear_ward_fixture(), 2_000)
 
-      refute Aura.has_aura?(entity, :mod_fear)
+      assert Aura.has_aura?(entity, :mod_fear)
       assert Aura.has_spell?(entity, 6346)
     end
   end

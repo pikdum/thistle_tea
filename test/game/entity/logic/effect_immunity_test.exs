@@ -20,6 +20,40 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunityTest do
   setup [:entity]
 
   describe "receive/4" do
+    test "mechanic immunity blocks the whole spell and spends a finite charge", %{entity: entity} do
+      entity = protect(entity, :mechanic_immunity, 12)
+      [holder] = entity.unit.auras
+      entity = %{entity | unit: %{entity.unit | auras: [%{holder | charges: 1}]}}
+      spell = %{stun() | mechanic: 12}
+      {updated, events} = SpellEffect.receive(entity, 2, spell, 100)
+
+      assert updated.unit.auras == []
+      assert [%Effects.SpellLogMiss{reason: :immune}] = events
+      {unprotected, _} = SpellEffect.receive(updated, 2, spell, 200)
+      assert Aura.has_aura?(unprotected, :mod_stun)
+    end
+
+    test "effect mechanic immunity preserves unrelated damage", %{entity: entity} do
+      entity = protect(entity, :mechanic_immunity, 12)
+      effects = Enum.map(stun().effects, &%{&1 | mechanic: 12})
+      spell = %{stun() | effects: [%Effect{index: 1, type: :school_damage, base_points: 10} | effects]}
+      {updated, events} = SpellEffect.receive(entity, 2, spell, 100)
+
+      assert updated.unit.health == 90
+      refute Aura.has_aura?(updated, :mod_stun)
+      assert Enum.any?(events, &match?(%Effects.SpellDamage{}, &1))
+    end
+
+    test "spell-wide mechanic immunity respects bypass attributes", %{entity: entity} do
+      entity = protect(entity, :mechanic_immunity, 12)
+
+      for attribute <- [:no_immunities, :ignore_caster_and_target_restrictions] do
+        spell = %{stun() | mechanic: 12, attributes: MapSet.new([attribute])}
+        {updated, _} = SpellEffect.receive(entity, 2, spell, 100)
+        assert Aura.has_aura?(updated, :mod_stun)
+      end
+    end
+
     test "state immunity blocks control without a mechanic and reports immune", %{entity: entity} do
       entity = protect(entity, :state_immunity, :mod_stun)
       {updated, events} = SpellEffect.receive(entity, 2, stun(), 100)
@@ -99,6 +133,32 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunityTest do
   end
 
   describe "apply_spell/5" do
+    test "mechanic purges follow spell and active effect mechanics", %{entity: entity} do
+      spell = %{stun() | mechanic: 12}
+      effect_spell = %{stun() | effects: Enum.map(stun().effects, &%{&1 | mechanic: 12})}
+      immunity = protection(:mechanic_immunity, 12, [:immunity_purges_effect])
+
+      for control <- [spell, effect_spell] do
+        {controlled, _} = Aura.apply_spell(entity, 2, 10, control, 0)
+        {protected, _} = Aura.apply_spell(controlled, 1, 10, immunity, 100)
+        refute Aura.has_aura?(protected, :mod_stun)
+        assert Aura.has_spell?(protected, immunity.id)
+      end
+    end
+
+    test "mechanic purges require the attribute and preserve immunity-bypassing controls", %{entity: entity} do
+      for {control_attributes, immunity_attributes} <- [
+            {[], []},
+            {[:no_immunities], [:immunity_purges_effect]}
+          ] do
+        control = %{stun() | mechanic: 12, attributes: MapSet.new(control_attributes)}
+        {controlled, _} = Aura.apply_spell(entity, 2, 10, control, 0)
+        immunity = protection(:mechanic_immunity, 12, immunity_attributes)
+        {protected, _} = Aura.apply_spell(controlled, 1, 10, immunity, 100)
+        assert Aura.has_aura?(protected, :mod_stun)
+      end
+    end
+
     test "dispel immunity purges matching concealment and blocks its return until expiry", %{entity: entity} do
       stealth = concealment(5, :mod_stealth)
       invisibility = concealment(6, :mod_invisibility)

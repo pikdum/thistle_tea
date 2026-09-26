@@ -144,7 +144,8 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
           type: :apply_aura,
           base_points: 0,
           die_sides: 0,
-          aura: :mod_root
+          aura: :mod_root,
+          mechanic: 7
         }
       ]
     }
@@ -2162,6 +2163,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       name: "Blink",
       school: :arcane,
       duration_ms: 0,
+      attributes: MapSet.new([:immunity_purges_effect]),
       effects: [
         %Effect{
           index: 1,

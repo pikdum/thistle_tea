@@ -82,8 +82,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   def apply_prepared(target, %Resolution{kind: :ignored}, _now), do: {target, []}
 
-  def apply_prepared(target, %Resolution{kind: :immune, context: context, spell: spell}, _now) do
-    {target, [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
+  def apply_prepared(target, %Resolution{kind: :immune, context: context, spell: spell}, now) do
+    {target, events} = Aura.consume_mechanic_immunity(target, spell, now)
+    {target, events ++ [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
   end
 
   def apply_prepared(target, %Resolution{kind: :reflect, context: context, spell: spell}, now) do
@@ -228,7 +229,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     do: receive_outcome(target, context, spell, outcome, now)
 
   defp immune_to_spell?(target, %CastContext{caster_guid: caster_guid} = context, %Spell{} = spell) do
-    CreatureImmunity.spell?(target, context, spell) or
+    Aura.mechanic_immune?(target, spell) or CreatureImmunity.spell?(target, context, spell) or
       (target.object.guid != caster_guid and Spell.harmful?(spell) and
          DamageImmunity.immune?(target, spell.school, spell))
   end

@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.DiminishingReturns
+  alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Logic.FeignDeath
@@ -73,6 +74,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     desired = StackingProc.reconcile(previous, desired)
     desired = Linked.reconcile(entity, previous, desired, now)
     desired = Capacity.retain(desired, entity_guid(entity))
+    desired = EffectImmunity.purge_new(previous, desired)
     desired = retain_active_sources(previous, desired, now)
 
     if desired == previous do

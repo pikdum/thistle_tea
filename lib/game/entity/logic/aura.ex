@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defdelegate transition(entity, change), to: Transition, as: :run
   defdelegate blocked_by_stronger_rank?(entity_or_holders, spell), to: AuraApplication
   defdelegate mechanic_immune?(entity, spell), to: AuraApplication
+  defdelegate consume_mechanic_immunity(entity, spell, now), to: AuraApplication
   defdelegate dispel_immune?(entity, spell), to: AuraApplication
 
   defdelegate interrupt_mask(action), to: Lifecycle

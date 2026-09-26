@@ -211,7 +211,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         {entity, []}
 
       blocked_by_mechanic_immunity?(existing, holder.spell) ->
-        consume_immunity_charge(entity, holder.spell, now)
+        consume_mechanic_immunity(entity, holder.spell, now)
 
       blocked_by_dispel_immunity?(existing, holder.spell.dispel_type) ->
         {entity, []}
@@ -252,11 +252,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp upsert_unblocked(entity, existing, %Holder{} = holder, context, now) do
     {entity, holder} = SingleTarget.assign(entity, holder)
-
-    existing =
-      existing
-      |> remove_immune_mechanics(holder)
-      |> EffectImmunity.purge(holder)
 
     holders =
       if holder.spell.id == @ignite_dot do
@@ -382,18 +377,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     if charges > 0, do: charges
   end
 
-  defp blocked_by_mechanic_immunity?(holders, %Spell{mechanic: mechanic}) when is_integer(mechanic) and mechanic > 0 do
-    Enum.any?(holders, &immunity_holder_for_mechanic?(&1, mechanic))
+  defp blocked_by_mechanic_immunity?(holders, %Spell{} = spell) do
+    Enum.any?(holders, &EffectImmunity.mechanic?(&1, spell))
   end
 
   defp blocked_by_mechanic_immunity?(_holders, _spell), do: false
 
-  defp immunity_holder_for_mechanic?(%Holder{auras: auras}, mechanic) do
-    Enum.any?(auras, &match?(%Aura{type: :mechanic_immunity, misc_value: ^mechanic}, &1))
-  end
-
-  defp consume_immunity_charge(%{unit: %Unit{auras: holders}} = entity, %Spell{mechanic: mechanic}, now) do
-    case Enum.find_index(holders, &(&1.charges != nil and immunity_holder_for_mechanic?(&1, mechanic))) do
+  def consume_mechanic_immunity(%{unit: %Unit{auras: holders}} = entity, %Spell{} = spell, now) when is_list(holders) do
+    case Enum.find_index(holders, &(&1.charges != nil and EffectImmunity.mechanic?(&1, spell))) do
       nil ->
         {entity, []}
 
@@ -402,6 +393,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         Transition.run(entity, %Change{holders: holders, cause: :consumed, now: now})
     end
   end
+
+  def consume_mechanic_immunity(entity, _spell, _now), do: {entity, []}
 
   defp spend_holder_charge(holders, index) do
     case Enum.at(holders, index) do
@@ -415,24 +408,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         holders
     end
   end
-
-  defp remove_immune_mechanics(holders, %Holder{auras: auras}) do
-    immune_types =
-      auras
-      |> Enum.filter(&match?(%Aura{type: :mechanic_immunity}, &1))
-      |> Enum.flat_map(&mechanic_aura_types(&1.misc_value))
-
-    case immune_types do
-      [] -> holders
-      types -> Enum.reject(holders, &Holder.has_any_type?(&1, types))
-    end
-  end
-
-  defp mechanic_aura_types(5), do: [:mod_fear]
-  defp mechanic_aura_types(7), do: [:mod_root]
-  defp mechanic_aura_types(11), do: [:mod_decrease_speed]
-  defp mechanic_aura_types(12), do: [:mod_stun]
-  defp mechanic_aura_types(_), do: []
 
   defp upsert_holder(existing, %Holder{spell: %Spell{id: spell_id} = spell, caster_guid: caster_guid} = incoming) do
     index =
