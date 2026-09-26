@@ -197,6 +197,35 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       refute_received {:"$gen_cast", {:receive_spell, _, _}}
     end
 
+    test "spell feedback snapshots only the emitting target's resolved life and resource" do
+      caster_guid = Guid.from_low_guid(:player, unique_guid())
+      target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      Entity.register(caster_guid)
+      on_exit(fn -> Entity.unregister(caster_guid) end)
+
+      target = %Mob{
+        object: %Object{guid: target_guid},
+        unit: %Unit{health: 25, power_type: 3},
+        internal: %Internal{world: WorldRef.open(0)},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      spell = %Spell{id: 774, school: :nature}
+      heal = Effects.spell_heal(caster_guid, target_guid, spell, 25, false, periodic?: true)
+      EventSink.emit(target, heal)
+      assert_receive {:"$gen_cast", {:spell_outcome, %{victim_alive?: true, victim_power_type: 3}}}
+
+      dead = %{target | unit: %{target.unit | health: 0, power_type: 1}}
+      damage = Effects.spell_damage(caster_guid, target_guid, %Spell{id: 172, school: :shadow}, 25)
+      EventSink.emit(dead, damage)
+      assert_receive {:"$gen_cast", {:spell_outcome, %{victim_alive?: false, victim_power_type: 1}}}
+
+      EventSink.emit(%{target | object: %Object{guid: caster_guid}}, heal)
+      assert_receive {:"$gen_cast", {:spell_outcome, payload}}
+      refute Map.has_key?(payload, :victim_alive?)
+      refute Map.has_key?(payload, :victim_power_type)
+    end
+
     test "direct healing reaches the recipient and observers without duplicating periodic logs" do
       owner_guid = Guid.from_low_guid(:player, unique_guid())
       observer_guid = Guid.from_low_guid(:player, unique_guid())

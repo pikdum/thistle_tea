@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.Change
+  alias ThistleTea.Game.Entity.Logic.Aura.ClassScript
   alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -252,13 +253,17 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
   defp generic_outgoing_spell_proc(holders, events, %Holder{} = holder, owner_guid, context) do
     victim_guid = Map.get(context, :victim_guid)
-    proc_auras = trigger_auras(holder)
+
+    proc_events =
+      if is_integer(victim_guid) do
+        Enum.map(trigger_auras(holder), &proc_event(&1, holder, owner_guid, victim_guid)) ++
+          ClassScript.events(holder, owner_guid, context)
+      else
+        []
+      end
 
     cond do
-      proc_auras != [] and is_integer(victim_guid) ->
-        proc_events =
-          Enum.map(proc_auras, &proc_event(&1, holder, owner_guid, victim_guid))
-
+      proc_events != [] ->
         {replace_or_delete(holders, holder, mark_proc(holder, Map.get(context, :now))), events ++ proc_events}
 
       spends_charge_without_trigger?(holder) ->
@@ -270,7 +275,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   end
 
   defp spends_charge_without_trigger?(%Holder{charges: charges} = holder) do
-    is_integer(charges) and not Holder.has_any_type?(holder, @modifier_auras)
+    is_integer(charges) and not Holder.has_any_type?(holder, [:override_class_scripts | @modifier_auras])
   end
 
   defp trigger_auras(%Holder{auras: auras}) do

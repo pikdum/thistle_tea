@@ -368,6 +368,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     Spell.same_exclusive_category?(existing, incoming)
   end
 
+  defp holder_charges(%Spell{id: id}, _modifiers) when id in [17_941, 22_008], do: 1
+
   defp holder_charges(%Spell{proc_charges: charges}, modifiers) do
     charges = trunc(Modifiers.value(modifiers, :charges, charges || 0))
     if charges > 0, do: charges

@@ -14,6 +14,25 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   end
 
   describe "get/1" do
+    test "class-script procs retain their spell-family and periodic restrictions" do
+      for {id, family, mask, flags, outcome, chance} <- [
+            {11_185, 3, 0x80, 0x50000, 0, 0.0},
+            {18_094, 5, 0xA, 0x40000, 0, 0.0},
+            {19_572, 9, 0x800000, 0x40000, 0x40000, 0.0},
+            {23_401, 6, 0, 0x4000, 0, 100.0},
+            {28_716, 7, 0x10, 0x48000, 0x40000, 50.0},
+            {28_744, 7, 0x40, 0x44000, 0x40003, 0.0}
+          ] do
+        assert %ProcRule{
+                 spell_family: ^family,
+                 family_mask_0: ^mask,
+                 proc_flags: ^flags,
+                 proc_ex: ^outcome,
+                 custom_chance: ^chance
+               } = SpellProcEvent.get(id)
+      end
+    end
+
     test "Shield Block spends charges only on blocked attacks" do
       assert %ProcRule{proc_ex: 0x40} = SpellProcEvent.get(2565)
     end

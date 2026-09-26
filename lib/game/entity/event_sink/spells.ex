@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Casting
@@ -172,7 +173,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
     }
     |> World.broadcast_packet(entity)
 
-    notify_spell_outcome(effect)
+    notify_spell_outcome(entity, effect)
 
     entity
   end
@@ -189,7 +190,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
       |> World.broadcast_packet(entity)
     end
 
-    notify_spell_outcome(effect)
+    notify_spell_outcome(entity, effect)
     entity
   end
 
@@ -543,27 +544,36 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
     Entity.receive_spell(effect.target_guid, effect.cast_context, effect.spell)
   end
 
-  defp notify_spell_outcome(%Effects.SpellDamage{} = effect) do
-    notify_spell_outcome(effect, effect.absorbed)
+  defp notify_spell_outcome(entity, %Effects.SpellDamage{} = effect) do
+    notify_spell_outcome(entity, effect, effect.absorbed)
   end
 
-  defp notify_spell_outcome(%Effects.SpellHeal{} = effect) do
-    notify_spell_outcome(effect, 0)
+  defp notify_spell_outcome(entity, %Effects.SpellHeal{} = effect) do
+    notify_spell_outcome(entity, effect, 0)
   end
 
   defp notify_spell_outcome(
+         entity,
          %{source_guid: source_guid, target_guid: target_guid, proc_type: proc_type} = effect,
          absorbed
        )
        when is_integer(source_guid) and is_atom(proc_type) and not is_nil(proc_type) do
-    Entity.spell_outcome(source_guid, %{
+    payload = %{
       victim_guid: target_guid,
       outcome: if(effect.crit?, do: :crit, else: :normal),
       damage: max((effect.damage || 0) - (absorbed || 0), 0),
       proc_type: proc_type,
       spell_id: effect.spell_id
-    })
+    }
+
+    Entity.spell_outcome(source_guid, Map.merge(payload, target_facts(entity, target_guid)))
   end
 
-  defp notify_spell_outcome(_effect, _absorbed), do: :ok
+  defp notify_spell_outcome(_entity, _effect, _absorbed), do: :ok
+
+  defp target_facts(%{object: %{guid: guid}, unit: %Unit{} = unit}, guid) do
+    %{victim_alive?: is_integer(unit.health) and unit.health > 0, victim_power_type: unit.power_type}
+  end
+
+  defp target_facts(_entity, _target_guid), do: %{}
 end
