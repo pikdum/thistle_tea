@@ -463,7 +463,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   defp reaction_event(
          %Aura{type: :damage_shield, amount: amount},
          %Holder{} = holder,
-         _owner_guid,
+         owner_guid,
          attacker_guid,
          _proc?,
          shield?,
@@ -472,11 +472,16 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
        when shield? and is_integer(amount) and amount > 0 do
     spell = %{
       holder.spell
-      | school: :holy,
-        effects: [%Effect{index: 0, type: :school_damage, base_points: amount, implicit_target_a: :target_enemy}]
+      | effects: [%Effect{index: 0, type: :school_damage, base_points: amount, implicit_target_a: :target_enemy}]
     }
 
-    context = %CastContext{caster_guid: holder.caster_guid, caster_level: holder.caster_level || 1, spell: spell}
+    context = %CastContext{
+      caster_guid: owner_guid,
+      caster_level: holder.caster_level || 1,
+      spell: spell,
+      proc_damage?: true
+    }
+
     [Effects.deliver_spell(attacker_guid, context, spell)]
   end
 

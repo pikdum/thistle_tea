@@ -22,6 +22,36 @@ defmodule ThistleTea.Game.Entity.Logic.ProcOriginTest do
   setup [:combatants]
 
   describe "receive/4" do
+    test "direct damage shields use the bearer and their own school without counter-procs", %{
+      caster: caster,
+      target: target
+    } do
+      shield = %Holder{
+        spell: %Spell{id: 467, school: :nature},
+        caster_guid: 3,
+        caster_level: 60,
+        auras: [%Aura{type: :damage_shield, amount: 10}]
+      }
+
+      target = %{target | unit: %{target.unit | auras: [shield]}}
+
+      {_target, [delivery]} =
+        AuraLogic.reactions(target, :hit_taken, %{
+          attacker_guid: caster.object.guid,
+          outcome: :normal,
+          damage: 5,
+          now: 1_000
+        })
+
+      assert %Effects.DeliverSpell{cast_context: %{caster_guid: 2, proc_damage?: true}, spell: %{school: :nature}} =
+               delivery
+
+      {caster, [damage]} = SpellEffect.receive(caster, delivery.cast_context, delivery.spell, 1_000)
+      assert caster.unit.health == 90
+      assert hd(caster.unit.auras).charges == 3
+      assert %Effects.SpellDamage{source_guid: 2, school: :nature, proc_type: nil, damage: 10} = damage
+    end
+
     test "aura damage cannot consume either combatant's charges or start cooldowns", %{caster: caster, target: target} do
       spell = damage_spell()
       context = aura_context()
