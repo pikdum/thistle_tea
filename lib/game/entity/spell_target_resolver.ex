@@ -76,7 +76,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     redirected = redirect_initial(caster, spell, query, initial)
     targets = if redirected == initial, do: ChainTargets.expand(caster, spell, initial), else: redirected
     targets = Enum.filter(targets, &buff_level_allowed?(caster, spell, &1, opts))
-    targets = if Spell.harmful?(spell), do: targets, else: Enum.filter(targets, &Hostility.can_assist?(caster, &1))
+    targets = Enum.filter(targets, &recipient_allowed?(caster, spell, &1))
     append_caster_execution_target(targets, spell, caster_guid)
   end
 
@@ -131,9 +131,20 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     |> Enum.reject(&(&1 in excluded))
     |> Enum.filter(fn guid ->
       creature_type_allowed?(spell, guid) and buff_level_allowed?(caster, spell, guid, opts) and
-        (Spell.harmful?(spell) or Hostility.can_assist?(caster, guid))
+        recipient_allowed?(caster, spell, guid)
     end)
     |> limit_targets(spell, Keyword.get(opts, :selected_guid))
+  end
+
+  defp recipient_allowed?(caster, spell, guid) do
+    Spell.harmful?(spell) or Hostility.can_assist?(caster, guid) or
+      (any_unit_target?(spell) and Hostility.valid_attack_target?(caster, guid))
+  end
+
+  defp any_unit_target?(%Spell{effects: effects}) do
+    Enum.any?(effects, fn effect ->
+      effect.implicit_target_a == :any_unit or effect.implicit_target_b == :any_unit
+    end)
   end
 
   defp buff_level_allowed?(%{object: %{guid: guid}}, _spell, guid, _opts), do: true

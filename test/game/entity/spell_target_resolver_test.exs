@@ -6,10 +6,12 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -18,6 +20,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.WorldRef
 
@@ -600,6 +603,35 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
     end
   end
 
+  describe "resolve/3 with duel targets" do
+    setup [:duel_targets]
+
+    test "mixed dispels retain the opponent for a player and their pet", context do
+      %{owner: owner, pet: pet, target: target, dispel: dispel} = context
+
+      for caster <- [owner, pet] do
+        refute Spell.harmful?(dispel)
+        refute Hostility.can_assist?(caster, target)
+        assert Hostility.valid_attack_target?(caster, target)
+        assert SpellTargetResolver.resolve(caster, dispel, Target.unit(target)) == [target]
+        assert SpellTargetResolver.resolve_query(caster, dispel, {:unit, target}) == [target]
+      end
+    end
+
+    test "preserves assistance and attack restrictions", context do
+      %{owner: owner, pet: pet, target: target, outsider: outsider, dispel: dispel} = context
+      heal = %Spell{effects: [%Effect{type: :heal, implicit_target_a: :target_ally}]}
+
+      assert SpellTargetResolver.resolve(pet, dispel, Target.unit(owner.object.guid)) == [owner.object.guid]
+      assert SpellTargetResolver.resolve(outsider, dispel, Target.unit(target)) == []
+      assert SpellTargetResolver.resolve(owner, heal, Target.unit(target)) == []
+
+      Metadata.update(target, %{unit_flags: 0x100})
+      assert SpellTargetResolver.resolve(pet, dispel, Target.unit(target)) == []
+      assert SpellTargetResolver.resolve_query(owner, dispel, {:unit, target}) == []
+    end
+  end
+
   describe "resolve_query/2" do
     test "returns direct unit query targets" do
       caster = %{object: %{guid: 1}}
@@ -634,6 +666,34 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
 
       assert Enum.sort(selected) == Enum.sort(tl(allies))
     end
+  end
+
+  defp duel_targets(_context) do
+    [owner, target, outsider] = for _ <- 1..3, do: player_guid()
+    pet = Guid.runtime(:pet, 417)
+
+    for guid <- [owner, target, outsider] do
+      put_spatial_target(:players, guid, {0.0, 0.0, 0.0})
+    end
+
+    put_spatial_target(:mobs, pet, {0.0, 0.0, 0.0}, faction_template(:players))
+    Metadata.update(pet, %{owner_guid: owner})
+
+    for {guid, opponent} <- [{owner, target}, {target, owner}] do
+      Metadata.update(guid, %{duel_started?: true})
+      :ets.insert(DuelSystem, {guid, %{opponent_guid: opponent, state: :started}})
+      on_exit(fn -> :ets.delete(DuelSystem, guid) end)
+    end
+
+    pet_caster = caster(pet, {0.0, 0.0, 0.0})
+
+    %{
+      owner: caster(owner, {0.0, 0.0, 0.0}),
+      pet: %{pet_caster | internal: %{pet_caster.internal | pet: %Pet{owner_guid: owner}}},
+      target: target,
+      outsider: caster(outsider, {0.0, 0.0, 0.0}),
+      dispel: %Spell{effects: [%Effect{type: :dispel, misc_value: 1, implicit_target_a: :any_unit}]}
+    }
   end
 
   defp player_guid do
