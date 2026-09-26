@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity.EventSink.CombatLeashes
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.EventSink.CreatureGroups
+  alias ThistleTea.Game.Entity.EventSink.GroupScripts
   alias ThistleTea.Game.Entity.EventSink.Honor
   alias ThistleTea.Game.Entity.EventSink.InstanceData
   alias ThistleTea.Game.Entity.EventSink.Movement
@@ -252,6 +253,10 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   defp emit_resolved(entity, %Effects.CombatLeashEvent{} = effect, context) do
     CombatLeashes.emit(entity, effect, context)
+  end
+
+  defp emit_resolved(entity, %Effects.StartGroupScript{} = effect, context) do
+    GroupScripts.emit(entity, effect, context)
   end
 
   defp emit_resolved(entity, %{__struct__: type} = effect, context)

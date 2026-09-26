@@ -63,6 +63,10 @@ defmodule ThistleTea.Game.World.CreatureGroups do
     GenServer.call(server, {:snapshot, world, guid})
   end
 
+  def members(world, guid, server \\ __MODULE__) do
+    GenServer.call(server, {:members, world, guid})
+  end
+
   def valid_command?(world, guid, token, owner, server \\ __MODULE__) do
     GenServer.call(server, {:valid_command, world, guid, token, owner})
   end
@@ -167,6 +171,21 @@ defmodule ThistleTea.Game.World.CreatureGroups do
       end
 
     {:reply, result, state}
+  end
+
+  defp handle_request({:members, world, guid}, state) do
+    members =
+      with {^world, _id} = key <- Map.get(state.guids, guid),
+           group_key when not is_nil(group_key) <- Map.get(state.memberships, key),
+           %CreatureGroup{} = group <- Map.get(state.groups, group_key) do
+        group
+        |> CreatureGroup.member_ids()
+        |> Enum.flat_map(&present_guids(Map.get(state.actors, {world, &1})))
+      else
+        _ungrouped -> []
+      end
+
+    {:reply, members, state}
   end
 
   defp handle_request({:valid_command, world, guid, token, owner}, state) do
@@ -324,6 +343,9 @@ defmodule ThistleTea.Game.World.CreatureGroups do
       _stale -> :error
     end
   end
+
+  defp present_guids(%{guid: guid, present?: true}), do: [guid]
+  defp present_guids(_absent), do: []
 
   defp detach_actor(state, key) do
     case Map.get(state.actors, key) do

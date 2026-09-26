@@ -16,6 +16,28 @@ defmodule ThistleTea.Game.World.CreatureGroupsTest do
 
   setup [:groups]
 
+  describe "members/3" do
+    test "returns present incarnations, including dead members, in one world copy", %{server: server, world: world} do
+      leader = mob(world, 1, 101)
+      member = mob(world, 2, 102)
+      other = mob(WorldRef.instance(world.map_id, 2), 2, 202)
+      Enum.each([leader, member, other], &CreatureGroups.register(&1, self(), server))
+      CreatureGroups.event(member, :death, self(), server)
+      assert CreatureGroups.members(world, 102, server) == [101, 102]
+      assert CreatureGroups.members(world, 202, server) == []
+
+      replacement = mob(world, 2, 103)
+      CreatureGroups.register(replacement, self(), server)
+      assert CreatureGroups.members(world, 101, server) == [101, 103]
+      assert CreatureGroups.members(world, 102, server) == []
+      CreatureGroups.leave(world, 103, self(), server)
+      assert CreatureGroups.members(world, 101, server) == [101]
+      assert CreatureGroups.members(world, 103, server) == []
+      CreatureGroups.stop_world(world, server)
+      assert CreatureGroups.members(world, 101, server) == []
+    end
+  end
+
   describe "event/4" do
     test "coordinates combat only within the same world copy", %{server: server, world: world} do
       a = mob(world, 1, 101)
@@ -99,6 +121,7 @@ defmodule ThistleTea.Game.World.CreatureGroupsTest do
       assert_receive :owner_stopped
       await_absent(server, world, 102, 100)
       assert CreatureGroups.snapshot(world, 101, server).dead?
+      assert CreatureGroups.members(world, 101, server) == [101]
       CreatureGroups.register(b, self(), server)
       refute CreatureGroups.snapshot(world, 101, server).dead?
     end

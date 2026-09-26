@@ -236,6 +236,28 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {state, blackboard, {:await, effect}}
   end
 
+  defp execute_command(
+         %{unit: %Unit{}} = state,
+         blackboard,
+         %ScriptStep{command: :start_script_on_group} = step,
+         target_guid,
+         _now,
+         %Context{random: random}
+       ) do
+    case choose_start_script(step, random) do
+      nil ->
+        failed(state, blackboard, step)
+
+      script_id ->
+        effect = %Effects.StartGroupScript{steps: Map.get(step.sub_scripts, script_id, []), target_guid: target_guid}
+        {Effects.enqueue(state, effect), blackboard, :continue}
+    end
+  end
+
+  defp execute_command(state, blackboard, %ScriptStep{command: :start_script_on_group} = step, _target, _now, _context) do
+    failed(state, blackboard, step)
+  end
+
   defp execute_command(state, blackboard, step, target_guid, now, context) do
     {state, blackboard} = execute(state, blackboard, step, target_guid, now, context)
     {state, blackboard, :continue}

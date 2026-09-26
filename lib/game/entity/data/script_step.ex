@@ -103,7 +103,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
     [script_id]
   end
 
-  def nested_script_ids(%__MODULE__{command: :start_script} = step) do
+  def nested_script_ids(%__MODULE__{command: command} = step) when command in [:start_script, :start_script_on_group] do
     Enum.filter([step.datalong, step.datalong2, step.datalong3, step.datalong4], &(is_integer(&1) and &1 > 0))
   end
 
@@ -136,7 +136,8 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
     Enum.filter([step.condition_id | event_condition_ids], &(is_integer(&1) and &1 > 0))
   end
 
-  def start_script_options(%__MODULE__{command: :start_script} = step) do
+  def start_script_options(%__MODULE__{command: command} = step)
+      when command in [:start_script, :start_script_on_group] do
     [
       {step.datalong, step.dataint},
       {step.datalong2, step.dataint2},
@@ -265,6 +266,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(85), do: :send_script_event
   defp command(87), do: :reset_door_or_button
   defp command(89), do: :play_custom_animation
+  defp command(90), do: :start_script_on_group
   defp command(other), do: {:unsupported, other}
 
   defp instance_data_mode(0), do: {:ok, :raw}
