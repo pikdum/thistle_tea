@@ -1,8 +1,9 @@
 defmodule ThistleTea.Game.Player.PetExperience do
   @moduledoc """
   Forwards eligible kill rewards to the player's current hunter pet owner.
-  Solo rewards use the pet's level. Group rewards use the owner's level-weighted
-  share and check the pet's level independently of the owner's XP eligibility.
+  Solo rewards use the owner's base reward and the pet's victim-level factor.
+  Group rewards use the owner's level-weighted share and check the pet's level
+  independently of the owner's XP eligibility.
   """
 
   alias ThistleTea.Game.Entity

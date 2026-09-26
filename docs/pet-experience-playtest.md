@@ -2,11 +2,16 @@
 
 Hunter pets gain experience from eligible creature kills and level up to the
 owner's level, with a maximum of 60. Each level costs one quarter of the
-corresponding player XP requirement. Solo rewards use the pet's level after
-checking that the kill grants XP to the owner; group rewards use the owner's
+corresponding player XP requirement. Solo rewards use the owner's level for the
+base amount and the pet's level for the victim-level factor, after checking that
+the kill grants XP to the owner; group rewards use the owner's
 unrested share. Dead pets, suspended pets, grey kills, and controlled victims
 do not grant pet experience. Overflow can cross several levels and is discarded
 when the pet reaches its owner-level cap.
+
+The corrected solo formula, dungeon elite bonuses, and rounding are covered in
+[contextual kill XP acceptance](contextual-experience-playtest.md). The older
+native results below describe the original progression implementation.
 
 The behavior follows `Pet::GivePetXP`, `Pet::GivePetLevel`, and
 `Pet::InitStatsForLevel` in `refs/vmangos/src/game/Objects/Pet.cpp`,
