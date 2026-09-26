@@ -1,10 +1,32 @@
 defmodule ThistleTea.Game.Entity.Logic.SkillsTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.Skills
 
   defp always_gain(_chance), do: true
   defp never_gain(_chance), do: false
+
+  describe "bonuses/1" do
+    test "scales signed temporary and permanent bonuses by their holder stacks" do
+      entity = %{
+        unit: %{
+          auras: [
+            %Holder{stacks: 10, auras: [%Aura{type: :mod_skill, misc_value: 95, amount: 3}]},
+            %Holder{stacks: 2, auras: [%Aura{type: :mod_skill, misc_value: 95, amount: -5}]},
+            %Holder{stacks: 3, auras: [%Aura{type: :mod_skill_talent, misc_value: 95, amount: 2}]}
+          ]
+        }
+      }
+
+      assert Skills.bonuses(entity) == %{95 => {20, 6}}
+
+      assert <<95::little-size(32), 300::little-size(16), 300::little-size(16), 20::little-signed-size(16),
+               6::little-signed-size(16), _rest::binary>> =
+               Skills.encode(%{95 => %{value: 300, max: 300}}, Skills.bonuses(entity))
+    end
+  end
 
   describe "new_entry/3" do
     test "builds entries per range" do

@@ -6,8 +6,9 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
   from combat use, `:tier` skills use their trained profession cap, `:mono`
   skills stay 1/1, and `:language` skills stay 300/300.
   """
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Inventory
@@ -65,20 +66,24 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
   def unarmed_skill, do: @unarmed_skill
   def fishing_skill, do: @fishing_skill
 
-  def bonuses(entity) do
-    for type <- [:mod_skill, :mod_skill_talent],
-        aura <- Aura.auras_of_type(entity, type),
+  def bonuses(%{unit: %{auras: holders}}) when is_list(holders) do
+    for %Holder{} = holder <- holders,
+        %Aura{type: type} = aura <- holder.auras,
+        type in [:mod_skill, :mod_skill_talent],
         is_integer(aura.misc_value) and is_integer(aura.amount),
         reduce: %{} do
-      acc -> add_skill_bonus(acc, aura)
+      acc -> add_skill_bonus(acc, aura, max(holder.stacks || 1, 1))
     end
   end
 
-  defp add_skill_bonus(acc, aura) do
+  def bonuses(_entity), do: %{}
+
+  defp add_skill_bonus(acc, aura, stacks) do
     {temporary, permanent} = Map.get(acc, aura.misc_value, {0, 0})
+    amount = aura.amount * stacks
 
     bonus =
-      if aura.type == :mod_skill, do: {temporary + aura.amount, permanent}, else: {temporary, permanent + aura.amount}
+      if aura.type == :mod_skill, do: {temporary + amount, permanent}, else: {temporary, permanent + amount}
 
     Map.put(acc, aura.misc_value, bonus)
   end
