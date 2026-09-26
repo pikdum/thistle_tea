@@ -27,7 +27,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ProcEquipment do
 
   defp hand(%{hand: hand}) when hand in [:mainhand, :offhand, :ranged], do: hand
   defp hand(%{attack_hand: hand}) when hand in [:mainhand, :offhand, :ranged], do: hand
-  defp hand(%{spell: %Spell{} = spell}), do: if(Spell.ranged_attack?(spell), do: :ranged, else: :mainhand)
+
+  defp hand(%{spell: %Spell{dmg_class: 2} = spell}) do
+    if Spell.attribute?(spell, :requires_offhand_weapon), do: :offhand, else: :mainhand
+  end
+
+  defp hand(%{spell: %Spell{} = spell}) do
+    if Spell.ranged_ability?(spell) or Spell.attribute?(spell, :auto_repeat), do: :ranged, else: :mainhand
+  end
+
   defp hand(_context), do: :mainhand
 
   defp matches_subclass?(%Spell{equipped_item_subclass_mask: mask}, subclass)

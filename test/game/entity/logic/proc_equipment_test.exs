@@ -28,9 +28,17 @@ defmodule ThistleTea.Game.Entity.Logic.ProcEquipmentTest do
 
       bow = %{sword | equipped_item_subclass_mask: 4}
       assert ProcEquipment.allowed?(character, bow, %{spell: %Spell{dmg_class: 3}})
-      repeat = %Spell{attributes: MapSet.new([:uses_ranged_slot, :auto_repeat])}
+      repeat = %Spell{attributes: MapSet.new([:auto_repeat])}
       assert ProcEquipment.allowed?(character, bow, %{spell: repeat})
       refute ProcEquipment.allowed?(character, %{sword | equipped_item_subclass_mask: 0}, %{})
+    end
+
+    test "offhand melee spells select the offhand before other spell attributes", %{character: character} do
+      spell = %Spell{dmg_class: 2, attributes: MapSet.new([:requires_offhand_weapon, :auto_repeat])}
+      refute ProcEquipment.allowed?(character, proc_spell(), %{spell: spell})
+      dagger = %{proc_spell() | equipped_item_subclass_mask: 0x8000}
+      assert ProcEquipment.allowed?(character, dagger, %{spell: spell})
+      refute ProcEquipment.allowed?(character, dagger, %{spell: %{spell | attributes: MapSet.new()}})
     end
 
     test "rejects empty and broken hands even when feedback supplies an old weapon", %{character: character} do
