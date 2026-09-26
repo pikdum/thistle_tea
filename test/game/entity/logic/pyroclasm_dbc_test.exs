@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.PyroclasmDbcTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EffectResolver.Spells
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -15,6 +16,9 @@ defmodule ThistleTea.Game.Entity.Logic.PyroclasmDbcTest do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
+  alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
+  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.PersistentArea
   alias ThistleTea.Game.Spell.PersistentArea.Check
@@ -31,6 +35,42 @@ defmodule ThistleTea.Game.Entity.Logic.PyroclasmDbcTest do
   setup [:catalog, :characters]
 
   describe "receive/4" do
+    test "creature owners retain unlearned damage spells in proc feedback", context do
+      guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+
+      mob = %Mob{
+        object: %Object{guid: guid},
+        unit: context.caster.unit,
+        internal: %Internal{world: WorldRef.open(0), spellbook: %{}},
+        movement_block: context.caster.movement_block
+      }
+
+      {mob, _} = Aura.apply_spell(mob, guid, 60, SpellLoader.load(18_073), 0)
+      {:ok, _} = Entity.register(context.target.object.guid)
+      spell = SpellLoader.load(5857)
+      refute Map.has_key?(mob.internal.spellbook, spell.id)
+
+      feedback = %{
+        victim_guid: context.target.object.guid,
+        victim_alive?: true,
+        damage: 100,
+        proc_type: :deal_harmful_spell,
+        outcome: :normal,
+        spell_id: spell.id,
+        spell: spell
+      }
+
+      :rand.seed(:exsss, {34, 2, 3})
+
+      assert {:noreply, updated, {:continue, :maybe_broadcast}} =
+               MobServer.handle_cast({:spell_outcome, feedback}, mob)
+
+      assert_receive {:"$gen_cast", {:receive_spell, cast_context, %{id: 18_093}}}
+      assert cast_context.caster_guid == guid
+      assert updated.internal.events == []
+      Process.cancel_timer(updated.internal.ai_tick_ref)
+    end
+
     test "both ranks proc from Soul Fire, Hellfire, and Rain of Fire through owner feedback", context do
       for talent_id <- [18_096, 18_073], damage_id <- [6353, 5857, 5740] do
         {caster, _} = Aura.apply_spell(context.caster, 1, 60, SpellLoader.load(talent_id), 0)
@@ -41,8 +81,13 @@ defmodule ThistleTea.Game.Entity.Logic.PyroclasmDbcTest do
         EventSink.emit(target, damage)
         assert_receive {:"$gen_cast", {:spell_outcome, feedback}}
         assert feedback.victim_alive?
+        assert feedback.spell == damage.spell
+        refute Map.has_key?(caster.internal.spellbook, damage_id)
         :rand.seed(:exsss, {34, 2, 3})
-        caster = SpellFeedback.receive(caster, feedback, spell, 2_000)
+
+        assert {:noreply, %{character: caster}, {:continue, :maybe_broadcast_update}} =
+                 PlayerServer.handle_cast({:spell_outcome, feedback}, %{character: caster})
+
         {caster, events} = Effects.drain(caster)
         assert [%Effects.TriggerSpell{spell_id: 18_093} = proc] = events
         assert proc.triggering_spell_id == talent_id
@@ -180,7 +225,7 @@ defmodule ThistleTea.Game.Entity.Logic.PyroclasmDbcTest do
       object: %Object{guid: 1},
       unit: %Unit{level: 60, health: 5_000, max_health: 5_000, auras: []},
       player: %Player{},
-      internal: %Internal{},
+      internal: %Internal{spellbook: %{1949 => SpellLoader.load(1949)}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
 

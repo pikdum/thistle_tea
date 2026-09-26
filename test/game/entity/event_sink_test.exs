@@ -197,7 +197,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       refute_received {:"$gen_cast", {:receive_spell, _, _}}
     end
 
-    test "spell feedback snapshots only the emitting target's resolved life and resource" do
+    test "spell feedback retains the resolved spell and emitting target's life and resource" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
       Entity.register(caster_guid)
@@ -213,7 +213,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       spell = %Spell{id: 774, school: :nature}
       heal = Effects.spell_heal(caster_guid, target_guid, spell, 25, false, periodic?: true)
       EventSink.emit(target, heal)
-      assert_receive {:"$gen_cast", {:spell_outcome, %{victim_alive?: true, victim_power_type: 3}}}
+      assert_receive {:"$gen_cast", {:spell_outcome, %{spell: ^spell, victim_alive?: true, victim_power_type: 3}}}
 
       dead = %{target | unit: %{target.unit | health: 0, power_type: 1}}
       damage = Effects.spell_damage(caster_guid, target_guid, %Spell{id: 172, school: :shadow}, 25)

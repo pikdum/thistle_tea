@@ -563,7 +563,8 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
       outcome: if(effect.crit?, do: :crit, else: :normal),
       damage: max((effect.damage || 0) - (absorbed || 0), 0),
       proc_type: proc_type,
-      spell_id: effect.spell_id
+      spell_id: effect.spell_id,
+      spell: effect.spell
     }
 
     Entity.spell_outcome(source_guid, Map.merge(payload, target_facts(entity, target_guid)))

@@ -482,7 +482,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def handle_cast({:spell_outcome, payload}, %{character: %Character{} = character} = state) do
-    spell = spellbook_spell(character, Map.get(payload, :spell_id))
+    spell = Map.get(payload, :spell) || spellbook_spell(character, Map.get(payload, :spell_id))
     character = SpellFeedback.receive(character, payload, spell, Time.now())
 
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
