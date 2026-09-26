@@ -27,8 +27,9 @@ Reference rules are in `refs/vmangos/src/game/Objects/Player.cpp`
 `refs/vmangos/src/game/Database/DBCStructure.h`. Packet layouts come from
 `refs/wow_messages/wow_message_parser/wowm/world/spell/`.
 
-The feature covers breath and drowning. Ocean fatigue and lava/slime hazards
-need liquid-type information beyond the current Namigator surface-height API.
+The feature covers breath and drowning. [Ocean fatigue](fatigue-playtest.md)
+now uses separately extracted terrain liquid flags. Lava/slime hazards remain
+separate work.
 
 ## Follow-up fixes
 

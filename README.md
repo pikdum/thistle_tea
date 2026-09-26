@@ -219,7 +219,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - fall damage, Safe Fall, and Slow Fall protection
 - [Environmental fire damage](docs/environmental-fire-playtest.md), with world campfires, resistance, shield depletion, combat-log feedback, and death durability loss
 - underwater breath timers, drowning, water-breathing effects, and extended breath reserves
-- ocean fatigue, coastal recovery, exhaustion damage, transport protection, and graveyard rescue for ghosts
+- [ocean fatigue, coastal recovery, exhaustion damage, transport protection, and graveyard rescue for ghosts](docs/fatigue-playtest.md)
 - swimming speed bonuses and snare updates, synchronized with the player and nearby observers
 - gossip + trainers
 - [Innkeeper home binding](docs/home-binding-playtest.md), with confirmation, retained home locations, Hearthstones, Astral Recall, and replacement Hearthstones
