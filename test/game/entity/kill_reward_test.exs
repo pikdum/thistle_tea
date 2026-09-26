@@ -4,7 +4,9 @@ defmodule ThistleTea.Game.Entity.KillRewardTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.Data.DamageOrigin
@@ -86,6 +88,17 @@ defmodule ThistleTea.Game.Entity.KillRewardTest do
   end
 
   describe "group_rewards/3" do
+    test "splits NPC pet experience after applying its reduction", %{mob: mob, opts: opts} do
+      mob = %{
+        mob
+        | object: %Object{guid: Guid.runtime(:pet, 1)},
+          internal: %{mob.internal | pet: %Pet{kind: :guardian, owner_guid: Guid.runtime(:mob, 2)}}
+      }
+
+      group = %Group{members: [%Member{guid: 1}, %Member{guid: 2}]}
+      assert [%Award{xp: 35, pet_xp: 35}, %Award{xp: 35, pet_xp: 35}] = KillReward.group_rewards(mob, group, opts)
+    end
+
     test "uses the dungeon elite reward before splitting among members", %{mob: mob, opts: opts} do
       creature = %{mob.internal.creature | rank: 1}
       mob = %{mob | internal: %{mob.internal | creature: creature}}

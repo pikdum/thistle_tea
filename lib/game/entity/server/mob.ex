@@ -54,6 +54,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
   alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.KillCredit
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
@@ -1987,7 +1988,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp maybe_tap(%Mob{internal: %Internal{loot: %Loot{tapped_by: nil}}} = state, caster, allow_dead?) do
     caster = controlling_player(caster)
 
-    if (allow_dead? or not Core.dead?(state)) and Guid.entity_type(caster) == :player do
+    if not KillCredit.pet?(state) and (allow_dead? or not Core.dead?(state)) and Guid.entity_type(caster) == :player do
       group_id =
         case PartySystem.group_of(caster) do
           %Party.Group{id: id} -> id
@@ -2022,6 +2023,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> PetHappiness.on_death(MapTemplate.battleground?(state.internal.world.map_id))
       |> mark_death_finalized()
       |> EventSink.emit_pending()
+      |> maybe_reward_kill(state.internal.killed_by)
       |> Core.mark_broadcast_update()
     else
       state
@@ -2062,10 +2064,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp maybe_reward_kill(%Mob{} = state, target) do
-    case KillReward.selection(state, target) do
-      {:group, group} -> reward_group_kill(state, group)
-      {:solo, guid} -> Entity.reward_kill(guid, state)
-      nil -> :ok
+    if KillCredit.eligible?(state) do
+      case KillReward.selection(state, target) do
+        {:group, group} -> reward_group_kill(state, group)
+        {:solo, guid} -> Entity.reward_kill(guid, state)
+        nil -> :ok
+      end
     end
 
     state

@@ -4,10 +4,12 @@ defmodule ThistleTea.Game.Entity.Server.PlayerGroupRewardTest do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.DamageOrigin
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Data.Reputation.Catalog
@@ -31,6 +33,40 @@ defmodule ThistleTea.Game.Entity.Server.PlayerGroupRewardTest do
   setup [:reward_context]
 
   describe "handle_cast/2" do
+    test "NPC pets award reduced XP alongside quest and reputation credit", context do
+      victim = %{
+        context.victim
+        | object: %{context.victim.object | guid: Guid.runtime(:pet, 299)},
+          internal: %{
+            context.victim.internal
+            | pet: %Pet{kind: :creature_pet, owner_guid: Guid.runtime(:mob, 1)},
+              damage_origin: %DamageOrigin{player: 100}
+          }
+      }
+
+      state = %{
+        context.state
+        | character: %{
+            context.state.character
+            | internal: %{
+                context.state.character.internal
+                | rest_bonus: 0.0
+              }
+          }
+      }
+
+      assert {:noreply, updated} = PlayerServer.handle_cast({:reward_kill, victim}, state)
+      assert updated.character.player.xp == 81
+      assert Reputation.standing(updated.character, 529) == 10
+      assert QuestLog.get(updated.character.player.quest_log, context.quest.id).counts == %{0 => 1}
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgLogXpgain{total_exp: 71, experience_without_rested: 71}}}
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgQuestupdateAddKill{count: 1}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgSetFactionStanding{standings: [{13, 10}]}}}
+    end
+
     test "awards an unreleased corpse quest credit and full reputation without XP", context do
       state = put_life(context.state, 0, 0)
       assert {:noreply, updated} = PlayerServer.handle_cast({:reward_kill_share, context.victim, context.award}, state)

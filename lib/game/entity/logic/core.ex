@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Honor.Combat, as: HonorCombat
   alias ThistleTea.Game.Entity.Logic.Intoxication
+  alias ThistleTea.Game.Entity.Logic.KillCredit
   alias ThistleTea.Game.Entity.Logic.MiniPet
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.MovementStats
@@ -418,7 +419,9 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   defp maybe_enqueue_defeat(%Mob{} = entity, health, 0, opts) when health > 0 do
-    Effects.enqueue(entity, %Effects.CreatureDefeated{source_guid: Keyword.get(opts, :source)})
+    entity
+    |> KillCredit.capture()
+    |> Effects.enqueue(%Effects.CreatureDefeated{source_guid: Keyword.get(opts, :source)})
   end
 
   defp maybe_enqueue_defeat(entity, _health, _new_health, _opts), do: entity

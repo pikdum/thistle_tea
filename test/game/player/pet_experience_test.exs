@@ -43,7 +43,8 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
                experience_multiplier: 1.0,
                damage_multiplier: 0.5,
                no_xp?: false,
-               elite?: false
+               elite?: false,
+               pet?: false
              ]
     end
 
@@ -61,8 +62,22 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
       PetExperience.reward_kill(%{character | unit: %{character.unit | health: 0}}, victim, 100, {:group, 60})
       PetExperience.reward_kill(%{character | player: %Player{flags: 0x10}}, victim, 100, {:group, 60})
       PetExperience.reward_kill(Companion.suspend(character), victim, 100, :solo)
-      PetExperience.reward_kill(character, %{victim | internal: %{victim.internal | pet: %Pet{}}}, 100, :solo)
+      controlled = %{victim | internal: %{victim.internal | pet: %Pet{owner_guid: 2}}}
+      PetExperience.reward_kill(character, controlled, 100, :solo)
       refute_receive {:reward_pet_kill, _, _, _}
+    end
+
+    test "forwards NPC pet kills with the pet victim modifier", %{character: character, victim: victim} do
+      victim = %{
+        victim
+        | object: %Object{guid: Guid.runtime(:pet, 10_928)},
+          internal: %{victim.internal | pet: %Pet{kind: :creature_pet, owner_guid: Guid.runtime(:mob, 3664)}}
+      }
+
+      PetExperience.reward_kill(character, victim, 100, :solo)
+      assert_receive {:reward_pet_kill, 1, 60, {:solo, 50, opts}}
+      assert opts[:pet?]
+      refute opts[:no_xp?]
     end
   end
 

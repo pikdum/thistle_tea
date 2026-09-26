@@ -343,6 +343,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         rooted?: false,
         running: false,
         killed_by: nil,
+        pve_reward_eligible?: nil,
         death_finalized?: false,
         movement_start_time: nil,
         movement_start_position: nil,

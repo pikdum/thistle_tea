@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.SummonLifecycleTest do
   alias ThistleTea.Game.Entity.Data.AIEvent
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Guardian
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
@@ -24,11 +25,64 @@ defmodule ThistleTea.Game.Entity.Server.Mob.SummonLifecycleTest do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
   setup [:summoner]
 
   describe "summon lifecycle" do
+    test "NPC pets grant one reward and leave an unlootable corpse until removal", %{summoner: summoner} do
+      killer = System.unique_integer([:positive]) + 10_000_000
+      Entity.register(killer)
+
+      for kind <- [:creature_pet, :guardian] do
+        mob = mob(summoner)
+        guid = Guid.runtime(:pet, mob.object.entry)
+
+        mob = %{
+          mob
+          | object: %{mob.object | guid: guid},
+            internal: %{mob.internal | pet: %Pet{owner_guid: summoner, kind: kind, profile: :combat}}
+        }
+
+        {:ok, pid} = start(mob)
+        kill(guid, killer)
+        assert_receive {:"$gen_cast", {:reward_kill, %Mob{object: %{guid: ^guid}} = victim}}
+        assert victim.unit.health == 0
+        assert victim.internal.death_finalized?
+        assert victim.internal.loot.tapped_by == nil
+        assert victim.internal.loot.session == nil
+        assert victim.internal.spawn.respawn_ref == nil
+        assert Process.alive?(pid)
+        kill(guid, killer)
+        assert :sys.get_state(pid).internal.death_finalized?
+        refute_receive {:"$gen_cast", {:reward_kill, _}}
+        monitor = Process.monitor(pid)
+        send(pid, :pet_stop)
+        assert_receive {:DOWN, ^monitor, :process, ^pid, _}, 1_000
+        assert Metadata.get(guid) == nil
+        assert World.position(guid) == nil
+      end
+    end
+
+    test "player-owned pets grant no kill credit", %{summoner: summoner} do
+      killer = System.unique_integer([:positive]) + 10_000_000
+      Entity.register(killer)
+      mob = mob(summoner)
+      guid = Guid.runtime(:pet, mob.object.entry)
+
+      mob = %{
+        mob
+        | object: %{mob.object | guid: guid},
+          internal: %{mob.internal | pet: %Pet{owner_guid: killer + 1, kind: :guardian, profile: :combat}}
+      }
+
+      {:ok, pid} = start(mob)
+      kill(guid, killer)
+      assert :sys.get_state(pid).unit.health == 0
+      refute_receive {:"$gen_cast", {:reward_kill, _}}
+    end
+
     test "temporary creatures publish one birth, death, and corpse departure", %{summoner: summoner} do
       mob = mob(summoner)
       guid = mob.object.guid
@@ -116,13 +170,29 @@ defmodule ThistleTea.Game.Entity.Server.Mob.SummonLifecycleTest do
   end
 
   defp start(mob) do
+    mob = prepare_owner(mob)
     on_exit(fn -> World.stop_entity(mob.object.guid) end)
     World.start_entity(mob)
   end
 
-  defp kill(guid) do
+  defp prepare_owner(%Mob{internal: %{pet: %Pet{owner_guid: owner, kind: kind}}} = mob) do
+    table = if Guid.entity_type(owner) == :player, do: :players, else: :mobs
+    Metadata.put(owner, %{alive?: true, pet_guid: mob.object.guid})
+    SpatialHash.update(table, owner, mob.internal.world, 0.0, 0.0, 0.0)
+
+    on_exit(fn ->
+      Metadata.delete(owner)
+      SpatialHash.remove(table, owner)
+    end)
+
+    if kind == :guardian, do: %{mob | internal: %{mob.internal | guardian: %Guardian{}}}, else: mob
+  end
+
+  defp prepare_owner(mob), do: mob
+
+  defp kill(guid, caster \\ nil) do
     spell = %Spell{id: 5, effects: [%Effect{index: 0, type: :instakill}]}
-    Entity.receive_spell(guid, %CastContext{caster_guid: guid, caster_level: 20}, spell)
+    Entity.receive_spell(guid, %CastContext{caster_guid: caster || guid, caster_level: 20}, spell)
   end
 
   defp mob(summoner) do

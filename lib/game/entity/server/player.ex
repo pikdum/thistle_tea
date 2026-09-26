@@ -54,6 +54,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.KillCredit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Logic.Loot.Reservation
   alias ThistleTea.Game.Entity.Logic.MovementHandoff
@@ -613,7 +614,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_cast({:reward_kill, victim}, %{character: %Character{} = character} = state) do
     xp = kill_xp(character, victim)
-    state = if xp > 0, do: trigger_kill_procs(state, victim), else: state
+    state = if xp > 0 and not KillCredit.pet?(victim), do: trigger_kill_procs(state, victim), else: state
     state = apply_kill_reward(state, victim, xp)
     PetExperience.reward_kill(state.character, victim, xp, :solo)
     {:noreply, state}
@@ -2071,11 +2072,9 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp maybe_reward_kill_quest(state, _victim, false), do: state
 
-  defp maybe_reward_kill_reputation(state, %{internal: %Internal{pet: nil}} = victim) do
+  defp maybe_reward_kill_reputation(state, victim) do
     PlayerReputation.reward_kill(state, victim.object.entry, victim.unit.level)
   end
-
-  defp maybe_reward_kill_reputation(state, _victim), do: state
 
   defp kill_xp(
          %Character{unit: %Unit{level: player_level}} = character,

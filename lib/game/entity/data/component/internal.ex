@@ -83,6 +83,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :pending_resurrect,
     :pending_summon,
     :killed_by,
+    :pve_reward_eligible?,
     :rest_type,
     :rest_started_at,
     :rest_logout_at,

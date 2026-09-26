@@ -3,9 +3,12 @@ defmodule ThistleTea.Game.Entity.Logic.ExperienceTest do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
+  alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.DamageOrigin
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Experience
+  alias ThistleTea.Game.Guid
 
   describe "gain_xp/3" do
     defp character(level, xp, next_level_xp) do
@@ -155,6 +158,13 @@ defmodule ThistleTea.Game.Entity.Logic.ExperienceTest do
   end
 
   describe "kill_xp/3" do
+    test "reduces pet victims without applying elite bonuses" do
+      assert Experience.kill_xp(24, 24, pet?: true) == 124
+      assert Experience.kill_xp(24, 24, pet?: true, elite?: true, non_raid_dungeon?: true) == 124
+      assert Experience.kill_xp(24, 24, pet?: true, experience_multiplier: 2.0, damage_multiplier: 0.5) == 124
+      assert Experience.kill_xp(20, 24, owner_level: 24, pet?: true) == 149
+    end
+
     test "calculates same-level kill XP" do
       assert Experience.kill_xp(1, 1) == 50
       assert Experience.kill_xp(10, 10) == 95
@@ -194,6 +204,20 @@ defmodule ThistleTea.Game.Entity.Logic.ExperienceTest do
   end
 
   describe "kill_options/1" do
+    test "distinguishes NPC pets, player pets and controlled ordinary creatures" do
+      mob = reward_mob(%Creature{rank: 1})
+      npc = Guid.runtime(:mob, 3664)
+      pet = %{mob | object: %Object{guid: Guid.runtime(:pet, 10_928)}}
+      pet = %{pet | internal: %{pet.internal | pet: %Pet{owner_guid: npc, kind: :creature_pet}}}
+      assert Experience.kill_xp(24, 24, Experience.kill_options(pet)) == 124
+      player_pet = %{pet | internal: %{pet.internal | pet: %{pet.internal.pet | owner_guid: 1}}}
+      assert Experience.kill_xp(24, 24, Experience.kill_options(player_pet)) == 0
+      controlled = %{mob | object: %Object{guid: npc}, unit: %{mob.unit | charmed_by: Guid.runtime(:mob, 1)}}
+      assert Experience.kill_xp(24, 24, Experience.kill_options(controlled)) == 330
+      controlled = %{controlled | unit: %{controlled.unit | charmed_by: 1}}
+      assert Experience.kill_xp(24, 24, Experience.kill_options(controlled)) == 0
+    end
+
     test "uses the no-XP static flag without suppressing creatures that always run" do
       mob = reward_mob(%Creature{extra_flags: 0x40, experience_multiplier: 1.0})
       assert Experience.kill_xp(20, 20, Experience.kill_options(mob)) == 145

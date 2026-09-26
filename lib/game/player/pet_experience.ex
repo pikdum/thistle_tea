@@ -14,15 +14,12 @@ defmodule ThistleTea.Game.Player.PetExperience do
   alias ThistleTea.Game.Entity.KillReward
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Entity.Logic.KillCredit
 
-  def reward_kill(
-        %Character{} = character,
-        %Mob{internal: %Internal{pet: nil, creature: %Creature{}}} = victim,
-        xp,
-        mode
-      )
+  def reward_kill(%Character{} = character, %Mob{internal: %Internal{creature: %Creature{}}} = victim, xp, mode)
       when is_integer(xp) and xp > 0 do
-    with true <- Death.alive?(character),
+    with true <- KillCredit.eligible?(victim),
+         true <- Death.alive?(character),
          %{kind: :hunter_pet} <- Companion.relationship(character),
          pid when is_pid(pid) <- Entity.pid(Companion.active_guid(character)) do
       reward =

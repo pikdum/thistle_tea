@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Experience do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Entity.Logic.DamageOrigin
+  alias ThistleTea.Game.Entity.Logic.KillCredit
 
   @group_reward_distance 74.0
 
@@ -20,8 +21,9 @@ defmodule ThistleTea.Game.Entity.Logic.Experience do
     [
       experience_multiplier: creature.experience_multiplier,
       damage_multiplier: DamageOrigin.xp_multiplier(mob),
-      no_xp?: CreatureFlags.has?(mob, :no_xp) or summoned_without_xp?(mob),
-      elite?: elite_rank?(creature.rank)
+      no_xp?: not KillCredit.eligible?(mob) or CreatureFlags.has?(mob, :no_xp) or summoned_without_xp?(mob),
+      elite?: elite_rank?(creature.rank),
+      pet?: KillCredit.pet?(mob)
     ]
   end
 
@@ -140,6 +142,7 @@ defmodule ThistleTea.Game.Entity.Logic.Experience do
     else
       owner_level = Keyword.get(opts, :owner_level, unit_level)
       xp = float32(base_gain(owner_level, unit_level, mob_level) * elite_multiplier(opts))
+      xp = float32(xp * if(Keyword.get(opts, :pet?, false), do: 0.75, else: 1.0))
       xp = float32(xp * experience_multiplier(Keyword.get(opts, :experience_multiplier, 1.0)))
       round_xp(float32(xp * float32(Keyword.get(opts, :damage_multiplier, 1.0))))
     end
@@ -149,6 +152,7 @@ defmodule ThistleTea.Game.Entity.Logic.Experience do
 
   defp elite_multiplier(opts) do
     cond do
+      Keyword.get(opts, :pet?, false) -> 1.0
       not Keyword.get(opts, :elite?, false) -> 1.0
       Keyword.get(opts, :non_raid_dungeon?, false) -> 2.5
       true -> 2.0
