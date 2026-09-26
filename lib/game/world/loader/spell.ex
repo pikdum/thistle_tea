@@ -1010,6 +1010,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex2, @allow_while_not_shapeshifted_ex2, :allow_while_not_shapeshifted)
     |> add_if(attrs_ex3, @completely_blocked_ex3, :completely_blocked)
     |> add_if(attrs_ex3, 0x00000001, :pvp_enabling)
+    |> add_if(attrs_ex3, 0x00000002, :no_proc_equip_requirement)
     |> add_if(attrs_ex3, 0x00000020, :no_durability_loss)
     |> add_if(attrs_ex3, 0x00000010, :no_resurrection_timer)
     |> add_if(attrs_ex3, 0x00000800, :only_battlegrounds)

@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.DeepWoundsDbcTest do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
@@ -32,6 +33,24 @@ defmodule ThistleTea.Game.Entity.Logic.DeepWoundsDbcTest do
   setup [:catalog, :entities]
 
   describe "receive/4" do
+    test "critical spells require a currently usable melee weapon", %{caster: caster, target: target} do
+      fireball = %Spell{id: 133, school: :fire, dmg_class: 1, attributes: MapSet.new([:negative])}
+      payload = %{victim_guid: target.object.guid, outcome: :crit, proc_type: :deal_harmful_spell, damage: 100}
+
+      for {talent, trigger} <- [{12_834, 12_162}, {12_849, 12_850}, {12_867, 12_868}] do
+        caster = with_talent(caster, talent)
+        empty = %{caster | unit: %{caster.unit | mainhand_weapon: nil}}
+        broken = %{caster | player: %{caster.player | broken_equipment: [:mainhand]}}
+
+        for ineligible <- [empty, broken] do
+          assert SpellFeedback.receive(ineligible, payload, fireball, 0).internal.events == []
+        end
+
+        assert [%Effects.TriggerSpell{spell_id: ^trigger}] =
+                 SpellFeedback.receive(caster, payload, fireball, 0).internal.events
+      end
+    end
+
     test "critical weapon hits complete every talent rank's bleed chain", %{caster: caster, target: target} do
       for {talent_id, trigger_id, amount} <- [{12_834, 12_162, 6}, {12_849, 12_850, 12}, {12_867, 12_868, 18}] do
         caster = with_talent(caster, talent_id)

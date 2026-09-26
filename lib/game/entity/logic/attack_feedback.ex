@@ -10,7 +10,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.AttackSpeed
   alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.CombatWeapon
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -121,7 +120,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
         proc_damage: Map.get(payload, :proc_damage, Map.get(payload, :damage, 0)),
         attack_time_ms: attack_time_ms(entity, hand),
         attack_hand: proc_attack_hand(spell, hand),
-        weapon: CombatWeapon.usable(entity, hand),
+        hand: hand,
         extra_attack?: Map.get(payload, :extra_attack?, false),
         now: now
       })

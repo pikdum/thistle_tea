@@ -9,12 +9,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.ClassScript
   alias ThistleTea.Game.Entity.Logic.Aura.HealingPower
+  alias ThistleTea.Game.Entity.Logic.Aura.ProcEquipment
   alias ThistleTea.Game.Entity.Logic.Aura.ProcSpell
   alias ThistleTea.Game.Entity.Logic.Aura.ReactiveArmor
   alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
@@ -59,7 +59,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   end
 
   def reactions(
-        %{object: %{guid: owner_guid}, unit: %Unit{auras: holders}} = entity,
+        %{unit: %Unit{auras: holders}} = entity,
         event,
         %{spell: %Spell{} = triggering_spell, outcome: outcome, proc_type: proc_type} = context
       )
@@ -82,7 +82,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
           current_holders,
           events,
           holder,
-          owner_guid,
+          entity,
           triggering_spell,
           proc_type,
           context
@@ -104,6 +104,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
       Enum.map_reduce(holders, [], fn %Holder{} = holder, events ->
         {holder, holder_events} =
           outgoing_melee_reaction(
+            entity,
             holder,
             owner_guid,
             victim_guid,
@@ -223,7 +224,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     modifier = &Modifiers.value(entity, holder.spell, :chance_of_success, &1)
 
     proc? =
-      proc_ready?(holder, Map.get(context, :now)) and
+      ProcEquipment.allowed?(entity, holder.spell, context) and proc_ready?(holder, Map.get(context, :now)) and
         Proc.eligible?(holder.spell, nil, :kill, :normal) and Proc.roll?(holder.spell, nil, &:rand.uniform/0, modifier)
 
     if proc? do
@@ -233,13 +234,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     end
   end
 
-  defp outgoing_proc_transition(holders, events, holder, owner_guid, triggering_spell, proc_type, context) do
+  defp outgoing_proc_transition(holders, events, holder, entity, triggering_spell, proc_type, context) do
     proc? =
-      not self_proc?(holder, triggering_spell) and proc_ready?(holder, Map.get(context, :now)) and
+      ProcEquipment.allowed?(entity, holder.spell, context) and not self_proc?(holder, triggering_spell) and
+        proc_ready?(holder, Map.get(context, :now)) and
         Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and Proc.roll?(holder.spell)
 
     if proc? do
-      apply_outgoing_proc(holders, events, holder, owner_guid, context)
+      apply_outgoing_proc(holders, events, holder, entity.object.guid, context)
     else
       {holders, events}
     end
@@ -360,8 +362,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     {if(proc?, do: mark_proc(holder, now), else: holder), events}
   end
 
-  defp outgoing_melee_reaction(%Holder{} = holder, owner_guid, victim_guid, context) do
-    if weapon_allowed?(holder.spell, context) and extra_attack_allowed?(holder.spell, context) do
+  defp outgoing_melee_reaction(entity, %Holder{} = holder, owner_guid, victim_guid, context) do
+    if ProcEquipment.allowed?(entity, holder.spell, context) and extra_attack_allowed?(holder.spell, context) do
       {holder, events} =
         case Script.outgoing_melee(holder, owner_guid, victim_guid, context) do
           {:handled, updated_holder, events} -> {updated_holder, events}
@@ -376,10 +378,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
   defp extra_attack_allowed?(%Spell{spell_icon: 108, spell_visual: 2759}, %{extra_attack?: true}), do: false
   defp extra_attack_allowed?(_spell, _context), do: true
-
-  defp weapon_allowed?(%Spell{equipped_item_class: class}, _context) when class in [nil, -1], do: true
-  defp weapon_allowed?(%Spell{} = spell, %{weapon: weapon}), do: WeaponDamage.fits?(weapon, spell)
-  defp weapon_allowed?(_spell, _context), do: true
 
   defp melee_proc_origin(%Effects.TriggerSpell{} = effect, context),
     do: %{effect | extra_attack?: Map.get(context, :extra_attack?, false), attack_hand: Map.get(context, :attack_hand)}
