@@ -1,0 +1,468 @@
+diff --git a/MapBuilder/MeshBuilder.cpp b/MapBuilder/MeshBuilder.cpp
+index 45c54eb..21b819f 100644
+--- a/MapBuilder/MeshBuilder.cpp
++++ b/MapBuilder/MeshBuilder.cpp
+@@ -1465,6 +1465,7 @@ void SerializeWmo(const parser::Wmo& wmo, BVHConstructor& constructor)
+     if (!of)
+         throw std::runtime_error("Could not write WMO geometry: " + path.string());
+     utility::wmo::WriteGroupFlags(path, aabbTree, wmo.VertexGroupFlags);
++    utility::wmo::WriteLiquids(path, aabbTree, wmo.LiquidMetadata);
+ }
+
+ void SerializeDoodad(const parser::Doodad& doodad, const fs::path& path)
+diff --git a/MapBuilder/WmoMetadata.hpp b/MapBuilder/WmoMetadata.hpp
+index c83d8dd..813d0f0 100644
+--- a/MapBuilder/WmoMetadata.hpp
++++ b/MapBuilder/WmoMetadata.hpp
+@@ -52,6 +52,7 @@ inline void UpdateWmoMetadata(const std::filesystem::path& data,
+             throw std::runtime_error("WMO client geometry differs from existing bake: " + mpq);
+
+         utility::wmo::WriteGroupFlags(path, tree, wmo.VertexGroupFlags);
++        utility::wmo::WriteLiquids(path, tree, wmo.LiquidMetadata);
+         ++updated;
+         if (updated % 50 == 0)
+             std::cout << "Updated " << updated << " WMO metadata files" << std::endl;
+diff --git a/parser/Wmo/GroupFile/Chunks/MLIQ.cpp b/parser/Wmo/GroupFile/Chunks/MLIQ.cpp
+index 43e12ec..bbb1cbb 100644
+--- a/parser/Wmo/GroupFile/Chunks/MLIQ.cpp
++++ b/parser/Wmo/GroupFile/Chunks/MLIQ.cpp
+@@ -36,6 +36,8 @@ MLIQ::MLIQ(size_t position, utility::BinaryStream* groupFileStream,
+             groupFileStream->rpos(groupFileStream->rpos() + 4);
+             Heights->Set(y, x, groupFileStream->Read<float>());
+         }
++    Tiles.resize(Width * Height);
++    groupFileStream->ReadBytes(Tiles.data(), Tiles.size());
+ }
+ } // namespace input
+-} // namespace parser
+\ No newline at end of file
++} // namespace parser
+diff --git a/parser/Wmo/GroupFile/Chunks/MLIQ.hpp b/parser/Wmo/GroupFile/Chunks/MLIQ.hpp
+index 4427794..d8253e6 100644
+--- a/parser/Wmo/GroupFile/Chunks/MLIQ.hpp
++++ b/parser/Wmo/GroupFile/Chunks/MLIQ.hpp
+@@ -4,6 +4,7 @@
+ #include "utility/Array2d.hpp"
+
+ #include <memory>
++#include <vector>
+
+ namespace parser
+ {
+@@ -17,9 +18,10 @@ public:
+
+     float Corner[3];
+     std::unique_ptr<utility::Array2d<float>> Heights;
++    std::vector<std::uint8_t> Tiles;
+
+     MLIQ(size_t position, utility::BinaryStream* groupFileStream,
+          unsigned int version);
+ };
+ } // namespace input
+-} // namespace parser
+\ No newline at end of file
++} // namespace parser
+diff --git a/parser/Wmo/GroupFile/WmoGroupFile.cpp b/parser/Wmo/GroupFile/WmoGroupFile.cpp
+index b5f2b61..bed2b58 100644
+--- a/parser/Wmo/GroupFile/WmoGroupFile.cpp
++++ b/parser/Wmo/GroupFile/WmoGroupFile.cpp
+@@ -21,6 +21,8 @@ void ReadWmoGroupFile(parser::input::WmoGroupFile *groupFile,
+
+     reader->rpos(reader->rpos() + 0x08); // +0x08: flags
+     groupFile->Flags = reader->Read<std::uint32_t>();
++    reader->rpos(mogpLocation + 60);
++    groupFile->LiquidType = reader->Read<std::uint32_t>();
+
+     // MOPY
+     size_t mopyLocation;
+@@ -80,4 +82,4 @@ WmoGroupFile::WmoGroupFile(unsigned int version, utility::BinaryStream *reader)
+     ReadWmoGroupFile(this, version, reader);
+ }
+ } // namespace input
+-} // namespace parser
+\ No newline at end of file
++} // namespace parser
+diff --git a/parser/Wmo/GroupFile/WmoGroupFile.hpp b/parser/Wmo/GroupFile/WmoGroupFile.hpp
+index d4cf912..5c0a12e 100644
+--- a/parser/Wmo/GroupFile/WmoGroupFile.hpp
++++ b/parser/Wmo/GroupFile/WmoGroupFile.hpp
+@@ -16,6 +16,7 @@ class WmoGroupFile
+ {
+ public:
+     unsigned int Flags;
++    unsigned int LiquidType;
+
+     std::unique_ptr<MOPY> MaterialsChunk;
+     std::unique_ptr<MOVI> IndicesChunk;
+@@ -26,4 +27,4 @@ public:
+     WmoGroupFile(unsigned int version, utility::BinaryStream *reader);
+ };
+ } // namespace input
+-} // namespace parser
+\ No newline at end of file
++} // namespace parser
+diff --git a/parser/Wmo/Wmo.cpp b/parser/Wmo/Wmo.cpp
+index c290cc8..35e18f8 100644
+--- a/parser/Wmo/Wmo.cpp
++++ b/parser/Wmo/Wmo.cpp
+@@ -56,6 +56,13 @@ Wmo::Wmo(const std::string& path) : MpqPath(utility::lower(path))
+     input::MOHD information;
+     reader->ReadBytes(&information, sizeof(information));
+
++    std::uint32_t rootFlags = 0;
++    if (version == 17)
++    {
++        reader->rpos(mohdLocation + 68);
++        rootFlags = reader->Read<std::uint32_t>();
++    }
++
+     std::vector<std::unique_ptr<input::WmoGroupFile>> groupFiles;
+     groupFiles.reserve(information.WMOGroupFilesCount);
+
+@@ -221,6 +228,26 @@ Wmo::Wmo(const std::string& path) : MpqPath(utility::lower(path))
+         constexpr float tileSize = MeshSettings::AdtSize / 128.f;
+         auto const liquidChunk = groupFiles[g]->LiquidChunk.get();
+
++        if (version == 17)
++        {
++            auto const entry = utility::wmo::LiquidEntry(rootFlags, information.WMOId,
++                groupFiles[g]->Flags, groupFiles[g]->LiquidType, liquidChunk->Tiles);
++            for (unsigned int y = 0; y < liquidChunk->Height; ++y)
++                for (unsigned int x = 0; x < liquidChunk->Width; ++x)
++                {
++                    if ((liquidChunk->Tiles[y * liquidChunk->Width + x] & 15) == 15 || !entry)
++                        continue;
++                    auto vertex = [&](unsigned int dx, unsigned int dy) {
++                        return math::Vertex {liquidChunk->Corner[0] + tileSize * (x + dx),
++                            liquidChunk->Corner[1] + tileSize * (y + dy),
++                            liquidChunk->Heights->Get(y + dy, x + dx)};
++                    };
++                    auto const a = vertex(0, 0), b = vertex(1, 0), c = vertex(0, 1), d = vertex(1, 1);
++                    LiquidMetadata.push_back({{a, b, d}, entry});
++                    LiquidMetadata.push_back({{a, d, c}, entry});
++                }
++        }
++
+         const math::Vector3 baseVertex(liquidChunk->Corner[0],
+                                        liquidChunk->Corner[1],
+                                        liquidChunk->Corner[2]);
+diff --git a/parser/Wmo/Wmo.hpp b/parser/Wmo/Wmo.hpp
+index f3c28d2..f0391ba 100644
+--- a/parser/Wmo/Wmo.hpp
++++ b/parser/Wmo/Wmo.hpp
+@@ -1,4 +1,5 @@
+ #pragma once
++#include "utility/WmoLiquids.hpp"
+
+ #include "parser/Wmo/WmoDoodad.hpp"
+ #include "utility/Vector.hpp"
+@@ -28,6 +29,7 @@ public:
+
+     std::vector<math::Vertex> LiquidVertices;
+     std::vector<std::int32_t> LiquidIndices;
++    std::vector<utility::wmo::LiquidTriangle> LiquidMetadata;
+
+     unsigned int RootId;
+     std::vector<std::array<std::uint32_t, 3>> NameSetToAreaAndZone;
+diff --git a/pathfind/Map.cpp b/pathfind/Map.cpp
+index 6be7878..b500b24 100644
+--- a/pathfind/Map.cpp
++++ b/pathfind/Map.cpp
+@@ -386,6 +386,7 @@ std::shared_ptr<WmoModel> Map::EnsureWmoModelLoaded(const std::string& mpq_path)
+
+     model->m_triangleGroupFlags = utility::wmo::ReadGroupFlags(
+         bvhFilename, model->m_aabbTree);
++    model->m_liquids = utility::wmo::ReadLiquids(bvhFilename, model->m_aabbTree);
+
+     std::uint32_t rootId, nameSetCount;
+     in >> rootId >> nameSetCount;
+@@ -1060,6 +1061,54 @@ bool Map::QueryLiquidSurface(float x, float y, float zHint,
+     return true;
+ }
+
++std::optional<std::tuple<std::uint32_t, float, float>> Map::WmoLiquid(const math::Vertex& position) const
++{
++    auto const tile = GetTile(position.X, position.Y);
++    if (!tile)
++        return std::nullopt;
++
++    std::optional<std::tuple<std::uint32_t, float, float>> result;
++    float bestDistance = std::numeric_limits<float>::max();
++    for (auto id : tile->m_staticWmos)
++    {
++        auto const& instance = m_staticWmos.at(id);
++        auto const model = instance.m_model.lock();
++        if (!model || model->m_liquids.empty())
++            continue;
++        auto const bottom = instance.m_bounds.getMinimum().Z - 1.0f;
++        math::Vertex start {position.X, position.Y, instance.m_bounds.getMaximum().Z + 1.0f};
++        math::Vertex end {position.X, position.Y, bottom};
++        math::Ray ray(start, end);
++        if (!ray.IntersectBoundingBox(instance.m_bounds))
++            continue;
++        auto inverse = [&](const math::Vertex& v) { return math::Vector3::Transform(v, instance.m_inverseTransformMatrix); };
++        math::Ray surfaceRay(inverse(start), inverse(end));
++        math::Ray floorRay(inverse({position.X, position.Y, position.Z + 2.0f}), inverse(end));
++        if (!model->m_aabbTree.IntersectRay(floorRay))
++            continue;
++        float floor = math::Vector3::Transform(floorRay.GetHitPoint(), instance.m_transformMatrix).Z;
++        float terrain;
++        if (GetADTHeight(tile, position.X, position.Y, terrain) && terrain <= position.Z + 2.0f)
++            floor = std::max(floor, terrain);
++        if (position.Z < floor - 2.0f)
++            continue;
++        for (const auto& liquid : model->m_liquids)
++        {
++            float fraction;
++            if (!surfaceRay.IntersectTriangle(liquid.vertices, &fraction))
++                continue;
++            float const surface = start.Z + (end.Z - start.Z) * fraction;
++            float const distance = std::abs(surface - position.Z);
++            if (surface > floor && distance < bestDistance)
++            {
++                result = std::make_tuple(liquid.entry, surface, floor);
++                bestDistance = distance;
++            }
++        }
++    }
++    return result;
++}
++
+ std::optional<bool> Map::IsOutdoors(const math::Vertex& position) const
+ {
+     auto const tile = GetTile(position.X, position.Y);
+diff --git a/pathfind/Map.hpp b/pathfind/Map.hpp
+index 18bfc44..3c98352 100644
+--- a/pathfind/Map.hpp
++++ b/pathfind/Map.hpp
+@@ -162,6 +162,7 @@ public:
+                      unsigned int& area) const;
+
+     std::optional<bool> IsOutdoors(const math::Vertex& position) const;
++    std::optional<std::tuple<std::uint32_t, float, float>> WmoLiquid(const math::Vertex& position) const;
+
+     // Returns true when there is line of sight from the start position to
+     // the stop position.  The intended use of this is for spells and NPC
+diff --git a/pathfind/Model.hpp b/pathfind/Model.hpp
+index b633946..6bbb6e4 100644
+--- a/pathfind/Model.hpp
++++ b/pathfind/Model.hpp
+@@ -3,6 +3,7 @@
+ #include "utility/AABBTree.hpp"
+ #include "utility/BoundingBox.hpp"
+ #include "utility/Matrix.hpp"
++#include "utility/WmoLiquids.hpp"
+
+ #include <memory>
+ #include <string>
+@@ -38,6 +39,7 @@ struct DoodadInstance
+ struct WmoModel : Model
+ {
+     std::vector<std::uint32_t> m_triangleGroupFlags;
++    std::vector<utility::wmo::LiquidTriangle> m_liquids;
+     std::vector<std::vector<DoodadInstance>> m_doodadSets;
+     std::vector<std::vector<std::shared_ptr<DoodadModel>>> m_loadedDoodadSets;
+     std::unordered_map<unsigned int, std::pair<unsigned int, unsigned int>>
+diff --git a/utility/CMakeLists.txt b/utility/CMakeLists.txt
+index 91d8e53..39a27f7 100644
+--- a/utility/CMakeLists.txt
++++ b/utility/CMakeLists.txt
+@@ -13,6 +13,9 @@ add_library(utility STATIC
+ target_include_directories(utility PUBLIC ..)
+
+ if(BUILD_TESTING)
++    add_executable(WmoLiquidsTests WmoLiquidsTests.cpp)
++    target_link_libraries(WmoLiquidsTests PRIVATE utility ${FILESYSTEM_LIBRARY})
++    add_test(NAME WmoLiquidsTests COMMAND WmoLiquidsTests)
+     add_executable(WmoGroupFlagsTests WmoGroupFlagsTests.cpp)
+     target_link_libraries(WmoGroupFlagsTests PRIVATE utility ${FILESYSTEM_LIBRARY})
+     add_test(NAME WmoGroupFlagsTests COMMAND WmoGroupFlagsTests)
+diff --git a/utility/WmoLiquids.hpp b/utility/WmoLiquids.hpp
+new file mode 100644
+index 0000000..b8ced51
+--- /dev/null
++++ b/utility/WmoLiquids.hpp
+@@ -0,0 +1,96 @@
++#pragma once
++
++#include "WmoGroupFlags.hpp"
++#include <cmath>
++
++namespace utility::wmo
++{
++struct LiquidTriangle
++{
++    math::Vertex vertices[3];
++    std::uint32_t entry;
++};
++
++inline bool ValidLiquid(const LiquidTriangle& liquid)
++{
++    if (!(liquid.entry >= 1 && liquid.entry <= 4) && liquid.entry != 21)
++        return false;
++    for (const auto& vertex : liquid.vertices)
++        if (!std::isfinite(vertex.X) || !std::isfinite(vertex.Y) || !std::isfinite(vertex.Z))
++            return false;
++    return true;
++}
++
++inline std::uint32_t LiquidEntry(std::uint32_t rootFlags, std::uint32_t rootId,
++                                std::uint32_t groupFlags, std::uint32_t groupType,
++                                const std::vector<std::uint8_t>& tiles)
++{
++    auto entry = (rootFlags & 4) ? groupType : (groupType == 15 ? 0 : groupType + 1);
++    if (!entry)
++        for (auto tile : tiles)
++            if ((tile & 15) != 15)
++            {
++                entry = (tile & 15) + 1;
++                break;
++            }
++    if (entry && entry < 21)
++        switch ((entry - 1) & 3)
++        {
++            case 0: return (groupFlags & 0x80000) ? 2 : 1;
++            case 1: return 2;
++            case 2: return 3;
++            case 3: return rootId == 4489 ? 21 : 4;
++        }
++    return entry;
++}
++
++inline std::vector<LiquidTriangle> ReadLiquids(const std::filesystem::path& bvh,
++                                              const math::AABBTree& geometry)
++{
++    auto const path = bvh.string() + ".liquids";
++    if (!std::filesystem::exists(path))
++        return {};
++    BinaryStream input(path);
++    if (input.wpos() < 16)
++        throw std::runtime_error("Truncated WMO liquid metadata: " + path);
++    std::uint32_t magic, count;
++    std::uint64_t hash;
++    input >> magic >> count >> hash;
++    if (magic != 0x31514c57 || hash != GeometryHash(geometry) ||
++        count > 1000000 || input.wpos() != 16ULL + 40ULL * count)
++        throw std::runtime_error("Invalid WMO liquid metadata: " + path);
++    std::vector<LiquidTriangle> liquids(count);
++    for (auto& liquid : liquids)
++    {
++        for (auto& vertex : liquid.vertices)
++            input >> vertex;
++        input >> liquid.entry;
++        if (!ValidLiquid(liquid))
++            throw std::runtime_error("Invalid WMO liquid triangle: " + path);
++    }
++    return liquids;
++}
++
++inline void WriteLiquids(const std::filesystem::path& bvh, const math::AABBTree& geometry,
++                         const std::vector<LiquidTriangle>& liquids)
++{
++    BinaryStream output;
++    output << std::uint32_t(0x31514c57) << std::uint32_t(liquids.size()) << GeometryHash(geometry);
++    for (const auto& liquid : liquids)
++    {
++        if (!ValidLiquid(liquid))
++            throw std::runtime_error("Invalid WMO liquid triangle");
++        for (const auto& vertex : liquid.vertices)
++            output << vertex;
++        output << liquid.entry;
++    }
++    auto const path = bvh.string() + ".liquids";
++    auto const temporary = path + ".tmp";
++    std::ofstream file(temporary, std::ios::binary | std::ios::trunc);
++    file << output;
++    file.close();
++    if (!file)
++        throw std::runtime_error("Could not write WMO liquid metadata: " + temporary);
++    std::filesystem::rename(temporary, path);
++}
++}
+diff --git a/utility/WmoLiquidsTests.cpp b/utility/WmoLiquidsTests.cpp
+new file mode 100644
+index 0000000..43164a2
+--- /dev/null
++++ b/utility/WmoLiquidsTests.cpp
+@@ -0,0 +1,81 @@
++#include "WmoLiquids.hpp"
++#include <chrono>
++#include <iostream>
++#include <limits>
++
++namespace
++{
++void Require(bool condition, const char* message)
++{
++    if (!condition)
++        throw std::runtime_error(message);
++}
++
++template<typename F>
++void Reject(F action)
++{
++    try { action(); }
++    catch (const std::exception&) { return; }
++    throw std::runtime_error("Invalid metadata accepted");
++}
++
++void Verify(const std::filesystem::path& directory)
++{
++    using namespace utility::wmo;
++    auto path = directory / "fixture.bvh";
++    std::vector<math::Vertex> vertices {{0, 0, -5}, {4, 0, -5}, {0, 4, -5}};
++    math::AABBTree geometry(vertices, {0, 1, 2});
++    Require(ReadLiquids(path, geometry).empty(), "Legacy file must remain loadable");
++    std::vector<LiquidTriangle> liquids {{{{0, 0, 0}, {4, 0, 4}, {0, 4, 0}}, 3}};
++    WriteLiquids(path, geometry, liquids);
++    auto loaded = ReadLiquids(path, geometry);
++    Require(loaded.size() == 1 && loaded[0].entry == 3, "Liquid identity lost");
++    math::Ray ray({1, 1, 10}, {1, 1, -10});
++    float fraction;
++    Require(ray.IntersectTriangle(loaded[0].vertices, &fraction), "Sloped liquid missing");
++    Require(std::abs(10 - 20 * fraction - 1) < 0.001f, "Sloped liquid height lost");
++    math::Ray outside({3, 3, 10}, {3, 3, -10});
++    Require(!outside.IntersectTriangle(loaded[0].vertices), "Empty liquid region filled");
++
++    liquids[0].vertices[0].Z = std::numeric_limits<float>::quiet_NaN();
++    Reject([&] { WriteLiquids(path, geometry, liquids); });
++    Require(ReadLiquids(path, geometry).size() == 1, "Rejected write replaced metadata");
++    vertices[0].Z = -6;
++    math::AABBTree changed(vertices, {0, 1, 2});
++    Reject([&] { ReadLiquids(path, changed); });
++    std::filesystem::resize_file(path.string() + ".liquids", 1);
++    Reject([&] { ReadLiquids(path, geometry); });
++    WriteLiquids(path, geometry, loaded);
++    std::filesystem::resize_file(path.string() + ".liquids", 50);
++    Reject([&] { ReadLiquids(path, geometry); });
++    WriteLiquids(path, geometry, {});
++    Require(ReadLiquids(path, geometry).empty(), "Dry WMO must be empty");
++
++    Require(LiquidEntry(0, 0, 0, 0, {}) == 1, "Water classification");
++    Require(LiquidEntry(0, 0, 0x80000, 0, {}) == 2, "Ocean group override");
++    Require(LiquidEntry(0, 0, 0, 2, {}) == 3, "Magma classification");
++    Require(LiquidEntry(0, 0, 0, 3, {}) == 4, "Ordinary slime classification");
++    Require(LiquidEntry(0, 4489, 0, 3, {}) == 21, "Naxxramas slime classification");
++    Require(LiquidEntry(4, 0, 0, 3, {}) == 3, "Direct liquid entry");
++    Require(LiquidEntry(0, 0, 0, 15, {15, 15, 2}) == 3, "Tile type fallback");
++    Require(LiquidEntry(0, 0, 0, 15, {15, 15}) == 0, "Hidden tiles have no liquid");
++}
++}
++
++int main()
++{
++    auto nonce = std::chrono::steady_clock::now().time_since_epoch().count();
++    auto directory = std::filesystem::temp_directory_path() / ("wmo-liquids-" + std::to_string(nonce));
++    std::filesystem::create_directory(directory);
++    try
++    {
++        Verify(directory);
++        std::filesystem::remove_all(directory);
++        return 0;
++    }
++    catch (const std::exception& error)
++    {
++        std::cerr << error.what() << " in " << directory << std::endl;
++        return 1;
++    }
++}

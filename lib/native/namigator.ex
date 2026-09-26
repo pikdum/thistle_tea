@@ -93,6 +93,8 @@ defmodule ThistleTea.Native.Namigator do
     with_map(map_id, &query_liquid_surface_native(&1, x, y, z))
   end
 
+  def wmo_liquid(map_id, x, y, z), do: with_map(map_id, &wmo_liquid_native(&1, x, y, z))
+
   def line_of_sight(map_id, start_x, start_y, start_z, stop_x, stop_y, stop_z, doodads? \\ false) do
     with_map(map_id, &line_of_sight_native(&1, start_x, start_y, start_z, stop_x, stop_y, stop_z, doodads?))
   end
@@ -136,6 +138,7 @@ defmodule ThistleTea.Native.Namigator do
   defp find_heights_native(_map, _x, _y), do: :erlang.nif_error(:nif_not_loaded)
 
   defp query_liquid_surface_native(_map, _x, _y, _z), do: :erlang.nif_error(:nif_not_loaded)
+  defp wmo_liquid_native(_map, _x, _y, _z), do: :erlang.nif_error(:nif_not_loaded)
 
   defp line_of_sight_native(_map, _start_x, _start_y, _start_z, _stop_x, _stop_y, _stop_z, _doodads?),
     do: :erlang.nif_error(:nif_not_loaded)

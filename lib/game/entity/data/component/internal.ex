@@ -82,6 +82,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :fall,
     :breath,
     :fatigue,
+    :lava_exposure,
     :pending_resurrect,
     :pending_summon,
     :killed_by,

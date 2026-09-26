@@ -11,6 +11,29 @@ defmodule ThistleTea.Native.NamigatorConcurrencyTest do
   ]
 
   describe "concurrent queries" do
+    test "keeps WMO liquid samples safe during unload and reload" do
+      {x, y, z} = {-7580.0, -1140.0, 167.2}
+      {adt_x, adt_y} = Namigator.load_adt_at(0, x, y)
+      assert {3, _, _} = expected = Namigator.wmo_liquid(0, x, y, z)
+      on_exit(fn -> Namigator.load_adt_at(0, x, y) end)
+
+      readers =
+        for _ <- 1..12 do
+          Task.async(fn ->
+            for _ <- 1..100, do: assert(Namigator.wmo_liquid(0, x, y, z) in [nil, expected])
+          end)
+        end
+
+      for _ <- 1..4 do
+        assert Namigator.unload_adt(0, trunc(adt_x), trunc(adt_y))
+        assert Namigator.wmo_liquid(0, x, y, z) == nil
+        assert {^adt_x, ^adt_y} = Namigator.load_adt_at(0, x, y)
+      end
+
+      Task.await_many(readers, 30_000)
+      assert Namigator.wmo_liquid(0, x, y, z) == expected
+    end
+
     test "preserves paths and geometry while workers switch maps" do
       expected =
         Map.new(@queries, fn {map, {sx, sy, _sz}, {gx, gy, _gz}} = query ->
@@ -92,6 +115,7 @@ defmodule ThistleTea.Native.NamigatorConcurrencyTest do
       Namigator.get_zone_and_area(map, sx, sy, sz),
       outdoors(query),
       Namigator.query_liquid_surface(map, sx, sy, sz),
+      Namigator.wmo_liquid(map, sx, sy, sz),
       Namigator.line_of_sight(map, sx, sy, sz, gx, gy, gz),
       walk_hit(query),
       Namigator.find_point_between_points(map, sx, sy, sz, gx, gy, gz, 1.0)

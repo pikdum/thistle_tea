@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.Entity.Logic.Emote
   alias ThistleTea.Game.Entity.Logic.Falling
   alias ThistleTea.Game.Entity.Logic.Fatigue
+  alias ThistleTea.Game.Entity.Logic.LavaExposure
   alias ThistleTea.Game.Entity.Logic.MovementHandoff
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Logic.SafePosition
@@ -35,6 +36,7 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Terrain.Liquid
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AggroProbe
@@ -147,6 +149,8 @@ defmodule ThistleTea.Game.Player.Movement do
   defp can_move?(%Character{} = character), do: not Core.dead?(character) and not ControlMovement.active?(character)
 
   def apply_environment(%Character{} = character, opcode, now) do
+    liquid = terrain_liquid(character)
+
     character
     |> Falling.update(action(opcode), now)
     |> Breathing.update(
@@ -155,7 +159,8 @@ defmodule ThistleTea.Game.Player.Movement do
       :rand.uniform(max(character.unit.level || 1, 1)) - 1,
       body_height(character)
     )
-    |> Fatigue.update(terrain_liquid(character), now, :rand.uniform(max(character.unit.level || 1, 1)) - 1)
+    |> Fatigue.update(liquid, now, :rand.uniform(max(character.unit.level || 1, 1)) - 1)
+    |> LavaExposure.update(liquid, now, 604 + :rand.uniform(6), :rand.uniform(100) - 1)
   end
 
   def synchronize_environment(%State{character: %Character{} = character} = state) do
@@ -178,7 +183,12 @@ defmodule ThistleTea.Game.Player.Movement do
 
   def terrain_liquid(%Character{} = character) do
     {x, y, z, _} = character.movement_block.position
-    Terrain.liquid(character.internal.world.map_id, {x, y, z})
+    map_id = character.internal.world.map_id
+
+    case Pathfinding.wmo_liquid(map_id, {x, y, z}) do
+      nil -> Terrain.liquid(map_id, {x, y, z})
+      liquid -> Liquid.from_wmo(liquid)
+    end
   end
 
   def terrain_liquid(_entity), do: nil

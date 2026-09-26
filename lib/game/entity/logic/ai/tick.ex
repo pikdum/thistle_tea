@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Entity.Logic.Fatigue
   alias ThistleTea.Game.Entity.Logic.Intoxication
+  alias ThistleTea.Game.Entity.Logic.LavaExposure
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
@@ -53,7 +54,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
 
   def needs_tick?(character),
     do:
-      Breathing.needs_tick?(character) or Fatigue.needs_tick?(character) or Regen.needs_regen?(character) or
+      Breathing.needs_tick?(character) or Fatigue.needs_tick?(character) or
+        not is_nil(LavaExposure.next_tick_at(character)) or Regen.needs_regen?(character) or
         Intoxication.needs_tick?(character) or Pvp.needs_tick?(character) or not is_nil(Rest.next_tick_at(character)) or
         not is_nil(Reactive.next_tick_at(character))
 
@@ -68,6 +70,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
     |> schedule_pet_loyalty(entity)
     |> schedule_breathing(entity)
     |> schedule_fatigue(entity)
+    |> schedule_lava(entity)
     |> schedule_sobering(entity)
     |> schedule_pvp(entity)
     |> schedule_rest(entity)
@@ -145,6 +148,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
 
   defp schedule_fatigue(plan, entity) do
     if Fatigue.needs_tick?(entity), do: TickPlan.schedule_in(plan, :fatigue, 1_000), else: plan
+  end
+
+  defp schedule_lava(plan, entity) do
+    case LavaExposure.next_tick_at(entity) do
+      at when is_integer(at) -> TickPlan.schedule_at(plan, :lava, at)
+      _ -> plan
+    end
   end
 
   def mob_delay(entity, status, now), do: entity |> plan(status, now) |> TickPlan.delay(@default_tick_ms)

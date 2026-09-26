@@ -138,6 +138,11 @@ defmodule ThistleTea.Game.World.Pathfinding do
     Namigator.query_liquid_surface(map_id, x, y, z)
   end
 
+  def wmo_liquid(map_id, {x, y, z}) do
+    load_adt_at(map_id, {x, y})
+    Namigator.wmo_liquid(map_id, x, y, z)
+  end
+
   @los_source_eye_height 2.0
   @los_target_eye_height 1.0
 
