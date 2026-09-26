@@ -1,13 +1,15 @@
 defmodule ThistleTea.Game.Entity.Logic.Experience do
-  @moduledoc false
-
-  import Bitwise, only: [&&&: 2]
+  @moduledoc """
+  Pure player and pet experience formulas, creature modifiers, and group distribution.
+  Kill rewards preserve the reference core's single-precision arithmetic and
+  round ties to even after all modifiers have been applied.
+  """
 
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Entity.Logic.DamageOrigin
 
-  @no_xp_at_kill 0x00000040
   @group_reward_distance 74.0
 
   def group_reward_distance, do: @group_reward_distance
@@ -18,10 +20,18 @@ defmodule ThistleTea.Game.Entity.Logic.Experience do
     [
       experience_multiplier: creature.experience_multiplier,
       damage_multiplier: DamageOrigin.xp_multiplier(mob),
-      extra_flags: creature.extra_flags,
+      no_xp?: CreatureFlags.has?(mob, :no_xp) or summoned_without_xp?(mob),
       elite?: elite_rank?(creature.rank)
     ]
   end
+
+  defp summoned_without_xp?(%Mob{unit: %{created_by_spell: spell}, internal: %{creature: creature}})
+       when is_integer(spell) and spell > 0 do
+    creature.creature_type in [8, 10, 11] or
+      (is_number(creature.health_multiplier) and creature.health_multiplier <= 0.1)
+  end
+
+  defp summoned_without_xp?(_mob), do: false
 
   def gain_xp(entity, amount, opts)
 
@@ -122,40 +132,53 @@ defmodule ThistleTea.Game.Entity.Logic.Experience do
 
   defp member_share(_base, _rate, _level, _sum_level, _max_level, _not_gray_max_level), do: 0
 
-  def kill_xp(player_level, mob_level, opts \\ [])
+  def kill_xp(unit_level, mob_level, opts \\ [])
 
-  def kill_xp(player_level, mob_level, opts) when is_integer(player_level) and is_integer(mob_level) do
-    if Keyword.get(opts, :no_xp?, false) or no_xp_extra_flags?(Keyword.get(opts, :extra_flags, 0)) do
+  def kill_xp(unit_level, mob_level, opts) when is_integer(unit_level) and is_integer(mob_level) do
+    if Keyword.get(opts, :no_xp?, false) do
       0
     else
-      xp = base_gain(player_level, mob_level)
-      xp = if Keyword.get(opts, :elite?, false), do: xp * 2, else: xp
-      xp = xp * experience_multiplier(Keyword.get(opts, :experience_multiplier, 1.0))
-      round_xp(xp * Keyword.get(opts, :damage_multiplier, 1.0))
+      owner_level = Keyword.get(opts, :owner_level, unit_level)
+      xp = float32(base_gain(owner_level, unit_level, mob_level) * elite_multiplier(opts))
+      xp = float32(xp * experience_multiplier(Keyword.get(opts, :experience_multiplier, 1.0)))
+      round_xp(float32(xp * float32(Keyword.get(opts, :damage_multiplier, 1.0))))
     end
   end
 
-  def kill_xp(_player_level, _mob_level, _opts), do: 0
+  def kill_xp(_unit_level, _mob_level, _opts), do: 0
+
+  defp elite_multiplier(opts) do
+    cond do
+      not Keyword.get(opts, :elite?, false) -> 1.0
+      Keyword.get(opts, :non_raid_dungeon?, false) -> 2.5
+      true -> 2.0
+    end
+  end
 
   defp round_xp(xp) do
     whole = trunc(xp)
     if xp - whole == 0.5, do: whole + rem(whole, 2), else: round(xp)
   end
 
-  def base_gain(player_level, mob_level) when mob_level >= player_level do
-    level_diff = min(mob_level - player_level, 4)
-    base = player_level * 5 + 45
-    div(div(base * (20 + level_diff), 10) + 1, 2)
+  defp float32(value) do
+    <<rounded::float-32>> = <<value::float-32>>
+    rounded
   end
 
-  def base_gain(player_level, mob_level) do
-    gray_level = gray_level(player_level)
+  defp base_gain(owner_level, unit_level, mob_level) do
+    float32((owner_level * 5 + 45) * level_factor(unit_level, mob_level))
+  end
 
-    if mob_level > gray_level do
-      zero_difference = zero_difference(player_level)
-      div((player_level * 5 + 45) * (zero_difference + mob_level - player_level), zero_difference)
+  defp level_factor(unit_level, mob_level) when mob_level >= unit_level do
+    float32(1.0 + float32(float32(0.05) * min(mob_level - unit_level, 4)))
+  end
+
+  defp level_factor(unit_level, mob_level) do
+    if mob_level > gray_level(unit_level) do
+      zero_difference = zero_difference(unit_level)
+      float32((zero_difference + mob_level - unit_level) / zero_difference)
     else
-      0
+      0.0
     end
   end
 
@@ -193,9 +216,6 @@ defmodule ThistleTea.Game.Entity.Logic.Experience do
   def zero_difference(player_level) when player_level < 60, do: 16
   def zero_difference(_player_level), do: 17
 
-  defp no_xp_extra_flags?(flags) when is_integer(flags), do: (flags &&& @no_xp_at_kill) != 0
-  defp no_xp_extra_flags?(_flags), do: false
-
-  defp experience_multiplier(multiplier) when is_number(multiplier) and multiplier >= 0, do: multiplier
+  defp experience_multiplier(multiplier) when is_number(multiplier) and multiplier >= 0, do: float32(multiplier)
   defp experience_multiplier(_multiplier), do: 1.0
 end

@@ -86,6 +86,15 @@ defmodule ThistleTea.Game.Entity.KillRewardTest do
   end
 
   describe "group_rewards/3" do
+    test "uses the dungeon elite reward before splitting among members", %{mob: mob, opts: opts} do
+      creature = %{mob.internal.creature | rank: 1}
+      mob = %{mob | internal: %{mob.internal | creature: creature}}
+      group = %Group{members: [%Member{guid: 1}, %Member{guid: 2}]}
+      assert [%Award{xp: 95}, %Award{xp: 95}] = KillReward.group_rewards(mob, group, opts)
+      opts = Keyword.put(opts, :non_raid_dungeon?, true)
+      assert [%Award{xp: 119}, %Award{xp: 119}] = KillReward.group_rewards(mob, group, opts)
+    end
+
     test "reduces the base reward before sharing it", %{mob: mob, opts: opts} do
       mob = %{mob | internal: %{mob.internal | damage_origin: %DamageOrigin{player: 50, npc: 50}}}
       group = %Group{members: [%Member{guid: 1}, %Member{guid: 2}]}

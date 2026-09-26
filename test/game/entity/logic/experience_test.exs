@@ -1,6 +1,10 @@
 defmodule ThistleTea.Game.Entity.Logic.ExperienceTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.DamageOrigin
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Experience
 
   describe "gain_xp/3" do
@@ -169,7 +173,54 @@ defmodule ThistleTea.Game.Entity.Logic.ExperienceTest do
       assert Experience.kill_xp(1, 1, elite?: true) == 100
       assert Experience.kill_xp(1, 1, experience_multiplier: 1.5) == 75
       assert Experience.kill_xp(1, 1, experience_multiplier: 0.0) == 0
-      assert Experience.kill_xp(1, 1, extra_flags: 0x40) == 0
+      assert Experience.kill_xp(1, 1, no_xp?: true) == 0
     end
+
+    test "applies the non-raid dungeon elite bonus before rounding" do
+      assert Experience.kill_xp(20, 20, elite?: true) == 290
+      assert Experience.kill_xp(20, 20, elite?: true, non_raid_dungeon?: true) == 362
+      assert Experience.kill_xp(20, 18, elite?: true, non_raid_dungeon?: true) == 297
+      assert Experience.kill_xp(20, 20, non_raid_dungeon?: true) == 145
+    end
+
+    test "retains fractional base experience until all modifiers are applied" do
+      assert Experience.kill_xp(1, 2) == 52
+      assert Experience.kill_xp(1, 2, elite?: true) == 105
+      assert Experience.kill_xp(12, 11) == 92
+      assert Experience.kill_xp(12, 11, damage_multiplier: 0.5) == 46
+      assert Experience.kill_xp(60, 63, elite?: true) == 794
+      assert Experience.kill_xp(30, 32) == 214
+    end
+  end
+
+  describe "kill_options/1" do
+    test "uses the no-XP static flag without suppressing creatures that always run" do
+      mob = reward_mob(%Creature{extra_flags: 0x40, experience_multiplier: 1.0})
+      assert Experience.kill_xp(20, 20, Experience.kill_options(mob)) == 145
+      mob = %{mob | internal: %{mob.internal | creature: %{mob.internal.creature | static_flags: 2}}}
+      assert Experience.kill_xp(20, 20, Experience.kill_options(mob)) == 0
+    end
+
+    test "excludes spell-created critters, unspecified creatures, totems, and fragile summons" do
+      for creature <- [
+            %Creature{creature_type: 10},
+            %Creature{creature_type: 8},
+            %Creature{creature_type: 11},
+            %Creature{creature_type: 7, health_multiplier: 0.1}
+          ] do
+        mob = reward_mob(creature)
+        assert Experience.kill_xp(20, 20, Experience.kill_options(mob)) == 145
+        summoned = %{mob | unit: %{mob.unit | created_by_spell: 1}}
+        assert Experience.kill_xp(20, 20, Experience.kill_options(summoned)) == 0
+      end
+
+      mob = reward_mob(%Creature{creature_type: 7, health_multiplier: 0.11})
+      summoned = %{mob | unit: %{mob.unit | created_by_spell: 1}}
+      assert Experience.kill_xp(20, 20, Experience.kill_options(summoned)) == 145
+    end
+  end
+
+  defp reward_mob(creature) do
+    %Mob{internal: %Internal{creature: creature, damage_origin: %DamageOrigin{player: 100}}}
   end
 end

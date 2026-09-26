@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Data.Trade.Prepare
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context, as: EventContext
+  alias ThistleTea.Game.Entity.KillReward
   alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request, as: ObservationRequest
@@ -2081,7 +2082,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
          %{unit: %Unit{level: mob_level}, internal: %Internal{creature: %Creature{}}} = victim
        ) do
     if Death.alive?(character) do
-      Experience.kill_xp(player_level, mob_level, Experience.kill_options(victim))
+      Experience.kill_xp(player_level, mob_level, KillReward.experience_options(victim))
     else
       0
     end

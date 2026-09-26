@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Creature do
     :default_equipment,
     :scale_override,
     :experience_multiplier,
+    :health_multiplier,
     :extra_flags,
     :static_flags,
     :static_flags2,

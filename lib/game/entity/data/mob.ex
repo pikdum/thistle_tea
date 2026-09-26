@@ -177,6 +177,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
             virtual_item_info: virtual_item_info
           },
           experience_multiplier: experience_multiplier(ct),
+          health_multiplier: ct.health_multiplier,
           extra_flags: ct.extra_flags,
           static_flags: ct.creature_type_flags,
           static_flags2: ct.static_flags2,

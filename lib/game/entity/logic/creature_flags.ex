@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureFlags do
   alias ThistleTea.Game.Entity.Logic.Pvp
 
   @flags %{
+    no_xp: 0x00000002,
     unkillable: 0x00000008,
     immune_to_player: 0x00000020,
     immune_to_npc: 0x00000040,

@@ -23,6 +23,8 @@ defmodule ThistleTea.Game.World.Loader.MapTemplateTest do
       refute MapTemplate.dungeon?(table, 0)
       assert MapTemplate.dungeon?(table, 33)
       assert MapTemplate.dungeon?(table, 249)
+      assert MapTemplate.non_raid_dungeon?(table, 33)
+      for map <- [0, 249, 30, 999, nil], do: refute(MapTemplate.non_raid_dungeon?(table, map))
       refute MapTemplate.battleground?(table, 249)
       assert MapTemplate.battleground?(table, 30)
       assert MapTemplate.admission_policy(249, table).raid?

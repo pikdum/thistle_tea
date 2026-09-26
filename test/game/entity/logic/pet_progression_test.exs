@@ -103,14 +103,18 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgressionTest do
     end
   end
 
-  describe "reward/2" do
-    test "uses pet-level solo XP and the unmodified group share", %{pet: pet} do
-      assert PetProgression.reward(pet, {:solo, 8, []}) == 85
-      assert PetProgression.reward(pet, {:solo, 12, [elite?: true]}) == 204
-      assert PetProgression.reward(pet, {:solo, 1, []}) == 0
-      assert PetProgression.reward(pet, {:solo, 8, [extra_flags: 0x40]}) == 0
-      assert PetProgression.reward(pet, {:group, 17, pet.unit.level}) == 17
-      assert PetProgression.reward(pet, {:group, 17, pet.unit.level - 1}) == 0
+  describe "reward/3" do
+    test "uses the owner's base XP with the pet's level factor", %{pet: pet} do
+      assert PetProgression.reward(pet, {:solo, 8, []}, 20) == 145
+      assert PetProgression.reward(pet, {:solo, 12, [elite?: true]}, 20) == 348
+      assert PetProgression.reward(pet, {:solo, 1, []}, 20) == 0
+      assert PetProgression.reward(pet, {:solo, 8, [no_xp?: true]}, 20) == 0
+      assert PetProgression.reward(pet, {:solo, 52, []}, 60) == 414
+    end
+
+    test "preserves group shares and rejects a pet above the eligible level", %{pet: pet} do
+      assert PetProgression.reward(pet, {:group, 17, pet.unit.level}, 20) == 17
+      assert PetProgression.reward(pet, {:group, 17, pet.unit.level - 1}, 20) == 0
     end
   end
 

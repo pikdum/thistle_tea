@@ -37,7 +37,14 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
     test "routes solo XP to the active pet using creature reward modifiers", %{character: character, victim: victim} do
       PetExperience.reward_kill(character, victim, 295, :solo)
       assert_receive {:reward_pet_kill, 1, 60, {:solo, 50, opts}}
-      assert opts == [experience_multiplier: 1.0, damage_multiplier: 0.5, extra_flags: 0, elite?: false]
+
+      assert opts == [
+               non_raid_dungeon?: false,
+               experience_multiplier: 1.0,
+               damage_multiplier: 0.5,
+               no_xp?: false,
+               elite?: false
+             ]
     end
 
     test "forwards the group share without rested XP", %{character: character, victim: victim} do

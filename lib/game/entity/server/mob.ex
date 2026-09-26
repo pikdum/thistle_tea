@@ -1342,7 +1342,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         {:reward_pet_kill, owner_guid, owner_level, reward},
         %Mob{internal: %Internal{pet: %Pet{kind: :hunter, owner_guid: owner_guid}}} = state
       ) do
-    amount = PetProgression.reward(state, reward)
+    amount = PetProgression.reward(state, reward, owner_level)
     state = PetProgression.gain(state, amount, owner_level, PetLevelLoader.levels())
     {:noreply, state, {:continue, :maybe_broadcast}}
   rescue

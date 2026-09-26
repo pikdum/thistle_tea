@@ -10,9 +10,9 @@ defmodule ThistleTea.Game.Player.PetExperience do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.KillReward
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Death
-  alias ThistleTea.Game.Entity.Logic.Experience
 
   def reward_kill(
         %Character{} = character,
@@ -27,7 +27,7 @@ defmodule ThistleTea.Game.Player.PetExperience do
       reward =
         case mode do
           :solo ->
-            {:solo, victim.unit.level, Experience.kill_options(victim)}
+            {:solo, victim.unit.level, KillReward.experience_options(victim)}
 
           {:group, max_level} ->
             {:group, xp, max_level}

@@ -194,6 +194,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       mob = Mob.build(creature)
 
       assert mob.internal.creature.experience_multiplier == 1.5
+      assert mob.internal.creature.health_multiplier == 1.0
       assert mob.internal.creature.civilian?
       assert mob.internal.creature.racial_leader?
       assert mob.internal.creature.extra_flags == 0x40

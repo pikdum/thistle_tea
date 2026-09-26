@@ -56,13 +56,16 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgression do
 
   def initialize(pet, _progress, _levels), do: pet
 
-  def reward(%Mob{} = pet, {:solo, level, opts}), do: Experience.kill_xp(pet.unit.level, level, opts)
+  def reward(%Mob{} = pet, {:solo, level, opts}, owner_level) do
+    Experience.kill_xp(pet.unit.level, level, Keyword.put(opts, :owner_level, owner_level))
+  end
 
-  def reward(%Mob{} = pet, {:group, amount, max_level}) when is_integer(amount) and is_integer(max_level) do
+  def reward(%Mob{} = pet, {:group, amount, max_level}, _owner_level)
+      when is_integer(amount) and is_integer(max_level) do
     if pet.unit.level <= max_level, do: amount, else: 0
   end
 
-  def reward(_pet, _reward), do: 0
+  def reward(_pet, _reward, _owner_level), do: 0
 
   def gain(
         %Mob{internal: %Internal{pet: %Pet{kind: :hunter, broken?: false}}, unit: %Unit{health: health, level: level}} =

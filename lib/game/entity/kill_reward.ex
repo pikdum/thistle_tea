@@ -15,8 +15,18 @@ defmodule ThistleTea.Game.Entity.KillReward do
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Party
+  alias ThistleTea.Game.WorldRef
+
+  def experience_options(%Mob{} = mob, opts \\ []) do
+    dungeon? = Keyword.get_lazy(opts, :non_raid_dungeon?, fn -> non_raid_dungeon?(mob.internal.world) end)
+    Keyword.put(Experience.kill_options(mob), :non_raid_dungeon?, dungeon?)
+  end
+
+  defp non_raid_dungeon?(%WorldRef{map_id: map_id}), do: MapTemplate.non_raid_dungeon?(map_id)
+  defp non_raid_dungeon?(_world), do: false
 
   def selection(%Mob{} = mob, source, opts \\ []) do
     if DamageOrigin.loot_allowed?(mob) do
@@ -70,7 +80,7 @@ defmodule ThistleTea.Game.Entity.KillReward do
     |> then(&Enum.uniq([tagger | &1]))
     |> Enum.reject(&is_nil/1)
     |> Enum.flat_map(&group_member(mob, &1, tagger, metadata, position))
-    |> GroupReward.plan(mob.unit.level, Experience.kill_options(mob))
+    |> GroupReward.plan(mob.unit.level, experience_options(mob, opts))
   end
 
   defp original_tagger(%Mob{internal: %{loot: %{tapped_by: %Tap{player: guid}}}}), do: guid
