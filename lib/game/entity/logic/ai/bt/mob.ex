@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   """
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.Internal.Waypoint
   alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
@@ -31,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Patrol
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.SeekAssistance
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
@@ -665,6 +667,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp reset_after_combat(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
     if Core.dead?(state), do: state, else: reset_living_after_combat(state, blackboard, context)
+  end
+
+  defp reset_living_after_combat(%Mob{internal: %Internal{pet: %Pet{}}} = state, %Blackboard{} = blackboard, %Context{}) do
+    state = %{state | internal: %{state.internal | blackboard: blackboard}}
+    PetBT.clear_combat_state(state)
   end
 
   defp reset_living_after_combat(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do

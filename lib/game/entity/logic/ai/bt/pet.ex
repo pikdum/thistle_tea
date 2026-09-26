@@ -123,7 +123,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
   defp clear_combat(state, blackboard), do: {:success, clear_combat_state(state), blackboard}
 
-  defp clear_combat_state(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state) do
+  def clear_combat_state(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state) do
     pet = if pet.command_state == :attack, do: %{pet | command_state: :follow}, else: pet
     %Engagement.Result{entity: state} = Engagement.leave(state, :pet_command)
     %{state | internal: %{state.internal | pet: pet}}

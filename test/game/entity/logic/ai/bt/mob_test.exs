@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.Internal.Waypoint
   alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
@@ -166,6 +167,46 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   end
 
   describe "drop_threat/2" do
+    test "pets keep their auras and health when the final opponent leaves combat" do
+      target = player_guid()
+      mob = fixture_mob(position: {20.0, 0.0, 0.0, 0.0}, spline_nodes: [])
+
+      holders = [
+        %Holder{
+          spell: %Spell{id: 10, attributes: MapSet.new([:passive])},
+          caster_guid: mob.object.guid,
+          expires_at: -1
+        },
+        %Holder{spell: %Spell{id: 11}, caster_guid: target, expires_at: 10_000, negative?: true}
+      ]
+
+      for command <- [:attack, :follow, :stay] do
+        unit = %{mob.unit | target: target, health: 40, max_health: 100, auras: holders}
+
+        internal = %{
+          mob.internal
+          | in_combat: true,
+            threat: %{target => 100.0},
+            pet: %Pet{owner_guid: 1, kind: :hunter_pet, command_state: command},
+            spawn: %Spawn{position: {0.0, 0.0, 0.0}},
+            blackboard: %Blackboard{combat: %Blackboard.Combat{auto_attacking: true}}
+        }
+
+        pet = MobBT.drop_threat(%{mob | unit: unit, internal: internal}, target, Context.new(1_000))
+
+        refute pet.internal.in_combat
+        assert Threat.entries(pet) == []
+        assert pet.unit.target == 0
+        assert pet.unit.health == 40
+        assert pet.unit.auras == holders
+        assert pet.internal.pet.command_state == if(command == :attack, do: :follow, else: command)
+        refute pet.internal.blackboard.navigation.returning_home?
+        assert pet.internal.navigation_intents == []
+        assert pet.movement_block.position == mob.movement_block.position
+        assert Enum.any?(pet.internal.events, &is_struct(&1, Effects.AttackStop))
+      end
+    end
+
     test "fully leaves combat when vanish removes the last hostile reference" do
       target = Guid.from_low_guid(:player, 50)
 
