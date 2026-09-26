@@ -85,6 +85,27 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentAurasTest do
   end
 
   describe "sync/5" do
+    test "item and enchant procs retain their item identity while sets have no casting item", %{
+      character: character,
+      enchants: [enchant | _]
+    } do
+      {slot, item, enchant_slot, definition} = enchant
+
+      spell = %Spell{
+        id: 4,
+        proc_type_mask: 4,
+        proc_chance: 100,
+        effects: [%Effect{type: :apply_aura, aura: :proc_trigger_spell, trigger_spell_id: 5}]
+      }
+
+      enchant = {slot, item, enchant_slot, %{definition | effects: [%{type: 3, spell_id: 4}]}}
+      sources = [{:item_equip, 99, 4}, {:item_set, 1, 4}]
+      equipped = EquipmentAuras.sync(character, [enchant], fn 4 -> spell end, 0, sources)
+      context = %{victim_guid: 2, outcome: :normal, proc_type: :deal_melee_swing, now: 100}
+      {_equipped, events} = Aura.reactions(equipped, :melee_hit_dealt, context)
+      assert Enum.map(events, & &1.cast_item_guid) == [item.object.guid, 99, nil]
+    end
+
     test "removes outdoor set bonuses indoors and restores their source on exit", %{character: character} do
       spell = %Spell{
         id: 23_218,

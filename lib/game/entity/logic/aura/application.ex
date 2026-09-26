@@ -138,8 +138,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   def dispel_immune?(_entity, _spell), do: false
 
   def equipment_holder(entity, %Spell{} = spell, source, now) do
-    %{passive_holder(entity, spell, now) | item_source: source}
+    %{passive_holder(entity, spell, now) | item_source: source, cast_item_guid: equipment_item_guid(source)}
   end
+
+  defp equipment_item_guid({:item_equip, guid, _spell}), do: guid
+  defp equipment_item_guid({guid, _slot, _spell}) when is_integer(guid), do: guid
+  defp equipment_item_guid(_source), do: nil
 
   def linked_holder(entity, %Spell{} = spell, source, now) do
     %{
