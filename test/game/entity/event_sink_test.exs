@@ -152,6 +152,37 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       end
     end
 
+    test "a selected periodic animation reaches the owner and same-world observers once" do
+      [owner, observer, other_world] = Enum.map(1..3, fn _ -> Guid.from_low_guid(:player, unique_guid()) end)
+
+      for {guid, map} <- [{owner, 0}, {observer, 0}, {other_world, 1}] do
+        Entity.register(guid)
+        SpatialHash.update(:players, guid, map, 0.0, 0.0, 0.0)
+      end
+
+      on_exit(fn ->
+        for guid <- [owner, observer, other_world] do
+          Entity.unregister(guid)
+          SpatialHash.remove(:players, guid)
+        end
+      end)
+
+      choice = %Effects.RandomChoice{choices: [{1, [%Effects.EmoteAnimation{emote_id: 94}]}]}
+
+      character = %Character{
+        object: %Object{guid: owner},
+        internal: %Internal{world: WorldRef.open(0), events: [choice]},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      assert EventSink.emit_pending(character, Context.new(self())).internal.events == []
+      packet = %Message.SmsgEmote{emote: 94, guid: owner}
+      assert_receive {:"$gen_cast", {:send_packet, ^packet}}
+      assert_receive {:"$gen_cast", {:send_packet, ^packet, _opts}}
+      refute_receive {:"$gen_cast", {:send_packet, ^packet}}
+      refute_receive {:"$gen_cast", {:send_packet, ^packet, _opts}}
+    end
+
     test "delivers item transformation only to the explicit player owner" do
       character = %Character{object: %Object{guid: unique_guid()}}
       spell = %Spell{id: 21_180}

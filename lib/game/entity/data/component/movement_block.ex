@@ -74,6 +74,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
   @movement_flag_backward 0x00000002
   @movement_flag_strafe_left 0x00000004
   @movement_flag_strafe_right 0x00000008
+  @movement_flag_pitch_up 0x00000040
+  @movement_flag_pitch_down 0x00000080
   @movement_flag_walk_mode 0x00000100
   @movement_flag_jumping 0x00002000
   @movement_flag_falling_far 0x00004000
@@ -88,6 +90,9 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
                                     @movement_flag_strafe_left |||
                                     @movement_flag_strafe_right
   @movement_flag_mask_airborne @movement_flag_jumping ||| @movement_flag_falling_far
+  @movement_flag_mask_moving @movement_flag_mask_translating ||| @movement_flag_mask_airborne |||
+                               @movement_flag_pitch_up ||| @movement_flag_pitch_down |||
+                               @movement_flag_spline_elevation
 
   @spline_flag_final_point 0x00010000
   @spline_flag_final_target 0x00020000
@@ -101,6 +106,12 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
   end
 
   def translating?(_movement_block), do: false
+
+  def moving?(%__MODULE__{movement_flags: flags}) when is_integer(flags) do
+    (flags &&& @movement_flag_mask_moving) != 0
+  end
+
+  def moving?(_movement_block), do: false
 
   def clear_motion_flags(flags) when is_integer(flags) do
     motion_flags = 0x000000FF ||| @movement_flag_spline_enabled ||| @movement_flag_flying ||| 0x00800000

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   alias ThistleTea.Game.Entity.EffectResolver.Pvp
   alias ThistleTea.Game.Entity.EffectResolver.Spells
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Effects.RandomChoice
   alias ThistleTea.Game.Entity.Logic.Emote
   alias ThistleTea.Game.World.Loader.Emote, as: EmoteLoader
 
@@ -38,6 +39,13 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
 
   def resolve(entity, effects) when is_list(effects) do
     Enum.flat_map(effects, &resolve(entity, &1))
+  end
+
+  def resolve(entity, %RandomChoice{} = choice) do
+    case RandomChoice.total_weight(choice) do
+      0 -> []
+      total -> resolve(entity, RandomChoice.select(choice, :rand.uniform(total)))
+    end
   end
 
   def resolve(_entity, %Effects.DeathItemReward{} = effect), do: DeathItem.resolve(effect)

@@ -422,7 +422,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
         nil
 
       type ->
-        aura = aura_type(int_field(mod, :effect_apply_aura_name, row, :"effect_aura_#{index}") || 0)
+        aura = aura_type(row, int_field(mod, :effect_apply_aura_name, row, :"effect_aura_#{index}") || 0)
         target_a_int = int_field(mod, :effect_implicit_target_a, row, :"implicit_target_a_#{index}") || 0
         target_b_int = int_field(mod, :effect_implicit_target_b, row, :"implicit_target_b_#{index}") || 0
         item_type = unsigned32(int_field(mod, :effect_item_type, row, :"effect_item_type_#{index}"))
@@ -501,12 +501,17 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   defp area_target?(target_int), do: target_int in @area_target_ints
 
+  defp effect_amplitude(_mod, %Spell{id: 8067}, 0), do: 10_000
+
   defp effect_amplitude(mod, row, index) do
     case mod do
       %SpellEffectMod{effect_amplitude: value} when is_integer(value) and value != -1 -> max(value, 0)
       _ -> amplitude_ms(Map.get(row, :"effect_amplitude_#{index}"))
     end
   end
+
+  defp aura_type(%Spell{id: 8067}, 4), do: :periodic_emote
+  defp aura_type(_row, type), do: aura_type(type)
 
   defp effect_type(%Spell{spell_class_set: 10, spell_class_mask_0: mask}, 77)
        when is_integer(mask) and (mask &&& 0x40000000) != 0, do: :heal

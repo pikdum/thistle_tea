@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Spell.Effect do
   alias ThistleTea.Game.Math
 
   @periodic_auras [
+    :periodic_emote,
     :periodic_power_burn,
     :periodic_damage_percent,
     :periodic_damage,

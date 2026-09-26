@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Logic.Aura.Reactions
   alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
+  alias ThistleTea.Game.Entity.Logic.Consumable
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
@@ -432,6 +433,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
       )
 
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
+  end
+
+  defp tick_aura(entity, _holder, %Aura{type: :periodic_emote, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, Consumable.party_emotes(entity)}
   end
 
   defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}
