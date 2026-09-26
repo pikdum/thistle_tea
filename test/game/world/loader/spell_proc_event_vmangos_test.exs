@@ -105,7 +105,11 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
     end
 
     test "splits VMangos combined family masks into the two vanilla words" do
-      assert %ProcRule{family_mask_0: 96, family_mask_1: 128} = SpellProcEvent.get(18_096)
+      assert %ProcRule{family_mask_0: 96, family_mask_1: 128, proc_flags: 0x50400, custom_chance: chance} =
+               SpellProcEvent.get(18_096)
+
+      assert chance == 0.0
+      assert Mangos.Repo.get_by(Mangos.SpellProcEvent, entry: 18_073) == nil
     end
   end
 end

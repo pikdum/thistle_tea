@@ -22,6 +22,47 @@ defmodule ThistleTea.Game.Entity.Logic.ProcSpellTest do
   setup [:character]
 
   describe "resolve/4" do
+    test "Pyroclasm divides each rank's chance across channel ticks" do
+      for {id, chance} <- [{18_096, 13}, {18_073, 26}],
+          {spell, ticks} <- [
+            {%Spell{spell_family: 5, family_flags_0: 0x20}, 4},
+            {%Spell{spell_family: 5, family_flags_0: 0x40}, 15},
+            {%Spell{spell_family: 5, family_flags_0: 0x40, spell_icon: 184, spell_visual: 2253}, 1}
+          ] do
+        holder = %Holder{spell: %Spell{id: id}}
+        event = Effects.trigger_spell(1, 60, 2, 18_350, triggered_by_spell_id: id)
+        context = %{spell: spell, victim_alive?: true}
+        threshold = chance / ticks / 100
+        assert [%Effects.TriggerSpell{} = resolved] = ProcSpell.resolve(event, holder, context, fn -> threshold end)
+        assert resolved.spell_id == 18_093
+        assert resolved.target_guid == 2
+        assert resolved.source_guid == 1
+        assert resolved.triggering_spell_id == id
+        assert resolved.requires_living_target?
+        assert resolved.amount == nil
+        assert ProcSpell.resolve(event, holder, context, fn -> threshold + 0.0001 end) == []
+      end
+    end
+
+    test "Pyroclasm rejects self damage, dead targets, and unrelated spells before rolling" do
+      holder = %Holder{spell: %Spell{id: 18_073}}
+      event = Effects.trigger_spell(1, 60, 2, 18_350)
+      context = %{spell: %Spell{spell_family: 5, family_flags_0: 0x40}, victim_alive?: true}
+      no_roll = fn -> flunk("ineligible proc rolled") end
+      assert ProcSpell.resolve(%{event | target_guid: 1}, holder, context, no_roll) == []
+      assert ProcSpell.resolve(event, holder, %{context | victim_alive?: false}, no_roll) == []
+      assert ProcSpell.resolve(event, holder, Map.delete(context, :victim_alive?), no_roll) == []
+      assert ProcSpell.resolve(event, holder, Map.delete(context, :spell), no_roll) == []
+
+      for spell <- [
+            %Spell{spell_family: 5, family_flags_0: 0x1},
+            %Spell{spell_family: 3, family_flags_0: 0x40},
+            %Spell{spell_family: 3, spell_icon: 184, spell_visual: 2253}
+          ] do
+        assert ProcSpell.resolve(event, holder, %{context | spell: spell}, no_roll) == []
+      end
+    end
+
     test "each Blessed Recovery rank returns three ticks of its damage percentage" do
       for {id, percent, trigger} <- [{27_811, 8, 27_813}, {27_815, 16, 27_817}, {27_816, 25, 27_818}] do
         holder = holder(recovery(id, percent))

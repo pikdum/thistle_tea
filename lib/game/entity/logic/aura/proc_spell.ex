@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.Aura.ProcSpell do
   @moduledoc """
-  Resolves proc spells whose target and strength depend on the triggering
-  damage or healing, before normal triggered-spell delivery.
+  Resolves proc spells whose target, strength, or chance depends on the
+  triggering spell outcome, before normal triggered-spell delivery.
   """
 
   alias ThistleTea.Game.Aura
@@ -12,8 +12,22 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ProcSpell do
   @blessed_recovery %{27_811 => 27_813, 27_815 => 27_817, 27_816 => 27_818}
   @persistent_shield 26_467
   @persistent_shield_absorb 26_470
+  @pyroclasm %{18_096 => 13, 18_073 => 26}
+  @pyroclasm_stun 18_093
 
   def resolve(event, holder, context, roll \\ &:rand.uniform/0)
+
+  def resolve(%Effects.TriggerSpell{} = event, %Holder{spell: %Spell{id: id}}, context, roll)
+      when is_map_key(@pyroclasm, id) do
+    with %{victim_alive?: true, spell: %Spell{} = spell} <- context,
+         true <- event.source_guid != event.target_guid,
+         ticks when is_integer(ticks) <- pyroclasm_ticks(spell),
+         true <- roll.() * 100 <= Map.fetch!(@pyroclasm, id) / ticks do
+      [%{event | spell_id: @pyroclasm_stun, requires_living_target?: true}]
+    else
+      _ineligible -> []
+    end
+  end
 
   def resolve(%Effects.TriggerSpell{} = event, %Holder{spell: %Spell{id: id}} = holder, context, roll)
       when is_map_key(@blessed_recovery, id) do
@@ -38,6 +52,16 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ProcSpell do
   end
 
   def resolve(event, _holder, _context, _roll), do: [event]
+
+  defp pyroclasm_ticks(%Spell{spell_family: 5, spell_icon: 184, spell_visual: 2253}), do: 1
+
+  defp pyroclasm_ticks(%Spell{} = spell) do
+    cond do
+      Spell.family_flag?(spell, 5, 0x40) -> 15
+      Spell.family_flag?(spell, 5, 0x20) -> 4
+      true -> nil
+    end
+  end
 
   defp custom_spell(%Effects.TriggerSpell{} = event, spell_id, target_guid, amount) do
     %{event | spell_id: spell_id, target_guid: target_guid, slot: 0, amount: amount, requires_living_target?: true}
