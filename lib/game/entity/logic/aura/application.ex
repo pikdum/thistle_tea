@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Spell.PersistentArea
   alias ThistleTea.Game.Spell.Radius
   alias ThistleTea.Game.Spell.Scripts
+  alias ThistleTea.Game.Spell.Slow
 
   @negative_auras [
     :periodic_power_burn,
@@ -237,6 +238,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       blocked_by_stronger_rank?(existing, holder.spell) ->
         {entity, []}
 
+      blocked_by_stronger_slow?(existing, holder.spell) ->
+        {entity, []}
+
       blocked_by_mechanic_immunity?(existing, holder.spell) ->
         consume_mechanic_immunity(entity, holder.spell, now)
 
@@ -250,6 +254,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp do_apply(entity, %Holder{} = holder, context, now) do
     apply_unblocked(entity, [], holder, context, now)
+  end
+
+  defp blocked_by_stronger_slow?(holders, spell) do
+    Enum.any?(holders, fn
+      %Holder{linked_from: nil, spell: existing} -> Slow.blocks?(existing, spell)
+      _holder -> false
+    end)
   end
 
   defp apply_diminished(entity, holders, holder, context, now) do

@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Consumable
+  alias ThistleTea.Game.Spell.Slow
 
   @battle_stance_form 17
   @defensive_stance_form 18
@@ -217,7 +218,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def exclusive_category(row, elixir_mask \\ 0) do
     Consumable.category(row) || generic_exclusive_category(row) || mage_exclusive_category(row) ||
-      paladin_exclusive_category(row) || warlock_exclusive_category(row) || Consumable.elixir_category(elixir_mask)
+      paladin_exclusive_category(row) || warlock_exclusive_category(row) || Consumable.elixir_category(elixir_mask) ||
+      Slow.category(row)
   end
 
   defp generic_exclusive_category(%{id: id}) when id in [28_418, 28_419, 28_420], do: :generals_warcry
