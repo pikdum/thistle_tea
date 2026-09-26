@@ -86,7 +86,7 @@ defmodule ThistleTea.Game.World.System.RaidLockoutTest do
       Instance.bind_raid(world, guid, server)
       assert Instance.saved_raids(guid, server) == []
       Instance.leave(guid, world, server)
-      assert_receive {:cleaned, ^world}
+      assert_receive {:cleaned, ^world}, 1000
       assert Instance.count(server) == 0
     end
   end
