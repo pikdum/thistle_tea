@@ -106,6 +106,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Battlegrounds
   alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.ConditionContext
+  alias ThistleTea.Game.Player.Corpses
   alias ThistleTea.Game.Player.Durability
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
@@ -912,6 +913,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def handle_cast({:finish_repop, token}, state) do
     state = MovementControl.finish_repop(state, token)
     {:noreply, state}
+  end
+
+  def handle_cast(:repop_at_graveyard, state) do
+    {:noreply, Corpses.repop_at_graveyard(state)}
+  rescue
+    error ->
+      Logger.error("Graveyard rescue failed: #{inspect(error)}")
+      {:noreply, state}
   end
 
   @impl GenServer

@@ -20,6 +20,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.Visibility
 
+  def emit(entity, %Effects.RepopAtGraveyard{}, context) do
+    Context.cast(context, :repop_at_graveyard)
+    entity
+  end
+
   def emit(%Mob{} = entity, %Effects.MovementInform{motion_type: type, point_id: point}, context) do
     Context.cast(context, {:movement_inform, type, point})
     entity

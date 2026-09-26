@@ -22,7 +22,16 @@ defmodule ThistleTea.Game.World.Loader.Exploration do
   def load_areas do
     AreaTable
     |> ThistleTea.DBC.all()
-    |> Enum.each(&:ets.insert(__MODULE__, {{:area, &1.id}, &1}))
+    |> Enum.each(fn area ->
+      :ets.insert(__MODULE__, [{{:area, area.id}, area}, {{:area_bit, area.map, area.area_bit}, area.id}])
+    end)
+  end
+
+  def area_by_bit(map_id, bit) do
+    case :ets.lookup(__MODULE__, {:area_bit, map_id, bit}) do
+      [{_key, id}] -> area(id)
+      [] -> nil
+    end
   end
 
   def load_base_xp do

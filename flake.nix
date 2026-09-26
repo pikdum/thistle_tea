@@ -245,6 +245,34 @@
             '';
           };
 
+          terrain-data = pkgs.writeShellApplication {
+            name = "terrain-data";
+            runtimeInputs = [
+              mangos-map-extractor
+              pkgs.coreutils
+            ];
+            text = ''
+              wow_dir=''${1:-''${WOW_DIR:-}}
+              out_dir=''${2:-./maps/terrain}
+              if [ -z "''${wow_dir}" ] || [ ! -d "''${wow_dir}/Data" ]; then
+                echo "usage: terrain-data <WOW_DIR> [OUT_DIR]  (or set WOW_DIR env)" >&2
+                exit 1
+              fi
+              mkdir -p "''${out_dir}"
+              out_dir=$(realpath "''${out_dir}")
+              tmp=$(mktemp -d "''${out_dir}/.extract.XXXXXX")
+              trap 'rm -rf "$tmp"' EXIT
+              map-extractor -i "''${wow_dir}" -o "''${tmp}" -e 1 -t "''${THREADS:-4}"
+              tiles=("''${tmp}/maps/"*.map)
+              if [ ! -f "''${tiles[0]}" ]; then
+                echo "terrain-data: extractor produced no terrain tiles" >&2
+                exit 1
+              fi
+              mv "''${tiles[@]}" "''${out_dir}/"
+              echo "Terrain tiles written to ''${out_dir}"
+            '';
+          };
+
           # `nix run .#maps -- <WOW_DIR> [OUT_DIR]` — generate navigation meshes
           # from the WoW client. A runner (like dbc-db) because the client MPQs
           # live outside /nix/store. Map names must match @maps_to_process in
@@ -253,6 +281,7 @@
             name = "maps";
             runtimeInputs = [
               namigator-mapbuilder
+              terrain-data
               pkgs.coreutils
             ];
             text = ''
@@ -271,6 +300,8 @@
               out_dir=$(realpath "''${out_dir}")
 
               threads=''${THREADS:-$(nproc)}
+
+              terrain-data "''${wow_dir}" "''${out_dir}/terrain"
 
               echo "Building BVH from: ''${data_dir}"
               MapBuilder --data "''${data_dir}" --output "''${out_dir}" --bvh --threads "''${threads}" --logLevel 1
@@ -480,6 +511,7 @@
             mysql2sqlite
             vmangos-db
             dbc-db
+            terrain-data
             namigator-mapbuilder
             namigator-source
             maps

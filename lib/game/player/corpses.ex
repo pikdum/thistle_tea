@@ -41,6 +41,10 @@ defmodule ThistleTea.Game.Player.Corpses do
     end
   end
 
+  def repop_at_graveyard(%{character: %Character{} = character} = state) do
+    if Death.ghost?(character), do: defer_graveyard_teleport(state), else: state
+  end
+
   def query(%{ready: true, character: %Character{} = character} = state) do
     Network.send_packet(location(character))
     state

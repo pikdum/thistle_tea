@@ -20,6 +20,14 @@ defmodule ThistleTea.Game.Player.CorpsesTest do
 
   setup [:build_ghost]
 
+  describe "repop_at_graveyard/1" do
+    test "ignores a stale rescue request after resurrection", %{state: state} do
+      {alive, _events} = Death.resurrect(state.character, 1.0, 40_000)
+      restored = %{state | character: alive}
+      assert Corpses.repop_at_graveyard(restored) == restored
+    end
+  end
+
   describe "send_reclaim_delay/2" do
     test "projects remaining time on reconnect without restarting it", %{state: state} do
       Corpses.send_reclaim_delay(state.character, 35_000)

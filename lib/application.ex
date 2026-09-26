@@ -112,6 +112,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.System.Trade, as: TradeSystem
   alias ThistleTea.Game.World.System.VendorStock
   alias ThistleTea.Game.World.System.Weather, as: WeatherSystem
+  alias ThistleTea.Game.World.Terrain
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Native.Namigator
 
@@ -305,6 +306,8 @@ defmodule ThistleTea.Application do
     Logger.info("Loading maps...")
     map_dir = Application.fetch_env!(:thistle_tea, :map_dir)
     Namigator.load(map_dir)
+    Terrain.init()
+    Terrain.load(Path.join(map_dir, "terrain"))
 
     Logger.info("ThistleTea started.")
 

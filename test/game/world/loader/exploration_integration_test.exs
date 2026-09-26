@@ -9,6 +9,8 @@ defmodule ThistleTea.Game.World.Loader.ExplorationIntegrationTest do
       Exploration.load_areas()
 
       assert %AreaTable{area_bit: 707, exploration_level: 10, name: "Orgrimmar"} = Exploration.area(1637)
+      assert %AreaTable{id: 1637} = Exploration.area_by_bit(1, 707)
+      assert Exploration.area_by_bit(9999, 707) == nil
     end
   end
 

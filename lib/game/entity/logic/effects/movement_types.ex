@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.MovementTypes do
     {:Charge, [:target_guid], [attack_on_arrival?: false]},
     {:ClientControlChanged, [:allow_movement?], []},
     {:MovementStopped, [], []},
+    {:RepopAtGraveyard, [], []},
     {:MovementInform, [:motion_type, :point_id], []},
     {:MovementSpeedChanged, [:speed], [movement_type: :run_speed]},
     {:MovementRootChanged, [:rooted?], []},

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.Loader.Graveyard do
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.Terrain
 
   @team_alliance 469
   @team_horde 67
@@ -59,8 +60,9 @@ defmodule ThistleTea.Game.World.Loader.Graveyard do
 
   def closest(map, position, team, candidates \\ &for_area/1) do
     dungeon = Map.get(MapTemplate.dungeons(), map)
+    zone_and_area = Pathfinding.get_zone_and_area(map, position) || Terrain.zone_and_area(map, position)
 
-    with {zone, area} <- Pathfinding.get_zone_and_area(map, position) || dungeon_zone(dungeon) do
+    with {zone, area} <- zone_and_area || dungeon_zone(dungeon) do
       entrance =
         case dungeon do
           %Dungeon{ghost_entrance: entrance} -> entrance

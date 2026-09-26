@@ -89,6 +89,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       condition_area: condition_area(entity, requirements),
       spell_area: spell_area(entity),
       liquid_surface: liquid_surface(entity),
+      terrain_liquid: PlayerMovement.terrain_liquid(entity),
       body_height: PlayerMovement.body_height(entity),
       instance_data: instance_data(entity, requirements, options),
       formation: FormationEnvironment.snapshot(entity, now),

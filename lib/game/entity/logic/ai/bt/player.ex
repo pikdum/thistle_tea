@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Ranged, as: RangedBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Breathing
+  alias ThistleTea.Game.Entity.Logic.Fatigue
   alias ThistleTea.Game.Entity.Logic.Intoxication
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Pvp
@@ -26,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
       BT.action(&sobering_tick/3),
       BT.action(&rest_tick/3),
       BT.action(&breathing_tick/3),
+      BT.action(&fatigue_tick/3),
       BT.action(&sync_combat/2),
       BT.action(&pvp_tick/3),
       BT.action(&reactive_tick/3),
@@ -57,6 +59,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
   end
 
   defp breathing_tick(state, blackboard, _context), do: {:failure, state, blackboard}
+
+  defp fatigue_tick(%Character{} = state, blackboard, %Context{} = context) do
+    bonus = Random.between(context.random, 0, max((state.unit.level || 1) - 1, 0))
+    {:failure, Fatigue.update(state, context.terrain_liquid, context.now, bonus), blackboard}
+  end
+
+  defp fatigue_tick(state, blackboard, _context), do: {:failure, state, blackboard}
 
   defp sync_combat(%Character{} = state, %Blackboard{} = blackboard) do
     {state, blackboard} = PlayerCombat.sync(state, blackboard)

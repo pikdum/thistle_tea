@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Emote
   alias ThistleTea.Game.Entity.Logic.Falling
+  alias ThistleTea.Game.Entity.Logic.Fatigue
   alias ThistleTea.Game.Entity.Logic.MovementHandoff
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Logic.SafePosition
@@ -40,6 +41,7 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.World.Loader.ModelGeometry
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Game.World.Terrain
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility
 
@@ -152,6 +154,7 @@ defmodule ThistleTea.Game.Player.Movement do
       :rand.uniform(max(character.unit.level || 1, 1)) - 1,
       body_height(character)
     )
+    |> Fatigue.update(terrain_liquid(character), now, :rand.uniform(max(character.unit.level || 1, 1)) - 1)
   end
 
   def interrupt_attacks(character, false, _now), do: character
@@ -164,6 +167,13 @@ defmodule ThistleTea.Game.Player.Movement do
     {x, y, z, _} = character.movement_block.position
     Pathfinding.query_liquid_surface(character.internal.world.map_id, {x, y, z})
   end
+
+  def terrain_liquid(%Character{} = character) do
+    {x, y, z, _} = character.movement_block.position
+    Terrain.liquid(character.internal.world.map_id, {x, y, z})
+  end
+
+  def terrain_liquid(_entity), do: nil
 
   def publish_changes(%{character: %Character{} = character} = state) do
     state =

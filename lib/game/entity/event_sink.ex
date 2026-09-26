@@ -93,6 +93,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.ThreatRefLost
   ]
   @movement_effects [
+    Effects.RepopAtGraveyard,
     Effects.BindHome,
     Effects.ChargeResolved,
     Effects.ClientControlChanged,

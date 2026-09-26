@@ -51,6 +51,15 @@ More documentation, like platform-specific setup guides, can be found in the [Wi
 Existing navigation bakes need [WMO group metadata](docs/terrain-interiors.md)
 for indoor and outdoor queries. New bakes include it automatically.
 
+Ocean fatigue also needs terrain liquid data. New map bakes include it; existing
+bakes can add it without rebuilding navigation:
+
+```bash
+nix run .#terrain-data -- "$WOW_DIR" ./maps/terrain
+```
+
+Restart the server after generating terrain data.
+
 ## databases
 
 - **vmangos.sqlite** `nix run .#vmangos-db -- ./db`
@@ -210,6 +219,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - fall damage, Safe Fall, and Slow Fall protection
 - [Environmental fire damage](docs/environmental-fire-playtest.md), with world campfires, resistance, shield depletion, combat-log feedback, and death durability loss
 - underwater breath timers, drowning, water-breathing effects, and extended breath reserves
+- ocean fatigue, coastal recovery, exhaustion damage, transport protection, and graveyard rescue for ghosts
 - swimming speed bonuses and snare updates, synchronized with the player and nearby observers
 - gossip + trainers
 - [Innkeeper home binding](docs/home-binding-playtest.md), with confirmation, retained home locations, Hearthstones, Astral Recall, and replacement Hearthstones
