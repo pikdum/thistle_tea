@@ -57,6 +57,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
       raid_class_aoe_spell?(spell) ->
         {:party_class_aoe, unit_guid, raid_class_radius(spell, modifiers)}
 
+      caster_only_spell?(spell) ->
+        :caster
+
       query = direct_unit_query(spell, unit_guid) ->
         query
 
@@ -217,6 +220,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   end
 
   defp direct_unit_query(_spell, _unit_guid), do: nil
+
+  defp caster_only_spell?(%Spell{effects: [_ | _] = effects}) do
+    Enum.all?(effects, fn %Effect{implicit_target_a: a, implicit_target_b: b} ->
+      a in [nil, :caster] and b in [nil, :caster] and (a == :caster or b == :caster)
+    end)
+  end
+
+  defp caster_only_spell?(_spell), do: false
 
   defp raid_class_aoe_spell?(%Spell{effects: effects}) do
     Enum.any?(effects, &effect_targets?(&1, [:raid_and_class]))

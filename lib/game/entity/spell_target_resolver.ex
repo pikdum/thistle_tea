@@ -175,6 +175,8 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     nearby_friendly_guids_at(caster, position, radius)
   end
 
+  defp query_guids(_caster, caster_guid, :caster), do: [caster_guid]
+
   defp query_guids(caster, caster_guid, query) do
     case query do
       {:caster_aoe, radius} ->

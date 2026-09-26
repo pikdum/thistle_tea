@@ -472,7 +472,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_class_mask(_spell_id, _index, _aura, fallback, %SpellEffectMod{effect_item_type: value})
        when is_integer(value) and value != -1, do: fallback
 
-  defp effect_class_mask(spell_id, index, aura, fallback, _mod) when aura in [:add_flat_modifier, :add_pct_modifier] do
+  defp effect_class_mask(spell_id, index, aura, fallback, _mod)
+       when aura in [:add_flat_modifier, :add_pct_modifier, :add_target_trigger] do
     SpellEffectOverrideLoader.class_mask(spell_id, index) || fallback
   end
 
@@ -1015,6 +1016,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex3, 0x10000000, :ignore_caster_and_target_restrictions)
     |> add_if(attrs_ex3, 0x20000000, :ignore_caster_modifiers)
     |> add_if(attrs_ex3, @dot_stacking_rule_ex3, :dot_stacking_rule)
+    |> add_if(attrs_ex4, 0x00000002, :class_trigger_only_on_caster)
     |> add_if(attrs_ex4, 0x00000008, :no_helpful_threat)
   end
 

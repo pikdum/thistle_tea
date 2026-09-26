@@ -571,7 +571,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
       effect_base_points: Keyword.get(opts, :effect_base_points, %{}),
       duration_ms: Keyword.get(opts, :duration_ms),
       hit_context: Keyword.get(opts, :hit_context),
-      resolve_targets?: Keyword.get(opts, :resolve_targets?, false)
+      resolve_targets?: Keyword.get(opts, :resolve_targets?, false),
+      requires_living_target?: Keyword.get(opts, :requires_living_target?, false)
     }
   end
 

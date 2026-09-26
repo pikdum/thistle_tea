@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Spell.Critical
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Semantics
+  alias ThistleTea.Game.Spell.TargetTrigger
   alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
 
   @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
@@ -102,6 +103,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     dispel_resistance: %{},
     spell_modifiers: [],
     conditional_crit_modifiers: [],
+    target_triggers: [],
     damage_done_versus: [],
     target_attack_power: %{},
     target_damage: [],
@@ -137,6 +139,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_bounding_radius: caster_bounding_radius(caster),
       caster_orientation: caster_orientation(caster),
       target_guid: target_guid,
+      target_triggers: TargetTrigger.snapshot(caster, spell),
       spell: spell,
       healing_bonus: healing_bonus(caster, spell),
       resistance_penetration: ResistancePenetration.snapshot(caster),
@@ -170,6 +173,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_bounding_radius: caster_bounding_radius(caster),
       caster_orientation: caster_orientation(caster),
       target_guid: target_guid,
+      target_triggers: TargetTrigger.snapshot(caster, spell),
       spell: spell,
       conditional_crit_modifiers: Critical.snapshot(caster, spell),
       reflect_chance_bonus: Mage.ward_reflect_chance(caster, spell),

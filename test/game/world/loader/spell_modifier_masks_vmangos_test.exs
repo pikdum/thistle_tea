@@ -6,6 +6,12 @@ defmodule ThistleTea.Game.World.Loader.SpellModifierMasksVmangosTest do
   @moduletag :vmangos_db
 
   describe "load_all/0" do
+    test "loads target-trigger restrictions for Revealed Flaw and Shadow Weaving" do
+      SpellEffectOverride.load_all()
+      assert SpellEffectOverride.class_mask(28_814, 0) == 0x20000
+      assert SpellEffectOverride.class_mask(15_334, 0) == 42_508_288
+    end
+
     test "loads Plagueheart's periodic threat mask including its high bit" do
       SpellEffectOverride.load_all()
       assert SpellEffectOverride.class_mask(28_746, 1) == 4_294_968_326

@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
+  alias ThistleTea.Game.Spell.TargetTrigger
 
   @dead_target_effects [:resurrect, :resurrect_new, :durability_damage, :durability_damage_percent]
 
@@ -119,12 +120,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   def apply_prepared(target, %Resolution{context: context, spell: spell} = resolution, now) do
+    alive_before? = (target.unit.health || 0) > 0
     {target, events} = apply_resolved_effects(target, resolution, now)
 
-    target =
-      if cast_hit?(resolution, events), do: Critter.spell_hit(target, context.caster_guid, spell, now), else: target
-
-    {target, events}
+    if cast_hit?(resolution, events) do
+      target = Critter.spell_hit(target, context.caster_guid, spell, now)
+      triggers = if alive_before?, do: TargetTrigger.events(context, target.object.guid), else: []
+      {target, events ++ triggers}
+    else
+      {target, events}
+    end
   end
 
   defp prepare_effects(target, %Resolution{context: context, spell: spell} = resolution) do

@@ -27,6 +27,56 @@ defmodule ThistleTea.Game.Entity.EffectResolver.TriggeredHitDbcTest do
   setup [:entities]
 
   describe "resolve/2" do
+    test "triggered Chilled snapshots Frostbite and sends its root request through the caster", %{
+      caster: caster,
+      target: target
+    } do
+      talent = SpellLoader.load(12_497)
+      caster = %{caster | unit: %{caster.unit | auras: []}}
+      {caster, _} = AuraLogic.apply_spell(caster, caster.object.guid, 60, talent, 0)
+      [holder] = caster.unit.auras
+      [aura] = holder.auras
+      assert aura.amount == 15
+      caster = %{caster | unit: %{caster.unit | auras: [%{holder | auras: [%{aura | amount: 100}]}]}}
+      Metadata.update(target.object.guid, %{no_spell_defense?: true})
+      delivery = resolve(caster, target.object.guid, 12_486) |> Enum.find(&is_struct(&1, Effects.DeliverSpell))
+      assert length(delivery.cast_context.target_triggers) == 1
+      {slowed, events} = SpellEffect.receive(target, delivery.cast_context, delivery.spell, 1_000)
+      trigger = Enum.find(events, &is_struct(&1, Effects.TriggerSpell))
+      assert trigger.spell_id == 12_494
+      assert trigger.source_guid == caster.object.guid
+      assert trigger.resolve_targets?
+      assert [%Effects.TriggerSpellRequest{spell_id: 12_494, opts: opts}] = Spells.resolve(slowed, trigger)
+      assert opts[:requires_living_target?]
+      root = Spells.resolve(caster, trigger) |> Enum.find(&is_struct(&1, Effects.DeliverSpell))
+      assert root.cast_context.target_triggers == []
+      {rooted, _} = SpellEffect.receive(slowed, root.cast_context, root.spell, 1_001)
+      assert AuraLogic.rooted?(rooted)
+      {expired, _} = AuraLogic.tick(rooted, 6_001)
+      refute AuraLogic.rooted?(expired)
+    end
+
+    test "dead victims reject target debuffs while caster-targeted refunds still resolve", %{
+      caster: caster,
+      target: target
+    } do
+      Metadata.update(target.object.guid, %{alive?: false})
+      caster = %{caster | unit: %{caster.unit | auras: []}}
+
+      refund =
+        Effects.trigger_spell(caster.object.guid, 60, target.object.guid, 14_181,
+          resolve_targets?: true,
+          requires_living_target?: true
+        )
+
+      events = Spells.resolve(caster, refund)
+      assert [%Effects.DeliverSpell{target_guid: guid}] = Enum.filter(events, &is_struct(&1, Effects.DeliverSpell))
+      assert guid == caster.object.guid
+      root = %{refund | spell_id: 12_494}
+      assert Spells.resolve(caster, root) == []
+      assert Spells.resolve(%{caster | unit: %{caster.unit | health: 0}}, refund) == []
+    end
+
     test "area triggers use each target's current avoidance", %{caster: caster, target: target, other: other} do
       caster = %{caster | unit: %{caster.unit | auras: []}}
       Metadata.update(target.object.guid, %{aoe_avoidance: 100})

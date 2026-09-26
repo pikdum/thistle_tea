@@ -18,7 +18,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   alias ThistleTea.Game.Entity.Logic.Aura.Reactions
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
-  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Spell
 
@@ -145,36 +144,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   defp holder_stacks(%Holder{stacks: stacks}) when is_integer(stacks) and stacks > 1, do: stacks
   defp holder_stacks(_holder), do: 1
-
-  def target_trigger_events(
-        %{object: %{guid: guid}, unit: %Unit{level: level, auras: holders}},
-        %Spell{} = spell,
-        target_guids
-      )
-      when is_list(holders) and is_list(target_guids) do
-    for %Holder{spell: %Spell{spell_family: family}} = holder <- holders,
-        is_integer(family) and family > 0 and family == spell.spell_family,
-        %Aura{type: :add_target_trigger, amount: chance, class_mask: mask, trigger_spell_id: trigger} <- holder.auras,
-        is_integer(trigger) and trigger > 0,
-        trigger_mask_applies?(mask, spell),
-        target_guid <- target_guids,
-        target_trigger_roll?(chance),
-        do: Effects.trigger_spell(guid, level || 1, target_guid, trigger)
-  end
-
-  def target_trigger_events(_entity, _spell, _target_guids), do: []
-
-  defp trigger_mask_applies?(mask, %Spell{family_flags_0: flags}) when is_integer(mask) and mask > 0 do
-    Bitwise.band(mask, flags || 0) != 0
-  end
-
-  defp trigger_mask_applies?(_mask, _spell), do: true
-
-  defp target_trigger_roll?(chance) when is_integer(chance) and chance > 0 do
-    chance >= 100 or :rand.uniform(100) <= chance
-  end
-
-  defp target_trigger_roll?(_chance), do: false
 
   def auras_of_type(%{unit: %Unit{auras: holders}}, type) when is_list(holders) do
     holders

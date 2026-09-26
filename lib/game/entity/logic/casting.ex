@@ -316,7 +316,6 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp apply_impact(entity, %Cast{resolution: %CastResolution{} = resolution} = casting, now) do
     entity =
       entity
-      |> queue_target_triggers(casting, resolution.hits)
       |> queue_area_effects(casting)
       |> queue_farsight(casting)
       |> queue_summon_objects(casting)
@@ -1100,12 +1099,6 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp area_duration(_casting, _spell), do: 8_000
 
-  defp queue_target_triggers(character, %Cast{spell: %Spell{} = spell}, hits) when is_list(hits) do
-    Effects.enqueue(character, AuraLogic.target_trigger_events(character, spell, hits))
-  end
-
-  defp queue_target_triggers(character, _casting, _hits), do: character
-
   defp queue_summon_objects(
          character,
          %Cast{
@@ -1407,17 +1400,20 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
       tick_effects ->
         hits = Enum.filter(impacts, &(&1.hit_outcome == :hit))
-        apply_impacts(character, %{casting | spell: %{spell | effects: tick_effects}}, hits, now)
+        apply_impacts(character, %{casting | spell: %{spell | effects: tick_effects}}, hits, now, false)
     end
   end
 
   defp apply_channel_tick_effects(character, _casting, _now), do: character
 
+  defp apply_impacts(character, casting, impacts, now, target_triggers? \\ true)
+
   defp apply_impacts(
          %{object: %{guid: caster_guid}} = character,
          %Cast{spell: %Spell{} = spell} = casting,
          impacts,
-         now
+         now,
+         target_triggers?
        )
        when is_integer(caster_guid) and is_list(impacts) do
     Enum.reduce(impacts, character, fn %Impact{target_guid: target_guid, target_role: target_role} = impact, caster ->
@@ -1428,6 +1424,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         | cast_item_guid: casting.cast_item_guid,
           triggered?: casting.triggered?,
           target_guid: target_guid,
+          target_triggers: if(target_triggers?, do: context.target_triggers, else: []),
           cooldown_started_at: cooldown_started_at(caster, spell.id),
           selected_target_guid: casting.resolution.followups.selected_unit_guid,
           destination_position: Target.ground_location(casting.targets),
@@ -1442,7 +1439,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     end)
   end
 
-  defp apply_impacts(character, _casting, _impacts, _now), do: character
+  defp apply_impacts(character, _casting, _impacts, _now, _target_triggers?), do: character
 
   defp cooldown_started_at(caster, spell_id) do
     case Cooldowns.pending(caster, spell_id) do

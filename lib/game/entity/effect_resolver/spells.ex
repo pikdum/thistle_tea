@@ -187,6 +187,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
       effect_index: effect.slot,
       duration_ms: effect.duration_ms,
       resolve_targets?: true,
+      requires_living_target?: effect.requires_living_target?,
       extra_attack?: effect.extra_attack?,
       triggered_by_spell_id: effect.triggering_spell_id,
       hit_context: effect.hit_context
@@ -272,6 +273,14 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   end
 
   defp triggered_cast(entity, effect, spell, targets, selection, objects) do
+    targets = if effect.requires_living_target?, do: Enum.filter(targets, &living_target?(entity, &1)), else: targets
+
+    if effect.requires_living_target? and targets == [],
+      do: [],
+      else: triggered_effects(entity, effect, spell, targets, selection, objects)
+  end
+
+  defp triggered_effects(entity, effect, spell, targets, selection, objects) do
     targets =
       if ObjectTargets.required?(spell) and Enum.all?(spell.effects, &(&1.type == :activate_object)),
         do: [],
@@ -308,6 +317,11 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
     actions = Enum.flat_map(ObjectTargets.actions(spell, objects), &resolve(entity, &1))
     [launch | deliveries ++ actions]
   end
+
+  defp living_target?(%{object: %{guid: guid}, unit: %Unit{health: health}}, guid),
+    do: is_integer(health) and health > 0
+
+  defp living_target?(_entity, guid), do: match?(%{alive?: true}, Metadata.query(guid, [:alive?]))
 
   defp trigger_outcome(%CastContext{caster_guid: guid} = context, _spell, guid), do: context
 

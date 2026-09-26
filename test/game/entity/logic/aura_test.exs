@@ -2601,37 +2601,6 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert entity.unit.power2 == 150
     end
 
-    test "add_target_trigger auras fire their trigger at cast targets" do
-      caster = fixture_entity()
-
-      relentless = %Spell{
-        id: 14_179,
-        spell_family: 8,
-        duration_ms: -1,
-        effects: [
-          %Effect{
-            index: 0,
-            type: :apply_aura,
-            aura: :add_target_trigger,
-            base_points: 99,
-            base_dice: 1,
-            class_mask: 0x20000,
-            trigger_spell_id: 14_181
-          }
-        ]
-      }
-
-      {caster, _events} = apply_spell(caster, 1, 60, relentless)
-
-      matching = %Spell{id: 8647, spell_family: 8, family_flags_0: 0x20000}
-      other = %Spell{id: 133, spell_family: 3, family_flags_0: 0x1}
-
-      assert [%Effects.TriggerSpell{target_guid: 77, spell_id: 14_181}] =
-               Aura.target_trigger_events(caster, matching, [77])
-
-      assert Aura.target_trigger_events(caster, other, [77]) == []
-    end
-
     test "obs_mod_health auras tick percent-of-max healing" do
       entity = fixture_entity()
       entity = %{entity | unit: %{entity.unit | health: 50}}

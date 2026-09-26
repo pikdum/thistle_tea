@@ -79,7 +79,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
        effect_base_points: %{},
        duration_ms: nil,
        hit_context: nil,
-       resolve_targets?: false
+       resolve_targets?: false,
+       requires_living_target?: false
      ]}
   ]
 
