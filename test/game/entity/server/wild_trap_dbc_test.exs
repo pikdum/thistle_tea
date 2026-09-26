@@ -22,10 +22,13 @@ defmodule ThistleTea.Game.Entity.Server.WildTrapDbcTest do
   alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.Loader.Faction
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Loader.SpellChain
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
 
   @moduletag :dbc_db
+
+  setup [:spell_chains]
 
   describe "trap activation" do
     test "owned Frost Trap creates ticking areas with complete caster snapshots" do
@@ -186,5 +189,20 @@ defmodule ThistleTea.Game.Entity.Server.WildTrapDbcTest do
       assert_receive {:DOWN, ^ref, :process, ^pid, _}, 1_000
       refute_receive {:"$gen_cast", {:receive_spell, _, %Spell{id: 25_656}}}
     end
+  end
+
+  defp spell_chains(_context) do
+    for id <- [7897, 13_810, 25_656] do
+      key = {:chain, id}
+      previous = :ets.lookup(SpellChain, key)
+      :ets.insert(SpellChain, {key, nil})
+
+      on_exit(fn ->
+        :ets.delete(SpellChain, key)
+        :ets.insert(SpellChain, previous)
+      end)
+    end
+
+    :ok
   end
 end
