@@ -137,6 +137,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Player.Taxi, as: PlayerTaxi
   alias ThistleTea.Game.Player.Trade
+  alias ThistleTea.Game.Player.WeaponProcs
   alias ThistleTea.Game.Player.Weather
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
@@ -464,12 +465,18 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def handle_cast({:attack_outcome, payload}, %{character: %Character{} = character} = state) do
     spell = Map.get(payload, :spell) || spellbook_spell(character, Map.get(payload, :spell_id))
 
-    character =
-      character
-      |> AttackFeedback.receive(payload, spell, Time.now())
-      |> Enchantments.trigger_weapon_procs(payload)
+    character = AttackFeedback.receive(character, payload, spell, Time.now())
 
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast({:trigger_weapon_procs, hit}, %{character: %Character{} = character} = state) do
+    character = WeaponProcs.trigger(character, hit, Time.now())
+    {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Weapon procs failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:kill_outcome, %KillFeedback.Victim{} = victim}, %{character: %Character{} = character} = state) do

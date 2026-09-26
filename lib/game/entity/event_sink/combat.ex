@@ -203,6 +203,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
     entity
   end
 
+  def emit(entity, %Effects.TriggerWeaponProcs{} = effect, _context) do
+    Entity.trigger_weapon_procs(effect.source_guid, effect)
+    entity
+  end
+
   def emit(entity, %Effects.KillOutcome{} = effect, _context) do
     Entity.kill_outcome(effect.target_guid, effect.victim)
     entity

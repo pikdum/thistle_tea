@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Logic.Totems
   alias ThistleTea.Game.Entity.Logic.Warrior
+  alias ThistleTea.Game.Entity.Logic.WeaponProcs
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -128,7 +129,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     if cast_hit?(resolution, events) do
       target = Critter.spell_hit(target, context.caster_guid, spell, now)
       triggers = if alive_before?, do: TargetTrigger.events(context, target.object.guid), else: []
-      {target, events ++ triggers}
+      {target, events ++ triggers ++ WeaponProcs.spell_events(target, context, spell)}
     else
       {target, events}
     end

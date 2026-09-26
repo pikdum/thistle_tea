@@ -150,7 +150,8 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
                  damage: 12,
                  attack: %{hit_info: 0x2, damage_state: 1, blocked_amount: 0, absorb: 0}
                },
-               %Effects.AttackOutcome{target_guid: 1, source_guid: 2, outcome: :normal, damage: 12, spell_id: nil}
+               %Effects.AttackOutcome{target_guid: 1, source_guid: 2, outcome: :normal, damage: 12, spell_id: nil},
+               %Effects.TriggerWeaponProcs{source_guid: 1, target_guid: 2, hand: :mainhand}
              ] = events
     end
 
@@ -163,7 +164,8 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
       assert [
                %Effects.AttackerStateUpdate{},
                %Effects.TriggerSpell{source_guid: 2, source_level: 10, target_guid: 1, spell_id: 6136},
-               %Effects.AttackOutcome{}
+               %Effects.AttackOutcome{},
+               %Effects.TriggerWeaponProcs{}
              ] = events
     end
 

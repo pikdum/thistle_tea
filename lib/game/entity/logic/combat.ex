@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Logic.ResistancePenetration
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.WeaponDamage
+  alias ThistleTea.Game.Entity.Logic.WeaponProcs
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
@@ -197,7 +198,8 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
     daze_roll = Keyword.get(opts, :daze_roll, fn -> :rand.uniform() * 100 end)
     daze_events = Daze.events(entity, attack, result.damage - absorbed, daze_roll)
 
-    {entity, daze_events ++ [event | reaction_events] ++ feedback_events ++ skill_events}
+    weapon_procs = WeaponProcs.swing_events(entity, attack, result, absorbed)
+    {entity, daze_events ++ [event | reaction_events] ++ feedback_events ++ skill_events ++ weapon_procs}
   end
 
   def receive_attack(entity, _attack, _now, _opts), do: {entity, []}

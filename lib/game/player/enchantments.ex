@@ -231,7 +231,7 @@ defmodule ThistleTea.Game.Player.Enchantments do
         enchantment_id: enchantment.id,
         token: if(enchant_slot == Item.temporary_enchantment_slot(), do: Item.temporary_enchantment(item).token),
         effect: effect,
-        proc_spell: SpellLoader.load(effect.spell_id),
+        proc_spell: SpellLoader.cached(effect.spell_id),
         attack_time_ms: Item.template(item).delay || 2_000
       }
     end

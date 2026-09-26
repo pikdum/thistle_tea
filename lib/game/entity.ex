@@ -144,6 +144,8 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:spell_outcome, payload})
   end
 
+  def trigger_weapon_procs(entity, hit), do: dispatch_cast(entity, {:trigger_weapon_procs, hit})
+
   def drain_power(entity, power_type) do
     dispatch_cast(entity, {:drain_power, power_type})
   end
