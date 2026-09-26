@@ -193,6 +193,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Spell-granted skill ranks](docs/spell-skills-playtest.md), with profession starter recipes, preserved progress on rank upgrades, riding values, and abandonment cleanup
 - [Teaching spells and recipe books](docs/spell-teaching-playtest.md), with recipe learning, Expert profession books, atomic consumption, cancellation, and specialization requirements
 - [First Aid](docs/first-aid-playtest.md), with healing channels, recipient lockouts, interruption, rejected-use item preservation, and reconnect retention
+- [Consumable stacking](docs/consumable-stacking-playtest.md), with separate food and drink recovery, combined meals, Well Fed replacement, and exclusive vanilla flasks
 - [Inventory containers and lockboxes](docs/item-containers-playtest.md), with retained private loot, Pick Lock, consumable keys, atomic claims, and full-bag recovery
 - [Trade-slot unlocking](docs/trade-opening-playtest.md), with paid lockpicking, consumable keys, final requirement checks, and retry without closing the trade
 - [Wrapped gifts](docs/gift-wrapping-playtest.md), with atomic paper consumption, creator labels, and retained item identity, charges, and enchants through trade and opening
