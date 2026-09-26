@@ -6,6 +6,25 @@ defmodule ThistleTea.Game.Spell.ProcTest do
   alias ThistleTea.Game.Spell.ProcRule
 
   describe "eligible?/4" do
+    test "trap hits combine activation and damage flags without matching cast completion or damage ticks" do
+      talent = %Spell{proc_type_mask: 0x200000, proc_rule: %ProcRule{spell_family: 9, family_mask_0: 0x14}}
+
+      for mask <- [4, 16] do
+        trap = %Spell{spell_family: 9, family_flags_0: mask}
+        assert Proc.eligible?(talent, trap, :deal_harmful_spell, :normal)
+        assert Proc.eligible?(talent, trap, :trap_activation, :normal)
+        refute Proc.eligible?(talent, trap, :deal_harmful_spell, :cast_end)
+        refute Proc.eligible?(talent, trap, :deal_harmful_spell, :resist)
+        refute Proc.eligible?(talent, trap, :deal_harmful_periodic, :normal)
+
+        suppressed = %{trap | attributes: MapSet.new([:suppress_caster_procs])}
+        refute Proc.eligible?(talent, suppressed, :trap_activation, :normal)
+      end
+
+      refute Proc.eligible?(talent, %Spell{spell_family: 9, family_flags_0: 8}, :deal_harmful_spell, :normal)
+      refute Proc.eligible?(talent, %Spell{spell_family: 3, family_flags_0: 4}, :deal_harmful_spell, :normal)
+    end
+
     test "cast-end and hit procs remain separate even with always-trigger flags" do
       for rule <- [nil, %ProcRule{proc_ex: 1}, %ProcRule{proc_ex: 0x10000}] do
         spell = %Spell{proc_type_mask: 0x10000, proc_rule: rule}

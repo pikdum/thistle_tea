@@ -412,6 +412,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
           []
       end
 
+    events = Script.periodic_trigger_events(entity, holder) ++ events
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
   end
 

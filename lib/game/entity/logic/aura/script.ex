@@ -46,6 +46,25 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
 
   def periodic_events(_entity, _holder), do: []
 
+  def periodic_trigger_events(%{object: %{guid: guid}, unit: %{health: health}}, %Holder{} = holder)
+      when is_integer(health) and health > 0 do
+    if Spell.vmangos_script?(holder.spell, "spell_hunter_frost_trap_aura") do
+      [
+        %Effects.SpellProc{
+          source_guid: holder.caster_guid,
+          target_guid: guid,
+          spell: holder.spell,
+          proc_type: :trap_activation,
+          proc_origin: :cast
+        }
+      ]
+    else
+      []
+    end
+  end
+
+  def periodic_trigger_events(_entity, _holder), do: []
+
   @ignite_pct %{11_119 => 4, 11_120 => 8, 12_846 => 12, 12_847 => 16, 12_848 => 20}
   @ignite_dot 12_654
   @master_of_elements [29_074, 29_075, 29_076]

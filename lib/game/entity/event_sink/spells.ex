@@ -22,6 +22,25 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
   @spell_hit_type_crit 0x2
 
+  def emit(entity, %Effects.SpellProc{} = effect, context) do
+    payload = %{
+      victim_guid: effect.target_guid,
+      outcome: :normal,
+      proc_origin: effect.proc_origin,
+      proc_type: effect.proc_type,
+      spell_id: effect.spell.id,
+      spell: effect.spell
+    }
+
+    payload = Map.merge(payload, target_facts(entity, effect.target_guid))
+
+    if effect.source_guid == entity.object.guid,
+      do: Context.cast(context, {:spell_outcome, payload}),
+      else: Entity.spell_outcome(effect.source_guid, payload)
+
+    entity
+  end
+
   def emit(entity, %Effects.SpellCastCompleted{} = effect, context) do
     payload = %{
       victim_guid: effect.target_guid,

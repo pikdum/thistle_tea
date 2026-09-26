@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Spell.Proc do
   @periodic_positive 0x40000
   @trigger_always 0x10000
   @cast_end 0x80000
+  @trap_activation 0x00200000
 
   def hit_mask(outcome, damage, absorbed) do
     mask = outcome_mask(outcome)
@@ -28,7 +29,9 @@ defmodule ThistleTea.Game.Spell.Proc do
   end
 
   def eligible?(%Spell{} = proc_spell, %Spell{} = triggering_spell, proc_type, outcome) do
-    origin_allowed?(proc_spell, triggering_spell, proc_type, outcome) and proc_flag?(proc_spell, proc_type) and
+    mask = event_mask(triggering_spell, proc_type, outcome)
+
+    origin_allowed?(proc_spell, triggering_spell, proc_type, outcome) and proc_flag?(proc_spell, mask) and
       school_allowed?(proc_spell.proc_rule, triggering_spell) and
       family_allowed?(proc_spell.proc_rule, triggering_spell) and
       outcome_allowed?(proc_spell.proc_rule, proc_type, outcome)
@@ -58,6 +61,17 @@ defmodule ThistleTea.Game.Spell.Proc do
     end
   end
 
+  def trap_spell?(%Spell{} = spell), do: Spell.family_flag?(spell, 9, 0x1C)
+
+  defp event_mask(spell, proc_type, outcome) do
+    mask = proc_mask(proc_type)
+
+    if proc_type in [:deal_harmful_spell, :deal_harmful_ability] and trap_spell?(spell) and
+         (outcome_mask(outcome) &&& @cast_end) == 0,
+       do: mask ||| @trap_activation,
+       else: mask
+  end
+
   defp direction_allowed?(%Spell{} = spell, proc_type) do
     attribute = if outgoing?(proc_type), do: :suppress_caster_procs, else: :suppress_target_procs
     not Spell.attribute?(spell, attribute)
@@ -76,7 +90,8 @@ defmodule ThistleTea.Game.Spell.Proc do
       :deal_harmful_periodic,
       :deal_helpful_spell,
       :deal_helpful_ability,
-      :deal_helpful_periodic
+      :deal_helpful_periodic,
+      :trap_activation
     ]
   end
 
@@ -100,7 +115,7 @@ defmodule ThistleTea.Game.Spell.Proc do
   defp proc_flag?(%Spell{proc_type_mask: flags}, proc_type), do: proc_flag?(flags, proc_type)
 
   defp proc_flag?(flags, proc_type) when is_integer(flags) do
-    case proc_mask(proc_type) do
+    case if(is_integer(proc_type), do: proc_type, else: proc_mask(proc_type)) do
       0 -> false
       mask -> (flags &&& mask) != 0
     end
@@ -109,6 +124,7 @@ defmodule ThistleTea.Game.Spell.Proc do
   defp proc_flag?(_flags, _proc_type), do: false
 
   defp proc_mask(:kill), do: 0x00000002
+  defp proc_mask(:trap_activation), do: @trap_activation
   defp proc_mask(:deal_helpful_ability), do: 0x00000400
   defp proc_mask(:deal_harmful_ability), do: 0x00001000
   defp proc_mask(:deal_helpful_spell), do: 0x00004000

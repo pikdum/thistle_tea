@@ -75,7 +75,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
                :deal_helpful_periodic,
                :deal_ranged_attack,
                :deal_ranged_ability,
-               :deal_melee_ability
+               :deal_melee_ability,
+               :trap_activation
              ] do
     {holders, events} =
       Enum.reduce(holders, {holders, []}, fn %Holder{} = holder, {current_holders, events} ->

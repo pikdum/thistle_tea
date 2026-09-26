@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Chain
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Proc
   alias ThistleTea.Game.Spell.ProcOrigin
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
@@ -130,9 +131,31 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     if cast_hit?(resolution, events) do
       target = Critter.spell_hit(target, context.caster_guid, spell, now)
       triggers = if alive_before?, do: TargetTrigger.events(context, target.object.guid), else: []
-      {target, events ++ triggers ++ WeaponProcs.spell_events(target, context, spell)}
+
+      {target,
+       events ++
+         triggers ++
+         WeaponProcs.spell_events(target, context, spell) ++ trap_proc_events(target, context, spell, events)}
     else
       {target, events}
+    end
+  end
+
+  defp trap_proc_events(target, context, spell, events) do
+    damage_feedback? = Enum.any?(events, &is_struct(&1, Effects.SpellDamage))
+
+    if Proc.trap_spell?(spell) and not damage_feedback? and Aura.has_spell?(target, spell.id) do
+      [
+        %Effects.SpellProc{
+          source_guid: context.caster_guid,
+          target_guid: target.object.guid,
+          spell: spell,
+          proc_type: Proc.cast_type(spell),
+          proc_origin: ProcOrigin.classify(spell, context)
+        }
+      ]
+    else
+      []
     end
   end
 

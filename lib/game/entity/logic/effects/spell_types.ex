@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
     {:SpellHeal, [:source_guid, :target_guid, :spell_id, :spell, :school, :damage, :proc_type, :crit?],
      [periodic?: false, proc_origin: :cast]},
     {:SpellCastCompleted, [:source_guid, :target_guid, :spell, :proc_origin], []},
+    {:SpellProc, [:source_guid, :target_guid, :spell, :proc_type, :proc_origin], []},
     {:SpellLogMiss, [:source_guid, :target_guid, :spell_id, :reason], []},
     {:SpellDamageImmune, [:source_guid, :target_guid, :spell_id], []},
     {:SpellDispel, [:source_guid, :target_guid, :spell_ids], []},

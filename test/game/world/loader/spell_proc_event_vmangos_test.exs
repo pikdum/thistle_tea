@@ -18,6 +18,18 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   end
 
   describe "get/1" do
+    test "Entrapment ranks share fire and frost trap restrictions and the frost periodic script" do
+      assert %ProcRule{spell_family: 9, family_mask_0: 0x14, proc_flags: 0} = SpellProcEvent.get(19_184)
+
+      for id <- [19_387, 19_388, 19_389, 19_390] do
+        assert Mangos.Repo.get_by(Mangos.SpellProcEvent, entry: id) == nil
+      end
+
+      SpellScriptName.init()
+      SpellScriptName.load_all()
+      assert SpellScriptName.get(13_810) == "spell_hunter_frost_trap_aura"
+    end
+
     test "depleting trinkets use their dummy scripts and unmodified DBC proc flags" do
       SpellScriptName.init()
       SpellScriptName.load_all()
