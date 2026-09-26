@@ -142,6 +142,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - stacked damage-over-time effects scale with remaining stacks after partial cures
 - exclusive resistance buffs use the strongest effect per school, with weaker protection resuming on removal
 - crowd-control diminishing returns, shared across casters with recovery after control ends
+- [Slow exclusivity](docs/slow-exclusivity-playtest.md), with strength and duration replacement, preserved direct damage, daze coexistence, and expiry and death cleanup
 - [Pacification and silence](docs/combat-control-playtest.md), including combined controls, attack suppression, channel interruption, and overlapping-source cleanup
 - creature and pet fear movement, with bounded panic runs, control cleanup, and Curse of Recklessness suppression
 - [Critter escape behavior](docs/critter-playtest.md), with damage and debuff reactions, timed panic movement, combat recovery, and death cleanup
