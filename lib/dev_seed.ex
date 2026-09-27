@@ -36,6 +36,8 @@ defmodule ThistleTea.DevSeed do
   An isolated Defias Evoker at {16043.2, 16088.1} uses unit-targeted Blink
   through the normal combat spell list for destination teleport testing.
   Another Evoker at {15983.2, 16088.1} casts Plague for raid proximity and expiry testing.
+  An isolated Vharr at {16603.2, 16358.1} and an elevated Defias Thug at
+  {16603.2, 16438.1} support civilian protection and vertical aggro checks.
   """
   import Ecto.Query
 
@@ -371,6 +373,9 @@ defmodule ThistleTea.DevSeed do
       ai_events: [],
       spells: [%CreatureSpell{spell_id: 22_997, delay_repeat_min_ms: 60_000, delay_repeat_max_ms: 60_000}]
     )
+
+    spawn_mob(1146, @base_low_guid + 3200, {x + 300.0, y + 40.0, z}, nil, 30)
+    spawn_mob(38, @base_low_guid + 3201, {x + 300.0, y + 120.0, z}, nil, 30, altitude: 8.0)
 
     spawn_mob(2006, @base_low_guid + 2600, {x - 220.0, y + 80.0, z}, nil, 30)
     spawn_mob(2007, @base_low_guid + 2601, {x - 224.0, y + 84.0, z}, nil, 30)
