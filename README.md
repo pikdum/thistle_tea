@@ -210,6 +210,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Creature-specific flat damage](docs/creature-damage-playtest.md), including Beastslayer and Elemental Slayer enchants across weapon attacks, spells, and periodic damage
 - quests
 - [Quest dependencies](docs/quest-dependencies-playtest.md), with signed and alternative prerequisites, exclusive groups, chains, breadcrumbs, profession requirements, and live NPC marker refreshes
+- [Seasonal quests](docs/seasonal-quests-playtest.md), with world-event eligibility, live questgiver markers, stale-dialog rejection, and retained progress across event changes
 - [Quest reward spells](docs/liquid-spells-playtest.md), with caster selection, hidden automatic quest rewards, and native Naxxramas attunement
 - [Quest sharing](docs/quest-sharing-playtest.md), with party confirmations, eligibility feedback, inherited timers, source-item lifecycle, and stale-offer cleanup
 - [Item-started quests](docs/item-quests-playtest.md), with owned starter validation, atomic item exchanges, retained objectives, full-bag rejection, and party confirmation
