@@ -608,7 +608,14 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
   describe "Curse of Agony" do
     test "ramps from half damage to normal and then one-and-a-half damage" do
-      spell = %Spell{id: 980, name: "Curse of Agony", school: :shadow, spell_family: 5, family_flags_0: 0x00000400}
+      spell = %Spell{
+        id: 980,
+        name: "Curse of Agony",
+        school: :shadow,
+        spell_family: 5,
+        family_flags_0: 0x00000400,
+        effects: [%Effect{index: 0, base_points: 9, base_dice: 1}]
+      }
 
       early = agony_target(spell, 3_000)
       {early, _events} = AuraLogic.tick(early, 3_000)
@@ -872,6 +879,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       auras: [
         %Aura{
           type: :periodic_damage,
+          tick_count: div(next_tick_at - 3_000, 2_000),
           amount: 10,
           amplitude_ms: 2_000,
           next_tick_at: next_tick_at

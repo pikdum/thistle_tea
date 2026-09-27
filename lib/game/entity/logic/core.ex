@@ -194,7 +194,11 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
         {entity, damage, remaining}
 
       true ->
-        damage = scale_damage_taken(entity, damage, school)
+        damage =
+          if Keyword.get(opts, :damage_taken_applied?, false),
+            do: damage,
+            else: scale_damage_taken(entity, damage, school)
+
         {entity, remaining} = Aura.absorb_damage(entity, damage, school, now)
         {remaining, transfers} = DamageSharing.split(entity, remaining, school, now, opts)
         {Effects.enqueue(entity, transfers), damage, remaining}

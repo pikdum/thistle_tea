@@ -9,12 +9,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.AttackDamageTaken
   alias ThistleTea.Game.Entity.Logic.Aura.AreaSources
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
   alias ThistleTea.Game.Entity.Logic.Aura.Linked
+  alias ThistleTea.Game.Entity.Logic.Aura.PeriodicDamage
   alias ThistleTea.Game.Entity.Logic.Aura.Reactions
   alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
@@ -311,18 +311,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: type, next_tick_at: at} = aura, now)
        when type in [:periodic_damage, :periodic_damage_percent] and is_integer(at) and now >= at do
-    effect = Enum.find(holder.spell.effects, &(&1.index == aura.index))
-
-    amount =
-      AttackDamageTaken.spell_amount(
-        entity,
-        periodic_damage_amount(entity, holder, aura),
-        holder.spell,
-        effect,
-        :dot,
-        max(holder.stacks || 1, 1)
-      )
-
+    amount = PeriodicDamage.amount(entity, holder, aura)
     {entity, damage, log_opts} = apply_periodic_damage(entity, holder, amount, now)
 
     event =
@@ -375,9 +364,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: type, next_tick_at: at} = aura, now)
        when type in [:periodic_leech, :periodic_health_funnel] and is_integer(at) and now >= at do
     health_before = max(entity.unit.health || 0, 0)
-    effect = Enum.find(holder.spell.effects, &(&1.index == aura.index))
-    stacks = max(holder.stacks || 1, 1)
-    amount = AttackDamageTaken.spell_amount(entity, aura.amount * stacks, holder.spell, effect, :dot, stacks)
+    amount = PeriodicDamage.amount(entity, holder, aura)
     {entity, damage, log_opts} = apply_periodic_damage(entity, holder, amount, now)
     health_drained = max(health_before - (entity.unit.health || 0), 0)
 
@@ -452,40 +439,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}
 
-  defp periodic_damage_amount(%{unit: %Unit{max_health: max_health}}, %Holder{stacks: stacks}, %Aura{
-         type: :periodic_damage_percent,
-         amount: amount
-       }) do
-    div(max(max_health || 0, 0) * max(amount || 0, 0) * max(stacks || 1, 1), 100)
-  end
-
-  defp periodic_damage_amount(_entity, %Holder{spell: %Spell{id: 12_654}}, %Aura{amount: amount}), do: amount
-
-  defp periodic_damage_amount(_entity, %Holder{stacks: stacks} = holder, %Aura{} = aura) do
-    base_periodic_damage_amount(holder, aura) * max(stacks || 1, 1)
-  end
-
-  defp base_periodic_damage_amount(%Holder{spell: %Spell{} = spell, applied_at: applied_at}, %Aura{
-         amount: amount,
-         amplitude_ms: amplitude,
-         next_tick_at: next_tick_at
-       })
-       when is_integer(applied_at) and is_integer(amplitude) and amplitude > 0 and is_integer(next_tick_at) do
-    if Warlock.curse_of_agony?(spell) do
-      tick = div(next_tick_at - applied_at, amplitude)
-
-      cond do
-        tick <= 4 -> div(amount, 2)
-        tick >= 9 -> amount + div(amount, 2)
-        true -> amount
-      end
-    else
-      amount
-    end
-  end
-
-  defp base_periodic_damage_amount(_holder, %Aura{amount: amount}), do: amount
-
   @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
 
   defp apply_periodic_damage(entity, %Holder{} = holder, amount, now) do
@@ -502,6 +455,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
         source_owner: holder.caster_owner_guid,
         reflected_by: holder.reflected_by_guid,
         periodic: true,
+        damage_taken_applied?: true,
         source_level: caster_level,
         resistance_penetration: holder.resistance_penetration,
         damage_sharing_targets: cast_context(holder).damage_sharing_targets,
