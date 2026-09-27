@@ -122,3 +122,21 @@ Both helper services were stopped through their recorded invocations
 `7312336d759c422896562834ebb2c855`). Both became inactive with empty cgroups,
 both WoW PIDs disappeared, and both retained server PTYs exited. Ports 4000,
 3724, and 8085 were free. Artifacts were retained.
+
+## Range discrepancy follow-up
+
+A fresh GPU session, `thistle-wow-playtest.QcrPxt`, compared the same walker's
+client movement coordinates with `World.position/1`. Read-only inspection used
+the build-5875 object and movement layouts in `refs/wow-1121-client-internals`.
+The client updated the patrol and chase positions, then agreed with the server
+when the walker stopped to attack. After native Fireballs killed it, both sides
+reported exactly `{-3504.588134765625, 2652.05224609375, 88.8404541015625}`.
+Teleporting away and back within visibility range preserved a usable corpse;
+the vessel created a Muisek and removed the corpse from the client.
+
+These checks did not reproduce the earlier failure or establish its cause.
+No movement code changed. Evidence uses `/tmp/thistle-creature-range-`, with
+`death-client.json`, `death-server.txt`, `capture-client.json`, and `server.log`;
+the session retains `after-fireballs.png` and `capture-after-teleports.png`.
+WoW PID 2019757's own graphics counter increased from 771,269,034 to
+16,801,616,551 ns. The helper-owned client and retained server were stopped.
