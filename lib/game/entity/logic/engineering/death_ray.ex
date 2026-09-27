@@ -15,6 +15,16 @@ defmodule ThistleTea.Game.Entity.Logic.Engineering.DeathRay do
     if periodic?(spell), do: 99 + roll.(401)
   end
 
+  def application_time(
+        %{internal: %{casting: %Cast{spell: %Spell{id: @channel}, phase: :channel_tick} = cast}},
+        spell,
+        now
+      ) do
+    if periodic?(spell), do: cast.ends_at - cast.channel_ms, else: now
+  end
+
+  def application_time(_entity, _spell, now), do: now
+
   def periodic_amount(entity, %Spell{} = spell, %Aura{} = aura, amount) do
     if periodic?(spell) do
       amount = if channeling?(entity), do: amount, else: 0

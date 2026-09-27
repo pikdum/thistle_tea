@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Logic.DiminishingReturns
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Engineering.DeathRay
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Amount
   alias ThistleTea.Game.Entity.Logic.TargetDamage
   alias ThistleTea.Game.Entity.Logic.TargetSpellPower
@@ -75,12 +76,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   end
 
   defp apply_unblocked_spell(entity, context, spell, now) do
-    case build_auras(entity, context, spell, now) do
+    applied_at = DeathRay.application_time(entity, spell, now)
+
+    case build_auras(entity, context, spell, applied_at) do
       [] ->
         {entity, []}
 
       auras ->
-        holder = build_holder(entity, context, spell, auras, now)
+        holder = build_holder(entity, context, spell, auras, applied_at)
         do_apply(entity, Heartbeat.prepare(entity, holder, context), context, now)
     end
   end

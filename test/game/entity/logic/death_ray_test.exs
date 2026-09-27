@@ -47,6 +47,29 @@ defmodule ThistleTea.Game.Entity.Logic.DeathRayTest do
   end
 
   describe "tick/2" do
+    test "delayed delivery preserves the final tick before the channel ends", %{caster: caster} do
+      caster = %{caster | internal: %{caster.internal | casting: nil}}
+      caster = Casting.start(caster, channel(), Target.self(1), 0)
+      {caster, _} = Aura.apply_spell(caster, 1, 60, periodic(), 14)
+      [holder] = caster.unit.auras
+      amount = hd(holder.auras).amount
+      assert holder.applied_at == 0
+      assert holder.expires_at == caster.internal.casting.ends_at
+
+      {caster, events} =
+        Enum.reduce(1..4, {caster, []}, fn tick, {current, previous} ->
+          {current, events} = Aura.tick(current, tick * 1_000)
+          {current, previous ++ events}
+        end)
+
+      assert caster.unit.health == 5_000 - 4 * amount
+      assert [discharge] = triggers(events)
+      assert discharge.amount == 4 * amount
+      assert {:finished, caster} = Casting.advance(caster, 4_000)
+      assert caster.internal.casting == nil
+      assert caster.unit.auras == []
+    end
+
     test "four ticks discharge their accumulated base amount once", %{caster: caster} do
       caster = charge(caster)
 
