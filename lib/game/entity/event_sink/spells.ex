@@ -381,6 +381,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
   def emit(entity, %Effects.SpellCooldown{}, _context), do: entity
 
+  def emit(%Character{} = entity, %Effects.ItemCooldown{} = effect, context) do
+    Context.send_packet(context, %Message.SmsgItemCooldown{item_guid: effect.item_guid, spell_id: effect.spell_id})
+    entity
+  end
+
+  def emit(entity, %Effects.ItemCooldown{}, _context), do: entity
+
   def emit(%Character{} = entity, %Effects.SpellModifier{modifier_type: :flat} = effect, context) do
     Context.send_packet(context, %Message.SmsgSetFlatSpellModifier{
       effect_index: effect.effect_index,

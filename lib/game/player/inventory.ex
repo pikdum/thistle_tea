@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Player.Inventory do
   """
 
   alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Entity.Logic.EquipmentTransitions
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
   alias ThistleTea.Game.Entity.Logic.Proficiency
@@ -14,6 +15,7 @@ defmodule ThistleTea.Game.Player.Inventory do
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Player.Bank
   alias ThistleTea.Game.Player.Reputation
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.System.Petition, as: PetitionSystem
 
@@ -27,7 +29,7 @@ defmodule ThistleTea.Game.Player.Inventory do
           destination_bag,
           &ItemStore.get/1
         )
-        |> then(&InventoryUpdate.apply(state, &1))
+        |> then(&apply_equipment_change(state, &1))
 
       {:error, state} ->
         reject_remote_bank(state)
@@ -46,7 +48,7 @@ defmodule ThistleTea.Game.Player.Inventory do
           &ItemStore.get/1,
           validate_item: &Reputation.validate_item_requirement(character, &1)
         )
-        |> then(&InventoryUpdate.apply(state, &1))
+        |> then(&apply_equipment_change(state, &1))
 
       {:error, state} ->
         reject_remote_bank(state)
@@ -68,7 +70,7 @@ defmodule ThistleTea.Game.Player.Inventory do
           &ItemStore.get/1,
           validate_item: &Reputation.validate_item_requirement(character, &1)
         )
-        |> then(&InventoryUpdate.apply(state, &1))
+        |> then(&apply_equipment_change(state, &1))
 
       {:error, state} ->
         reject_remote_bank(state)
@@ -140,6 +142,15 @@ defmodule ThistleTea.Game.Player.Inventory do
     InventoryUpdate.send_failure(:too_far_away_from_bank, 0, 0)
     state
   end
+
+  defp apply_equipment_change(state, {:ok, %{player: player}} = result) do
+    case EquipmentTransitions.validate(state.character, player, &ItemStore.get/1, Time.now()) do
+      :ok -> InventoryUpdate.apply(state, result)
+      error -> InventoryUpdate.apply(state, error)
+    end
+  end
+
+  defp apply_equipment_change(state, error), do: InventoryUpdate.apply(state, error)
 
   defp reject_missing_item(state) do
     InventoryUpdate.send_failure(:item_not_found, 0, 0)

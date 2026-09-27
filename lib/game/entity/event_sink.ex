@@ -152,6 +152,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.SpellCastCompleted,
     Effects.SpellProc,
     Effects.SpellCooldown,
+    Effects.ItemCooldown,
     Effects.SpellDamage,
     Effects.SpellDamageImmune,
     Effects.SpellDelayed,

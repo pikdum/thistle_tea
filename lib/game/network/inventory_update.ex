@@ -15,6 +15,9 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.EventSink.Context
+  alias ThistleTea.Game.Entity.Logic.EquipmentTransitions
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet.Placement
@@ -25,9 +28,11 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.ItemDurations
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Presence
 
   def apply(state, result, placement \\ nil)
@@ -55,10 +60,7 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
     Enum.each(destroyed, fn item -> ItemStore.delete(item.object.guid) end)
     Enum.each(items, fn item -> ItemStore.put(item) end)
 
-    character =
-      %{state.character | player: player}
-      |> Character.sync_equipment_stats()
-      |> store_character()
+    character = sync_character(state.character, player)
 
     state =
       state
@@ -77,9 +79,7 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
       |> Network.send_packet()
     end)
 
-    state = sync_condition_subject(state)
-    broadcast_player(state)
-    ItemDurations.sync(state)
+    finish_update(state)
   end
 
   def apply(state, {:error, error, item1_guid, item2_guid}, _placement) do
@@ -96,10 +96,7 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
     destroyed = ChangeSet.destroyed_items(change_set)
     changed = ChangeSet.changed_items(change_set)
 
-    character =
-      %{state.character | player: change_set.player}
-      |> Character.sync_equipment_stats()
-      |> store_character()
+    character = sync_character(state.character, change_set.player)
 
     state =
       state
@@ -124,9 +121,20 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
       |> Network.send_packet()
     end)
 
+    finish_update(state)
+  end
+
+  defp sync_character(%Character{} = character, %Player{} = player) do
+    %{character | player: player}
+    |> Character.sync_equipment_stats()
+    |> EquipmentTransitions.apply(character.player, &ItemStore.get/1, &SpellLoader.cached/1, Time.now())
+  end
+
+  defp finish_update(state) do
     state = sync_condition_subject(state)
     broadcast_player(state)
-    ItemDurations.sync(state)
+    character = state.character |> EventSink.emit_pending(Context.new(self())) |> store_character()
+    ItemDurations.sync(%{state | character: character})
   end
 
   def commit_placement(%Item{} = item, placement) do

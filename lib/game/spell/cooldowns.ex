@@ -31,6 +31,57 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
 
   def start(entity, _spell, _now, _item_id), do: entity
 
+  def equip(%{internal: internal} = entity, %Spell{} = spell, item_guid, now) when is_integer(now) do
+    current = Map.get(stored(internal), spell.id)
+
+    entity =
+      if active_entry?(current, now) do
+        entity
+      else
+        entry = equip_entry(entity, spell, current, now)
+        cooldowns = internal |> active(now) |> Map.put(spell.id, entry) |> prune(now)
+        updated = %{entity | internal: %{internal | cooldowns: cooldowns}}
+
+        if is_struct(current, Entry),
+          do: Effects.enqueue(updated, Effects.cooldown_event(entity.object.guid, spell.id)),
+          else: updated
+      end
+
+    Effects.enqueue(entity, %Effects.ItemCooldown{item_guid: item_guid, spell_id: spell.id})
+  end
+
+  defp active_entry?(%Entry{pending?: false} = entry, now),
+    do: locked_until?(entry.ready_at, now) or locked_until?(entry.category_ready_at, now)
+
+  defp active_entry?(deadline, now), do: locked_until?(deadline, now)
+
+  defp equip_entry(entity, _spell, %Entry{pending?: true, item_id: item_id} = entry, now) when item_id > 0,
+    do: activate_entry(entity, entry, now)
+
+  defp equip_entry(entity, spell, _previous, now) do
+    spell = %{spell | recovery_time_ms: 30_000}
+    activate_entry(entity, %Entry{spell: spell, category: spell.category || 0, started_at: now}, now)
+  end
+
+  def start_weapon_change(%{internal: internal} = entity, %Spell{} = spell, now) do
+    if weapon_change_locked?(entity, now) or spell.gcd_ms <= 0 do
+      entity
+    else
+      cooldowns = internal |> active(now) |> Map.put(:weapon_change, now + spell.gcd_ms)
+
+      cooldowns =
+        if on_gcd?(entity, spell, now),
+          do: cooldowns,
+          else: Map.put(cooldowns, {:weapon_gcd, spell.gcd_category}, now + gcd_duration(entity, spell))
+
+      %{entity | internal: %{internal | cooldowns: cooldowns}}
+      |> Effects.enqueue(Effects.spell_cooldown(entity.object.guid, spell.id, 0))
+    end
+  end
+
+  def weapon_change_locked?(%{internal: internal}, now),
+    do: locked_until?(Map.get(stored(internal), :weapon_change), now)
+
   defp queue_client_cooldown(%{object: %{guid: guid}} = entity, %Spell{id: spell_id} = spell) when is_integer(guid) do
     if Spell.attribute?(spell, :cooldown_on_event) do
       entity
@@ -69,8 +120,10 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
 
   def gcd_duration(_entity, %Spell{} = spell), do: positive(spell.gcd_ms)
 
-  def on_gcd?(%{internal: internal}, %Spell{gcd_category: category}, now) when is_integer(now),
-    do: locked_until?(Map.get(stored(internal), {:gcd, category}), now)
+  def on_gcd?(%{internal: internal}, %Spell{gcd_category: category}, now) when is_integer(now) do
+    cooldowns = stored(internal)
+    locked_until?(cooldowns[{:gcd, category}], now) or locked_until?(cooldowns[{:weapon_gcd, category}], now)
+  end
 
   def on_gcd?(_entity, _spell, _now), do: false
 
