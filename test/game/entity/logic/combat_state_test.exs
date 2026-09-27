@@ -92,7 +92,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatStateTest do
     end
   end
 
-  describe "combat entry paths" do
+  describe "enter/2 through gameplay transitions" do
     test "player contact, holds, and threat membership share interruption", ctx do
       casting = prepare(ctx.player, ctx.spell, 1_000)
 
