@@ -101,6 +101,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Spell radius modifiers](docs/spell-radius-playtest.md), with area targeting, persistent ground effects, totem inheritance, talent reset, and reconnect acceptance
 - [Combo point builders](docs/combo-points-playtest.md), with Premeditation expiry, talent-generated points, finisher consumption, and single melee proc delivery
 - [Ownerless summoned objects](docs/wild-object-playtest.md), with shared loot, caster-independent lifetimes, linked objects, and environmental trap activation
+- [Owned summoned objects](docs/owned-game-objects-playtest.md), with independent spell slots, Hunter trap replacement, death retention, and cleanup on expiry, logout, and world departure
 - creature-specific melee and ranged attack power from slaying gear and consumables, with weapon-speed scaling and live target debuffs
 - [Armor and spell penetration](docs/resistance-penetration-playtest.md), with school masks, stacking, equipment bonuses, and periodic damage
 - [Armor and resistance modifiers](docs/armor-resistance-playtest.md), with agility armor, base and total modifier layers, multiplicative percentages, and form and talent lifecycles
