@@ -37,14 +37,15 @@ defmodule ThistleTea.Game.Spell.Cast do
     modifier_holder_ids: [],
     consume_item: false,
     pushback_count: 0,
+    delayed_ms: 0,
     started_at: 0,
     ends_at: 0
   ]
 
   def new(%Spell{} = spell, %Target{} = targets, now, modifiers \\ []) when is_integer(now) do
     cast_time_ms = normalize_time(spell.cast_time_ms)
-    channel_ms = if Spell.attribute?(spell, :channeled), do: normalize_time(spell.duration_ms), else: 0
-    channel_tick_ms = if channel_ms > 0, do: Spell.channel_tick_ms(spell, modifiers)
+    channel_ms = if Spell.attribute?(spell, :channeled), do: channel_duration(spell.duration_ms), else: 0
+    channel_tick_ms = if channel_ms != 0, do: Spell.channel_tick_ms(spell, modifiers)
 
     %__MODULE__{
       spell: spell,
@@ -56,7 +57,7 @@ defmodule ThistleTea.Game.Spell.Cast do
       preserve_stealth?: Stealth.exempt?(spell),
       next_channel_tick_at: next_channel_tick_at(now, cast_time_ms, channel_tick_ms),
       started_at: now,
-      ends_at: now + cast_time_ms + channel_ms
+      ends_at: if(channel_ms != -1, do: now + cast_time_ms + channel_ms)
     }
   end
 
@@ -80,10 +81,11 @@ defmodule ThistleTea.Game.Spell.Cast do
     end
   end
 
-  def launch_at(%__MODULE__{started_at: started_at, cast_time_ms: cast_time_ms}) do
-    started_at + normalize_time(cast_time_ms)
+  def launch_at(%__MODULE__{started_at: started_at, cast_time_ms: cast_time_ms, delayed_ms: delayed_ms}) do
+    started_at + normalize_time(cast_time_ms) + delayed_ms
   end
 
+  def channeled?(%__MODULE__{channel_ms: -1}), do: true
   def channeled?(%__MODULE__{channel_ms: channel_ms}) when is_integer(channel_ms) and channel_ms > 0, do: true
   def channeled?(_cast), do: false
 
@@ -94,7 +96,7 @@ defmodule ThistleTea.Game.Spell.Cast do
     %{
       cast
       | cast_time_ms: cast_time_ms,
-        ends_at: cast.ends_at + delta,
+        ends_at: shift_time(cast.ends_at, delta),
         next_channel_tick_at: shift_time(cast.next_channel_tick_at, delta)
     }
   end
@@ -102,13 +104,13 @@ defmodule ThistleTea.Game.Spell.Cast do
   def push_back_cast(%__MODULE__{cast_time_ms: cast_time_ms} = cast, now)
       when is_integer(cast_time_ms) and cast_time_ms > 0 and is_integer(now) do
     {cast, requested} = take_pushback_delay(cast)
-    new_ends_at = min(cast.ends_at + requested, now + cast_time_ms + (cast.channel_ms || 0))
-    delta = max(new_ends_at - cast.ends_at, 0)
+    remaining = max(launch_at(cast) - now, 0)
+    delta = min(requested, max(cast_time_ms - remaining, 0))
 
     cast = %{
       cast
-      | ends_at: cast.ends_at + delta,
-        cast_time_ms: cast_time_ms + channel_pushback_delta(cast, delta),
+      | ends_at: shift_time(cast.ends_at, delta),
+        delayed_ms: cast.delayed_ms + delta,
         next_channel_tick_at: shift_time(cast.next_channel_tick_at, delta)
     }
 
@@ -134,13 +136,6 @@ defmodule ThistleTea.Game.Spell.Cast do
 
   defp take_pushback_delay(%__MODULE__{} = cast), do: {%{cast | pushback_count: 1}, 1_000}
 
-  defp channel_pushback_delta(%__MODULE__{channel_ms: channel_ms}, delta)
-       when is_integer(channel_ms) and channel_ms > 0 do
-    delta
-  end
-
-  defp channel_pushback_delta(_cast, _delta), do: 0
-
   def advance_channel_tick(%__MODULE__{channel_tick_ms: tick_ms, next_channel_tick_at: next_tick_at} = cast, now)
       when is_integer(tick_ms) and tick_ms > 0 and is_integer(next_tick_at) do
     %{cast | next_channel_tick_at: advance_tick(next_tick_at, tick_ms, now)}
@@ -153,6 +148,9 @@ defmodule ThistleTea.Game.Spell.Cast do
     min(max(next_tick_at - now, 0), max(ends_at - now, 0))
   end
 
+  def next_channel_delay(%__MODULE__{channel_ms: -1, next_channel_tick_at: next_tick_at}, now)
+      when is_integer(next_tick_at), do: max(next_tick_at - now, 0)
+
   def next_channel_delay(%__MODULE__{ends_at: ends_at}, now) when is_integer(ends_at), do: max(ends_at - now, 0)
   def next_channel_delay(_cast, _now), do: 0
 
@@ -163,6 +161,9 @@ defmodule ThistleTea.Game.Spell.Cast do
 
   defp normalize_time(value) when is_integer(value) and value > 0, do: value
   defp normalize_time(_value), do: 0
+
+  defp channel_duration(-1), do: -1
+  defp channel_duration(duration), do: normalize_time(duration)
 
   defp next_channel_tick_at(_now, _cast_time_ms, nil), do: nil
   defp next_channel_tick_at(now, cast_time_ms, tick_ms), do: now + cast_time_ms + tick_ms

@@ -234,10 +234,11 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp advance_phase(entity, %Cast{phase: :channel_tick} = casting, now) do
-    {entity, delay_ms} = channel_tick(entity, casting, min(now, casting.ends_at))
+    tick_at = if is_integer(casting.ends_at), do: min(now, casting.ends_at), else: now
+    {entity, delay_ms} = channel_tick(entity, casting, tick_at)
 
     case entity.internal.casting do
-      %Cast{ends_at: ends_at} = casting when now >= ends_at ->
+      %Cast{ends_at: ends_at} = casting when is_integer(ends_at) and now >= ends_at ->
         casting = Cast.transition(casting, :finish)
         entity |> put_cast(casting) |> advance_phase(casting, now)
 
@@ -835,7 +836,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     character = reset_preparing_gcd(character, internal.casting)
 
     case internal.casting do
-      %Cast{channel_ms: channel_ms} = casting when is_integer(channel_ms) and channel_ms > 0 ->
+      %Cast{channel_ms: channel_ms} = casting when is_integer(channel_ms) and (channel_ms > 0 or channel_ms == -1) ->
         stop_channel(character, casting, :cancelled, now)
 
       _ ->
@@ -928,7 +929,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
          %{object: %{guid: guid}, unit: unit} = character,
          %Cast{spell: %Spell{id: spell_id}, channel_ms: duration_ms} = casting
        )
-       when is_integer(guid) and is_integer(duration_ms) and duration_ms > 0 do
+       when is_integer(guid) and is_integer(duration_ms) and (duration_ms > 0 or duration_ms == -1) do
     channel_object = channel_target_guid(character, casting)
 
     %{character | unit: %{unit | channel_spell: spell_id, channel_object: channel_object}}

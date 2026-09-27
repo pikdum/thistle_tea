@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
@@ -36,6 +37,9 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
       assert caster.internal.casting.ends_at == 5_600
       assert [%Effects.SpellDelayed{delay_ms: 600}] = effects_of(caster, Effects.SpellDelayed)
       assert caster.internal.casting.pushback_count == 2
+      assert Cast.launch_at(caster.internal.casting) == 5_600
+      assert {:waiting, ^caster, 1_600} = Casting.advance(caster, 4_000)
+      assert {:waiting, ^caster, 1} = Casting.advance(caster, 5_599)
     end
 
     test "cancels the cast outright when the spell interrupts on damage" do

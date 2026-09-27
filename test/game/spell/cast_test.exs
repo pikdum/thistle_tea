@@ -8,6 +8,27 @@ defmodule ThistleTea.Game.Spell.CastTest do
   alias ThistleTea.Game.Spell.CastResolution.Followups
   alias ThistleTea.Game.Spell.Target
 
+  describe "new/4" do
+    test "indefinite channels retain their duration and schedule future ticks" do
+      spell = %Spell{cast_time_ms: 2_000, duration_ms: -1, attributes: MapSet.new([:channeled])}
+      cast = Cast.new(spell, Target.none(), -10_000)
+      assert Cast.channeled?(cast)
+      assert cast.channel_ms == -1
+      assert cast.ends_at == nil
+      assert Cast.launch_at(cast) == -8_000
+      cast = Cast.apply_speed_multiplier(cast, 0.5)
+      assert Cast.launch_at(cast) == -9_000
+      assert cast.ends_at == nil
+      {cast, delay} = Cast.push_back_cast(cast, -9_500)
+      assert delay == 500
+      assert Cast.launch_at(cast) == -8_500
+      assert cast.ends_at == nil
+      assert Cast.next_channel_delay(cast, -8_500) == 1_000
+      cast = Cast.advance_channel_tick(cast, 60_000)
+      assert Cast.next_channel_delay(cast, 60_000) in 1..1_000
+    end
+  end
+
   describe "transition/2" do
     test "accepts only state-machine edges" do
       cast = Cast.new(%Spell{id: 1}, Target.none(), 1_000)
