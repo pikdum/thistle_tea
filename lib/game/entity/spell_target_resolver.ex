@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   """
   alias ThistleTea.Game.Entity.ChainTargets
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Logic.ControlOwner
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.PetTraining
@@ -209,6 +210,10 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
 
   defp query_guids(caster, caster_guid, {:party_unit, guid}), do: party_unit_guids(caster, caster_guid, guid)
 
+  defp query_guids(caster, _caster_guid, {:raid_aoe, radius, spell_level}) do
+    nearby_raid_guids(caster, radius, spell_level)
+  end
+
   defp query_guids(caster, caster_guid, :caster_master) do
     case party_owner_guid(caster, caster_guid) do
       owner_guid when is_integer(owner_guid) and owner_guid != caster_guid -> [owner_guid]
@@ -385,6 +390,35 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   end
 
   defp nearby_party_guids(_caster, caster_guid, _radius, _scope), do: [caster_guid]
+
+  defp nearby_raid_guids(caster, radius, spell_level) when is_number(radius) and radius > 0 do
+    owner_guid = ControlOwner.guid(caster)
+
+    members =
+      case PartySystem.group_of(owner_guid) do
+        %Party.Group{members: members} ->
+          members
+          |> Enum.filter(&raid_member_eligible?(caster, &1.guid, spell_level))
+          |> MapSet.new(& &1.guid)
+
+        _ ->
+          MapSet.new([owner_guid])
+      end
+
+    caster
+    |> nearby_units(radius)
+    |> Enum.map(&elem(&1, 0))
+    |> Enum.filter(&(alive?(&1) and (MapSet.member?(members, &1) or party_pet?(&1, members))))
+  end
+
+  defp nearby_raid_guids(_caster, _radius, _spell_level), do: []
+
+  defp raid_member_eligible?(caster, guid, spell_level) do
+    case Metadata.query(guid, [:level]) do
+      %{level: level} when is_integer(level) -> level + 10 >= spell_level and not Hostility.hostile?(caster, guid)
+      _ -> false
+    end
+  end
 
   defp target_party_guids(target_guid, radius) when is_number(radius) and radius > 0 do
     with owner_guid when is_integer(owner_guid) <- target_party_owner(target_guid),

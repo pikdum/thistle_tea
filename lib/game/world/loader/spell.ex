@@ -939,6 +939,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(33), do: :party_around_caster
   defp target_type(34), do: :party_around_caster
   defp target_type(35), do: :party_member
+  defp target_type(56), do: :raid_around_caster
   defp target_type(37), do: :party_around_target
   defp target_type(38), do: :creature_near_caster
   defp target_type(39), do: :caster_fishing_spot

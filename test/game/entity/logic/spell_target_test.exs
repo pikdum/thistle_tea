@@ -112,6 +112,17 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
       assert SpellTarget.target_query(spell, Target.unit(2)) == {:party_aoe, 10.0}
     end
 
+    test "raid areas retain their level gate and ignore the selected unit" do
+      spell = %{aoe_spell(:raid_around_caster) | spell_level: 20, range_yards: 30.0}
+      assert SpellTarget.target_query(spell, Target.unit(2)) == {:raid_aoe, 10.0, 20}
+      assert SpellTarget.target_query(spell, Target.none()) == {:raid_aoe, 10.0, 20}
+      assert SpellTarget.area_targeted?(spell)
+
+      [effect] = spell.effects
+      spell = %{spell | effects: [%{effect | radius_yards: nil}]}
+      assert SpellTarget.target_query(spell, Target.none()) == {:raid_aoe, 30.0, 20}
+    end
+
     test "targeted party buffs use the selected unit as their center" do
       spell = aoe_spell(:party_around_target)
 

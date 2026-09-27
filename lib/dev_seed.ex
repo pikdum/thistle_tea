@@ -35,6 +35,7 @@ defmodule ThistleTea.DevSeed do
   beside an Urok Enforcer and Urok Ogre Magus for scripted trap targeting.
   An isolated Defias Evoker at {16043.2, 16088.1} uses unit-targeted Blink
   through the normal combat spell list for destination teleport testing.
+  Another Evoker at {15983.2, 16088.1} casts Plague for raid proximity and expiry testing.
   """
   import Ecto.Query
 
@@ -364,6 +365,11 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(1729, @base_low_guid + 3000, {x - 260.0, y - 230.0, z}, nil, 30,
       ai_events: [],
       spells: [%CreatureSpell{spell_id: 28_401, delay_repeat_min_ms: 30_000, delay_repeat_max_ms: 30_000}]
+    )
+
+    spawn_mob(1729, @base_low_guid + 3100, {x - 320.0, y - 230.0, z}, nil, 30,
+      ai_events: [],
+      spells: [%CreatureSpell{spell_id: 22_997, delay_repeat_min_ms: 60_000, delay_repeat_max_ms: 60_000}]
     )
 
     spawn_mob(2006, @base_low_guid + 2600, {x - 220.0, y + 80.0, z}, nil, 30)

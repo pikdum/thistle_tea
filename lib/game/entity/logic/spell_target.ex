@@ -50,14 +50,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
       query = area_query(spell, targets, radius) ->
         query
 
-      query = party_query(spell, unit_guid, radius) ->
+      query = group_query(spell, unit_guid, radius, modifiers) ->
         query
 
       query = master_query(spell, unit_guid) ->
         query
-
-      raid_class_aoe_spell?(spell) ->
-        {:party_class_aoe, unit_guid, raid_class_radius(spell, modifiers)}
 
       caster_only_spell?(spell) ->
         :caster
@@ -81,7 +78,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
 
   def area_targeted?(%Spell{} = spell) do
     caster_aoe_spell?(spell) or cone_aoe_spell?(spell) or targeted_aoe_spell?(spell) or party_aoe_spell?(spell) or
-      target_party_aoe_spell?(spell) or friendly_aoe_spell?(spell) or UnitTargets.area?(spell)
+      target_party_aoe_spell?(spell) or raid_aoe_spell?(spell) or friendly_aoe_spell?(spell) or UnitTargets.area?(spell)
   end
 
   def area_targeted?(_spell), do: false
@@ -180,13 +177,30 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
     Enum.any?(effects, &effect_targets?(&1, [:party_around_caster]))
   end
 
-  defp party_query(spell, unit_guid, radius) do
+  defp raid_aoe_spell?(%Spell{effects: effects}) do
+    Enum.any?(effects, &effect_targets?(&1, [:raid_around_caster]))
+  end
+
+  defp raid_radius(spell, modifiers) do
+    case Radius.maximum(spell.effects, []) do
+      radius when radius > 0 -> Radius.maximum(spell.effects, modifiers)
+      _ -> Radius.maximum([], modifiers, spell.range_yards || 0.0)
+    end
+  end
+
+  defp group_query(spell, unit_guid, radius, modifiers) do
     cond do
+      raid_aoe_spell?(spell) ->
+        {:raid_aoe, raid_radius(spell, modifiers), spell.spell_level || 0}
+
       party_aoe_spell?(spell) ->
         {:party_aoe, radius}
 
       target_party_aoe_spell?(spell) and is_integer(unit_guid) ->
         {:target_party_aoe, unit_guid, radius}
+
+      raid_class_aoe_spell?(spell) ->
+        {:party_class_aoe, unit_guid, raid_class_radius(spell, modifiers)}
 
       true ->
         nil
