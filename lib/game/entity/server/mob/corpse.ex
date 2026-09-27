@@ -235,7 +235,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     with %LootSession{} = session <- session(state),
          {:ok, session} <- LootSession.release(session, command) do
       Process.demonitor(command.token, [:flush])
-      state = put_session(state, session)
+      state = state |> put_session(session) |> publish_lootability()
       maybe_continue_respawn(state)
       {:ok, state}
     else
@@ -252,6 +252,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
         _ -> state
       end
 
+    state = publish_lootability(state)
     maybe_continue_respawn(state)
     state
   end
@@ -409,7 +410,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
           :all_passed -> pass_roll(state, roll)
         end
 
-      state = finish_if_done(state)
+      state = state |> finish_if_done() |> publish_lootability()
       maybe_continue_respawn(state)
       state
     else
@@ -542,6 +543,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
 
   defp maybe_continue_respawn(%Mob{} = state) do
     Respawn.maybe_continue(state)
+  end
+
+  defp publish_lootability(%Mob{} = state) do
+    if session(state) do
+      Core.update_object(state, :values) |> World.broadcast_packet(state)
+    end
+
+    state
   end
 
   defp maybe_set_lootable_flag(%Mob{unit: %Unit{} = unit} = state) do

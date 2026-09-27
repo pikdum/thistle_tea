@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
   alias ThistleTea.Game.Entity.Data.DamageOrigin
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.ItemEligibility
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
@@ -21,11 +22,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.Visibility.Tap
   alias ThistleTea.Game.WorldRef
 
   @dynamic_flag_lootable 0x0001
@@ -276,16 +279,40 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
     test "retains the winner on inventory failure", %{corpse: corpse, killer: killer, member: member} do
       prepared = Corpse.prepare(corpse, killer)
       assert_receive {:loot_award, _, reservation}
+      initial = Tap.personalize(Core.update_object(prepared, :values), killer)
+      assert (initial.unit.dynamic_flags &&& @dynamic_flag_lootable) == 0
 
       assert {:ok, released} =
                Corpse.release_reservation(prepared, %Release{token: reservation.token, actor_guid: killer})
 
       assert released.internal.loot.session.rolls == %{}
+      assert_receive {:"$gen_cast", {:send_packet, %UpdateObject{} = update, _options}}
+      assert (Tap.personalize(update, killer).unit.dynamic_flags &&& @dynamic_flag_lootable) != 0
+      assert (Tap.personalize(update, member).unit.dynamic_flags &&& @dynamic_flag_lootable) == 0
       assert {{:error, :nothing_to_take}, _} = Corpse.view(released, group_actor(member))
       assert {{:error, :already_looted}, _} = Corpse.reserve_item(released, group_actor(member), 0, self())
       assert {{:ok, retry}, _} = Corpse.reserve_item(released, group_actor(killer), 0, self())
       assert retry.item.item_id == @grey_item_id
       assert retry.item.owner_guid == killer
+    end
+
+    test "publishes lootability when a reserved recipient disappears", %{corpse: corpse, killer: killer} do
+      prepared = Corpse.prepare(corpse, killer)
+      assert_receive {:loot_award, _, reservation}
+      restored = Corpse.reservation_lost(prepared, reservation.token)
+      assert restored.internal.loot.session.reservations == %{}
+      assert_receive {:"$gen_cast", {:send_packet, %UpdateObject{} = update, _options}}
+      assert (Tap.personalize(update, killer).unit.dynamic_flags &&& @dynamic_flag_lootable) != 0
+    end
+
+    test "publishes lootability after everyone passes", %{corpse: corpse, killer: killer, member: member} do
+      Metadata.update(member, %{item_eligibility: eligibility(Proficiency.all())})
+      prepared = Corpse.prepare(corpse, killer)
+      passed = prepared |> Corpse.roll_vote(killer, 0, :pass) |> Corpse.roll_vote(member, 0, :pass)
+      assert passed.internal.loot.session.rolls == %{}
+      assert_receive {:"$gen_cast", {:send_packet, %UpdateObject{} = update, _options}}
+      assert (Tap.personalize(update, killer).unit.dynamic_flags &&& @dynamic_flag_lootable) != 0
+      assert (Tap.personalize(update, member).unit.dynamic_flags &&& @dynamic_flag_lootable) != 0
     end
 
     test "retains the winner when its owner has disconnected", %{corpse: corpse, killer: killer, member: member} do
