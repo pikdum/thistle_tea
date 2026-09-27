@@ -187,7 +187,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
              is_integer(delay_ms) and delay_ms > 0 do
     {holders, events} =
       Enum.map_reduce(holders, [], fn %Holder{} = holder, events ->
-        if Holder.same_source?(holder, spell_id, caster_guid) and is_integer(holder.expires_at) do
+        if Holder.same_source?(holder, spell_id, caster_guid) and is_integer(holder.expires_at) and
+             not AreaSources.ground?(holder) do
           holder = %{holder | expires_at: max(holder.expires_at - delay_ms, now)}
           holder = Heartbeat.delay(holder, delay_ms, now)
           {holder, events ++ duration_event(holder, now)}

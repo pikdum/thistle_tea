@@ -11,6 +11,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.AreaSources do
   alias ThistleTea.Game.Spell.PersistentArea
   alias ThistleTea.Game.Spell.PersistentArea.Check
 
+  def ground?(%Holder{auras: auras}),
+    do: auras != [] and Enum.all?(auras, &match?(%Aura{persistent_area: %PersistentArea{}}, &1))
+
   def merge(%Holder{} = current, %Holder{} = incoming) do
     if ground?(current) and ground?(incoming) do
       auras = Enum.uniq_by(current.auras ++ incoming.auras, & &1.index)
@@ -70,7 +73,4 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.AreaSources do
     context = %{holder.cast_context | spell: spell}
     %{holder | auras: Enum.sort_by(auras, & &1.index), spell: spell, cast_context: context, expires_at: expires_at}
   end
-
-  defp ground?(%Holder{auras: auras}),
-    do: auras != [] and Enum.all?(auras, &match?(%Aura{persistent_area: %PersistentArea{}}, &1))
 end

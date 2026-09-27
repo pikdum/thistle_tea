@@ -30,6 +30,20 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PersistentAreaTest do
   setup [:ground_spell]
 
   describe "shorten_area_aura/4" do
+    test "selected ground recipients shorten once regardless of target and source delivery order", ctx do
+      {target, _} = Aura.apply_spell(ctx.target, ctx.context, ctx.spell, 0)
+
+      ordinary_delay = &Aura.delay_source_spell(&1, ctx.spell.id, ctx.context.caster_guid, 1_000, 500)
+      area_delay = fn target -> elem(Aura.shorten_area_aura(target, ctx.area.guid, 3_000, 500), 0) end
+
+      for operations <- [[ordinary_delay, area_delay], [area_delay, ordinary_delay]] do
+        delayed = Enum.reduce(operations, target, fn operation, target -> operation.(target) end)
+        assert [%Holder{expires_at: 3_000, auras: [aura]}] = ground_holders(delayed)
+        assert aura.persistent_area.expires_at == 3_000
+        assert aura.next_tick_at == 1_000
+      end
+    end
+
     test "shortens each source independently without restarting ticks or subtracting twice", ctx do
       second = ground_effect(ctx, 1, 5.0, 4_000)
       {target, _} = Aura.apply_spell(ctx.target, ctx.context, ctx.spell, 0)
