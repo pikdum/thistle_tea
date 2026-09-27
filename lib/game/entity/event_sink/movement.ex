@@ -204,6 +204,9 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
 
   def emit(entity, %Effects.MovementSpeedChanged{}, _context), do: entity
 
+  def emit(%{movement_block: %MovementBlock{spline_nodes: nodes}} = entity, %Effects.MonsterMove{}, _context)
+      when nodes in [nil, []], do: entity
+
   def emit(%Mob{} = entity, %Effects.MonsterMove{move_opts: opts}, _context) do
     World.update_position(entity)
     notify_chasers(entity)

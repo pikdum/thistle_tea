@@ -67,7 +67,7 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
   end
 
   describe "emit/3 CreatureTeleported" do
-    test "spell teleports halt creature splines without clearing engagement" do
+    test "spell teleports discard queued spline projections without clearing engagement" do
       world = WorldRef.instance(529, unique_low())
       guid = Guid.from_low_guid(:mob, 10_917, unique_low())
       observers = start_observers(nearby: {world, {0.0, 0.0, 0.0}})
@@ -95,7 +95,7 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
         destination: {:position, {15.0, 0.0, 0.0}}
       }
 
-      moved = EventSink.emit(entity, request)
+      moved = EventSink.emit(entity, [request, Effects.monster_move(face_target: 7)])
       assert moved.movement_block.position == {15.0, 0.0, 0.0, 0.0}
       assert moved.movement_block.spline_nodes == []
       assert moved.internal.movement_start_time == nil
@@ -105,6 +105,7 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
       assert World.position(guid) == {world, 15.0, 0.0, 0.0}
       assert Position.projection(guid) == nil
       assert_receive {:observer, :nearby, {:"$gen_cast", {:send_packet, %MsgMoveTeleport{guid: ^guid}, _}}}
+      refute_receive {:observer, :nearby, {:"$gen_cast", {:send_packet, %SmsgMonsterMove{}, _}}}
       Visibility.leave_entity(moved)
     end
 
