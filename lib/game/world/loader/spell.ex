@@ -665,6 +665,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(8), do: :power_drain
   defp effect_type(9), do: :health_leech
   defp effect_type(10), do: :heal
+  defp effect_type(75), do: :heal_mechanical
   defp effect_type(11), do: :bind
   defp effect_type(16), do: :quest_complete
   defp effect_type(18), do: :resurrect

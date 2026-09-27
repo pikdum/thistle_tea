@@ -116,13 +116,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     {state, swiftmend_healing, swiftmend_events} = Druid.consume_swiftmend_hot(state, spell, now)
 
     base = base_amount(spell, effect, context) + swiftmend_healing
-    healing = healing_done(base, context, spell, effect)
-
-    healing =
-      HealingReceived.spell_amount(state, healing, spell, effect,
-        coefficient_multiplier: Chain.multiplier(effect, context)
-      )
-
+    healing = healing_amount(state, base, context, spell, effect)
     crit? = heal_crit?(context, spell)
     healing = if crit?, do: healing + div(healing, 2), else: healing
     events = SpellThreat.heal_events(state, context, spell, healing)
@@ -133,6 +127,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
       )
 
     {Core.heal(state, healing), swiftmend_events ++ events ++ [heal_event]}
+  end
+
+  def apply(state, %CastContext{} = context, spell, %Effect{type: :heal_mechanical} = effect, _now) do
+    healing = healing_amount(state, base_amount(spell, effect, context), context, spell, effect)
+
+    event =
+      Effects.spell_heal(context.caster_guid, state.object.guid, spell, healing, false,
+        proc_type: nil,
+        proc_origin: ProcOrigin.classify(spell, context)
+      )
+
+    {Core.heal(state, healing), [event]}
   end
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :heal_max_health}, _now) do
@@ -216,6 +222,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   end
 
   defp heal_crit?(_context, _spell), do: false
+
+  defp healing_amount(state, base, context, spell, effect) do
+    HealingReceived.spell_amount(state, healing_done(base, context, spell, effect), spell, effect,
+      coefficient_multiplier: Chain.multiplier(effect, context)
+    )
+  end
 
   defp healing_done(base, context, spell, effect) do
     if Spell.attribute?(spell, :ignore_caster_modifiers) or Spell.custom?(spell, :fixed_damage) do

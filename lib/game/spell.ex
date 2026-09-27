@@ -348,7 +348,7 @@ defmodule ThistleTea.Game.Spell do
 
   def healing?(%__MODULE__{effects: effects}) do
     Enum.any?(effects, fn
-      %Effect{type: type} when type in [:heal, :heal_max_health] ->
+      %Effect{type: type} when type in [:heal, :heal_mechanical, :heal_max_health] ->
         true
 
       %Effect{type: type, aura: aura} when type in [:apply_aura, :apply_area_aura] ->

@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   @direct_amount_effects [
     :school_damage,
     :heal,
+    :heal_mechanical,
     :health_leech,
     :power_drain,
     :power_burn,

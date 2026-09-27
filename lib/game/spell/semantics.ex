@@ -112,6 +112,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
     :health_leech,
     :instakill,
     :heal,
+    :heal_mechanical,
     :heal_max_health,
     :weapon_damage,
     :weapon_damage_noschool,
