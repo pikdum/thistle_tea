@@ -131,6 +131,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   end
 
   defp continue_combat(state, blackboard, %Context{now: now} = context) do
+    previous_victim = state.unit.target
     pet = %{state.internal.pet | attack_command?: false}
     blackboard = blackboard |> Blackboard.clear_chase() |> Blackboard.reset_spells()
     state = %{state | internal: %{state.internal | pet: pet, blackboard: blackboard}}
@@ -138,13 +139,24 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
     state = state |> Casting.cancel() |> halt(now)
 
     state =
-      case TargetSelection.next(state, context) do
+      case TargetSelection.next(state, context, previous_victim) do
         nil -> clear_combat_state(state, now)
         target -> Engagement.enter(state, target, now, selection: :target).entity
       end
 
     {:success, state, state.internal.blackboard}
   end
+
+  def victim_died(%Mob{unit: %{target: victim}, internal: %{pet: %Pet{}}} = state, victim, %Context{} = context) do
+    if Core.dead?(state) do
+      state
+    else
+      {:success, state, _blackboard} = continue_combat(state, Blackboard.ensure(state.internal.blackboard), context)
+      state
+    end
+  end
+
+  def victim_died(%Mob{} = state, _victim, %Context{}), do: state
 
   def clear_combat_state(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, now \\ Time.now()) do
     pet = %{pet | attack_command?: false}

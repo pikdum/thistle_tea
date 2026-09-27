@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerKillRewardTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.GroupReward.Award
+  alias ThistleTea.Game.Entity.Logic.KillFeedback
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
@@ -20,6 +21,25 @@ defmodule ThistleTea.Game.Entity.Server.PlayerKillRewardTest do
   alias ThistleTea.Game.World.Metadata
 
   describe "handle_cast/2" do
+    test "fatal blows notify the active pet even when the victim is gray" do
+      pet_guid = Guid.runtime(:pet, 1)
+      player_guid = System.unique_integer([:positive])
+      Entity.register(pet_guid)
+
+      character =
+        %Character{object: %Object{guid: player_guid}, unit: %Unit{health: 100, level: 60}, internal: %Internal{}}
+        |> Companion.activate(:hunter_pet, %EntityRef{guid: pet_guid, entry: 1, spell_id: 1515})
+
+      victim = %KillFeedback.Victim{guid: Guid.runtime(:mob, 38), level: 4, reward_target?: true}
+      state = %State{guid: player_guid, character: character}
+
+      assert {:noreply, ^state, {:continue, :maybe_broadcast_update}} =
+               PlayerServer.handle_cast({:kill_outcome, victim}, state)
+
+      assert_receive {:owner_killed, ^player_guid, guid}
+      assert guid == victim.guid
+    end
+
     test "preserves capped-player rested XP and still forwards the pet's group reward" do
       pet_guid = Guid.from_low_guid(:pet, 1, System.unique_integer([:positive]))
       player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))

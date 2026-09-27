@@ -486,6 +486,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_cast({:kill_outcome, %KillFeedback.Victim{} = victim}, %{character: %Character{} = character} = state) do
     character = KillFeedback.receive(character, victim, Time.now())
+    notify_companion(character, {:owner_killed, character.object.guid, victim.guid})
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   rescue
     error ->
@@ -2160,14 +2161,17 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp notify_defensive_pet(%Character{} = character, attacker_guid) when is_integer(attacker_guid) do
     GuardianOwner.defend(character, attacker_guid)
-
-    case Entity.pid(Companion.creature_guid(character)) do
-      pid when is_pid(pid) -> send(pid, {:owner_attacked, attacker_guid})
-      _ -> :ok
-    end
+    notify_companion(character, {:owner_attacked, attacker_guid})
   end
 
   defp notify_defensive_pet(%Character{}, _attacker_guid), do: :ok
+
+  defp notify_companion(%Character{} = character, message) do
+    case Entity.pid(Companion.creature_guid(character)) do
+      pid when is_pid(pid) -> send(pid, message)
+      _ -> :ok
+    end
+  end
 
   defp apply_incoming_spell(%Character{} = character, _caster, _spell, _now, true, false), do: {character, false}
 

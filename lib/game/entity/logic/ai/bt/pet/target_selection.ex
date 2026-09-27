@@ -10,7 +10,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.TargetSelection do
 
   def next(
         %Mob{internal: %{pet: %Pet{owner_guid: owner}, world: world}} = pet,
-        %Context{perception: perception} = context
+        %Context{perception: perception} = context,
+        excluded_guid \\ nil
       ) do
     with {^world, _, _, _} <- Perception.position(perception, owner),
          metadata when is_map(metadata) <- Perception.metadata(perception, owner),
@@ -18,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.TargetSelection do
       pet
       |> candidates(owner, metadata, perception)
       |> Enum.uniq()
+      |> Enum.reject(&(&1 == excluded_guid))
       |> Enum.find(&Targeting.retaliation?(pet, &1, context))
     else
       _ -> nil

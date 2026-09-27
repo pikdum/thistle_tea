@@ -128,6 +128,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.TargetSelectionTest do
     end
   end
 
+  describe "victim_died/3" do
+    test "kill feedback excludes its victim even before death metadata is published", %{
+      pet: pet,
+      context: context,
+      targets: [a, b, _]
+    } do
+      pet = PetBT.command(pet, :attack, a, 900)
+      continued = PetBT.victim_died(pet, a, context)
+      assert continued.unit.target == b
+      assert continued.internal.in_combat
+      refute continued.internal.pet.attack_command?
+      assert PetBT.victim_died(pet, b, context) == pet
+    end
+  end
+
   describe "tree/0" do
     test "a dead commanded victim yields to an attacker without losing combat or issuing another command", %{
       pet: pet,

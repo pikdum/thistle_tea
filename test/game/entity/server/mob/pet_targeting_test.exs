@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetTargetingTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.KillFeedback
   alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
@@ -19,6 +20,42 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetTargetingTest do
   alias ThistleTea.Game.WorldRef
 
   setup [:entities]
+
+  describe "handle_cast/2 kill_outcome" do
+    test "both pet and owner kills select the next victim before death metadata arrives", %{
+      pet: pet,
+      target: target,
+      other: other
+    } do
+      owner = System.unique_integer([:positive]) + 20_000_000
+      pet = %{pet | internal: %{pet.internal | pet: %{pet.internal.pet | owner_guid: owner}}}
+      pet = PetBT.command(pet, :attack, target, 1_000)
+      Metadata.put(owner, %{in_combat: true, combat_targets: [target, other]})
+      SpatialHash.update(:players, owner, pet.internal.world, 0.0, 0.0, 0.0)
+      Metadata.update(target, %{in_combat: true, combat_victim_guid: pet.object.guid})
+      Metadata.update(other, %{in_combat: true, combat_victim_guid: owner})
+
+      on_exit(fn ->
+        Metadata.delete(owner)
+        SpatialHash.remove(:players, owner)
+      end)
+
+      victim = %KillFeedback.Victim{guid: target, level: 10, reward_target?: true}
+
+      assert {:noreply, continued, {:continue, :maybe_broadcast}} = MobServer.handle_cast({:kill_outcome, victim}, pet)
+      assert continued.unit.target == other
+      assert continued.internal.in_combat
+      refute continued.internal.pet.attack_command?
+      Process.cancel_timer(continued.internal.ai_tick_ref)
+
+      assert {:noreply, continued, {:continue, :maybe_broadcast}} =
+               MobServer.handle_info({:owner_killed, owner, target}, pet)
+
+      assert continued.unit.target == other
+      Process.cancel_timer(continued.internal.ai_tick_ref)
+      assert {:noreply, ^pet} = MobServer.handle_info({:owner_killed, owner + 1, target}, pet)
+    end
+  end
 
   describe "handle_info/2 pet_attacked" do
     test "core damage reaches the explicit owner context and respects the latest command", %{pet: pet, target: target} do
@@ -58,10 +95,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetTargetingTest do
       Process.cancel_timer(damaged.internal.ai_tick_ref)
     end
 
-    test "contact starts defense even when the incoming attack misses", %{pet: pet, target: target} do
+    test "contact starts defense even when the incoming attack deals no damage", %{pet: pet, target: target} do
       pet = PetBT.command(pet, :stay, 0, 1_000)
       SpatialHash.update(:mobs, target, pet.internal.world, 2.0, 0.0, 0.0)
-      attack = %{attack(target) | hit_chance_bonus: -100}
+      attack = %{attack(target) | damage: 0}
       assert {:noreply, defended, {:continue, :maybe_broadcast}} = MobServer.handle_cast({:receive_attack, attack}, pet)
       assert defended.unit.health == 100
       assert defended.internal.in_combat

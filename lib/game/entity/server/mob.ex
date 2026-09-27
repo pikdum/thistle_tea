@@ -743,7 +743,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   def handle_cast({:kill_outcome, %KillFeedback.Victim{} = victim}, %Mob{} = state) do
-    state = state |> KillFeedback.receive(victim, Time.now()) |> EventSink.emit_pending() |> wake_ai_tick()
+    now = Time.now()
+
+    state =
+      state
+      |> KillFeedback.receive(victim, now)
+      |> pet_victim_died(victim.guid, now)
+      |> EventSink.emit_pending()
+      |> wake_ai_tick()
+
     {:noreply, state, {:continue, :maybe_broadcast}}
   rescue
     error ->
@@ -1431,6 +1439,17 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       {:noreply, state}
   end
 
+  def handle_info({:owner_killed, owner, victim}, %Mob{internal: %{pet: %Pet{owner_guid: owner}}} = state) do
+    state = state |> pet_victim_died(victim, Time.now()) |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet kill reaction failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:owner_killed, _owner, _victim}, %Mob{} = state), do: {:noreply, state}
+
   def handle_info({:pet_cast, controller, spell_id, targets}, %Mob{} = state) when is_integer(spell_id) do
     state = PetCasting.cast(state, controller, spell_id, targets)
     {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
@@ -1916,6 +1935,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp evading?(%Blackboard{navigation: %{returning_home?: true}}), do: true
   defp evading?(_blackboard), do: false
+
+  defp pet_victim_died(%Mob{internal: %{pet: %Pet{}}, unit: %{target: victim}} = state, victim, now) do
+    PetBT.victim_died(state, victim, AIEnvironment.context(state, now))
+  end
+
+  defp pet_victim_died(state, _victim, _now), do: state
 
   defp engage_combat(state, caster), do: engage_combat(state, caster, [])
 
