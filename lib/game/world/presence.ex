@@ -79,6 +79,7 @@ defmodule ThistleTea.Game.World.Presence do
       area: area,
       chat_status: character.internal.chat_status,
       orientation: orientation,
+      lateral_speed: MovementBlock.lateral_speed(character.movement_block),
       viewpoint: viewpoint(character),
       creature_type: Character.creature_type(character),
       honor_rank: honor_rank(character),

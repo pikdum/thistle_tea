@@ -1,32 +1,36 @@
 defmodule ThistleTea.Game.Spell.Destination do
   @moduledoc "Validates explicit ground destinations before a cast is admitted."
 
-  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Range
   alias ThistleTea.Game.Spell.Target
 
-  def validate(caster, %Spell{} = spell, %Target{selection: :none, destination_location: destination}, los?)
+  def validate(caster, spell, targets, los?, opts \\ [])
+
+  def validate(caster, %Spell{} = spell, %Target{selection: :none, destination_location: destination}, los?, opts)
       when is_tuple(destination) do
-    with :ok <- check_range(caster, spell, destination) do
+    range = if Keyword.get(opts, :triggered?, false), do: :ok, else: check_range(caster, spell, destination, opts)
+
+    with :ok <- range do
       if los? == false and not Spell.attribute?(spell, :ignore_line_of_sight),
         do: {:error, :line_of_sight},
         else: :ok
     end
   end
 
-  def validate(_caster, _spell, _targets, _los?), do: :ok
+  def validate(_caster, _spell, _targets, _los?, _opts), do: :ok
 
   defp check_range(
          %{unit: unit, movement_block: %{position: {x, y, z, _}}} = caster,
          %Spell{range_yards: range, min_range_yards: minimum} = spell,
-         destination
+         destination,
+         opts
        )
        when is_number(range) and range > 0 do
     radius = if is_number(unit.bounding_radius), do: max(unit.bounding_radius, 0), else: 0
     distance = max(Math.distance({x, y, z}, destination) - radius, 0)
-    maximum = Range.maximum(caster, spell) + leeway(caster)
+    maximum = Range.maximum(caster, spell) + Range.allowance(caster, Keyword.get(opts, :phase, :start))
 
     cond do
       distance > maximum -> {:error, :out_of_range}
@@ -35,8 +39,5 @@ defmodule ThistleTea.Game.Spell.Destination do
     end
   end
 
-  defp check_range(_caster, _spell, _destination), do: :ok
-
-  defp leeway(%Character{}), do: 1.25
-  defp leeway(_caster), do: 0.0
+  defp check_range(_caster, _spell, _destination, _opts), do: :ok
 end

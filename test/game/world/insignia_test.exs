@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.World.InsigniaTest do
   alias ThistleTea.Game.World.InsigniaTarget
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.SpellRequirements
   alias ThistleTea.Game.WorldRef
 
   @moduletag :namigator_maps
@@ -137,7 +138,7 @@ defmodule ThistleTea.Game.World.InsigniaTest do
       }
 
       target = Target.corpse(corpse.object.guid, victim.object.guid, :enemy)
-      complete = caster |> Casting.start(spell, target, 1_000) |> Casting.complete(1_000)
+      complete = caster |> Casting.start(spell, target, 1_000) |> complete(1_000)
       assert complete.internal.casting == nil
       assert Enum.any?(complete.internal.events, &match?(%Effects.RemoveInsignia{targets: ^target}, &1))
       refute Enum.any?(complete.internal.events, &match?(%Effects.DeliverSpell{}, &1))
@@ -145,9 +146,18 @@ defmodule ThistleTea.Game.World.InsigniaTest do
       assert_received {:remove_insignia, ^target, 22_027}
 
       World.stop_entity(corpse.object.guid)
-      failed = caster |> Casting.start(spell, target, 2_000) |> Casting.complete(2_000)
+      failed = caster |> Casting.start(spell, target, 2_000) |> complete(2_000)
+      assert failed.internal.casting == nil
       refute Enum.any?(failed.internal.events, &match?(%Effects.RemoveInsignia{}, &1))
+      refute_received {:remove_insignia, ^target, 22_027}
     end
+  end
+
+  defp complete(character, now) do
+    pending = Casting.complete(character, now)
+    cast = pending.internal.casting
+    requirements = SpellRequirements.resolve(pending, cast.spell, cast.targets)
+    Casting.resolve_requirements(pending, cast, requirements, now)
   end
 
   defp bodies(_context) do

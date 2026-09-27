@@ -183,7 +183,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".modify money <copper> - add money (negative to remove)",
       ".modify rage <value> - set current rage (clamped to max)",
       ".modify speed <rate> - modify player speed from 0.1 to 10",
-      ".move - move target to you",
+      ".move [x y z] - move target to you or coordinates",
       ".pid - show target pid",
       ".pos - show current position",
       ".talents reset - unlearn all talents and refund points",
@@ -548,7 +548,19 @@ defmodule ThistleTea.Game.Player.DevCommands do
     state |> system_message(message) |> handled()
   end
 
-  def run(state, ".move" <> _) do
+  def run(state, ".move " <> coordinates) do
+    case parse_coords(String.split(coordinates, " ", trim: true)) do
+      {:ok, x, y, z} ->
+        Entity.move_to(Map.get(state, :target), {x, y, z})
+        state
+
+      _ ->
+        system_message(state, "Use: .move [x y z]")
+    end
+    |> handled()
+  end
+
+  def run(state, ".move") do
     target = Map.get(state, :target)
 
     case state.character.movement_block.position do

@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.World.PresenceTest do
   alias ThistleTea.Game.World.Position.ClientMotion
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.SpellTargetInfo
   alias ThistleTea.Game.WorldRef
 
   describe "enter/2" do
@@ -87,6 +88,21 @@ defmodule ThistleTea.Game.World.PresenceTest do
   end
 
   describe "sync/2" do
+    test "spell snapshots follow current translation speed and clear it when movement stops" do
+      character = character(WorldRef.open(0), {1.0, 2.0, 3.0, 0.0}, 12)
+      character = %{character | movement_block: %{character.movement_block | movement_flags: 1, run_speed: 7.0}}
+      on_exit(fn -> Presence.leave(character) end)
+      Presence.enter(character, %{})
+      assert SpellTargetInfo.build(character, character.object.guid, %Spell{}).lateral_speed == 7.0
+
+      slowed = %{character | movement_block: %{character.movement_block | run_speed: 3.5}}
+      Presence.sync(slowed, %{})
+      assert SpellTargetInfo.build(character, character.object.guid, %Spell{}).lateral_speed == 3.5
+
+      Presence.relocate(%{slowed | movement_block: %{slowed.movement_block | movement_flags: 0}})
+      assert SpellTargetInfo.build(character, character.object.guid, %Spell{}).lateral_speed == 0.0
+    end
+
     test "publishes actual attack targets separately from UI selection and releases combat references" do
       character = character(WorldRef.open(0), {1.0, 2.0, 3.0, 0.0}, 12)
       character = %{character | unit: %{character.unit | target: 42}}

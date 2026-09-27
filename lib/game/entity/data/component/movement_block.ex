@@ -107,6 +107,24 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
 
   def translating?(_movement_block), do: false
 
+  def lateral_speed(%__MODULE__{movement_flags: flags} = movement) when is_integer(flags) do
+    cond do
+      not translating?(movement) -> 0.0
+      swimming?(movement) -> swimming_speed(movement)
+      (flags &&& @movement_flag_walk_mode) != 0 -> movement.walk_speed || 0.0
+      (flags &&& @movement_flag_backward) != 0 -> movement.run_back_speed || 0.0
+      true -> movement.run_speed || 0.0
+    end
+  end
+
+  def lateral_speed(_movement), do: 0.0
+
+  defp swimming_speed(%__MODULE__{movement_flags: flags} = movement) do
+    if (flags &&& @movement_flag_backward) == 0,
+      do: movement.swim_speed || 0.0,
+      else: movement.swim_back_speed || 0.0
+  end
+
   def moving?(%__MODULE__{movement_flags: flags}) when is_integer(flags) do
     (flags &&& @movement_flag_mask_moving) != 0
   end

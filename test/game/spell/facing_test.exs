@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Spell.FacingTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastTarget
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Facing
@@ -44,7 +45,7 @@ defmodule ThistleTea.Game.Spell.FacingTest do
 
       queued = %{spell | melee_range?: true, attributes: MapSet.new([:on_next_swing])}
       assert Facing.validate(caster, queued, target) == :ok
-      refute Requirements.required?(caster, queued)
+      refute Facing.required?(caster, queued)
       refute Requirements.required?(caster, spell, triggered?: true)
     end
 
@@ -85,7 +86,9 @@ defmodule ThistleTea.Game.Spell.FacingTest do
 
       assert Requirements.required?(caster, data.spell)
 
-      assert Requirements.validate(caster, data.spell, %Requirements{facing_target: data.target}) ==
+      context = %CastTarget{targets: Target.unit(2), info: data.target}
+
+      assert Requirements.validate(caster, data.spell, %Requirements{cast_target: context}) ==
                {:error, :unit_not_infront}
     end
   end

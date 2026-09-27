@@ -32,11 +32,19 @@ defmodule ThistleTea.Game.Player.ResurrectionTest do
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.ResurrectionTarget
+  alias ThistleTea.Game.World.SpellRequirements
   alias ThistleTea.Game.World.System.Instance
   alias ThistleTea.Game.WorldRef
 
   @map 900_041
   @dungeon 900_042
+
+  defp complete(character, now) do
+    pending = Casting.complete(character, now)
+    cast = pending.internal.casting
+    requirements = SpellRequirements.resolve(pending, cast.spell, cast.targets)
+    Casting.resolve_requirements(pending, cast, requirements, now)
+  end
 
   setup [:spirit_run]
 
@@ -86,7 +94,7 @@ defmodule ThistleTea.Game.Player.ResurrectionTest do
       target = Target.corpse(corpse.object.guid, state.guid)
       spell = %{spell | cast_time_ms: 1000, mana_cost: 10, power_type: 0}
       casting = Casting.start(caster, spell, target, 100)
-      completed = Casting.complete(casting, 1100)
+      completed = complete(casting, 1100)
       assert completed.unit.power1 == 70
 
       assert Enum.any?(
@@ -95,7 +103,7 @@ defmodule ThistleTea.Game.Player.ResurrectionTest do
              )
 
       World.stop_entity(corpse.object.guid)
-      aborted = Casting.complete(casting, 1100)
+      aborted = complete(casting, 1100)
       assert aborted.unit.power1 == 80
       refute Enum.any?(aborted.internal.events, &is_struct(&1, Effects.DeliverSpell))
       assert Enum.any?(aborted.internal.events, &match?(%Effects.SpellCastFailed{reason: :bad_targets}, &1))

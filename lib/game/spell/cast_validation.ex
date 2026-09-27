@@ -58,7 +58,6 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   @power_fields %{0 => :power1, 1 => :power2, 2 => :power3, 3 => :power4, 4 => :power5}
   @health_power_type -2
-  @range_leeway_yards 5.0
 
   def validate(caster, %Spell{} = spell, %Target{} = targets, target_info, now, opts \\ []) do
     with :ok <- check_caster_alive(caster),
@@ -107,7 +106,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_reagents(caster, spell, Keyword.get(opts, :count_item)),
          :ok <- check_duel(spell, Keyword.get(opts, :duel_context)),
          :ok <- CorpseTarget.validate(spell, Keyword.get(opts, :spell_corpse)),
-         :ok <- Destination.validate(caster, spell, targets, Keyword.get(opts, :destination_los?)) do
+         :ok <- Destination.validate(caster, spell, targets, Keyword.get(opts, :destination_los?), opts) do
       if CorpseTarget.required?(spell), do: :ok, else: validate_target(caster, spell, targets, target_info, opts)
     end
   end
@@ -152,7 +151,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_warlock_target(caster, spell, target_info),
          :ok <- PlayerPossession.validate(caster, spell, target_info),
          :ok <- Hunter.validate_tame(caster, spell, target_info),
-         :ok <- check_range(caster, spell, target_info) do
+         :ok <- Range.validate(caster, spell, target_info, opts) do
       check_line_of_sight(spell, target_info)
     end
   end
@@ -162,7 +161,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
     max_range = Range.channel_maximum(caster, spell, hostile?)
 
-    case combat_distance(caster, target_info) do
+    case Range.combat_distance(caster, target_info) do
       {:ok, distance} -> distance <= max_range
       :different_world -> false
       :unknown -> true
@@ -493,6 +492,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   defp check_target_flags(_caster, _spell, _target_info), do: :ok
 
   defp check_target(%Spell{}, %{visible?: false}), do: {:error, :bad_targets}
+  defp check_target(%Spell{}, :unknown), do: {:error, :bad_targets}
 
   defp check_target(%Spell{} = spell, target_info) do
     cond do
@@ -589,7 +589,6 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_hostile_target(nil), do: {:error, :bad_implicit_targets}
   defp check_hostile_target(:self), do: {:error, :bad_targets}
-  defp check_hostile_target(:unknown), do: {:error, :bad_targets}
 
   defp check_hostile_target(%{} = target_info) do
     cond do
@@ -639,52 +638,6 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     end)
   end
 
-  defp check_range(caster, %Spell{range_yards: range} = spell, %{position: position} = target_info)
-       when is_tuple(position) and tuple_size(position) == 4 and is_number(range) and range > 0 do
-    case combat_distance(caster, target_info) do
-      {:ok, distance} -> check_distance(distance, spell, Range.maximum(caster, spell))
-      :different_world -> {:error, :out_of_range}
-      :unknown -> :ok
-    end
-  end
-
-  defp check_range(_caster, _spell, _target_info), do: :ok
-
-  defp combat_distance(caster, %{position: {map, x, y, z}} = target_info) do
-    case caster_position(caster) do
-      {caster_map, _cx, _cy, _cz} when caster_map != map ->
-        :different_world
-
-      {_map, cx, cy, cz} ->
-        distance = max(distance({cx, cy, cz}, {x, y, z}) - combat_reach_sum(caster, target_info), 0.0)
-        {:ok, distance}
-
-      nil ->
-        :unknown
-    end
-  end
-
-  defp combat_distance(_caster, _target_info), do: :unknown
-
-  defp combat_reach_sum(caster, target_info) do
-    caster_combat_reach(caster) + combat_reach(Map.get(target_info, :combat_reach))
-  end
-
-  defp caster_combat_reach(%{unit: unit}), do: combat_reach(unit.combat_reach)
-  defp caster_combat_reach(_caster), do: 0.0
-
-  defp combat_reach(reach) when is_number(reach) and reach > 0, do: reach
-  defp combat_reach(_reach), do: 0.0
-
-  defp check_distance(distance, %Spell{min_range_yards: min_range} = spell, range) do
-    cond do
-      spell.melee_range? and Spell.attribute?(spell, :on_next_swing) -> :ok
-      distance > range + @range_leeway_yards -> {:error, :out_of_range}
-      is_number(min_range) and min_range > 0 and distance < min_range -> {:error, :too_close}
-      true -> :ok
-    end
-  end
-
   defp check_line_of_sight(%Spell{} = spell, %{los?: false}) do
     if Spell.attribute?(spell, :ignore_line_of_sight) do
       :ok
@@ -694,16 +647,6 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   defp check_line_of_sight(_spell, _target_info), do: :ok
-
-  defp caster_position(%{internal: %{world: world}, movement_block: %{position: {x, y, z, _o}}}) do
-    {world, x, y, z}
-  end
-
-  defp caster_position(_caster), do: nil
-
-  defp distance({x1, y1, z1}, {x2, y2, z2}) do
-    :math.sqrt(:math.pow(x2 - x1, 2) + :math.pow(y2 - y1, 2) + :math.pow(z2 - z1, 2))
-  end
 
   defp self_target?(%{object: %{guid: guid}}, unit_guid), do: unit_guid == guid
   defp self_target?(_caster, _unit_guid), do: false

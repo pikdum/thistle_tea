@@ -146,6 +146,35 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
     end
   end
 
+  describe "lateral_speed/1" do
+    test "uses translation flags and the applicable mode even while airborne" do
+      movement = %MovementBlock{
+        run_speed: 7.0,
+        run_back_speed: 4.5,
+        walk_speed: 2.5,
+        swim_speed: 4.72,
+        swim_back_speed: 2.5
+      }
+
+      for {flags, speed} <- [
+            {0, 0.0},
+            {0x10, 0.0},
+            {1, 7.0},
+            {4, 7.0},
+            {8, 7.0},
+            {2, 4.5},
+            {0x101, 2.5},
+            {0x2001, 7.0},
+            {0x200101, 4.72},
+            {0x200002, 2.5}
+          ] do
+        assert MovementBlock.lateral_speed(%{movement | movement_flags: flags}) == speed
+      end
+
+      assert MovementBlock.lateral_speed(%MovementBlock{}) == 0.0
+    end
+  end
+
   describe "client_velocity/1" do
     test "derives forward motion from orientation and canonical run speed", context do
       movement_block = %{

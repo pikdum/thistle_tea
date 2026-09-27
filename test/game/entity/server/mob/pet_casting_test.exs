@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetCastingTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Requirements
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
@@ -93,6 +94,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetCastingTest do
 
       assert cast.internal.casting.targets == targets
       finished = Casting.complete(cast, 3_000)
+      finished = Casting.resolve_requirements(finished, finished.internal.casting, %Requirements{}, 3_000)
       assert finished.unit.power1 == 80
       assert Cooldowns.on_cooldown?(finished, spell, 3_000)
       assert Enum.any?(finished.internal.events, &match?(%Effects.SpellGo{targets: ^targets}, &1))

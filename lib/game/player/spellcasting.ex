@@ -7,7 +7,6 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   """
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Data.Possession
@@ -17,7 +16,6 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Enchantments
-  alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.ItemUse
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
@@ -56,14 +54,12 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Spell.UnitTargets
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.InsigniaTarget
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.ItemTarget, as: ItemTargetLoader
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.ResurrectionTarget
   alias ThistleTea.Game.World.SpellAreas
   alias ThistleTea.Game.World.SpellEnvironment
   alias ThistleTea.Game.World.SpellFocus
@@ -518,28 +514,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
   defp equipped_weapon_templates(_character), do: []
 
-  defp build_target_info(%{guid: caster_guid, character: character}, %Spell{} = spell, %Target{} = targets) do
-    unit_guid = Target.unit_guid(targets)
-    explicit_guid = nonself_guid(unit_guid, caster_guid)
-    pet_guid = implicit_pet_guid(character, spell)
-
-    fallback_guid =
-      if Spell.requires_hostile_target?(spell) do
-        nonself_guid(selected_target(character), caster_guid)
-      end
-
-    cond do
-      Insignia.spell?(spell) -> InsigniaTarget.info(character, targets)
-      Spell.resurrect_spell?(spell) -> ResurrectionTarget.info(character, targets)
-      is_integer(pet_guid) -> SpellTargetInfo.build(character, pet_guid, spell)
-      is_integer(explicit_guid) -> SpellTargetInfo.build(character, explicit_guid, spell)
-      is_integer(fallback_guid) -> SpellTargetInfo.build(character, fallback_guid, spell)
-      unit_guid == caster_guid -> :self
-      true -> nil
-    end
-  end
-
-  defp build_target_info(_state, _spell, _targets), do: nil
+  defp build_target_info(%{character: character}, spell, targets),
+    do: SpellTargetInfo.resolve(character, spell, targets)
 
   defp duel_context(
          %Character{object: %{guid: caster_guid}, internal: %{world: caster_world}},
@@ -554,29 +530,6 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   end
 
   defp duel_context(_character, _spell, _targets), do: nil
-
-  defp implicit_pet_guid(%Character{} = character, %Spell{effects: effects}) do
-    pet_guid =
-      if Enum.any?(effects, &(&1.type == :feed_pet)) do
-        Companion.summon_guid(character)
-      else
-        Character.controlled_guid(character)
-      end
-
-    if Enum.any?(effects, &(&1.type == :feed_pet or &1.implicit_target_a == :pet or &1.implicit_target_b == :pet)),
-      do: positive_guid(pet_guid)
-  end
-
-  defp implicit_pet_guid(_character, _spell), do: nil
-
-  defp positive_guid(guid) when is_integer(guid) and guid > 0, do: guid
-  defp positive_guid(_guid), do: nil
-
-  defp nonself_guid(guid, caster_guid) when is_integer(guid) and guid > 0 and guid != caster_guid, do: guid
-  defp nonself_guid(_guid, _caster_guid), do: nil
-
-  defp selected_target(%{unit: %Unit{target: target}}), do: target
-  defp selected_target(_character), do: nil
 
   defp fail_cast(state, %Spell{id: spell_id} = spell, reason) do
     Logger.warning("Spell #{spell_id} failed validation: #{reason}")

@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   Loads creature spawns and their immutable blueprint data from the VMangos seed.
   """
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
@@ -89,6 +90,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         name: mob.internal.name,
         bounding_radius: mob.unit.bounding_radius,
         combat_reach: mob.unit.combat_reach,
+        lateral_speed: MovementBlock.lateral_speed(mob.movement_block),
         level: mob.unit.level,
         tameable?: Bitwise.band(mob.internal.creature.type_flags || 0, 0x1) != 0,
         unit_flags: mob.unit.flags,

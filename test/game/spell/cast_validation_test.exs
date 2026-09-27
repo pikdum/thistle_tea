@@ -800,7 +800,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
     end
 
     test "combat reach extends the maximum range" do
-      barely_too_far = hostile_target(position: {WorldRef.open(0), 44.0, 0.0, 0.0})
+      barely_too_far = hostile_target(position: {WorldRef.open(0), 40.0, 0.0, 0.0})
 
       assert {:error, :out_of_range} =
                CastValidation.validate(caster(), harmful_spell(), Target.unit(7), barely_too_far, @now)

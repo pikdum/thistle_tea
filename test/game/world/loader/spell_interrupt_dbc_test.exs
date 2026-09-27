@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Loader.SpellInterruptDbcTest do
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Cooldowns
+  alias ThistleTea.Game.Spell.Requirements
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
@@ -36,6 +37,7 @@ defmodule ThistleTea.Game.World.Loader.SpellInterruptDbcTest do
 
     test "Counterspell cancels the real Drain Life channel", %{entity: entity} do
       casting = Casting.start(entity, SpellLoader.load(689), Target.unit(2), 1_000)
+      casting = Casting.resolve_requirements(casting, casting.internal.casting, %Requirements{}, 1_000)
       assert casting.unit.channel_spell == 689
       {stopped, _events} = SpellEffect.receive(casting, attacker(), SpellLoader.load(2139), 2_000)
       assert stopped.internal.casting == nil

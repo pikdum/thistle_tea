@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.Loader.FlareDbcTest do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.PersistentArea
+  alias ThistleTea.Game.Spell.Requirements
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
@@ -31,7 +32,7 @@ defmodule ThistleTea.Game.World.Loader.FlareDbcTest do
 
       for {spell_id, expected_direct_types} <- [{1543, []}, {26_573, []}, {2120, [:school_damage]}] do
         spell = SpellLoader.load(spell_id)
-        cast = Cast.new(spell, Target.at({3.0, 0.0, 0.0}), 1_000)
+        cast = %{Cast.new(spell, Target.at({3.0, 0.0, 0.0}), 1_000) | requirements: %Requirements{}}
         result = Casting.complete(caster, cast, 1_000)
         areas = Enum.filter(result.internal.events, &is_struct(&1, Effects.SpawnAreaEffect))
         deliveries = Enum.filter(result.internal.events, &is_struct(&1, Effects.DeliverSpell))

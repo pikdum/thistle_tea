@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.DeathRayDbcTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.Requirements
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellScriptName
@@ -35,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.DeathRayDbcTest do
       assert spell.semantics.channel_start_trigger_spell_id == 13_493
       caster = %{caster | internal: %{caster.internal | casting: nil}}
       caster = Casting.start(caster, spell, Target.self(caster.object.guid), 0)
+      caster = Casting.resolve_requirements(caster, caster.internal.casting, %Requirements{}, 0)
       assert caster.internal.casting && caster.internal.casting.phase == :channel_tick, inspect(caster.internal.events)
       [trigger] = Enum.filter(caster.internal.events, &is_struct(&1, Effects.TriggerSpell))
 

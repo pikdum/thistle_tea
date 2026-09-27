@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Spell.RangeTest do
 
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -10,6 +11,7 @@ defmodule ThistleTea.Game.Spell.RangeTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
@@ -31,13 +33,13 @@ defmodule ThistleTea.Game.Spell.RangeTest do
 
   describe "validate_target/4" do
     test "applies flat and percent range before cast leeway and preserves the base spell", ctx do
-      assert validate(ctx.caster, ctx.spell, 57.5) == :ok
-      assert validate(ctx.caster, ctx.spell, 57.6) == {:error, :out_of_range}
+      assert validate(ctx.caster, ctx.spell, 52.5) == :ok
+      assert validate(ctx.caster, ctx.spell, 52.6) == {:error, :out_of_range}
       assert ctx.spell.range_yards == 30.0
 
       reset = %{ctx.caster | unit: %{ctx.caster.unit | auras: []}}
-      assert validate(reset, ctx.spell, 35.0) == :ok
-      assert validate(reset, ctx.spell, 35.1) == {:error, :out_of_range}
+      assert validate(reset, ctx.spell, 30.0) == :ok
+      assert validate(reset, ctx.spell, 30.1) == {:error, :out_of_range}
     end
 
     test "excludes unrelated families and masks", ctx do
@@ -51,7 +53,7 @@ defmodule ThistleTea.Game.Spell.RangeTest do
       caster = %{ctx.caster | unit: %{ctx.caster.unit | combat_reach: 1.5}}
       assert validate(caster, spell, 9.4) == {:error, :too_close}
       assert validate(caster, spell, 9.5) == :ok
-      assert validate(caster, spell, 59.0) == :ok
+      assert validate(caster, spell, 54.0) == :ok
 
       target = target(20.0) |> Map.put(:position, {WorldRef.open(1), 20.0, 0.0, 0.0})
       assert CastValidation.validate_target(caster, spell, Target.unit(2), target) == {:error, :out_of_range}
@@ -61,8 +63,56 @@ defmodule ThistleTea.Game.Spell.RangeTest do
       aura = %Aura{type: :add_flat_modifier, misc_value: 5, amount: -100, class_mask: 1}
       holder = %{ctx.holder | auras: [aura]}
       caster = %{ctx.caster | unit: %{ctx.caster.unit | auras: [holder]}}
-      assert validate(caster, ctx.spell, 5.0) == :ok
-      assert validate(caster, ctx.spell, 5.1) == {:error, :out_of_range}
+      assert validate(caster, ctx.spell, 0.0) == :ok
+      assert validate(caster, ctx.spell, 0.1) == {:error, :out_of_range}
+    end
+  end
+
+  describe "validate/4" do
+    test "distinguishes player and creature admission and launch allowances", ctx do
+      player = struct!(Character, Map.from_struct(ctx.caster) |> Map.take([:object, :unit, :internal, :movement_block]))
+
+      for {caster, phase, allowance} <- [
+            {ctx.caster, :start, 0.0},
+            {ctx.caster, :launch, 2.25},
+            {player, :start, 1.25},
+            {player, :launch, 6.25}
+          ] do
+        limit = 52.5 + allowance
+        assert Range.validate(caster, ctx.spell, target(limit), phase: phase) == :ok
+        assert Range.validate(caster, ctx.spell, target(limit + 0.01), phase: phase) == {:error, :out_of_range}
+      end
+    end
+
+    test "requires both units to move quickly and at least one player for movement allowance", ctx do
+      movement = %{ctx.caster.movement_block | movement_flags: 1, run_speed: 7.0}
+      caster = %{ctx.caster | movement_block: movement}
+      moving = Map.put(target(55.16), :lateral_speed, 7.0)
+      assert Range.validate(caster, ctx.spell, moving) == :ok
+      assert Range.validate(caster, ctx.spell, %{moving | lateral_speed: 4.97}) == {:error, :out_of_range}
+      assert Range.validate(ctx.caster, ctx.spell, moving) == {:error, :out_of_range}
+      creature = %{moving | guid: Guid.runtime(:mob, 2)}
+      assert Range.validate(caster, ctx.spell, creature) == {:error, :out_of_range}
+    end
+
+    test "melee spells use horizontal reach with a minimum size and no extra launch allowance", ctx do
+      caster = %{ctx.caster | unit: %{ctx.caster.unit | auras: [], combat_reach: 0.5}}
+      spell = %{ctx.spell | melee_range?: true, range_yards: 5.0}
+      inside = %{target(5.332) | position: {caster.internal.world, 5.332, 0.0, 100.0}}
+
+      for phase <- [:start, :launch] do
+        assert Range.validate(caster, spell, inside, phase: phase) == :ok
+        assert Range.validate(caster, spell, target(5.333), phase: phase) == {:error, :out_of_range}
+      end
+
+      assert Range.validate(ctx.caster, spell, target(15.332)) == :ok
+      assert Range.validate(ctx.caster, spell, target(15.334)) == {:error, :out_of_range}
+    end
+
+    test "triggered spells bypass range and minimum range checks", ctx do
+      spell = %{ctx.spell | min_range_yards: 8.0}
+      assert Range.validate(ctx.caster, spell, target(1_000.0), triggered?: true) == :ok
+      assert Range.validate(ctx.caster, spell, target(0.0), triggered?: true) == :ok
     end
   end
 

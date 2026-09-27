@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.SpellRequirementsTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Corpse, as: CorpseComponent
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -12,6 +13,7 @@ defmodule ThistleTea.Game.World.SpellRequirementsTest do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Casting
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
@@ -22,6 +24,7 @@ defmodule ThistleTea.Game.World.SpellRequirementsTest do
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.CorpseTarget
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Requirements
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -31,6 +34,17 @@ defmodule ThistleTea.Game.World.SpellRequirementsTest do
   alias ThistleTea.Game.WorldRef
 
   setup [:caster]
+
+  describe "resolve/3" do
+    test "implicit pet range uses the active pet even when the packet selects the caster", %{caster: caster} do
+      pet = body(:mob, caster.internal.world, {50.0, 0.0, 0.0}, %{alive?: true, faction_template: friendly()})
+      caster = Companion.activate(caster, :hunter_pet, %EntityRef{guid: pet, entry: 1, spell_id: 1515})
+      spell = %{facing_spell() | effects: [%Effect{type: :heal, implicit_target_a: :pet}]}
+      requirements = SpellRequirements.resolve(caster, spell, Target.self(caster.object.guid))
+      assert requirements.cast_target.info.guid == pet
+      assert Requirements.validate(caster, spell, requirements) == {:error, :out_of_range}
+    end
+  end
 
   describe "corpse/2" do
     test "rejects living, friendly, wrong-type, ghost, airborne and invisible targets", %{caster: caster, spell: spell} do
@@ -112,6 +126,57 @@ defmodule ThistleTea.Game.World.SpellRequirementsTest do
   end
 
   describe "complete/2" do
+    test "rejects a target that leaves launch range without paying costs", %{caster: caster} do
+      spell = %{facing_spell() | custom_flags: 0}
+      target = body(:mob, caster.internal.world, {30.0, 0.0, 0.0}, %{alive?: true})
+      started = Casting.start(caster, spell, Target.unit(target), 1_000)
+      SpatialHash.update(:mobs, target, caster.internal.world, 36.26, 0.0, 0.0)
+      failed = started |> Casting.complete(3_000) |> EventSink.emit_pending(Context.new(self()))
+
+      assert failed.internal.casting == nil
+      assert failed.unit.power1 == 100
+      assert failed.internal.cooldowns == %{}
+      packet = SmsgCastResult.failure(spell, :out_of_range)
+      assert_received {:"$gen_cast", {:send_packet, ^packet}}
+      refute_received {:"$gen_cast", {:send_packet, %SmsgCastResult{result: 0}}}
+    end
+
+    test "allows a target to move within launch grace", %{caster: caster} do
+      spell = %{facing_spell() | custom_flags: 0}
+      target = body(:mob, caster.internal.world, {30.0, 0.0, 0.0}, %{alive?: true})
+      started = Casting.start(caster, spell, Target.unit(target), 1_000)
+      SpatialHash.update(:mobs, target, caster.internal.world, 36.25, 0.0, 0.0)
+      completed = started |> Casting.complete(3_000) |> EventSink.emit_pending(Context.new(self()))
+
+      assert completed.internal.casting == nil
+      assert completed.unit.power1 == 90
+      assert Map.has_key?(completed.internal.cooldowns, spell.id)
+      assert_received {:"$gen_cast", {:send_packet, %SmsgCastResult{result: 0}}}
+    end
+
+    test "rejects targets that die, disappear, or become friendly during the cast", %{caster: caster} do
+      spell = facing_spell()
+
+      for {change, reason} <- [{:death, :targets_dead}, {:despawn, :bad_targets}, {:friendly, :target_friendly}] do
+        target = body(:mob, caster.internal.world, {10.0, 0.0, 0.0}, %{alive?: true})
+        started = Casting.start(caster, spell, Target.unit(target), 1_000)
+
+        case change do
+          :death -> Metadata.update(target, %{alive?: false})
+          :despawn -> Metadata.delete(target)
+          :friendly -> Metadata.update(target, %{faction_template: friendly()})
+        end
+
+        failed = started |> Casting.complete(3_000) |> EventSink.emit_pending(Context.new(self()))
+        assert failed.internal.casting == nil
+        assert failed.unit.power1 == 100
+        assert failed.internal.cooldowns == %{}
+        packet = SmsgCastResult.failure(spell, reason)
+        assert_received {:"$gen_cast", {:send_packet, ^packet}}
+        refute_received {:"$gen_cast", {:send_packet, %SmsgCastResult{result: 0}}}
+      end
+    end
+
     test "turning away during a cast rejects launch without spending power or starting cooldown", %{caster: caster} do
       spell = facing_spell()
       target = body(:mob, caster.internal.world, {10.0, 0.0, 0.0}, %{alive?: true})
@@ -141,7 +206,8 @@ defmodule ThistleTea.Game.World.SpellRequirementsTest do
       SpatialHash.update(:mobs, target, caster.internal.world, -10.0, 0.0, 0.0)
       Metadata.update(target, %{orientation: 1.0})
       snapshot = SpellRequirements.resolve(caster, spell, Target.unit(target))
-      assert snapshot.facing_target == %{position: {caster.internal.world, -10.0, 0.0, 0.0}, orientation: 1.0}
+      assert snapshot.cast_target.info.position == {caster.internal.world, -10.0, 0.0, 0.0}
+      assert snapshot.cast_target.info.orientation == 1.0
 
       failed = started |> Casting.complete(3_000) |> EventSink.emit_pending(Context.new(self()))
       assert failed.internal.casting == nil

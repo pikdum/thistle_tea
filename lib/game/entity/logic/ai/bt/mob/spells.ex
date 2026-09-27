@@ -601,6 +601,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
           power_type: Map.get(metadata, :power_type),
           level: Map.get(metadata, :level),
           combat_reach: Map.get(metadata, :combat_reach),
+          lateral_speed: Map.get(metadata, :lateral_speed, 0.0),
           orientation: Map.get(metadata, :orientation),
           position: Perception.position(perception, target_guid),
           los?: Perception.line_of_sight?(perception, target_guid)

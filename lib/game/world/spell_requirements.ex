@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.SpellRequirements do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastTarget
   alias ThistleTea.Game.Spell.CorpseTarget
   alias ThistleTea.Game.Spell.LocationTargets
   alias ThistleTea.Game.Spell.Requirements
@@ -16,6 +17,7 @@ defmodule ThistleTea.Game.World.SpellRequirements do
   alias ThistleTea.Game.World.SpellFocus
   alias ThistleTea.Game.World.SpellLocations
   alias ThistleTea.Game.World.SpellObjects
+  alias ThistleTea.Game.World.SpellTargetInfo
   alias ThistleTea.Game.World.SpellUnits
   alias ThistleTea.Game.World.Visibility
 
@@ -27,7 +29,11 @@ defmodule ThistleTea.Game.World.SpellRequirements do
       requirements
       | corpse: corpse(caster, spell),
         aura_target: aura_target(caster, targets),
-        facing_target: facing_target(caster, targets),
+        cast_target: %CastTarget{
+          targets: targets,
+          info: SpellTargetInfo.resolve(caster, spell, targets),
+          destination_los?: World.line_of_sight?(caster, targets.destination_location)
+        },
         spell_area: SpellAreas.context(caster, spell),
         outdoors?: SpellEnvironment.context(caster, spell)
     }
@@ -50,15 +56,6 @@ defmodule ThistleTea.Game.World.SpellRequirements do
   defp aura_target(caster, targets) do
     guid = Target.unit_guid(targets)
     if is_integer(guid) and guid != caster.object.guid, do: Metadata.query(guid, [:level])
-  end
-
-  defp facing_target(caster, targets) do
-    guid = Target.unit_guid(targets)
-
-    if is_integer(guid) and guid != caster.object.guid do
-      metadata = Metadata.query(guid, [:orientation]) || %{}
-      Map.put(metadata, :position, World.position(guid))
-    end
   end
 
   def corpse(caster, %Spell{} = spell) do

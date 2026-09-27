@@ -423,11 +423,15 @@ defmodule ThistleTea.Game.Player.AmmunitionTest do
       |> Character.sync_equipment_stats()
 
     SpatialHash.update(:players, guid, WorldRef.open(0), 0.0, 0.0, 0.0)
+    SpatialHash.update(:players, guid + 1, WorldRef.open(0), 10.0, 0.0, 0.0)
+    Metadata.put(guid + 1, %{alive?: true})
 
     on_exit(fn ->
       :ets.delete(CharacterStore, guid)
       Metadata.delete(guid)
       SpatialHash.remove(:players, guid)
+      Metadata.delete(guid + 1)
+      SpatialHash.remove(:players, guid + 1)
     end)
 
     %{state: %State{guid: guid, ready: true, character: character}, bow: bow, arrows: arrows, spell: spell}

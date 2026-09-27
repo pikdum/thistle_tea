@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   alias ThistleTea.Game.Spell.CastResolution.Impact
   alias ThistleTea.Game.Spell.CastResolution.PowerCost
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Requirements
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
@@ -1353,7 +1354,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
 
     test "defers object cast credit until live activation succeeds" do
       spell = %Spell{id: 3366, range_yards: 5.0, effects: [%Effect{index: 0, type: :open_lock_item}]}
-      casting = %Cast{spell: spell, targets: Target.object(0xF110_0001), ends_at: 1_000}
+      casting = %Cast{spell: spell, targets: Target.object(0xF110_0001), ends_at: 1_000, requirements: %Requirements{}}
 
       character = %Character{
         object: %Object{guid: 1},
@@ -1608,7 +1609,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
       }
 
       targets = Target.item(22)
-      casting = Cast.new(spell, targets, 1_000)
+      casting = %{Cast.new(spell, targets, 1_000) | requirements: %Requirements{}}
 
       character =
         %Character{

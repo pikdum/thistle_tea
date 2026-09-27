@@ -1710,6 +1710,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
        when is_integer(guid) and is_number(orientation) do
     Metadata.update(guid, %{
       orientation: orientation,
+      lateral_speed: MovementBlock.lateral_speed(state.movement_block),
       assistance_available?: Assistance.available?(state),
       flee_from_help_available?: Assistance.flee_available?(state)
     })
