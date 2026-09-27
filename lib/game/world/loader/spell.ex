@@ -944,6 +944,14 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(39), do: :caster_fishing_spot
   defp target_type(23), do: :game_object
   defp target_type(40), do: :game_object_near_caster
+  defp target_type(41), do: :caster_front_right
+  defp target_type(42), do: :caster_back_right
+  defp target_type(43), do: :caster_back_left
+  defp target_type(44), do: :caster_front_left
+  defp target_type(47), do: :caster_front
+  defp target_type(48), do: :caster_back
+  defp target_type(49), do: :caster_left
+  defp target_type(50), do: :caster_right
   defp target_type(51), do: :game_objects_at_source
   defp target_type(52), do: :game_objects_at_destination
   defp target_type(24), do: :aoe_enemy_in_cone

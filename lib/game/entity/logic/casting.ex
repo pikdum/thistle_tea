@@ -1122,12 +1122,19 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
           is_integer(entry) and entry > 0 do
         Effects.summon_game_object(entry, area_duration(casting, spell),
           ritual_target_guid: target_guid,
-          spell_id: spell.id
+          spell_id: spell.id,
+          position: summoned_object_position(character, casting.targets)
         )
       end
 
     Effects.enqueue(character, events)
   end
+
+  defp summoned_object_position(%{movement_block: %{position: {_, _, _, orientation}}}, %Target{
+         destination_location: {x, y, z}
+       }), do: {x, y, z, orientation}
+
+  defp summoned_object_position(_character, _targets), do: nil
 
   defp queue_consume_costs(character, %Costs{} = costs) do
     character

@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   including caster procs and self-targeted enemy channel procs.
   """
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CasterLocation
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Radius
   alias ThistleTea.Game.Spell.Target
@@ -223,8 +224,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   defp direct_unit_query(_spell, _unit_guid), do: nil
 
   defp caster_only_spell?(%Spell{effects: [_ | _] = effects}) do
-    Enum.all?(effects, fn %Effect{implicit_target_a: a, implicit_target_b: b} ->
-      a in [nil, :caster] and b in [nil, :caster] and (a == :caster or b == :caster)
+    Enum.all?(effects, fn %Effect{implicit_target_a: a, implicit_target_b: b} = effect ->
+      CasterLocation.caster_only?(effect) or
+        (a in [nil, :caster] and b in [nil, :caster] and (a == :caster or b == :caster))
     end)
   end
 

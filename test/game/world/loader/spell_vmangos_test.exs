@@ -37,7 +37,7 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
   describe "caster-relative teleports" do
     test "loads live summon and database banishment spells" do
       for {id, selector, radius} <- [
-            {15_734, 47, 5.0},
+            {15_734, :caster_front, 5.0},
             {21_150, :caster_destination, nil},
             {24_466, :database_location, nil}
           ] do

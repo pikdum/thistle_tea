@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Spell.LocationTargets do
   @moduledoc "Resolved spell destinations and any units or objects that supplied them."
 
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CasterLocation
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.Target
@@ -15,7 +16,8 @@ defmodule ThistleTea.Game.Spell.LocationTargets do
 
   def required?(%Spell{effects: effects}), do: Enum.any?(effects, &location?/1)
 
-  def location?(%Effect{} = effect), do: scripted?(effect) or database?(effect) or selected_unit?(effect)
+  def location?(%Effect{} = effect),
+    do: scripted?(effect) or database?(effect) or selected_unit?(effect) or CasterLocation.required?(effect)
 
   def selected_unit?(%Effect{} = effect),
     do: Enum.any?([effect.implicit_target_a, effect.implicit_target_b], &(&1 in [:enemy_location, :unit_location]))

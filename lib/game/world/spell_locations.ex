@@ -4,12 +4,15 @@ defmodule ThistleTea.Game.World.SpellLocations do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CasterLocation
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.LocationTargets
   alias ThistleTea.Game.Spell.LocationTargets.Selection
+  alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpellObjects
   alias ThistleTea.Game.World.SpellTargetInfo
   alias ThistleTea.Game.World.SpellUnits
@@ -18,6 +21,8 @@ defmodule ThistleTea.Game.World.SpellLocations do
     spell.effects
     |> Enum.filter(&LocationTargets.location?/1)
     |> Enum.reduce_while(%LocationTargets{}, fn effect, snapshot ->
+      targets = LocationTargets.apply(targets, snapshot)
+
       case selection(caster, spell, effect, targets, focus) do
         %Selection{} = selected ->
           {:cont, %{snapshot | by_effect: Map.put(snapshot.by_effect, effect.index, selected)}}
@@ -38,8 +43,19 @@ defmodule ThistleTea.Game.World.SpellLocations do
     cond do
       LocationTargets.database?(effect) -> database_selection(caster, spell)
       LocationTargets.selected_unit?(effect) -> selected_unit(caster, spell, effect, targets)
+      CasterLocation.required?(effect) -> caster_relative(caster, spell, effect, targets)
       true -> scripted_selection(caster, spell, effect, targets, focus)
     end
+  end
+
+  defp caster_relative(_caster, _spell, _effect, %Target{destination_location: {_, _, _} = position}),
+    do: %Selection{position: position, kind: :caster_relative}
+
+  defp caster_relative(caster, spell, effect, _targets) do
+    {x, y, z, _orientation} = caster.movement_block.position
+    destination = CasterLocation.destination(effect, caster.movement_block.position, Modifiers.snapshot(caster, spell))
+    position = Pathfinding.first_collision_position(caster.internal.world.map_id, {x, y, z}, destination)
+    %Selection{position: position, kind: :caster_relative}
   end
 
   defp selected_unit(caster, spell, effect, targets) do

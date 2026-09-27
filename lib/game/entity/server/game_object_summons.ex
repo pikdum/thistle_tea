@@ -143,13 +143,11 @@ defmodule ThistleTea.Game.Entity.Server.GameObjectSummons do
 
   defp position(%Effects.SummonGameObject{position: nil}, source), do: source
 
-  defp position(%Effects.SummonGameObject{position: position, slot: slot}, _source) when slot in 1..4, do: position
-
   defp position(%Effects.SummonGameObject{position: {x, y, z, orientation}}, {sx, sy, sz, so}) do
     {coordinate(x, sx), coordinate(y, sy), coordinate(z, sz), coordinate(orientation, so)}
   end
 
-  defp coordinate(value, _fallback) when is_number(value) and value != 0, do: value
+  defp coordinate(value, _fallback) when is_number(value), do: value
   defp coordinate(_value, fallback), do: fallback
 
   defp track_channel(%GameObject{object: %{guid: guid}, internal: %Internal{ritual: %Ritual{}}}, context) do

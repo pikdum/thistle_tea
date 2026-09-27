@@ -1074,7 +1074,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :summon_object} = step, _target_guid, _now) do
-    effect = Effects.summon_game_object(step.datalong, step.datalong2 * 1_000, position: step.position)
+    position = step.position |> Tuple.to_list() |> Enum.map(&unspecified_coordinate/1) |> List.to_tuple()
+    effect = Effects.summon_game_object(step.datalong, step.datalong2 * 1_000, position: position)
     {Effects.enqueue(state, effect), blackboard}
   end
 
@@ -1286,6 +1287,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp interrupt_casts(state, _spell_id), do: state
+
+  defp unspecified_coordinate(value) when value == 0, do: nil
+  defp unspecified_coordinate(value), do: value
 
   defp home_position(%Mob{}, %ScriptStep{datalong: 0, position: position}), do: position
 

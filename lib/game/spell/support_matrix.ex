@@ -23,11 +23,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
 
   @deferred_targets %{
     26 => :locked_object,
-    41 => :front_left_totem,
-    42 => :back_left_totem,
-    43 => :back_right_totem,
-    44 => :front_right_totem,
-    47 => :caster_front,
     55 => :caster_front_leap
   }
 

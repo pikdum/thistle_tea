@@ -30,6 +30,20 @@ defmodule ThistleTea.Game.Entity.Server.GameObjectSummonsTest do
 
   setup [:templates]
 
+  describe "prepare/2" do
+    test "preserves zero coordinates and fills only unspecified values", %{caster: caster} do
+      caster = %{caster | movement_block: %{caster.movement_block | position: {10.0, 20.0, 30.0, 1.0}}}
+
+      for slot <- [nil, 1] do
+        effect = Effects.summon_game_object(950_101, 60_000, slot: slot, position: {0.0, 0.0, 0.0, 0.0})
+        assert GameObjectSummons.prepare(caster, effect).position == {0.0, 0.0, 0.0, 0.0}
+
+        assert GameObjectSummons.prepare(caster, %{effect | position: {nil, 0.0, nil, nil}}).position ==
+                 {10.0, 0.0, 30.0, 1.0}
+      end
+    end
+  end
+
   describe "emit/3" do
     test "queues ownership work to the explicit owner with its source world", %{caster: caster} do
       owner = idle_owner()

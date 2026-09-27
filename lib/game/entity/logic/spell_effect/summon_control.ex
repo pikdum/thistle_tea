@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.CasterLocation
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Modifiers
 
@@ -220,7 +221,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
       )
       when is_integer(entry) and entry > 0 do
     orientation = orientation || 0.0
-    {x, y, z} = wild_object_position(effect, destination, {x, y, z}, orientation)
+    {x, y, z} = summon_position(effect, destination, {x, y, z}, orientation)
 
     {state,
      [
@@ -261,7 +262,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
       )
       when is_integer(entry) and entry > 0 do
     orientation = orientation || 0.0
-    {x, y, z} = summon_effect_position(effect, destination, {caster_x, caster_y, caster_z}, orientation)
+    {x, y, z} = summon_position(effect, destination, {caster_x, caster_y, caster_z}, orientation)
 
     summon = %{
       entry: entry,
@@ -293,7 +294,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
       )
       when is_integer(entry) and entry > 0 do
     orientation = orientation || 0.0
-    {x, y, z} = summon_effect_position(effect, destination, {caster_x, caster_y, caster_z}, orientation)
+    {x, y, z} = summon_position(effect, destination, {caster_x, caster_y, caster_z}, orientation)
 
     summon = %{
       entry: entry,
@@ -417,52 +418,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
   defp summon_duration(%Spell{}), do: 3_600_000
 
   defp mini_pet_position(state, context, effect) do
-    if context.destination_position != nil or effect.implicit_target_a in [:minion_position, 47] do
+    if context.destination_position != nil or CasterLocation.required?(effect) do
       {x, y, z, orientation} = state.movement_block.position
       angle = orientation + :math.pi() / 4
       {x + 2.0 * :math.cos(angle), y + 2.0 * :math.sin(angle), z, angle + :math.pi()}
     end
   end
 
-  defp wild_object_position(_effect, {x, y, z}, _caster_position, _orientation), do: {x, y, z}
-
-  defp wild_object_position(%Effect{implicit_target_a: target, radius_yards: radius}, nil, {x, y, z}, orientation)
-       when target in [:minion_position, 47] and is_number(radius) and radius > 0 do
-    angle = if target == :minion_position, do: orientation + :math.pi() / 4, else: orientation
-    {x + radius * :math.cos(angle), y + radius * :math.sin(angle), z}
-  end
-
-  defp wild_object_position(_effect, nil, caster_position, _orientation), do: caster_position
-
   defp summon_position(%Effect{}, {x, y, z}, _position, _orientation), do: {x, y, z}
 
-  @summon_angles %{
-    :minion_position => 0.25,
-    41 => 1.75,
-    42 => 1.25,
-    43 => 0.75,
-    44 => 0.25,
-    47 => 0.0,
-    48 => 1.0,
-    49 => 0.5,
-    50 => -0.5
-  }
-
-  defp summon_position(%Effect{implicit_target_a: target, radius_yards: radius}, nil, {x, y, z}, orientation)
-       when is_map_key(@summon_angles, target) and is_number(radius) do
-    offset = Map.fetch!(@summon_angles, target) * :math.pi()
-
-    {x + radius * :math.cos(orientation + offset), y + radius * :math.sin(orientation + offset), z}
+  defp summon_position(%Effect{} = effect, nil, {x, y, z} = position, orientation) do
+    CasterLocation.destination(effect, {x, y, z, orientation}) || position
   end
-
-  defp summon_position(_effect, nil, position, _orientation), do: position
-
-  defp summon_effect_position(%Effect{implicit_target_a: :minion_position}, _destination, {x, y, z}, orientation) do
-    {x + 0.5 * :math.cos(orientation), y + 0.5 * :math.sin(orientation), z}
-  end
-
-  defp summon_effect_position(%Effect{}, {x, y, z}, _caster_position, _orientation), do: {x, y, z}
-  defp summon_effect_position(%Effect{}, nil, caster_position, _orientation), do: caster_position
 
   defp maybe_vanish_stealth_events(state, %Spell{} = spell) do
     if Rogue.vanish?(spell), do: vanish_stealth_events(state), else: []

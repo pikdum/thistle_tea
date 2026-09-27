@@ -17,6 +17,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
     {state, [%Effects.BindHome{binder_guid: guid}]}
   end
 
+  def apply(state, %CastContext{destination_position: {_, _, _}} = context, _spell, %Effect{type: :leap}, _now),
+    do: {state, destination_teleport(state, context)}
+
   def apply(
         %{movement_block: %{position: {x, y, z, orientation}}} = state,
         %CastContext{},
@@ -116,7 +119,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
         {_world, x, y, z} = context.caster_position
         {:position, {x, y, z}}
 
-      47 in selectors ->
+      :caster_front in selectors ->
         {:forward, radius}
 
       true ->

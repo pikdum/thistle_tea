@@ -887,6 +887,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
              ] = mob.internal.events
     end
 
+    test "summon_object translates script zero coordinates into unspecified positions", %{mob: mob} do
+      step = %ScriptStep{command: :summon_object, datalong: 21_145, datalong2: 300, position: {0.0, 5.0, 0.0, 0.0}}
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+      assert [%Effects.SummonGameObject{position: {nil, 5.0, nil, nil}}] = mob.internal.events
+    end
+
     test "game object state and animation commands stay typed" do
       game_object = %GameObjectEntity{
         object: %Object{guid: Guid.from_low_guid(:game_object, 1, 1)},

@@ -104,7 +104,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTeleportTest do
         %Effect{
           type: :teleport_units_face_caster,
           implicit_target_a: :target_enemy,
-          implicit_target_b: 47,
+          implicit_target_b: :caster_front,
           radius_yards: 5.0
         }
       ]

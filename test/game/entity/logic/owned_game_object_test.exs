@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.OwnedGameObjectTest do
       spell = %Spell{id: 1499, duration_ms: 60_000, effects: effects}
       context = %{context | destination_position: {0.0, 0.0, 0.0}}
 
-      assert SpellTargetResolver.resolve(caster, spell, Target.unit(2)) == [2, 1]
+      assert SpellTargetResolver.resolve(caster, spell, Target.unit(2)) == [1]
       {_, events} = SpellEffect.receive(caster, context, spell, 1_000)
       assert Enum.map(events, & &1.slot) == [1, 2, 3, 4]
 

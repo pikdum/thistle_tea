@@ -284,6 +284,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
         caster_level: 22,
         caster_position: {%WorldRef{map_id: 0}, 1.0, 2.0, 3.0},
         caster_orientation: 0.5,
+        destination_position: {4.0, 5.0, 6.0},
         target_role: :caster
       }
 
@@ -292,9 +293,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       assert summon.entry == 4277
       {x, y, z, orientation} = summon.position
-      assert_in_delta x, 1.0 + 0.5 * :math.cos(0.5), 0.0001
-      assert_in_delta y, 2.0 + 0.5 * :math.sin(0.5), 0.0001
-      assert z == 3.0
+      assert {x, y, z} == {4.0, 5.0, 6.0}
       assert orientation == 0.5
       assert summon.control == :possessed
       assert summon.control_spell_id == 126

@@ -19,7 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.WildObjectTest do
   describe "receive/4" do
     test "summons once on the caster even with another selected target", %{caster: caster, context: context} do
       spell = spell()
-      assert SpellTargetResolver.resolve(caster, spell, Target.unit(2)) == [2, 1]
+      assert SpellTargetResolver.resolve(caster, spell, Target.unit(2)) == [1]
       {_, events} = SpellEffect.receive(caster, context, spell, 1_000)
 
       assert [
@@ -51,7 +51,7 @@ defmodule ThistleTea.Game.Entity.Logic.WildObjectTest do
     end
 
     test "uses the effect radius for forward placement", %{caster: caster, context: context} do
-      effect = %{hd(spell().effects) | implicit_target_a: 47, radius_yards: 3.0}
+      effect = %{hd(spell().effects) | implicit_target_a: :caster_front, radius_yards: 3.0}
       spell = %{spell() | effects: [effect]}
       {_, [event]} = SpellEffect.receive(caster, context, spell, 1_000)
       assert event.position == {13.0, 20.0, 30.0, 0.0}
