@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.CombatLeash
+  alias ThistleTea.Game.Entity.Logic.CombatTimer
   alias ThistleTea.Game.Entity.Logic.ControlledCombat
   alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.DamageOrigin
@@ -29,6 +30,10 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   alias ThistleTea.Game.Guid
 
   @dynamic_flag_tapped 0x0004
+
+  def hold_combat(%Mob{} = entity, now, duration) do
+    entity |> CombatTimer.hold(now, duration) |> Combat.sync_combat_flag()
+  end
 
   def contact(entity, source, now, role \\ :attacked) do
     entity |> PetCombat.contact(source, now) |> ControlledCombat.contact(source, now, role)

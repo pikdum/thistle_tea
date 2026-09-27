@@ -41,6 +41,11 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureFlags do
 
   def no_owner_threat?(_entity), do: false
 
+  def no_threat_list?(%{internal: %Internal{creature: %Creature{extra_flags: flags}}}) when is_integer(flags),
+    do: (flags &&& 0x800) != 0
+
+  def no_threat_list?(_entity), do: false
+
   def locks_raid?(%{internal: %Internal{creature: %Creature{static_flags2: flags}}}) when is_integer(flags),
     do: (flags &&& 0x4) != 0
 

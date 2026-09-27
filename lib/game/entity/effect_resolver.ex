@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   alias ThistleTea.Game.Entity.EffectResolver.Movement
   alias ThistleTea.Game.Entity.EffectResolver.PetLearning
   alias ThistleTea.Game.Entity.EffectResolver.Pvp
+  alias ThistleTea.Game.Entity.EffectResolver.SpellLaunch
   alias ThistleTea.Game.Entity.EffectResolver.Spells
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Effects.RandomChoice
@@ -55,6 +56,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   end
 
   def resolve(_entity, %Effects.DeathItemReward{} = effect), do: DeathItem.resolve(effect)
+
+  def resolve(entity, %Effects.SpellLaunched{} = effect), do: SpellLaunch.resolve(entity, effect)
 
   def resolve(entity, %Effects.DurabilityDamage{} = effect), do: Durability.resolve(entity, effect)
 

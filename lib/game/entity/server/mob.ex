@@ -166,6 +166,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> Map.put(:pet_guid, Companion.active_guid(state))
       |> Map.put(:unit_flags, state.unit.flags)
       |> Map.put(:no_spell_defense?, CreatureFlags.has?(state, :no_spell_defense))
+      |> Map.put(:no_threat_list?, CreatureFlags.no_threat_list?(state))
       |> Map.merge(SpellResist.defense_snapshot(state))
       |> Map.put(:spell_threat, SpellThreat.projection(state))
       |> Map.merge(control_metadata(state))
@@ -520,6 +521,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   rescue
     error ->
       Logger.error("Spell combat contact failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:hold_combat, %Effects.HoldCombat{} = effect}, %Mob{} = state) do
+    state = state |> Engagement.hold_combat(effect.now, effect.duration_ms) |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Combat hold failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 
@@ -1667,6 +1677,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         |> Map.merge(ControlledCombat.projection(state))
         |> Map.put(:proximity_aggro?, Mob.proximity_aggro?(state))
         |> Map.put(:no_spell_defense?, CreatureFlags.has?(state, :no_spell_defense))
+        |> Map.put(:no_threat_list?, CreatureFlags.no_threat_list?(state))
         |> Map.merge(visibility)
 
       Metadata.update(state.object.guid, metadata)

@@ -16,6 +16,14 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Pvp do
 
   @fields [:owner_guid, :pvp?, :pvp_combat?, :unit_flags, :free_for_all?, :contested_pvp?, :in_combat]
 
+  def launch_contacts(entity, source, target, opts \\ []) do
+    get_metadata = Keyword.get(opts, :metadata, &Metadata.query(&1, @fields))
+    now = Keyword.get_lazy(opts, :now, &Time.now/0)
+    source = profile(source, entity, get_metadata)
+    target = profile(target, entity, get_metadata)
+    contact(source.player_guid, :attack, target, now, engage?: false)
+  end
+
   def spell_contacts(entity, source, target, %Spell{} = spell, outcome, opts \\ []) do
     case spell_contact(spell, outcome, opts) do
       {role, combat?, only_in_combat?} ->
@@ -90,7 +98,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Pvp do
           role: role,
           other: other,
           now: now,
-          combat?: Keyword.get(opts, :combat?, true)
+          combat?: Keyword.get(opts, :combat?, true),
+          engage?: Keyword.get(opts, :engage?, true)
         }
       ]
     end

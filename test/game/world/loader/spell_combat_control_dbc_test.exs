@@ -18,6 +18,16 @@ defmodule ThistleTea.Game.World.Loader.SpellCombatControlDbcTest do
   @moduletag :dbc_db
 
   describe "load/1" do
+    test "charge stuns and totems retain their active-threat launch attribute" do
+      for id <- [2_484, 7_922, 8_187, 8_349, 20_253, 25_999] do
+        assert Spell.attribute?(SpellLoader.load(id), :active_threat)
+      end
+
+      for id <- [133, 116, 635] do
+        refute Spell.attribute?(SpellLoader.load(id), :active_threat)
+      end
+    end
+
     test "pet attacks and player openers retain their separate initiation flags" do
       for id <- [2_649, 16_827, 17_253] do
         assert Spell.attribute?(SpellLoader.load(id), :initiates_combat)

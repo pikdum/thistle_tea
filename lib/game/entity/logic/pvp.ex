@@ -46,20 +46,21 @@ defmodule ThistleTea.Game.Entity.Logic.Pvp do
     put(character, pvp)
   end
 
-  def contact(character, role, other, now, combat? \\ true)
+  def contact(character, role, other, now, combat? \\ true, engage? \\ true)
 
-  def contact(%Character{} = character, role, other, now, combat?) when role in [:attack, :attacked, :assist] do
+  def contact(%Character{} = character, role, other, now, combat?, engage?)
+      when role in [:attack, :attacked, :assist] do
     now = max(now, character.internal.pvp.updated_at || now)
     character = tick(character, now)
 
     if flags_contact?(character, role, other, combat?) do
-      refresh_contact(character, role, other, now, combat?)
+      refresh_contact(character, role, other, now, combat?, engage?)
     else
       character
     end
   end
 
-  def contact(entity, _role, _other, _now, _combat?), do: entity
+  def contact(entity, _role, _other, _now, _combat?, _engage?), do: entity
 
   def contest(%Character{} = character, now) do
     character = tick(character, now)
@@ -67,7 +68,7 @@ defmodule ThistleTea.Game.Entity.Logic.Pvp do
     put(character, pvp)
   end
 
-  defp refresh_contact(character, role, other, now, combat_allowed?) do
+  defp refresh_contact(character, role, other, now, combat_allowed?, engage?) do
     pvp = character.internal.pvp
     combat? = combat_allowed? and (role != :assist or Map.get(other, :in_combat, false))
     pvp_combat? = combat? and (role != :assist or Map.get(other, :pvp_combat?, false))
@@ -83,8 +84,15 @@ defmodule ThistleTea.Game.Entity.Logic.Pvp do
     }
 
     character = put(character, pvp)
-    if combat? and not Core.dead?(character), do: PlayerCombat.mark_initiated(character, now), else: character
+
+    engage(character, now, combat? and engage?)
   end
+
+  defp engage(character, now, true) do
+    if Core.dead?(character), do: character, else: PlayerCombat.mark_initiated(character, now)
+  end
+
+  defp engage(character, _now, false), do: character
 
   defp contested_contact?(:attack, other, _combat?), do: is_integer(other.player_guid)
   defp contested_contact?(:assist, other, combat?), do: combat? and other.contested_pvp?

@@ -325,6 +325,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> start_cooldown(casting, now)
       |> queue_cast_result(casting)
       |> queue_spell_go(casting, resolution.followups.packet_hits, resolution.misses)
+      |> queue_launch_combat(casting, now)
       |> queue_consume_costs(resolution.costs)
       |> break_stealth(casting, now)
       |> interrupt_completion_auras(casting, now)
@@ -368,6 +369,24 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     else
       casting = Cast.transition(casting, :finish)
       entity |> put_cast(casting) |> advance_phase(casting, now)
+    end
+  end
+
+  defp queue_launch_combat(entity, %Cast{resolution: resolution, spell: spell}, now) do
+    target = resolution.followups.selected_unit_guid
+
+    if is_integer(target) and target > 0 and (spell.speed > 0 or Spell.attribute?(spell, :active_threat)) do
+      impact = Enum.find(resolution.impacts, &(&1.target_guid == target))
+
+      Effects.enqueue(entity, %Effects.SpellLaunched{
+        source_guid: entity.object.guid,
+        target_guid: target,
+        spell: spell,
+        effect_indices: if(impact, do: impact.effect_indices, else: []),
+        now: now
+      })
+    else
+      entity
     end
   end
 

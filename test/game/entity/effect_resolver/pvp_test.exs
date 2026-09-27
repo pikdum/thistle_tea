@@ -16,6 +16,20 @@ defmodule ThistleTea.Game.Entity.EffectResolver.PvpTest do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
+  describe "launch_contacts/4" do
+    test "launch flags only the attacking owner without engaging a pet owner or victim" do
+      pet = Guid.runtime(:pet, 9)
+      rows = %{pet => %{owner_guid: 1}, 1 => %{}, 2 => %{pvp?: true}}
+      effects = Pvp.launch_contacts(character(3), pet, 2, metadata: &Map.get(rows, &1), now: 0)
+      assert [%Effects.PvpContact{target_guid: 1, role: :attack, engage?: false} = effect] = effects
+      owner = EventSink.emit(character(1), effect)
+      assert PvpLogic.active?(owner)
+      assert PvpLogic.contested?(owner)
+      refute owner.internal.in_combat
+      assert owner.internal.pvp.combat?
+    end
+  end
+
   describe "spell_contacts/6" do
     test "successful Sap does not flag either player or enter combat" do
       spell = %Spell{

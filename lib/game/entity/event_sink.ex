@@ -79,6 +79,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.SharedDamage,
     Effects.PvpContact,
     Effects.ControlledCombatContact,
+    Effects.HoldCombat,
     Effects.PvpFlagsChanged,
     Effects.DropNearbyThreatResolved,
     Effects.FeignDeathAppliedResolved,

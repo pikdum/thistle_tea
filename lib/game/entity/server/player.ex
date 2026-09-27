@@ -374,7 +374,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def handle_cast({:pvp_contact, %Effects.PvpContact{} = effect}, %{character: %Character{} = character} = state) do
-    character = Pvp.contact(character, effect.role, effect.other, effect.now, effect.combat?)
+    character = Pvp.contact(character, effect.role, effect.other, effect.now, effect.combat?, effect.engage?)
     state = TickScheduler.ensure_scheduled(%{state | character: character})
     {:noreply, state, {:continue, :maybe_broadcast_update}}
   rescue
@@ -510,6 +510,16 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
     state = TickScheduler.ensure_scheduled(%{state | character: character})
     {:noreply, state, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast({:hold_combat, %Effects.HoldCombat{} = effect}, %{character: %Character{} = character} = state) do
+    character = PlayerCombat.hold_combat(character, effect.now, effect.duration_ms)
+    state = TickScheduler.ensure_scheduled(%{state | character: character})
+    {:noreply, state, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Combat hold failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast(

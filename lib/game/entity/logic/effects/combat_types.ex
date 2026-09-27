@@ -29,7 +29,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
        resistance_penetration: []
      ]},
     {:AdvanceCombatSkill, [:target_guid, :skill_id], []},
-    {:PvpContact, [:target_guid, :role, :other, :now], [combat?: true]},
+    {:PvpContact, [:target_guid, :role, :other, :now], [combat?: true, engage?: true]},
+    {:HoldCombat, [:target_guid, :now, :duration_ms], []},
     {:ControlledCombatContact, [:target_guid, :controlled_guid, :opponent_guid, :role, :now], []},
     {:PvpFlagsChanged, [:enabled?], []},
     {:AttackStart, [:source_guid, :target_guid], []},

@@ -9,7 +9,9 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.FeignDeath
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Guid
@@ -22,6 +24,19 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
 
   @victimstate_normal 1
+
+  def emit(%Character{object: %{guid: guid}} = entity, %Effects.HoldCombat{target_guid: guid} = effect, _context) do
+    PlayerCombat.hold_combat(entity, effect.now, effect.duration_ms)
+  end
+
+  def emit(%Mob{object: %{guid: guid}} = entity, %Effects.HoldCombat{target_guid: guid} = effect, _context) do
+    Engagement.hold_combat(entity, effect.now, effect.duration_ms)
+  end
+
+  def emit(entity, %Effects.HoldCombat{} = effect, _context) do
+    Entity.hold_combat(effect.target_guid, effect)
+    entity
+  end
 
   def emit(entity, %Effects.ControlledCombatContact{} = effect, _context) do
     Entity.controlled_combat_contact(effect.target_guid, effect)
@@ -39,7 +54,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   end
 
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.PvpContact{target_guid: guid} = effect, _context) do
-    Pvp.contact(entity, effect.role, effect.other, effect.now, effect.combat?)
+    Pvp.contact(entity, effect.role, effect.other, effect.now, effect.combat?, effect.engage?)
   end
 
   def emit(entity, %Effects.PvpContact{} = effect, _context) do

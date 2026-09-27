@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.CombatReferences
+  alias ThistleTea.Game.Entity.Logic.CombatTimer
   alias ThistleTea.Game.Entity.Logic.ControlledCombat
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
@@ -67,10 +68,9 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   def mark_attacked(character, _now, _faction_id), do: character
 
-  def hold_combat(%Character{internal: %Internal{} = internal} = character, now, duration)
+  def hold_combat(%Character{} = character, now, duration)
       when is_integer(now) and is_integer(duration) and duration > 0 do
-    %{character | internal: %{internal | in_combat: true, last_hostile_time: now, combat_timeout_ms: duration}}
-    |> CombatLogic.sync_combat_flag()
+    character |> CombatTimer.hold(now, duration) |> CombatLogic.sync_combat_flag()
   end
 
   def mark_initiated(character, now), do: mark_attacked(character, now)

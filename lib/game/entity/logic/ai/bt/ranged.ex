@@ -97,6 +97,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
     character
     |> AutoRepeat.launched(auto_shot, now)
     |> Effects.enqueue(Effects.spell_go(character.object.guid, spell.id, [auto_shot.target_guid], auto_shot.targets))
+    |> Effects.enqueue(%Effects.SpellLaunched{
+      source_guid: character.object.guid,
+      target_guid: auto_shot.target_guid,
+      spell: spell,
+      now: now
+    })
     |> Effects.enqueue(Effects.deliver_spell(auto_shot.target_guid, context, spell))
   end
 

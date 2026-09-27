@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.EffectResolver.Movement
   alias ThistleTea.Game.Entity.EffectResolver.Pvp
+  alias ThistleTea.Game.Entity.EffectResolver.SpellLaunch
   alias ThistleTea.Game.Entity.Logic.Aura.ProcDamage
   alias ThistleTea.Game.Entity.Logic.Aura.TriggeredLifetime
   alias ThistleTea.Game.Entity.Logic.Charge
@@ -388,7 +389,15 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
           ),
         else: []
 
-    [launch | movement ++ deliveries ++ actions ++ [completion]]
+    launch_combat =
+      SpellLaunch.resolve(entity, %Effects.SpellLaunched{
+        source_guid: context.caster_guid,
+        target_guid: Target.unit_guid(selection),
+        spell: spell,
+        effect_indices: UnitTargets.indices(units, Target.unit_guid(selection))
+      })
+
+    [launch | launch_combat ++ movement ++ deliveries ++ actions ++ [completion]]
   end
 
   defp living_target?(%{object: %{guid: guid}, unit: %Unit{health: health}}, guid),
@@ -420,22 +429,9 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
   defp trigger_outcome(context, _spell, _target_guid), do: context
 
-  defp projectile_delay_ms(%{movement_block: %{position: {x, y, z, _o}}}, %Effects.DeliverSpell{
-         spell: %Spell{speed: speed},
-         target_guid: target_guid
-       })
-       when is_number(speed) and speed > 0 and is_integer(target_guid) do
-    case World.position(target_guid) do
-      {_map, tx, ty, tz} ->
-        distance = :math.sqrt(:math.pow(tx - x, 2) + :math.pow(ty - y, 2) + :math.pow(tz - z, 2))
-        trunc(distance / speed * 1000)
-
-      _missing ->
-        0
-    end
+  defp projectile_delay_ms(entity, %Effects.DeliverSpell{spell: spell, cast_context: context, target_guid: target}) do
+    SpellLaunch.delay(entity, context.caster_guid, target, spell)
   end
-
-  defp projectile_delay_ms(_entity, _effect), do: 0
 
   defp scripted_proc_spell(%Spell{} = spell, %Effects.TriggerSpell{triggering_spell_id: triggering_spell_id}) do
     case Scripts.proc_trigger_spell_id(spell, triggering_spell_id) do
