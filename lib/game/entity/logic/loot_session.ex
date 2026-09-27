@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
   alias ThistleTea.Game.Entity.Data.ItemProperty
   alias ThistleTea.Game.Entity.Logic.Condition
   alias ThistleTea.Game.Entity.Logic.Experience
+  alias ThistleTea.Game.Entity.Logic.ItemEligibility
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
@@ -26,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
 
   @loot_method_round_robin 1
   @loot_method_master_loot 2
+  @loot_method_need_before_greed 4
   @loot_slot_type_master 2
   @interaction_distance 5.0
 
@@ -111,7 +113,7 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
          true <- session.loot_master == giver.guid,
          true <- master_recipient?(session, recipient),
          %Loot.Item{} = item <- blocked_item(session, slot),
-         true <- condition_allowed?(recipient, item) do
+         true <- item_allowed?(recipient, item) do
       reserve(session, recipient, item, token, true)
     else
       {:error, reason} -> {:error, reason}
@@ -123,7 +125,7 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
     with true <- tap_allowed?(session, winner),
          true <- Actor.within?(winner, Experience.group_reward_distance()),
          %Loot.Item{} = item <- blocked_item(session, slot),
-         true <- condition_allowed?(winner, item) do
+         true <- item_allowed?(winner, item) do
       reserve(session, winner, item, token, false)
     else
       _ -> {:error, :no_permission}
@@ -133,7 +135,7 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
   def validate_commit(%__MODULE__{} = session, %Actor{} = actor, token) when is_reference(token) do
     case Map.get(session.reservations, token) do
       %Reservation{actor_guid: actor_guid, item: item} when actor_guid == actor.guid ->
-        if actor.access_allowed? and condition_allowed?(actor, item), do: :ok, else: {:error, :no_permission}
+        if actor.access_allowed? and item_allowed?(actor, item), do: :ok, else: {:error, :no_permission}
 
       _missing ->
         {:error, :invalid_reservation}
@@ -175,13 +177,13 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
     %{session | loot_method: @loot_method_round_robin, assigned_looter: looter}
   end
 
-  def start_rolls(%__MODULE__{loot: %Loot{} = loot} = session, threshold, eligible) do
+  def start_rolls(%__MODULE__{loot: %Loot{} = loot} = session, threshold, eligible, templates \\ %{}) do
     rollable = rollable_items(loot, threshold)
 
     rolls =
       rollable
       |> Enum.flat_map(fn item ->
-        case eligible_guids(item, eligible) do
+        case eligible_guids(item, eligible, session.loot_method, templates) do
           [] ->
             []
 
@@ -215,6 +217,10 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
 
   def unblock_item(%__MODULE__{loot: %Loot{} = loot} = session, slot) do
     %{session | loot: Loot.unblock_item(loot, slot)}
+  end
+
+  def assign_need_winner(%__MODULE__{loot: %Loot{} = loot} = session, slot, winner) do
+    %{session | loot: Loot.assign_item(loot, slot, winner)}
   end
 
   def blocked_item(%__MODULE__{loot: %Loot{} = loot} = session, slot) do
@@ -280,7 +286,7 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
 
   defp visible_item?(policy, %Actor{} = actor, %Loot.Item{} = item) do
     not item.looted and
-      condition_allowed?(actor, item) and
+      item_allowed?(actor, item) and
       (not item.quest_item or Actor.needs_item?(actor, item.item_id)) and
       (not item.blocked or actor.guid == Map.get(policy, :loot_master))
   end
@@ -327,7 +333,8 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
 
   defp rollable_items(%Loot{items: items}, threshold) do
     Enum.filter(items, fn item ->
-      not item.quest_item and not item.looted and not item.blocked and item.quality >= threshold
+      not item.quest_item and not item.looted and not item.blocked and is_nil(item.owner_guid) and
+        item.quality >= threshold
     end)
   end
 
@@ -340,16 +347,26 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
 
   defp condition_allowed?(%Actor{}, %Loot.Item{}), do: false
 
-  defp eligible_guids(%Loot.Item{condition: nil}, eligible), do: Enum.map(eligible, &eligible_guid/1)
-
-  defp eligible_guids(%Loot.Item{} = item, eligible) do
-    eligible
-    |> Enum.filter(fn
-      %Actor{} = actor -> condition_allowed?(actor, item)
-      _guid -> false
-    end)
-    |> Enum.map(& &1.guid)
+  defp item_allowed?(%Actor{} = actor, %Loot.Item{} = item) do
+    item.owner_guid in [nil, actor.guid] and condition_allowed?(actor, item)
   end
+
+  defp eligible_guids(%Loot.Item{} = item, eligible, method, templates) do
+    eligible
+    |> Enum.filter(&roll_eligible?(&1, item, method, templates))
+    |> Enum.map(&eligible_guid/1)
+  end
+
+  defp roll_eligible?(%Actor{} = actor, item, method, templates) do
+    actor.access_allowed? and item_allowed?(actor, item) and
+      (method != @loot_method_need_before_greed or
+         ItemEligibility.check(actor.item_eligibility, Map.get(templates, item.item_id)) == :ok)
+  end
+
+  defp roll_eligible?(guid, %Loot.Item{condition: nil}, method, _templates) when is_integer(guid),
+    do: method != @loot_method_need_before_greed
+
+  defp roll_eligible?(_actor, _item, _method, _templates), do: false
 
   defp eligible_guid(%Actor{guid: guid}), do: guid
   defp eligible_guid(guid) when is_integer(guid), do: guid

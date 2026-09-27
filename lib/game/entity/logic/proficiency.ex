@@ -135,8 +135,8 @@ defmodule ThistleTea.Game.Entity.Logic.Proficiency do
          required_skill: skill_id,
          required_skill_rank: rank
        })
-       when is_integer(skill_id) and skill_id > 0 and is_integer(rank) and rank > 0 do
-    if Map.get(skill_values, skill_id, 0) >= rank, do: :ok, else: {:error, :no_required_proficiency}
+       when is_integer(skill_id) and skill_id > 0 do
+    if Map.get(skill_values, skill_id, 0) >= max(rank || 0, 1), do: :ok, else: {:error, :no_required_proficiency}
   end
 
   defp check_required_skill(%__MODULE__{}, %ItemTemplate{}), do: :ok

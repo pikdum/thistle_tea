@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Condition.Context
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
+  alias ThistleTea.Game.Entity.Logic.ItemEligibility
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Party
@@ -33,6 +34,7 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
       needed_items: Quests.needed_items(character),
       distance: World.distance_between(character, target_guid),
       condition_context: condition_context,
+      item_eligibility: ItemEligibility.from_character(character),
       access_allowed?: access_allowed?(guid, target_guid)
     }
   end
@@ -44,6 +46,7 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
       needed_items: needed_items(guid),
       distance: World.distance_between(guid, target_guid),
       condition_context: remote_condition_context(guid, target_guid),
+      item_eligibility: item_eligibility(guid),
       access_allowed?: access_allowed?(guid, target_guid)
     }
   end
@@ -73,6 +76,13 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
     case Metadata.query(guid, [:needed_quest_items]) do
       %{needed_quest_items: %MapSet{} = needed_items} -> needed_items
       _ -> :unknown
+    end
+  end
+
+  defp item_eligibility(guid) do
+    case Metadata.query(guid, [:item_eligibility]) do
+      %{item_eligibility: %ItemEligibility{} = eligibility} -> eligibility
+      _missing -> nil
     end
   end
 

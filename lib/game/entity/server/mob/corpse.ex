@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -338,28 +339,34 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     session = session(state)
 
     case eligible_members(state, group) do
-      [_, _ | _] = eligible ->
+      [_ | _] = eligible ->
         actors = Enum.map(eligible, &ActorFactory.for_guid(&1, state.object.guid))
-        {session, rolls} = LootSession.start_rolls(session, group.loot_threshold, actors)
-
-        Enum.each(rolls, fn roll ->
-          packet = %Message.SmsgLootStartRoll{
-            loot_guid: state.object.guid,
-            slot: roll.slot,
-            item_id: roll.item_id,
-            random_prop: roll.random_property_id,
-            countdown: @loot_roll_countdown_ms
-          }
-
-          broadcast_roll_packet(roll, packet)
-          Process.send_after(self(), {:loot_roll_timeout, roll.slot}, @loot_roll_countdown_ms)
-        end)
-
-        put_session(state, session)
+        templates = Map.new(session.loot.items, &{&1.item_id, ItemLoader.get_cached_template(&1.item_id)})
+        {session, rolls} = LootSession.start_rolls(session, group.loot_threshold, actors, templates)
+        Enum.reduce(rolls, put_session(state, session), &start_roll(&2, &1))
 
       _ ->
         state
     end
+  end
+
+  defp start_roll(state, %LootRoll{eligible: [winner]} = roll) do
+    {_roll, session} = LootSession.pop_roll(session(state), roll.slot)
+    state |> put_session(session) |> award_roll(roll, winner, 100, :need, [])
+  end
+
+  defp start_roll(state, %LootRoll{} = roll) do
+    packet = %Message.SmsgLootStartRoll{
+      loot_guid: state.object.guid,
+      slot: roll.slot,
+      item_id: roll.item_id,
+      random_prop: roll.random_property_id,
+      countdown: @loot_roll_countdown_ms
+    }
+
+    broadcast_roll_packet(roll, packet)
+    Process.send_after(self(), {:loot_roll_timeout, roll.slot}, @loot_roll_countdown_ms)
+    state
   end
 
   defp prepare_master(%Mob{} = state, %Party.Group{master_looter: master, loot_threshold: threshold})
@@ -435,8 +442,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
       roll_type: type
     })
 
-    session = session(state)
+    session =
+      if vote == :need, do: LootSession.assign_need_winner(session(state), roll.slot, winner), else: session(state)
 
+    state = put_session(state, session)
     winner_actor = ActorFactory.for_guid(winner, state.object.guid)
 
     case EntityRegistry.whereis(winner) do

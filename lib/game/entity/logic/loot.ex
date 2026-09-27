@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
             slot_type: non_neg_integer(),
             looted: boolean(),
             blocked: boolean(),
+            owner_guid: integer() | nil,
             quest_item: boolean(),
             condition: struct() | nil,
             random_property: struct() | nil
@@ -26,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
       :slot,
       :item_id,
       :display_id,
+      :owner_guid,
       count: 1,
       quality: 0,
       slot_type: 0,
@@ -61,6 +63,11 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
   def block_item(%__MODULE__{} = loot, slot), do: set_blocked(loot, slot, true)
 
   def unblock_item(%__MODULE__{} = loot, slot), do: set_blocked(loot, slot, false)
+
+  def assign_item(%__MODULE__{items: items} = loot, slot, owner_guid) when is_integer(owner_guid) do
+    items = Enum.map(items, fn item -> if item.slot == slot, do: %{item | owner_guid: owner_guid}, else: item end)
+    %{loot | items: items}
+  end
 
   defp set_blocked(%__MODULE__{items: items} = loot, slot, blocked?) do
     items = Enum.map(items, fn i -> if i.slot == slot, do: %{i | blocked: blocked?}, else: i end)

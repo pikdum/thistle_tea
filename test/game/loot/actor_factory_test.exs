@@ -6,19 +6,65 @@ defmodule ThistleTea.Game.Loot.ActorFactoryTest do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Condition, as: Evaluator
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
+  alias ThistleTea.Game.Entity.Logic.ItemEligibility
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Loot.ActorFactory
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.WorldRef
 
   describe "for_character/2 and for_guid/2" do
+    test "refresh item eligibility through owner updates and reconnect" do
+      player_guid = Guid.from_low_guid(:player, unique_guid())
+      target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+
+      character = %Character{
+        object: %Object{guid: player_guid},
+        unit: %Unit{class: 1, race: 1, level: 20, health: 100, max_health: 100},
+        player: %Player{skills: %{}},
+        internal: %Internal{world: WorldRef.open(0)},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      on_exit(fn -> Presence.leave(character) end)
+      Presence.enter(character, %{})
+      initial = ActorFactory.for_character(character, target_guid).item_eligibility
+      assert %ItemEligibility{level: 20} = initial
+      assert ActorFactory.for_guid(player_guid, target_guid).item_eligibility == initial
+
+      updated = %{
+        character
+        | unit: %{character.unit | level: 30},
+          player: %{character.player | skills: %{164 => %{value: 100}}, highest_honor_rank: 6},
+          internal: %{character.internal | spells: [9788]}
+      }
+
+      Presence.sync(updated, %{item_eligibility: initial})
+      local = ActorFactory.for_character(updated, target_guid).item_eligibility
+      assert ActorFactory.for_guid(player_guid, target_guid).item_eligibility == local
+      assert local.level == 30
+      assert local.highest_honor_rank == 6
+      assert local.proficiency.skill_values == %{164 => 100}
+      assert MapSet.member?(local.proficiency.known_spell_ids, 9788)
+
+      Presence.relocate(updated)
+      assert ActorFactory.for_guid(player_guid, target_guid).item_eligibility == local
+      Presence.sync(character, %{})
+      assert ActorFactory.for_guid(player_guid, target_guid).item_eligibility == initial
+      Presence.leave(character)
+      assert ActorFactory.for_guid(player_guid, target_guid).item_eligibility == nil
+      Presence.enter(updated, %{})
+      assert ActorFactory.for_guid(player_guid, target_guid).item_eligibility == local
+    end
+
     for entry <- 178_784..178_789 do
       test "deny supply #{entry} access without an active match reservation" do
         player_guid = Guid.from_low_guid(:player, unique_guid())

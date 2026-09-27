@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.Loot.Actor do
   @moduledoc false
 
   @enforce_keys [:guid, :group_id, :needed_items, :distance]
-  defstruct [:guid, :group_id, :needed_items, :distance, :condition_context, access_allowed?: true]
+  defstruct [:guid, :group_id, :needed_items, :distance, :condition_context, :item_eligibility, access_allowed?: true]
 
   @type t :: %__MODULE__{
           guid: integer(),
@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Loot.Actor do
           needed_items: MapSet.t(integer()) | :unknown,
           distance: number() | nil,
           condition_context: struct() | nil,
+          item_eligibility: struct() | nil,
           access_allowed?: boolean()
         }
 

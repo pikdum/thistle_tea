@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.World.Presence do
   alias ThistleTea.Game.Entity.Logic.Appearance
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.FeignDeath
+  alias ThistleTea.Game.Entity.Logic.ItemEligibility
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.OutdoorPvp.Participation
@@ -21,7 +22,7 @@ defmodule ThistleTea.Game.World.Presence do
   alias ThistleTea.Realm
 
   def enter(%Character{} = character, metadata) when is_map(metadata) do
-    Metadata.put(character.object.guid, Map.merge(metadata, location_metadata(character)))
+    Metadata.put(character.object.guid, Map.merge(metadata, state_metadata(character)))
     put_position(character)
     SocialNotifier.online(character.object.guid)
     :ok
@@ -42,7 +43,7 @@ defmodule ThistleTea.Game.World.Presence do
   end
 
   def sync(%Character{} = character, metadata) when is_map(metadata) do
-    Metadata.update(character.object.guid, Map.merge(metadata, location_metadata(character)))
+    Metadata.update(character.object.guid, Map.merge(metadata, state_metadata(character)))
   end
 
   def leave(%Character{} = character) do
@@ -51,6 +52,10 @@ defmodule ThistleTea.Game.World.Presence do
     Position.remove(character, :players)
     if published?, do: SocialNotifier.offline(character.object.guid)
     :ok
+  end
+
+  defp state_metadata(character) do
+    Map.put(location_metadata(character), :item_eligibility, ItemEligibility.from_character(character))
   end
 
   defp put_position(%Character{movement_block: %MovementBlock{}} = character) do

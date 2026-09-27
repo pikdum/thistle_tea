@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   classification, and equip-slot resolution with class/level/proficiency
   checks. Item lookups are injected as functions so the core stays DB-free.
   """
-  import Bitwise, only: [&&&: 2, <<<: 2]
+  import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Entity.Data.Component.Container
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -13,10 +13,10 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Logic.Honor.ItemRequirements
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch.Removal
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
+  alias ThistleTea.Game.Entity.Logic.ItemEligibility
   alias ThistleTea.Game.Entity.Logic.Proficiency
 
   @bag_0 255
@@ -683,13 +683,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   end
 
   def can_use(%Unit{} = unit, %Proficiency{} = prof, %ItemTemplate{} = template, %Player{} = player \\ %Player{}) do
-    cond do
-      (template.allowable_class &&& 1 <<< (unit.class - 1)) == 0 -> {:error, :you_can_never_use_that_item}
-      (template.allowable_race &&& 1 <<< (unit.race - 1)) == 0 -> {:error, :you_can_never_use_that_item}
-      not ItemRequirements.can_use?(player, template) -> {:error, :cant_equip_rank}
-      is_integer(template.required_level) and unit.level < template.required_level -> {:error, :cant_equip_level_i}
-      true -> Proficiency.can_equip?(prof, template)
-    end
+    unit |> ItemEligibility.new(prof, player) |> ItemEligibility.check(template)
   end
 
   defp ctx(player, unit, prof, owner_guid, get_item, opts \\ []) do

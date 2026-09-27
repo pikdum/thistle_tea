@@ -12,10 +12,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
   alias ThistleTea.Game.Entity.Data.DamageOrigin
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.ItemEligibility
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
+  alias ThistleTea.Game.Entity.Logic.Loot.Release
+  alias ThistleTea.Game.Entity.Logic.Proficiency
+  alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
   alias ThistleTea.Game.World.Metadata
@@ -241,6 +246,130 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
       assert Corpse.remove(current, previous.internal.loot.corpse_token) == current
     end
   end
+
+  describe "automatic roll awards" do
+    setup [:rolling_group]
+
+    test "awards to the sole eligible member without a roll prompt", %{corpse: corpse, killer: killer, member: member} do
+      prepared = Corpse.prepare(corpse, killer)
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgLootRollWon{winner_guid: ^killer, roll_number: 100, roll_type: 1}}}
+
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgLootStartRoll{}}}
+      assert_receive {:loot_award, guid, reservation}
+      assert guid == corpse.object.guid
+      assert reservation.actor_guid == killer
+      assert reservation.item.item_id == @grey_item_id
+      assert prepared.internal.loot.session.rolls == %{}
+      refute hd(prepared.internal.loot.session.loot.items).looted
+      assert {{:error, :already_looted}, _} = Corpse.reserve_item(prepared, group_actor(member), 0, self())
+
+      assert {:ok, committed} = Corpse.commit(prepared, %Commit{token: reservation.token, actor_guid: killer})
+      assert committed.internal.loot.session == nil
+      assert (committed.unit.dynamic_flags &&& @dynamic_flag_lootable) == 0
+
+      assert {{:error, :invalid_reservation}, _} =
+               Corpse.commit(committed, %Commit{token: reservation.token, actor_guid: killer})
+    end
+
+    test "retains the winner on inventory failure", %{corpse: corpse, killer: killer, member: member} do
+      prepared = Corpse.prepare(corpse, killer)
+      assert_receive {:loot_award, _, reservation}
+
+      assert {:ok, released} =
+               Corpse.release_reservation(prepared, %Release{token: reservation.token, actor_guid: killer})
+
+      assert released.internal.loot.session.rolls == %{}
+      assert {{:error, :nothing_to_take}, _} = Corpse.view(released, group_actor(member))
+      assert {{:error, :already_looted}, _} = Corpse.reserve_item(released, group_actor(member), 0, self())
+      assert {{:ok, retry}, _} = Corpse.reserve_item(released, group_actor(killer), 0, self())
+      assert retry.item.item_id == @grey_item_id
+      assert retry.item.owner_guid == killer
+    end
+
+    test "retains the winner when its owner has disconnected", %{corpse: corpse, killer: killer, member: member} do
+      EntityRegistry.unregister(killer)
+      prepared = Corpse.prepare(corpse, killer)
+      assert prepared.internal.loot.session.rolls == %{}
+      assert prepared.internal.loot.session.reservations == %{}
+      assert {{:error, :already_looted}, _} = Corpse.reserve_item(prepared, group_actor(member), 0, self())
+      assert {{:ok, _}, _} = Corpse.reserve_item(prepared, group_actor(killer), 0, self())
+    end
+
+    test "leaves items lootable when nobody can use them", %{corpse: corpse, killer: killer} do
+      Metadata.update(killer, %{item_eligibility: eligibility(%Proficiency{})})
+      prepared = Corpse.prepare(corpse, killer)
+      assert prepared.internal.loot.session.rolls == %{}
+      assert prepared.internal.loot.session.reservations == %{}
+      refute_receive {:loot_award, _, _}
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgLootStartRoll{}}}
+      assert {{:ok, _}, _} = Corpse.reserve_item(prepared, group_actor(killer), 0, self())
+    end
+
+    test "starts ordinary rolls for multiple eligible members", %{corpse: corpse, killer: killer, member: member} do
+      Metadata.update(member, %{item_eligibility: eligibility(Proficiency.all())})
+      prepared = Corpse.prepare(corpse, killer)
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgLootStartRoll{item_id: @grey_item_id}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgLootStartRoll{item_id: @grey_item_id}}}
+      refute_receive {:loot_award, _, _}
+      assert %{0 => roll} = prepared.internal.loot.session.rolls
+      assert Enum.sort(roll.eligible) == Enum.sort([killer, member])
+    end
+
+    test "Group Loot automatically awards when only one member is nearby", %{
+      corpse: corpse,
+      killer: killer,
+      member: member
+    } do
+      {:ok, _} = PartySystem.set_loot(killer, 3, 0, 2)
+      SpatialHash.remove(:players, member)
+      Metadata.update(killer, %{item_eligibility: nil})
+      prepared = Corpse.prepare(corpse, killer)
+      assert_receive {:loot_award, _, %{actor_guid: ^killer}}
+      assert prepared.internal.loot.session.rolls == %{}
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgLootStartRoll{}}}
+    end
+  end
+
+  defp rolling_group(%{killer: killer}) do
+    member = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    :ok = PartySystem.invite(killer, "Tagger", member)
+    {:ok, _} = PartySystem.accept(member, "Member")
+    {:ok, group} = PartySystem.set_loot(killer, 4, 0, 2)
+    corpse = put_in(mob(killer).internal.loot.tapped_by.group_id, group.id)
+    template = %ItemTemplate{entry: @grey_item_id, name: "Sword", quality: 2, class: 2, subclass: 8}
+    :ets.insert(ItemLoader, {@grey_item_id, template})
+    cache_loot_rows([grey_row()])
+    SpatialHash.insert(:mobs, corpse.object.guid, corpse.internal.world, 0.0, 0.0, 0.0)
+
+    for guid <- [killer, member] do
+      EntityRegistry.register(guid)
+      SpatialHash.insert(:players, guid, corpse.internal.world, 0.0, 0.0, 0.0)
+    end
+
+    Metadata.put(killer, %{item_eligibility: eligibility(Proficiency.all())})
+    Metadata.put(member, %{item_eligibility: eligibility(%Proficiency{})})
+
+    on_exit(fn ->
+      for guid <- [killer, member] do
+        PartySystem.leave(guid)
+        SpatialHash.remove(:players, guid)
+        Metadata.delete(guid)
+      end
+
+      SpatialHash.remove(:mobs, corpse.object.guid)
+      Metadata.delete(corpse.object.guid)
+    end)
+
+    %{corpse: corpse, member: member}
+  end
+
+  defp eligibility(proficiency) do
+    %ItemEligibility{class: 1, race: 1, level: 60, highest_honor_rank: 0, proficiency: proficiency}
+  end
+
+  defp group_actor(guid), do: %{actor(guid) | group_id: PartySystem.group_of(guid).id}
 
   defp skinning_mob(killer) do
     mob = mob(killer)

@@ -9,8 +9,11 @@ defmodule ThistleTea.Game.Entity.Logic.Honor.ItemRequirements do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
 
   def can_use?(%Player{} = player, %ItemTemplate{} = template) do
-    (player.highest_honor_rank || 0) >= (template.required_honor_rank || 0)
+    can_use?(player.highest_honor_rank || 0, template)
   end
+
+  def can_use?(highest_rank, %ItemTemplate{} = template) when is_integer(highest_rank),
+    do: highest_rank >= (template.required_honor_rank || 0)
 
   def can_buy?(%Character{player: player, unit: unit}, %ItemTemplate{} = template) do
     required = template.required_honor_rank || 0

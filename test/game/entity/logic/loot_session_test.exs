@@ -3,13 +3,16 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
 
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.ItemProperty
+  alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Condition.Context
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
+  alias ThistleTea.Game.Entity.Logic.ItemEligibility
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Logic.LootSession
+  alias ThistleTea.Game.Entity.Logic.Proficiency
 
   defp loot do
     %Loot{
@@ -28,7 +31,8 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
       group_id: Keyword.get(opts, :group_id),
       needed_items: MapSet.new(Keyword.get(opts, :needed_items, [])),
       distance: Keyword.get(opts, :distance, 0.0),
-      condition_context: Keyword.get(opts, :condition_context)
+      condition_context: Keyword.get(opts, :condition_context),
+      item_eligibility: Keyword.get(opts, :item_eligibility)
     }
   end
 
@@ -186,7 +190,87 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
     end
   end
 
+  describe "start_rolls/4" do
+    test "Need Before Greed filters participation per item while Group Loot permits every actor" do
+      loot = %Loot{
+        items: [%Loot.Item{slot: 0, item_id: 100, quality: 2}, %Loot.Item{slot: 1, item_id: 101, quality: 2}]
+      }
+
+      templates = %{100 => %ItemTemplate{class: 2, subclass: 8}, 101 => %ItemTemplate{class: 4, subclass: 1}}
+      warrior = roll_actor(1, %Proficiency{weapon_mask: 256, armor_mask: 2})
+      mage = roll_actor(2, %Proficiency{armor_mask: 2})
+      session = loot |> LootSession.new(nil) |> LootSession.configure_group(4)
+      {rolling, rolls} = LootSession.start_rolls(session, 2, [warrior, mage], templates)
+      assert Map.new(rolls, &{&1.slot, &1.eligible}) == %{0 => [1], 1 => [1, 2]}
+      assert :error = LootSession.vote(rolling, 0, 2, :need)
+      assert :error = LootSession.vote(rolling, 0, 2, :greed)
+      assert {:ok, _, _} = LootSession.vote(rolling, 1, 2, :need)
+
+      {_rolling, rolls} =
+        session |> LootSession.configure_group(3) |> LootSession.start_rolls(2, [warrior, mage], templates)
+
+      assert Enum.all?(rolls, &(&1.eligible == [1, 2]))
+    end
+
+    test "Need Before Greed combines usability, conditions, and source access" do
+      condition = %Condition{entry: 1, type: :level, value1: 10, value2: 1}
+      loot = %Loot{items: [%Loot.Item{slot: 0, item_id: 1604, quality: 2, condition: condition}]}
+      eligible = roll_actor(1, Proficiency.all())
+      allowed = %{condition_actor(1, 10) | item_eligibility: eligible.item_eligibility}
+      denied = %{condition_actor(2, 9) | item_eligibility: eligible.item_eligibility}
+      inaccessible = %{allowed | guid: 3, access_allowed?: false}
+      session = loot |> LootSession.new(nil) |> LootSession.configure_group(4)
+
+      {_session, [roll]} =
+        LootSession.start_rolls(session, 2, [allowed, denied, inaccessible], %{1604 => %ItemTemplate{}})
+
+      assert roll.eligible == [1]
+    end
+
+    test "leaves items available when nobody qualifies or eligibility is missing" do
+      session = loot() |> LootSession.new(nil) |> LootSession.configure_group(4)
+      unskilled = roll_actor(1, %Proficiency{})
+
+      for {actors, templates} <- [
+            {[unskilled], %{1604 => %ItemTemplate{class: 2, subclass: 8}}},
+            {[unskilled], %{}},
+            {[actor(1)], %{1604 => %ItemTemplate{}}},
+            {[1], %{1604 => %ItemTemplate{}}}
+          ] do
+        assert {^session, []} = LootSession.start_rolls(session, 2, actors, templates)
+        assert {:ok, %{item: %{item_id: 1604}}, _} = LootSession.reserve_item(session, actor(1), 0, make_ref())
+      end
+    end
+  end
+
+  defp roll_actor(guid, proficiency) do
+    eligibility = %ItemEligibility{class: 1, race: 1, level: 60, highest_honor_rank: 0, proficiency: proficiency}
+    actor(guid, item_eligibility: eligibility)
+  end
+
   describe "reservations" do
+    test "Need ownership survives lost reservations and preserves the exact item on retry" do
+      property = %ItemProperty{id: 1182, suffix: "of the Bear", enchantments: [72, 69, 0]}
+      item = %Loot.Item{slot: 0, item_id: 1608, quality: 2, random_property: property}
+      {session, [_roll]} = LootSession.start_rolls(LootSession.new(%Loot{items: [item]}, nil), 2, [1, 2])
+      {_roll, session} = LootSession.pop_roll(session, 0)
+      session = LootSession.assign_need_winner(session, 0, 1)
+      token = make_ref()
+      assert {:error, :no_permission} = LootSession.reserve_roll(session, actor(2), 0, token)
+      assert {:ok, _, reserved} = LootSession.reserve_roll(session, actor(1), 0, token)
+      released = LootSession.release(reserved, token)
+      refute LootSession.visible?(released, actor(2))
+      refute LootSession.visible?(LootSession.project(released), actor(2))
+      assert LootSession.visible?(LootSession.project(released), actor(1))
+      assert {^released, []} = LootSession.start_rolls(released, 2, [1, 2])
+      assert {:error, :already_looted} = LootSession.reserve_item(released, actor(2), 0, make_ref())
+      assert {:ok, retry, reserved} = LootSession.reserve_item(released, actor(1), 0, make_ref())
+      assert retry.item.random_property == property
+      assert {:ok, awarded, committed} = LootSession.commit(reserved, %Commit{token: retry.token, actor_guid: 1})
+      assert awarded.random_property == property
+      assert LootSession.finished?(committed)
+    end
+
     test "does not mark a direct item looted until the owner commits" do
       session = LootSession.new(loot(), nil)
       token = make_ref()

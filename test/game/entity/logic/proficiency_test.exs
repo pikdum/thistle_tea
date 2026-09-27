@@ -95,6 +95,13 @@ defmodule ThistleTea.Game.Entity.Logic.ProficiencyTest do
   end
 
   describe "can_equip?/2" do
+    test "requires the skill even when its required rank is zero" do
+      recipe = %ItemTemplate{class: 9, required_skill: 164, required_skill_rank: 0}
+      assert Proficiency.can_equip?(%Proficiency{}, recipe) == {:error, :no_required_proficiency}
+      assert Proficiency.can_equip?(%Proficiency{skill_values: %{164 => 1}}, recipe) == :ok
+      assert Proficiency.can_equip?(Proficiency.all(), recipe) == :ok
+    end
+
     test "requires specialization spells for recipes and equipment" do
       book = spellbook([%SpellData{id: 9788}])
       qualified = Proficiency.from_spellbook(book)
