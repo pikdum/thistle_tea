@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Player.QuestSharingTest do
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.WorldRef
 
@@ -92,6 +93,22 @@ defmodule ThistleTea.Game.Player.QuestSharingTest do
   end
 
   describe "accept/3" do
+    test "rejects a shared offer when its event ends before acceptance", context do
+      saved = GameEvent.get_events()
+      on_exit(fn -> GameEvent.set_events(saved) end)
+      quest = put_quest(%{context.quest | event_id: context.quest.id, src_item_id: context.item.entry})
+      GameEvent.set_events([quest.event_id | saved])
+      state = offer(%{context | quest: quest})
+      assert %Offer{} = state.quest_share
+      GameEvent.set_events(saved)
+      rejected = Quests.accept(state, context.source.guid, quest.id)
+      assert rejected.quest_share == nil
+      assert rejected.quest_share_monitor == nil
+      refute QuestLog.active?(rejected.character.player.quest_log, quest.id)
+      assert Inventory.count_entry(rejected.character.player, context.item.entry, &ItemStore.get/1) == 0
+      assert_result(1)
+    end
+
     test "rechecks exclusive choices acquired after a share offer", context do
       alternate = %Quest{id: context.quest.id + 1, exclusive_group: context.quest.id}
       [quest, _] = QuestGraph.compile([%{context.quest | exclusive_group: context.quest.id}, alternate])

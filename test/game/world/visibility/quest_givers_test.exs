@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Visibility.QuestGiversTest do
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.World.Visibility.QuestGivers
   alias ThistleTea.Game.WorldRef
@@ -26,6 +27,21 @@ defmodule ThistleTea.Game.World.Visibility.QuestGiversTest do
   setup [:questgiver]
 
   describe "refresh/1" do
+    test "refreshes stationary viewers when the world event starts and stops", context do
+      saved = GameEvent.get_events()
+      on_exit(fn -> GameEvent.set_events(saved) end)
+      quest = %{context.quest | required_skill: 0, event_id: context.quest.id}
+      :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
+
+      state = refresh_and_deliver(context.state, context.guid, 0)
+      GameEvent.set_events([quest.event_id | saved])
+      state = refresh_and_deliver(state, context.guid, 5)
+      GameEvent.set_events(saved)
+      state = refresh_and_deliver(state, context.guid, 0)
+      QuestGivers.refresh(state)
+      refute_received {:"$gen_cast", {:send_packet, %SmsgQuestgiverStatus{}, _}}
+    end
+
     test "refreshes visible NPC eligibility after skill changes and deduplicates sent statuses", context do
       state = refresh_and_deliver(context.state, context.guid, 0)
       QuestGivers.refresh(state)

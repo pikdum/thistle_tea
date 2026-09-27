@@ -23,6 +23,16 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
   end
 
   describe "load_all/0" do
+    test "preloads patch-appropriate world event links" do
+      for {id, event} <- [{172, 10}, {1_468, 10}, {8_311, 12}, {8_980, 8}] do
+        assert %Quest{event_id: ^event} = QuestLoader.get(id)
+      end
+
+      assert %Quest{event_id: 0} = QuestLoader.get(54)
+      assert %Quest{event_id: 0} = QuestLoader.get(8_795)
+      assert Enum.count(:ets.tab2list(QuestLoader), &match?({{:quest, _}, %Quest{event_id: id}} when id > 0, &1)) == 63
+    end
+
     test "compiles real chapter prerequisites, exclusive choices, breadcrumbs, and skills" do
       for id <- 339..342 do
         assert QuestLoader.get(id).dependencies.prerequisites == [

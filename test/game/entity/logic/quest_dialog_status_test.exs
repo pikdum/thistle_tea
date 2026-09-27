@@ -68,6 +68,21 @@ defmodule ThistleTea.Game.Entity.Logic.QuestDialogStatusTest do
   end
 
   describe "menu/3" do
+    test "event end hides accepted quests without discarding progress" do
+      quest = %Quest{id: 1, event_id: 12}
+      {:ok, log} = QuestLog.add(%{}, quest.id)
+
+      for status <- [:incomplete, :complete] do
+        {:ok, log} = QuestLog.update(log, quest.id, &%{&1 | status: status})
+        context = ctx(quest_log: log, active_game_events: MapSet.new())
+        assert QuestDialogStatus.for_npc([quest], [quest], context) == QuestDialogStatus.none()
+        assert QuestDialogStatus.menu([quest], [quest], context) == []
+        active = %{context | active_game_events: MapSet.new([12])}
+        assert [{^quest, _icon}] = QuestDialogStatus.menu([quest], [quest], active)
+        assert QuestLog.get(log, quest.id).status == status
+      end
+    end
+
     test "lists takeable giver quests as available" do
       quests = [%Quest{id: 1, min_level: 5}, %Quest{id: 2, min_level: 50}]
 

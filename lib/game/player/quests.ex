@@ -44,6 +44,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   defmodule Availability do
@@ -58,6 +59,7 @@ defmodule ThistleTea.Game.Player.Quests do
       class: character.unit.class,
       quest_log: character.player.quest_log,
       rewarded_quests: character.player.rewarded_quests,
+      active_game_events: MapSet.new(GameEvent.active_events()),
       skills: character.player.skills,
       skill_bonuses: character.player.skill_bonuses,
       reputation: PlayerReputation.standings(character)

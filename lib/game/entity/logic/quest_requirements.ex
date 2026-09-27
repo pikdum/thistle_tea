@@ -45,6 +45,7 @@ defmodule ThistleTea.Game.Entity.Logic.QuestRequirements do
     [
       {QuestLog.active?(ctx.quest_log, quest.id), :already_active},
       {rewarded?(quest, ctx), :already_rewarded},
+      {not Quest.event_active?(quest, Map.get(ctx, :active_game_events)), :inactive_event},
       {quest.limit_time > 0 and QuestLog.timed?(ctx.quest_log), :timed_quest_active},
       {not race_allowed?(quest, ctx.race), :wrong_race},
       {not class_allowed?(quest, ctx.class), :wrong_class},

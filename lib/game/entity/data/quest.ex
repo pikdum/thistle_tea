@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
 
   defstruct [
     :id,
+    event_id: 0,
     start_script_id: 0,
     complete_script_id: 0,
     start_script_steps: [],
@@ -81,6 +82,10 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
   def party_accept?(%__MODULE__{flags: flags}), do: Bitwise.band(flags || 0, 0x2) != 0
 
   def repeatable?(%__MODULE__{special_flags: flags}), do: Bitwise.band(flags || 0, 0x1) != 0
+
+  def event_active?(%__MODULE__{event_id: 0}, _events), do: true
+  def event_active?(%__MODULE__{event_id: id}, %MapSet{} = events), do: MapSet.member?(events, id)
+  def event_active?(%__MODULE__{}, _events), do: false
 
   def auto_rewarded?(%__MODULE__{flags: flags}), do: Bitwise.band(flags || 0, 0x400) != 0
 

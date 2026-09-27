@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.QuestRequirementsTest do
 
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Logic.Condition.Reason
+  alias ThistleTea.Game.Entity.Logic.QuestGraph
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Logic.QuestRequirements
 
@@ -47,6 +48,26 @@ defmodule ThistleTea.Game.Entity.Logic.QuestRequirementsTest do
   end
 
   describe "can_take/2" do
+    test "requires the linked event before considering a low-level marker" do
+      quest = %Quest{id: 1, event_id: 12, min_level: 20}
+      assert QuestRequirements.can_take(quest, ctx()) == {:error, :inactive_event}
+      assert QuestRequirements.can_take(quest, ctx(active_game_events: MapSet.new([10]))) == {:error, :inactive_event}
+      assert QuestRequirements.can_take(quest, ctx(active_game_events: MapSet.new([12]))) == {:error, :low_level}
+      assert QuestRequirements.can_take(quest, ctx(level: 20, active_game_events: MapSet.new([12]))) == :ok
+    end
+
+    test "breadcrumb targets retain their event requirement after compilation" do
+      [breadcrumb, target] =
+        QuestGraph.compile([
+          %Quest{id: 1, breadcrumb_for_quest_id: 2},
+          %Quest{id: 2, event_id: 12}
+        ])
+
+      assert target.event_id == 12
+      assert QuestRequirements.can_take(breadcrumb, ctx()) == {:error, :breadcrumb_unavailable}
+      assert QuestRequirements.can_take(breadcrumb, ctx(active_game_events: MapSet.new([12]))) == :ok
+    end
+
     test "passes a plain quest" do
       assert QuestRequirements.can_take(%Quest{id: 1}, ctx()) == :ok
     end

@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Player.GameObjectQuestsTest do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.World.Visibility.QuestGivers
   alias ThistleTea.Game.WorldRef
@@ -45,6 +46,22 @@ defmodule ThistleTea.Game.Player.GameObjectQuestsTest do
   setup [:questgiver]
 
   describe "quest object activation" do
+    test "event transitions hide offerings and retained turn-ins on quest objects", context do
+      saved = GameEvent.get_events()
+      on_exit(fn -> GameEvent.set_events(saved) end)
+      quest = put_quest(%{context.quest | event_id: context.quest.id})
+      character = context.state.character
+      assert QuestGivers.personalize(object_update(context), character).game_object.dyn_flags == 0
+      GameEvent.set_events([quest.event_id | saved])
+      assert QuestGivers.personalize(object_update(context), character).game_object.dyn_flags == 1
+      {:ok, log} = QuestLog.add(character.player.quest_log, quest, 0, 0)
+      character = %{character | player: %{character.player | quest_log: log}}
+      assert QuestGivers.personalize(object_update(context), character).game_object.dyn_flags == 1
+      GameEvent.set_events(saved)
+      assert QuestGivers.personalize(object_update(context), character).game_object.dyn_flags == 0
+      assert QuestLog.active?(character.player.quest_log, quest.id)
+    end
+
     test "exclusive rewards disable object activation and reject stale acceptance", context do
       alternate = %Quest{id: context.quest.id + 1, exclusive_group: context.quest.id}
       [quest, _] = QuestGraph.compile([%{context.quest | exclusive_group: context.quest.id}, alternate])

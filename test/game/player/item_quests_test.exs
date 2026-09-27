@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Player.ItemQuestsTest do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.WorldRef
 
@@ -71,6 +72,20 @@ defmodule ThistleTea.Game.Player.ItemQuestsTest do
   end
 
   describe "accept/3" do
+    test "preserves an event quest starter when the event ends after details", context do
+      saved = GameEvent.get_events()
+      on_exit(fn -> GameEvent.set_events(saved) end)
+      quest = put_quest(%{context.quest | event_id: context.quest.id})
+      GameEvent.set_events([quest.event_id | saved])
+      Quests.query_quest(context.state, context.item.object.guid, quest.id)
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgQuestgiverQuestDetails{}}}
+      GameEvent.set_events(saved)
+      assert accept(%{context | quest: quest}) == context.state
+      assert ItemStore.get(context.item.object.guid) == context.item
+      assert count(context.state, context.source.entry) == 0
+      refute QuestLog.active?(CharacterStore.get(context.state.guid).player.quest_log, quest.id)
+    end
+
     test "atomically replaces a starter and restores it on abandonment", context do
       accepted = accept(context)
       assert QuestLog.get(accepted.character.player.quest_log, context.quest.id).status == :complete

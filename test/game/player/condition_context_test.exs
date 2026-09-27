@@ -21,6 +21,21 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
   alias ThistleTea.Game.WorldRef
 
   describe "build/3" do
+    test "quest availability alone requests the active event snapshot" do
+      condition = %Condition{type: :quest_available, value1: 300}
+
+      context =
+        ConditionContext.build(character(), [condition],
+          quest_lookup: fn 300 -> %Quest{id: 300, event_id: 12} end,
+          reputation_standings: fn _ -> %{} end,
+          game_events: fn -> [12] end
+        )
+
+      assert context.world.active_game_events == MapSet.new([12])
+      assert Evaluator.evaluate(context, condition) == :met
+      assert Evaluator.evaluate(%{context | world: %{active_game_events: MapSet.new()}}, condition) == :unmet
+    end
+
     test "projects current visible rank and refreshes it after rank loss" do
       condition = %Condition{type: :pvp_rank, value1: 6, value2: 1}
       character = character()

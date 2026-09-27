@@ -12,7 +12,6 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Logic.QuestLog
-  alias ThistleTea.Game.Entity.Logic.QuestRequirements
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -153,26 +152,6 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
   end
 
   defp questgiver_flags(guid, viewer) do
-    {givers, enders} = Quests.npc_quests(guid)
-    availability = Quests.availability(viewer, givers)
-
-    available? =
-      Enum.any?(givers, fn quest ->
-        QuestRequirements.can_take?(
-          quest,
-          availability.quest_context,
-          Map.get(availability.condition_results, quest.id)
-        )
-      end)
-
-    active? =
-      Enum.any?(enders, fn quest ->
-        case QuestLog.get(viewer.player.quest_log, quest.id) do
-          %{status: status} when status in [:incomplete, :complete] -> true
-          _ -> false
-        end
-      end)
-
-    if available? or active?, do: 1, else: 0
+    if Quests.quest_menu(guid, viewer) == [], do: 0, else: 1
   end
 end

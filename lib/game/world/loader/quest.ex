@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Loader.Quest do
   alias ThistleTea.Game.World.Loader.Script
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
+  @supported_patch 10
 
   def init(table \\ __MODULE__) do
     case :ets.whereis(table) do
@@ -28,6 +29,7 @@ defmodule ThistleTea.Game.World.Loader.Quest do
     complete_scripts = load_scripts(rows, :complete_script, Mangos.QuestEndScript)
     required_conditions = rows |> Enum.map(& &1.required_condition) |> ConditionLoader.load_by_ids()
     start_items = load_start_items()
+    events = load_events()
 
     rows
     |> Enum.map(fn row ->
@@ -35,7 +37,8 @@ defmodule ThistleTea.Game.World.Loader.Quest do
 
       %{
         quest
-        | start_item_template: Map.get(start_items, quest.id),
+        | event_id: Map.get(events, quest.id, 0),
+          start_item_template: Map.get(start_items, quest.id),
           start_script_steps: Map.get(start_scripts, quest.start_script_id, []),
           complete_script_steps: Map.get(complete_scripts, quest.complete_script_id, [])
       }
@@ -70,6 +73,17 @@ defmodule ThistleTea.Game.World.Loader.Quest do
     from(item in Mangos.ItemTemplate, where: item.start_quest > 0, order_by: [desc: item.entry])
     |> Mangos.Repo.all()
     |> Map.new(&{&1.start_quest, ItemTemplate.build(&1)})
+  end
+
+  defp load_events do
+    from(relation in Mangos.GameEventQuest,
+      join: event in Mangos.GameEvent,
+      on: event.entry == relation.event,
+      where: relation.event > 0 and relation.patch_min <= @supported_patch,
+      select: {relation.quest, relation.event}
+    )
+    |> Mangos.Repo.all()
+    |> Map.new()
   end
 
   def get(quest_id) do

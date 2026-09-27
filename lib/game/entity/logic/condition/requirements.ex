@@ -196,7 +196,10 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Requirements do
   defp requirement({:unsupported, type}, _condition, _source, _target), do: {:unsupported, type}
   defp requirement(type, _condition, _source, _target), do: {:capability, type}
 
-  defp maybe_put_quest(requirements, :quest_available, quest_id), do: MapSet.put(requirements, {:quest, quest_id})
+  defp maybe_put_quest(requirements, :quest_available, quest_id) do
+    requirements |> MapSet.put({:quest, quest_id}) |> MapSet.put({:active_game_event, 0})
+  end
+
   defp maybe_put_quest(requirements, _type, _quest_id), do: requirements
 
   defp condition_key(%Condition{entry: entry}) when is_integer(entry) and entry > 0, do: {:entry, entry}

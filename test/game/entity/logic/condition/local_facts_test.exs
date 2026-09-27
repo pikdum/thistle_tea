@@ -77,6 +77,18 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.LocalFactsTest do
       assert met?(context, :quest_available, 13)
     end
 
+    test "event quests use the world snapshot and require known event facts" do
+      condition = %Condition{entry: 9, type: :quest_available, value1: 100}
+      target = subject(level: 20, race: 1, class: 1, quest_log: %{}, rewarded_quests: MapSet.new(), reputation: %{})
+      context = Context.new(target: target, quests: %{100 => %Quest{id: 100, event_id: 12}})
+
+      assert {:unknown, [%Reason{capability: {:missing_facts, :quest_availability}}]} =
+               Evaluator.evaluate(context, condition)
+
+      assert Evaluator.evaluate(%{context | world: %{active_game_events: MapSet.new()}}, condition) == :unmet
+      assert Evaluator.evaluate(%{context | world: %{active_game_events: MapSet.new([12])}}, condition) == :met
+    end
+
     test "missing quest catalog entries are unknown" do
       condition = %Condition{entry: 9, type: :quest_available, value1: 100}
 

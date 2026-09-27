@@ -96,7 +96,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Leaf.Player do
   end
 
   def evaluate(
-        %Context{target: %Subject{} = target, quests: quests},
+        %Context{target: %Subject{} = target, quests: quests, world: world},
         %Condition{type: :quest_available, value1: quest_id} = condition
       )
       when is_map(quests) do
@@ -107,7 +107,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Leaf.Player do
       %Quest{} = quest ->
         result =
           case Enum.find(QuestRequirements.condition_quests(quest), &(&1.required_condition_id > 0)) do
-            nil -> quest_available(target, quest, condition)
+            nil -> quest_available(target, quest, condition, Map.get(world, :active_game_events))
             nested -> Result.unknown(condition, {:nested_required_condition, nested.id})
           end
 
@@ -155,7 +155,8 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Leaf.Player do
            reputation: reputation
          },
          quest,
-         condition
+         condition,
+         events
        )
        when is_integer(level) and is_integer(race) and is_integer(class) and is_map(quest_log) and
               is_struct(rewarded, MapSet) and is_map(reputation) do
@@ -165,20 +166,27 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Leaf.Player do
       class: class,
       quest_log: quest_log,
       rewarded_quests: rewarded,
+      active_game_events: events,
       skills: skills || %{},
       skill_bonuses: skill_bonuses || %{},
       reputation: reputation
     }
 
-    if skill_facts?(skills, quest) do
+    if availability_facts?(skills, events, quest) do
       Result.truth(QuestRequirements.base_can_take?(quest, ctx))
     else
       Result.unknown(condition, {:missing_facts, :quest_availability})
     end
   end
 
-  defp quest_available(_subject, _quest, condition),
+  defp quest_available(_subject, _quest, condition, _events),
     do: Result.unknown(condition, {:missing_facts, :quest_availability})
+
+  defp availability_facts?(skills, events, quest), do: skill_facts?(skills, quest) and event_facts?(events, quest)
+
+  defp event_facts?(%MapSet{}, _quest), do: true
+
+  defp event_facts?(_events, quest), do: Enum.all?(QuestRequirements.condition_quests(quest), &(&1.event_id == 0))
 
   defp skill_facts?(skills, _quest) when is_map(skills), do: true
 

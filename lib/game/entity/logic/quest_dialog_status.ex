@@ -57,10 +57,14 @@ defmodule ThistleTea.Game.Entity.Logic.QuestDialogStatus do
   end
 
   defp ender_status(%Quest{} = quest, ctx) do
-    case QuestLog.get(ctx.quest_log, quest.id) do
-      %Entry{status: :complete} -> @reward
-      %Entry{status: :incomplete} -> @incomplete
-      _entry -> @none
+    if Quest.event_active?(quest, Map.get(ctx, :active_game_events)) do
+      case QuestLog.get(ctx.quest_log, quest.id) do
+        %Entry{status: :complete} -> @reward
+        %Entry{status: :incomplete} -> @incomplete
+        _entry -> @none
+      end
+    else
+      @none
     end
   end
 

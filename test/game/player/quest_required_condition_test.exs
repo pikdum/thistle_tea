@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Player.QuestRequiredConditionTest do
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.WorldRef
 
   setup do
@@ -77,6 +78,33 @@ defmodule ThistleTea.Game.Player.QuestRequiredConditionTest do
   end
 
   describe "availability/2" do
+    test "rechecks event state after details while retaining accepted quest progress", context do
+      saved = GameEvent.get_events()
+      on_exit(fn -> GameEvent.set_events(saved) end)
+      quest = %Quest{id: context.quest_id, event_id: context.quest_id, required_items: [{0, context.item_id, 1}]}
+      put_quest(context, quest, giver: true, ender: true)
+      state = state(context, context.character)
+      assert Quests.quest_menu(context.npc_guid, context.character) == []
+      assert Quests.accept(state, context.npc_guid, quest.id) == state
+
+      GameEvent.set_events([quest.event_id | saved])
+      assert [{^quest, _icon}] = Quests.quest_menu(context.npc_guid, context.character)
+      Quests.hello(state, context.npc_guid)
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgQuestgiverQuestDetails{quest: ^quest}}}
+      GameEvent.set_events(saved)
+      assert Quests.accept(state, context.npc_guid, quest.id) == state
+      refute QuestLog.active?(CharacterStore.get(state.guid).player.quest_log, quest.id)
+
+      GameEvent.set_events([quest.event_id | saved])
+      accepted = Quests.accept(state, context.npc_guid, quest.id)
+      assert QuestLog.active?(accepted.character.player.quest_log, quest.id)
+      GameEvent.set_events(saved)
+      assert Quests.quest_menu(context.npc_guid, accepted.character) == []
+      assert QuestLog.active?(CharacterStore.get(state.guid).player.quest_log, quest.id)
+      GameEvent.set_events([quest.event_id | saved])
+      assert [{^quest, 3}] = Quests.quest_menu(context.npc_guid, accepted.character)
+    end
+
     test "evaluates breadcrumb target conditions for dialog and acceptance", context do
       target =
         conditioned_quest(context, %Condition{entry: 1, type: :item_with_bank, value1: context.item_id, value2: 1})
