@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
   alias ThistleTea.Game.Entity.EffectResolver.Pvp
   alias ThistleTea.Game.Entity.FeignDeath
   alias ThistleTea.Game.Entity.Logic.Aura.Heartbeat
+  alias ThistleTea.Game.Entity.Logic.CombatTimer
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.DispelResistance
@@ -80,6 +81,7 @@ defmodule ThistleTea.Game.Entity.SpellReception do
           %Effects.SpellContact{
             target_guid: context.caster_guid,
             other_guid: target.object.guid,
+            other_uses_timer?: CombatTimer.uses_timer?(target),
             decision: decision,
             now: now
           }

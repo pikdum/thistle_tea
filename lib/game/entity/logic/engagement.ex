@@ -31,12 +31,12 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   @dynamic_flag_tapped 0x0004
 
-  def hold_combat(%Mob{} = entity, now, duration) do
-    entity |> CombatTimer.hold(now, duration) |> Combat.sync_combat_flag()
+  def hold_combat(%Mob{} = entity, now, duration, opponent \\ nil) do
+    entity |> CombatTimer.hold(now, duration, opponent) |> Combat.sync_combat_flag()
   end
 
-  def contact(entity, source, now, role \\ :attacked) do
-    entity |> PetCombat.contact(source, now) |> ControlledCombat.contact(source, now, role)
+  def contact(entity, source, now, role \\ :attacked, timed? \\ nil) do
+    entity |> PetCombat.contact(source, now, role, timed?) |> ControlledCombat.contact(source, now, role)
   end
 
   defdelegate gain_threat_ref(entity, guid, incarnation), to: PetCombat, as: :gain_ref
@@ -128,6 +128,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   defp enter_unit_combat(%Mob{} = entity, target_guid, now, opts) do
     previous = entity
     entity = CombatLeash.enter(entity, now, Keyword.get(opts, :leash_source))
+    entity = if match?(%Pet{}, entity.internal.pet), do: CombatTimer.hold(entity, now, 0), else: entity
     internal = entity.internal
     blackboard = internal.blackboard |> Blackboard.ensure() |> Distraction.clear() |> Blackboard.return_pet(nil)
     entity = %{entity | internal: %{internal | in_combat: true, last_hostile_time: now, blackboard: blackboard}}
@@ -202,6 +203,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
     entity =
       %{entity | unit: unit, internal: %{internal | pet: clear_pet_attack(internal.pet)}}
       |> PetCombat.leave(reason)
+      |> clear_combat_timer(reason)
       |> Casting.cancel()
       |> Combat.sync_combat_flag()
       |> ControlMovement.sync_flags()
@@ -214,6 +216,9 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
     result(previous, entity, reason)
   end
+
+  defp clear_combat_timer(entity, :pet_command), do: entity
+  defp clear_combat_timer(entity, _reason), do: CombatTimer.clear(entity)
 
   def stop_attack(%Mob{} = entity) do
     previous = entity
@@ -250,13 +255,16 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
         threat: %{},
         threat_refs: nil,
         temporary_threat: %{},
-        last_hostile_time: nil,
         loot: clear_tap(entity.internal.loot, true),
         damage_origin: %DamageTotals{},
         blackboard: nil
     }
 
-    entity = %{entity | unit: unit, internal: internal} |> Effects.enqueue(Effects.creature_group_event(:respawn))
+    entity =
+      %{entity | unit: unit, internal: internal}
+      |> CombatTimer.clear()
+      |> Effects.enqueue(Effects.creature_group_event(:respawn))
+
     result(previous, entity, :respawn)
   end
 

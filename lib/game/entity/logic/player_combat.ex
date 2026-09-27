@@ -3,8 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   Player combat state as a self-healing derived property.
 
   A player is "in combat" while on at least one mob's threat table (vmangos:
-  PvE combat ends only when the hostile-ref list empties), while actively
-  auto-attacking a live target, or within a short drop window of the last
+  PvE combat ends only when the hostile-ref list empties), or within a window of the last
   hostile event — the timer covers PvP and hostile actions that created no
   threat entry. Mobs announce table membership with `threat_ref_gained`/
   `threat_ref_lost` casts and the player keeps the referencing mob incarnations in
@@ -25,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.CombatReferences
@@ -35,8 +35,6 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Guid
-
-  @combat_drop_ms 5_000
 
   def projection(%Character{} = character) do
     %{
@@ -58,26 +56,35 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   defp ranged_target(%Character{internal: %Internal{auto_shot: %{target_guid: guid}}}), do: guid
   defp ranged_target(_character), do: nil
 
-  def mark_attacked(character, now, faction_id \\ nil)
+  def mark_attacked(character, now, faction_id \\ nil, opponent \\ nil)
 
-  def mark_attacked(%Character{internal: %Internal{} = internal} = character, now, faction_id) when is_integer(now) do
-    %{character | internal: %{internal | in_combat: true, last_hostile_time: now, combat_timeout_ms: @combat_drop_ms}}
+  def mark_attacked(%Character{} = character, now, faction_id, opponent) when is_integer(now) do
+    character
+    |> CombatTimer.attacked(opponent, now)
     |> CombatLogic.sync_combat_flag()
     |> mark_temporary_at_war(faction_id)
   end
 
-  def mark_attacked(character, _now, _faction_id), do: character
+  def mark_attacked(character, _now, _faction_id, _opponent), do: character
 
-  def hold_combat(%Character{} = character, now, duration)
-      when is_integer(now) and is_integer(duration) and duration > 0 do
-    character |> CombatTimer.hold(now, duration) |> CombatLogic.sync_combat_flag()
+  def hold_combat(%Character{} = character, now, duration, opponent \\ nil)
+      when is_integer(now) and is_integer(duration) and duration >= 0 do
+    character |> CombatTimer.hold(now, duration, opponent) |> CombatLogic.sync_combat_flag()
   end
 
-  def mark_initiated(character, now), do: mark_attacked(character, now)
+  def mark_initiated(character, now, opponent, timed? \\ nil)
+
+  def mark_initiated(%Character{} = character, now, opponent, timed?) do
+    character |> CombatTimer.attack(opponent, now, timed?) |> CombatLogic.sync_combat_flag()
+  end
+
+  def mark_initiated(entity, _now, _opponent, _timed?), do: entity
 
   def mark_hostile_contact(%Character{object: %{guid: guid}, unit: %Unit{health: health}} = character, other_guid, now)
       when is_integer(other_guid) and other_guid > 0 and other_guid != guid and is_number(health) and health > 0 do
-    if Guid.entity_type(other_guid) in [:player, :mob, :pet], do: mark_attacked(character, now), else: character
+    if Guid.entity_type(other_guid) in [:player, :mob, :pet],
+      do: mark_attacked(character, now, nil, other_guid),
+      else: character
   end
 
   def mark_hostile_contact(character, _other_guid, _now), do: character
@@ -134,10 +141,10 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
             internal
             | threat_refs: MapSet.new(),
               in_combat: false,
-              last_hostile_time: nil,
               blackboard: blackboard
           }
       }
+      |> CombatTimer.clear()
       |> CombatLogic.sync_combat_flag()
 
     effects =
@@ -163,11 +170,11 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
             internal
             | threat_refs: MapSet.new(),
               in_combat: false,
-              last_hostile_time: nil,
               undetectable_until: now + 1_000,
               blackboard: blackboard
           }
       }
+      |> CombatTimer.clear()
       |> CombatLogic.sync_combat_flag()
 
     {character, temporary_war_effects} = clear_temporary_at_war(character)
@@ -207,17 +214,18 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
         %Blackboard{} = blackboard,
         %Context{now: now} = context
       ) do
-    if auto_attacking_target?(character, blackboard, context.perception) do
-      {character |> touch_hostile(now) |> CombatLogic.sync_combat_flag(), blackboard}
-    else
-      character = prune_threat_refs(character, context.perception)
+    blackboard =
+      if auto_attacking_target?(character, blackboard, context.perception),
+        do: blackboard,
+        else: clear_inactive_attack(blackboard)
 
-      if threat_refs?(character) or ControlledCombat.holds_combat?(character, context) or
-           within_drop_window?(character, now) do
-        {CombatLogic.sync_combat_flag(character), clear_inactive_attack(blackboard)}
-      else
-        {clear(character), clear_inactive_attack(blackboard)}
-      end
+    character = prune_threat_refs(character, context.perception)
+
+    if threat_refs?(character) or ControlledCombat.holds_combat?(character, context) or
+         CombatTimer.remaining(character, now) > 0 or Aura.has_aura?(character, :interrupt_regen) do
+      {CombatLogic.sync_combat_flag(character), blackboard}
+    else
+      {clear(character), blackboard}
     end
   end
 
@@ -248,20 +256,10 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   defp attack_stop_effects(_source_guid, _target_guid), do: []
 
-  defp touch_hostile(%Character{internal: %Internal{} = internal} = character, now) do
-    %{character | internal: %{internal | last_hostile_time: now, combat_timeout_ms: @combat_drop_ms}}
-  end
-
-  defp within_drop_window?(%Character{internal: %Internal{last_hostile_time: last, combat_timeout_ms: duration}}, now)
-       when is_integer(last) and is_integer(now) do
-    now - last < duration
-  end
-
-  defp within_drop_window?(_character, _now), do: false
-
   defp clear(%Character{internal: %Internal{} = internal} = character) do
     character =
       %{character | internal: %{internal | in_combat: false}}
+      |> CombatTimer.clear()
       |> CombatLogic.sync_combat_flag()
 
     {character, effects} = clear_temporary_at_war(character)

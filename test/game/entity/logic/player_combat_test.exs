@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -49,9 +51,9 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
     end
   end
 
-  describe "mark_initiated/2" do
+  describe "mark_initiated/3" do
     test "sets the combat flag and the hostile timestamp" do
-      character = PlayerCombat.mark_initiated(character(), 1_000)
+      character = PlayerCombat.mark_initiated(character(), 1_000, Guid.runtime(:mob, 1))
 
       assert character.internal.in_combat == true
       assert character.internal.last_hostile_time == 1_000
@@ -164,6 +166,18 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
   end
 
   describe "sync/3" do
+    test "an interrupt-regen aura retains existing combat until it leaves" do
+      holder = %Holder{spell: %Spell{id: 2687}, auras: [%Aura{type: :interrupt_regen}]}
+      character = PlayerCombat.hold_combat(character(), 0, 5_000)
+      character = %{character | unit: %{character.unit | auras: [holder]}}
+      {held, _} = sync(character, %Blackboard{}, 10_000)
+      assert held.internal.in_combat
+      released = %{held | unit: %{held.unit | auras: []}}
+      {released, _} = sync(released, %Blackboard{}, 10_001)
+      refute released.internal.in_combat
+      assert released.internal.combat_timer_target == nil
+    end
+
     test "stays in combat within the drop window of the last hostile event" do
       character = character(in_combat: true, last_hostile_time: 1_000)
 
@@ -206,7 +220,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
       assert character.internal.in_combat == false
     end
 
-    test "keeps combat and refreshes the timer while auto-attacking a live target" do
+    test "attack intent alone does not refresh combat against a live target" do
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
       SpatialHash.update(:mobs, target_guid, 0, 1.0, 0.0, 0.0)
       Metadata.put(target_guid, %{alive?: true, incarnation_id: 1})
@@ -227,8 +241,8 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
 
       {character, blackboard} = sync(character, blackboard, 100_000)
 
-      assert character.internal.in_combat == true
-      assert character.internal.last_hostile_time == 100_000
+      refute character.internal.in_combat
+      assert character.internal.last_hostile_time == nil
       assert blackboard.combat.auto_attacking == true
     end
 
@@ -391,7 +405,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
   defp character(opts \\ []) do
     %Character{
       object: %Object{guid: Guid.from_low_guid(:player, unique_guid())},
-      unit: %Unit{target: Keyword.get(opts, :target, 0)},
+      unit: %Unit{health: 100, target: Keyword.get(opts, :target, 0)},
       internal: %Internal{
         world: %WorldRef{map_id: 0},
         in_combat: Keyword.get(opts, :in_combat, false),

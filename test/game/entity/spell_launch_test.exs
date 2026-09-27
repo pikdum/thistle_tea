@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.SpellLaunchTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Combat
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World.Metadata
@@ -65,7 +66,7 @@ defmodule ThistleTea.Game.Entity.SpellLaunchTest do
       assert EventSink.emit(ctx.caster, %{request | spell: mixed, effect_indices: [0]}).internal.in_combat
     end
 
-    test "a miss still starts launch combat and ordinary contact supplies its own window", ctx do
+    test "a miss starts launch combat and PvE contact does not extend flight", ctx do
       context = %CastContext{
         caster_guid: ctx.caster.object.guid,
         selected_target_guid: ctx.target,
@@ -82,9 +83,17 @@ defmodule ThistleTea.Game.Entity.SpellLaunchTest do
              ] = resolved
 
       launched = EventSink.emit(ctx.caster, launch(ctx))
-      contacted = PlayerCombat.mark_initiated(launched, 1_000)
-      assert sync(contacted, 5_999).internal.in_combat
-      refute sync(contacted, 6_000).internal.in_combat
+
+      contact = %Effects.SpellContact{
+        target_guid: ctx.caster.object.guid,
+        other_guid: ctx.target,
+        decision: %Combat{combat?: true},
+        now: 1_000
+      }
+
+      contacted = Combat.apply_caster(launched, contact)
+      assert sync(contacted, 1_499).internal.in_combat
+      refute sync(contacted, 1_500).internal.in_combat
     end
 
     test "pet launch changes only the pet's combat state", ctx do

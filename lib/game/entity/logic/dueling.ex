@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Dueling do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.CombatTimer
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -142,11 +143,10 @@ defmodule ThistleTea.Game.Entity.Logic.Dueling do
         %{character.internal | duel: nil, blackboard: blackboard}
       else
         %{
-          character.internal
+          CombatTimer.clear(character).internal
           | duel: nil,
             blackboard: blackboard,
-            in_combat: false,
-            last_hostile_time: nil
+            in_combat: false
         }
       end
 

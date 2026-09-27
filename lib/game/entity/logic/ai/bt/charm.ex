@@ -129,7 +129,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Charm do
     blackboard = Blackboard.enable_auto_attack(blackboard, target_ref)
     entity = if entity.unit.target == target, do: entity, else: Core.mark_broadcast_update(entity)
     entity = %{entity | unit: %{entity.unit | target: target}, internal: %{entity.internal | running: true}}
-    entity = PlayerCombat.mark_initiated(entity, context.now)
     {entity, blackboard}
   end
 

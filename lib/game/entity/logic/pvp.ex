@@ -85,14 +85,28 @@ defmodule ThistleTea.Game.Entity.Logic.Pvp do
 
     character = put(character, pvp)
 
-    engage(character, now, combat? and engage?)
+    engage(character, role, other, now, combat? and engage?)
   end
 
-  defp engage(character, now, true) do
-    if Core.dead?(character), do: character, else: PlayerCombat.mark_initiated(character, now)
+  defp engage(character, role, other, now, true) do
+    if Core.dead?(character), do: character, else: enter_contact(character, role, other, now)
   end
 
-  defp engage(character, _now, false), do: character
+  defp engage(character, _role, _other, _now, false), do: character
+
+  defp enter_contact(character, :attack, other, now),
+    do:
+      PlayerCombat.mark_initiated(
+        character,
+        now,
+        Map.get(other, :guid, other.player_guid),
+        Map.get(other, :uses_timer?)
+      )
+
+  defp enter_contact(character, :attacked, other, now),
+    do: PlayerCombat.mark_attacked(character, now, nil, Map.get(other, :guid, other.player_guid))
+
+  defp enter_contact(character, :assist, _other, now), do: PlayerCombat.hold_combat(character, now, 5_000)
 
   defp contested_contact?(:attack, other, _combat?), do: is_integer(other.player_guid)
   defp contested_contact?(:assist, other, combat?), do: combat? and other.contested_pvp?

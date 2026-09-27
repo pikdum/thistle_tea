@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Entity.Logic.Aura.ProcDamage
   alias ThistleTea.Game.Entity.Logic.Aura.TriggeredLifetime
   alias ThistleTea.Game.Entity.Logic.Charge
+  alias ThistleTea.Game.Entity.Logic.CombatTimer
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
   alias ThistleTea.Game.Entity.Logic.SpellResist
@@ -105,6 +106,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
       contact = %Effects.SpellContact{
         target_guid: source,
         other_guid: target,
+        other_uses_timer?: timed_target?(entity, target),
         decision: %SpellCombat{combat?: true},
         now: Time.now()
       }
@@ -174,6 +176,10 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
     [%{effect | cast_context: context, delay_ms: projectile_delay_ms(entity, effect)}]
   end
+
+  defp timed_target?(%{object: %{guid: guid}} = entity, guid), do: CombatTimer.uses_timer?(entity)
+
+  defp timed_target?(_entity, guid), do: CombatTimer.uses_timer?(Map.put(Metadata.get(guid) || %{}, :guid, guid))
 
   defp trigger_spell(%{internal: %{spellbook: spellbook}}, id) when is_map(spellbook),
     do: Map.get(spellbook, id) || SpellLoader.cached(id)

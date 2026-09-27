@@ -67,7 +67,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
     {:ScriptedCast, [:entry, :target_guid], []},
     {:CharmCast, [:controller_guid, :control_spell_id, :control_applied_at, :spell_id, :target_guid], []},
     {:DeliverHealThreat, [:mob_guid, :source_guid, :target_guid, :amount], []},
-    {:SpellContact, [:target_guid, :other_guid, :decision, :now], []},
+    {:SpellContact, [:target_guid, :other_guid, :decision, :now], [other_uses_timer?: nil]},
     {:DrainPower, [:target_guid, :misc_value], []},
     {:GrantPower, [:target_guid, :misc_value, :amount], [source_guid: nil, spell: nil]},
     {:AddComboPoints, [:source_guid, :target_guid, :amount], [retention: nil]},

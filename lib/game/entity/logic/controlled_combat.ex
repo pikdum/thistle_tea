@@ -103,10 +103,10 @@ defmodule ThistleTea.Game.Entity.Logic.ControlledCombat do
 
     case contact.role do
       :attacked when targetable? ->
-        PlayerCombat.mark_attacked(character, contact.now)
+        PlayerCombat.mark_attacked(character, contact.now, nil, contact.opponent_guid)
 
       :attack ->
-        character = PlayerCombat.mark_initiated(character, contact.now)
+        character = PlayerCombat.hold_combat(character, contact.now, 5_000, contact.opponent_guid)
 
         if targetable? do
           Effects.enqueue(character, %Effects.AddThreat{

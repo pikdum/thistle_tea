@@ -334,7 +334,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
           character
 
         true ->
-          character = PlayerCombat.mark_attacked(character, now, PlayerReputation.faction_id(attack.caster))
+          character =
+            PlayerCombat.mark_attacked(character, now, PlayerReputation.faction_id(attack.caster), attack.caster)
 
           {character, events} =
             Combat.receive_attack(character, attack, now, damage_sharing_targets: DamageSharing.targets(character))
@@ -513,7 +514,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def handle_cast({:hold_combat, %Effects.HoldCombat{} = effect}, %{character: %Character{} = character} = state) do
-    character = PlayerCombat.hold_combat(character, effect.now, effect.duration_ms)
+    character = PlayerCombat.hold_combat(character, effect.now, effect.duration_ms, effect.opponent_guid)
     state = TickScheduler.ensure_scheduled(%{state | character: character})
     {:noreply, state, {:continue, :maybe_broadcast_update}}
   rescue
@@ -2222,7 +2223,13 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
     character =
       if combat?,
-        do: PlayerCombat.mark_attacked(character, now, caster |> spell_caster_guid() |> PlayerReputation.faction_id()),
+        do:
+          PlayerCombat.mark_attacked(
+            character,
+            now,
+            caster |> spell_caster_guid() |> PlayerReputation.faction_id(),
+            spell_caster_guid(caster)
+          ),
         else: character
 
     {character, events} = SpellReception.apply_prepared(character, prepared, now)

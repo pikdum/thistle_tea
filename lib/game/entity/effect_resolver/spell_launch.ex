@@ -58,7 +58,14 @@ defmodule ThistleTea.Game.Entity.EffectResolver.SpellLaunch do
         now = effect.now || Time.now()
 
         Pvp.launch_contacts(entity, effect.source_guid, effect.target_guid, now: now) ++
-          [%Effects.HoldCombat{target_guid: effect.source_guid, now: now, duration_ms: duration}]
+          [
+            %Effects.HoldCombat{
+              target_guid: effect.source_guid,
+              opponent_guid: effect.target_guid,
+              now: now,
+              duration_ms: duration
+            }
+          ]
 
       nil ->
         []

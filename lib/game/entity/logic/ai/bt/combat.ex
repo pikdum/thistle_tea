@@ -27,7 +27,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Movement
-  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Spell
@@ -122,7 +121,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   defp perform_ready_attacks(state, target, blackboard, main_ready?, now) do
     {state, events} = Aura.remove_with_interrupt_flags(state, Aura.interrupt_mask(:attack), now)
     state = Effects.enqueue(state, events)
-    state = PlayerCombat.mark_initiated(state, now)
     blackboard = clear_swing_error(blackboard)
     {state, blackboard} = perform_main_hand(state, target, blackboard, main_ready?, now)
     perform_offhand(state, target, blackboard, offhand_ready?(state, blackboard, now), now)
@@ -248,7 +246,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
     if extra_attack_ready?(state, blackboard, context) do
       {state, events} = Aura.remove_with_interrupt_flags(state, Aura.interrupt_mask(:attack), context.now)
-      state = state |> Effects.enqueue(events) |> PlayerCombat.mark_initiated(context.now)
+      state = Effects.enqueue(state, events)
       state = Enum.reduce(1..count, state, fn _attack, entity -> send_white_swing(entity, entity.unit.target, true) end)
       blackboard = %{blackboard | combat: %{blackboard.combat | extra_attacks: 0}}
       blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, CombatLogic.attack_speed_ms(state), context.now)

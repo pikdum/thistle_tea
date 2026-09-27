@@ -36,7 +36,7 @@ defmodule ThistleTea.Game.Spell.Combat do
 
   def damage_contact?(_spell, periodic?, triggered_by_proc?), do: not periodic? and not triggered_by_proc?
 
-  def apply_caster(entity, %Effects.SpellContact{decision: decision, now: now}) do
+  def apply_caster(entity, %Effects.SpellContact{decision: decision, now: now} = contact) do
     if Death.alive?(entity) and not PlayerCombat.undetectable?(entity, now) do
       types =
         []
@@ -47,7 +47,7 @@ defmodule ThistleTea.Game.Spell.Combat do
       entity = Effects.enqueue(entity, events)
 
       if decision.combat? and is_struct(entity, Character),
-        do: PlayerCombat.mark_initiated(entity, now),
+        do: PlayerCombat.mark_initiated(entity, now, contact.other_guid, contact.other_uses_timer?),
         else: entity
     else
       entity

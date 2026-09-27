@@ -11,24 +11,34 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement.PetCombat do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.CombatReferences
+  alias ThistleTea.Game.Entity.Logic.CombatTimer
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Guid
 
-  @combat_drop_ms 5_000
-
-  def contact(%Mob{object: %{guid: guid}, internal: %{pet: %Pet{}}, unit: %{health: health}} = entity, source, now)
+  def contact(
+        %Mob{object: %{guid: guid}, internal: %{pet: %Pet{}}, unit: %{health: health}} = entity,
+        source,
+        now,
+        role,
+        timed?
+      )
       when is_number(health) and health > 0 and is_integer(source) and source > 0 and is_integer(now) do
     if source != guid and Guid.entity_type(source) in [:player, :mob, :pet] do
-      internal = %{entity.internal | last_hostile_time: now, combat_timeout_ms: @combat_drop_ms}
-      set_combat(%{entity | internal: internal}, true)
+      entity =
+        if role == :attack,
+          do: CombatTimer.attack(entity, source, now, timed?),
+          else: CombatTimer.attacked(entity, source, now)
+
+      Combat.sync_combat_flag(entity)
     else
       entity
     end
   end
 
-  def contact(entity, _source, _now), do: entity
+  def contact(entity, _source, _now, _role, _timed?), do: entity
 
   def gain_ref(%Mob{internal: %{pet: %Pet{}}, unit: %{health: health}} = entity, guid, incarnation)
       when is_number(health) and health > 0 and is_integer(guid) and guid > 0 and is_integer(incarnation) and
@@ -49,7 +59,12 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement.PetCombat do
     refs = CombatReferences.prune(entity.internal.threat_refs, entity.internal.world, perception)
     target = entity.unit.target
     attacking? = is_integer(target) and target > 0
-    combat? = entity.unit.health > 0 and (attacking? or MapSet.size(refs) > 0 or recent_contact?(entity, now))
+
+    combat? =
+      entity.unit.health > 0 and
+        (attacking? or MapSet.size(refs) > 0 or CombatTimer.remaining(entity, now) > 0 or
+           (entity.internal.in_combat == true and Aura.has_aura?(entity, :interrupt_regen)))
+
     entity |> put_refs(refs) |> set_combat(combat?)
   end
 
@@ -63,15 +78,10 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement.PetCombat do
   end
 
   def leave(%Mob{internal: %{pet: %Pet{}} = internal} = entity, _reason) do
-    %{entity | internal: %{internal | threat_refs: MapSet.new(), last_hostile_time: nil}}
+    %{entity | internal: %{internal | threat_refs: MapSet.new()}}
   end
 
   def leave(entity, _reason), do: entity
-
-  defp recent_contact?(%Mob{internal: %Internal{last_hostile_time: last, combat_timeout_ms: timeout}}, now)
-       when is_integer(last), do: now - last < timeout
-
-  defp recent_contact?(_entity, _now), do: false
 
   defp put_refs(%Mob{internal: %Internal{} = internal} = entity, refs) do
     if internal.threat_refs == refs do

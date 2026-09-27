@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Pvp do
   """
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Logic.CombatTimer
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Pvp, as: PvpLogic
   alias ThistleTea.Game.Guid
@@ -14,7 +15,17 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Pvp do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
 
-  @fields [:owner_guid, :pvp?, :pvp_combat?, :unit_flags, :free_for_all?, :contested_pvp?, :in_combat]
+  @fields [
+    :owner_guid,
+    :charmed_by,
+    :no_threat_list?,
+    :pvp?,
+    :pvp_combat?,
+    :unit_flags,
+    :free_for_all?,
+    :contested_pvp?,
+    :in_combat
+  ]
 
   def launch_contacts(entity, source, target, opts \\ []) do
     get_metadata = Keyword.get(opts, :metadata, &Metadata.query(&1, @fields))
@@ -109,6 +120,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Pvp do
 
   defp profile(guid, %Character{object: %{guid: guid}, internal: %{possession: nil}} = entity, _get_metadata) do
     %{
+      guid: guid,
+      uses_timer?: true,
       player_guid: guid,
       pvp?: PvpLogic.active?(entity),
       pvp_combat?: PvpLogic.combat?(entity),
@@ -124,6 +137,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Pvp do
     owner = if is_integer(player) and player != guid, do: get_metadata.(player) || %{}, else: metadata
 
     %{
+      guid: guid,
+      uses_timer?: CombatTimer.uses_timer?(Map.put(metadata, :guid, guid)),
       player_guid: player,
       pvp?: Map.get(owner, :pvp?) == true or PvpLogic.active?(owner),
       pvp_combat?: Map.get(owner, :pvp_combat?) == true,

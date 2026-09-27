@@ -82,7 +82,7 @@ defmodule ThistleTea.Game.Entity.Logic.Warrior do
 
   def after_energize(%Character{} = character, %Spell{} = spell, now) do
     if Spell.vmangos_script?(spell, "spell_warrior_bloodrage") do
-      PlayerCombat.mark_initiated(character, now)
+      PlayerCombat.hold_combat(character, now, 5_000)
     else
       character
     end

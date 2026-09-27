@@ -508,7 +508,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
     state =
       if effect.decision.combat? and not Core.dead?(state),
-        do: receive_combat_contact(state, effect.other_guid, effect.now, :attack),
+        do: receive_combat_contact(state, effect.other_guid, effect.now, :attack, effect.other_uses_timer?),
         else: state
 
     state =
@@ -525,7 +525,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   def handle_cast({:hold_combat, %Effects.HoldCombat{} = effect}, %Mob{} = state) do
-    state = state |> Engagement.hold_combat(effect.now, effect.duration_ms) |> wake_ai_tick()
+    state = state |> Engagement.hold_combat(effect.now, effect.duration_ms, effect.opponent_guid) |> wake_ai_tick()
     {:noreply, state, {:continue, :maybe_broadcast}}
   rescue
     error ->
@@ -2027,8 +2027,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp engage_combat(%Mob{} = state, _caster, _opts), do: state
 
-  defp receive_combat_contact(state, caster, now, role \\ :attacked) do
-    state |> Engagement.contact(caster, now, role) |> engage_combat(caster)
+  defp receive_combat_contact(state, caster, now, role \\ :attacked, timed? \\ nil) do
+    state |> Engagement.contact(caster, now, role, timed?) |> engage_combat(caster)
   end
 
   defp enter_combat(%Mob{} = state, caster, opts, now) do

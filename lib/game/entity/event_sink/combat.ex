@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.AttackSchool
   alias ThistleTea.Game.Entity.Logic.CombatLeash
+  alias ThistleTea.Game.Entity.Logic.CombatTimer
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
@@ -26,11 +27,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   @victimstate_normal 1
 
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.HoldCombat{target_guid: guid} = effect, _context) do
-    PlayerCombat.hold_combat(entity, effect.now, effect.duration_ms)
+    PlayerCombat.hold_combat(entity, effect.now, effect.duration_ms, effect.opponent_guid)
   end
 
   def emit(%Mob{object: %{guid: guid}} = entity, %Effects.HoldCombat{target_guid: guid} = effect, _context) do
-    Engagement.hold_combat(entity, effect.now, effect.duration_ms)
+    Engagement.hold_combat(entity, effect.now, effect.duration_ms, effect.opponent_guid)
   end
 
   def emit(entity, %Effects.HoldCombat{} = effect, _context) do
@@ -209,6 +210,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   def emit(entity, %Effects.AttackOutcome{} = effect, _context) do
     Entity.attack_outcome(effect.target_guid, %{
       victim_guid: effect.source_guid,
+      victim_uses_timer?: CombatTimer.uses_timer?(entity),
       outcome: effect.outcome,
       proc_ex: effect.proc_ex,
       proc_origin: effect.proc_origin,
