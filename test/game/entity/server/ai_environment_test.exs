@@ -5,6 +5,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.AIEvent
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -53,6 +55,39 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   end
 
   describe "context/3" do
+    test "owners snapshot distant pet and direct combat references" do
+      world = WorldRef.open(999)
+      guid = Guid.runtime(:pet, 18)
+      enemy = Guid.runtime(:mob, 19)
+      direct = Guid.runtime(:mob, 20)
+
+      for {actor, distance} <- [{guid, 100.0}, {enemy, 130.0}, {direct, 150.0}],
+          do: put_actor(:mobs, actor, world, distance)
+
+      Metadata.update(guid, %{owner_guid: 98_205, threat_refs: MapSet.new([{enemy, 7}])})
+
+      on_exit(fn ->
+        for actor <- [guid, enemy, direct], do: remove_actor(:mobs, actor)
+      end)
+
+      character = %Character{
+        object: %Object{guid: 98_205},
+        unit: %Unit{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{
+          world: world,
+          threat_refs: MapSet.new([{direct, 8}]),
+          companion: %Companion{kind: :hunter_pet, status: {:active, %EntityRef{guid: guid, entry: 1, spell_id: 1}}}
+        }
+      }
+
+      perception = AIEnvironment.context(character, 1_000).perception
+      Metadata.update(guid, %{threat_refs: MapSet.new()})
+      assert Perception.metadata(perception, guid).threat_refs == MapSet.new([{enemy, 7}])
+      assert Perception.position(perception, enemy) == {world, 130.0, 0.0, 0.0}
+      assert Perception.position(perception, direct) == {world, 150.0, 0.0, 0.0}
+    end
+
     test "aggressive pets observe and check sight beyond twenty yards" do
       world = WorldRef.open(999)
       target_guid = Guid.from_low_guid(:mob, 1, 98_200)

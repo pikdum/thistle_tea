@@ -11,8 +11,9 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement.PetCombat do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.CombatReferences
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Guid
 
   @combat_drop_ms 5_000
@@ -45,8 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement.PetCombat do
   def lose_ref(entity, _guid, _incarnation), do: entity
 
   def reconcile(%Mob{internal: %{pet: %Pet{}}} = entity, %Context{now: now, perception: perception}) do
-    refs = entity.internal.threat_refs || MapSet.new()
-    refs = MapSet.filter(refs, &active_ref?(&1, entity.internal.world, perception))
+    refs = CombatReferences.prune(entity.internal.threat_refs, entity.internal.world, perception)
     target = entity.unit.target
     attacking? = is_integer(target) and target > 0
     combat? = entity.unit.health > 0 and (attacking? or MapSet.size(refs) > 0 or recent_contact?(entity, now))
@@ -68,23 +68,17 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement.PetCombat do
 
   def leave(entity, _reason), do: entity
 
-  defp active_ref?({guid, incarnation}, world, perception) do
-    case {Perception.position(perception, guid), Perception.metadata(perception, guid)} do
-      {{^world, _, _, _}, %{alive?: true, incarnation_id: ^incarnation} = metadata} ->
-        metadata[:in_combat] != false and metadata[:evading?] != true
-
-      _ ->
-        false
-    end
-  end
-
   defp recent_contact?(%Mob{internal: %Internal{last_hostile_time: last, combat_timeout_ms: timeout}}, now)
        when is_integer(last), do: now - last < timeout
 
   defp recent_contact?(_entity, _now), do: false
 
   defp put_refs(%Mob{internal: %Internal{} = internal} = entity, refs) do
-    %{entity | internal: %{internal | threat_refs: refs}}
+    if internal.threat_refs == refs do
+      entity
+    else
+      %{entity | internal: %{internal | threat_refs: refs}} |> Core.mark_broadcast_update()
+    end
   end
 
   defp set_combat(%Mob{internal: %Internal{} = internal} = entity, combat?) do

@@ -42,6 +42,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.CombatSkills
   alias ThistleTea.Game.Entity.Logic.ComboPoints
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.ControlledCombat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.DispelResistance
@@ -509,6 +510,24 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
     state = TickScheduler.ensure_scheduled(%{state | character: character})
     {:noreply, state, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast(
+        {:controlled_combat_contact, %Effects.ControlledCombatContact{} = contact},
+        %{character: %Character{} = character} = state
+      ) do
+    request = %ObservationRequest{actors: [contact.controlled_guid, contact.opponent_guid]}
+    context = AIEnvironment.context(character, Time.now(), request)
+
+    character =
+      character |> ControlledCombat.receive(contact, context) |> EventSink.emit_pending(EventContext.new(self()))
+
+    state = TickScheduler.ensure_scheduled(%{state | character: character})
+    {:noreply, state, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Controlled creature combat contact failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:threat_ref_lost, mob_guid, incarnation_id}, %{character: %Character{} = character} = state) do

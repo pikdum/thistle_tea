@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
   alias ThistleTea.Game.Entity.Logic.CombatLeash
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.LiquidSpells
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.TemporarySummon
   alias ThistleTea.Game.Entity.Logic.UnreachableTarget
 
@@ -57,6 +58,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
     blackboard = Blackboard.ensure(entity.internal.blackboard)
     {:failure, entity, blackboard} = AuraBT.tick(entity, blackboard, context)
     entity = Engagement.maintain(entity, context)
+    {entity, blackboard} = PlayerCombat.sync(entity, blackboard, context)
     {:failure, entity, blackboard} = RegenBT.tick(entity, blackboard, now)
     entity = %{entity | internal: %{entity.internal | blackboard: blackboard}}
 

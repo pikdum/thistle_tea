@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.PeriodicCombatTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.PowerBurn
@@ -24,11 +25,11 @@ defmodule ThistleTea.Game.Entity.Logic.PeriodicCombatTest do
       spell = %Spell{id: 10_797, attributes: MapSet.new([:channeled])}
       player = PlayerCombat.mark_attacked(player, 0)
       player = Core.take_damage(player, 10, 4_000, source: 2, periodic: true, spell: spell)
-      {player, _} = PlayerCombat.sync(player, %Blackboard{}, 5_000)
+      {player, _} = PlayerCombat.sync(player, %Blackboard{}, Context.new(5_000))
       assert player.internal.in_combat
       assert player.internal.last_hostile_time == 4_000
       assert Regen.tick(player, 6_000).unit.health == 90
-      {player, _} = PlayerCombat.sync(player, %Blackboard{}, 9_000)
+      {player, _} = PlayerCombat.sync(player, %Blackboard{}, Context.new(9_000))
       refute player.internal.in_combat
     end
 
@@ -37,7 +38,7 @@ defmodule ThistleTea.Game.Entity.Logic.PeriodicCombatTest do
       player = PlayerCombat.mark_attacked(player, 0)
       player = Core.take_damage(player, 10, 4_000, source: 2, periodic: true)
       assert player.internal.last_hostile_time == 0
-      {player, _} = PlayerCombat.sync(player, %Blackboard{}, 5_000)
+      {player, _} = PlayerCombat.sync(player, %Blackboard{}, Context.new(5_000))
       refute player.internal.in_combat
     end
 

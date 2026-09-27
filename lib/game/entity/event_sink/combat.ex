@@ -23,6 +23,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
 
   @victimstate_normal 1
 
+  def emit(entity, %Effects.ControlledCombatContact{} = effect, _context) do
+    Entity.controlled_combat_contact(effect.target_guid, effect)
+    entity
+  end
+
   def emit(%Mob{object: %{guid: guid}} = entity, %Effects.EnterEvade{target_guid: guid}, context) do
     Context.cast(context, :enter_evade)
     entity

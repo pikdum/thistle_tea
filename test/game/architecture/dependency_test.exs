@@ -11,8 +11,6 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
                               {"lib/game/entity/logic/core.ex", "ThistleTea.Game.Network.UpdateObject"},
                               {"lib/game/entity/logic/hostility.ex", "ThistleTea.Game.World.Metadata"},
                               {"lib/game/entity/logic/hostility.ex", "ThistleTea.Game.World.System.Duel"},
-                              {"lib/game/entity/logic/player_combat.ex", "ThistleTea.Game.World"},
-                              {"lib/game/entity/logic/player_combat.ex", "ThistleTea.Game.World.Metadata"},
                               {"lib/game/entity/logic/shaman.ex", "ThistleTea.Game.World.Loader.Spell"},
                               {"lib/game/entity/logic/spell_effect/script.ex",
                                "ThistleTea.Game.World.Loader.SpellPetAura"},

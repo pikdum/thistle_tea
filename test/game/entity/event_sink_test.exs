@@ -41,6 +41,24 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   end
 
   describe "emit/2" do
+    test "controlled contact reaches the explicit player owner" do
+      owner = unique_guid()
+      Entity.register(owner)
+      pet = %Mob{object: %Object{guid: Guid.runtime(:pet, 7)}}
+
+      contact = %Effects.ControlledCombatContact{
+        target_guid: owner,
+        controlled_guid: pet.object.guid,
+        opponent_guid: 20,
+        role: :attacked,
+        now: 1_000
+      }
+
+      assert EventSink.emit(pet, contact) == pet
+      assert_receive {:"$gen_cast", {:controlled_combat_contact, ^contact}}
+      Entity.unregister(owner)
+    end
+
     test "cast completion reaches only the explicit caster owner with its proc origin" do
       guid = unique_guid()
       caster = %Character{object: %Object{guid: guid}}

@@ -39,6 +39,60 @@ defmodule ThistleTea.Game.Entity.SpellContactTest do
   setup [:actors]
 
   describe "prepare/4 and apply_prepared/3" do
+    test "controlled contact wakes an idle owner and publishes its combat flag", ctx do
+      pet = %{ctx.mob | object: %Object{guid: ctx.pet}}
+      World.update_position(pet)
+      Metadata.put(ctx.pet, %{owner_guid: ctx.caster.object.guid, alive?: true})
+
+      on_exit(fn ->
+        World.remove_position(pet)
+        Metadata.delete(ctx.pet)
+      end)
+
+      companion = %Companion{kind: :hunter_pet, status: {:active, %EntityRef{guid: ctx.pet, entry: 1, spell_id: 1}}}
+      owner = %{ctx.caster | internal: %{ctx.caster.internal | companion: companion}}
+
+      contact = %Effects.ControlledCombatContact{
+        target_guid: owner.object.guid,
+        controlled_guid: ctx.pet,
+        opponent_guid: ctx.mob.object.guid,
+        role: :attacked,
+        now: Time.now()
+      }
+
+      assert {:noreply, state, {:continue, :maybe_broadcast_update}} =
+               PlayerServer.handle_cast({:controlled_combat_contact, contact}, %State{character: owner})
+
+      assert state.character.internal.in_combat
+      assert state.character.internal.broadcast_update?
+      assert is_reference(state.player_tick_ref)
+      cancel_tick(state)
+    end
+
+    test "direct pet damage reports caster contact while ordinary periodic damage does not", ctx do
+      Entity.register(ctx.pet)
+      spell = %Spell{id: 3, school: :physical}
+
+      damage = %Effects.SpellDamage{
+        source_guid: ctx.pet,
+        target_guid: ctx.mob.object.guid,
+        spell_id: 3,
+        spell: spell,
+        school: :physical,
+        damage: 20,
+        proc_type: :deal_harmful_spell
+      }
+
+      EventSink.emit(ctx.mob, damage)
+      assert_receive {:"$gen_cast", {:spell_contact, %Effects.SpellContact{target_guid: pet}}}
+      assert pet == ctx.pet
+      EventSink.emit(ctx.mob, %{damage | periodic?: true})
+      refute_receive {:"$gen_cast", {:spell_contact, _}}
+      EventSink.emit(ctx.mob, %{damage | periodic?: true, spell: %{spell | attributes: MapSet.new([:channeled])}})
+      assert_receive {:"$gen_cast", {:spell_contact, %Effects.SpellContact{target_guid: ^pet}}}
+      Entity.unregister(ctx.pet)
+    end
+
     test "an undetected immune Sap leaves both owners peaceful", ctx do
       prepared = SpellReception.prepare(ctx.mob, ctx.context, ctx.sap, 0)
       assert prepared.resolution.outcome == :immune

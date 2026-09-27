@@ -137,7 +137,7 @@ defmodule ThistleTea.Game.Entity.Logic.ExtraAttacksTest do
     test "passive combat synchronization preserves banked attacks while auto-attack is off", %{entity: entity} do
       entity = ExtraAttacks.grant(entity, 1)
       character = %Character{object: entity.object, unit: entity.unit, internal: entity.internal, player: %Player{}}
-      {_, blackboard} = PlayerCombat.sync(character, entity.internal.blackboard, 1_000)
+      {_, blackboard} = PlayerCombat.sync(character, entity.internal.blackboard, Context.new(1_000))
       assert blackboard.combat.extra_attacks == 1
     end
   end

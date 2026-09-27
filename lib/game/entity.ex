@@ -63,6 +63,8 @@ defmodule ThistleTea.Game.Entity do
 
   def spell_contact(entity, effect), do: dispatch_cast(entity, {:spell_contact, effect})
 
+  def controlled_combat_contact(entity, effect), do: dispatch_cast(entity, {:controlled_combat_contact, effect})
+
   def trigger_spell(entity, spell_id, target_guid, opts \\ []) do
     dispatch_cast(entity, {:trigger_spell, spell_id, target_guid, opts})
   end

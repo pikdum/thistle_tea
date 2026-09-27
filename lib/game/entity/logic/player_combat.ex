@@ -12,6 +12,9 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   release messages are idempotent, and the per-tick `sync/3` prunes refs
   whose mob is dead, gone, or has respawned, so a missed release can never
   pin a player in combat — the state always converges.
+
+  Combat synchronization consumes an immutable context captured by the owner;
+  the core never queries world state while making the transition.
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
@@ -20,16 +23,17 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   alias ThistleTea.Game.Entity.Data.Reputation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
+  alias ThistleTea.Game.Entity.Logic.CombatReferences
+  alias ThistleTea.Game.Entity.Logic.ControlledCombat
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Metadata
 
   @combat_drop_ms 5_000
 
@@ -198,18 +202,18 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   def lose_threat_ref(character, _mob_guid, _incarnation_id), do: character
 
-  def sync(character, %Blackboard{} = blackboard) do
-    sync(character, blackboard, Time.now())
-  end
-
-  def sync(%Character{internal: %Internal{in_combat: true}} = character, %Blackboard{} = blackboard, now)
-      when is_integer(now) do
-    if auto_attacking_target?(character, blackboard) do
+  def sync(
+        %Character{internal: %Internal{in_combat: true}} = character,
+        %Blackboard{} = blackboard,
+        %Context{now: now} = context
+      ) do
+    if auto_attacking_target?(character, blackboard, context.perception) do
       {character |> touch_hostile(now) |> CombatLogic.sync_combat_flag(), blackboard}
     else
-      character = prune_threat_refs(character)
+      character = prune_threat_refs(character, context.perception)
 
-      if threat_refs?(character) or within_drop_window?(character, now) do
+      if threat_refs?(character) or ControlledCombat.holds_combat?(character, context) or
+           within_drop_window?(character, now) do
         {CombatLogic.sync_combat_flag(character), clear_inactive_attack(blackboard)}
       else
         {clear(character), clear_inactive_attack(blackboard)}
@@ -217,30 +221,19 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
     end
   end
 
-  def sync(character, %Blackboard{} = blackboard, _now), do: {character, blackboard}
+  def sync(character, %Blackboard{} = blackboard, %Context{}), do: {character, blackboard}
 
   defp clear_inactive_attack(%Blackboard{combat: %{auto_attacking: true}} = blackboard),
     do: Blackboard.clear_auto_attack(blackboard)
 
   defp clear_inactive_attack(%Blackboard{} = blackboard), do: blackboard
 
-  defp prune_threat_refs(%Character{internal: %Internal{threat_refs: %MapSet{} = refs} = internal} = character) do
-    %{character | internal: %{internal | threat_refs: MapSet.filter(refs, &referencing_mob_active?/1)}}
+  defp prune_threat_refs(%Character{internal: %Internal{} = internal} = character, perception) do
+    refs = CombatReferences.prune(internal.threat_refs, internal.world, perception)
+    %{character | internal: %{internal | threat_refs: refs}}
   end
-
-  defp prune_threat_refs(character), do: character
 
   defp threat_refs?(%Character{internal: %Internal{threat_refs: %MapSet{} = refs}}), do: MapSet.size(refs) > 0
-  defp threat_refs?(_character), do: false
-
-  defp referencing_mob_active?({mob_guid, incarnation_id}) do
-    case Metadata.query(mob_guid, [:alive?, :incarnation_id]) do
-      %{alive?: true, incarnation_id: ^incarnation_id} -> true
-      _ -> false
-    end
-  end
-
-  defp referencing_mob_active?(_ref), do: false
 
   defp threat_ref_guids(refs) do
     refs
@@ -284,28 +277,27 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   defp clear_temporary_at_war(character), do: {character, []}
 
-  defp auto_attacking_target?(%Character{} = character, %Blackboard{
-         combat: %Combat{auto_attacking: true, auto_attack_target: %TargetRef{} = target}
-       }) do
-    active_target?(character, target)
+  defp auto_attacking_target?(
+         %Character{} = character,
+         %Blackboard{combat: %Combat{auto_attacking: true, auto_attack_target: %TargetRef{} = target}},
+         perception
+       ) do
+    active_target?(character, target, perception)
   end
 
-  defp auto_attacking_target?(_character, _blackboard), do: false
+  defp auto_attacking_target?(_character, _blackboard, _perception), do: false
 
   defp active_target?(
          %Character{internal: %Internal{world: world}, unit: %Unit{target: target}},
-         %TargetRef{guid: target} = target_ref
+         %TargetRef{guid: target} = target_ref,
+         perception
        )
        when is_integer(target) and target > 0 do
-    case World.target_position(target) do
-      {^world, _x, _y, _z} -> target_ref_active?(target_ref)
+    case Perception.position(perception, target) do
+      {^world, _x, _y, _z} -> TargetRef.active?(target_ref, Perception.metadata(perception, target) || %{})
       _ -> false
     end
   end
 
-  defp active_target?(_character, _target_ref), do: false
-
-  defp target_ref_active?(%TargetRef{guid: target} = target_ref) do
-    TargetRef.active?(target_ref, Metadata.query(target, [:alive?, :incarnation_id]) || %{})
-  end
+  defp active_target?(_character, _target_ref, _perception), do: false
 end

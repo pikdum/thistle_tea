@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.FeignDeathTest do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context, as: AIContext
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -90,8 +91,8 @@ defmodule ThistleTea.Game.Entity.Logic.FeignDeathTest do
       assert FeignDeath.successful?(character)
       assert character.internal.in_combat
       assert character.internal.threat_refs == MapSet.new()
-      {before, _} = PlayerCombat.sync(character, Blackboard.new(), 6_999)
-      {after_timeout, _} = PlayerCombat.sync(character, Blackboard.new(), 7_000)
+      {before, _} = PlayerCombat.sync(character, Blackboard.new(), AIContext.new(6_999))
+      {after_timeout, _} = PlayerCombat.sync(character, Blackboard.new(), AIContext.new(7_000))
       assert before.internal.in_combat
       refute after_timeout.internal.in_combat
     end

@@ -108,7 +108,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
         now: Time.now()
       }
 
-      contacts = if Guid.entity_type(source) in [:player, :mob], do: [contact], else: []
+      contacts = if Guid.entity_type(source) in [:player, :mob, :pet], do: [contact], else: []
       contacts ++ Pvp.contacts(entity, source, target, :attack) ++ [effect]
     else
       [effect]

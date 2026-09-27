@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
   @moduledoc """
-  The player behavior tree, ticked from the player owner: combat sync, reactive
+  The player behavior tree, ticked from the player owner: reactive
   updates, spell casting, ranged attacks, and melee auto-attack.
   """
   alias ThistleTea.Game.Entity.Data.Character
@@ -18,7 +18,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
   alias ThistleTea.Game.Entity.Logic.Fatigue
   alias ThistleTea.Game.Entity.Logic.Intoxication
   alias ThistleTea.Game.Entity.Logic.LavaExposure
-  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Rest
@@ -30,7 +29,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
       BT.action(&breathing_tick/3),
       BT.action(&fatigue_tick/3),
       BT.action(&lava_tick/3),
-      BT.action(&sync_combat/2),
       BT.action(&pvp_tick/3),
       BT.action(&reactive_tick/3),
       BT.action(&Charm.maintain/3),
@@ -76,13 +74,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
   end
 
   defp lava_tick(state, blackboard, _context), do: {:failure, state, blackboard}
-
-  defp sync_combat(%Character{} = state, %Blackboard{} = blackboard) do
-    {state, blackboard} = PlayerCombat.sync(state, blackboard)
-    {:failure, state, blackboard}
-  end
-
-  defp sync_combat(state, blackboard), do: {:failure, state, blackboard}
 
   defp pvp_tick(state, blackboard, %Context{now: now}) do
     {:failure, Pvp.tick(state, now), blackboard}

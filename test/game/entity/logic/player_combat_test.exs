@@ -9,12 +9,17 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
   alias ThistleTea.Game.Entity.Data.Reputation
   alias ThistleTea.Game.Entity.Data.Reputation.State
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
+  alias ThistleTea.Game.Entity.Logic.CombatReferences
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
@@ -162,7 +167,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
     test "stays in combat within the drop window of the last hostile event" do
       character = character(in_combat: true, last_hostile_time: 1_000)
 
-      {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{}, 3_000)
+      {character, _blackboard} = sync(character, %Blackboard{}, 3_000)
 
       assert character.internal.in_combat == true
     end
@@ -170,7 +175,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
     test "drops combat once the drop window lapses" do
       character = character(in_combat: true, last_hostile_time: 1_000)
 
-      {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{}, 7_000)
+      {character, _blackboard} = sync(character, %Blackboard{}, 7_000)
 
       assert character.internal.in_combat == false
       assert Bitwise.band(character.unit.flags, @unit_flag_in_combat) == 0
@@ -178,7 +183,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
 
     test "clears temporary faction war when the combat window lapses" do
       character = PlayerCombat.mark_attacked(character_with_reputation(), 1_000, 529)
-      {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{}, 7_000)
+      {character, _blackboard} = sync(character, %Blackboard{}, 7_000)
 
       refute character.internal.in_combat
       assert Bitwise.band(character.player.reputation.states[529].flags, 0x02) == 0
@@ -196,7 +201,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
 
       on_exit(fn -> Metadata.delete(character.object.guid) end)
 
-      {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{}, 7_000)
+      {character, _blackboard} = sync(character, %Blackboard{}, 7_000)
 
       assert character.internal.in_combat == false
     end
@@ -220,7 +225,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
         }
       }
 
-      {character, blackboard} = PlayerCombat.sync(character, blackboard, 100_000)
+      {character, blackboard} = sync(character, blackboard, 100_000)
 
       assert character.internal.in_combat == true
       assert character.internal.last_hostile_time == 100_000
@@ -248,14 +253,14 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
         }
       }
 
-      {character, blackboard} = PlayerCombat.sync(character, blackboard, 3_000)
+      {character, blackboard} = sync(character, blackboard, 3_000)
 
       assert character.internal.in_combat == true
       assert blackboard.combat.auto_attacking == false
       assert blackboard.combat.next_attack_at == 1_500
 
       {character, _blackboard} =
-        PlayerCombat.sync(
+        sync(
           character,
           %Blackboard{combat: %Blackboard.Combat{auto_attacking: false}},
           7_000
@@ -284,7 +289,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
         }
       }
 
-      {character, blackboard} = PlayerCombat.sync(character, blackboard, 7_000)
+      {character, blackboard} = sync(character, blackboard, 7_000)
 
       assert character.internal.in_combat == false
       assert blackboard.combat.auto_attacking == false
@@ -294,14 +299,18 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
     test "stays in combat past the drop window while a live mob references the player" do
       mob_guid = Guid.from_low_guid(:mob, 1, unique_guid())
       Metadata.put(mob_guid, %{alive?: true, incarnation_id: 1})
+      SpatialHash.update(:mobs, mob_guid, 0, 1.0, 0.0, 0.0)
 
-      on_exit(fn -> Metadata.delete(mob_guid) end)
+      on_exit(fn ->
+        Metadata.delete(mob_guid)
+        SpatialHash.remove(:mobs, mob_guid)
+      end)
 
       character =
         character(in_combat: true, last_hostile_time: 1_000)
         |> PlayerCombat.gain_threat_ref(mob_guid, 1)
 
-      {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{}, 100_000)
+      {character, _blackboard} = sync(character, %Blackboard{}, 100_000)
 
       assert character.internal.in_combat == true
     end
@@ -318,7 +327,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
         |> PlayerCombat.gain_threat_ref(dead_guid, 1)
         |> PlayerCombat.gain_threat_ref(missing_guid, 1)
 
-      {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{}, 7_000)
+      {character, _blackboard} = sync(character, %Blackboard{}, 7_000)
 
       assert character.internal.in_combat == false
       assert MapSet.size(character.internal.threat_refs) == 0
@@ -327,14 +336,18 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
     test "prunes a stale ref when the same mob guid respawns before combat drops" do
       mob_guid = Guid.from_low_guid(:mob, 1, unique_guid())
       Metadata.put(mob_guid, %{alive?: true, incarnation_id: 2})
+      SpatialHash.update(:mobs, mob_guid, 0, 1.0, 0.0, 0.0)
 
-      on_exit(fn -> Metadata.delete(mob_guid) end)
+      on_exit(fn ->
+        Metadata.delete(mob_guid)
+        SpatialHash.remove(:mobs, mob_guid)
+      end)
 
       character =
         character(in_combat: true, last_hostile_time: 1_000)
         |> PlayerCombat.gain_threat_ref(mob_guid, 1)
 
-      {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{}, 7_000)
+      {character, _blackboard} = sync(character, %Blackboard{}, 7_000)
 
       assert character.internal.in_combat == false
       assert MapSet.size(character.internal.threat_refs) == 0
@@ -353,7 +366,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
       end)
 
       {character, _blackboard} =
-        PlayerCombat.sync(
+        sync(
           character,
           %Blackboard{combat: %Blackboard.Combat{auto_attacking: false}},
           7_000
@@ -361,6 +374,18 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
 
       assert character.internal.in_combat == false
     end
+  end
+
+  defp sync(character, blackboard, now) do
+    observations =
+      [character.unit.target | CombatReferences.targets(character.internal.threat_refs)]
+      |> Enum.filter(&(is_integer(&1) and &1 > 0))
+      |> Map.new(fn guid ->
+        {guid, %Observation{guid: guid, position: World.position(guid), metadata: Metadata.get(guid)}}
+      end)
+
+    context = Context.new(now, perception: Perception.new(now, nil, observations, %{}))
+    PlayerCombat.sync(character, blackboard, context)
   end
 
   defp character(opts \\ []) do

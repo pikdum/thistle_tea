@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
      ]},
     {:AdvanceCombatSkill, [:target_guid, :skill_id], []},
     {:PvpContact, [:target_guid, :role, :other, :now], [combat?: true]},
+    {:ControlledCombatContact, [:target_guid, :controlled_guid, :opponent_guid, :role, :now], []},
     {:PvpFlagsChanged, [:enabled?], []},
     {:AttackStart, [:source_guid, :target_guid], []},
     {:StartAttack, [:target_guid], [target_ref: nil]},

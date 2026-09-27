@@ -48,6 +48,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.BoundaryResult
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.ControlledCombat
   alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
@@ -168,6 +169,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> Map.merge(SpellResist.defense_snapshot(state))
       |> Map.put(:spell_threat, SpellThreat.projection(state))
       |> Map.merge(control_metadata(state))
+      |> Map.merge(ControlledCombat.projection(state))
       |> Map.merge(Mob.visibility_metadata(state))
       |> Map.merge(FactionLoader.metadata(state.unit.faction_template))
       |> Map.put(:level, state.unit.level)
@@ -505,7 +507,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
     state =
       if effect.decision.combat? and not Core.dead?(state),
-        do: receive_combat_contact(state, effect.other_guid, Time.now()),
+        do: receive_combat_contact(state, effect.other_guid, effect.now, :attack),
         else: state
 
     state =
@@ -1662,6 +1664,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         |> Map.merge(FactionLoader.metadata(state.unit.faction_template))
         |> Map.merge(Appearance.metadata(state))
         |> Map.merge(control_metadata(state))
+        |> Map.merge(ControlledCombat.projection(state))
         |> Map.put(:proximity_aggro?, Mob.proximity_aggro?(state))
         |> Map.put(:no_spell_defense?, CreatureFlags.has?(state, :no_spell_defense))
         |> Map.merge(visibility)
@@ -2013,8 +2016,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp engage_combat(%Mob{} = state, _caster, _opts), do: state
 
-  defp receive_combat_contact(state, caster, now) do
-    state |> Engagement.contact(caster, now) |> engage_combat(caster)
+  defp receive_combat_contact(state, caster, now, role \\ :attacked) do
+    state |> Engagement.contact(caster, now, role) |> engage_combat(caster)
   end
 
   defp enter_combat(%Mob{} = state, caster, opts, now) do

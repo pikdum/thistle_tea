@@ -36,7 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   end
 
   defp mark_contact(entity, %{victim_guid: victim, outcome: outcome}, now) when outcome != :evade,
-    do: Engagement.contact(entity, victim, now)
+    do: Engagement.contact(entity, victim, now, :attack)
 
   defp mark_contact(entity, _payload, _now), do: entity
 

@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.CombatLeash
+  alias ThistleTea.Game.Entity.Logic.ControlledCombat
   alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.DamageOrigin
   alias ThistleTea.Game.Entity.Logic.Distraction
@@ -29,7 +30,10 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   @dynamic_flag_tapped 0x0004
 
-  defdelegate contact(entity, source, now), to: PetCombat
+  def contact(entity, source, now, role \\ :attacked) do
+    entity |> PetCombat.contact(source, now) |> ControlledCombat.contact(source, now, role)
+  end
+
   defdelegate gain_threat_ref(entity, guid, incarnation), to: PetCombat, as: :gain_ref
   defdelegate lose_threat_ref(entity, guid, incarnation), to: PetCombat, as: :lose_ref
 
@@ -74,23 +78,26 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   def enter(%Mob{} = entity, _target_guid, _now, _opts), do: result(entity, entity, :invalid_target)
 
-  def on_damage(%Mob{object: %{guid: guid}, internal: %Internal{pet: %Pet{}}} = entity, source, now)
+  def on_damage(%Mob{object: %{guid: guid}} = entity, source, now)
       when is_integer(source) and source > 0 and source != guid do
-    entity = contact(entity, source, now)
+    entity |> contact(source, now) |> react_to_damage(source, now)
+  end
 
+  def on_damage(entity, _source, _now), do: entity
+
+  defp react_to_damage(%Mob{internal: %Internal{pet: %Pet{}}} = entity, source, _now) do
     if is_nil(victim(entity)),
       do: Effects.enqueue(entity, %Effects.PetAttacked{attacker_guid: source}),
       else: entity
   end
 
-  def on_damage(%Mob{object: %{guid: guid}, internal: %Internal{in_combat: combat?}} = entity, source, now)
-      when combat? != true and is_integer(source) and source > 0 and source != guid do
+  defp react_to_damage(%Mob{internal: %Internal{in_combat: combat?}} = entity, source, now) when combat? != true do
     selection = if default_selection(entity) == :preserve, do: :preserve, else: :target
     %Result{entity: entity} = enter(entity, source, now, selection: selection)
     entity
   end
 
-  def on_damage(entity, _source, _now), do: entity
+  defp react_to_damage(entity, _source, _now), do: entity
 
   defp enter_active(
          %Mob{internal: %Internal{pet: %Pet{}, blackboard: %Blackboard{pet: %{returning: :command}}}} = entity,

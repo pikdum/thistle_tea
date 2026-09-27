@@ -31,6 +31,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
   alias ThistleTea.Game.Entity.Logic.AI.Script
+  alias ThistleTea.Game.Entity.Logic.CombatReferences
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Condition.Requirements
   alias ThistleTea.Game.Entity.Logic.CreatureMovement
   alias ThistleTea.Game.Entity.Logic.Fear
@@ -260,9 +262,16 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     end
   end
 
-  defp direct_guids(%Character{internal: %{possession: %Possession{} = control}, unit: %{target: target}}) do
+  defp direct_guids(%Character{internal: %{possession: %Possession{} = control}, unit: %{target: target}} = entity) do
     controller = Metadata.get(control.caster_guid) || %{}
-    [control.caster_guid, control.command_target, target, controller[:victim_guid] | controller[:combat_targets] || []]
+
+    [control.caster_guid, control.command_target, target, controller[:victim_guid]]
+    |> Enum.concat(controller[:combat_targets] || [])
+    |> Enum.concat(player_combat_guids(entity))
+  end
+
+  defp direct_guids(%Character{internal: %{auto_shot: auto_shot}, unit: %{target: target}} = entity) do
+    [auto_repeat_target(auto_shot), target | player_combat_guids(entity)]
   end
 
   defp direct_guids(
@@ -287,6 +296,12 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   end
 
   defp direct_guids(_entity), do: []
+
+  defp player_combat_guids(%Character{internal: %{threat_refs: refs}} = entity) do
+    companion = Companion.summon_guid(entity)
+    metadata = Metadata.get(companion) || %{}
+    [companion | CombatReferences.targets(refs) ++ CombatReferences.targets(metadata[:threat_refs])]
+  end
 
   defp player_attackers(%Mob{object: %{guid: guid}, internal: %{in_combat: true}} = entity, owner) do
     (World.nearby_players(entity) ++ World.nearby_players(owner))
