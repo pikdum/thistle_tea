@@ -668,6 +668,49 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
       assert Enum.any?(character.internal.events, &is_struct(&1, Effects.DeliverSpell))
     end
 
+    test "keeps pet channels active when the client selects the caster" do
+      pet_guid = Guid.from_low_guid(:pet, 2960, 45)
+
+      for {spell_id, hits} <- [{13_542, [pet_guid]}, {755, [1, pet_guid]}] do
+        spell = %Spell{
+          id: spell_id,
+          duration_ms: 5_000,
+          attributes: MapSet.new([:channeled]),
+          effects: [%Effect{type: :apply_aura, aura: :periodic_heal, implicit_target_a: :pet}]
+        }
+
+        resolution = %{channel_resolution() | hits: hits, impacts: []}
+
+        cast =
+          spell
+          |> Cast.new(Target.self(1), 1_000)
+          |> Cast.transition(:launch)
+          |> Cast.put_resolution(resolution)
+          |> Cast.transition(:impact)
+
+        character =
+          %Character{
+            object: %Object{guid: 1},
+            unit: %Unit{target: 7},
+            player: %Player{},
+            internal: %Internal{}
+          }
+          |> Companion.activate(:hunter_pet, %EntityRef{guid: pet_guid, entry: 2960, spell_id: 1515})
+
+        channeling = Casting.complete(character, cast, 1_000)
+        assert %Cast{phase: :channel_tick} = channeling.internal.casting
+        assert channeling.unit.channel_object == pet_guid
+        assert channeling.unit.channel_spell == spell_id
+
+        cancelled = Casting.cancel(channeling, 2_000)
+        assert cancelled.internal.casting == nil
+        assert Enum.any?(cancelled.internal.events, &match?(%Effects.RemoveAura{target_guid: ^pet_guid}, &1))
+
+        rejected = %{cast | resolution: %{resolution | hits: [1]}}
+        assert Casting.complete(character, rejected, 1_000).internal.casting == nil
+      end
+    end
+
     test "stops a target-dependent channel when its only target resists" do
       now = 1_000
       target_guid = 7
