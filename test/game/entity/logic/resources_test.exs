@@ -238,18 +238,4 @@ defmodule ThistleTea.Game.Entity.Logic.ResourcesTest do
       assert Resources.spend_power(entity, heal, 5_000).unit.power1 == 100
     end
   end
-
-  describe "refund_power/3" do
-    test "returns a fraction of the spell cost" do
-      entity = Resources.refund_power(rage_user(rage: 100), %Spell{mana_cost: 150, power_type: 1}, 0.82)
-
-      assert entity.unit.power2 == 223
-    end
-
-    test "ignores non-positive fractions" do
-      entity = rage_user(rage: 100)
-
-      assert Resources.refund_power(entity, %Spell{mana_cost: 150, power_type: 1}, 0) == entity
-    end
-  end
 end

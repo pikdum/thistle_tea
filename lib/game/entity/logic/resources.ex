@@ -169,13 +169,6 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
 
   defp track_mana_use(entity, _power_type, _now), do: entity
 
-  def refund_power(entity, %Spell{power_type: power_type} = spell, fraction)
-      when is_number(fraction) and fraction > 0 do
-    gain_power(entity, power_type, round(power_cost(entity, spell) * fraction))
-  end
-
-  def refund_power(entity, _spell, _fraction), do: entity
-
   def rage_conversion(level) when is_integer(level) and level > 0 do
     0.0091107836 * level * level + 3.225598133 * level + 4.2652911
   end

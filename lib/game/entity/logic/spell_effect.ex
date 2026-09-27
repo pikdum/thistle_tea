@@ -85,7 +85,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   def apply_prepared(target, %Resolution{kind: :immune, context: context, spell: spell}, now) do
     {target, events} = Aura.consume_mechanic_immunity(target, spell, now)
-    {target, events ++ [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
+
+    feedback =
+      if Spell.melee_ability?(spell),
+        do: melee_avoid_events(target, context, spell, :immune),
+        else: [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]
+
+    {target, events ++ feedback}
   end
 
   def apply_prepared(target, %Resolution{kind: :reflect, context: context, spell: spell}, now) do
@@ -527,7 +533,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp spell_attack_outcome(context, target_guid, outcome, damage, spell, proc_damage \\ nil) do
     event = Effects.attack_outcome(context.caster_guid, target_guid, outcome, damage, spell.id, proc_damage)
-    %{event | spell: spell, proc_origin: ProcOrigin.classify(spell, context)}
+    %{event | spell: spell, power_cost: context.power_cost, proc_origin: ProcOrigin.classify(spell, context)}
   end
 
   defp dealt_damage(events) do

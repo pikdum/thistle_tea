@@ -63,7 +63,7 @@ defmodule ThistleTea.Game.World.Loader.SpellInterruptDbcTest do
     %{
       entity: %Mob{
         object: %Object{guid: 1},
-        unit: %Unit{health: 10_000, max_health: 10_000, level: 1},
+        unit: %Unit{health: 10_000, max_health: 10_000, power1: 1_000, max_power1: 1_000, level: 1},
         internal: %Internal{},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }

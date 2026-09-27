@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastResolution.PowerCost
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.ProcRule
 
@@ -66,7 +67,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
         attributes: MapSet.new([:discount_power_on_miss])
       }
 
-      entity = AttackFeedback.receive(entity, %{outcome: :dodge, damage: 0, spell_id: 78}, spell, 1_000)
+      payload = %{outcome: :dodge, damage: 0, spell_id: 78, power_cost: %PowerCost{power_type: 1, amount: 150}}
+      entity = AttackFeedback.receive(entity, payload, spell, 1_000)
 
       assert entity.unit.power2 == 123
     end
@@ -75,7 +77,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
       entity = warrior()
       spell = %Spell{id: 78, mana_cost: 150, power_type: 1}
 
-      assert AttackFeedback.receive(entity, %{outcome: :dodge, damage: 0, spell_id: 78}, spell, 1_000) == entity
+      payload = %{outcome: :dodge, damage: 0, spell_id: 78, power_cost: %PowerCost{power_type: 1, amount: 150}}
+      assert AttackFeedback.receive(entity, payload, spell, 1_000) == entity
     end
 
     test "abilities that land grant no rage even with the spell known" do
@@ -145,7 +148,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
       assert avoided.player.combo_points == 5
     end
 
-    test "missed finishers retain points and refund eighty percent of their energy" do
+    test "avoided finishers retain points and spend their full cost" do
       entity = rogue()
       entity = %{entity | unit: %{entity.unit | power4: 65}}
       entity = Reactive.add_combo_points(entity, 77, 5)
@@ -158,10 +161,62 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
         attributes: MapSet.new([:finishing_move])
       }
 
-      entity = AttackFeedback.receive(entity, %{outcome: :miss, damage: 0, victim_guid: 77}, spell, 1_000)
+      for outcome <- [:miss, :dodge, :parry, :immune] do
+        payload = %{
+          outcome: outcome,
+          damage: 0,
+          victim_guid: 77,
+          spell_id: spell.id,
+          power_cost: %PowerCost{power_type: 3, amount: 35}
+        }
 
-      assert entity.player.combo_points == 5
-      assert entity.unit.power4 == 93
+        avoided = AttackFeedback.receive(entity, payload, spell, 1_000)
+        assert avoided.player.combo_points == 5
+        assert avoided.unit.power4 == 65
+      end
+    end
+
+    test "energy builders refund miss dodge parry and immunity using the paid cost" do
+      entity = rogue()
+      entity = %{entity | unit: %{entity.unit | power4: 60}}
+      spell = %Spell{id: 1752, power_type: 3, mana_cost: 45, attributes: MapSet.new([:discount_power_on_miss])}
+
+      for outcome <- [:miss, :dodge, :parry, :immune] do
+        payload = %{outcome: outcome, spell_id: spell.id, power_cost: %PowerCost{power_type: 3, amount: 40}}
+        assert AttackFeedback.receive(entity, payload, spell, 1_000).unit.power4 == 93
+      end
+
+      for outcome <- [:normal, :crit, :block, :resist, :evade, :reflect] do
+        payload = %{outcome: outcome, spell_id: spell.id, power_cost: %PowerCost{power_type: 3, amount: 40}}
+        assert AttackFeedback.receive(entity, payload, spell, 1_000).unit.power4 == 60
+      end
+    end
+
+    test "rage refunds only dodge and parry and mana is never refunded" do
+      for power_type <- [0, 1] do
+        entity = warrior()
+        entity = %{entity | unit: %{entity.unit | power_type: power_type, power1: 0, max_power1: 1_000}}
+        spell = %Spell{id: 78, power_type: power_type, attributes: MapSet.new([:discount_power_on_miss])}
+
+        for outcome <- [:miss, :dodge, :parry, :immune, :resist, :block, :normal] do
+          payload = %{outcome: outcome, spell_id: spell.id, power_cost: %PowerCost{power_type: power_type, amount: 150}}
+          result = AttackFeedback.receive(entity, payload, spell, 1_000)
+          expected = if power_type == 1 and outcome in [:dodge, :parry], do: 123, else: 0
+          assert result.unit.power2 == expected
+          assert result.unit.power1 == 0
+        end
+      end
+    end
+
+    test "free casts and feedback without a paid cost cannot create power" do
+      entity = rogue()
+      entity = %{entity | unit: %{entity.unit | power4: 20}}
+      spell = %Spell{id: 1752, power_type: 3, mana_cost: 45, attributes: MapSet.new([:discount_power_on_miss])}
+
+      for cost <- [nil, %PowerCost{power_type: 3, amount: 0}, %PowerCost{power_type: nil, amount: 0}] do
+        payload = %{outcome: :dodge, spell_id: spell.id, power_cost: cost}
+        assert AttackFeedback.receive(entity, payload, spell, 1_000).unit.power4 == 20
+      end
     end
 
     test "blade flurry queues a secondary strike from landed damage" do

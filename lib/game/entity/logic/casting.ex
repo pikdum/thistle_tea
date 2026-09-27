@@ -296,7 +296,18 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp launch_ready(entity, casting, now) do
     casting = casting |> Cast.transition(:launch) |> Cast.put_resolution(resolve(entity, casting))
-    entity |> put_cast(casting) |> advance_phase(casting, now)
+    cost = casting.resolution.costs.power
+
+    if Resources.can_pay_cost?(entity, cost.power_type, cost.amount) do
+      entity |> put_cast(casting) |> advance_phase(casting, now)
+    else
+      entity =
+        entity
+        |> Effects.enqueue(Effects.spell_cast_failed(Cast.result_spell(casting), :no_power))
+        |> cancel()
+
+      {:finished, entity}
+    end
   end
 
   defp apply_launch(entity, %Cast{resolution: %CastResolution{} = resolution} = casting, now) do
@@ -1409,6 +1420,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       context = %{
         context
         | cast_item_guid: casting.cast_item_guid,
+          power_cost: if(target_triggers?, do: casting.resolution.costs.power),
           triggered?: casting.triggered?,
           target_guid: target_guid,
           target_triggers: if(target_triggers?, do: context.target_triggers, else: []),

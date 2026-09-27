@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defstruct [
     :cast_item_guid,
+    :power_cost,
     :cooldown_started_at,
     :caster_guid,
     :caster_owner_guid,

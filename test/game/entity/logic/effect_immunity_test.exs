@@ -135,7 +135,9 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunityTest do
       spell = %{stun() | dmg_class: 2}
 
       {_entity, events} = SpellEffect.receive(entity, 2, spell, 100)
-      assert [%Effects.SpellLogMiss{reason: :immune}] = events
+
+      assert [%Effects.SpellLogMiss{reason: :immune}, %Effects.AttackOutcome{outcome: :immune, power_cost: nil}] =
+               events
     end
   end
 

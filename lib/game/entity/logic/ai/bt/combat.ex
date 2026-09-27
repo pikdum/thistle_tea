@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.CastResolution.PowerCost
   alias ThistleTea.Game.Spell.Target
 
   @attack_retry_delay_ms 100
@@ -340,7 +341,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
       state
       |> Resources.spend_cost(spell.power_type, cost, now)
       |> queue_queued_spell_go(spell, target, targets)
-      |> deliver_queued_spell(spell, targets)
+      |> deliver_queued_spell(spell, targets, %PowerCost{power_type: spell.power_type, amount: cost})
     else
       state
       |> Effects.enqueue(Effects.spell_cast_failed(spell.id, :no_power))
@@ -355,11 +356,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     end
   end
 
-  defp deliver_queued_spell(state, %Spell{} = spell, targets) do
+  defp deliver_queued_spell(state, %Spell{} = spell, targets, %PowerCost{} = cost) do
     Enum.reduce(targets, state, fn target, entity ->
       context = %{
         CastContext.from_caster(entity, spell, target)
-        | selected_target_guid: List.first(targets),
+        | power_cost: cost,
+          selected_target_guid: List.first(targets),
           target_hostile?: Hostility.valid_attack_target?(entity, target)
       }
 

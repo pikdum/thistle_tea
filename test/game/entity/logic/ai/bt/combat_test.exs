@@ -16,11 +16,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
+  alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.CastResolution.PowerCost
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Item
   alias ThistleTea.Game.World.Metadata
@@ -373,17 +375,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       assert blackboard.combat.next_offhand_attack_at == 2_700
     end
 
-    test "sends queued melee spell go before delivering the attack" do
+    test "sends queued melee spell go and retains the paid cost for avoidance feedback" do
       target_guid = 2
       SpatialHash.update(:players, target_guid, 0, 1.0, 0.0, 0.0)
       on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
 
-      spell = %Spell{id: 78}
+      spell = %Spell{id: 78, power_type: 1, mana_cost: 150, attributes: MapSet.new([:discount_power_on_miss])}
 
       mob = %Mob{
         object: %Object{guid: 1},
         unit: %Unit{
           target: target_guid,
+          power2: 300,
+          max_power2: 1_000,
           min_damage: 3,
           max_damage: 3,
           combat_reach: 1.0,
@@ -400,10 +404,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       assert [
                %Effects.SpellCastResult{spell_id: 78},
                %Effects.SpellGo{spell_id: 78, hit_guids: [^target_guid]},
-               %Effects.DeliverSpell{target_guid: ^target_guid, spell: %Spell{id: 78}}
+               %Effects.DeliverSpell{target_guid: ^target_guid, spell: %Spell{id: 78}, cast_context: context}
              ] = mob.internal.events
 
       assert mob.internal.next_swing_spell == nil
+      assert mob.unit.power2 == 150
+      assert context.power_cost == %PowerCost{power_type: 1, amount: 150}
+
+      feedback = %{outcome: :dodge, power_cost: context.power_cost}
+      assert AttackFeedback.receive(mob, feedback, %{spell | mana_cost: 500}, 1_001).unit.power2 == 273
     end
 
     test "resolves queued chain weapon attacks against nearby enemies" do

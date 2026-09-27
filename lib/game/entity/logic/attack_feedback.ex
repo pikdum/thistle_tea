@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   Applies the resolved outcome of an entity's own outgoing swing or melee
   ability, delivered back from the defender that rolled the attack table: rage
   from damage dealt, partial rage from dodged/parried swings, the vanilla 82%
-  power refund when a rage ability is dodged or parried, and the hidden combo
+  power refund from a paid energy or rage ability's avoided hit, and the hidden combo
   point that marks a dodging target for Overpower. Swings that carried a
   queued on-next-swing spell generate no rage.
   """
@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastResolution.PowerCost
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Proc
   alias ThistleTea.Game.Spell.Scripts
@@ -32,13 +33,15 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
     |> mark_reactives(payload, now)
   end
 
-  defp apply_power_feedback(entity, %{outcome: outcome}, %Spell{} = spell) when outcome in [:dodge, :parry] do
-    cond do
-      Scripts.finisher?(spell) -> Resources.refund_power(entity, spell, 0.8)
-      Spell.attribute?(spell, :discount_power_on_miss) -> Resources.refund_power(entity, spell, @avoided_power_refund)
-      true -> entity
+  defp apply_power_feedback(entity, %{outcome: outcome, power_cost: %PowerCost{} = cost}, %Spell{} = spell) do
+    if Spell.attribute?(spell, :discount_power_on_miss) and refundable_outcome?(cost.power_type, outcome) do
+      Resources.gain_power(entity, cost.power_type, round(cost.amount * @avoided_power_refund))
+    else
+      entity
     end
   end
+
+  defp apply_power_feedback(entity, _payload, %Spell{}), do: entity
 
   defp apply_power_feedback(entity, %{spell_id: spell_id}, _spell) when is_integer(spell_id) do
     entity
@@ -49,10 +52,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
     Resources.gain_attack_rage(entity, damage * @avoided_rage_factor, :dealt)
   end
 
-  defp apply_power_feedback(entity, %{outcome: :miss}, %Spell{} = spell) do
-    if Scripts.finisher?(spell), do: Resources.refund_power(entity, spell, 0.8), else: entity
-  end
-
   defp apply_power_feedback(entity, %{outcome: :miss}, _spell), do: entity
 
   defp apply_power_feedback(entity, %{damage: damage}, _spell) when is_number(damage) and damage > 0 do
@@ -60,6 +59,10 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   end
 
   defp apply_power_feedback(entity, _payload, _spell), do: entity
+
+  defp refundable_outcome?(3, outcome), do: outcome in [:miss, :dodge, :parry, :immune]
+  defp refundable_outcome?(1, outcome), do: outcome in [:dodge, :parry]
+  defp refundable_outcome?(_power_type, _outcome), do: false
 
   defp apply_finisher_feedback(entity, %{outcome: outcome}, %Spell{} = spell, now) when outcome in [:normal, :crit] do
     if Scripts.finisher?(spell), do: Reactive.consume_combo(entity, now), else: entity

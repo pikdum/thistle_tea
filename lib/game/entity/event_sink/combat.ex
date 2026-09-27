@@ -196,6 +196,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
       proc_damage: effect.proc_damage,
       spell_id: effect.spell_id,
       spell: effect.spell,
+      power_cost: effect.power_cost,
       hand: effect.hand,
       extra_attack?: effect.extra_attack?
     })
