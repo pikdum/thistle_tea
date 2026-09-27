@@ -38,7 +38,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Acquisition do
     Hostility.valid_hostile_target?(source, target) and
       distance <= radius(entity, guid, perception) and
       civilian_allowed?(entity, target) and
-      Targeting.automatic_allowed?(entity, guid, context) and
+      Targeting.proximity_allowed?(entity, guid, context) and
       vertically_accessible?(entity, guid, perception) and
       CreatureMovement.accessible?(entity, Perception.swimmable?(perception, guid)) and
       Detection.detectable?(entity, guid, context) and

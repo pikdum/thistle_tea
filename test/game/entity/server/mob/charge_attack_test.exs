@@ -30,7 +30,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.ChargeAttackTest do
       assert_receive {:force_attack, ^target} = command
 
       assert {:noreply, started, {:continue, :maybe_broadcast}} = MobServer.handle_info(command, creature)
-      assert started.internal.pet.command_state == :attack
+      assert started.internal.pet.command_state == :stay
+      assert started.internal.pet.attack_command?
       assert started.internal.pet.reaction_state == :passive
       assert started.unit.target == target.guid
       assert started.internal.in_combat

@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.Targeting do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
@@ -18,15 +19,28 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.Targeting do
 
   @unit_pvp 0x00001000
 
+  def proximity_allowed?(%Mob{internal: %{pet: %Pet{}}} = pet, target, context) do
+    not Blackboard.pet_returning?(pet.internal.blackboard) and automatic_allowed?(pet, target, context)
+  end
+
+  def proximity_allowed?(_entity, _target, _context), do: true
+
   def automatic_allowed?(%Mob{internal: %{pet: %Pet{} = control}} = pet, target, %Context{} = context) do
     metadata = Perception.metadata(context.perception, target) || %{}
 
     control.reaction_state != :passive and not control.broken? and not control.possessed? and
+      not Blackboard.pet_recalled?(pet.internal.blackboard) and
       crowd_control_allowed?(control, metadata) and pvp_allowed?(pet, metadata) and
-      (control.command_state != :stay or Combat.in_melee_range?(pet, target, context))
+      within_stay_range?(pet, target, context)
   end
 
   def automatic_allowed?(_entity, _target, _context), do: true
+
+  defp within_stay_range?(%Mob{internal: %{pet: %Pet{command_state: :stay}}} = pet, target, context) do
+    Blackboard.pet_returning?(pet.internal.blackboard) or Combat.in_melee_range?(pet, target, context)
+  end
+
+  defp within_stay_range?(_pet, _target, _context), do: true
 
   def autocast_allowed?(pet, %Spell{} = spell, target, %Context{} = context) do
     not Spell.harmful?(spell) or commanded?(pet, target) or automatic_allowed?(pet, target, context)
@@ -42,7 +56,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.Targeting do
       )
   end
 
-  defp commanded?(%Mob{unit: %{target: target}, internal: %{pet: %Pet{command_state: :attack}}}, target)
+  defp commanded?(%Mob{unit: %{target: target}, internal: %{pet: %Pet{attack_command?: true}}}, target)
        when is_integer(target) and target > 0, do: true
 
   defp commanded?(_pet, _target), do: false

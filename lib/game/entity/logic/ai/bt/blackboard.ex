@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   alias __MODULE__.Guardian
   alias __MODULE__.Maintenance
   alias __MODULE__.Navigation
+  alias __MODULE__.Pet
   alias __MODULE__.Spells
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
 
@@ -25,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
             critter: nil,
             formation: nil,
             guardian: %Guardian{},
+            pet: %Pet{},
             combat: %Combat{},
             spells: %Spells{},
             event_ai: %EventAI{},
@@ -34,6 +36,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
 
   def ensure(%__MODULE__{} = blackboard), do: blackboard
   def ensure(nil), do: new()
+
+  def return_pet(%__MODULE__{pet: pet} = blackboard, reason) when reason in [:command, :combat, nil] do
+    %{blackboard | pet: %{pet | returning: reason}}
+  end
+
+  def pet_returning?(%__MODULE__{pet: %Pet{returning: reason}}), do: reason != nil
+  def pet_returning?(_blackboard), do: false
+
+  def pet_recalled?(%__MODULE__{pet: %Pet{returning: :command}}), do: true
+  def pet_recalled?(_blackboard), do: false
 
   def ready_for?(%__MODULE__{} = blackboard, key, now) when is_atom(key) and is_integer(now) do
     deadline(blackboard, key) in [nil, 0] or now >= deadline(blackboard, key)

@@ -812,7 +812,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       assert result.unit.target == 99
       assert result.internal.in_combat
-      assert result.internal.pet.command_state == :attack
+      assert result.internal.pet.command_state == :follow
+      assert result.internal.pet.attack_command?
     end
 
     test "follow clears combat and returns ownership to follow mode" do

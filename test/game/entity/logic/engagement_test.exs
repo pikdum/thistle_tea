@@ -54,7 +54,7 @@ defmodule ThistleTea.Game.Entity.Logic.EngagementTest do
             | unit: %{mob.unit | target: commanded_target},
               internal: %{
                 mob.internal
-                | pet: %Pet{command_state: :attack},
+                | pet: %Pet{attack_command?: true},
                   in_combat: true,
                   threat: %{commanded_target => 0.0}
               }

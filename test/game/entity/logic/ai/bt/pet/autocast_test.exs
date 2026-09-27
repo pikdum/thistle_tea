@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.AutocastTest do
       pet = %{pet | unit: %{pet.unit | target: 2}}
       context = context(5.0, %{breakable_crowd_control?: true})
       refute allowed?(pet, spell, 2, context)
-      commanded = %{pet | internal: %{pet.internal | pet: %{pet.internal.pet | command_state: :attack}}}
+      commanded = %{pet | internal: %{pet.internal | pet: %{pet.internal.pet | attack_command?: true}}}
       assert allowed?(commanded, spell, 2, context)
     end
 

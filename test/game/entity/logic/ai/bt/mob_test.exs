@@ -187,7 +187,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
           mob.internal
           | in_combat: true,
             threat: %{target => 100.0},
-            pet: %Pet{owner_guid: 1, kind: :hunter_pet, command_state: command},
+            pet: %Pet{
+              owner_guid: 1,
+              kind: :hunter_pet,
+              command_state: if(command == :stay, do: :stay, else: :follow),
+              attack_command?: command == :attack
+            },
             spawn: %Spawn{position: {0.0, 0.0, 0.0}},
             blackboard: %Blackboard{combat: %Blackboard.Combat{auto_attacking: true}}
         }
@@ -200,6 +205,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
         assert pet.unit.health == 40
         assert pet.unit.auras == holders
         assert pet.internal.pet.command_state == if(command == :attack, do: :follow, else: command)
+        refute pet.internal.pet.attack_command?
+        assert pet.internal.blackboard.pet.returning == :combat
         refute pet.internal.blackboard.navigation.returning_home?
         assert pet.internal.navigation_intents == []
         assert pet.movement_block.position == mob.movement_block.position

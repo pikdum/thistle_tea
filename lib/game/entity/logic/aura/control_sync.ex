@@ -196,6 +196,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
         possession_original_command_state: pet.command_state,
         possession_original_reaction_state: pet.reaction_state,
         possessed?: true,
+        attack_command?: false,
         command_state: :stay,
         reaction_state: :passive
     }

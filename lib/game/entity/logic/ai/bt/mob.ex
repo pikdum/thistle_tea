@@ -603,9 +603,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     if Core.dead?(state), do: state, else: reset_living_after_combat(state, blackboard, context)
   end
 
-  defp reset_living_after_combat(%Mob{internal: %Internal{pet: %Pet{}}} = state, %Blackboard{} = blackboard, %Context{}) do
+  defp reset_living_after_combat(%Mob{internal: %Internal{pet: %Pet{}}} = state, %Blackboard{} = blackboard, %Context{
+         now: now
+       }) do
     state = %{state | internal: %{state.internal | blackboard: blackboard}}
-    PetBT.clear_combat_state(state)
+    PetBT.clear_combat_state(state, now)
   end
 
   defp reset_living_after_combat(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do

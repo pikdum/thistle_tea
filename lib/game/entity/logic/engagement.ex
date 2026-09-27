@@ -72,6 +72,13 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   def on_damage(entity, _source, _now), do: entity
 
   defp enter_active(
+         %Mob{internal: %Internal{pet: %Pet{}, blackboard: %Blackboard{pet: %{returning: :command}}}} = entity,
+         _target_guid,
+         _now,
+         _opts
+       ), do: result(entity, entity, :pet_recall)
+
+  defp enter_active(
          %Mob{internal: %Internal{blackboard: %Blackboard{navigation: %{returning_home?: true}}}} = entity,
          _target_guid,
          _now,
@@ -89,7 +96,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
     previous = entity
     entity = CombatLeash.enter(entity, now, Keyword.get(opts, :leash_source))
     internal = entity.internal
-    blackboard = internal.blackboard |> Blackboard.ensure() |> Distraction.clear()
+    blackboard = internal.blackboard |> Blackboard.ensure() |> Distraction.clear() |> Blackboard.return_pet(nil)
     entity = %{entity | internal: %{internal | in_combat: true, last_hostile_time: now, blackboard: blackboard}}
     entity = Threat.add(entity, target_guid, 0)
     selection = Keyword.get(opts, :selection, default_selection(entity))
@@ -160,7 +167,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
     }
 
     entity =
-      %{entity | unit: unit, internal: internal}
+      %{entity | unit: unit, internal: %{internal | pet: clear_pet_attack(internal.pet)}}
       |> Casting.cancel()
       |> Combat.sync_combat_flag()
       |> ControlMovement.sync_flags()
@@ -286,7 +293,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   defp select_on_enter(entity, _target_guid, opts) when is_list(opts), do: select(entity, opts)
 
-  defp default_selection(%Mob{internal: %Internal{pet: %Pet{command_state: :attack}}, unit: %Unit{target: target_guid}})
+  defp default_selection(%Mob{internal: %Internal{pet: %Pet{attack_command?: true}}, unit: %Unit{target: target_guid}})
        when is_integer(target_guid) and target_guid > 0, do: :preserve
 
   defp default_selection(%Mob{} = mob), do: if(Mob.critter?(mob), do: :preserve, else: [])
@@ -319,8 +326,12 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
     |> Blackboard.reset_spread()
     |> Blackboard.reset_spells()
     |> Blackboard.clear_flee()
+    |> Blackboard.return_pet(nil)
     |> then(&%{&1 | critter: nil, distancing: nil})
   end
+
+  defp clear_pet_attack(%Pet{} = pet), do: %{pet | attack_command?: false}
+  defp clear_pet_attack(pet), do: pet
 
   defp leave_effects(source_guid, target, clear_tap?) do
     target_effects =

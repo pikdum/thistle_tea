@@ -84,7 +84,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.TargetingTest do
       commanded = %{
         pet
         | unit: %{pet.unit | target: target},
-          internal: %{pet.internal | pet: %{pet.internal.pet | command_state: :attack, reaction_state: :passive}}
+          internal: %{pet.internal | pet: %{pet.internal.pet | attack_command?: true, reaction_state: :passive}}
       }
 
       assert Targeting.autocast_allowed?(commanded, spell, target, context)

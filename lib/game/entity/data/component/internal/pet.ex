@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Pet do
     broken?: false,
     possessed?: false,
     action_bar: %{},
+    attack_command?: false,
     command_state: :follow,
     reaction_state: :defensive,
     autocast: MapSet.new()

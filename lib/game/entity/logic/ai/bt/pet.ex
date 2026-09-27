@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Acquisition
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Confusion
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
@@ -19,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
+  alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -40,12 +42,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
       BT.sequence([BT.condition(&dead?/2), BT.action(&idle/2)]),
       BT.action(&Confusion.tick/3),
       BT.action(&FearBT.tick/3),
+      BT.action(&return_to_command/3),
       CombatBT.extra_attacks_step(),
       SpellBT.casting_sequence(),
       BT.sequence([
         BT.condition(&in_combat?/2),
         BT.selector([
-          BT.sequence([BT.condition(&target_invalid?/3), BT.action(&clear_combat/2)]),
+          BT.sequence([BT.condition(&target_invalid?/3), BT.action(&clear_combat/3)]),
           MobSpells.step(),
           BT.sequence([
             BT.condition(&CombatBT.in_combat_range?/3),
@@ -67,32 +70,36 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
     MobSpells.try_cast(state, blackboard, context, self_only?: true)
   end
 
-  def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :stay, _target_guid) do
+  def command(state, command, target_guid, now \\ Time.now())
+
+  def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :stay, _target_guid, now) do
+    state = Movement.sync_position(state, now)
     position = xyz(state.movement_block.position)
-    pet = %{pet | command_state: :stay, stay_position: position}
+    pet = %{pet | command_state: :stay, stay_position: position, attack_command?: false}
 
     state
-    |> clear_combat_state()
+    |> halt(now)
     |> then(fn state -> %{state | internal: %{state.internal | pet: pet}} end)
-    |> Movement.stop(Time.now())
+    |> returning(nil)
   end
 
-  def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :follow, _target_guid) do
-    state = clear_combat_state(state)
-    %{state | internal: %{state.internal | pet: %{pet | command_state: :follow, stay_position: nil}}}
+  def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :follow, _target_guid, now) do
+    state = clear_combat_state(state, now)
+    pet = %{pet | command_state: :follow, stay_position: nil, attack_command?: false}
+    %{state | internal: %{state.internal | pet: pet}} |> returning(:command)
   end
 
-  def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :attack, target_guid)
+  def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :attack, target_guid, now)
       when is_integer(target_guid) and target_guid > 0 do
-    state = %{state | internal: %{state.internal | pet: %{pet | command_state: :attack}}}
+    state = %{state | internal: %{state.internal | pet: %{pet | attack_command?: true}}} |> returning(nil)
 
     %Engagement.Result{entity: state} =
-      Engagement.enter(state, target_guid, Time.now(), allow_passive?: true, selection: :target)
+      Engagement.enter(state, target_guid, now, allow_passive?: true, selection: :target)
 
     state
   end
 
-  def command(%Mob{} = state, _command, _target_guid), do: state
+  def command(%Mob{} = state, _command, _target_guid, _now), do: state
 
   def reaction(%Mob{internal: %Internal{pet: %Pet{} = pet} = internal} = state, reaction)
       when reaction in [:passive, :defensive, :aggressive] do
@@ -121,18 +128,26 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
     not Navigation.target_alive_same_map?(state, target, context)
   end
 
-  defp clear_combat(state, blackboard), do: {:success, clear_combat_state(state), blackboard}
+  defp clear_combat(state, blackboard, %Context{now: now}) do
+    state = %{state | internal: %{state.internal | blackboard: blackboard}} |> clear_combat_state(now)
+    {:success, state, state.internal.blackboard}
+  end
 
-  def clear_combat_state(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state) do
-    pet = if pet.command_state == :attack, do: %{pet | command_state: :follow}, else: pet
+  def clear_combat_state(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, now \\ Time.now()) do
+    pet = %{pet | attack_command?: false}
     %Engagement.Result{entity: state} = Engagement.leave(state, :pet_command)
+
     %{state | internal: %{state.internal | pet: pet}}
+    |> halt(now)
+    |> returning(:combat)
   end
 
   defp should_follow?(%Mob{internal: %Internal{pet: %Pet{command_state: :follow}}}, _blackboard), do: true
   defp should_follow?(_state, _blackboard), do: false
 
-  defp aggressive?(%Mob{internal: %Internal{pet: %Pet{reaction_state: :aggressive}}}, _blackboard), do: true
+  defp aggressive?(%Mob{internal: %Internal{pet: %Pet{reaction_state: :aggressive}}}, blackboard),
+    do: not Blackboard.pet_returning?(blackboard)
+
   defp aggressive?(_state, _blackboard), do: false
 
   defp acquire_aggressive_target(state, blackboard, %Context{now: now} = context) do
@@ -144,6 +159,62 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
       _ ->
         {:failure, state, blackboard}
     end
+  end
+
+  defp return_to_command(
+         %Mob{internal: %{pet: %Pet{command_state: :stay, stay_position: destination}}} = state,
+         %Blackboard{pet: %{returning: reason}} = blackboard,
+         %Context{now: now} = context
+       )
+       when reason != nil and is_tuple(destination) do
+    state = Movement.sync_position(state, now)
+
+    if NavigationIntent.reached?(xyz(state.movement_block.position), destination) do
+      finish_return(Movement.stop(state, now), blackboard)
+    else
+      state =
+        if Movement.moving?(state, now) or NavigationIntent.pending?(state),
+          do: state,
+          else: state |> run() |> Navigation.move_to(destination, [], context)
+
+      {{:running, @follow_tick_ms}, state, blackboard}
+    end
+  end
+
+  defp return_to_command(
+         %Mob{internal: %{pet: %Pet{owner_guid: owner, command_state: :follow}}} = state,
+         %Blackboard{pet: %{returning: reason}} = blackboard,
+         %Context{now: now, perception: perception} = context
+       )
+       when reason != nil do
+    state = Movement.sync_position(state, now)
+
+    case Perception.position(perception, owner) do
+      {_world, x, y, z} ->
+        if distance_to(state, {x, y, z}) <= stationary_slack(state, owner, perception),
+          do: finish_return(state, blackboard),
+          else: follow_owner(state, blackboard, context)
+
+      _ ->
+        follow_owner(state, blackboard, context)
+    end
+  end
+
+  defp return_to_command(state, %Blackboard{pet: %{returning: reason}} = blackboard, _context) when reason != nil,
+    do: finish_return(state, blackboard)
+
+  defp return_to_command(state, blackboard, _context), do: {:failure, state, blackboard}
+
+  defp finish_return(state, blackboard), do: {:success, state, Blackboard.return_pet(blackboard, nil)}
+
+  defp returning(%Mob{} = state, reason) do
+    blackboard = state.internal.blackboard |> Blackboard.ensure() |> Blackboard.return_pet(reason)
+    %{state | internal: %{state.internal | blackboard: blackboard}}
+  end
+
+  defp halt(%Mob{} = state, now) do
+    state = Movement.stop(state, now)
+    %{state | internal: %{state.internal | navigation_intents: []}}
   end
 
   def follow_owner(
@@ -172,6 +243,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
     else
       _ -> {:success, Effects.enqueue(state, Effects.despawn_self(0, 0)), blackboard}
     end
+  end
+
+  defp chase_target(
+         %Mob{internal: %{pet: %Pet{command_state: :stay, attack_command?: false}}} = state,
+         blackboard,
+         %Context{now: now}
+       ) do
+    {{:running, @idle_delay_ms}, Movement.stop(state, now), blackboard}
   end
 
   defp chase_target(
