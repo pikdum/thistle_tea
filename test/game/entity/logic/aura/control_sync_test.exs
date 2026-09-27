@@ -178,6 +178,28 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
       assert Enum.any?(events, &is_struct(&1, Effects.MovementStopped))
       assert Enum.any?(events, &is_struct(&1, Effects.ControlGranted))
     end
+
+    test "charm release removes pet combat flags while preserving ordinary combat" do
+      mob = %Mob{
+        object: %Object{guid: 20},
+        unit: %Unit{auras: [holder(:mod_charm)], faction_template: 14},
+        internal: %Internal{}
+      }
+
+      {charmed, _events} = ControlSync.sync(mob)
+
+      for combat? <- [true, false] do
+        charmed = %{
+          charmed
+          | unit: %{charmed.unit | flags: 0x00080808, auras: []},
+            internal: %{charmed.internal | in_combat: combat?}
+        }
+
+        {released, _events} = ControlSync.sync(charmed)
+        assert (released.unit.flags &&& 0x00000808) == 0
+        assert (released.unit.flags &&& 0x00080000) != 0 == combat?
+      end
+    end
   end
 
   describe "summoned possession lifecycle" do

@@ -82,7 +82,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.ReturnTest do
       assert {:success, returning} = BT.tick(PetBT.tree(), pet, context)
       assert returning.internal.blackboard.pet.returning == :combat
       refute returning.internal.pet.attack_command?
-      refute returning.internal.in_combat
+      assert returning.internal.in_combat
       assert returning.internal.blackboard.combat.attack_started == false
 
       assert {{:running, _}, returning} = BT.tick(PetBT.tree(), returning, context)
@@ -144,7 +144,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.ReturnTest do
       recalled = PetBT.command(pet, :follow, 0, 1_000)
       damaged = Core.take_damage(recalled, 10, 1_001, source: target)
       assert damaged.unit.health == 90
-      refute damaged.internal.in_combat
+      assert damaged.internal.in_combat
       assert damaged.unit.target == 0
       assert damaged.internal.blackboard.pet.returning == :command
 

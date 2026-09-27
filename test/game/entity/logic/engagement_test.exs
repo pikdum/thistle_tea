@@ -166,7 +166,7 @@ defmodule ThistleTea.Game.Entity.Logic.EngagementTest do
       pet = %{pet | internal: %{pet.internal | pet: %Pet{reaction_state: :defensive}}}
       damaged = Engagement.on_damage(pet, 20, 1_000)
       assert damaged.unit.target == pet.unit.target
-      assert damaged.internal.in_combat == pet.internal.in_combat
+      assert damaged.internal.in_combat
       assert [%Effects.PetAttacked{attacker_guid: 20}] = damaged.internal.events
     end
 

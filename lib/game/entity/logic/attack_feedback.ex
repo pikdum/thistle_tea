@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
@@ -25,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
 
   def receive(entity, payload, spell \\ nil, now) do
     entity
+    |> mark_contact(payload, now)
     |> apply_power_feedback(payload, spell)
     |> apply_finisher_feedback(payload, spell, now)
     |> trigger_blade_flurry(payload, spell)
@@ -32,6 +34,11 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
     |> trigger_melee_procs(payload, spell, now)
     |> mark_reactives(payload, now)
   end
+
+  defp mark_contact(entity, %{victim_guid: victim, outcome: outcome}, now) when outcome != :evade,
+    do: Engagement.contact(entity, victim, now)
+
+  defp mark_contact(entity, _payload, _now), do: entity
 
   defp apply_power_feedback(entity, %{outcome: outcome, power_cost: %PowerCost{} = cost}, %Spell{} = spell) do
     if Spell.attribute?(spell, :discount_power_on_miss) and refundable_outcome?(cost.power_type, outcome) do

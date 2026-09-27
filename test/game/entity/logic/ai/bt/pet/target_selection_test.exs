@@ -171,7 +171,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.TargetSelectionTest do
       context = Enum.reduce(targets, context, &update_actor(&2, &1, breakable_crowd_control?: true))
       assert {:success, returning} = BT.tick(PetBT.tree(), pet, context)
       assert returning.unit.target == 0
-      refute returning.internal.in_combat
+      assert returning.internal.in_combat
       refute returning.internal.pet.attack_command?
       assert returning.internal.blackboard.pet.returning == :combat
       assert returning.internal.threat == %{}

@@ -469,7 +469,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
     state =
       if SpellReception.starts_combat?(prepared) and not Core.dead?(state) do
-        engage_combat(state, caster_guid)
+        receive_combat_contact(state, caster_guid, now)
       else
         state
       end
@@ -505,7 +505,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
     state =
       if effect.decision.combat? and not Core.dead?(state),
-        do: engage_combat(state, effect.other_guid),
+        do: receive_combat_contact(state, effect.other_guid, Time.now()),
         else: state
 
     state =
@@ -712,7 +712,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:receive_attack, %{caster: caster} = attack}, state) do
-    state = engage_combat(state, caster)
+    state = receive_combat_contact(state, caster, Time.now())
 
     {state, events} =
       Combat.receive_attack(state, attack, Time.now(), damage_sharing_targets: DamageSharing.targets(state))
@@ -741,6 +741,27 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
     {:noreply, state, {:continue, :maybe_broadcast}}
   end
+
+  def handle_cast({:threat_ref_gained, guid, incarnation}, %Mob{internal: %{pet: %Pet{}}} = state) do
+    state = Engagement.gain_threat_ref(state, guid, incarnation)
+    {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet combat reference failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:threat_ref_lost, guid, incarnation}, %Mob{internal: %{pet: %Pet{}}} = state) do
+    state = Engagement.lose_threat_ref(state, guid, incarnation)
+    {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet combat reference release failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({reference, _guid, _incarnation}, %Mob{} = state)
+      when reference in [:threat_ref_gained, :threat_ref_lost], do: {:noreply, state}
 
   def handle_cast({:kill_outcome, %KillFeedback.Victim{} = victim}, %Mob{} = state) do
     now = Time.now()
@@ -1991,6 +2012,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp engage_combat(%Mob{} = state, _caster, _opts), do: state
+
+  defp receive_combat_contact(state, caster, now) do
+    state |> Engagement.contact(caster, now) |> engage_combat(caster)
+  end
 
   defp enter_combat(%Mob{} = state, caster, opts, now) do
     %Engagement.Result{entity: state, from: from, to: to} = Engagement.enter(state, caster, now, opts)

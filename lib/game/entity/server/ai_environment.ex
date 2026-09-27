@@ -272,6 +272,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
 
     [owner_guid, target, owner[:combat_victim_guid], owner[:victim_guid] | threat_guids(threat)]
     |> Enum.concat(owner[:combat_targets] || [])
+    |> Enum.concat(Enum.map(entity.internal.threat_refs || [], &elem(&1, 0)))
     |> Enum.concat(player_attackers(entity, owner_guid))
     |> Enum.filter(&(is_integer(&1) and &1 > 0))
   end

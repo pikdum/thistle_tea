@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetTargetingTest do
     test "core damage reaches the explicit owner context and respects the latest command", %{pet: pet, target: target} do
       damaged = Core.take_damage(pet, 10, 1_000, source: target)
       assert damaged.unit.health == 90
-      refute damaged.internal.in_combat
+      assert damaged.internal.in_combat
       effect = Enum.find(damaged.internal.events, &is_struct(&1, Effects.PetAttacked))
       test_pid = self()
       receiver = spawn(fn -> receive do: (message -> send(test_pid, {:delivered, message})) end)
@@ -90,7 +90,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetTargetingTest do
       attack = attack(target)
       assert {:noreply, damaged, {:continue, :maybe_broadcast}} = MobServer.handle_cast({:receive_attack, attack}, pet)
       assert damaged.unit.health == 90
-      refute damaged.internal.in_combat
+      assert damaged.internal.in_combat
       assert damaged.unit.target in [nil, 0]
       Process.cancel_timer(damaged.internal.ai_tick_ref)
     end
@@ -104,6 +104,21 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetTargetingTest do
       assert defended.internal.in_combat
       assert defended.unit.target == target
       Process.cancel_timer(defended.internal.ai_tick_ref)
+    end
+
+    test "zero-damage contact keeps a waiting or passive pet in combat", %{pet: pet, target: target} do
+      for reaction <- [:passive, :defensive] do
+        waiting = pet |> PetBT.command(:stay, 0, 1_000) |> PetBT.reaction(reaction)
+        attack = %{attack(target) | damage: 0}
+
+        assert {:noreply, contacted, {:continue, :maybe_broadcast}} =
+                 MobServer.handle_cast({:receive_attack, attack}, waiting)
+
+        assert contacted.unit.health == 100
+        assert contacted.internal.in_combat
+        assert contacted.unit.target in [nil, 0]
+        Process.cancel_timer(contacted.internal.ai_tick_ref)
+      end
     end
 
     test "damage from another attacker keeps the current living victim", %{pet: pet, target: target, other: other} do

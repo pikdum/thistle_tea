@@ -220,7 +220,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   end
 
   def emit(%{object: %{guid: mob_guid}} = entity, %Effects.ThreatRefGained{target_guid: target_guid}, _context) do
-    if Guid.entity_type(target_guid) == :player do
+    if Guid.entity_type(target_guid) in [:player, :pet, :mob] do
       Entity.threat_ref_gained(target_guid, mob_guid, Incarnation.id(entity))
     end
 
@@ -228,7 +228,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   end
 
   def emit(%{object: %{guid: mob_guid}} = entity, %Effects.ThreatRefLost{target_guid: target_guid}, _context) do
-    if Guid.entity_type(target_guid) == :player do
+    if Guid.entity_type(target_guid) in [:player, :pet, :mob] do
       Entity.threat_ref_lost(target_guid, mob_guid, Incarnation.id(entity))
     end
 

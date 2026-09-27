@@ -816,21 +816,21 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       assert result.internal.pet.attack_command?
     end
 
-    test "follow clears combat and returns ownership to follow mode" do
+    test "follow stops attacking while retaining recent combat contact" do
       pet = PetBT.command(pet(), :attack, 99)
       result = PetBT.command(pet, :follow, 0)
 
       assert result.unit.target == 0
-      refute result.internal.in_combat
+      assert result.internal.in_combat
       assert result.internal.pet.command_state == :follow
     end
 
-    test "passive immediately stops combat" do
+    test "passive immediately stops attacking while retaining recent combat contact" do
       pet = PetBT.command(pet(), :attack, 99)
       result = PetBT.reaction(pet, :passive)
 
       assert result.unit.target == 0
-      refute result.internal.in_combat
+      assert result.internal.in_combat
       assert result.internal.pet.reaction_state == :passive
     end
   end

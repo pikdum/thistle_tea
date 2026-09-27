@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Casting
+  alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
@@ -119,7 +120,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
         internal: %{mob.internal | pet: nil}
     }
 
-    {Core.mark_broadcast_update(mob), [Effects.control_released(pet.owner_guid, mob.object.guid)]}
+    {mob |> Combat.sync_combat_flag() |> Core.mark_broadcast_update(),
+     [Effects.control_released(pet.owner_guid, mob.object.guid)]}
   end
 
   defp sync_possession(

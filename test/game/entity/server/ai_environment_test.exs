@@ -153,6 +153,20 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
       assert Perception.metadata(context.perception, rival).combat_victim_guid == owner
     end
 
+    test "a waiting pet observes incoming threat beyond its acquisition radius" do
+      world = WorldRef.open(999)
+      enemy = Guid.runtime(:mob, 17)
+      pet = mob(world)
+      pet = %{pet | internal: %{pet.internal | pet: %Internal.Pet{}, threat_refs: MapSet.new([{enemy, 7}])}}
+      put_actor(:mobs, enemy, world, 160.0)
+      Metadata.update(enemy, %{alive?: true, incarnation_id: 7, in_combat: true})
+      on_exit(fn -> remove_actor(:mobs, enemy) end)
+
+      context = AIEnvironment.context(pet, 1_000)
+      assert Perception.position(context.perception, enemy) == {world, 160.0, 0.0, 0.0}
+      assert Perception.metadata(context.perception, enemy).incarnation_id == 7
+    end
+
     test "a charmed player observes its controller and every threat candidate" do
       world = WorldRef.open(999)
       caster = Guid.from_low_guid(:mob, 1, 98_190)

@@ -21,12 +21,24 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   alias ThistleTea.Game.Entity.Logic.DamageOrigin
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Engagement.PetCombat
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Guid
 
   @dynamic_flag_tapped 0x0004
+
+  defdelegate contact(entity, source, now), to: PetCombat
+  defdelegate gain_threat_ref(entity, guid, incarnation), to: PetCombat, as: :gain_ref
+  defdelegate lose_threat_ref(entity, guid, incarnation), to: PetCombat, as: :lose_ref
+
+  def maintain(entity, context) do
+    case PetCombat.reconcile(entity, context) do
+      %Mob{internal: %{pet: %Pet{}, in_combat: false}} = entity -> Threat.wipe(entity)
+      entity -> entity
+    end
+  end
 
   defmodule Tap do
     @moduledoc false
@@ -62,13 +74,13 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   def enter(%Mob{} = entity, _target_guid, _now, _opts), do: result(entity, entity, :invalid_target)
 
-  def on_damage(
-        %Mob{object: %{guid: guid}, internal: %Internal{pet: %Pet{}, in_combat: combat?}} = entity,
-        source,
-        _now
-      )
-      when combat? != true and is_integer(source) and source > 0 and source != guid do
-    Effects.enqueue(entity, %Effects.PetAttacked{attacker_guid: source})
+  def on_damage(%Mob{object: %{guid: guid}, internal: %Internal{pet: %Pet{}}} = entity, source, now)
+      when is_integer(source) and source > 0 and source != guid do
+    entity = contact(entity, source, now)
+
+    if is_nil(victim(entity)),
+      do: Effects.enqueue(entity, %Effects.PetAttacked{attacker_guid: source}),
+      else: entity
   end
 
   def on_damage(%Mob{object: %{guid: guid}, internal: %Internal{in_combat: combat?}} = entity, source, now)
@@ -168,7 +180,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
     internal = %{
       entity.internal
-      | in_combat: false,
+      | in_combat: reason == :pet_command and match?(%Pet{}, entity.internal.pet) and entity.internal.in_combat == true,
         running: if(blackboard.critter, do: blackboard.critter.previous_running, else: entity.internal.running),
         loot: clear_tap(entity.internal.loot, clear_tap?),
         damage_origin: if(reason == :death, do: entity.internal.damage_origin, else: %DamageTotals{}),
@@ -177,6 +189,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
     entity =
       %{entity | unit: unit, internal: %{internal | pet: clear_pet_attack(internal.pet)}}
+      |> PetCombat.leave(reason)
       |> Casting.cancel()
       |> Combat.sync_combat_flag()
       |> ControlMovement.sync_flags()
@@ -223,6 +236,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
       entity.internal
       | in_combat: false,
         threat: %{},
+        threat_refs: nil,
         temporary_threat: %{},
         last_hostile_time: nil,
         loot: clear_tap(entity.internal.loot, true),

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AttackSchool
   alias ThistleTea.Game.Entity.Logic.AttackTable
@@ -34,6 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   @default_attack_speed_ms 2000
   @default_damage 2
   @unit_flag_in_combat 0x00080000
+  @unit_flag_pet_in_combat 0x00000800
   @hitinfo_absorb 0x20
   @hitinfo_resist 0x40
 
@@ -67,7 +69,13 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   def offhand_damage_range(_entity), do: nil
 
   def sync_combat_flag(%{unit: %Unit{} = unit, internal: %Internal{in_combat: in_combat}} = entity) do
-    updated = combat_flags(unit.flags || 0, in_combat)
+    mask =
+      if match?(%Pet{}, entity.internal.pet),
+        do: bor(@unit_flag_in_combat, @unit_flag_pet_in_combat),
+        else: @unit_flag_in_combat
+
+    flags = band(unit.flags || 0, bnot(bor(@unit_flag_in_combat, @unit_flag_pet_in_combat)))
+    updated = combat_flags(flags, in_combat, mask)
 
     if updated == unit.flags do
       entity
@@ -79,8 +87,8 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   def sync_combat_flag(entity), do: entity
 
-  defp combat_flags(flags, true), do: bor(flags, @unit_flag_in_combat)
-  defp combat_flags(flags, in_combat) when in_combat in [false, nil], do: band(flags, bnot(@unit_flag_in_combat))
+  defp combat_flags(flags, true, mask), do: bor(flags, mask)
+  defp combat_flags(flags, in_combat, _mask) when in_combat in [false, nil], do: flags
 
   def melee_reach(attacker_reach, target_reach) when is_number(attacker_reach) and is_number(target_reach) do
     max(attacker_reach + target_reach + @base_melee_range_offset, @attack_distance)

@@ -599,16 +599,19 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     end
 
     test "threat ref messages carry the mob incarnation" do
-      player_guid = Guid.from_low_guid(:player, unique_guid())
       mob_guid = Guid.from_low_guid(:mob, 1, unique_guid())
-      Entity.register(player_guid)
-
-      on_exit(fn -> Entity.unregister(player_guid) end)
-
       mob = %Mob{object: %Object{guid: mob_guid}, internal: %Internal{spawn: %Spawn{incarnation_id: 7}}}
 
-      assert ^mob = EventSink.emit(mob, Effects.threat_ref_gained(player_guid))
-      assert_receive {:"$gen_cast", {:threat_ref_gained, ^mob_guid, 7}}
+      targets = [Guid.from_low_guid(:player, unique_guid()), Guid.runtime(:pet, 1), Guid.runtime(:mob, 1)]
+
+      for target_guid <- targets do
+        Entity.register(target_guid)
+        assert ^mob = EventSink.emit(mob, Effects.threat_ref_gained(target_guid))
+        assert_receive {:"$gen_cast", {:threat_ref_gained, ^mob_guid, 7}}
+        assert ^mob = EventSink.emit(mob, Effects.threat_ref_lost(target_guid))
+        assert_receive {:"$gen_cast", {:threat_ref_lost, ^mob_guid, 7}}
+        Entity.unregister(target_guid)
+      end
     end
 
     test "dismiss_pet stops the transitioned pet without mutating the owner" do
