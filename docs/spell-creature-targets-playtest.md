@@ -34,8 +34,9 @@ effect and supplies a `create_item` command in `spell_scripts`.
 
 This milestone covers nearest-creature target 38 for unit casts and triggered
 spells. [Scripted areas and configured cones](spell-scripted-areas-playtest.md)
-subsequently added modes 7, 8, and 60. Scripted location target 46 remains separate
-work; these milestones do not claim all database-scripted content is implemented.
+subsequently added modes 7, 8, and 60, followed by
+[scripted destinations](spell-scripted-locations-playtest.md) for target 46.
+These milestones do not claim all database-scripted content is implemented.
 
 ## Native acceptance
 

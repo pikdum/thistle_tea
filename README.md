@@ -103,6 +103,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Spell range modifiers](docs/spell-range-playtest.md), with unit casts, channel grace, Auto Shot, pet inheritance, and live bonus removal
 - [Database-selected creature targets](docs/spell-creature-targets-playtest.md), with living and corpse selectors, per-effect delivery, and native quest-item acceptance
 - [Scripted spell areas and configured cones](docs/spell-scripted-areas-playtest.md), with source and destination areas, per-effect selectors, narrow and rear arcs, and native Steam Tonk acceptance
+- [Scripted spell destinations](docs/spell-scripted-locations-playtest.md), with nearby creature, corpse, and object locations, triggered delivery, and native summon placement and expiry
 - [Combo point builders](docs/combo-points-playtest.md), with Premeditation expiry, talent-generated points, finisher consumption, and single melee proc delivery
 - [Avoided ability power refunds](docs/ability-refunds-playtest.md), using paid energy and rage costs across charged discounts, immunity, and queued melee attacks
 - [Ownerless summoned objects](docs/wild-object-playtest.md), with shared loot, caster-independent lifetimes, linked objects, and environmental trap activation

@@ -29,8 +29,9 @@ use the same pure geometry: a 60-degree default, configured forward angles, and
 negative angles for rear arcs. This supports Cannon's 7-degree cone, Shoot
 Rocket's 90-degree cone, and negative rear cones without gameplay database calls.
 
-This milestone covers unit casts and triggered spells. Scripted location target
-46 and game-object spell entry points remain separate work.
+This milestone covers unit casts and triggered spells.
+[Scripted destinations](spell-scripted-locations-playtest.md) subsequently added
+target 46. Game-object spell entry points remain separate work.
 
 ## Native acceptance
 
