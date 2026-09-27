@@ -42,6 +42,42 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     Aura.apply_spell(entity, caster_guid, caster_level, spell, 1_000)
   end
 
+  describe "breakable_crowd_control?/1" do
+    test "requires both a protected control type and damage cancellation" do
+      for type <- [:mod_confuse, :mod_stun, :transform] do
+        holder = %Holder{spell: %Spell{aura_interrupt_flags: 2}, auras: [%AuraData{type: type}]}
+        entity = fixture_entity()
+        assert Aura.breakable_crowd_control?(%{entity | unit: %{entity.unit | auras: [holder]}})
+        holder = %{holder | spell: %{holder.spell | aura_interrupt_flags: 0}}
+        refute Aura.breakable_crowd_control?(%{entity | unit: %{entity.unit | auras: [holder]}})
+      end
+
+      for type <- [:mod_fear, :mod_root, :mod_stealth, :mod_stat] do
+        holder = %Holder{spell: %Spell{aura_interrupt_flags: 2}, auras: [%AuraData{type: type}]}
+        entity = fixture_entity()
+        refute Aura.breakable_crowd_control?(%{entity | unit: %{entity.unit | auras: [holder]}})
+      end
+    end
+
+    test "tracks application, explicit removal, expiry, and death through aura transitions" do
+      spell = %Spell{
+        id: 123,
+        duration_ms: 1_000,
+        aura_interrupt_flags: 2,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_stun, base_points: 0}]
+      }
+
+      {controlled, _} = apply_spell(fixture_entity(), 2, 10, spell)
+      assert Aura.breakable_crowd_control?(controlled)
+      {removed, _} = Aura.remove_spells(controlled, [spell.id], 1_100)
+      refute Aura.breakable_crowd_control?(removed)
+      {expired, _} = Aura.expire_due(controlled, 2_000)
+      refute Aura.breakable_crowd_control?(expired)
+      dead = Core.take_damage(controlled, 100, 1_100)
+      refute Aura.breakable_crowd_control?(dead)
+    end
+  end
+
   defp frost_armor_fixture do
     %Spell{
       id: 168,

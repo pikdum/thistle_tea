@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.Autocast do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Pet.Targeting
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.SpellTarget
@@ -75,6 +76,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.Autocast do
     MapSet.member?(enabled, spell.id) and
       not Spell.attribute?(spell, :passive) and not Spell.attribute?(spell, :no_autocast_ai) and
       preserves_attack?(pet, spell) and combat_useful?(pet, spell) and
+      Targeting.autocast_allowed?(pet, spell, target_guid, context) and
       shield_useful?(spell, target) and heal_useful?(spell, target) and
       auras_useful?(pet, spell, target, context)
   end

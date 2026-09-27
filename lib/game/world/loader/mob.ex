@@ -114,6 +114,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         aura_stacks: Aura.spell_stacks(mob),
         aura_effects: Aura.effect_keys(mob),
         crowd_controlled?: Aura.crowd_controlled?(mob),
+        breakable_crowd_control?: Aura.breakable_crowd_control?(mob),
         dispel_options: Aura.dispel_options(mob),
         friendly_mechanic_immunities: Aura.friendly_mechanics(mob)
       }

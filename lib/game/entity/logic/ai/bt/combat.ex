@@ -69,11 +69,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def target_valid_same_map?(_state, _blackboard, %Context{}), do: false
 
-  def in_combat_range?(
-        %{movement_block: %{position: {x, y, z, _orientation}}, unit: %Unit{target: target}} = state,
-        _blackboard,
-        %Context{perception: perception}
-      ) do
+  def in_combat_range?(%{unit: %Unit{target: target}} = state, _blackboard, %Context{} = context),
+    do: in_melee_range?(state, target, context)
+
+  def in_combat_range?(_state, _blackboard, %Context{}), do: false
+
+  def in_melee_range?(%{movement_block: %{position: {x, y, z, _orientation}}} = state, target, %Context{
+        perception: perception
+      }) do
     case Perception.position(perception, target) do
       {_world, tx, ty, tz} ->
         distance = :math.sqrt(:math.pow(tx - x, 2) + :math.pow(ty - y, 2) + :math.pow(tz - z, 2))
@@ -84,7 +87,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     end
   end
 
-  def in_combat_range?(_state, _blackboard, %Context{}), do: false
+  def in_melee_range?(_state, _target, %Context{}), do: false
 
   def melee_attack_with_context(%{internal: %Internal{casting: %Cast{}}} = state, blackboard, %Context{}),
     do: {:success, state, blackboard}

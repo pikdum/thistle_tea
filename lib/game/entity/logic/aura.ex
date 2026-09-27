@@ -211,6 +211,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def crowd_controlled?(_entity), do: false
 
+  def breakable_crowd_control?(%{unit: %Unit{auras: holders}}) when is_list(holders) do
+    Enum.any?(holders, fn %Holder{spell: spell} = holder ->
+      Spell.breaks_on_damage?(spell) and Holder.has_any_type?(holder, [:mod_confuse, :mod_stun, :transform])
+    end)
+  end
+
+  def breakable_crowd_control?(_entity), do: false
+
   def source_spells(%{unit: %Unit{auras: holders}}) when is_list(holders) do
     MapSet.new(holders, fn %Holder{spell: %Spell{} = spell, caster_guid: caster_guid} ->
       {spell.id, spell.spell_family, spell.family_flags_0, spell.family_flags_1, caster_guid}

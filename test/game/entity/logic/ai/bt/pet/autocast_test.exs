@@ -20,6 +20,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.AutocastTest do
   setup [:pet]
 
   describe "allowed?/4" do
+    test "harmful autocasts respect breakable control until explicitly commanded", %{pet: pet} do
+      spell = %Spell{id: 1, attributes: MapSet.new([:negative]), effects: [%Effect{type: :school_damage}]}
+      pet = %{pet | unit: %{pet.unit | target: 2}}
+      context = context(5.0, %{breakable_crowd_control?: true})
+      refute allowed?(pet, spell, 2, context)
+      commanded = %{pet | internal: %{pet.internal | pet: %{pet.internal.pet | command_state: :attack}}}
+      assert allowed?(commanded, spell, 2, context)
+    end
+
     test "requires enabled autocast and leaves ordinary creatures alone", %{pet: pet} do
       spell = buff()
       assert allowed?(pet, spell)

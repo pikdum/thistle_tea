@@ -172,6 +172,7 @@ defmodule ThistleTea.Game.Player.Login do
         aura_stacks: AuraLogic.spell_stacks(c),
         aura_effects: AuraLogic.effect_keys(c),
         crowd_controlled?: AuraLogic.crowd_controlled?(c),
+        breakable_crowd_control?: AuraLogic.breakable_crowd_control?(c),
         mechanic_resistance: AuraLogic.misc_amounts(c, :mechanic_resistance),
         school_resistances: SpellResist.school_resistances(c),
         spell_threat: SpellThreat.projection(c),

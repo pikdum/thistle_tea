@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Passive, as: PassiveBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Pet.Targeting, as: PetTargeting
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Totem, as: TotemBT
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
@@ -1415,8 +1416,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_info({:owner_attacked, attacker_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state)
       when is_integer(attacker_guid) do
-    state = state |> engage_combat(attacker_guid) |> wake_ai_tick()
+    context = AIEnvironment.context(state, Time.now(), ObservationRequest.actor(attacker_guid))
+
+    state =
+      if PetTargeting.owner_defense?(state, attacker_guid, context),
+        do: state |> engage_combat(attacker_guid) |> wake_ai_tick(),
+        else: state
+
     {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet owner defense failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_info({:pet_cast, controller, spell_id, targets}, %Mob{} = state) when is_integer(spell_id) do
@@ -1599,6 +1610,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           aura_stacks: Aura.spell_stacks(state),
           aura_effects: Aura.effect_keys(state),
           crowd_controlled?: Aura.crowd_controlled?(state),
+          breakable_crowd_control?: Aura.breakable_crowd_control?(state),
           dispel_options: Aura.dispel_options(state),
           friendly_mechanic_immunities: Aura.friendly_mechanics(state),
           spell_threat: SpellThreat.projection(state)

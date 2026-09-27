@@ -1942,6 +1942,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         aura_stacks: Aura.spell_stacks(character),
         aura_effects: Aura.effect_keys(character),
         crowd_controlled?: Aura.crowd_controlled?(character),
+        breakable_crowd_control?: Aura.breakable_crowd_control?(character),
         dispel_options: Aura.dispel_options(character),
         friendly_mechanic_immunities: Aura.friendly_mechanics(character),
         spell_threat: SpellThreat.projection(character),
