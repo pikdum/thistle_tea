@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:ForwardScriptSteps, [:target_guid, :steps, :source_guid], [reply: nil]},
     {:StartGroupScript, [:steps, :target_guid], []},
     {:SendTaxiPath, [:target_guid, :path_id], [spell_id: nil]},
+    {:MeetingStoneQueue, [:player_guid, :area, :world], []},
     {:PlaySound, [:sound_id], []},
     {:PlayObjectSound, [:sound_id], []},
     {:FactionAtWarChanged, [:index, :enabled], []},

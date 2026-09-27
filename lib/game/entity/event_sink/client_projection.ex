@@ -312,6 +312,20 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
 
   def emit(entity, %Effects.QuestCastCredit{}, _context), do: entity
 
+  def emit(%{object: %{guid: guid}} = entity, %Effects.MeetingStoneQueue{player_guid: guid} = effect, context) do
+    Context.send(context, {:meeting_stone_queue, effect.area, effect.world})
+    entity
+  end
+
+  def emit(entity, %Effects.MeetingStoneQueue{} = effect, _context) do
+    case Entity.pid(effect.player_guid) do
+      pid when is_pid(pid) -> send(pid, {:meeting_stone_queue, effect.area, effect.world})
+      _ -> :ok
+    end
+
+    entity
+  end
+
   def emit(entity, %Effects.QuestEventCredit{} = effect, _context) do
     case Entity.pid(effect.player_guid) do
       pid when is_pid(pid) ->

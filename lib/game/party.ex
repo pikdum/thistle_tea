@@ -47,6 +47,15 @@ defmodule ThistleTea.Game.Party do
 
   def invited?(%__MODULE__{} = party, guid), do: Map.has_key?(party.invites, guid)
 
+  def matchmake(%__MODULE__{} = party, leader, %Member{} = member, expected_group) do
+    with %Group{id: ^expected_group, leader: ^leader, raid?: false} = group <- group_of(party, leader),
+         false <- in_group?(party, member.guid) or invited?(party, member.guid) do
+      join_group(party, group, nil, member)
+    else
+      _ -> {:error, :unavailable}
+    end
+  end
+
   def member(%Group{members: members}, guid), do: Enum.find(members, &(&1.guid == guid))
 
   def member_by_name(%Group{members: members}, name), do: Enum.find(members, &(&1.name == name))

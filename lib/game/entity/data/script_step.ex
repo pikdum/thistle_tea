@@ -231,6 +231,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(33), do: :enter_evade
   defp command(34), do: :set_home_position
   defp command(35), do: :turn_to
+  defp command(36), do: :meeting_stone
   defp command(39), do: :start_script
   defp command(41), do: :remove_object
   defp command(42), do: :set_melee_attack

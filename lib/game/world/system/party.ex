@@ -6,10 +6,22 @@ defmodule ThistleTea.Game.World.System.Party do
   """
   use GenServer
 
+  alias ThistleTea.Game.MeetingStone
   alias ThistleTea.Game.Party
+  alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World.MeetingStones
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
+  require Logger
+
   @table_options [:named_table, :public, read_concurrency: true]
+
+  defmodule State do
+    @moduledoc false
+    defstruct party: %Party{}, queue: %MeetingStone{}
+  end
+
+  def meeting_stone(action, guid, area \\ nil), do: GenServer.call(__MODULE__, {:meeting_stone, action, guid, area})
 
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, nil, Keyword.put_new(opts, :name, __MODULE__))
@@ -72,18 +84,72 @@ defmodule ThistleTea.Game.World.System.Party do
   @impl GenServer
   def init(nil) do
     :ets.new(__MODULE__, @table_options)
-    {:ok, %Party{}}
+    Process.send_after(self(), :meeting_stone_tick, 1_000)
+    {:ok, %State{}}
   end
 
   @impl GenServer
-  def handle_call({:invite, inviter_guid, inviter_name, invitee_guid}, _from, party) do
+  def handle_call({:meeting_stone, action, guid, area}, _from, %State{} = state) do
+    {queue, events} = MeetingStones.request(state.queue, state.party, action, guid, area, Time.now())
+    Enum.each(events, &deliver_queue_event/1)
+    {:reply, :ok, refresh_queue(%{state | queue: queue})}
+  rescue
+    error ->
+      Logger.error("Meeting Stone request failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:reply, {:error, :unavailable}, state}
+  end
+
+  def handle_call(request, from, %State{} = state) do
+    {:reply, reply, party} = handle_party_call(request, from, state.party)
+    {queue, events} = MeetingStone.party_changed(state.queue, state.party, party, request, Time.now())
+    Enum.each(events, &deliver_queue_event/1)
+    {:reply, reply, synchronize_queue(%{state | party: party, queue: queue})}
+  rescue
+    error ->
+      Logger.error("Party request failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:reply, {:error, :unavailable}, state}
+  end
+
+  @impl GenServer
+  def handle_info(:meeting_stone_tick, %State{} = state) do
+    Process.send_after(self(), :meeting_stone_tick, 1_000)
+    {:noreply, refresh_queue(state)}
+  rescue
+    error ->
+      Logger.error("Meeting Stone matching failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  defp synchronize_queue(%State{} = state) do
+    {queue, events} = MeetingStone.synchronize(state.queue, state.party, Time.now())
+    Enum.each(events, &deliver_queue_event/1)
+    %{state | queue: queue}
+  end
+
+  defp refresh_queue(%State{queue: %MeetingStone{solos: solos, groups: groups}} = state)
+       when map_size(solos) == 0 and map_size(groups) == 0, do: state
+
+  defp refresh_queue(%State{} = state) do
+    {queue, party, events} = MeetingStones.refresh(state.queue, state.party, Time.now())
+    Enum.each(events, &deliver_queue_event/1)
+    %{state | queue: queue, party: party}
+  end
+
+  defp deliver_queue_event({:group, group}) do
+    index_group(group)
+    Party.Notifier.send_group_list(group)
+  end
+
+  defp deliver_queue_event(event), do: MeetingStones.deliver(event)
+
+  defp handle_party_call({:invite, inviter_guid, inviter_name, invitee_guid}, _from, party) do
     case Party.invite(party, inviter_guid, inviter_name, invitee_guid) do
       {:ok, party} -> {:reply, :ok, party}
       {:error, reason} -> {:reply, {:error, reason}, party}
     end
   end
 
-  def handle_call({:accept, guid, name}, _from, party) do
+  defp handle_party_call({:accept, guid, name}, _from, party) do
     case Party.accept(party, guid, name) do
       {:ok, group, party} ->
         index_group(group)
@@ -94,14 +160,14 @@ defmodule ThistleTea.Game.World.System.Party do
     end
   end
 
-  def handle_call({:decline, guid}, _from, party) do
+  defp handle_party_call({:decline, guid}, _from, party) do
     case Party.decline(party, guid) do
       {:ok, inviter, party} -> {:reply, {:ok, inviter}, party}
       {:error, reason} -> {:reply, {:error, reason}, party}
     end
   end
 
-  def handle_call({:leave, guid}, _from, party) do
+  defp handle_party_call({:leave, guid}, _from, party) do
     case Party.leave(party, guid) do
       {:ok, outcome, party} ->
         index_removal(outcome, guid)
@@ -112,7 +178,7 @@ defmodule ThistleTea.Game.World.System.Party do
     end
   end
 
-  def handle_call({:uninvite, remover_guid, target_guid}, _from, party) do
+  defp handle_party_call({:uninvite, remover_guid, target_guid}, _from, party) do
     case Party.uninvite(party, remover_guid, target_guid) do
       {:ok, :invite_cancelled, party} ->
         {:reply, {:ok, :invite_cancelled}, party}
@@ -126,7 +192,7 @@ defmodule ThistleTea.Game.World.System.Party do
     end
   end
 
-  def handle_call({:set_leader, requester_guid, new_leader_guid}, _from, party) do
+  defp handle_party_call({:set_leader, requester_guid, new_leader_guid}, _from, party) do
     case Party.set_leader(party, requester_guid, new_leader_guid) do
       {:ok, group, party} ->
         index_group(group)
@@ -137,7 +203,7 @@ defmodule ThistleTea.Game.World.System.Party do
     end
   end
 
-  def handle_call({:update_looter, group_id, eligible_guids}, _from, party) do
+  defp handle_party_call({:update_looter, group_id, eligible_guids}, _from, party) do
     {looter, party} = Party.update_looter(party, group_id, eligible_guids)
 
     case Map.get(party.groups, group_id) do
@@ -148,7 +214,7 @@ defmodule ThistleTea.Game.World.System.Party do
     {:reply, looter, party}
   end
 
-  def handle_call({:set_loot, requester_guid, method, master_looter, threshold}, _from, party) do
+  defp handle_party_call({:set_loot, requester_guid, method, master_looter, threshold}, _from, party) do
     case Party.set_loot(party, requester_guid, method, master_looter, threshold) do
       {:ok, group, party} ->
         index_group(group)
@@ -159,8 +225,8 @@ defmodule ThistleTea.Game.World.System.Party do
     end
   end
 
-  def handle_call({:raid_action, action, arguments}, _from, party)
-      when action in [:convert_raid, :set_assistant, :change_subgroup, :swap_subgroups] do
+  defp handle_party_call({:raid_action, action, arguments}, _from, party)
+       when action in [:convert_raid, :set_assistant, :change_subgroup, :swap_subgroups] do
     case apply(Party, action, [party | arguments]) do
       {:ok, group, party} ->
         index_group(group)
@@ -171,7 +237,7 @@ defmodule ThistleTea.Game.World.System.Party do
     end
   end
 
-  def handle_call({:set_icon, guid, icon, target}, _from, party) do
+  defp handle_party_call({:set_icon, guid, icon, target}, _from, party) do
     case Party.set_icon(party, guid, icon, target) do
       {:ok, group, changes, party} ->
         index_group(group)

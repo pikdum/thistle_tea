@@ -555,6 +555,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   defp execute(
          %{object: %{guid: source_guid}} = state,
          blackboard,
+         %ScriptStep{command: :meeting_stone, datalong: area},
+         target_guid,
+         _now,
+         %Context{}
+       )
+       when is_integer(area) and area > 0 do
+    case script_player_guid(source_guid, target_guid) do
+      nil ->
+        {state, blackboard}
+
+      player_guid ->
+        effect = %Effects.MeetingStoneQueue{player_guid: player_guid, area: area, world: state.internal.world}
+        {Effects.enqueue(state, effect), blackboard}
+    end
+  end
+
+  defp execute(
+         %{object: %{guid: source_guid}} = state,
+         blackboard,
          %ScriptStep{command: :quest_explored, datalong: quest_id} = step,
          target_guid,
          _now,

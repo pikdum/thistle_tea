@@ -62,7 +62,7 @@ defmodule ThistleTea.Game.Player.GameObjects do
       %GameObjectTemplate{type: 22} = template ->
         enabled? and object_in_range?(character, guid, template, metadata) and not Hostility.hostile?(guid, character)
 
-      %GameObjectTemplate{type: type} = template when type in [0, 1, 9, 10] ->
+      %GameObjectTemplate{type: type} = template when type in [0, 1, 9, 10, 23] ->
         enabled? and object_in_range?(character, guid, template, metadata)
 
       _ ->

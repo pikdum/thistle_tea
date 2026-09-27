@@ -124,6 +124,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Login
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.Mail
+  alias ThistleTea.Game.Player.MeetingStones
   alias ThistleTea.Game.Player.Movement
   alias ThistleTea.Game.Player.OutdoorPvp
   alias ThistleTea.Game.Player.PetExperience
@@ -1632,6 +1633,18 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_info({:quest_event_credit, quest_id}, %State{} = state) do
     {:noreply, Quests.credit_event(state, quest_id)}
+  end
+
+  def handle_info({:meeting_stone_queue, area, world}, %State{} = state) do
+    if state.character.internal.world == world do
+      {:noreply, MeetingStones.queue(state, area)}
+    else
+      {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Scripted Meeting Stone queue failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_info({:quest_event_credit, quest_id, group?, distance, world_object_guid}, %State{} = state) do
