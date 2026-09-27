@@ -590,6 +590,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
           (Spell.melee_ability?(spell) or Spell.ranged_attack?(spell)),
       hit_chance_bonus: context.hit_chance_bonus,
       crit_chance: context.melee_crit_chance,
+      can_crit?: not Spell.attribute?(spell, :cant_crit),
+      spell_damage_class: spell.dmg_class,
       caster_position: attack_position(context.caster_position),
       spell_school_mask: Spell.school_mask(spell),
       mechanic: spell.mechanic,

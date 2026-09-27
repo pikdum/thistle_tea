@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Logic.Daze
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Emote
   alias ThistleTea.Game.Entity.Logic.ParryHaste
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -162,6 +163,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   def receive_attack(%{object: %{guid: target_guid}} = entity, attack, now, opts)
       when is_map(attack) and is_integer(target_guid) and is_integer(now) do
+    standing? = Emote.standing?(entity)
     result = resolve_attack(entity, attack, opts)
     resisted = resisted_damage(entity, attack, result.damage, opts)
     result = %{result | damage: result.damage - resisted}
@@ -202,7 +204,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
     event = attacker_state_update(Map.get(attack, :caster, 0), target_guid, max(result.damage - absorbed, 0), attack)
     feedback_events = attack_outcome_events(entity, attack, result, absorbed)
 
-    {entity, reaction_events} = attack_reactions(entity, attack, result, now)
+    {entity, reaction_events} = attack_reactions(entity, attack, result, standing?, now)
 
     daze_roll = Keyword.get(opts, :daze_roll, fn -> :rand.uniform() * 100 end)
     daze_events = Daze.events(entity, attack, result.damage - absorbed, daze_roll)
@@ -309,7 +311,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
     if resisted > 0, do: bor(hit_info, @hitinfo_resist), else: hit_info
   end
 
-  defp attack_reactions(entity, %{caster: attacker_guid} = attack, %{outcome: outcome} = result, now)
+  defp attack_reactions(entity, %{caster: attacker_guid} = attack, %{outcome: outcome} = result, standing?, now)
        when is_integer(attacker_guid) do
     if Core.dead?(entity) do
       {entity, []}
@@ -321,7 +323,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
         attacker_position: Map.get(attack, :caster_position),
         proc_type: proc_type,
         outcome: outcome,
-        proc_ex: result.proc_ex,
+        proc_ex: Proc.incoming_hit_mask(result.proc_ex, standing?, Map.get(attack, :spell)),
         damage: max(result.damage - Map.get(attack, :absorb, 0), 0),
         absorbed: Map.get(attack, :absorb, 0),
         spell: Map.get(attack, :spell),
@@ -331,5 +333,5 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
     end
   end
 
-  defp attack_reactions(entity, _attack, _result, _now), do: {entity, []}
+  defp attack_reactions(entity, _attack, _result, _standing?, _now), do: {entity, []}
 end

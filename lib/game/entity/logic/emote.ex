@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Emote do
 
   import Bitwise, only: [band: 2]
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Emote
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -21,6 +22,21 @@ defmodule ThistleTea.Game.Entity.Logic.Emote do
   @text_only_animations [0, 12, 13, 68]
 
   def allowed?(entity), do: Death.alive?(entity) and posture_allowed?(entity)
+
+  def standing?(%{unit: %Unit{stand_state: posture}}), do: posture in [nil, 0, 7]
+
+  def on_damage(entity, now, opts \\ [])
+
+  def on_damage(%Character{} = character, now, opts) do
+    if Death.alive?(character) and not standing?(character) and
+         not Keyword.get(opts, :periodic, false) and not Aura.has_aura?(character, :mounted) do
+      set_posture(character, 0, now)
+    else
+      character
+    end
+  end
+
+  def on_damage(entity, _now, _opts), do: entity
 
   def command(entity, id, now) when id in [0, 3] do
     if allowed?(entity) do

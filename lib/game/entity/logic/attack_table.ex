@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Logic.DamageReceived
   alias ThistleTea.Game.Entity.Logic.Daze
   alias ThistleTea.Game.Entity.Logic.Disarm
+  alias ThistleTea.Game.Entity.Logic.Emote
   alias ThistleTea.Game.Entity.Logic.MechanicResistance
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.ResistancePenetration
@@ -156,8 +157,11 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     case roll_special_outcome(ctx, roll) do
       :normal ->
         crit_roll = Keyword.get_lazy(opts, :crit_roll, fn -> Math.random_int(0, 9_999) end)
-        crit? = crit_roll < crit_bp(ctx)
+        crit? = ctx.can_crit? and crit_roll < crit_bp(ctx)
         %{outcome: if(crit?, do: :crit, else: :normal), crit?: crit?}
+
+      :crit ->
+        %{outcome: :crit, crit?: true}
 
       outcome ->
         %{outcome: outcome, crit?: false}
@@ -192,6 +196,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       caster_level: caster_level,
       caster_player?: caster_player?,
       caster_class: Map.get(attack, :caster_class),
+      can_crit?: Map.get(attack, :can_crit?, true),
+      spell_damage_class: Map.get(attack, :spell_damage_class),
       dual_wield_penalty?: Map.get(attack, :dual_wield_penalty?, false),
       crit_chance:
         (Map.get(attack, :crit_chance) || @default_crit_chance) +
@@ -224,7 +230,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       attacker_hit_bonus: attacker_hit_debuff(defender, attack),
       versus_damage_pct: versus_pct(attack, :damage_done_versus, defender),
       versus_crit_pct: versus_pct(attack, :crit_damage_versus, defender),
-      standing?: (unit.stand_state || 0) == 0,
+      standing?: Emote.standing?(defender),
       from_behind?: from_behind?(defender, Map.get(attack, :caster_position)),
       avoidance_disabled?: casting?(defender) or stunned?(unit),
       block_disabled?: defender_player? and (unit.sheath_state || 0) == 0
@@ -282,15 +288,15 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   end
 
   defp roll_special_avoidance(ctx, roll) do
-    walk_steps(
-      [
-        {:miss, miss_bp(ctx)},
-        {:dodge, dodge_bp(ctx)},
-        {:parry, parry_bp(ctx)},
-        {:block, block_bp(ctx)}
-      ],
-      roll
-    )
+    [
+      {:miss, miss_bp(ctx)},
+      sitting_crit_step(ctx),
+      {:dodge, dodge_bp(ctx)},
+      {:parry, parry_bp(ctx)},
+      {:block, block_bp(ctx)}
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> walk_steps(roll)
   end
 
   defp walk_steps(steps, roll) do
@@ -308,8 +314,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     end
   end
 
-  defp sitting_crit_step(%{defender_player?: true, standing?: false} = ctx) do
-    if ctx.crit_chance > 0 or not ctx.caster_player?, do: {:crit, 10_000}
+  defp sitting_crit_step(%{defender_player?: true, standing?: false, can_crit?: true} = ctx) do
+    if ctx.crit_chance > 0 or not ctx.caster_player? or ctx.spell_damage_class in [2, 3], do: {:crit, 10_000}
   end
 
   defp sitting_crit_step(_ctx), do: nil

@@ -57,10 +57,6 @@ defmodule ThistleTea.Game.Entity.Logic.EnvironmentalDamage do
 
   defp interrupt_stealth_and_sitting(character, now) do
     {character, events} = Aura.remove_aura_types(character, [:mod_stealth], now)
-    character = Effects.enqueue(character, events)
-
-    if character.unit.stand_state in [1, 3, 8] and not Aura.has_aura?(character, :mounted),
-      do: Emote.move(character, false, true, now),
-      else: character
+    character |> Effects.enqueue(events) |> Emote.on_damage(now)
   end
 end

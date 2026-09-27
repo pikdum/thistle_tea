@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   alias ThistleTea.Game.Entity.Logic.DamageReceived
   alias ThistleTea.Game.Entity.Logic.Druid
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Emote
   alias ThistleTea.Game.Entity.Logic.EnvironmentalDamage
   alias ThistleTea.Game.Entity.Logic.HealingReceived
   alias ThistleTea.Game.Entity.Logic.Hunter
@@ -382,6 +383,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         Aura.flat_amount(state, :mod_attacker_spell_crit_chance) +
         Critical.target_bonus(context.conditional_crit_modifiers, state)
 
+    chance = posture_crit_chance(state, spell, chance)
+
     chance > 0 and
       (not Keyword.get(opts, :periodic?, false) or Keyword.get(opts, :periodic_can_crit?, false)) and
       not Spell.attribute?(spell, :cant_crit) and
@@ -390,6 +393,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   end
 
   defp direct_spell_crit?(_state, _context, _spell, _opts), do: false
+
+  defp posture_crit_chance(%Character{} = state, %Spell{dmg_class: 3}, chance) do
+    if Emote.standing?(state), do: chance, else: 100
+  end
+
+  defp posture_crit_chance(_state, _spell, chance), do: chance
 
   defp crit_bonus(%CastContext{} = context, %Spell{} = spell, damage) do
     base_bonus = damage * (spell_crit_multiplier(spell) - 1.0)

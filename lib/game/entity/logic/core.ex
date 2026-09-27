@@ -116,10 +116,12 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   def take_damage_with_mitigation(entity, _damage, _now, _opts), do: {entity, 0, 0}
 
-  defp take_unblocked_damage(%{unit: %Unit{health: health}} = entity, damage, now, opts) do
+  defp take_unblocked_damage(%{unit: %Unit{}} = entity, damage, now, opts) do
     if spirit_damage_immune?(entity, opts) do
       {entity, damage, damage}
     else
+      entity = Emote.on_damage(entity, now, opts)
+      health = entity.unit.health
       entity = enter_damage_combat(entity, now, opts)
       entity = CombatLeash.on_damage(entity, now, opts)
       school = Keyword.get(opts, :school, :physical)
