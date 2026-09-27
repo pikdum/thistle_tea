@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PlayerSync do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Skills
+  alias ThistleTea.Game.Entity.Logic.SpellPower
 
   def sync(%Character{unit: %{auras: holders}, player: %Player{}} = character) when is_list(holders) do
     track_stealthed? = Enum.any?(holders, &Holder.has_aura_type?(&1, :track_stealthed))
@@ -22,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PlayerSync do
 
     %{character | player: player}
     |> CombatRatings.sync()
+    |> SpellPower.recompute()
   end
 
   def sync(entity), do: entity

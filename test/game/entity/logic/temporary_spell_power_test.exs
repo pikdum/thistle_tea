@@ -10,7 +10,10 @@ defmodule ThistleTea.Game.Entity.Logic.TemporarySpellPowerTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.EquipmentStats
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Logic.SpellPower
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
@@ -25,6 +28,8 @@ defmodule ThistleTea.Game.Entity.Logic.TemporarySpellPowerTest do
       assert context.spell_damage_bonus.fire == 110
       assert context.spell_damage_bonus.frost == 0
       assert context.healing_bonus == 220
+      assert buffed.player.mod_damage_done_pos_fire == 110
+      assert buffed.player.mod_damage_done_pos_frost == 0
 
       for restriction <- [
             %{buff() | equipped_item_class: 2},
@@ -32,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.TemporarySpellPowerTest do
           ] do
         {restricted, _} = Aura.apply_spell(caster, 1, 60, restriction, 0)
         assert context(restricted, spell(:school_damage)).spell_damage_bonus.fire == 10
+        assert restricted.player.mod_damage_done_pos_fire == 10
       end
 
       assert context(buffed, %{spell(:heal) | school: :frost}).healing_bonus == 20
@@ -48,10 +54,84 @@ defmodule ThistleTea.Game.Entity.Logic.TemporarySpellPowerTest do
         fresh = context(entity, spell(:school_damage))
         assert fresh.spell_damage_bonus.fire == 10
         assert fresh.healing_bonus == 20
+        assert entity.player.mod_damage_done_pos_fire == 10
       end
 
       assert saved.spell_damage_bonus.fire == 60
       assert saved.healing_bonus == 120
+    end
+  end
+
+  describe "recompute/1" do
+    test "projects separate signed penalties and multiplicative school bonuses privately", %{caster: caster} do
+      positive = buff()
+
+      negative = %{
+        buff()
+        | id: 900_032,
+          effects: [
+            %Effect{index: 0, type: :apply_aura, aura: :mod_damage_done, base_points: -7, misc_value: 4},
+            %Effect{index: 1, type: :apply_aura, aura: :mod_damage_percent_done, base_points: 20, misc_value: 4},
+            %Effect{index: 2, type: :apply_aura, aura: :mod_damage_percent_done, base_points: -10, misc_value: 4}
+          ]
+      }
+
+      {caster, _} = Aura.apply_spell(caster, 1, 60, positive, 0)
+      {caster, _} = Aura.apply_spell(caster, 1, 60, negative, 0)
+      assert caster.player.mod_damage_done_pos_fire == 60
+      assert caster.player.mod_damage_done_neg_fire == -7
+      assert context(caster, spell(:school_damage)).spell_damage_bonus.fire == 53
+      assert_in_delta caster.player.mod_damage_done_pct_fire, 1.08, 0.0001
+      assert caster.player.mod_damage_done_pct_frost == 1.0
+      fields = Player.to_list(caster.player)
+      field = Enum.find(fields, &match?({:mod_damage_done_neg_fire, _, _}, &1))
+      assert field == {:mod_damage_done_neg_fire, -7, {0x04BA, 1, :int}}
+      assert UpdateObject.field(field) == <<-7::little-signed-size(32)>>
+      refute Enum.any?(Player.to_list(caster.player, :other), &match?({:mod_damage_done_neg_fire, _, _}, &1))
+      {caster, _} = Aura.apply_spell(caster, 1, 60, negative, 500)
+      assert_in_delta caster.player.mod_damage_done_pct_fire, 1.12, 0.0001
+    end
+
+    test "equipment resync preserves temporary bonuses without accumulating them", %{caster: caster} do
+      {caster, _} = Aura.apply_spell(caster, 1, 60, buff(), 0)
+      assert caster.player.mod_damage_done_pos_fire == 60
+      empty_equipment = EquipmentStats.resync(caster, fn _ -> nil end)
+      assert empty_equipment.player.mod_damage_done_pos_fire == 50
+      assert context(empty_equipment, spell(:school_damage)).spell_damage_bonus.fire == 50
+      assert EquipmentStats.resync(empty_equipment, fn _ -> nil end).player.mod_damage_done_pos_fire == 50
+    end
+
+    test "spirit-derived spell power follows stat changes and restoration", %{caster: caster} do
+      caster = %{caster | unit: %{caster.unit | base_spirit: 100, spirit: 100}}
+
+      scaling = %{
+        buff()
+        | effects: [
+            %Effect{
+              index: 0,
+              type: :apply_aura,
+              aura: :mod_spell_damage_of_stat_percent,
+              base_points: 20,
+              misc_value: 4
+            }
+          ]
+      }
+
+      spirit = %{
+        buff()
+        | id: 900_032,
+          effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_stat, base_points: 50, misc_value: 4}]
+      }
+
+      {caster, _} = Aura.apply_spell(caster, 1, 60, scaling, 0)
+      assert caster.player.mod_damage_done_pos_fire == 30
+      {caster, _} = Aura.apply_spell(caster, 1, 60, spirit, 0)
+      assert caster.unit.spirit == 150
+      assert caster.player.mod_damage_done_pos_fire == 40
+      assert SpellPower.recompute(caster) == caster
+      {caster, _} = Aura.remove_spells(caster, [spirit.id], 500)
+      assert caster.player.mod_damage_done_pos_fire == 30
+      assert context(caster, spell(:school_damage)).spell_damage_bonus.fire == 30
     end
   end
 

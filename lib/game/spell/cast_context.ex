@@ -6,7 +6,6 @@ defmodule ThistleTea.Game.Spell.CastContext do
   changes. The receiving owner refreshes threat modifiers when the spell lands
   and recipient availability for damage sharing and periodic life drains.
   """
-  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
@@ -22,6 +21,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.ResistancePenetration
   alias ThistleTea.Game.Entity.Logic.Skills
+  alias ThistleTea.Game.Entity.Logic.SpellPower
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.SpellThreat
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
@@ -34,8 +34,6 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Spell.Semantics
   alias ThistleTea.Game.Spell.TargetTrigger
   alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
-
-  @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
 
   @two_hand_inventory_type 17
   @dagger_subclass 15
@@ -190,7 +188,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   def with_damage_bonuses(%__MODULE__{} = context, caster, %Spell{} = spell) do
     %{
       context
-      | spell_damage_bonus: spell_damage_bonus(caster),
+      | spell_damage_bonus: SpellPower.bonuses(caster),
         spell_damage_versus: TargetSpellPower.snapshot(caster),
         spell_modifiers: Modifiers.snapshot(caster, spell),
         damage_done_multiplier: WeaponDamage.multiplier(caster, spell.school, attack_weapon(caster, spell)),
@@ -371,40 +369,11 @@ defmodule ThistleTea.Game.Spell.CastContext do
     end)
   end
 
-  defp spell_damage_bonus(caster) do
-    bonuses = equipment_bonuses(caster)
-
-    Map.new(@schools, fn school ->
-      {school,
-       Map.get(bonuses, :"spell_#{school}", 0) + temporary_spell_damage(caster, school) +
-         stat_scaled_spell_damage(caster, school)}
-    end)
-  end
-
-  defp temporary_spell_damage(%{unit: %Unit{auras: holders}} = caster, school) when is_list(holders) do
-    unrestricted =
-      Enum.filter(holders, fn %Holder{spell: %Spell{} = spell} ->
-        spell.equipped_item_class in [nil, -1] and spell.equipped_item_inventory_type_mask in [nil, 0]
-      end)
-
-    Aura.flat_modifier(
-      %{caster | unit: %{caster.unit | auras: unrestricted}},
-      :mod_damage_done,
-      Spell.school_mask(school)
-    )
-  end
-
-  defp temporary_spell_damage(_caster, _school), do: 0
-
   defp healing_bonus(caster, spell) do
     equipment = caster |> equipment_bonuses() |> Map.get(:healing, 0)
 
     equipment + Aura.flat_modifier(caster, :mod_healing_done, Spell.school_mask(spell)) +
       stat_scaled_amount(caster, :mod_spell_healing_of_stat_percent, 1)
-  end
-
-  defp stat_scaled_spell_damage(caster, school) do
-    stat_scaled_amount(caster, :mod_spell_damage_of_stat_percent, Spell.school_mask(school))
   end
 
   defp stat_scaled_amount(%{unit: unit} = caster, aura_type, school_mask) do

@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Player.Stats do
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Rest
   alias ThistleTea.Game.Entity.Logic.Skills
+  alias ThistleTea.Game.Entity.Logic.SpellPower
   alias ThistleTea.Game.Entity.Logic.Stats, as: LogicStats
   alias ThistleTea.Game.Entity.Logic.Talents
 
@@ -105,6 +106,7 @@ defmodule ThistleTea.Game.Player.Stats do
 
     %{character | unit: unit, player: player}
     |> CombatRatings.sync()
+    |> SpellPower.recompute()
     |> Talents.sync_points()
     |> Rest.set_bonus(character.internal.rest_bonus)
   end

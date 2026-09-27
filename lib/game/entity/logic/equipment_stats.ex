@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.EquipmentSpells
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.SpellPower
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
@@ -62,9 +63,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
 
     bonuses = Enum.reduce(enchantments, bonuses, &add_enchantment(&2, &1, unit.class))
     unit = %{unit | equipment_bonuses: bonuses} |> Stats.recompute()
-    player = apply_spell_damage_fields(player, bonuses)
-
-    %{character | unit: unit, player: player}
+    SpellPower.recompute(%{character | unit: unit})
   end
 
   defp add_enchantment(acc, {slot, item, _enchant_slot, enchantment}, class) do
@@ -192,12 +191,6 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
   end
 
   defp add_schools(acc, _mask, _amount), do: acc
-
-  defp apply_spell_damage_fields(%Player{} = player, bonuses) do
-    Enum.reduce(@schools, player, fn school, player ->
-      Map.put(player, :"mod_damage_done_pos_#{school}", Map.fetch!(bonuses, :"spell_#{school}"))
-    end)
-  end
 
   defp add(acc, key, value) when is_number(value) and not is_nil(key), do: Map.update!(acc, key, &(&1 + value))
   defp add(acc, _key, _value), do: acc
