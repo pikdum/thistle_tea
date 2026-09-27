@@ -214,6 +214,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Quest reward spells](docs/liquid-spells-playtest.md), with caster selection, hidden automatic quest rewards, and native Naxxramas attunement
 - [Quest sharing](docs/quest-sharing-playtest.md), with party confirmations, eligibility feedback, inherited timers, source-item lifecycle, and stale-offer cleanup
 - [Item-started quests](docs/item-quests-playtest.md), with owned starter validation, atomic item exchanges, retained objectives, full-bag rejection, and party confirmation
+- [Quest tool targets](docs/item-targets-playtest.md), with creature entry and life-state restrictions, rejected-use recovery, corpse capture, and separate caster rewards
 - [Game-object questgivers](docs/game-object-quests-playtest.md), with per-player activation, native quest chains, conditioned gossip, and scripted player casts
 - xp, leveling, and exploration
 - [Rested experience and logout](docs/rest-logout-playtest.md), with offline inn and wilderness gains, idle rest updates, native logout countdowns, and cancellation cleanup
