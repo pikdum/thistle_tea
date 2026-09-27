@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
   describe "build/3" do
@@ -151,6 +152,29 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
 
       assert Evaluator.evaluate(context, zone) == :met
       assert Evaluator.evaluate(context, area) == :met
+    end
+
+    test "the default source uses the current owner snapshot before presence catches up" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      character = %{character() | object: %Object{guid: guid}}
+      condition = %Condition{type: :area_id, value1: 12}
+      owner = self()
+      SpatialHash.insert(:players, guid, WorldRef.open(451), 0.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:players, guid) end)
+
+      context =
+        ConditionContext.build(character, [condition],
+          zone_and_area: fn 1, {1.0, 2.0, 3.0} ->
+            send(owner, :zone_lookup)
+            {12, 34}
+          end
+        )
+
+      assert context.source == context.target
+      assert context.source.position == {1.0, 2.0, 3.0, 0.0}
+      assert context.source.zone_id == 12
+      assert_received :zone_lookup
+      refute_received :zone_lookup
     end
 
     test "collects planned environmental facts for an interacting world source" do

@@ -38,7 +38,12 @@ defmodule ThistleTea.Game.Player.ConditionContext do
     movement_now = Keyword.get(options, :movement_now, Time.now())
 
     target = subject(character, requirements, item_lookup, movement_now, options)
-    source = options |> Keyword.get(:source, target) |> enrich_source(requirements, options)
+
+    source =
+      case Keyword.fetch(options, :source) do
+        {:ok, source} -> enrich_source(source, requirements, options)
+        :error -> target
+      end
 
     Context.new(
       source: source,
