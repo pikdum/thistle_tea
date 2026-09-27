@@ -285,7 +285,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
           caster: state.guid,
           id: spell_id
         }
-        |> World.broadcast_packet(character, exclude_self?: true)
+        |> World.broadcast_packet(character, include_self?: false)
 
         character =
           character

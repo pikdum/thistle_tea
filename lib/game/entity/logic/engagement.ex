@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.CombatLeash
+  alias ThistleTea.Game.Entity.Logic.CombatState
   alias ThistleTea.Game.Entity.Logic.CombatTimer
   alias ThistleTea.Game.Entity.Logic.ControlledCombat
   alias ThistleTea.Game.Entity.Logic.ControlMovement
@@ -39,7 +40,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
     entity |> PetCombat.contact(source, now, role, timed?) |> ControlledCombat.contact(source, now, role)
   end
 
-  defdelegate gain_threat_ref(entity, guid, incarnation), to: PetCombat, as: :gain_ref
+  defdelegate gain_threat_ref(entity, guid, incarnation, now), to: PetCombat, as: :gain_ref
   defdelegate lose_threat_ref(entity, guid, incarnation), to: PetCombat, as: :lose_ref
 
   def maintain(entity, context) do
@@ -131,7 +132,11 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
     entity = if match?(%Pet{}, entity.internal.pet), do: CombatTimer.hold(entity, now, 0), else: entity
     internal = entity.internal
     blackboard = internal.blackboard |> Blackboard.ensure() |> Distraction.clear() |> Blackboard.return_pet(nil)
-    entity = %{entity | internal: %{internal | in_combat: true, last_hostile_time: now, blackboard: blackboard}}
+
+    entity =
+      %{entity | internal: %{internal | last_hostile_time: now, blackboard: blackboard}}
+      |> CombatState.enter(now)
+
     entity = Threat.add(entity, target_guid, 0)
     selection = Keyword.get(opts, :selection, default_selection(entity))
 

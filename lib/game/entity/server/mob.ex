@@ -755,7 +755,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   def handle_cast({:threat_ref_gained, guid, incarnation}, %Mob{internal: %{pet: %Pet{}}} = state) do
-    state = Engagement.gain_threat_ref(state, guid, incarnation)
+    state = Engagement.gain_threat_ref(state, guid, incarnation, Time.now())
     {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
   rescue
     error ->

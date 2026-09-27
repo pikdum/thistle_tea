@@ -31,7 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.ControlledCombatTest do
   describe "contact/4" do
     test "commands and threat membership wait for actual contact", %{pet: pet, enemy: enemy} do
       commanded = PetBT.command(pet, :attack, enemy, 1_000)
-      referenced = Engagement.gain_threat_ref(pet, enemy, 7)
+      referenced = Engagement.gain_threat_ref(pet, enemy, 7, 0)
 
       for unchanged <- [commanded, referenced] do
         refute Enum.any?(unchanged.internal.events, &is_struct(&1, Effects.ControlledCombatContact))
@@ -162,7 +162,7 @@ defmodule ThistleTea.Game.Entity.Logic.ControlledCombatTest do
     end
 
     test "pet removal preserves an overlapping owner threat reference", ctx do
-      owner = ctx |> receive_contact(:attacked) |> PlayerCombat.gain_threat_ref(ctx.enemy, 7)
+      owner = ctx |> receive_contact(:attacked) |> PlayerCombat.gain_threat_ref(ctx.enemy, 7, 0)
       owner = %{owner | internal: %{owner.internal | companion: Relationship.none()}}
       assert sync(owner, %{ctx.context | now: 20_000}).internal.in_combat
       owner = PlayerCombat.lose_threat_ref(owner, ctx.enemy, 7)

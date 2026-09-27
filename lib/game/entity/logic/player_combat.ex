@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.CombatReferences
+  alias ThistleTea.Game.Entity.Logic.CombatState
   alias ThistleTea.Game.Entity.Logic.CombatTimer
   alias ThistleTea.Game.Entity.Logic.ControlledCombat
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -189,15 +190,20 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   def undetectable?(_character, _now), do: false
 
-  def gain_threat_ref(%Character{internal: %Internal{} = internal} = character, mob_guid, incarnation_id)
-      when is_integer(mob_guid) and mob_guid > 0 and is_integer(incarnation_id) and incarnation_id > 0 do
+  def gain_threat_ref(
+        %Character{internal: %Internal{} = internal, unit: %Unit{health: health}} = character,
+        mob_guid,
+        incarnation_id,
+        now
+      )
+      when is_number(health) and health > 0 and is_integer(mob_guid) and mob_guid > 0 and is_integer(incarnation_id) and
+             incarnation_id > 0 and is_integer(now) do
     refs = MapSet.put(internal.threat_refs || MapSet.new(), {mob_guid, incarnation_id})
 
-    %{character | internal: %{internal | threat_refs: refs, in_combat: true}}
-    |> CombatLogic.sync_combat_flag()
+    %{character | internal: %{internal | threat_refs: refs}} |> CombatState.enter(now)
   end
 
-  def gain_threat_ref(character, _mob_guid, _incarnation_id), do: character
+  def gain_threat_ref(character, _mob_guid, _incarnation_id, _now), do: character
 
   def lose_threat_ref(
         %Character{internal: %Internal{threat_refs: %MapSet{} = refs} = internal} = character,

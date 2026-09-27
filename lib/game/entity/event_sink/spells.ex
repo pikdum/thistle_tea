@@ -337,7 +337,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
     })
 
     %Message.SmsgSpellFailedOther{caster: guid, id: effect.spell_id}
-    |> World.broadcast_packet(entity, exclude_self?: true)
+    |> World.broadcast_packet(entity, include_self?: false)
 
     entity
   end

@@ -447,7 +447,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       character =
         character(guid, health: 100, max_health: 100, summon: pet_guid)
         |> PlayerCombat.mark_attacked(1_000)
-        |> PlayerCombat.gain_threat_ref(mob_guid, 1)
+        |> PlayerCombat.gain_threat_ref(mob_guid, 1, 0)
         |> ExtraAttacks.grant(2)
         |> then(fn character -> %{character | unit: %{character.unit | target: mob_guid}} end)
 
@@ -483,7 +483,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       character =
         character(guid, health: 100, max_health: 100, summon: pet_guid)
         |> PlayerCombat.mark_attacked(Time.now())
-        |> PlayerCombat.gain_threat_ref(mob_guid, 1)
+        |> PlayerCombat.gain_threat_ref(mob_guid, 1, 0)
         |> then(fn character -> %{character | unit: %{character.unit | target: mob_guid}} end)
 
       state = %State{connection_pid: self(), guid: guid, character: character, ready: true}

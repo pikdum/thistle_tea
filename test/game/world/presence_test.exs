@@ -90,7 +90,7 @@ defmodule ThistleTea.Game.World.PresenceTest do
     test "publishes actual attack targets separately from UI selection and releases combat references" do
       character = character(WorldRef.open(0), {1.0, 2.0, 3.0, 0.0}, 12)
       character = %{character | unit: %{character.unit | target: 42}}
-      character = PlayerCombat.gain_threat_ref(character, 50, 1)
+      character = PlayerCombat.gain_threat_ref(character, 50, 1, 0)
       on_exit(fn -> Presence.leave(character) end)
       Presence.enter(character, %{})
       assert Metadata.get(character.object.guid).combat_victim_guid == nil

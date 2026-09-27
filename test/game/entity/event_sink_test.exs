@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
+  alias ThistleTea.Game.Entity.Logic.CombatState
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -25,8 +26,10 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Area
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.Metadata
@@ -41,6 +44,41 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   end
 
   describe "emit/2" do
+    test "combat interruption sends owner failure and same-world observer cancellation" do
+      [owner, observer, other_world] = Enum.map(1..3, fn _ -> Guid.from_low_guid(:player, unique_guid()) end)
+
+      for {guid, map} <- [{owner, 0}, {observer, 0}, {other_world, 1}] do
+        Entity.register(guid)
+        SpatialHash.update(:players, guid, map, 0.0, 0.0, 0.0)
+      end
+
+      on_exit(fn ->
+        for guid <- [owner, observer, other_world] do
+          Entity.unregister(guid)
+          SpatialHash.remove(:players, guid)
+        end
+      end)
+
+      spell = %Spell{id: 458, cast_time_ms: 3_000, attributes: MapSet.new([:not_in_combat])}
+
+      character = %Character{
+        object: %Object{guid: owner},
+        unit: %Unit{health: 100},
+        internal: %Internal{world: WorldRef.open(0), casting: Cast.new(spell, Target.self(owner), 1_000)},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      entered = character |> CombatState.enter(1_500) |> EventSink.emit_pending(Context.new(self()))
+      assert entered.internal.casting == nil
+      assert entered.internal.events == []
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{spell: 458} = result}}
+      assert result == Message.SmsgCastResult.failure(458, :interrupted)
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgSpellFailure{guid: ^owner, spell: 458}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgSpellFailedOther{caster: ^owner, id: 458}, _opts}}
+      refute_received {:"$gen_cast", {:send_packet, %Message.SmsgSpellFailedOther{}, _opts}}
+      refute_received {:"$gen_cast", {:send_packet, %Message.SmsgSpellFailedOther{}}}
+    end
+
     test "controlled contact reaches the explicit player owner" do
       owner = unique_guid()
       Entity.register(owner)

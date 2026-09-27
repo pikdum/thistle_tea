@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTimer do
   @moduledoc "Combat windows with target-aware PvE contact and monotonic expiry."
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Logic.CombatState
   alias ThistleTea.Game.Entity.Logic.ControlOwner
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Guid
@@ -17,13 +18,12 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTimer do
 
     internal = %{
       internal
-      | in_combat: true,
-        last_hostile_time: now,
+      | last_hostile_time: now,
         combat_timeout_ms: duration,
         combat_timer_target: target
     }
 
-    %{entity | internal: internal}
+    %{entity | internal: internal} |> CombatState.enter(now)
   end
 
   def hold(entity, _now, _duration, _target), do: entity

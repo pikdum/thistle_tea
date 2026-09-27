@@ -1238,6 +1238,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       },
       unit: %Unit{
         level: Keyword.get(opts, :level, 1),
+        health: 100,
         faction_template: Keyword.get(opts, :faction_template, 17),
         flags: 0,
         target: 0

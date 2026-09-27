@@ -506,7 +506,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def handle_cast({:threat_ref_gained, mob_guid, incarnation_id}, %{character: %Character{} = character} = state) do
     character =
       character
-      |> PlayerCombat.gain_threat_ref(mob_guid, incarnation_id)
+      |> PlayerCombat.gain_threat_ref(mob_guid, incarnation_id, Time.now())
       |> PlayerCombat.mark_temporary_at_war(PlayerReputation.faction_id(mob_guid))
 
     state = TickScheduler.ensure_scheduled(%{state | character: character})

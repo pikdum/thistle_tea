@@ -107,9 +107,9 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
     end
   end
 
-  describe "gain_threat_ref/3 and lose_threat_ref/3" do
+  describe "gain_threat_ref/4 and lose_threat_ref/3" do
     test "gaining a ref enters combat and records the mob" do
-      character = PlayerCombat.gain_threat_ref(character(), 100, 1)
+      character = PlayerCombat.gain_threat_ref(character(), 100, 1, 0)
 
       assert character.internal.in_combat == true
       assert MapSet.member?(character.internal.threat_refs, {100, 1})
@@ -119,7 +119,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
     test "losing a ref removes it and is idempotent" do
       character =
         character()
-        |> PlayerCombat.gain_threat_ref(100, 1)
+        |> PlayerCombat.gain_threat_ref(100, 1, 0)
         |> PlayerCombat.lose_threat_ref(100, 1)
         |> PlayerCombat.lose_threat_ref(100, 1)
 
@@ -129,7 +129,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
     test "a delayed loss from an old incarnation keeps the new ref" do
       character =
         character()
-        |> PlayerCombat.gain_threat_ref(100, 2)
+        |> PlayerCombat.gain_threat_ref(100, 2, 0)
         |> PlayerCombat.lose_threat_ref(100, 1)
 
       assert character.internal.threat_refs == MapSet.new([{100, 2}])
@@ -143,8 +143,8 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
 
       character =
         character(in_combat: true, target: target_guid, last_hostile_time: 1_000)
-        |> PlayerCombat.gain_threat_ref(target_guid, 1)
-        |> PlayerCombat.gain_threat_ref(other_guid, 2)
+        |> PlayerCombat.gain_threat_ref(target_guid, 1, 0)
+        |> PlayerCombat.gain_threat_ref(other_guid, 2, 0)
         |> then(fn character ->
           %{character | internal: %{character.internal | auto_shot: %{target_guid: target_guid}}}
         end)
@@ -322,7 +322,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
 
       character =
         character(in_combat: true, last_hostile_time: 1_000)
-        |> PlayerCombat.gain_threat_ref(mob_guid, 1)
+        |> PlayerCombat.gain_threat_ref(mob_guid, 1, 0)
 
       {character, _blackboard} = sync(character, %Blackboard{}, 100_000)
 
@@ -338,8 +338,8 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
 
       character =
         character(in_combat: true, last_hostile_time: 1_000)
-        |> PlayerCombat.gain_threat_ref(dead_guid, 1)
-        |> PlayerCombat.gain_threat_ref(missing_guid, 1)
+        |> PlayerCombat.gain_threat_ref(dead_guid, 1, 0)
+        |> PlayerCombat.gain_threat_ref(missing_guid, 1, 0)
 
       {character, _blackboard} = sync(character, %Blackboard{}, 7_000)
 
@@ -359,7 +359,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
 
       character =
         character(in_combat: true, last_hostile_time: 1_000)
-        |> PlayerCombat.gain_threat_ref(mob_guid, 1)
+        |> PlayerCombat.gain_threat_ref(mob_guid, 1, 0)
 
       {character, _blackboard} = sync(character, %Blackboard{}, 7_000)
 

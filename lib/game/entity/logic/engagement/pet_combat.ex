@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement.PetCombat do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.CombatReferences
+  alias ThistleTea.Game.Entity.Logic.CombatState
   alias ThistleTea.Game.Entity.Logic.CombatTimer
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Guid
@@ -40,14 +41,14 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement.PetCombat do
 
   def contact(entity, _source, _now, _role, _timed?), do: entity
 
-  def gain_ref(%Mob{internal: %{pet: %Pet{}}, unit: %{health: health}} = entity, guid, incarnation)
+  def gain_ref(%Mob{internal: %{pet: %Pet{}}, unit: %{health: health}} = entity, guid, incarnation, now)
       when is_number(health) and health > 0 and is_integer(guid) and guid > 0 and is_integer(incarnation) and
-             incarnation > 0 do
+             incarnation > 0 and is_integer(now) do
     refs = MapSet.put(entity.internal.threat_refs || MapSet.new(), {guid, incarnation})
-    entity |> put_refs(refs) |> set_combat(true)
+    entity |> put_refs(refs) |> CombatState.enter(now)
   end
 
-  def gain_ref(entity, _guid, _incarnation), do: entity
+  def gain_ref(entity, _guid, _incarnation, _now), do: entity
 
   def lose_ref(%Mob{internal: %{pet: %Pet{}, threat_refs: %MapSet{} = refs}} = entity, guid, incarnation) do
     put_refs(entity, MapSet.delete(refs, {guid, incarnation}))
@@ -65,7 +66,8 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement.PetCombat do
         (attacking? or MapSet.size(refs) > 0 or CombatTimer.remaining(entity, now) > 0 or
            (entity.internal.in_combat == true and Aura.has_aura?(entity, :interrupt_regen)))
 
-    entity |> put_refs(refs) |> set_combat(combat?)
+    entity = put_refs(entity, refs)
+    if combat?, do: CombatState.enter(entity, now), else: set_combat(entity, false)
   end
 
   def reconcile(entity, _context), do: entity

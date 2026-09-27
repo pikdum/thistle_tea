@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement.PetCombatTest do
 
   describe "maintain/2" do
     test "incoming threat prevents health regeneration without a selected victim", %{pet: pet, enemy: enemy} do
-      pet = Engagement.gain_threat_ref(pet, enemy, 7)
+      pet = Engagement.gain_threat_ref(pet, enemy, 7, 0)
       pet = PetBT.command(pet, :follow, 0, 1_000)
       context = context(pet, enemy, 20_000)
       tree = BT.action(fn entity, blackboard -> {:failure, entity, blackboard} end)
@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement.PetCombatTest do
     end
 
     test "prunes dead, despawned, evading, inactive, moved and reincarnated enemies", %{pet: pet, enemy: enemy} do
-      pet = Engagement.gain_threat_ref(pet, enemy, 7)
+      pet = Engagement.gain_threat_ref(pet, enemy, 7, 0)
       context = context(pet, enemy, 20_000)
       observation = context.perception.entities[enemy]
 
@@ -91,9 +91,9 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement.PetCombatTest do
     end
   end
 
-  describe "gain_threat_ref/3" do
+  describe "gain_threat_ref/4" do
     test "duplicate gains and stale losses preserve the current incarnation", %{pet: pet, enemy: enemy} do
-      pet = pet |> Engagement.gain_threat_ref(enemy, 7) |> Engagement.gain_threat_ref(enemy, 7)
+      pet = pet |> Engagement.gain_threat_ref(enemy, 7, 0) |> Engagement.gain_threat_ref(enemy, 7, 0)
       assert pet.internal.threat_refs == MapSet.new([{enemy, 7}])
       assert Engagement.lose_threat_ref(pet, enemy, 6) == pet
       assert Engagement.lose_threat_ref(pet, enemy, 7).internal.threat_refs == MapSet.new()
@@ -119,11 +119,11 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement.PetCombatTest do
 
   describe "die/1" do
     test "death clears references and rejects delayed combat messages", %{pet: pet, enemy: enemy} do
-      pet = pet |> Engagement.gain_threat_ref(enemy, 7) |> Engagement.contact(enemy, 1_000)
+      pet = pet |> Engagement.gain_threat_ref(enemy, 7, 0) |> Engagement.contact(enemy, 1_000)
       dead = Engagement.die(%{pet | unit: %{pet.unit | health: 0}}).entity
       assert dead.internal.threat_refs == MapSet.new()
       assert dead.internal.last_hostile_time == nil
-      assert Engagement.gain_threat_ref(dead, enemy, 7) == dead
+      assert Engagement.gain_threat_ref(dead, enemy, 7, 0) == dead
       assert Engagement.contact(dead, enemy, 2_000) == dead
       refute dead.internal.in_combat
       assert Bitwise.band(dead.unit.flags, @combat_flags) == 0
