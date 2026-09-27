@@ -20,7 +20,9 @@ defmodule ThistleTea.Game.World.Loader.SpellPositionsTest do
       assert_in_delta x, -11_582.9, 0.01
       assert_in_delta y, -1251.15, 0.01
       assert %{map: 1} = Spell.target_position(22_951)
-      assert %{map: 0} = Spell.target_position(3561)
+      assert %{map: 0, orientation: orientation} = Spell.target_position(3561)
+      assert_in_delta orientation, 5.28, 0.001
+      assert %{map: 0, x: -6076.0, y: -215.0, z: 424.0} = Spell.target_position(18_634)
       assert Spell.target_position(987_654) == nil
     end
   end

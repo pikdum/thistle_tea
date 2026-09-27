@@ -99,7 +99,14 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
     entries =
       Enum.map(rows, fn row ->
-        position = %{map: row.target_map, x: row.target_position_x, y: row.target_position_y, z: row.target_position_z}
+        position = %{
+          map: row.target_map,
+          x: row.target_position_x,
+          y: row.target_position_y,
+          z: row.target_position_z,
+          orientation: row.target_orientation
+        }
+
         {{:target_position, row.id}, position}
       end)
 
@@ -923,6 +930,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(57), do: :target_ally
   defp target_type(15), do: :aoe_enemy_at_caster
   defp target_type(16), do: :aoe_enemy_at_dest
+  defp target_type(17), do: :database_location
   defp target_type(18), do: :caster_destination
   defp target_type(20), do: :party_around_caster
   defp target_type(22), do: :caster_source

@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Spell.LocationTargets do
-  @moduledoc "Script-selected destinations and the units or objects that supplied them."
+  @moduledoc "Resolved spell destinations and any units or objects that supplied them."
 
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
@@ -13,7 +13,13 @@ defmodule ThistleTea.Game.Spell.LocationTargets do
     defstruct [:guid, :position, :kind]
   end
 
-  def required?(%Spell{effects: effects}), do: Enum.any?(effects, &scripted?/1)
+  def required?(%Spell{effects: effects}), do: Enum.any?(effects, &location?/1)
+
+  def location?(%Effect{} = effect), do: scripted?(effect) or database?(effect)
+
+  def database?(%Effect{type: :teleport_units}), do: false
+
+  def database?(%Effect{} = effect), do: :database_location in [effect.implicit_target_a, effect.implicit_target_b]
 
   def scripted?(%Effect{} = effect),
     do: :script_location_near_caster in [effect.implicit_target_a, effect.implicit_target_b]

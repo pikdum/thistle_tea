@@ -68,7 +68,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTeleportTest do
         :ets.insert(SpellLoader, previous)
       end)
 
-      spell = %{data.spell | effects: [%{hd(data.spell.effects) | implicit_target_b: 17}]}
+      spell = %{data.spell | effects: [%{hd(data.spell.effects) | implicit_target_b: :database_location}]}
       assert {_, [request]} = SpellEffect.receive(data.target, data.context, spell, 1000)
 
       assert [%Effects.TeleportToWorld{world: world, position: {7.0, 8.0, 9.0}}] =

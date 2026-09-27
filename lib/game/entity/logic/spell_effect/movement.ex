@@ -97,7 +97,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
     size = (state.unit.bounding_radius || Unit.default_bounding_radius()) + (context.caster_bounding_radius || 0.0)
 
     cond do
-      17 in selectors ->
+      :database_location in selectors ->
         {:database, id, radius + size}
 
       :caster_destination in selectors ->

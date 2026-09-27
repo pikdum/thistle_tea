@@ -294,6 +294,16 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
     emit(entity, effect, context)
   end
 
+  def emit(
+        %Character{} = entity,
+        %Effects.TeleportToWorld{world: world, position: {x, y, z}, orientation: orientation},
+        context
+      )
+      when is_number(orientation) do
+    Context.cast(context, {:start_teleport, x, y, z, orientation, world})
+    entity
+  end
+
   def emit(%Character{} = entity, %Effects.TeleportToWorld{world: world, position: {x, y, z}}, context) do
     Context.cast(context, {:start_teleport, x, y, z, world})
     entity

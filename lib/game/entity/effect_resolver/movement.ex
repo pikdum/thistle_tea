@@ -85,8 +85,11 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Movement do
 
   def resolve(%Character{}, %Effects.TeleportToSpellTarget{spell_id: spell_id}) do
     case SpellLoader.target_position(spell_id) do
-      %{map: map, x: x, y: y, z: z} -> [Effects.teleport_to_world(map, {x, y, z})]
-      _missing -> []
+      %{map: map, x: x, y: y, z: z} = destination ->
+        [Effects.teleport_to_world(map, {x, y, z}, orientation: Map.get(destination, :orientation))]
+
+      _missing ->
+        []
     end
   end
 

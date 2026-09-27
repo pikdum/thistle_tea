@@ -34,6 +34,18 @@ defmodule ThistleTea.Game.World.Loader.SpellUnitTargetDbcTest do
   end
 
   describe "load/1" do
+    test "decodes database locations for summons, ground auras and teleports" do
+      for {id, type} <- [{18_634, :summon_guardian}, {29_237, :summon_wild}, {22_191, :persistent_area_aura}] do
+        spell = SpellLoader.load(id)
+        assert %Effect{type: ^type, implicit_target_a: :database_location} = hd(spell.effects)
+        assert LocationTargets.required?(spell)
+      end
+
+      teleport = SpellLoader.load(3561)
+      assert %Effect{type: :teleport_units, implicit_target_b: :database_location} = hd(teleport.effects)
+      refute LocationTargets.required?(teleport)
+    end
+
     test "decodes creature, corpse and object destination spells" do
       for id <- [9082, 12_699, 26_286, 26_344] do
         assert LocationTargets.required?(SpellLoader.load(id))
