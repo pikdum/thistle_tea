@@ -28,6 +28,10 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
     GenServer.start_link(__MODULE__, opts, name: EntityRegistry.via(entity.object.guid))
   end
 
+  def delay(pid, delay_ms) when is_pid(pid) and is_integer(delay_ms) and delay_ms > 0 do
+    GenServer.cast(pid, {:delay, delay_ms})
+  end
+
   @impl GenServer
   def init(%{entity: %DynamicObject{} = entity} = opts) do
     Process.flag(:trap_exit, true)
@@ -44,8 +48,7 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
       |> Map.put(:started_at, now)
       |> Map.put(:expires_at, now + opts.duration_ms)
       |> Map.put(:recipients, MapSet.new())
-
-    Process.send_after(self(), :expire, opts.duration_ms)
+      |> schedule_expiry(now)
 
     if is_map(state[:tick]) do
       send(self(), :tick)
@@ -55,6 +58,19 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
   end
 
   @impl GenServer
+  def handle_cast({:delay, delay_ms}, state) when is_integer(delay_ms) and delay_ms > 0 do
+    now = Time.now()
+    expires_at = min(state.expires_at, max(now, state.expires_at - delay_ms))
+    Process.cancel_timer(state.expiry_timer)
+    state = schedule_expiry(%{state | expires_at: expires_at}, now)
+    Enum.each(state.recipients, &Entity.shorten_area_aura(&1, state.entity.object.guid, expires_at))
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("DynamicObject delay failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_cast({:send_update_to, pid}, %{entity: entity} = state) do
     Core.update_object(entity)
     |> Network.send_packet(pid)
@@ -83,7 +99,7 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
       {:noreply, state}
   end
 
-  def handle_info(:expire, state) do
+  def handle_info({:expire, expires_at}, %{expires_at: expires_at} = state) do
     {:stop, :normal, state}
   end
 
@@ -113,6 +129,11 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
   end
 
   defp notify_farsight_owner(_entity, _owner_guid), do: nil
+
+  defp schedule_expiry(state, now) do
+    timer = Process.send_after(self(), {:expire, state.expires_at}, max(state.expires_at - now, 0))
+    Map.put(state, :expiry_timer, timer)
+  end
 
   defp apply_tick(%{entity: entity, tick: tick} = state) do
     %{caster: caster, spell: spell, effect: effect} = tick

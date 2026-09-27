@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defdelegate remove_aura_types(entity, aura_types, now), to: Lifecycle
   defdelegate remove_source_spell(entity, spell_id, caster_guid, now), to: Lifecycle
   defdelegate remove_area_aura(entity, area_guid, now), to: Lifecycle
+  defdelegate shorten_area_aura(entity, area_guid, expires_at, now), to: Lifecycle
   defdelegate delay_source_spell(entity, spell_id, caster_guid, delay_ms, now), to: Lifecycle
   defdelegate cancel_spell(entity, spell_id, now), to: Lifecycle
   defdelegate dispel(entity, dispel_type, now, polarity \\ nil, count \\ 1), to: Lifecycle

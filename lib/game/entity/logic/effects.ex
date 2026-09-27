@@ -490,6 +490,10 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.DespawnAreaEffects{spell_id: spell_id}
   end
 
+  def delay_area_effects(spell_id, delay_ms) when is_integer(spell_id) and is_integer(delay_ms) and delay_ms > 0 do
+    %Effects.DelayAreaEffects{spell_id: spell_id, delay_ms: delay_ms}
+  end
+
   def despawn_entity(guid) when is_integer(guid) do
     %Effects.DespawnEntity{target_guid: guid}
   end

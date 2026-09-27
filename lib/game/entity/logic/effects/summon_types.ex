@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SummonTypes do
     {:SpawnAreaEffect, [:spell, :effect, :position, :duration_ms], [radius_yards: nil]},
     {:SpawnFarsight, [:spell, :position, :duration_ms], []},
     {:DespawnAreaEffects, [:spell_id], []},
+    {:DelayAreaEffects, [:spell_id, :delay_ms], []},
     {:DespawnEntity, [:target_guid], []},
     {:RemoveSelf, [:respawn_delay_ms], []},
     {:ActivateGameObject, [:user_guid], []},

@@ -2,12 +2,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PersistentAreaTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.DynamicObject
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
@@ -20,11 +22,72 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PersistentAreaTest do
   alias ThistleTea.Game.Spell.PersistentArea
   alias ThistleTea.Game.Spell.PersistentArea.Check
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
   setup [:ground_spell]
+
+  describe "shorten_area_aura/4" do
+    test "shortens each source independently without restarting ticks or subtracting twice", ctx do
+      second = ground_effect(ctx, 1, 5.0, 4_000)
+      {target, _} = Aura.apply_spell(ctx.target, ctx.context, ctx.spell, 0)
+      {target, _} = Aura.apply_spell(target, second, second.spell, 10)
+      {target, []} = Aura.shorten_area_aura(target, ctx.area.guid, 2_500, 500)
+
+      assert [%Holder{expires_at: 4_000, auras: [first, other]}] = ground_holders(target)
+      assert first.persistent_area.expires_at == 2_500
+      assert other.persistent_area.expires_at == 4_000
+      assert first.next_tick_at == 1_000
+      assert other.next_tick_at == 1_000
+      assert {^target, []} = Aura.shorten_area_aura(target, ctx.area.guid, 2_500, 600)
+      assert {^target, []} = Aura.shorten_area_aura(target, ctx.area.guid, 3_500, 600)
+
+      {target, []} = Aura.shorten_area_aura(target, second.persistent_area.guid, 3_000, 750)
+      assert [%Holder{expires_at: 3_000} = holder] = ground_holders(target)
+      contexts = %{{ctx.spell.id, ctx.context.caster_guid, nil} => ground_checks(holder, 0)}
+
+      target =
+        Enum.reduce([1_000, 2_000, 2_500, 3_000], target, fn now, target ->
+          elem(Aura.tick(target, now, contexts), 0)
+        end)
+
+      assert target.unit.health == 500
+      assert ground_holders(target) == []
+      assert Aura.next_event_at(target) == nil
+      assert {^target, []} = Aura.tick(target, 4_000, contexts)
+    end
+
+    test "a refresh cannot restore the old deadline and the final due tick survives despawn", ctx do
+      {target, _} = Aura.apply_spell(ctx.target, ctx.context, ctx.spell, 0)
+      {target, _} = Aura.shorten_area_aura(target, ctx.area.guid, 1_000, 500)
+      {target, _} = Aura.apply_spell(target, ctx.context, ctx.spell, 750)
+      assert [%Holder{expires_at: 1_000, auras: [%{next_tick_at: 1_000}]}] = ground_holders(target)
+      World.remove_position(ctx.dynamic)
+      {target, _} = tick(target, ctx.context, 1_005, 0)
+      assert target.unit.health == 900
+      assert ground_holders(target) == []
+    end
+
+    test "stale shortening leaves replacement sources and ordinary auras alone", ctx do
+      {target, _} = Aura.apply_spell(ctx.target, ctx.context, ctx.spell, 0)
+      replacement = ground_effect(ctx, 0, 5.0, 5_000)
+      {target, _} = Aura.remove_area_aura(target, ctx.area.guid, 100)
+      {target, _} = Aura.apply_spell(target, replacement, replacement.spell, 250)
+      assert {^target, []} = Aura.shorten_area_aura(target, ctx.area.guid, 500, 300)
+      assert [%Holder{expires_at: 5_000}] = ground_holders(target)
+    end
+
+    test "player recipients receive the shortened aura duration", ctx do
+      target = %Character{object: ctx.target.object, unit: ctx.target.unit, internal: ctx.target.internal}
+      spell = %{ctx.spell | hidden_aura?: false}
+      {target, _} = Aura.apply_spell(target, %{ctx.context | spell: spell}, spell, 0)
+      {target, events} = Aura.shorten_area_aura(target, ctx.area.guid, 2_500, 500)
+      assert [%Holder{expires_at: 2_500, slot: slot}] = ground_holders(target)
+      assert [%Effects.AuraDuration{aura_slot: ^slot, duration_ms: 2_000}] = events
+    end
+  end
 
   describe "tick/3" do
     test "separately delivered ground effects coexist and expire with their own sources", ctx do
@@ -253,10 +316,61 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PersistentAreaTest do
       assert context.persistent_area.guid == ctx.dynamic.object.guid
       assert context.caster_guid == caster.object.guid
       assert hd(delivered.effects).type == :apply_aura
-      World.stop_entity(pid)
+
+      old_expiry = context.persistent_area.expires_at
       area_guid = ctx.dynamic.object.guid
+      DynamicObjectServer.delay(pid, 1_000)
+      assert_receive {:"$gen_cast", {:shorten_area_aura, ^area_guid, new_expiry}}, 1_000
+      assert new_expiry == old_expiry - 1_000
+      state = :sys.get_state(pid)
+      assert state.expires_at == new_expiry
+      assert state.started_at == context.persistent_area.started_at
+      send(pid, :tick)
+      assert_receive {:"$gen_cast", {:receive_spell, %{persistent_area: %{expires_at: ^new_expiry}}, _}}, 1_000
+
+      World.stop_entity(pid)
       assert_receive {:"$gen_cast", {:remove_area_aura, ^area_guid}}, 1_000
       assert World.position(area_guid) == nil
+    end
+
+    test "pushback routes by owner and spell, ignores stale timers, and expires the world source", ctx do
+      world = ctx.target.internal.world
+      owner = ctx.context.caster_guid
+      spell = ctx.spell
+      World.remove_position(ctx.dynamic)
+
+      objects = [
+        ctx.dynamic,
+        DynamicObject.build(owner, world, spell, {0.0, 0.0, 0.0}, 8.0),
+        DynamicObject.build(owner, world, %{spell | id: spell.id + 1}, {0.0, 0.0, 0.0}, 5.0),
+        DynamicObject.build(owner + 1, world, spell, {0.0, 0.0, 0.0}, 5.0)
+      ]
+
+      pids =
+        Enum.map(objects, fn entity ->
+          {:ok, pid} = World.start_entity(%{entity: entity, duration_ms: 60_000})
+          on_exit(fn -> World.stop_entity(entity.object.guid) end)
+          pid
+        end)
+
+      [pid, sibling | others] = pids
+      original = :sys.get_state(pid)
+      sibling_original = :sys.get_state(sibling)
+      other_states = Enum.map(others, &:sys.get_state/1)
+      monitor = Process.monitor(pid)
+      sibling_monitor = Process.monitor(sibling)
+      caster = %Character{object: %Object{guid: owner}}
+      EventSink.emit(caster, Effects.delay_area_effects(spell.id, 59_500))
+      shortened = :sys.get_state(pid)
+      assert shortened.expires_at == original.expires_at - 59_500
+      assert :sys.get_state(sibling).expires_at == sibling_original.expires_at - 59_500
+      assert Enum.map(others, &:sys.get_state/1) == other_states
+      send(pid, {:expire, original.expires_at})
+      assert :sys.get_state(pid).expires_at == shortened.expires_at
+      assert_receive {:DOWN, ^monitor, :process, ^pid, :normal}, 2_000
+      assert_receive {:DOWN, ^sibling_monitor, :process, ^sibling, :normal}, 2_000
+      assert World.position(ctx.dynamic.object.guid) == nil
+      refute Enum.any?(AreaEffects.pids(owner, spell.id), &Process.alive?/1)
     end
   end
 

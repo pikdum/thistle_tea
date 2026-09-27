@@ -172,6 +172,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.ControlGranted,
     Effects.ControlReleased,
     Effects.DespawnAreaEffects,
+    Effects.DelayAreaEffects,
     Effects.DespawnEntity,
     Effects.DespawnSelf,
     Effects.RemoveSelf,

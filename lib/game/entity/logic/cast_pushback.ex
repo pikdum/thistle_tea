@@ -39,7 +39,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushback do
         end
 
       Spell.channel_cancels_on_damage?(spell) ->
-        Casting.cancel(entity)
+        Casting.cancel(entity, now)
 
       true ->
         entity
@@ -51,7 +51,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushback do
       Spell.cancels_on_damage?(spell) ->
         entity
         |> Effects.enqueue(Effects.spell_cast_failed(Cast.spell_id(casting), :interrupted))
-        |> Casting.cancel()
+        |> Casting.cancel(now)
 
       Spell.pushback_on_damage?(spell) ->
         maybe_push_back(entity, casting, now)
@@ -87,7 +87,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushback do
       entity = delay_channel_auras(entity, casting, reduction, now)
 
       cond do
-        new_remaining <= 0 -> Casting.cancel(entity)
+        new_remaining <= 0 -> Casting.cancel(entity, now)
         reduction > 0 -> Effects.enqueue(entity, Effects.channel_update(guid, new_remaining))
         true -> entity
       end
@@ -102,6 +102,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushback do
        )
        when is_integer(reduction) and reduction > 0 do
     spell_id = Cast.spell_id(casting)
+    entity = Effects.enqueue(entity, Effects.delay_area_effects(spell_id, reduction))
 
     cond do
       target_guid in [0, nil, guid] -> AuraLogic.delay_source_spell(entity, spell_id, guid, reduction, now)

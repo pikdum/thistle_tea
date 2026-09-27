@@ -79,6 +79,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:remove_area_aura, area_guid})
   end
 
+  def shorten_area_aura(entity, area_guid, expires_at) do
+    dispatch_cast(entity, {:shorten_area_aura, area_guid, expires_at})
+  end
+
   def remove_spell_auras(entity, spell_ids) when is_list(spell_ids) do
     dispatch_cast(entity, {:remove_spell_auras, spell_ids})
   end

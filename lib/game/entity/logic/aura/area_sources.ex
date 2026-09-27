@@ -26,6 +26,21 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.AreaSources do
 
   def expire(holders, now), do: reject(holders, &(&1.expires_at <= now))
 
+  def shorten(holders, area_guid, expires_at) do
+    Enum.map(holders, fn %Holder{} = holder ->
+      auras =
+        Enum.map(holder.auras, fn
+          %Aura{persistent_area: %PersistentArea{guid: ^area_guid} = area} = aura ->
+            %{aura | persistent_area: %{area | expires_at: min(area.expires_at, expires_at)}}
+
+          aura ->
+            aura
+        end)
+
+      if auras == holder.auras, do: holder, else: synchronize(holder, auras)
+    end)
+  end
+
   def retain_available(%Holder{} = holder, %CastContext{area_checks: checks}) do
     reject_holder(holder, &match?(%Check{available?: false}, Map.get(checks, &1.guid)))
   end

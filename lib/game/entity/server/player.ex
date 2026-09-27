@@ -632,6 +632,16 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
+  def handle_cast({:shorten_area_aura, area_guid, expires_at}, %{character: %Character{} = character} = state) do
+    {character, events} = Aura.shorten_area_aura(character, area_guid, expires_at, Time.now())
+    character = EventSink.emit(character, events)
+    {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Area aura shortening failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_cast({:remove_spell_auras, spell_ids}, %{character: %Character{} = character} = state)
       when is_list(spell_ids) do
     {character, events} = Aura.remove_spells(character, spell_ids, Time.now())

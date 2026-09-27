@@ -111,6 +111,9 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
 
       assert caster.internal.casting.ends_at == 10_000
       assert [%Effects.ChannelUpdate{channel_time_ms: 8_000}] = effects_of(caster, Effects.ChannelUpdate)
+
+      assert [%Effects.DelayAreaEffects{spell_id: 15_407, delay_ms: 1_000}] =
+               effects_of(caster, Effects.DelayAreaEffects)
     end
 
     test "interrupts the channel when the remaining time is exhausted" do
@@ -120,6 +123,8 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
 
       assert caster.internal.casting == nil
       assert [%Effects.ChannelUpdate{channel_time_ms: 0}] = effects_of(caster, Effects.ChannelUpdate)
+      assert [%Effects.DelayAreaEffects{delay_ms: 100}] = effects_of(caster, Effects.DelayAreaEffects)
+      assert [%Effects.DespawnAreaEffects{spell_id: 15_407}] = effects_of(caster, Effects.DespawnAreaEffects)
     end
 
     test "self-inflicted damage does not shorten the channel" do
@@ -129,6 +134,20 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
 
       assert caster.internal.casting.ends_at == 11_000
       assert effects_of(caster, Effects.ChannelUpdate) == []
+      assert effects_of(caster, Effects.DelayAreaEffects) == []
+    end
+
+    test "periodic damage and resisted pushback leave area lifetimes intact" do
+      caster = channeling_character(channel_spell(@channel_delay), 1_000)
+      damaged = Core.take_damage(caster, 10, 2_000, source: 99, periodic: true)
+      assert damaged.internal.casting.ends_at == 11_000
+      assert effects_of(damaged, Effects.DelayAreaEffects) == []
+
+      resist = %Holder{spell: %Spell{id: 27_827}, auras: [%AuraData{type: :reduce_pushback, amount: 100}]}
+      caster = %{caster | unit: %{caster.unit | auras: [resist]}}
+      damaged = Core.take_damage(caster, 10, 2_000, source: 99)
+      assert damaged.internal.casting.ends_at == 11_000
+      assert effects_of(damaged, Effects.DelayAreaEffects) == []
     end
 
     test "cancels the channel when its flags interrupt on damage" do

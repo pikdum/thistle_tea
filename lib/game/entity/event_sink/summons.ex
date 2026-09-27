@@ -86,6 +86,17 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
 
   def emit(entity, %Effects.DespawnAreaEffects{}, _context), do: entity
 
+  def emit(%{object: %{guid: caster_guid}} = entity, %Effects.DelayAreaEffects{} = effect, _context)
+      when is_integer(caster_guid) do
+    caster_guid
+    |> AreaEffects.pids(effect.spell_id)
+    |> Enum.each(&DynamicObjectServer.delay(&1, effect.delay_ms))
+
+    entity
+  end
+
+  def emit(entity, %Effects.DelayAreaEffects{}, _context), do: entity
+
   def emit(entity, %Effects.DespawnEntity{target_guid: guid}, _context) when is_integer(guid) do
     World.stop_entity(guid)
     entity

@@ -172,6 +172,16 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
     transition(entity, kept, :removed, now)
   end
 
+  def shorten_area_aura(%{unit: %Unit{auras: holders}} = entity, area_guid, expires_at, now) do
+    updated = AreaSources.shorten(holders || [], area_guid, expires_at)
+
+    duration_events =
+      for holder <- updated, holder not in (holders || []), event <- duration_event(holder, now), do: event
+
+    {entity, events} = transition(entity, updated, :delayed, now)
+    {entity, events ++ duration_sync_events(entity, duration_events)}
+  end
+
   def delay_source_spell(%{unit: %Unit{auras: holders}} = entity, spell_id, caster_guid, delay_ms, now)
       when is_list(holders) and holders != [] and is_integer(spell_id) and is_integer(caster_guid) and
              is_integer(delay_ms) and delay_ms > 0 do
