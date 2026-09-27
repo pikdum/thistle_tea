@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.Targeting do
-  @moduledoc "Pet attack permissions for automatic acquisition, owner defense, and spell autocasting."
+  @moduledoc "Pet attack permissions for automatic acquisition, retaliation, and spell autocasting."
 
   import Bitwise, only: [&&&: 2]
 
@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.Targeting do
     not Spell.harmful?(spell) or commanded?(pet, target) or automatic_allowed?(pet, target, context)
   end
 
-  def owner_defense?(%Mob{} = pet, target, %Context{perception: perception} = context) do
+  def retaliation?(%Mob{} = pet, target, %Context{perception: perception} = context) do
     not Core.dead?(pet) and not CombatControl.auto_attack_blocked?(pet) and
       not living_victim?(pet, context) and automatic_allowed?(pet, target, context) and
       Navigation.target_alive_same_map?(pet, target, context) and Detection.detectable?(pet, target, context) and

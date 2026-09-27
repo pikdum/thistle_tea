@@ -118,7 +118,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.ReturnTest do
       assert returning.unit.target == 0
       assert [%NavigationIntent{destination: {x, 2.0, +0.0}}] = returning.internal.navigation_intents
       assert_in_delta x, 0.0, 0.01
-      refute Targeting.owner_defense?(returning, target, context)
+      refute Targeting.retaliation?(returning, target, context)
 
       moved = NavigationResolver.resolve(returning, 1_000, fn _, _, destination, _ -> [destination] end)
       context = %{context | now: moved.internal.movement_start_time + moved.movement_block.duration}
@@ -149,7 +149,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.ReturnTest do
       assert damaged.internal.blackboard.pet.returning == :command
 
       returning = PetBT.clear_combat_state(pet, 1_000)
-      assert Targeting.owner_defense?(returning, target, context(returning, target))
+      assert Targeting.retaliation?(returning, target, context(returning, target))
       assert %Engagement.Result{entity: defended, to: :engaged} = Engagement.enter(returning, target, 1_001)
       assert defended.internal.blackboard.pet.returning == nil
     end

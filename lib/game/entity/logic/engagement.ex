@@ -62,6 +62,15 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   def enter(%Mob{} = entity, _target_guid, _now, _opts), do: result(entity, entity, :invalid_target)
 
+  def on_damage(
+        %Mob{object: %{guid: guid}, internal: %Internal{pet: %Pet{}, in_combat: combat?}} = entity,
+        source,
+        _now
+      )
+      when combat? != true and is_integer(source) and source > 0 and source != guid do
+    Effects.enqueue(entity, %Effects.PetAttacked{attacker_guid: source})
+  end
+
   def on_damage(%Mob{object: %{guid: guid}, internal: %Internal{in_combat: combat?}} = entity, source, now)
       when combat? != true and is_integer(source) and source > 0 and source != guid do
     selection = if default_selection(entity) == :preserve, do: :preserve, else: :target

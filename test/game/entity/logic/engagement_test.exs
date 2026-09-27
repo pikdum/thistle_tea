@@ -161,6 +161,15 @@ defmodule ThistleTea.Game.Entity.Logic.EngagementTest do
   end
 
   describe "on_damage/3" do
+    test "pet damage requests retaliation without choosing a victim in the core" do
+      pet = mob()
+      pet = %{pet | internal: %{pet.internal | pet: %Pet{reaction_state: :defensive}}}
+      damaged = Engagement.on_damage(pet, 20, 1_000)
+      assert damaged.unit.target == pet.unit.target
+      assert damaged.internal.in_combat == pet.internal.in_combat
+      assert [%Effects.PetAttacked{attacker_guid: 20}] = damaged.internal.events
+    end
+
     test "first damage selects the attacker so the combat tree can run" do
       mob = Engagement.on_damage(mob(), 20, 1_000)
       assert mob.internal.in_combat

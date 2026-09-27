@@ -723,6 +723,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> wake_ai_tick()
 
     {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Attack reception failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   @impl GenServer
@@ -1414,19 +1418,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_info({:reward_pet_kill, _owner_guid, _owner_level, _reward}, %Mob{} = state), do: {:noreply, state}
 
-  def handle_info({:owner_attacked, attacker_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state)
-      when is_integer(attacker_guid) do
-    context = AIEnvironment.context(state, Time.now(), ObservationRequest.actor(attacker_guid))
-
-    state =
-      if PetTargeting.owner_defense?(state, attacker_guid, context),
-        do: state |> engage_combat(attacker_guid) |> wake_ai_tick(),
-        else: state
+  def handle_info({reaction, attacker_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state)
+      when reaction in [:owner_attacked, :pet_attacked] and is_integer(attacker_guid) do
+    previous = state
+    state = engage_combat(state, attacker_guid)
+    state = if state == previous, do: state, else: wake_ai_tick(state)
 
     {:noreply, state, {:continue, :maybe_broadcast}}
   rescue
     error ->
-      Logger.error("Pet owner defense failed: #{Exception.message(error)}")
+      Logger.error("Pet retaliation failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 
@@ -1946,8 +1947,22 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp apply_creature_group_command(%Mob{} = state, _command), do: state
 
-  defp engage_combat(%Mob{} = state, caster, opts) when is_integer(caster) do
+  defp engage_combat(%Mob{internal: %Internal{pet: %Pet{}}} = state, caster, opts) when is_integer(caster) do
     now = Time.now()
+    context = AIEnvironment.context(state, now, ObservationRequest.actor(caster))
+
+    if PetTargeting.retaliation?(state, caster, context),
+      do: enter_combat(state, caster, Keyword.put(opts, :selection, :target), now),
+      else: state
+  end
+
+  defp engage_combat(%Mob{} = state, caster, opts) when is_integer(caster) do
+    enter_combat(state, caster, opts, Time.now())
+  end
+
+  defp engage_combat(%Mob{} = state, _caster, _opts), do: state
+
+  defp enter_combat(%Mob{} = state, caster, opts, now) do
     %Engagement.Result{entity: state, from: from, to: to} = Engagement.enter(state, caster, now, opts)
     was_in_combat = from == :engaged
 
@@ -1956,10 +1971,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     else
       state
     end
-  end
-
-  defp engage_combat(%Mob{} = state, _caster, _opts) do
-    state
   end
 
   defp combat_entered(state, caster, was_in_combat, opts, now) do

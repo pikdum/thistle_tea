@@ -93,7 +93,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.TargetingTest do
     end
   end
 
-  describe "owner_defense?/3" do
+  describe "retaliation?/3" do
     test "keeps a living victim and permits replacement after its death", %{pet: pet, target: target} do
       current = target + 1
       context = context(pet, target, 10.0)
@@ -101,19 +101,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.TargetingTest do
       perception = %{context.perception | entities: Map.put(context.perception.entities, current, observation)}
       context = %{context | perception: perception}
       pet = %{pet | unit: %{pet.unit | target: current}, internal: %{pet.internal | in_combat: true}}
-      refute Targeting.owner_defense?(pet, target, context)
+      refute Targeting.retaliation?(pet, target, context)
 
       dead = %{observation | metadata: %{observation.metadata | alive?: false}}
       perception = %{perception | entities: Map.put(perception.entities, current, dead)}
-      assert Targeting.owner_defense?(pet, target, %{context | perception: perception})
+      assert Targeting.retaliation?(pet, target, %{context | perception: perception})
     end
 
     test "rejects distant Stay reactions and crowd-controlled attackers", %{pet: pet, target: target} do
-      assert Targeting.owner_defense?(pet, target, context(pet, target, 10.0))
-      refute Targeting.owner_defense?(pet, target, context(pet, target, 10.0, breakable_crowd_control?: true))
+      assert Targeting.retaliation?(pet, target, context(pet, target, 10.0))
+      refute Targeting.retaliation?(pet, target, context(pet, target, 10.0, breakable_crowd_control?: true))
       pet = %{pet | internal: %{pet.internal | pet: %{pet.internal.pet | command_state: :stay}}}
-      refute Targeting.owner_defense?(pet, target, context(pet, target, 10.0))
-      assert Targeting.owner_defense?(pet, target, context(pet, target, 2.0))
+      refute Targeting.retaliation?(pet, target, context(pet, target, 10.0))
+      assert Targeting.retaliation?(pet, target, context(pet, target, 2.0))
     end
   end
 
