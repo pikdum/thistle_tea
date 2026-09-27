@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.AmmunitionTest do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT.Ranged
   alias ThistleTea.Game.Entity.Logic.Ammunition, as: Ammo
+  alias ThistleTea.Game.Entity.Logic.AttackTimers
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Inventory
@@ -87,6 +88,36 @@ defmodule ThistleTea.Game.Player.AmmunitionTest do
   end
 
   describe "launch/2" do
+    test "a combat ranged swap invalidates a queued launch without spending ammunition", %{
+      state: state,
+      arrows: arrows,
+      bow: bow,
+      spell: spell
+    } do
+      state = Ammunition.select(state, arrows.object.entry)
+      {state, request} = repeat(state, spell, 2_000)
+      replacement = create_item(%{Item.template(bow) | entry: 997_984, delay: 3_500}, state.guid)
+      previous = %{state.character | internal: %{state.character.internal | in_combat: true}}
+
+      character =
+        %{previous | player: Inventory.equip(previous.player, :ranged, replacement)} |> Character.sync_equipment_stats()
+
+      character = AttackTimers.equipment_changed(character, previous, 2_000)
+      replaced = %{state | character: character}
+
+      assert character.internal.ranged_attack_at == 5_500
+      assert character.internal.auto_shot.next_at == 5_500
+      assert Ammunition.launch(replaced, request) == replaced
+      assert ItemStore.get(arrows.object.guid).item.stack_count == 2
+      refute_received {:"$gen_cast", {:receive_spell, _, _}}
+
+      {replaced, fresh} = repeat(replaced, spell, 5_500)
+      fired = Ammunition.launch(replaced, fresh)
+      assert ItemStore.get(arrows.object.guid).item.stack_count == 1
+      assert fired.character.internal.ranged_attack_at == 9_000
+      assert_receive {:"$gen_cast", {:receive_spell, %CastContext{}, ^spell}}
+    end
+
     test "wand repeats use the equipped school and skill without consuming ammunition", context do
       %{state: state, arrows: arrows} = context
       {state, spell, wand} = wand_weapon(state)

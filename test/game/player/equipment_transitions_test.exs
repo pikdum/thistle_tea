@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Player.EquipmentTransitionsTest do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
   alias ThistleTea.Game.Entity.Server.Player.State
@@ -22,6 +23,7 @@ defmodule ThistleTea.Game.Player.EquipmentTransitionsTest do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
 
@@ -83,7 +85,9 @@ defmodule ThistleTea.Game.Player.EquipmentTransitionsTest do
     end
 
     test "a combat weapon swap publishes the GCD and rejects a second swap", %{state: state, item: item} do
-      template = %ItemTemplate{entry: item.object.entry, class: 2, subclass: 14, inventory_type: 13}
+      template = %ItemTemplate{entry: item.object.entry, class: 2, subclass: 14, inventory_type: 13, delay: 3_400}
+      :ets.insert(ItemLoader, {template.entry, template})
+      on_exit(fn -> :ets.delete(ItemLoader, template.entry) end)
       weapon = Item.build(template, item.object.guid, owner: state.guid)
       ItemStore.put(weapon)
       other = ItemStore.create(%{template | entry: template.entry + 1}, owner: state.guid)
@@ -97,8 +101,11 @@ defmodule ThistleTea.Game.Player.EquipmentTransitionsTest do
       }
 
       state = %{state | character: character}
+      before = Time.now()
       equipped = Inventory.auto_equip(state, {255, 23})
       assert equipped.character.player.mainhand == weapon.object.guid
+      assert equipped.character.internal.blackboard.combat.next_attack_at in (before + 3_400)..(Time.now() + 3_400)
+      assert equipped.character.internal.broadcast_update?
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgSpellCooldown{cooldowns: [{6119, 0}]}}}
       assert Inventory.swap(equipped, {255, 24}, {255, 15}) == equipped
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgInventoryChangeFailure{code: 39}}}
@@ -107,6 +114,30 @@ defmodule ThistleTea.Game.Player.EquipmentTransitionsTest do
   end
 
   describe "InventoryUpdate.apply/2" do
+    test "change-set removal restarts unarmed combat without needing the deleted item", %{state: state, item: item} do
+      template = %ItemTemplate{entry: item.object.entry, class: 2, inventory_type: 13, delay: 3_400}
+
+      character = %{
+        state.character
+        | player: %{state.character.player | mainhand: item.object.guid, inv1: 0},
+          unit: %{
+            state.character.unit
+            | mainhand_weapon: template,
+              base_melee_attack_time: 3_400,
+              base_attack_time: 3_400
+          },
+          internal: %{state.character.internal | in_combat: true, blackboard: Blackboard.new()}
+      }
+
+      changes = ChangeSet.new(%{character.player | mainhand: 0})
+      changes = %{changes | destroyed: %{item.object.guid => item}}
+      before = Time.now()
+      removed = InventoryUpdate.apply(%{state | character: character}, {:ok, changes})
+      assert ItemStore.get(item.object.guid) == nil
+      assert removed.character.unit.mainhand_weapon == nil
+      assert removed.character.internal.blackboard.combat.next_attack_at in (before + 2_000)..(Time.now() + 2_000)
+    end
+
     test "change sets share the cooldown transition and no-op resync leaves its deadline alone", %{
       state: state,
       item: item,

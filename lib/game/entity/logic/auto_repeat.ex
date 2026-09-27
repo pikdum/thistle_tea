@@ -49,6 +49,18 @@ defmodule ThistleTea.Game.Entity.Logic.AutoRepeat do
     %{character | internal: %{character.internal | auto_shot: shot, ranged_attack_at: next_at}}
   end
 
+  def reset_timer(%Character{internal: %Internal{} = internal} = character, now) do
+    next_at = now + max(character.unit.ranged_attack_time || 2_000, 1)
+
+    shot =
+      case internal.auto_shot do
+        nil -> nil
+        shot -> shot |> Map.put(:next_at, next_at) |> Map.delete(:pending?)
+      end
+
+    %{character | internal: %{internal | auto_shot: shot, ranged_attack_at: next_at}}
+  end
+
   def moving?(%{movement_block: %MovementBlock{} = movement}) do
     MovementBlock.translating?(movement) or MovementBlock.airborne?(movement)
   end

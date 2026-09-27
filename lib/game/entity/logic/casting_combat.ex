@@ -7,8 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingCombat do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
-  alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.AttackTimers
   alias ThistleTea.Game.Entity.Logic.CombatWeapon
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
@@ -47,24 +46,11 @@ defmodule ThistleTea.Game.Entity.Logic.CastingCombat do
   defp command_pet_attack(entity, _target_guid), do: entity
 
   defp reset_swings(entity, now) do
-    blackboard =
-      entity.internal.blackboard
-      |> Blackboard.ensure()
-      |> Blackboard.put_next_at(:next_attack_at, Combat.attack_speed_ms(entity), now)
+    entity = AttackTimers.reset(entity, :mainhand, now)
 
-    blackboard =
-      if CombatWeapon.usable(entity, :offhand) do
-        Blackboard.put_next_at(
-          blackboard,
-          :next_offhand_attack_at,
-          Combat.offhand_attack_speed_ms(entity) || 2_000,
-          now
-        )
-      else
-        blackboard
-      end
-
-    %{entity | internal: %{entity.internal | blackboard: blackboard}}
+    if CombatWeapon.usable(entity, :offhand),
+      do: AttackTimers.reset(entity, :offhand, now),
+      else: entity
   end
 
   defp stop_attacks(%Character{} = character) do

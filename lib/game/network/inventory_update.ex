@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
+  alias ThistleTea.Game.Entity.Logic.AttackTimers
   alias ThistleTea.Game.Entity.Logic.EquipmentTransitions
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
@@ -125,9 +126,12 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
   end
 
   defp sync_character(%Character{} = character, %Player{} = player) do
+    now = Time.now()
+
     %{character | player: player}
     |> Character.sync_equipment_stats()
-    |> EquipmentTransitions.apply(character.player, &ItemStore.get/1, &SpellLoader.cached/1, Time.now())
+    |> EquipmentTransitions.apply(character.player, &ItemStore.get/1, &SpellLoader.cached/1, now)
+    |> AttackTimers.equipment_changed(character, now)
   end
 
   defp finish_update(state) do

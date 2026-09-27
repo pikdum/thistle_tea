@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MeleeReadinessTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
+  alias ThistleTea.Game.Entity.Logic.AttackTimers
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
@@ -26,6 +27,28 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MeleeReadinessTest do
   setup [:attacker]
 
   describe "melee_attack_with_context/3" do
+    test "a restarted hand waits for its new deadline before delivering an attack", %{
+      attacker: attacker,
+      blackboard: blackboard
+    } do
+      blackboard = %{blackboard | combat: %{blackboard.combat | next_attack_at: 1_100, next_offhand_attack_at: 10_000}}
+      attacker = %{attacker | internal: %{attacker.internal | blackboard: blackboard}}
+      attacker = AttackTimers.reset(attacker, :mainhand, 1_000)
+      deadline = attacker.internal.blackboard.combat.next_attack_at
+
+      {:success, waiting, blackboard} =
+        Combat.melee_attack_with_context(attacker, attacker.internal.blackboard, context(3, 0, deadline - 1))
+
+      assert waiting.internal.events == []
+      assert blackboard.combat.next_attack_at == deadline
+
+      {:success, attacked, blackboard} = Combat.melee_attack_with_context(waiting, blackboard, context(3, 0, deadline))
+      assert [%Effects.DeliverAttack{attack: %{damage: 10} = attack}] = attacked.internal.events
+      refute Map.get(attack, :offhand?, false)
+      assert blackboard.combat.next_attack_at == deadline + attacker.unit.base_attack_time
+      assert blackboard.combat.next_offhand_attack_at == 10_000
+    end
+
     test "holds both hands and a queued ability outside the facing arc", %{attacker: attacker, blackboard: blackboard} do
       queued = %Spell{id: 78}
       attacker = %{attacker | internal: %{attacker.internal | next_swing_spell: queued}}
