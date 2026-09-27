@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.World.Presence do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.ItemEligibility
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.OutdoorPvp.Participation
@@ -55,7 +56,10 @@ defmodule ThistleTea.Game.World.Presence do
   end
 
   defp state_metadata(character) do
-    Map.put(location_metadata(character), :item_eligibility, ItemEligibility.from_character(character))
+    character
+    |> location_metadata()
+    |> Map.put(:item_eligibility, ItemEligibility.from_character(character))
+    |> Map.merge(PlayerCombat.projection(character))
   end
 
   defp put_position(%Character{movement_block: %MovementBlock{}} = character) do

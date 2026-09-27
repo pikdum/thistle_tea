@@ -126,6 +126,33 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
       end
     end
 
+    test "a fighting pet observes distant owner opponents and player attackers as immutable snapshots" do
+      world = WorldRef.open(999)
+      owner = Guid.from_low_guid(:player, 98_201)
+      attacker = Guid.runtime(:mob, 17)
+      rival = Guid.from_low_guid(:player, 98_202)
+      pet = mob(world)
+      pet = %{pet | internal: %{pet.internal | in_combat: true, pet: %Internal.Pet{owner_guid: owner}}}
+      put_actor(:players, owner, world, 150.0)
+      put_actor(:mobs, attacker, world, 160.0)
+      put_actor(:players, rival, world, 180.0)
+      Metadata.update(owner, %{in_combat: true, combat_targets: [attacker], combat_victim_guid: attacker})
+      Metadata.update(rival, %{in_combat: true, combat_victim_guid: owner})
+
+      on_exit(fn ->
+        remove_actor(:players, owner)
+        remove_actor(:mobs, attacker)
+        remove_actor(:players, rival)
+      end)
+
+      context = AIEnvironment.context(pet, 1_000)
+      Metadata.update(owner, %{combat_targets: []})
+      Metadata.update(rival, %{combat_victim_guid: nil})
+      assert Perception.position(context.perception, attacker) == {world, 160.0, 0.0, 0.0}
+      assert Perception.metadata(context.perception, owner).combat_targets == [attacker]
+      assert Perception.metadata(context.perception, rival).combat_victim_guid == owner
+    end
+
     test "a charmed player observes its controller and every threat candidate" do
       world = WorldRef.open(999)
       caster = Guid.from_low_guid(:mob, 1, 98_190)

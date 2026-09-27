@@ -33,6 +33,26 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   @combat_drop_ms 5_000
 
+  def projection(%Character{} = character) do
+    %{
+      combat_victim_guid: attack_target(character),
+      combat_targets: character.internal.threat_refs |> Kernel.||(MapSet.new()) |> threat_ref_guids() |> Enum.sort()
+    }
+  end
+
+  defp attack_target(%Character{
+         internal: %Internal{
+           in_combat: true,
+           blackboard: %Blackboard{combat: %Combat{auto_attacking: true, auto_attack_target: %TargetRef{guid: guid}}}
+         }
+       }), do: guid
+
+  defp attack_target(%Character{internal: %Internal{in_combat: true}} = character), do: ranged_target(character)
+  defp attack_target(_character), do: nil
+
+  defp ranged_target(%Character{internal: %Internal{auto_shot: %{target_guid: guid}}}), do: guid
+  defp ranged_target(_character), do: nil
+
   def mark_attacked(character, now, faction_id \\ nil)
 
   def mark_attacked(%Character{internal: %Internal{} = internal} = character, now, faction_id) when is_integer(now) do

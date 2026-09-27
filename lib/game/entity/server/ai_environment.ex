@@ -265,13 +265,14 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     [control.caster_guid, control.command_target, target, controller[:victim_guid] | controller[:combat_targets] || []]
   end
 
-  defp direct_guids(%{
-         internal: %Internal{pet: %Pet{owner_guid: owner_guid}, threat: threat},
-         unit: %Unit{target: target}
-       }) do
+  defp direct_guids(
+         %{internal: %Internal{pet: %Pet{owner_guid: owner_guid}, threat: threat}, unit: %Unit{target: target}} = entity
+       ) do
     owner = Metadata.get(owner_guid) || %{}
 
-    [owner_guid, target, Map.get(owner, :victim_guid) | threat_guids(threat)]
+    [owner_guid, target, owner[:combat_victim_guid], owner[:victim_guid] | threat_guids(threat)]
+    |> Enum.concat(owner[:combat_targets] || [])
+    |> Enum.concat(player_attackers(entity, owner_guid))
     |> Enum.filter(&(is_integer(&1) and &1 > 0))
   end
 
@@ -285,6 +286,20 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   end
 
   defp direct_guids(_entity), do: []
+
+  defp player_attackers(%Mob{object: %{guid: guid}, internal: %{in_combat: true}} = entity, owner) do
+    (World.nearby_players(entity) ++ World.nearby_players(owner))
+    |> Enum.map(&elem(&1, 0))
+    |> Enum.uniq()
+    |> Enum.filter(fn player ->
+      case Metadata.get(player) do
+        %{in_combat: true, combat_victim_guid: victim} -> victim in [guid, owner]
+        _ -> false
+      end
+    end)
+  end
+
+  defp player_attackers(_entity, _owner), do: []
 
   defp script_condition_results(%{object: %{guid: source_guid}, internal: %Internal{world: world}}, groups)
        when is_map(groups) do

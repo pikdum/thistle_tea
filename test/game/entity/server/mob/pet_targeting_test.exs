@@ -50,7 +50,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetTargetingTest do
   describe "handle_cast/2 receive_attack" do
     test "Stay takes ranged damage without choosing a victim", %{pet: pet, target: target} do
       pet = PetBT.command(pet, :stay, 0, 1_000)
-      attack = %{caster: target, damage: 10, damage_state: 1, hit_info: 2}
+      attack = attack(target)
       assert {:noreply, damaged, {:continue, :maybe_broadcast}} = MobServer.handle_cast({:receive_attack, attack}, pet)
       assert damaged.unit.health == 90
       refute damaged.internal.in_combat
@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetTargetingTest do
     test "contact starts defense even when the incoming attack misses", %{pet: pet, target: target} do
       pet = PetBT.command(pet, :stay, 0, 1_000)
       SpatialHash.update(:mobs, target, pet.internal.world, 2.0, 0.0, 0.0)
-      attack = %{caster: target, damage: 0, damage_state: 1, hit_info: 0x10}
+      attack = %{attack(target) | hit_chance_bonus: -100}
       assert {:noreply, defended, {:continue, :maybe_broadcast}} = MobServer.handle_cast({:receive_attack, attack}, pet)
       assert defended.unit.health == 100
       assert defended.internal.in_combat
@@ -71,7 +71,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetTargetingTest do
 
     test "damage from another attacker keeps the current living victim", %{pet: pet, target: target, other: other} do
       pet = %{pet | unit: %{pet.unit | target: other}, internal: %{pet.internal | in_combat: true}}
-      attack = %{caster: target, damage: 10, damage_state: 1, hit_info: 2}
+      attack = attack(target)
       assert {:noreply, defended, {:continue, :maybe_broadcast}} = MobServer.handle_cast({:receive_attack, attack}, pet)
       assert defended.unit.health == 90
       assert defended.unit.target == other
@@ -107,6 +107,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetTargetingTest do
       pet = %{pet | unit: %{pet.unit | target: other}, internal: %{pet.internal | in_combat: true}}
       assert {:noreply, ^pet, {:continue, :maybe_broadcast}} = MobServer.handle_info({:owner_attacked, target}, pet)
     end
+  end
+
+  defp attack(target) do
+    %{
+      caster: target,
+      caster_level: 10,
+      damage: 10,
+      ranged?: true,
+      hit_chance_bonus: 100,
+      crit_chance: 0,
+      block_allowed?: false
+    }
   end
 
   defp entities(_context) do

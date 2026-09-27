@@ -38,6 +38,8 @@ defmodule ThistleTea.DevSeed do
   Another Evoker at {15983.2, 16088.1} casts Plague for raid proximity and expiry testing.
   An isolated Vharr at {16603.2, 16358.1} and an elevated Defias Thug at
   {16603.2, 16438.1} support civilian protection and vertical aggro checks.
+  A Defias Thug and Cutpurse at {16653.2, 16268.1} and {16657.2, 16268.1}
+  support defensive pet target transitions between multiple attackers.
   """
   import Ecto.Query
 
@@ -376,6 +378,8 @@ defmodule ThistleTea.DevSeed do
 
     spawn_mob(1146, @base_low_guid + 3200, {x + 300.0, y + 40.0, z}, nil, 30)
     spawn_mob(38, @base_low_guid + 3201, {x + 300.0, y + 120.0, z}, nil, 30, altitude: 8.0)
+    spawn_mob(38, @base_low_guid + 3300, {x + 350.0, y - 50.0, z}, nil, 30)
+    spawn_mob(94, @base_low_guid + 3301, {x + 354.0, y - 50.0, z}, nil, 30)
 
     spawn_mob(2006, @base_low_guid + 2600, {x - 220.0, y + 80.0, z}, nil, 30)
     spawn_mob(2007, @base_low_guid + 2601, {x - 224.0, y + 84.0, z}, nil, 30)

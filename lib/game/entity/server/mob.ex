@@ -1594,7 +1594,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           alive?: not Core.dead?(state),
           feigning_death?: FeignDeath.successful?(state),
           victim_guid: state.unit.target,
+          combat_victim_guid: state.unit.target,
           combat_targets: Threat.targets(state),
+          evading?: evading?(state.internal.blackboard),
           charmed_by: state.unit.charmed_by,
           detect_range_modifier: Aura.flat_amount(state, :mod_detect_range),
           level: state.unit.level,
@@ -1911,6 +1913,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     blackboard = blackboard |> Blackboard.ensure() |> Blackboard.reset_deadline(:next_aggro_at)
     %{state | internal: %{internal | blackboard: blackboard}}
   end
+
+  defp evading?(%Blackboard{navigation: %{returning_home?: true}}), do: true
+  defp evading?(_blackboard), do: false
 
   defp engage_combat(state, caster), do: engage_combat(state, caster, [])
 

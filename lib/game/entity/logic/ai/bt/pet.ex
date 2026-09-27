@@ -19,8 +19,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Fear, as: FearBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Pet.TargetSelection
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -48,7 +50,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
       BT.sequence([
         BT.condition(&in_combat?/2),
         BT.selector([
-          BT.sequence([BT.condition(&target_invalid?/3), BT.action(&clear_combat/3)]),
+          BT.sequence([BT.condition(&target_invalid?/3), BT.action(&continue_combat/3)]),
           MobSpells.step(),
           BT.sequence([
             BT.condition(&CombatBT.in_combat_range?/3),
@@ -128,8 +130,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
     not Navigation.target_alive_same_map?(state, target, context)
   end
 
-  defp clear_combat(state, blackboard, %Context{now: now}) do
-    state = %{state | internal: %{state.internal | blackboard: blackboard}} |> clear_combat_state(now)
+  defp continue_combat(state, blackboard, %Context{now: now} = context) do
+    pet = %{state.internal.pet | attack_command?: false}
+    blackboard = blackboard |> Blackboard.clear_chase() |> Blackboard.reset_spells()
+    state = %{state | internal: %{state.internal | pet: pet, blackboard: blackboard}}
+    %Engagement.Result{entity: state} = Engagement.stop_attack(state)
+    state = state |> Casting.cancel() |> halt(now)
+
+    state =
+      case TargetSelection.next(state, context) do
+        nil -> clear_combat_state(state, now)
+        target -> Engagement.enter(state, target, now, selection: :target).entity
+      end
+
     {:success, state, state.internal.blackboard}
   end
 

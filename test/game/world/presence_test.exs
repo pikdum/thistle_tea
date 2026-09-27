@@ -8,7 +8,10 @@ defmodule ThistleTea.Game.World.PresenceTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Model
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -84,6 +87,42 @@ defmodule ThistleTea.Game.World.PresenceTest do
   end
 
   describe "sync/2" do
+    test "publishes actual attack targets separately from UI selection and releases combat references" do
+      character = character(WorldRef.open(0), {1.0, 2.0, 3.0, 0.0}, 12)
+      character = %{character | unit: %{character.unit | target: 42}}
+      character = PlayerCombat.gain_threat_ref(character, 50, 1)
+      on_exit(fn -> Presence.leave(character) end)
+      Presence.enter(character, %{})
+      assert Metadata.get(character.object.guid).combat_victim_guid == nil
+      assert Metadata.get(character.object.guid).combat_targets == [50]
+
+      blackboard = %Blackboard{}
+
+      blackboard = %{
+        blackboard
+        | combat: %{blackboard.combat | auto_attacking: true, auto_attack_target: %TargetRef{guid: 77}}
+      }
+
+      character = %{character | internal: %{character.internal | blackboard: blackboard}}
+      Presence.sync(character, %{})
+      assert Metadata.get(character.object.guid).combat_victim_guid == 77
+
+      character = PlayerCombat.lose_threat_ref(character, 50, 1)
+
+      character = %{
+        character
+        | internal: %{character.internal | blackboard: %Blackboard{}, auto_shot: %{target_guid: 88}}
+      }
+
+      Presence.sync(character, %{})
+      assert Metadata.get(character.object.guid).combat_victim_guid == 88
+      assert Metadata.get(character.object.guid).combat_targets == []
+
+      character = %{character | internal: %{character.internal | in_combat: false}}
+      Presence.sync(character, %{})
+      assert Metadata.get(character.object.guid).combat_victim_guid == nil
+    end
+
     test "publishes transformed reach and restores native geometry" do
       character = character(WorldRef.open(0), {1.0, 2.0, 3.0, 0.0}, 12)
 
