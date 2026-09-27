@@ -31,6 +31,8 @@ defmodule ThistleTea.DevSeed do
   A Defias Evoker southeast of the playground supports controlled ground spell casts.
   A Stormwind guard and Skeletal Flayer southwest of the playground support
   NPC-assisted kills, contribution-based experience, and loot eligibility.
+  A Challenge to Urok button and linked trap southwest of the playground sit
+  beside an Urok Enforcer and Urok Ogre Magus for scripted trap targeting.
   """
   import Ecto.Query
 
@@ -353,6 +355,8 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(6329, @base_low_guid + 2501, {x + 230.0, y - 100.0, z}, nil, 180)
     spawn_mob(5307, @base_low_guid + 2800, {x + 90.0, y - 140.0, z}, nil, 180)
     spawn_mob(5308, @base_low_guid + 2801, {x + 100.0, y - 140.0, z}, nil, 180)
+    spawn_mob(10_602, @base_low_guid + 2900, {x - 260.0, y - 180.0, z}, nil, 180)
+    spawn_mob(10_601, @base_low_guid + 2901, {x - 264.0, y - 180.0, z}, nil, 180)
     spawn_mob(2006, @base_low_guid + 2600, {x - 220.0, y + 80.0, z}, nil, 30)
     spawn_mob(2007, @base_low_guid + 2601, {x - 224.0, y + 84.0, z}, nil, 30)
     spawn_mob(1412, @base_low_guid + 2602, {x - 224.0, y + 80.0, z}, nil, 30)
@@ -385,7 +389,9 @@ defmodule ThistleTea.DevSeed do
           {17_189, 30.0, 30.0},
           {181_598, 40.0, 42.0},
           {164_882, 35.0, 42.0},
-          {180_771, 90.0, -180.0}
+          {180_771, 90.0, -180.0},
+          {175_584, -260.0, -184.0},
+          {175_589, -260.0, -184.0}
         ] do
       template = GameObjectTemplateLoader.cached(entry)
       {ox, oy, oz} = Pathfinding.snap_to_ground(@map, {x + dx, y + dy, z})

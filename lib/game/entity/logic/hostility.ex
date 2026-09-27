@@ -124,6 +124,9 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   def faction_template(%FactionTemplate{} = faction_template), do: faction_template
   def faction_template(%{faction_template: %FactionTemplate{} = faction_template}), do: faction_template
 
+  def faction_template(%{game_object: %{created_by: owner}}) when is_integer(owner) and owner > 0,
+    do: faction_template(%{object: %{guid: owner}})
+
   def faction_template(%{object: %{guid: guid}}) when is_integer(guid) do
     case Metadata.query(guid, [:faction_template]) do
       %{faction_template: %FactionTemplate{} = faction_template} -> faction_template
@@ -245,6 +248,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   defp owner_guid(%{internal: %{possession: %{caster_guid: owner_guid}}}), do: owner_guid
   defp owner_guid(%{internal: %{pet: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid
   defp owner_guid(%{internal: %{totem: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid
+  defp owner_guid(%{game_object: %{created_by: owner_guid}}) when is_integer(owner_guid), do: owner_guid
   defp owner_guid(_entity), do: nil
 
   defp player_guid?(guid) when is_integer(guid), do: Guid.entity_type(guid) == :player

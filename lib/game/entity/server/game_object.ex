@@ -37,10 +37,10 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Server.GameObject.Fishing
   alias ThistleTea.Game.Entity.Server.GameObject.Goober, as: GooberServer
   alias ThistleTea.Game.Entity.Server.GameObject.Ritual, as: RitualServer
+  alias ThistleTea.Game.Entity.Server.GameObject.SpellCast
   alias ThistleTea.Game.Entity.Server.GameObject.Trap, as: TrapServer
   alias ThistleTea.Game.Entity.Server.ScriptDelivery
   alias ThistleTea.Game.Entity.Server.ScriptExecution
-  alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgFishNotHooked
   alias ThistleTea.Game.Network.Message.SmsgGameobjectCustomAnim
@@ -49,7 +49,6 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
@@ -728,19 +727,24 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   defp finish_ritual_channels(%GameObject{}), do: nil
 
   defp trigger_trap(state, %Trap{owner_guid: owner_guid, spell_id: spell_id, level: template_level}, target_guid) do
-    case SpellLoader.load(spell_id) do
+    case SpellLoader.cached(spell_id) do
       %Spell{} = spell ->
         level = Enum.find([template_level, state.game_object.level, 60], &(is_integer(&1) and &1 > 0))
         caster = trap_caster(state, owner_guid, level)
 
-        spell
-        |> immediate_trap_spell()
-        |> deliver_trap_spell(caster, target_guid, level)
+        state =
+          state
+          |> SpellCast.launch(immediate_trap_spell(spell), target_guid,
+            caster_guid: owner_guid || state.object.guid,
+            level: level
+          )
+          |> EventSink.emit_pending(Context.new(self()))
 
         spawn_trap_areas(caster, spell)
+        state
 
       _ ->
-        nil
+        state
     end
   end
 
@@ -755,7 +759,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   defp do_activate_trap(state, trap, target_guid, now) do
-    trigger_trap(state, trap, target_guid)
+    state = trigger_trap(state, trap, target_guid)
 
     case TrapServer.consume(trap) do
       :depleted ->
@@ -794,17 +798,6 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   defp immediate_trap_spell(%Spell{} = spell) do
     %{spell | effects: Enum.reject(spell.effects, &(&1.type == :persistent_area_aura))}
-  end
-
-  defp deliver_trap_spell(%Spell{effects: []}, _caster, _target_guid, _level), do: nil
-
-  defp deliver_trap_spell(%Spell{} = spell, caster, target_guid, level) do
-    caster
-    |> SpellTargetResolver.resolve(spell, Target.unit(target_guid))
-    |> Enum.each(fn guid ->
-      context = %CastContext{caster_guid: caster.object.guid, caster_level: level, target_guid: guid, spell: spell}
-      Entity.receive_spell(guid, context, spell)
-    end)
   end
 
   defp spawn_trap_areas(caster, %Spell{} = spell) do

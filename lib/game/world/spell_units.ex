@@ -95,13 +95,15 @@ defmodule ThistleTea.Game.World.SpellUnits do
   defp area_origin(caster, _effect, _targets, :script_units_in_cone), do: position(caster)
 
   defp area_candidates(caster, _origin, radius) when radius > 200,
-    do: [caster.object.guid | World.mobs_in(caster.internal.world) ++ World.players_in(caster.internal.world)]
+    do: caster_units(caster) ++ World.mobs_in(caster.internal.world) ++ World.players_in(caster.internal.world)
 
   defp area_candidates(caster, origin, radius),
-    do: [
-      caster.object.guid
-      | Enum.flat_map([:mobs, :players], &World.nearby_candidates(&1, caster.internal.world, origin, radius))
-    ]
+    do:
+      caster_units(caster) ++
+        Enum.flat_map([:mobs, :players], &World.nearby_candidates(&1, caster.internal.world, origin, radius))
+
+  defp caster_units(%{object: %{guid: guid}, unit: _unit}), do: [guid]
+  defp caster_units(_caster), do: []
 
   defp area_candidate(caster, guid, origin, radius, mode, cone_degrees) do
     with {position, metadata} <- area_facts(caster, guid),
@@ -198,8 +200,7 @@ defmodule ThistleTea.Game.World.SpellUnits do
   end
 
   defp candidates(caster, radius),
-    do:
-      World.nearby_candidates(:mobs, caster.internal.world, position(caster), radius + reach(caster.unit.combat_reach))
+    do: World.nearby_candidates(:mobs, caster.internal.world, position(caster), radius + combat_reach(caster))
 
   defp candidate(caster, guid, radius, selectors) do
     world = caster.internal.world
@@ -208,9 +209,9 @@ defmodule ThistleTea.Game.World.SpellUnits do
          {^world, x, y, z} <- World.position(guid),
          true <- is_pid(Entity.pid(guid)),
          distance = Math.distance(position(caster), {x, y, z}),
-         true <- distance <= radius + reach(caster.unit.combat_reach) + reach(Map.get(metadata, :combat_reach)),
+         true <- distance <= radius + combat_reach(caster) + reach(Map.get(metadata, :combat_reach)),
          true <- Enum.any?(selectors, &matches?(caster, guid, metadata, &1)) do
-      max(distance - reach(caster.unit.bounding_radius) - reach(Map.get(metadata, :bounding_radius)), 0)
+      max(distance - bounding_radius(caster) - reach(Map.get(metadata, :bounding_radius)), 0)
     else
       _ -> nil
     end
@@ -246,5 +247,9 @@ defmodule ThistleTea.Game.World.SpellUnits do
 
   defp reach(value) when is_number(value) and value > 0, do: value
   defp reach(_value), do: 0
+  defp combat_reach(%{unit: %{combat_reach: value}}), do: reach(value)
+  defp combat_reach(_caster), do: 0
+  defp bounding_radius(%{unit: %{bounding_radius: value}}), do: reach(value)
+  defp bounding_radius(_caster), do: 0
   defp position(%{movement_block: %{position: {x, y, z, _}}}), do: {x, y, z}
 end

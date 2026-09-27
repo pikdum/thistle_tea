@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Entity.Logic.Threat
+  alias ThistleTea.Game.Guid
 
   @dynamic_flag_tapped 0x0004
 
@@ -79,6 +80,12 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   defp enter_active(%Mob{internal: %Internal{}} = entity, target_guid, now, opts)
        when is_integer(target_guid) and target_guid > 0 and is_integer(now) do
+    if Guid.entity_type(target_guid) in [:player, :mob, :pet],
+      do: enter_unit_combat(entity, target_guid, now, opts),
+      else: result(entity, entity, :invalid_target)
+  end
+
+  defp enter_unit_combat(%Mob{} = entity, target_guid, now, opts) do
     previous = entity
     entity = CombatLeash.enter(entity, now, Keyword.get(opts, :leash_source))
     internal = entity.internal

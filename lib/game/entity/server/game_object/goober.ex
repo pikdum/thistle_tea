@@ -5,9 +5,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Goober do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Goober
-  alias ThistleTea.Game.Entity.SpellTargetResolver
+  alias ThistleTea.Game.Entity.Server.GameObject.SpellCast
   alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.EventScript, as: EventScriptLoader
@@ -53,17 +52,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Goober do
 
   def finish_spell(%GameObject{internal: %{world: world}} = object, %Spell{} = spell, user_guid) do
     if match?({^world, _, _, _}, World.position(user_guid)) do
-      targets = SpellTargetResolver.resolve(object, spell, Target.unit(user_guid))
-
-      deliveries =
-        Enum.map(targets, fn guid ->
-          context = %{CastContext.from_caster(object, spell, guid) | selected_target_guid: user_guid}
-          Effects.deliver_spell(guid, context, spell)
-        end)
-
-      Effects.enqueue(object, [
-        Effects.spell_go(object.object.guid, spell.id, targets, Target.unit(user_guid)) | deliveries
-      ])
+      SpellCast.launch(object, spell, user_guid)
     else
       object
     end

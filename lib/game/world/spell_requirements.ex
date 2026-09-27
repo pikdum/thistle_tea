@@ -20,6 +20,19 @@ defmodule ThistleTea.Game.World.SpellRequirements do
   alias ThistleTea.Game.World.Visibility
 
   def resolve(caster, %Spell{} = spell, targets \\ Target.none()) do
+    requirements = resolve_targets(caster, spell, targets)
+    targets = LocationTargets.apply(targets, requirements.locations)
+
+    %{
+      requirements
+      | corpse: corpse(caster, spell),
+        aura_target: aura_target(caster, targets),
+        spell_area: SpellAreas.context(caster, spell),
+        outdoors?: SpellEnvironment.context(caster, spell)
+    }
+  end
+
+  def resolve_targets(caster, %Spell{} = spell, %Target{} = targets) do
     focus = SpellFocus.find(caster, spell)
     locations = SpellLocations.resolve(caster, spell, targets, focus)
     targets = LocationTargets.apply(targets, locations)
@@ -27,10 +40,6 @@ defmodule ThistleTea.Game.World.SpellRequirements do
 
     %Requirements{
       focus: focus,
-      corpse: corpse(caster, spell),
-      aura_target: aura_target(caster, targets),
-      spell_area: SpellAreas.context(caster, spell),
-      outdoors?: SpellEnvironment.context(caster, spell),
       locations: locations,
       objects: LocationTargets.put_objects(objects, spell, locations),
       units: SpellUnits.resolve(caster, spell, targets)

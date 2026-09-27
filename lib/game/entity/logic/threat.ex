@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
 
@@ -54,9 +55,15 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
 
   def add(entity, source_guid, amount)
 
-  def add(%Mob{object: %{guid: self_guid}, internal: %Internal{} = internal} = entity, source_guid, amount)
+  def add(%Mob{object: %{guid: self_guid}} = entity, source_guid, amount)
       when is_integer(source_guid) and source_guid > 0 and source_guid != self_guid and is_number(amount) and
              amount >= 0 do
+    if Guid.entity_type(source_guid) in [:player, :mob, :pet], do: add_unit(entity, source_guid, amount), else: entity
+  end
+
+  def add(entity, _source_guid, _amount), do: entity
+
+  defp add_unit(%Mob{internal: %Internal{} = internal} = entity, source_guid, amount) do
     existing = internal.threat || %{}
     table = Map.update(existing, source_guid, amount / 1, &(&1 + amount))
     entity = %{entity | internal: %{internal | threat: table}}
@@ -67,8 +74,6 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
       entity |> Effects.enqueue(Effects.threat_ref_gained(source_guid)) |> Core.mark_broadcast_update()
     end
   end
-
-  def add(entity, _source_guid, _amount), do: entity
 
   def change(entity, source_guid, amount) when is_number(amount) and amount >= 0 do
     add(entity, source_guid, amount)

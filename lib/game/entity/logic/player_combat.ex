@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Entity.Logic.TargetRef
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
@@ -52,7 +53,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   def mark_hostile_contact(%Character{object: %{guid: guid}, unit: %Unit{health: health}} = character, other_guid, now)
       when is_integer(other_guid) and other_guid > 0 and other_guid != guid and is_number(health) and health > 0 do
-    mark_attacked(character, now)
+    if Guid.entity_type(other_guid) in [:player, :mob, :pet], do: mark_attacked(character, now), else: character
   end
 
   def mark_hostile_contact(character, _other_guid, _now), do: character
