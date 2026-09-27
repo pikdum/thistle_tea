@@ -130,7 +130,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
         not UnitTargets.scripted?(effect) and effect.implicit_target_a != :script_location_near_caster and
           Enum.any?(
             [effect.implicit_target_a, effect.implicit_target_b],
-            &(&1 in [:target_enemy, :target_ally, :any_unit, :party_member])
+            &(&1 in [:target_enemy, :target_ally, :any_unit, :party_member, :enemy_location, :unit_location])
           )
       end)
 
@@ -703,8 +703,11 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   defp combat_distance(_caster, _target_info), do: :unknown
 
   defp combat_reach_sum(caster, target_info) do
-    combat_reach(caster.unit.combat_reach) + combat_reach(Map.get(target_info, :combat_reach))
+    caster_combat_reach(caster) + combat_reach(Map.get(target_info, :combat_reach))
   end
+
+  defp caster_combat_reach(%{unit: unit}), do: combat_reach(unit.combat_reach)
+  defp caster_combat_reach(_caster), do: 0.0
 
   defp combat_reach(reach) when is_number(reach) and reach > 0, do: reach
   defp combat_reach(_reach), do: 0.0

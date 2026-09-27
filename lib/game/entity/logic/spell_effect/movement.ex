@@ -29,13 +29,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
     {state, [Effects.leap(destination)]}
   end
 
-  def apply(state, %CastContext{}, %Spell{id: spell_id}, %Effect{type: :teleport_units} = effect, _now) do
-    request =
-      if :home_bind in [effect.implicit_target_a, effect.implicit_target_b],
-        do: %Effects.TeleportHome{},
-        else: Effects.teleport_to_spell_target(spell_id)
+  def apply(state, %CastContext{} = context, %Spell{id: spell_id}, %Effect{type: :teleport_units} = effect, _now) do
+    selectors = [effect.implicit_target_a, effect.implicit_target_b]
 
-    {state, [request]}
+    events =
+      cond do
+        :home_bind in selectors -> [%Effects.TeleportHome{}]
+        :database_location in selectors -> [Effects.teleport_to_spell_target(spell_id)]
+        is_tuple(context.destination_position) -> destination_teleport(state, context)
+        true -> [Effects.teleport_to_spell_target(spell_id)]
+      end
+
+    {state, events}
   end
 
   def apply(
@@ -87,6 +92,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
   end
 
   def apply(state, _context, _spell, _effect, _now), do: {state, []}
+
+  defp destination_teleport(%{unit: %Unit{}, internal: %Internal{world: world, taxi_flight: nil}}, %CastContext{
+         caster_position: {world, _, _, _},
+         destination_position: position
+       }), do: [Effects.teleport_to_world(world, position, preserve_combat?: true)]
+
+  defp destination_teleport(_state, _context), do: []
 
   defp teleport_destination(_state, %CastContext{destination_position: {x, y, z}}, _effect, _id),
     do: {:position, {x, y, z}}

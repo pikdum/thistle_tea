@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
               |> Map.get(effect.index, [])
               |> append_caster_execution_target(%{spell | effects: [effect]}, caster.object.guid)
 
-            LocationTargets.scripted?(effect) ->
+            LocationTargets.scripted?(effect) or LocationTargets.selected_unit?(effect) ->
               resolve_location_effect(caster, spell, effect, targets, opts)
 
             true ->
@@ -78,12 +78,18 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     direct = LocationTargets.direct_guids(Keyword.get(opts, :locations), effect, :unit)
 
     targets =
-      if effect.implicit_target_a == :script_location_near_caster and
-           effect.implicit_target_b not in [:target_enemy, :target_ally, :any_unit, :party_member],
-         do: %{targets | selection: :none},
-         else: targets
+      if location_only_selection?(effect),
+        do: %{targets | selection: :none},
+        else: targets
 
     Enum.uniq(direct ++ resolve(caster, %{spell | effects: [effect]}, targets, opts))
+  end
+
+  defp location_only_selection?(effect) do
+    (effect.implicit_target_a == :script_location_near_caster and
+       effect.implicit_target_b not in [:target_enemy, :target_ally, :any_unit, :party_member]) or
+      (:unit_location in [effect.implicit_target_a, effect.implicit_target_b] and
+         :caster in [effect.implicit_target_a, effect.implicit_target_b])
   end
 
   def insignia_target(caster, spell, targets) do

@@ -22,19 +22,13 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
   @deferred_auras %{}
 
   @deferred_targets %{
-    17 => :database_location,
-    23 => :gameobject,
     26 => :locked_object,
-    38 => :script_near_caster,
-    40 => :gameobject_script,
     41 => :front_left_totem,
     42 => :back_left_totem,
     43 => :back_right_totem,
     44 => :front_right_totem,
     47 => :caster_front,
-    52 => :gameobjects_at_dest,
-    55 => :caster_front_leap,
-    63 => :unit_position
+    55 => :caster_front_leap
   }
 
   def known_effect?(value) when is_atom(value), do: true

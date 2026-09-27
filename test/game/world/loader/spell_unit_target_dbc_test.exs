@@ -34,6 +34,18 @@ defmodule ThistleTea.Game.World.Loader.SpellUnitTargetDbcTest do
   end
 
   describe "load/1" do
+    test "distinguishes selected-unit positions from area selectors" do
+      summon = SpellLoader.load(22_421)
+      assert [%Effect{type: :summon_wild, implicit_target_a: :enemy_location, area_target?: false}] = summon.effects
+      assert LocationTargets.required?(summon)
+
+      assert [%Effect{implicit_target_a: :enemy_location, implicit_target_b: :aoe_enemy_at_dest, area_target?: true}] =
+               SpellLoader.load(26_789).effects
+
+      assert [%Effect{type: :teleport_units, implicit_target_a: :caster, implicit_target_b: :unit_location}] =
+               SpellLoader.load(28_401).effects
+    end
+
     test "decodes database locations for summons, ground auras and teleports" do
       for {id, type} <- [{18_634, :summon_guardian}, {29_237, :summon_wild}, {22_191, :persistent_area_aura}] do
         spell = SpellLoader.load(id)

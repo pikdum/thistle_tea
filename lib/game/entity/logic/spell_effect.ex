@@ -329,6 +329,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp hostile_target_effect?(%Effect{} = effect) do
     effect.implicit_target_a in [
       :target_enemy,
+      :enemy_location,
       :aoe_enemy_at_caster,
       :aoe_enemy_in_cone,
       :aoe_enemy_at_channel,
@@ -336,6 +337,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     ] or
       effect.implicit_target_b in [
         :target_enemy,
+        :enemy_location,
         :aoe_enemy_at_caster,
         :aoe_enemy_in_cone,
         :aoe_enemy_at_channel,

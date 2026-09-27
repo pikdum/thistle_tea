@@ -17,7 +17,6 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Enchantments
-  alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.ItemUse
@@ -71,10 +70,10 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.World.SpellLocations
   alias ThistleTea.Game.World.SpellObjects
   alias ThistleTea.Game.World.SpellRequirements
+  alias ThistleTea.Game.World.SpellTargetInfo
   alias ThistleTea.Game.World.SpellUnits
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
-  alias ThistleTea.Game.World.Visibility
 
   require Logger
 
@@ -532,9 +531,9 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     cond do
       Insignia.spell?(spell) -> InsigniaTarget.info(character, targets)
       Spell.resurrect_spell?(spell) -> ResurrectionTarget.info(character, targets)
-      is_integer(pet_guid) -> target_info(character, pet_guid, spell)
-      is_integer(explicit_guid) -> target_info(character, explicit_guid, spell)
-      is_integer(fallback_guid) -> target_info(character, fallback_guid, spell)
+      is_integer(pet_guid) -> SpellTargetInfo.build(character, pet_guid, spell)
+      is_integer(explicit_guid) -> SpellTargetInfo.build(character, explicit_guid, spell)
+      is_integer(fallback_guid) -> SpellTargetInfo.build(character, fallback_guid, spell)
       unit_guid == caster_guid -> :self
       true -> nil
     end
@@ -572,72 +571,6 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
   defp positive_guid(guid) when is_integer(guid) and guid > 0, do: guid
   defp positive_guid(_guid), do: nil
-
-  defp target_info(character, guid, spell) do
-    case Metadata.query(guid, [
-           :alive?,
-           :feigning_death?,
-           :faction_template,
-           :unit_flags,
-           :charmed_by,
-           :health_pct,
-           :power_type,
-           :shapeshift_form,
-           :level,
-           :tameable?,
-           :pickpocket_id,
-           :skinning_id,
-           :skinned?,
-           :body_loot?,
-           :owner_guid,
-           :orientation,
-           :creature_type,
-           :combat_reach,
-           :aura_sources,
-           :dispel_options,
-           :friendly_mechanic_immunities,
-           :area
-         ]) do
-      nil ->
-        :unknown
-
-      metadata ->
-        metadata = Map.put(metadata, :guid, guid)
-
-        %{
-          guid: guid,
-          visible?: Visibility.can_see?(%{guid: character.object.guid, character: character}, guid),
-          unit_flags: Map.get(metadata, :unit_flags, 0),
-          charmed_by: Map.get(metadata, :charmed_by),
-          feigning_death?: Map.get(metadata, :feigning_death?, false),
-          alive?: Map.get(metadata, :alive?, true),
-          hostile?: Hostility.hostile?(character, metadata),
-          friendly?: Hostility.friendly?(character, metadata),
-          attackable?:
-            Hostility.valid_attack_target?(character, guid, allow_dead?: Spell.attribute?(spell, :allow_dead_target)),
-          helpful?: Hostility.can_assist?(character, guid),
-          health_pct: Map.get(metadata, :health_pct),
-          power_type: Map.get(metadata, :power_type),
-          shapeshift_form: Map.get(metadata, :shapeshift_form, 0),
-          level: Map.get(metadata, :level),
-          tameable?: Map.get(metadata, :tameable?, false),
-          pickpocket_id: Map.get(metadata, :pickpocket_id),
-          skinning_id: Map.get(metadata, :skinning_id),
-          skinned?: Map.get(metadata, :skinned?, false),
-          body_loot?: Map.get(metadata, :body_loot?, true),
-          owner_guid: Map.get(metadata, :owner_guid),
-          creature_type: Map.get(metadata, :creature_type),
-          combat_reach: Map.get(metadata, :combat_reach),
-          position: World.position(guid),
-          orientation: Map.get(metadata, :orientation),
-          aura_sources: Map.get(metadata, :aura_sources, MapSet.new()),
-          dispel_options: Map.get(metadata, :dispel_options, MapSet.new()),
-          friendly_mechanic_immunities: Map.get(metadata, :friendly_mechanic_immunities, MapSet.new()),
-          area: Map.get(metadata, :area),
-          los?: World.line_of_sight?(character, guid)
-        }
-    end
-  end
 
   defp nonself_guid(guid, caster_guid) when is_integer(guid) and guid > 0 and guid != caster_guid, do: guid
   defp nonself_guid(_guid, _caster_guid), do: nil

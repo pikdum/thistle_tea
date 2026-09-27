@@ -954,7 +954,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(5), do: :pet
   defp target_type(45), do: :chain_heal
   defp target_type(46), do: :script_location_near_caster
-  defp target_type(53), do: :aoe_enemy_at_dest
+  defp target_type(53), do: :enemy_location
+  defp target_type(63), do: :unit_location
   defp target_type(61), do: :raid_and_class
   defp target_type(other) when is_integer(other), do: other
 

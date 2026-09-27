@@ -15,7 +15,12 @@ defmodule ThistleTea.Game.Spell.LocationTargets do
 
   def required?(%Spell{effects: effects}), do: Enum.any?(effects, &location?/1)
 
-  def location?(%Effect{} = effect), do: scripted?(effect) or database?(effect)
+  def location?(%Effect{} = effect), do: scripted?(effect) or database?(effect) or selected_unit?(effect)
+
+  def selected_unit?(%Effect{} = effect),
+    do: Enum.any?([effect.implicit_target_a, effect.implicit_target_b], &(&1 in [:enemy_location, :unit_location]))
+
+  def enemy?(%Effect{} = effect), do: :enemy_location in [effect.implicit_target_a, effect.implicit_target_b]
 
   def database?(%Effect{type: :teleport_units}), do: false
 
@@ -42,11 +47,13 @@ defmodule ThistleTea.Game.Spell.LocationTargets do
 
   def apply(%Target{} = targets, _locations), do: targets
 
+  def for_packet(18_392, %Target{} = targets), do: %{targets | destination_location: nil}
+  def for_packet(_spell_id, %Target{} = targets), do: targets
+
   def direct_guids(%__MODULE__{by_effect: locations}, %Effect{} = effect, kind) do
-    case {effect.implicit_target_a, effect.type, Map.get(locations, effect.index)} do
-      {:script_location_near_caster, type, %Selection{guid: guid, kind: ^kind}}
-      when type != :persistent_area_aura ->
-        [guid]
+    case Map.get(locations, effect.index) do
+      %Selection{guid: guid, kind: ^kind} when is_integer(guid) ->
+        if direct_recipient?(effect), do: [guid], else: []
 
       _ ->
         []
@@ -54,6 +61,14 @@ defmodule ThistleTea.Game.Spell.LocationTargets do
   end
 
   def direct_guids(_locations, _effect, _kind), do: []
+
+  defp direct_recipient?(%Effect{implicit_target_a: :script_location_near_caster, type: type}),
+    do: type != :persistent_area_aura
+
+  defp direct_recipient?(%Effect{implicit_target_a: :unit_location, implicit_target_b: target})
+       when target in [nil, :caster_destination], do: true
+
+  defp direct_recipient?(effect), do: enemy?(effect)
 
   def put_objects(%ObjectTargets{} = objects, %Spell{effects: effects}, locations) do
     by_effect =

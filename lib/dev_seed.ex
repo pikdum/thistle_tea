@@ -33,6 +33,8 @@ defmodule ThistleTea.DevSeed do
   NPC-assisted kills, contribution-based experience, and loot eligibility.
   A Challenge to Urok button and linked trap southwest of the playground sit
   beside an Urok Enforcer and Urok Ogre Magus for scripted trap targeting.
+  An isolated Defias Evoker at {16043.2, 16088.1} uses unit-targeted Blink
+  through the normal combat spell list for destination teleport testing.
   """
   import Ecto.Query
 
@@ -41,6 +43,7 @@ defmodule ThistleTea.DevSeed do
   alias ThistleTea.DevSeed.ActionBars
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.PetProgress
@@ -357,6 +360,12 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(5308, @base_low_guid + 2801, {x + 100.0, y - 140.0, z}, nil, 180)
     spawn_mob(10_602, @base_low_guid + 2900, {x - 260.0, y - 180.0, z}, nil, 180)
     spawn_mob(10_601, @base_low_guid + 2901, {x - 264.0, y - 180.0, z}, nil, 180)
+
+    spawn_mob(1729, @base_low_guid + 3000, {x - 260.0, y - 230.0, z}, nil, 30,
+      ai_events: [],
+      spells: [%CreatureSpell{spell_id: 28_401, delay_repeat_min_ms: 30_000, delay_repeat_max_ms: 30_000}]
+    )
+
     spawn_mob(2006, @base_low_guid + 2600, {x - 220.0, y + 80.0, z}, nil, 30)
     spawn_mob(2007, @base_low_guid + 2601, {x - 224.0, y + 84.0, z}, nil, 30)
     spawn_mob(1412, @base_low_guid + 2602, {x - 224.0, y + 80.0, z}, nil, 30)
@@ -430,6 +439,7 @@ defmodule ThistleTea.DevSeed do
           |> MobLoader.load_creature()
           |> Mob.build()
           |> select_ai_events(Keyword.get(opts, :ai_events))
+          |> select_spells(Keyword.get(opts, :spells))
 
         mob = %{mob | internal: %{mob.internal | loot: %{mob.internal.loot | override: loot_override}}}
         MobLoader.start_mob(mob)
@@ -452,5 +462,13 @@ defmodule ThistleTea.DevSeed do
   defp select_ai_events(%Mob{internal: %{creature: creature}} = mob, types) do
     events = Enum.filter(creature.ai_events, &(&1.event_type in types))
     %{mob | internal: %{mob.internal | creature: %{creature | ai_events: events}}}
+  end
+
+  defp select_spells(mob, nil), do: mob
+
+  defp select_spells(%Mob{internal: internal} = mob, spells) do
+    spellbook = Map.new(spells, &{&1.spell_id, SpellLoader.load(&1.spell_id)})
+    creature = %{internal.creature | spells: spells}
+    %{mob | internal: %{internal | creature: creature, spellbook: spellbook}}
   end
 end

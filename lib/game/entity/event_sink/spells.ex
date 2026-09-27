@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   alias ThistleTea.Game.Player.Projectile
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
+  alias ThistleTea.Game.Spell.LocationTargets
   alias ThistleTea.Game.Spell.Proc
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -358,7 +359,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
       spell: effect.spell_id,
       flags: Bitwise.bor(0x2, projectile.flags),
       timer: effect.duration_ms || 0,
-      targets: effect.targets,
+      targets: LocationTargets.for_packet(effect.spell_id, effect.targets),
       ammo_display_id: projectile.display_id,
       ammo_inventory_type: projectile.inventory_type
     }
@@ -456,7 +457,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
       flags: Bitwise.bor(0x100, projectile.flags),
       hits: effect.hit_guids || [],
       misses: effect.misses || [],
-      targets: effect.targets,
+      targets: LocationTargets.for_packet(effect.spell_id, effect.targets),
       ammo_display_id: projectile.display_id,
       ammo_inventory_type: projectile.inventory_type
     }

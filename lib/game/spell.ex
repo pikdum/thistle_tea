@@ -285,7 +285,7 @@ defmodule ThistleTea.Game.Spell do
 
   def requires_hostile_target?(%__MODULE__{effects: effects}) do
     Enum.any?(effects, fn %Effect{implicit_target_a: a, implicit_target_b: b} ->
-      a == :target_enemy or b == :target_enemy
+      a in [:target_enemy, :enemy_location] or b in [:target_enemy, :enemy_location]
     end)
   end
 
@@ -298,6 +298,7 @@ defmodule ThistleTea.Game.Spell do
   defp hostile_implicit_target?(target) do
     target in [
       :target_enemy,
+      :enemy_location,
       :aoe_enemy_at_caster,
       :aoe_enemy_at_dest,
       :aoe_enemy_in_cone,
