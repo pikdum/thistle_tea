@@ -15,10 +15,13 @@ defmodule ThistleTea.Game.World.Loader.Guardian do
   alias ThistleTea.Game.Entity.Logic.AttackPower
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Engineering
+  alias ThistleTea.Game.Entity.Logic.PetSpellModifiers
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon
 
   def build(owner, %Effects.SummonGuardians{} = effect, position, now, index \\ 0) do
@@ -66,7 +69,23 @@ defmodule ThistleTea.Game.World.Loader.Guardian do
     flags = ((mob.unit.flags || 0) &&& bnot(0x1008)) ||| ((owner.unit.flags || 0) &&& 0x1008)
     mob = %{mob | unit: %{mob.unit | flags: flags}}
 
-    Mob.apply_addon_auras(mob, now)
+    mob
+    |> Mob.apply_addon_auras(now)
+    |> apply_creation_passive(now)
+  end
+
+  defp apply_creation_passive(%Mob{} = mob, now) do
+    mob.object.entry
+    |> Engineering.guardian_passive()
+    |> SpellLoader.cached()
+    |> case do
+      nil ->
+        mob
+
+      spell ->
+        mob = PetSpellModifiers.apply_passive(mob, spell, now)
+        %{mob | unit: %{mob.unit | health: mob.unit.max_health, power1: mob.unit.max_power1}}
+    end
   end
 
   defp level(%Character{} = owner, effect, default) do

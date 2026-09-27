@@ -13,13 +13,17 @@ defmodule ThistleTea.Game.Entity.Server.GuardianOwnerTest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Guardians
+  alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Entity.Server.GuardianOwner
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Guardian, as: GuardianLoader
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
@@ -116,6 +120,38 @@ defmodule ThistleTea.Game.Entity.Server.GuardianOwnerTest do
   end
 
   describe "GuardianLoader.build/5" do
+    test "dragonlings start with their passive health and retain it across recomputes", %{owner: owner} do
+      [{_, prototype}] = :ets.lookup(Summon, 990_201)
+      template = %{prototype.creature_template | entry: 2678, health_multiplier: 0.000001}
+      saved_template = :ets.take(Summon, 2678)
+      saved_spell = :ets.take(SpellLoader, {:spell, 23_051})
+      :ets.insert(Summon, {2678, %{prototype | id: 2678, creature_template: template}})
+
+      spell = %Spell{
+        id: 23_051,
+        attributes: MapSet.new([:passive]),
+        duration_ms: -1,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_increase_health, base_points: 300}]
+      }
+
+      :ets.insert(SpellLoader, {{:spell, 23_051}, spell})
+
+      on_exit(fn ->
+        :ets.delete(Summon, 2678)
+        :ets.delete(SpellLoader, {:spell, 23_051})
+        :ets.insert(Summon, saved_template)
+        :ets.insert(SpellLoader, saved_spell)
+      end)
+
+      guardian = GuardianLoader.build(owner, %{request() | entry: 2678}, owner.movement_block.position, Time.now())
+      assert guardian.unit.base_health == 0
+      assert guardian.unit.max_health == 300
+      assert guardian.unit.health == 300
+      assert [%{spell: %{id: 23_051}, caster_guid: guid}] = guardian.unit.auras
+      assert guid == guardian.object.guid
+      assert Stats.recompute(guardian.unit) == guardian.unit
+    end
+
     test "engineering trinkets scale statistics without changing template defaults", %{owner: owner} do
       now = Time.now()
       position = owner.movement_block.position

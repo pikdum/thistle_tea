@@ -4,6 +4,10 @@ defmodule ThistleTea.Game.Entity.Logic.Engineering do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell.CastContext
 
+  @guardian_passives %{2678 => 23_051, 8615 => 23_050, 12_473 => 23_052}
+
+  def guardian_passive(entry), do: Map.get(@guardian_passives, entry)
+
   def net_o_matic(target, %CastContext{} = context) do
     choices =
       Enum.map([{1, 16_566}, {1, 13_119}, {8, 13_099}], fn {weight, spell_id} ->
