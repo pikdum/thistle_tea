@@ -349,6 +349,8 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(724, @base_low_guid + 2201, {x + 176.0, y + 150.0, z}, nil, 30, wander: 2.0)
     spawn_mob(1729, @base_low_guid + 2300, {x + 90.0, y - 60.0, z}, nil, 30)
     spawn_mob(68, @base_low_guid + 2400, {x - 180.0, y - 100.0, z}, nil, 30)
+    spawn_mob(6213, @base_low_guid + 2500, {x + 220.0, y - 100.0, z}, nil, 180)
+    spawn_mob(6329, @base_low_guid + 2501, {x + 230.0, y - 100.0, z}, nil, 180)
 
     spawn_mob(
       @hostile_entry,

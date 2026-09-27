@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Spell.TargetLimit
+  alias ThistleTea.Game.Spell.UnitTargets
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.InsigniaTarget
@@ -49,6 +50,24 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   end
 
   def resolve(_caster, _spell, _targets, _opts), do: []
+
+  def resolve_plan(caster, spell, targets, %UnitTargets{} = units, opts) do
+    by_effect =
+      Map.new(spell.effects, fn effect ->
+        recipients =
+          if UnitTargets.scripted?(effect) do
+            units.by_effect
+            |> Map.get(effect.index, [])
+            |> append_caster_execution_target(%{spell | effects: [effect]}, caster.object.guid)
+          else
+            resolve(caster, %{spell | effects: [effect]}, targets, opts)
+          end
+
+        {effect.index, recipients}
+      end)
+
+    %{units | by_effect: by_effect}
+  end
 
   def insignia_target(caster, spell, targets) do
     info = InsigniaTarget.info(caster, targets)

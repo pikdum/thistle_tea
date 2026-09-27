@@ -52,6 +52,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Spell.StackRules
   alias ThistleTea.Game.Spell.Stealth
   alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Spell.UnitTargets
 
   @power_fields %{0 => :power1, 1 => :power2, 2 => :power3, 3 => :power4, 4 => :power5}
   @health_power_type -2
@@ -110,9 +111,26 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   def validate_target(caster, %Spell{} = spell, %Target{} = targets, target_info) do
-    if Insignia.spell?(spell),
-      do: Insignia.validate(caster, target_info),
-      else: validate_unit_target(caster, spell, targets, target_info)
+    cond do
+      Insignia.spell?(spell) -> Insignia.validate(caster, target_info)
+      UnitTargets.required?(spell) -> validate_explicit_effects(caster, spell, targets, target_info)
+      true -> validate_unit_target(caster, spell, targets, target_info)
+    end
+  end
+
+  defp validate_explicit_effects(caster, spell, targets, target_info) do
+    effects =
+      Enum.filter(spell.effects, fn effect ->
+        not UnitTargets.scripted?(effect) and
+          Enum.any?(
+            [effect.implicit_target_a, effect.implicit_target_b],
+            &(&1 in [:target_enemy, :target_ally, :any_unit, :party_member])
+          )
+      end)
+
+    if effects == [],
+      do: :ok,
+      else: validate_unit_target(caster, %{spell | effects: effects}, targets, target_info)
   end
 
   defp validate_unit_target(caster, spell, targets, target_info) do

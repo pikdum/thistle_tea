@@ -59,6 +59,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Spell.Semantics
   alias ThistleTea.Game.Spell.Stealth
   alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Spell.UnitTargets
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
@@ -190,7 +191,8 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   def resolve_requirements(%{internal: %Internal{casting: cast}} = entity, %Cast{} = cast, requirements, now) do
     case Requirements.validate(entity, cast.spell, requirements, cast_options(cast)) do
       :ok ->
-        complete(entity, %{cast | requirements: requirements}, now)
+        targets = UnitTargets.item_selection(cast.targets, requirements.units, cast.cast_item_guid)
+        complete(entity, %{cast | requirements: requirements, targets: targets}, now)
 
       {:error, reason} ->
         events = [Effects.spell_cast_failed(Cast.result_spell(cast), reason)]
@@ -394,7 +396,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp resolve(entity, %Cast{spell: %Spell{} = spell, targets: %Target{} = targets} = casting) do
-    resolved_targets = resolve_targets(entity, casting)
+    {resolved_targets, unit_plan} = resolve_targets(entity, casting)
     {hits, misses} = roll_spell_hits(entity, spell, resolved_targets)
     chain = Chain.plan(entity, spell, resolved_targets, hits)
     object_guid = Target.object_guid(targets)
@@ -403,7 +405,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       hits: hits,
       misses: misses,
       costs: casting_costs(entity, casting),
-      impacts: resolved_impacts(entity, spell, hits, misses, chain),
+      impacts: resolved_impacts(entity, spell, hits, misses, chain, unit_plan),
       followups: %Followups{
         packet_hits: Enum.uniq(hits ++ object_hit(object_guid) ++ object_guids(casting)),
         selected_unit_guid: selected_unit_guid(entity.object.guid, spell, targets, resolved_targets),
@@ -441,14 +443,18 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp selected_unit_guid(_caster, _spell, targets, _resolved), do: Target.unit_guid(targets)
 
-  defp resolved_impacts(entity, spell, hits, misses, chain) do
+  defp resolved_impacts(entity, spell, hits, misses, chain, units) do
     if Insignia.spell?(spell) do
       []
     else
       entity
       |> unit_impacts(hits, misses)
       |> Enum.map(fn impact ->
-        %{impact | chain_effects: if(chain, do: Map.get(chain, impact.target_guid, %{}))}
+        %{
+          impact
+          | chain_effects: if(chain, do: Map.get(chain, impact.target_guid, %{})),
+            effect_indices: UnitTargets.indices(units, impact.target_guid)
+        }
       end)
     end
   end
@@ -1434,6 +1440,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
                 allow_dead?: Spell.attribute?(spell, :allow_dead_target)
               ),
           target_role: target_role,
+          effect_indices: impact.effect_indices,
           chain_effects: impact.chain_effects,
           hit_outcome: impact.hit_outcome
       }
@@ -1477,9 +1484,13 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp dispatch_to_target(character, _context, _spell, _target_guid, _now), do: character
 
   defp resolve_targets(caster, %Cast{spell: %Spell{} = spell, targets: %Target{} = targets} = cast) do
-    SpellTargetResolver.resolve(caster, spell, targets,
-      triggered?: cast.triggered?,
-      cast_item_guid: cast.cast_item_guid
-    )
+    opts = [triggered?: cast.triggered?, cast_item_guid: cast.cast_item_guid]
+
+    if UnitTargets.required?(spell) do
+      plan = SpellTargetResolver.resolve_plan(caster, spell, targets, cast.requirements.units, opts)
+      {UnitTargets.guids(plan), plan}
+    else
+      {SpellTargetResolver.resolve(caster, spell, targets, opts), nil}
+    end
   end
 end

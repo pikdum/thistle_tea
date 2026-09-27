@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.Game.World.Loader.SpellProcEvent, as: SpellProcEventLoader
   alias ThistleTea.Game.World.Loader.SpellScript, as: SpellScriptLoader
   alias ThistleTea.Game.World.Loader.SpellScriptName, as: SpellScriptNameLoader
+  alias ThistleTea.Game.World.Loader.SpellUnitTarget, as: SpellUnitTargetLoader
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
 
   @learn_spell_effect 36
@@ -251,6 +252,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       max_targets: row.max_targets || 0,
       custom_flags: SpellEffectOverrideLoader.custom_flags(row.id),
       object_targets: SpellObjectTargetLoader.get(row.id),
+      unit_targets: SpellUnitTargetLoader.get(row.id),
       area_rules: SpellAreaLoader.get(row.id),
       effects: build_effects(row, radius_lookup),
       script_steps: SpellScriptLoader.get(row.id),
@@ -926,6 +928,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(34), do: :party_around_caster
   defp target_type(35), do: :party_member
   defp target_type(37), do: :party_around_target
+  defp target_type(38), do: :creature_near_caster
   defp target_type(39), do: :caster_fishing_spot
   defp target_type(23), do: :game_object
   defp target_type(40), do: :game_object_near_caster

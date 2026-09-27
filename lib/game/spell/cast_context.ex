@@ -64,6 +64,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :target_guid,
     :selected_target_guid,
     :target_role,
+    :effect_indices,
     :target_hostile?,
     :spell,
     :attack_power,

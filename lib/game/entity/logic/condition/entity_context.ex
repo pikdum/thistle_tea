@@ -43,12 +43,8 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.EntityContext do
 
   defp condition_results(%AIContext{script_conditions: results}, _target_guid), do: results
 
-  defp subject(
-         %Character{object: object, unit: unit, player: player, internal: internal, movement_block: movement} =
-           character,
-         now
-       ) do
-    common_subject(object, unit, internal, movement, now)
+  def subject(%Character{object: object, unit: unit, player: player, internal: internal} = character, now) do
+    common_subject(object, unit, internal, character.movement_block, now)
     |> then(fn subject ->
       %{
         subject
@@ -70,23 +66,20 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.EntityContext do
     end)
   end
 
-  defp subject(
-         %Mob{
-           object: object,
-           unit: unit,
-           internal: %Internal{creature: %Creature{db_guid: db_guid}} = internal,
-           movement_block: movement
-         },
-         now
-       ) do
+  def subject(
+        %Mob{
+          object: object,
+          unit: unit,
+          internal: %Internal{creature: %Creature{db_guid: db_guid}} = internal,
+          movement_block: movement
+        },
+        now
+      ) do
     subject = common_subject(object, unit, internal, movement, now)
     %{subject | kind: :creature, db_guid: db_guid, spellbook: internal.spellbook}
   end
 
-  defp subject(
-         %GameObject{object: object, game_object: game_object, internal: internal, movement_block: movement},
-         _now
-       ) do
+  def subject(%GameObject{object: object, game_object: game_object, internal: internal, movement_block: movement}, _now) do
     %Subject{
       guid: object.guid,
       kind: :game_object,
@@ -131,18 +124,28 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.EntityContext do
   defp target_subject(_source, %Perception{} = perception, guid) when is_integer(guid) and guid > 0 do
     metadata = Perception.metadata(perception, guid) || %{}
 
+    metadata_subject(guid, metadata,
+      entry: Perception.entry(perception, guid),
+      position: Perception.position(perception, guid),
+      moving?: Perception.moving?(perception, guid)
+    )
+  end
+
+  defp target_subject(_source, %Perception{}, _guid), do: nil
+
+  def metadata_subject(guid, metadata, opts \\ []) do
     %Subject{
       guid: guid,
       kind: Guid.entity_type(guid),
-      entry: Perception.entry(perception, guid),
-      position: Perception.position(perception, guid),
+      entry: Keyword.get(opts, :entry, Map.get(metadata, :entry, Guid.entry(guid))),
+      position: Keyword.get(opts, :position),
       level: Map.get(metadata, :level),
       race: Map.get(metadata, :race),
       class: Map.get(metadata, :class),
       honor_rank: Rank.visual_from_number(Map.get(metadata, :honor_rank)),
       gender: Map.get(metadata, :gender),
       alive?: Map.get(metadata, :alive?),
-      moving?: Perception.moving?(perception, guid),
+      moving?: Keyword.get(opts, :moving?),
       combat?: Map.get(metadata, :in_combat),
       health: Map.get(metadata, :health_pct),
       max_health: if(is_number(Map.get(metadata, :health_pct)), do: 100),
@@ -159,8 +162,6 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.EntityContext do
       go_state: Map.get(metadata, :go_state)
     }
   end
-
-  defp target_subject(_source, %Perception{}, _guid), do: nil
 
   defp aura_effects(holders) do
     MapSet.new(

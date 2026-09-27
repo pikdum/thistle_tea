@@ -9,13 +9,14 @@ defmodule ThistleTea.Game.Spell.Requirements do
   alias ThistleTea.Game.Spell.Environment
   alias ThistleTea.Game.Spell.Focus
   alias ThistleTea.Game.Spell.ObjectTargets
+  alias ThistleTea.Game.Spell.UnitTargets
 
-  defstruct [:focus, :corpse, :objects, :aura_target, :spell_area, :outdoors?]
+  defstruct [:focus, :corpse, :objects, :units, :aura_target, :spell_area, :outdoors?]
 
   def required?(caster, %Spell{} = spell, opts \\ []),
     do:
       Focus.required?(caster, spell) or CorpseTarget.required?(spell) or ObjectTargets.required?(spell) or
-        AuraRank.requires_check?(caster, spell, opts) or Area.restricted?(spell) or
+        UnitTargets.required?(spell) or AuraRank.requires_check?(caster, spell, opts) or Area.restricted?(spell) or
         (match?(%Character{}, caster) and Environment.restricted?(spell))
 
   def validate(
@@ -25,6 +26,7 @@ defmodule ThistleTea.Game.Spell.Requirements do
           focus: focus,
           corpse: corpse,
           objects: objects,
+          units: units,
           aura_target: target,
           spell_area: area,
           outdoors?: outdoors
@@ -36,6 +38,7 @@ defmodule ThistleTea.Game.Spell.Requirements do
          :ok <- Environment.validate(caster, spell, outdoors),
          :ok <- CorpseTarget.validate(spell, corpse),
          :ok <- AuraRank.validate(caster, spell, target, opts),
-         do: ObjectTargets.validate(spell, objects)
+         :ok <- ObjectTargets.validate(spell, objects),
+         do: UnitTargets.validate(spell, units)
   end
 end

@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Spell.ProcOrigin
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Spell.UnitTargets
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -34,6 +35,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.World.SpellMagnets
   alias ThistleTea.Game.World.SpellObjects
   alias ThistleTea.Game.World.SpellRequirements
+  alias ThistleTea.Game.World.SpellUnits
 
   @heal_threat_radius 100.0
 
@@ -205,9 +207,11 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
     is_integer(effect.source_guid) and effect.source_guid != entity.object.guid and
       (Enum.any?(spell.effects, &(&1.type == :charge)) or
          Spell.attribute?(spell, :channeled) or Chain.spell?(spell) or ObjectTargets.required?(spell) or
-         Area.restricted?(spell) or
+         target_requirements?(spell) or
          (Focus.required?(spell) and Guid.entity_type(effect.source_guid) == :player))
   end
+
+  defp target_requirements?(spell), do: UnitTargets.required?(spell) or Area.restricted?(spell)
 
   defp validate_trigger_focus(entity, effect, spell) do
     with :ok <- Focus.validate(entity, spell, SpellFocus.find(entity, spell)),
@@ -223,6 +227,9 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
     cond do
       Spell.attribute?(spell, :channeled) ->
         resolve_triggered_channel(entity, effect, spell)
+
+      UnitTargets.required?(spell) ->
+        resolve_scripted_trigger(entity, effect, spell)
 
       effect.resolve_targets? or SpellTarget.area_targeted?(spell) or Chain.spell?(spell) ->
         resolve_area_trigger(entity, effect, spell)
@@ -265,6 +272,21 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
     end
   end
 
+  defp resolve_scripted_trigger(entity, effect, spell) do
+    selection = Target.unit(effect.target_guid || entity.object.guid)
+    units = SpellUnits.resolve(entity, spell, selection)
+
+    case UnitTargets.validate(spell, units) do
+      :ok ->
+        selection = UnitTargets.item_selection(selection, units, effect.cast_item_guid)
+        plan = SpellTargetResolver.resolve_plan(entity, spell, selection, units, triggered?: true)
+        triggered_cast(entity, effect, spell, plan, selection)
+
+      {:error, reason} ->
+        [Effects.spell_cast_failed(spell, reason)]
+    end
+  end
+
   defp resolve_area_trigger(entity, effect, spell) do
     targets = SpellTargetResolver.resolve(entity, spell, Target.unit(effect.target_guid), triggered?: true)
 
@@ -281,14 +303,16 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   end
 
   defp triggered_cast(entity, effect, spell, targets, selection, objects) do
+    units = if is_struct(targets, UnitTargets), do: targets
+    targets = if units, do: UnitTargets.guids(units), else: targets
     targets = if effect.requires_living_target?, do: Enum.filter(targets, &living_target?(entity, &1)), else: targets
 
     if effect.requires_living_target? and targets == [],
       do: [],
-      else: triggered_effects(entity, effect, spell, targets, selection, objects)
+      else: triggered_effects(entity, effect, spell, targets, selection, objects, units)
   end
 
-  defp triggered_effects(entity, effect, spell, targets, selection, objects) do
+  defp triggered_effects(entity, effect, spell, targets, selection, objects, units) do
     targets =
       if ObjectTargets.required?(spell) and Enum.all?(spell.effects, &(&1.type == :activate_object)),
         do: [],
@@ -318,7 +342,12 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
     deliveries =
       Enum.flat_map(contexts, fn context ->
-        context = Chain.put_context(context, chain)
+        context = %{
+          Chain.put_context(context, chain)
+          | effect_indices: UnitTargets.indices(units, context.target_guid),
+            selected_target_guid: Target.unit_guid(selection)
+        }
+
         resolved_delivery(entity, Effects.deliver_spell(context.target_guid, context, spell))
       end)
 

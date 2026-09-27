@@ -80,6 +80,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.SpellScript, as: SpellScriptLoader
   alias ThistleTea.Game.World.Loader.SpellScriptName, as: SpellScriptNameLoader
   alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
+  alias ThistleTea.Game.World.Loader.SpellUnitTarget, as: SpellUnitTargetLoader
   alias ThistleTea.Game.World.Loader.StableSlotPrice, as: StableSlotPriceLoader
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
@@ -241,6 +242,7 @@ defmodule ThistleTea.Application do
     PassiveSpellLoader.init()
     SpellAreaLoader.init()
     SpellObjectTargetLoader.init()
+    SpellUnitTargetLoader.init()
     SpellProcEventLoader.init()
     SpellScriptLoader.init()
     SpellScriptNameLoader.init()
@@ -377,6 +379,7 @@ defmodule ThistleTea.Application do
         SpellLoader.load_target_positions()
         SpellPetAuraLoader.load_all()
         SpellObjectTargetLoader.load_all()
+        SpellUnitTargetLoader.load_all()
         GameObjectScriptLoader.load_all()
         EventScriptLoader.load_all()
         PageTextLoader.load_all()

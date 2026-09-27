@@ -94,15 +94,24 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
     end
   end
 
-  def apply(state, %CastContext{}, spell, %Effect{type: :script_effect}, now) do
+  def apply(state, %CastContext{} = context, spell, %Effect{type: :script_effect}, now) do
     cond do
       aura_id = StackingProc.removal_spell(spell) -> Aura.remove_stack(state, aura_id, now)
       item_id = Warlock.healthstone_item(state, spell) -> {state, [Effects.create_item(item_id, 1)]}
-      true -> {state, []}
+      true -> {state, database_script_events(state, context, spell.script_steps)}
     end
   end
 
   def apply(state, _context, _spell, _effect, _now), do: {state, []}
+
+  defp database_script_events(state, %CastContext{caster_guid: guid}, [_ | _] = steps)
+       when is_integer(guid) and guid > 0 do
+    if state.object.guid == guid,
+      do: [Effects.script_steps(steps, guid, 0)],
+      else: [Effects.forward_script_steps(guid, steps, state.object.guid)]
+  end
+
+  defp database_script_events(_state, _context, _steps), do: []
 
   defp trigger_target_guid(state, %CastContext{} = context, %Effect{implicit_target_a: :caster})
        when state.object.guid != context.caster_guid do

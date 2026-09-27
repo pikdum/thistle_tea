@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
   alias ThistleTea.Game.Spell.TargetTrigger
+  alias ThistleTea.Game.Spell.UnitTargets
 
   @dead_target_effects [:resurrect, :resurrect_new, :durability_damage, :durability_damage_percent]
   @corpse_script_effects [:dummy, :script_effect, :send_event]
@@ -172,6 +173,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     applicable =
       target
       |> applicable_effects(context, spell.effects)
+      |> UnitTargets.filter_effects(context.effect_indices)
       |> Chain.effects(context)
       |> Warrior.filter_target_effects(target.object.guid, context, spell)
       |> defer_combo_retention(context)
@@ -430,7 +432,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp apply_effects(target, context, effects, events, applied, now) do
     effects =
       if Core.dead?(target) do
-        Enum.filter(effects, &dead_target_effect?(&1, context.spell))
+        Enum.filter(effects, &dead_target_effect?(&1, context.spell, target))
       else
         effects
       end
@@ -438,9 +440,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     do_apply_effects(target, context, effects, events, applied, now)
   end
 
-  defp dead_target_effect?(%Effect{type: type}, spell) do
+  defp dead_target_effect?(%Effect{type: type} = effect, spell, target) do
     type in @dead_target_effects or
-      (type in @corpse_script_effects and Spell.attribute?(spell, :allow_dead_target))
+      (type in @corpse_script_effects and
+         (Spell.attribute?(spell, :allow_dead_target) or UnitTargets.corpse_effect?(spell, effect, target)))
   end
 
   defp do_apply_effects(target, _context, [], events, _applied, _now), do: {target, events}

@@ -52,6 +52,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Spell.Stealth
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Spell.TargetCodec
+  alias ThistleTea.Game.Spell.UnitTargets
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.InsigniaTarget
@@ -67,6 +68,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.World.SpellFocus
   alias ThistleTea.Game.World.SpellObjects
   alias ThistleTea.Game.World.SpellRequirements
+  alias ThistleTea.Game.World.SpellUnits
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
@@ -378,7 +380,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     focus = SpellFocus.find(character, spell)
 
     with :ok <- check_party_unit_target(character, spell, targets),
-         :ok <- check_object_target(state, spell, targets) do
+         :ok <- check_object_target(state, spell, targets),
+         :ok <- UnitTargets.validate(spell, SpellUnits.resolve(character, spell, targets)) do
       CastValidation.validate(
         character,
         spell,
