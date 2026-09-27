@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Aura do
     :next_tick_at,
     :persistent_area,
     :trigger_spell_id,
-    tick_count: 0
+    tick_count: 0,
+    accumulated_damage: 0
   ]
 end

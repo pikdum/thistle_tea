@@ -915,9 +915,25 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     %{character | unit: %{unit | channel_spell: spell_id, channel_object: channel_object}}
     |> Core.mark_broadcast_update()
     |> Effects.enqueue(Effects.channel_start(guid, spell_id, duration_ms))
+    |> queue_channel_start_trigger(casting.spell)
   end
 
   defp start_channel(character, _casting), do: character
+
+  defp queue_channel_start_trigger(character, spell) do
+    case Semantics.rules(spell).channel_start_trigger_spell_id do
+      nil ->
+        character
+
+      spell_id ->
+        Effects.enqueue(
+          character,
+          Effects.trigger_spell(character.object.guid, character.unit.level || 1, character.object.guid, spell_id,
+            triggered_by_spell_id: spell.id
+          )
+        )
+    end
+  end
 
   defp channel_target_guid(%{object: %{guid: guid}, unit: %{target: target}} = character, %Cast{
          spell: %Spell{effects: effects},

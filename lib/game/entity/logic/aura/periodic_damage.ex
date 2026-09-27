@@ -8,16 +8,23 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PeriodicDamage do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.DamageReceived
+  alias ThistleTea.Game.Entity.Logic.Engineering.DeathRay
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
 
   def amount(entity, %Holder{} = holder, %Aura{} = aura, roll \\ &:rand.uniform/0) do
+    {_aura, amount} = tick_amount(entity, holder, aura, roll)
+    amount
+  end
+
+  def tick_amount(entity, %Holder{} = holder, %Aura{} = aura, roll \\ &:rand.uniform/0) do
     effect = Enum.find(holder.spell.effects, &(&1.index == aura.index))
     damage = base_amount(entity, holder, aura)
+    {aura, damage} = DeathRay.periodic_amount(entity, holder.spell, aura, damage)
     damage = DamageReceived.spell_amount(entity, damage, holder.spell, effect, :dot, max(holder.stacks || 1, 1))
-    Math.dither(damage, roll)
+    {aura, Math.dither(damage, roll)}
   end
 
   defp base_amount(%{unit: %Unit{max_health: health}}, %Holder{stacks: stacks}, %Aura{

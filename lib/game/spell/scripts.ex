@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Entity.Logic.Druid
+  alias ThistleTea.Game.Entity.Logic.Engineering.DeathRay
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Priest
   alias ThistleTea.Game.Entity.Logic.Warlock
@@ -111,6 +112,10 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def channel_trigger_spell_id(%Spell{id: 1515}, @tame_beast_completion), do: @tame_beast_ownership
   def channel_trigger_spell_id(_spell, trigger_spell_id), do: trigger_spell_id
+
+  def channel_start_trigger(%Spell{} = spell) do
+    if Spell.vmangos_script?(spell, "spell_gdr_channel"), do: 13_493
+  end
 
   def successful_finish_trigger(%Spell{} = spell) do
     if Spell.vmangos_script?(spell, "spell_cannibalize"), do: 20_578, else: Priest.holy_nova_heal_id(spell)
@@ -230,7 +235,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
     trunc(max_health * @last_stand_health_fraction)
   end
 
-  def aura_amount_override(_spell, _entity), do: nil
+  def aura_amount_override(%Spell{} = spell, _entity), do: DeathRay.aura_amount(spell)
 
   @dispel_poison 4
   @mod_confuse_aura 5

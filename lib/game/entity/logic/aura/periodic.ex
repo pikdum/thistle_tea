@@ -166,8 +166,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp merge_aura_tick(%Aura{index: index} = current, ticked) do
     case Enum.find(ticked, &(&1.index == index)) do
-      nil -> current
-      %Aura{next_tick_at: at, tick_count: count} -> %{current | next_tick_at: at, tick_count: count}
+      nil ->
+        current
+
+      %Aura{next_tick_at: at, tick_count: count, accumulated_damage: damage} ->
+        %{current | next_tick_at: at, tick_count: count, accumulated_damage: damage}
     end
   end
 
@@ -311,7 +314,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: type, next_tick_at: at} = aura, now)
        when type in [:periodic_damage, :periodic_damage_percent] and is_integer(at) and now >= at do
-    amount = PeriodicDamage.amount(entity, holder, aura)
+    {aura, amount} = PeriodicDamage.tick_amount(entity, holder, aura)
     {entity, damage, log_opts} = apply_periodic_damage(entity, holder, amount, now)
 
     event =
