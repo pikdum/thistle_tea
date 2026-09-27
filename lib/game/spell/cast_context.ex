@@ -120,9 +120,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
     healing_threat_ratio: 0.5,
     damage_done_multiplier: 1.0,
     happiness_multiplier: 1.0,
-    effect_damage_multiplier: 1.0,
     weapon_attack_power_included?: false,
-    effect_healing_multiplier: 1.0,
+    healing_done_multiplier: 1.0,
     melee_crit?: false
   ]
 
@@ -152,7 +151,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       conditional_crit_modifiers: Critical.snapshot(caster, spell),
       target_attack_power: TargetAttackPower.snapshot(caster),
       crit_damage_versus: Aura.misc_amounts(caster, :mod_crit_percent_versus),
-      effect_healing_multiplier: healing_done_multiplier(caster, spell),
+      healing_done_multiplier: healing_done_multiplier(caster, spell),
       spell_crit_chance: spell_crit_chance(caster, spell),
       reflect_chance_bonus: Mage.ward_reflect_chance(caster, spell),
       caster_max_health: caster.unit.max_health,
@@ -196,8 +195,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
         damage_done_multiplier: WeaponDamage.multiplier(caster, spell.school, attack_weapon(caster, spell)),
         happiness_multiplier: PetHappiness.damage_multiplier(caster),
         damage_done_versus: Aura.misc_amounts(caster, :mod_damage_done_versus),
-        target_damage: TargetDamage.snapshot(caster),
-        effect_damage_multiplier: effect_multiplier(caster, spell, [:all_effects, :damage])
+        target_damage: TargetDamage.snapshot(caster)
     }
   end
 
@@ -365,12 +363,6 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defp spell_crit_chance(_caster, _spell), do: 0.0
 
-  defp effect_multiplier(caster, %Spell{} = spell, operations) do
-    Enum.reduce(operations, 1.0, fn operation, multiplier ->
-      multiplier * Modifiers.value(caster, spell, operation, 100) / 100
-    end)
-  end
-
   defp healing_bonus(caster, spell) do
     equipment = caster |> equipment_bonuses() |> Map.get(:healing, 0)
 
@@ -386,8 +378,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   end
 
   defp healing_done_multiplier(caster, %Spell{} = spell) do
-    effect_multiplier(caster, spell, [:all_effects]) *
-      Aura.percent_multiplier(caster, :mod_healing_done_percent, Spell.school_mask(spell))
+    Aura.percent_multiplier(caster, :mod_healing_done_percent, Spell.school_mask(spell))
   end
 
   defp equipment_bonuses(%{unit: %{equipment_bonuses: %{} = bonuses}}), do: bonuses

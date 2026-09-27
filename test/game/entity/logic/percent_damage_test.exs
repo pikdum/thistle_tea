@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.PercentDamageTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura, as: AuraData
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -28,7 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.PercentDamageTest do
         caster_level: 60,
         spell_damage_bonus: %{physical: 1_000},
         spell_damage_versus: [{1, 1_000}],
-        effect_damage_multiplier: 3.0,
+        spell_modifiers: [%AuraData{type: :add_pct_modifier, misc_value: 0, amount: 200}],
         damage_done_multiplier: 2.0
       }
 

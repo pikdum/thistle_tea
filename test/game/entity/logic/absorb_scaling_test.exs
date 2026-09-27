@@ -21,7 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.AbsorbScalingTest do
       spell = shield()
       context = CastContext.from_caster(caster, spell, target.object.guid)
       modifier = %AuraData{type: :add_pct_modifier, misc_value: 8, amount: 15}
-      context = %{context | spell_modifiers: [modifier], effect_healing_multiplier: 2.0}
+      context = %{context | spell_modifiers: [modifier], healing_done_multiplier: 2.0}
       {shielded, _events} = Aura.apply_spell(target, context, spell, 0)
       assert capacity(shielded) == 215
       assert shielded.unit.health == target.unit.health

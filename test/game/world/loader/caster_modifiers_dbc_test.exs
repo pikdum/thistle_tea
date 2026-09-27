@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.CasterModifiersDbcTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Aura, as: AuraData
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -77,7 +78,7 @@ defmodule ThistleTea.Game.World.Loader.CasterModifiersDbcTest do
       | spell_damage_bonus: %{physical: 100, holy: 100, fire: 100, nature: 100, frost: 100, shadow: 100, arcane: 100},
         spell_crit_chance: 100,
         damage_done_multiplier: 2.0,
-        effect_damage_multiplier: 2.0,
+        spell_modifiers: [%AuraData{type: :add_pct_modifier, misc_value: 0, amount: 100}],
         happiness_multiplier: 1.25,
         damage_done_versus: [{64, 100}],
         target_damage: [{64, 100}],

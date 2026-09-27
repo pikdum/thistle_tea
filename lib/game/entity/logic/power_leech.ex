@@ -133,7 +133,7 @@ defmodule ThistleTea.Game.Entity.Logic.PowerLeech do
   defp consume(entity, power, amount), do: Resources.consume_power(entity, power, amount)
 
   defp direct_amount(entity, context, spell, effect) do
-    base = Effect.roll(effect, Spell.level_units(spell, context.caster_level))
+    base = Amount.base(spell, effect, context)
     if base < 0, do: base, else: Amount.with_damage_bonuses(entity, context, spell, effect, base)
   end
 end

@@ -55,7 +55,7 @@ defmodule ThistleTea.Game.Entity.Logic.HealingReceivedTest do
         caster_guid: 2,
         caster_level: 60,
         healing_bonus: 200,
-        effect_healing_multiplier: 1.5,
+        healing_done_multiplier: 1.5,
         spell_crit_chance: 100
       }
 
@@ -73,7 +73,7 @@ defmodule ThistleTea.Game.Entity.Logic.HealingReceivedTest do
         caster_guid: 2,
         caster_level: 60,
         healing_bonus: 200,
-        effect_healing_multiplier: 1.5,
+        healing_done_multiplier: 1.5,
         chain_effects: %{0 => 0.5}
       }
 

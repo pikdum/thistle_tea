@@ -108,7 +108,7 @@ defmodule ThistleTea.Game.Spell.ModifiersTest do
       target = %{object: %Object{guid: 2}, unit: %Unit{level: 60, health: 1_000, max_health: 1_000, auras: []}}
       {target, _events} = AuraLogic.apply_spell(target, context, spell, 1_000)
 
-      assert context.effect_damage_multiplier == 1.5
+      assert Modifiers.value(context.spell_modifiers, :all_effects, 100) == 150
       assert [%Holder{auras: [%Aura{amount: 150}]}] = target.unit.auras
     end
 
@@ -159,6 +159,32 @@ defmodule ThistleTea.Game.Spell.ModifiersTest do
   end
 
   describe "consumable_holder_ids/2" do
+    test "amount charges distinguish direct, periodic, and resource effects" do
+      entity =
+        entity([
+          modifier_holder(:add_flat_modifier, 10, 8, 1, charges: 1, id: 1),
+          modifier_holder(:add_flat_modifier, 10, 0, 1, charges: 1, id: 2),
+          modifier_holder(:add_flat_modifier, 10, 22, 1, charges: 1, id: 3)
+        ])
+
+      for {effect, expected} <- [
+            {%Effect{type: :heal}, [1, 2]},
+            {%Effect{type: :power_drain}, [1, 2]},
+            {%Effect{type: :energize}, [1]},
+            {%Effect{type: :apply_aura, aura: :mod_stat}, [1]},
+            {%Effect{type: :apply_aura, aura: :periodic_heal}, [1, 3]},
+            {%Effect{type: :apply_aura, aura: :periodic_damage}, [1, 3]},
+            {%Effect{type: :apply_aura, aura: :periodic_mana_leech}, [1]},
+            {%Effect{type: :apply_aura, aura: :periodic_power_burn}, [1, 2]}
+          ] do
+        spell = %Spell{spell_family: 8, family_flags_0: 1, effects: [effect]}
+        assert Modifiers.consumable_holder_ids(entity, spell) == expected
+
+        assert Modifiers.consumable_holder_ids(entity, %{spell | attributes: MapSet.new([:ignore_caster_modifiers])}) ==
+                 []
+      end
+    end
+
     test "attack power and haste charges require the matching aura operation" do
       entity =
         entity([

@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Logic.DiminishingReturns
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.SpellEffect.Amount
   alias ThistleTea.Game.Entity.Logic.TargetDamage
   alias ThistleTea.Game.Entity.Logic.TargetSpellPower
   alias ThistleTea.Game.Spell
@@ -678,14 +679,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     }
   end
 
-  defp aura_amount(%Spell{}, %Effect{}, amount_override, _context) when is_integer(amount_override), do: amount_override
+  defp aura_amount(%Spell{} = spell, %Effect{}, amount_override, context) when is_integer(amount_override),
+    do: Amount.modify_base(spell, context, amount_override)
 
   defp aura_amount(%Spell{} = spell, %Effect{} = effect, _amount_override, %CastContext{} = context) do
-    level_units = Spell.level_units(spell, context.caster_level)
     combo_points = finisher_combo_points(spell, context)
 
-    effect
-    |> Effect.amount(level_units, combo_points)
+    spell
+    |> Amount.base(effect, context, combo_points)
     |> Chain.scale(effect, context)
   end
 
@@ -705,49 +706,29 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     amount = modify_aura_base_amount(effect.aura, amount, context)
     amount = amount + periodic_benefit(entity, spell, effect, context)
 
-    multiplier =
-      case effect.aura do
-        aura when aura in [:periodic_damage, :periodic_leech, :periodic_health_funnel, :periodic_mana_leech] ->
-          context.effect_damage_multiplier
-
-        :periodic_heal ->
-          context.effect_healing_multiplier
-
-        _aura ->
-          1.0
-      end
-
-    amount =
-      if effect.aura in [
-           :periodic_damage,
-           :periodic_leech,
-           :periodic_health_funnel,
-           :periodic_mana_leech,
-           :periodic_heal
-         ] do
-        Modifiers.value(context.spell_modifiers, :dot, amount * 1.0)
-      else
-        Modifiers.value(context.spell_modifiers, :all_effects, amount)
-      end
-
-    amount =
-      if effect.aura in [:periodic_damage, :periodic_leech, :periodic_health_funnel],
-        do: periodic_done_amount(entity, spell, context, amount) * context.happiness_multiplier,
-        else: amount
-
-    amount = trunc(amount * (multiplier || 1.0) + AbsorbBonus.value(spell, effect, context))
+    amount = periodic_done_amount(entity, spell, effect, context, amount)
+    amount = trunc(amount + AbsorbBonus.value(spell, effect, context))
     Modifiers.aura_amount(context.spell_modifiers, effect, amount)
   end
 
-  defp periodic_done_amount(entity, %Spell{} = spell, %CastContext{} = context, amount) do
-    if Spell.custom?(spell, :fixed_damage) or Spell.attribute?(spell, :ignore_caster_modifiers) or
-         spell.id == @ignite_dot do
+  defp periodic_done_amount(entity, spell, %Effect{aura: type}, context, amount)
+       when type in [:periodic_damage, :periodic_leech, :periodic_health_funnel] do
+    if Spell.custom?(spell, :fixed_damage) or spell.id == @ignite_dot do
       amount
     else
       versus = max(100 + TargetDamage.bonus(entity, context.damage_done_versus), 0) / 100
-      amount * (context.damage_done_multiplier || 1.0) * versus
+      amount = amount * (context.damage_done_multiplier || 1.0) * versus * context.happiness_multiplier
+      Modifiers.value(context.spell_modifiers, :dot, amount)
     end
   end
+
+  defp periodic_done_amount(_entity, spell, %Effect{aura: :periodic_heal}, context, amount) do
+    if Spell.custom?(spell, :fixed_damage),
+      do: amount,
+      else: Modifiers.value(context.spell_modifiers, :dot, amount * context.healing_done_multiplier)
+  end
+
+  defp periodic_done_amount(_entity, _spell, _effect, _context, amount), do: amount
 
   defp modify_aura_base_amount(aura, amount, %CastContext{} = context)
        when aura in [:mod_increase_speed, :mod_decrease_speed, :mod_increase_swim_speed] do

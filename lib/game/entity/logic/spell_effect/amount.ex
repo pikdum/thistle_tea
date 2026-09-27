@@ -1,5 +1,9 @@
 defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Amount do
-  @moduledoc false
+  @moduledoc """
+  Rolls spell effect values and applies all-effects modifiers to their base
+  amounts. Resource drains additionally use the shared outgoing and incoming
+  damage bonus stages.
+  """
 
   alias ThistleTea.Game.Entity.Logic.DamageReceived
   alias ThistleTea.Game.Entity.Logic.TargetDamage
@@ -9,11 +13,24 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Amount do
   alias ThistleTea.Game.Spell.Chain
   alias ThistleTea.Game.Spell.Coefficient
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Modifiers
+
+  def base(%Spell{} = spell, %Effect{} = effect, %CastContext{} = context, combo_points \\ 0) do
+    amount = Effect.amount(effect, Spell.level_units(spell, context.caster_level), combo_points)
+    modify_base(spell, context, amount)
+  end
+
+  def modify_base(%Spell{} = spell, %CastContext{} = context, amount) do
+    if Spell.attribute?(spell, :ignore_caster_modifiers),
+      do: amount,
+      else: Modifiers.value(context.spell_modifiers, :all_effects, amount)
+  end
 
   def roll(%Spell{} = spell, %Effect{} = effect, %CastContext{} = context) do
-    effect
-    |> Effect.roll(Spell.level_units(spell, context.caster_level))
+    spell
+    |> base(effect, context)
     |> Chain.scale(effect, context)
+    |> trunc()
   end
 
   def with_damage_bonuses(entity, %CastContext{} = context, %Spell{} = spell, %Effect{} = effect, base) do
@@ -32,10 +49,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Amount do
       versus = max(100 + TargetDamage.bonus(entity, context.damage_done_versus), 0) / 100
 
       amount =
-        (base + bonus) * context.effect_damage_multiplier * context.damage_done_multiplier *
+        (base + bonus) * context.damage_done_multiplier *
           context.happiness_multiplier * versus
 
-      Chain.scale(trunc(amount), effect, context)
+      amount = Chain.scale(amount, effect, context)
+      trunc(Modifiers.value(context.spell_modifiers, :damage, amount))
     end
   end
 end

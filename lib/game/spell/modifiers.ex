@@ -11,7 +11,18 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   alias ThistleTea.Game.Spell.Effect
 
   @modifier_types [:add_flat_modifier, :add_pct_modifier]
-  @periodic_auras [:periodic_damage, :periodic_heal, :periodic_leech, :periodic_health_funnel, :periodic_mana_leech]
+  @periodic_auras [:periodic_damage, :periodic_heal, :periodic_leech, :periodic_health_funnel]
+  @direct_amount_effects [
+    :school_damage,
+    :heal,
+    :health_leech,
+    :power_drain,
+    :power_burn,
+    :weapon_damage,
+    :weapon_damage_noschool,
+    :normalized_weapon_damage,
+    :weapon_percent_damage
+  ]
 
   @aura_operations %{
     mod_attack_power: :attack_power,
@@ -191,8 +202,12 @@ defmodule ThistleTea.Game.Spell.Modifiers do
     do: is_integer(cast_time_ms) and cast_time_ms > 0
 
   defp operation_used_by_spell?(:critical_chance, %Spell{} = spell), do: critical_spell?(spell)
-  defp operation_used_by_spell?(:damage, %Spell{} = spell), do: Spell.damage_effects(spell) != []
-  defp operation_used_by_spell?(:all_effects, %Spell{effects: effects}), do: Enum.any?(effects, &effectful?/1)
+
+  defp operation_used_by_spell?(:damage, %Spell{effects: effects}) do
+    Enum.any?(effects, &(&1.type in @direct_amount_effects or &1.aura == :periodic_power_burn))
+  end
+
+  defp operation_used_by_spell?(:all_effects, %Spell{effects: effects}), do: effects != []
 
   defp operation_used_by_spell?(operation, %Spell{effects: effects}) when operation in [:attack_power, :haste] do
     Enum.any?(effects, &(Map.get(@aura_operations, &1.aura) == operation))
@@ -245,22 +260,4 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   defp critical_spell?(%Spell{effects: effects} = spell) do
     Spell.damage_effects(spell) != [] or Enum.any?(effects, &match?(%Effect{type: :heal}, &1))
   end
-
-  defp effectful?(%Effect{type: type, aura: aura}) when type in [:apply_aura, :apply_area_aura] do
-    aura in @periodic_auras
-  end
-
-  defp effectful?(%Effect{type: type}) do
-    type in [
-      :school_damage,
-      :heal,
-      :health_leech,
-      :weapon_damage,
-      :weapon_damage_noschool,
-      :normalized_weapon_damage,
-      :weapon_percent_damage
-    ]
-  end
-
-  defp effectful?(_effect), do: false
 end

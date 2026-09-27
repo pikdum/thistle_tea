@@ -6,6 +6,13 @@ defmodule ThistleTea.Game.World.Loader.SpellModifierMasksVmangosTest do
   @moduletag :vmangos_db
 
   describe "load_all/0" do
+    test "loads Improved Bloodrage and Revenge modifier masks" do
+      SpellEffectOverride.load_all()
+      assert SpellEffectOverride.class_mask(12_301, 0) == 256
+      assert SpellEffectOverride.class_mask(12_818, 0) == 256
+      assert SpellEffectOverride.class_mask(28_844, 0) == 1_024
+    end
+
     test "loads target-trigger restrictions for Revealed Flaw and Shadow Weaving" do
       SpellEffectOverride.load_all()
       assert SpellEffectOverride.class_mask(28_814, 0) == 0x20000

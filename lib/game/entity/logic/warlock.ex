@@ -67,7 +67,7 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
   end
 
   defp life_tap_cost(state, context, spell, effect) do
-    base = Effect.roll(effect, Spell.level_units(spell, context.caster_level))
+    base = Amount.base(spell, effect, context)
     base = max(Modifiers.value(context.spell_modifiers, :cost, base), 0)
     Amount.with_damage_bonuses(state, context, spell, effect, base)
   end

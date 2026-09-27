@@ -144,8 +144,12 @@ defmodule ThistleTea.Game.Entity.Logic.CasterModifiersTest do
       hit_chance_bonus: 100,
       spell_damage_bonus: %{fire: 100},
       healing_bonus: 100,
-      effect_damage_multiplier: 2.0,
-      effect_healing_multiplier: 2.0,
+      spell_modifiers: [
+        %AuraData{type: :add_pct_modifier, misc_value: 0, amount: 100},
+        %AuraData{type: :add_pct_modifier, misc_value: 8, amount: 100},
+        %AuraData{type: :add_pct_modifier, misc_value: 22, amount: 100}
+      ],
+      healing_done_multiplier: 2.0,
       damage_done_multiplier: 2.0,
       happiness_multiplier: 1.25,
       damage_done_versus: [{64, 50}],
