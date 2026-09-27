@@ -33,8 +33,9 @@ this missing path: VMangos overrides its DBC create-item effect with a script
 effect and supplies a `create_item` command in `spell_scripts`.
 
 This milestone covers nearest-creature target 38 for unit casts and triggered
-spells. Database-selected area, cone, and destination modes remain separate work;
-it does not claim all database-scripted spell content is implemented.
+spells. [Scripted areas and configured cones](spell-scripted-areas-playtest.md)
+subsequently added modes 7, 8, and 60. Scripted location target 46 remains separate
+work; these milestones do not claim all database-scripted content is implemented.
 
 ## Native acceptance
 
