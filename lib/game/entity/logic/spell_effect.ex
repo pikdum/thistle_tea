@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Spell.TargetTrigger
 
   @dead_target_effects [:resurrect, :resurrect_new, :durability_damage, :durability_damage_percent]
+  @corpse_script_effects [:dummy, :script_effect, :send_event]
 
   @weapon_effect_types [:weapon_damage, :weapon_damage_noschool, :normalized_weapon_damage, :weapon_percent_damage]
 
@@ -429,12 +430,17 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp apply_effects(target, context, effects, events, applied, now) do
     effects =
       if Core.dead?(target) do
-        Enum.filter(effects, &match?(%Effect{type: type} when type in @dead_target_effects, &1))
+        Enum.filter(effects, &dead_target_effect?(&1, context.spell))
       else
         effects
       end
 
     do_apply_effects(target, context, effects, events, applied, now)
+  end
+
+  defp dead_target_effect?(%Effect{type: type}, spell) do
+    type in @dead_target_effects or
+      (type in @corpse_script_effects and Spell.attribute?(spell, :allow_dead_target))
   end
 
   defp do_apply_effects(target, _context, [], events, _applied, _now), do: {target, events}

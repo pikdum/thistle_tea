@@ -1000,6 +1000,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     base = if from_behind?(attrs_ex1, attrs_ex2), do: MapSet.put(base, :from_behind), else: base
 
     base
+    |> add_if(attrs_ex2, 0x00000001, :allow_dead_target)
     |> add_if(attrs_ex1, 0x00000008, :no_redirection)
     |> add_if(attrs_ex3, 0x00000200, :not_a_proc)
     |> add_if(attrs_ex3, 0x00010000, :suppress_caster_procs)

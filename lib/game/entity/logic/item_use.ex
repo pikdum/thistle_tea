@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.ItemUse do
   @moduledoc """
   Plans on-use charge consumption and binding. Negative charges destroy one
   item only when exhausted; positive charges leave an empty item behind.
+  Checks explicit creature targets against an item's allowed entries and life states.
   """
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Logic.Enchantments
@@ -9,6 +10,14 @@ defmodule ThistleTea.Game.Entity.Logic.ItemUse do
   alias ThistleTea.Game.Entity.Logic.OpenLock
   alias ThistleTea.Game.Entity.Logic.SpellTeaching
   alias ThistleTea.Game.Spell
+
+  def validate_target([], _target), do: :ok
+
+  def validate_target(requirements, %{entity_type: :mob, entry: entry, alive?: alive?}) when is_boolean(alive?) do
+    if {entry, alive?} in requirements, do: :ok, else: {:error, :bad_targets}
+  end
+
+  def validate_target(_requirements, _target), do: {:error, :bad_targets}
 
   def deferred_costs?(%Spell{} = spell, cast_item_guid) do
     Enchantments.item_enchant?(spell) or OpenLock.spell?(spell) or

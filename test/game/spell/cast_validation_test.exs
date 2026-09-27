@@ -614,6 +614,21 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(caster(), harmful_spell(), Target.unit(7), hostile_target(alive?: false), @now)
     end
 
+    test "allows explicit corpse spells while retaining target restrictions" do
+      spell = harmful_spell(attributes: MapSet.new([:allow_dead_target]))
+      corpse = hostile_target(alive?: false)
+      assert :ok = CastValidation.validate(caster(), spell, Target.unit(7), corpse, @now)
+
+      assert {:error, :target_friendly} =
+               CastValidation.validate(caster(), spell, Target.unit(7), %{corpse | friendly?: true}, @now)
+
+      assert {:error, :bad_targets} =
+               CastValidation.validate(caster(), spell, Target.unit(7), Map.put(corpse, :visible?, false), @now)
+
+      assert {:error, :bad_targets} =
+               CastValidation.validate(caster(), spell, Target.unit(7), Map.put(corpse, :attackable?, false), @now)
+    end
+
     test "rejects an unattackable neutral target for a harmful spell" do
       target = hostile_target(hostile?: false, attackable?: false)
 

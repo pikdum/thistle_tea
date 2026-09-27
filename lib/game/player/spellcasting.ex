@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Insignia
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.ItemUse
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.PlayerCharm
   alias ThistleTea.Game.Entity.Logic.SpellTarget
@@ -56,6 +57,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.World.InsigniaTarget
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.ItemTarget, as: ItemTargetLoader
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
@@ -190,7 +192,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp cast_target(state, spell, targets, cast_item_guid, requested) do
     spell = WeaponDamage.prepare_spell(state.character, spell)
 
-    with :ok <- Deadmines.validate_cast(state, spell, targets, cast_item_guid),
+    with :ok <- validate_item_target(cast_item_guid, targets),
+         :ok <- Deadmines.validate_cast(state, spell, targets, cast_item_guid),
          :ok <- validate_cast(state, spell, targets, cast_item_guid),
          :ok <- Teaching.validate(state.character, spell, cast_item_guid),
          :ok <- PetTraining.validate(state.character, spell),
@@ -354,6 +357,16 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
   defp cast_item_id(_guid), do: 0
 
+  defp validate_item_target(nil, _targets), do: :ok
+
+  defp validate_item_target(item_guid, %Target{} = targets) do
+    requirements = item_guid |> cast_item_id() |> ItemTargetLoader.get()
+    guid = Target.unit_guid(targets)
+    target = Metadata.get(guid)
+    target = if target, do: Map.put(target, :entity_type, Guid.entity_type(guid))
+    ItemUse.validate_target(requirements, target)
+  end
+
   defp stealth_roll(character, spell) do
     if Stealth.preservation_chance(character, spell) in 1..99, do: Math.random_int(1, 100)
   end
@@ -509,9 +522,9 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     cond do
       Insignia.spell?(spell) -> InsigniaTarget.info(character, targets)
       Spell.resurrect_spell?(spell) -> ResurrectionTarget.info(character, targets)
-      is_integer(pet_guid) -> target_info(character, pet_guid)
-      is_integer(explicit_guid) -> target_info(character, explicit_guid)
-      is_integer(fallback_guid) -> target_info(character, fallback_guid)
+      is_integer(pet_guid) -> target_info(character, pet_guid, spell)
+      is_integer(explicit_guid) -> target_info(character, explicit_guid, spell)
+      is_integer(fallback_guid) -> target_info(character, fallback_guid, spell)
       unit_guid == caster_guid -> :self
       true -> nil
     end
@@ -550,7 +563,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp positive_guid(guid) when is_integer(guid) and guid > 0, do: guid
   defp positive_guid(_guid), do: nil
 
-  defp target_info(character, guid) do
+  defp target_info(character, guid, spell) do
     case Metadata.query(guid, [
            :alive?,
            :feigning_death?,
@@ -590,7 +603,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
           alive?: Map.get(metadata, :alive?, true),
           hostile?: Hostility.hostile?(character, metadata),
           friendly?: Hostility.friendly?(character, metadata),
-          attackable?: Hostility.attackable?(character, guid),
+          attackable?:
+            Hostility.valid_attack_target?(character, guid, allow_dead?: Spell.attribute?(spell, :allow_dead_target)),
           helpful?: Hostility.can_assist?(character, guid),
           health_pct: Map.get(metadata, :health_pct),
           power_type: Map.get(metadata, :power_type),

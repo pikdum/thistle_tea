@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
   @moduledoc false
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Aura.StackingProc
@@ -112,6 +113,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
 
   defp apply_class_dummy(state, context, _spell, %Effect{index: 0}, :net_o_matic, _now) do
     Engineering.net_o_matic(state, context)
+  end
+
+  defp apply_class_dummy(%Mob{unit: %{health: 0}} = state, _context, _spell, _effect, :capture_corpse, _now) do
+    {state, [Effects.despawn_self(1_000, 0)]}
   end
 
   defp apply_class_dummy(state, context, spell, effect, :execute, now) do

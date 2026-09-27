@@ -84,7 +84,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   end
 
   def valid_attack_target?(source, target, opts) do
-    alive?(target) and targetable_by?(source, target, false, opts) and
+    (alive?(target) or Keyword.get(opts, :allow_dead?, false)) and targetable_by?(source, target, false, opts) and
       attack_reaction_allows?(source, target) and
       pvp_attack_allowed?(source, target)
   end

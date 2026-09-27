@@ -19,8 +19,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.Cooldowns
+  alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Spell.TargetCodec
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.ItemTarget
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
   @backpack_start 23
@@ -33,6 +38,60 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
   end
 
   describe "handle/3" do
+    test "rejects invalid creature targets without charges or cooldowns and permits a corrected retry" do
+      player_guid = Guid.from_low_guid(:player, unique_id())
+      entry = unique_id() + 1_000_000
+      target = Guid.from_low_guid(:mob, 7977, unique_id())
+      template = %{drink_template() | entry: entry, stackable: 1, spellcharges_1: 3}
+      item = ItemStore.create(template, owner: player_guid)
+      :ets.insert(ItemTarget, {entry, [{7977, true}]})
+      Metadata.put(target, %{entry: 7978, alive?: true, unit_flags: 0})
+      SpatialHash.update(:mobs, target, %WorldRef{map_id: 0}, 1.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        :ets.delete(ItemTarget, entry)
+        ItemStore.delete(item.object.guid)
+        Metadata.delete(target)
+        SpatialHash.remove(:mobs, target)
+      end)
+
+      spell = %Spell{
+        id: @spell_id,
+        name: "Quest tool",
+        cast_time_ms: 10_000,
+        attributes: MapSet.new([:ignore_line_of_sight])
+      }
+
+      state = %{
+        ready: true,
+        guid: player_guid,
+        packed_guid: BinaryUtils.pack_guid(player_guid),
+        character: character(player_guid, item.object.guid),
+        player_tick_ref: nil
+      }
+
+      message = %CmsgUseItem{
+        bag: Inventory.bag_0(),
+        slot: @backpack_start,
+        targets: TargetCodec.encode(Target.unit(target))
+      }
+
+      for metadata <- [%{entry: 7978, alive?: true}, %{entry: 7977, alive?: false}] do
+        Metadata.update(target, metadata)
+        rejected = CmsgUseItem.handle(message, state, fn @spell_id -> spell end)
+        assert rejected.character.internal.casting == nil
+        assert rejected.character.internal.cooldowns == %{}
+        assert ItemStore.get(item.object.guid) == item
+        assert_received {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{reason: 0x0A}}}
+        assert_received {:"$gen_cast", {:send_packet, %Message.SmsgInventoryChangeFailure{code: 0}}}
+      end
+
+      Metadata.update(target, %{alive?: true})
+      accepted = CmsgUseItem.handle(message, state, fn @spell_id -> spell end)
+      assert %Cast{consume_item: true} = accepted.character.internal.casting
+      assert ItemStore.get(item.object.guid) == item
+    end
+
     test "instant transformation keeps its charged source until atomic replacement" do
       player_guid = Guid.from_low_guid(:player, unique_id())
       Entity.register(player_guid)

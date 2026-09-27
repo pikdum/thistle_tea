@@ -9,6 +9,39 @@ defmodule ThistleTea.Game.Entity.Logic.ItemUseTest do
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
   alias ThistleTea.Game.Entity.Logic.ItemUse
 
+  describe "validate_target/2" do
+    test "accepts unrestricted items and any matching creature alternative" do
+      assert ItemUse.validate_target([], nil) == :ok
+      assert ItemUse.validate_target([], %{entity_type: :player}) == :ok
+
+      for entry <- [2927, 2928, 2929] do
+        assert ItemUse.validate_target([{2927, false}, {2928, false}, {2929, false}], %{
+                 entity_type: :mob,
+                 entry: entry,
+                 alive?: false
+               }) == :ok
+      end
+
+      assert ItemUse.validate_target([{7977, true}], %{entity_type: :mob, entry: 7977, alive?: true}) == :ok
+    end
+
+    test "rejects the wrong creature, life state, entity kind, and missing target facts" do
+      for target <- [
+            nil,
+            %{entity_type: :mob, entry: 7977},
+            %{entity_type: :mob, entry: 7977, alive?: false},
+            %{entity_type: :mob, entry: 7978, alive?: true},
+            %{entity_type: :player, entry: 7977, alive?: true},
+            %{entity_type: :corpse, entry: 7977, alive?: false}
+          ] do
+        assert ItemUse.validate_target([{7977, true}], target) == {:error, :bad_targets}
+      end
+
+      assert ItemUse.validate_target([{7318, false}], %{entity_type: :mob, entry: 7318, alive?: true}) ==
+               {:error, :bad_targets}
+    end
+  end
+
   describe "plan/3" do
     test "retains a five-charge oil bottle until the fifth application" do
       item = Item.build(%ItemTemplate{entry: 20_744, spellid_1: 25_117, spellcharges_1: -5}, 101, owner: 1)

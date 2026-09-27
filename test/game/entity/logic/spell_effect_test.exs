@@ -330,6 +330,27 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       refute SpellEffect.successful_hit?([Effects.spell_log_miss(99, 1, spell.id, :immune)])
     end
 
+    test "corpse capture schedules removal without reviving or damaging the corpse" do
+      target = target_fixture()
+      target = %{target | unit: %{target.unit | health: 0}}
+
+      spell = %Spell{
+        id: 11_885,
+        attributes: MapSet.new([:allow_dead_target]),
+        effects: [
+          %Effect{index: 0, type: :dummy},
+          %Effect{index: 1, type: :heal, base_points: 100},
+          %Effect{index: 2, type: :school_damage, base_points: 100}
+        ]
+      }
+
+      context = %CastContext{caster_guid: 99, caster_level: 10}
+      {result, events} = SpellEffect.receive(target, context, spell, 1_000)
+      assert result.unit.health == 0
+      assert [%Effects.DespawnSelf{duration_ms: 1_000, respawn_delay_ms: 0}] = events
+      assert {^target, []} = SpellEffect.receive(target, context, %{spell | attributes: MapSet.new()}, 1_000)
+    end
+
     test "credits the recipient of quest-complete effects" do
       spell = %Spell{
         id: 10_617,

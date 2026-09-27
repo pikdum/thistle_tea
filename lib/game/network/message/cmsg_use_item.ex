@@ -56,8 +56,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
       Logger.info("CMSG_USE_ITEM: #{template.name} casting #{spell.name}")
 
       case Spellcasting.cast_result(state, spell, message.targets, guid) do
-        {:ok, state} -> handle_consumption(state, guid, consumable? and not ItemUse.deferred_costs?(spell, guid))
-        {:error, state} -> state
+        {:ok, state} ->
+          handle_consumption(state, guid, consumable? and not ItemUse.deferred_costs?(spell, guid))
+
+        {:error, state} ->
+          Network.send_packet(%Message.SmsgInventoryChangeFailure{})
+          state
       end
     else
       {:cast_error, spell_id, reason} ->

@@ -514,11 +514,23 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_target(%Spell{} = spell, target_info) do
     cond do
-      Skinning.spell?(spell) -> :ok
-      Spell.resurrect_spell?(spell) -> check_resurrect_target(target_info)
-      Spell.requires_hostile_target?(spell) -> check_hostile_target(target_info)
-      Spell.requires_friendly_target?(spell) -> check_friendly_target(target_info)
-      true -> check_incidental_target(target_info)
+      Skinning.spell?(spell) ->
+        :ok
+
+      Spell.resurrect_spell?(spell) ->
+        check_resurrect_target(target_info)
+
+      match?(%{alive?: false}, target_info) and not Spell.attribute?(spell, :allow_dead_target) ->
+        {:error, :targets_dead}
+
+      Spell.requires_hostile_target?(spell) ->
+        check_hostile_target(target_info)
+
+      Spell.requires_friendly_target?(spell) ->
+        check_friendly_target(target_info)
+
+      true ->
+        :ok
     end
   end
 
@@ -599,7 +611,6 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_hostile_target(%{} = target_info) do
     cond do
-      Map.get(target_info, :alive?) == false -> {:error, :targets_dead}
       Map.get(target_info, :friendly?) == true -> {:error, :target_friendly}
       Map.get(target_info, :attackable?) == false -> {:error, :bad_targets}
       true -> :ok
@@ -608,7 +619,6 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_friendly_target(%{} = target_info) do
     cond do
-      Map.get(target_info, :alive?) == false -> {:error, :targets_dead}
       Map.get(target_info, :hostile?) == true -> {:error, :target_enemy}
       Map.get(target_info, :helpful?) == false -> {:error, :bad_targets}
       true -> :ok
@@ -646,12 +656,6 @@ defmodule ThistleTea.Game.Spell.CastValidation do
       effect.implicit_target_a in area_targets or effect.implicit_target_b in area_targets
     end)
   end
-
-  defp check_incidental_target(%{} = target_info) do
-    if Map.get(target_info, :alive?) == false, do: {:error, :targets_dead}, else: :ok
-  end
-
-  defp check_incidental_target(_target_info), do: :ok
 
   defp check_range(caster, %Spell{range_yards: range} = spell, %{position: position} = target_info)
        when is_tuple(position) and tuple_size(position) == 4 and is_number(range) and range > 0 do

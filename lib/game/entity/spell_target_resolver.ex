@@ -139,7 +139,8 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
 
   defp recipient_allowed?(caster, spell, guid) do
     Spell.harmful?(spell) or Hostility.can_assist?(caster, guid) or
-      (any_unit_target?(spell) and Hostility.valid_attack_target?(caster, guid))
+      (any_unit_target?(spell) and
+         Hostility.valid_attack_target?(caster, guid, allow_dead?: Spell.attribute?(spell, :allow_dead_target)))
   end
 
   defp any_unit_target?(%Spell{effects: effects}) do

@@ -53,6 +53,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.ItemProperty, as: ItemPropertyLoader
   alias ThistleTea.Game.World.Loader.ItemSet, as: ItemSetLoader
+  alias ThistleTea.Game.World.Loader.ItemTarget, as: ItemTargetLoader
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
   alias ThistleTea.Game.World.Loader.Mail, as: MailLoader
@@ -208,6 +209,7 @@ defmodule ThistleTea.Application do
     ItemEnchantmentLoader.init()
     ItemPropertyLoader.init()
     ItemSetLoader.init()
+    ItemTargetLoader.init()
     DurabilityLoader.init()
     AuctionHouseLoader.init()
     EmoteLoader.init()
@@ -359,6 +361,7 @@ defmodule ThistleTea.Application do
         ItemEnchantmentLoader.load_all()
         ItemPropertyLoader.load_all()
         ItemSetLoader.load_all()
+        ItemTargetLoader.load_all()
         FishingLoader.load_all()
         WeatherLoader.load_all()
         LootLoader.load_all()
