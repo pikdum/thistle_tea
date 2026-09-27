@@ -532,6 +532,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
       entry: entry,
       duration_ms: duration_ms,
       spell_id: Keyword.get(opts, :spell_id),
+      slot: Keyword.get(opts, :slot),
       target_guid: Keyword.get(opts, :ritual_target_guid),
       position: Keyword.get(opts, :position),
       owned?: Keyword.get(opts, :owned?, true)

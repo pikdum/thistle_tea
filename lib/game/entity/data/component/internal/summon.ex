@@ -5,6 +5,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Summon do
   """
   defstruct [
     :owner_guid,
+    :owner_pid,
+    :owner_monitor,
     :despawn_in_ms,
     :spell_id,
     :charges,

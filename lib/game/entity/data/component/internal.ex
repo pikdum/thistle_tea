@@ -110,6 +110,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     corpse_reclaim: %CorpseReclaim{},
     guardians: %{},
     guardian_monitors: %{},
+    game_object_monitors: %{},
     pet_stable: %PetStable{},
     pvp: %Pvp{},
     honor_damage: %HonorDamage{},

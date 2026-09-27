@@ -75,6 +75,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   def init(%GameObject{} = state) do
     GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
+    state = monitor_owner(state)
     publish_condition_metadata(state)
     World.update_position(state)
     state = Visibility.join_entity(state)
@@ -247,6 +248,10 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   @impl GenServer
+  def handle_call(:release_summon, _from, %GameObject{internal: %{summon: %Summon{}}} = state) do
+    {:stop, :normal, cooldown_release(state), state}
+  end
+
   def handle_call(
         {:use_goober, user_guid, world, quest_allowed?},
         _from,
@@ -367,6 +372,14 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   def handle_info({:event_start, _event}, state) do
     {:noreply, state}
+  end
+
+  def handle_info(
+        {:DOWN, token, :process, _pid, _reason},
+        %GameObject{internal: %{summon: %Summon{owner_monitor: token}}} = state
+      )
+      when is_reference(token) do
+    despawn(state)
   end
 
   def handle_info({:DOWN, token, :process, _pid, _reason}, %GameObject{} = state) when is_reference(token) do
@@ -522,17 +535,23 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   defp release_cooldown(
-         %GameObject{internal: %{summon: %Summon{cooldown_event: %Effects.ActivateCooldown{} = event}}} = state
+         %GameObject{internal: %{summon: %Summon{cooldown_event: %Effects.ActivateCooldown{} = event} = summon}} = state
        ) do
-    cancel? = match?(%Ritual{completed?: false}, state.internal.ritual)
-
-    case Entity.pid(event.target_guid) do
-      pid when is_pid(pid) -> send(pid, %{event | cancel?: cancel?})
+    case summon.owner_pid || Entity.pid(event.target_guid) do
+      pid when is_pid(pid) -> send(pid, cooldown_release(state))
       _ -> :ok
     end
   end
 
   defp release_cooldown(_state), do: :ok
+
+  defp cooldown_release(
+         %GameObject{internal: %{summon: %Summon{cooldown_event: %Effects.ActivateCooldown{} = event}}} = state
+       ) do
+    %{event | cancel?: match?(%Ritual{completed?: false}, state.internal.ritual)}
+  end
+
+  defp cooldown_release(_state), do: nil
 
   defp despawn(state) do
     pid = self()
@@ -555,6 +574,13 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   defp schedule_despawn(_state), do: nil
+
+  defp monitor_owner(%GameObject{internal: %{summon: %Summon{owner_pid: pid} = summon}} = state) when is_pid(pid) do
+    summon = %{summon | owner_monitor: Process.monitor(pid)}
+    %{state | internal: %{state.internal | summon: summon}}
+  end
+
+  defp monitor_owner(state), do: state
 
   defp stop_linked_objects(%GameObject{internal: %{summon: %Summon{linked_guids: guids}}}) do
     Enum.each(guids, fn guid ->

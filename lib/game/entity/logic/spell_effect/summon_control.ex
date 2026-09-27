@@ -186,9 +186,24 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
     Companion.dismiss(state)
   end
 
-  def apply(state, %CastContext{}, spell, %Effect{type: :summon_game_object, misc_value: entry}, _now)
+  def apply(
+        %{object: %{guid: caster_guid}} = state,
+        %CastContext{caster_guid: caster_guid, destination_position: destination, caster_orientation: orientation},
+        spell,
+        %Effect{type: :summon_game_object, misc_value: entry, summon_slot: slot},
+        _now
+      )
       when is_integer(entry) and entry > 0 do
-    {state, [Effects.summon_game_object(entry, max(spell.duration_ms || 0, 0), spell_id: spell.id)]}
+    position = if destination, do: Tuple.insert_at(destination, 3, orientation || 0.0)
+
+    {state,
+     [
+       Effects.summon_game_object(entry, max(spell.duration_ms || 0, 0),
+         spell_id: spell.id,
+         slot: slot || 1,
+         position: position
+       )
+     ]}
   end
 
   def apply(

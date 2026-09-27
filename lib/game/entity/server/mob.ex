@@ -85,6 +85,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Entity.Server.CreatureEventEnvironment
   alias ThistleTea.Game.Entity.Server.CreaturePetOwner
+  alias ThistleTea.Game.Entity.Server.GameObjectSummons
   alias ThistleTea.Game.Entity.Server.GuardianOwner
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Entity.Server.Mob.Flight
@@ -1037,6 +1038,22 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   rescue
     error ->
       Logger.error("Creature pet cleanup failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info(
+        {:game_object_down, token, :process, _pid, _reason},
+        %Mob{internal: %{game_object_monitors: monitors}} = state
+      ) do
+    {:noreply, %{state | internal: %{state.internal | game_object_monitors: Map.delete(monitors, token)}}}
+  end
+
+  def handle_info(%Effects.SummonGameObject{} = effect, %Mob{} = state) do
+    monitors = GameObjectSummons.summon(state, state.internal.game_object_monitors, effect, EventContext.new(self()))
+    {:noreply, %{state | internal: %{state.internal | game_object_monitors: monitors}}}
+  rescue
+    error ->
+      Logger.error("Creature game object summon failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 

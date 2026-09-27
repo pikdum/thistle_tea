@@ -75,6 +75,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
   alias ThistleTea.Game.Entity.Server.AIEnvironment
+  alias ThistleTea.Game.Entity.Server.GameObjectSummons
   alias ThistleTea.Game.Entity.Server.GuardianOwner
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
@@ -1006,6 +1007,19 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   rescue
     error ->
       Logger.error("Guardian cleanup failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:game_object_down, token, :process, _pid, _reason}, %State{game_object_monitors: monitors} = state) do
+    {:noreply, %{state | game_object_monitors: Map.delete(monitors, token)}}
+  end
+
+  def handle_info(%Effects.SummonGameObject{} = effect, %State{character: %Character{}} = state) do
+    monitors = GameObjectSummons.summon(state.character, state.game_object_monitors, effect, EventContext.new(self()))
+    {:noreply, %{state | game_object_monitors: monitors}}
+  rescue
+    error ->
+      Logger.error("Game object summon failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 

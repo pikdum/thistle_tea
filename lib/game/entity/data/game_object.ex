@@ -86,6 +86,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
           ),
         summon: %Summon{
           owner_guid: Keyword.get(opts, :summoned_by),
+          owner_pid: Keyword.get(opts, :owner_pid),
           despawn_in_ms: Keyword.get(opts, :despawn_in_ms),
           spell_id: spellcaster_spell(ot),
           charges: spellcaster_charges(ot),

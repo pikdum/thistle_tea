@@ -17,6 +17,15 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
 
   @moduletag :dbc_db
 
+  describe "owned game object slots" do
+    test "loads trap and legacy standard slots independently of totem slots" do
+      for {id, slot, entry} <- [{1499, 1, 2561}, {22_996, 2, 179_604}, {23_005, 2, 179_624}] do
+        assert [%Effect{type: :summon_game_object, summon_slot: ^slot, misc_value: ^entry}] =
+                 SpellLoader.load(id).effects
+      end
+    end
+  end
+
   describe "caster-relative teleports" do
     test "loads live summon and database banishment spells" do
       for {id, selector, radius} <- [{15_734, 47, 5.0}, {21_150, :caster_destination, nil}, {24_466, 17, nil}] do

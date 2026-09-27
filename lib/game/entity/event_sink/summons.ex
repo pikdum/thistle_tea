@@ -6,26 +6,23 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Ritual
   alias ThistleTea.Game.Entity.Data.DynamicObject, as: DataDynamicObject
   alias ThistleTea.Game.Entity.Data.GameObject
-  alias ThistleTea.Game.Entity.Data.GameObjectTemplate, as: DataGameObjectTemplate
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Totems
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
+  alias ThistleTea.Game.Entity.Server.GameObjectSummons
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Radius
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AreaEffects
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
@@ -171,43 +168,15 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
-  def emit(
-        %{
-          object: %{guid: owner_guid},
-          internal: %Internal{world: world},
-          movement_block: %{position: {_x, _y, _z, _o} = source_position}
-        } = entity,
-        %Effects.SummonGameObject{entry: entry, duration_ms: duration_ms} = effect,
-        context
-      ) do
-    position = if effect.owned?, do: summon_position(effect.position, source_position), else: effect.position
-
-    case GameObjectTemplateLoader.get(entry) do
-      %DataGameObjectTemplate{} = template ->
-        opts = [
-          summoned_by: if(effect.owned?, do: owner_guid),
-          level: if(effect.owned?, do: owner_level(entity), else: 0),
-          despawn_in_ms: duration_ms,
-          ritual_target_guid: effect.target_guid,
-          ritual_zone_id: zone_id(world, position)
-        ]
-
-        game_object = GameObject.build_summoned(template, world, position, opts)
-        linked = summon_linked_object(template, world, position, opts)
-        cooldown_event = object_cooldown_event(entity, effect)
-        summon = %{game_object.internal.summon | linked_guids: linked, cooldown_event: cooldown_event}
-        game_object = %{game_object | internal: %{game_object.internal | summon: summon}}
-
-        start_summoned_game_object(game_object, context)
-        entity
-
-      _ ->
-        cancel_object_cooldown(object_cooldown_event(entity, effect), context)
-        entity
-    end
+  def emit(entity, %Effects.SummonGameObject{owned?: true} = effect, context) do
+    Context.send(context, GameObjectSummons.prepare(entity, effect))
+    entity
   end
 
-  def emit(entity, %Effects.SummonGameObject{}, _context), do: entity
+  def emit(entity, %Effects.SummonGameObject{owned?: false} = effect, context) do
+    GameObjectSummons.start(entity, effect, context)
+    entity
+  end
 
   def emit(
         entity,
@@ -441,50 +410,6 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
-  defp summon_position({x, y, z, orientation}, {source_x, source_y, source_z, source_orientation}) do
-    {
-      coordinate(x, source_x),
-      coordinate(y, source_y),
-      coordinate(z, source_z),
-      coordinate(orientation, source_orientation)
-    }
-  end
-
-  defp summon_position(_position, source_position), do: source_position
-
-  defp summon_linked_object(template, world, position, opts) do
-    with entry when is_integer(entry) and entry > 0 <- DataGameObjectTemplate.linked_entry(template),
-         %DataGameObjectTemplate{} = linked <- GameObjectTemplateLoader.get(entry),
-         game_object = GameObject.build_summoned(linked, world, position, opts),
-         {:ok, _pid} <- World.start_entity(game_object) do
-      [game_object.object.guid]
-    else
-      _missing -> []
-    end
-  end
-
-  defp coordinate(value, _fallback) when is_number(value) and value != 0, do: value
-  defp coordinate(_value, fallback), do: fallback
-
-  defp maybe_track_channel_game_object(
-         %GameObject{object: %{guid: guid}, internal: %Internal{ritual: %Ritual{}}},
-         context
-       ) do
-    Context.send(context, %Commands.ChannelGameObjectStarted{guid: guid})
-  end
-
-  defp maybe_track_channel_game_object(%GameObject{}, _context), do: :ok
-
-  defp owner_level(%{unit: %{level: level}}) when is_integer(level), do: level
-  defp owner_level(_entity), do: 1
-
-  defp zone_id(%{map_id: map_id}, {x, y, z, _orientation}) do
-    case Pathfinding.get_zone_and_area(map_id, {x, y, z}) do
-      {zone_id, _area_id} -> zone_id
-      _missing -> 0
-    end
-  end
-
   defp summon_allowed?(map, %{unique?: true, entry: entry, position: {x, y, z, _o}} = summon) do
     limit = max(summon.unique_limit, 1)
     range = if summon.unique_distance > 0, do: summon.unique_distance, else: @summon_unique_default_range
@@ -562,30 +487,4 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   end
 
   defp wild_position(_entity, effect, _index), do: effect.position
-
-  defp object_cooldown_event(entity, %Effects.SummonGameObject{owned?: true, spell_id: spell_id}) do
-    case Cooldowns.pending(entity, spell_id) do
-      nil ->
-        nil
-
-      entry ->
-        %Effects.ActivateCooldown{target_guid: entity.object.guid, spell_id: spell_id, started_at: entry.started_at}
-    end
-  end
-
-  defp object_cooldown_event(_entity, _effect), do: nil
-
-  defp start_summoned_game_object(game_object, context) do
-    case World.start_entity(game_object) do
-      {:ok, _pid} ->
-        maybe_track_channel_game_object(game_object, context)
-
-      _failure ->
-        Enum.each(game_object.internal.summon.linked_guids, &World.stop_entity/1)
-        cancel_object_cooldown(game_object.internal.summon.cooldown_event, context)
-    end
-  end
-
-  defp cancel_object_cooldown(nil, _context), do: :ok
-  defp cancel_object_cooldown(event, context), do: Context.send(context, %{event | cancel?: true})
 end

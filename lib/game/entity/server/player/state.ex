@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Entity.Logic.MovementHandoff
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Totems
+  alias ThistleTea.Game.Entity.Server.GameObjectSummons
   alias ThistleTea.Game.Entity.Server.GuardianOwner
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.MiniPetOwner
@@ -109,7 +110,8 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     mob_guids: [],
     gossip_menu_options: [],
     cell_activator: CellActivator,
-    guardian_monitors: %{}
+    guardian_monitors: %{},
+    game_object_monitors: %{}
   ]
 
   def prepare_worldport(%__MODULE__{} = state, origin, destination) do
@@ -121,6 +123,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     |> Instances.clear()
     |> MiniPetOwner.dismiss()
     |> dismiss_guardians()
+    |> dismiss_game_objects()
     |> dismiss_totems()
     |> do_prepare_worldport(origin, destination)
   end
@@ -165,6 +168,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     state = CompanionOwner.suspend(state)
     state = MiniPetOwner.dismiss(state)
     state = dismiss_guardians(state)
+    state = dismiss_game_objects(state)
     state = Taxi.disconnect(state)
     state = ServerMovement.cancel(state)
     state = leave_transport(state)
@@ -212,6 +216,12 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
 
   defp dismiss_totems(%__MODULE__{} = state) do
     %{state | character: state.character |> Totems.dismiss_all() |> EventSink.emit_pending()}
+  end
+
+  defp dismiss_game_objects(%__MODULE__{} = state) do
+    {character, monitors} = GameObjectSummons.dismiss(state.character, state.game_object_monitors)
+    character = if character, do: EventSink.emit_pending(character)
+    %{state | character: character, game_object_monitors: monitors}
   end
 
   defp dismiss_guardians(%__MODULE__{character: nil} = state), do: state

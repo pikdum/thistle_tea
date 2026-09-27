@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.Entity.Logic.Skinning
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.Entity.Server.GameObjectSummons
   alias ThistleTea.Game.Entity.Server.Mob.Pockets
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
   alias ThistleTea.Game.Loot.ActorFactory
@@ -144,6 +145,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
           loot_projection: nil
         })
 
+        {state, monitors} = GameObjectSummons.dismiss(state, state.internal.game_object_monitors)
+        state = %{state | internal: %{state.internal | game_object_monitors: monitors}}
+        state = EventSink.emit_pending(state)
         state = Visibility.leave_entity(state)
         World.remove_position(state)
         loot = state.internal.loot || %InternalLoot{}
