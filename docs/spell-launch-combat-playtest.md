@@ -2,6 +2,10 @@
 
 Gameplay commit: `8e25287b`, validated on 2026-09-27.
 
+Follow-up: [contact timer acceptance](combat-contact-timers-playtest.md)
+records target-aware PvE expiry and removal of the auto-attack timer refresh.
+The observations below describe the original launch-combat commit.
+
 ## Behavior and reference
 
 Player-controlled hostile projectiles enter the caster into combat at launch,
