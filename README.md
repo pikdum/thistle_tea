@@ -101,6 +101,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Chained spells](docs/chain-spells-playtest.md), with per-jump attenuation, spell modifiers, line of sight, injured-friendly selection, and caster bounces
 - [Spell radius modifiers](docs/spell-radius-playtest.md), with area targeting, persistent ground effects, totem inheritance, talent reset, and reconnect acceptance
 - [Spell range modifiers](docs/spell-range-playtest.md), with unit casts, channel grace, Auto Shot, pet inheritance, and live bonus removal
+- [Database-selected creature targets](docs/spell-creature-targets-playtest.md), with living and corpse selectors, per-effect delivery, and native quest-item acceptance
 - [Combo point builders](docs/combo-points-playtest.md), with Premeditation expiry, talent-generated points, finisher consumption, and single melee proc delivery
 - [Avoided ability power refunds](docs/ability-refunds-playtest.md), using paid energy and rage costs across charged discounts, immunity, and queued melee attacks
 - [Ownerless summoned objects](docs/wild-object-playtest.md), with shared loot, caster-independent lifetimes, linked objects, and environmental trap activation
