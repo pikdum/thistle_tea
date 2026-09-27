@@ -2,12 +2,13 @@ defmodule ThistleTea.Game.Entity.Data.Companion.EntityRef do
   @moduledoc false
 
   @enforce_keys [:guid, :entry, :spell_id]
-  defstruct [:guid, :entry, :spell_id]
+  defstruct [:guid, :entry, :spell_id, :cooldown_started_at]
 
   @type t :: %__MODULE__{
           guid: integer(),
           entry: non_neg_integer(),
-          spell_id: non_neg_integer()
+          spell_id: non_neg_integer(),
+          cooldown_started_at: integer() | nil
         }
 end
 

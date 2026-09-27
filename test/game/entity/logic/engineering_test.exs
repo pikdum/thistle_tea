@@ -15,6 +15,24 @@ defmodule ThistleTea.Game.Entity.Logic.EngineeringTest do
   alias ThistleTea.Game.Spell.Effect
 
   describe "receive/4" do
+    test "the dispenser selects a summon or malfunction only for an item cast" do
+      entity = target()
+      context = %CastContext{caster_guid: 2, caster_level: 60, target_guid: 2, cast_item_guid: 42}
+      spell = %Spell{id: 23_134, effects: [%Effect{index: 0, type: :dummy, implicit_target_a: :caster}]}
+      assert {^entity, [%RandomChoice{} = choice]} = SpellEffect.receive(entity, context, spell, 0)
+
+      assert [%Effects.TriggerSpell{spell_id: 13_261, cast_item_guid: nil, resolve_targets?: true}] =
+               RandomChoice.select(choice, 1)
+
+      for roll <- 2..10 do
+        assert [%Effects.TriggerSpell{spell_id: 13_258, cast_item_guid: 42, source_guid: 2, target_guid: 2}] =
+                 RandomChoice.select(choice, roll)
+      end
+
+      assert {^entity, []} = SpellEffect.receive(entity, %{context | cast_item_guid: nil}, spell, 0)
+      assert {^entity, []} = SpellEffect.receive(entity, %{context | caster_guid: 1}, spell, 0)
+    end
+
     test "a net requests one caster-owned outcome from its first dummy effect" do
       entity = target()
       context = %CastContext{caster_guid: 1, caster_level: 60, target_guid: 2, cast_item_guid: 42}

@@ -2085,8 +2085,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp maybe_finalize_death(%Mob{internal: %Internal{pet: %Pet{}}} = state) do
     if Core.dead?(state) do
-      corpse_ms = if state.internal.pet.kind in [:guardian, :creature_pet], do: 15_000, else: 100
-      Process.send_after(self(), :pet_stop, corpse_ms)
+      Process.send_after(self(), :pet_stop, pet_corpse_delay(state))
 
       state
       |> PetHappiness.on_death(MapTemplate.battleground?(state.internal.world.map_id))
@@ -2126,6 +2125,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       state
     end
   end
+
+  defp pet_corpse_delay(%Mob{internal: %{guardian: %{corpse_delay_ms: delay}}}), do: delay
+  defp pet_corpse_delay(%Mob{internal: %{pet: %{kind: kind}}}) when kind in [:guardian, :creature_pet], do: 15_000
+  defp pet_corpse_delay(_state), do: 100
 
   defp mark_death_finalized(%Mob{internal: internal} = state) do
     SummonLifecycle.notify(state, :summoned_just_died)

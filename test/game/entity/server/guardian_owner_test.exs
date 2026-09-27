@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Server.GuardianOwnerTest do
   alias ThistleTea.Game.Entity.Server.GuardianOwner
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -120,6 +121,42 @@ defmodule ThistleTea.Game.Entity.Server.GuardianOwnerTest do
   end
 
   describe "GuardianLoader.build/5" do
+    test "explosives retain their timer passive and deferred cast identity", %{owner: owner} do
+      [{_, prototype}] = :ets.lookup(Summon, 990_201)
+
+      for {entry, passive, blast, lifetime} <- [{2675, 4051, 4050, 180_000}, {8937, 13_260, 13_259, 60_000}] do
+        template = %{prototype.creature_template | entry: entry}
+        saved_template = :ets.take(Summon, entry)
+        saved_spell = :ets.take(SpellLoader, {:spell, passive})
+        :ets.insert(Summon, {entry, %{prototype | id: entry, creature_template: template}})
+
+        spell = %Spell{
+          id: passive,
+          attributes: MapSet.new([:passive]),
+          duration_ms: -1,
+          proc_charges: 1,
+          effects: [%Effect{type: :apply_aura, aura: :proc_trigger_spell, trigger_spell_id: blast}]
+        }
+
+        :ets.insert(SpellLoader, {{:spell, passive}, spell})
+
+        on_exit(fn ->
+          :ets.delete(Summon, entry)
+          :ets.delete(SpellLoader, {:spell, passive})
+          :ets.insert(Summon, saved_template)
+          :ets.insert(SpellLoader, saved_spell)
+        end)
+
+        owner = Cooldowns.start(owner, %Spell{id: 500, attributes: MapSet.new([:cooldown_on_event])}, 100)
+        guardian = GuardianLoader.build(owner, %{request() | entry: entry}, owner.movement_block.position, 1000)
+        assert guardian.internal.guardian.expires_at == 1000 + lifetime
+        assert guardian.internal.guardian.expiration_spell_id == blast
+        assert guardian.internal.guardian.corpse_delay_ms == 5000
+        assert guardian.internal.guardian.cooldown_started_at == 100
+        assert [%{spell: %{id: ^passive}, charges: 1}] = guardian.unit.auras
+      end
+    end
+
     test "dragonlings start with their passive health and retain it across recomputes", %{owner: owner} do
       [{_, prototype}] = :ets.lookup(Summon, 990_201)
       template = %{prototype.creature_template | entry: 2678, health_multiplier: 0.000001}

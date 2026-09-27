@@ -7,7 +7,11 @@ defmodule ThistleTea.Game.Entity.Logic.Guardians do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Guardian
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Spell.Cooldowns
 
   def active(%{internal: %Internal{guardians: guardians}}), do: Map.values(guardians)
 
@@ -15,29 +19,54 @@ defmodule ThistleTea.Game.Entity.Logic.Guardians do
     %{entity | internal: %{internal | guardians: Map.put(internal.guardians, guid, ref)}}
   end
 
-  def removed(%{internal: %Internal{} = internal} = entity, guid) do
-    %{entity | internal: %{internal | guardians: Map.delete(internal.guardians, guid)}}
+  def removed(%{internal: %Internal{} = internal} = entity, guid, now) do
+    {ref, guardians} = Map.pop(internal.guardians, guid)
+    entity = %{entity | internal: %{internal | guardians: guardians}}
+    release_cooldown(entity, ref, now)
   end
 
-  def prepare(%Character{} = entity, %Effects.SummonGuardians{triggered?: false, entry: entry} = effect) do
+  def prepare(%Character{} = entity, %Effects.SummonGuardians{triggered?: false, entry: entry} = effect, now) do
     matching = Enum.filter(active(entity), &(&1.entry == entry))
-    {dismiss(entity, matching), matching == [] or effect.replace?}
+    {dismiss(entity, matching, now), matching == [] or effect.replace?}
   end
 
-  def prepare(entity, %Effects.SummonGuardians{entry: entry}) do
+  def prepare(entity, %Effects.SummonGuardians{entry: entry}, _now) do
     {entity, match?(%Character{}, entity) or Enum.count(active(entity), &(&1.entry == entry)) < 16}
   end
 
-  def dismiss_all(%{internal: %Internal{}} = entity), do: dismiss(entity, active(entity))
-  def dismiss_all(entity), do: entity
+  def dismiss_all(%{internal: %Internal{}} = entity, now), do: dismiss(entity, active(entity), now)
+  def dismiss_all(entity, _now), do: entity
 
-  def dismiss_entry(%{internal: %Internal{}} = entity, entry) when is_integer(entry) and entry > 0 do
-    dismiss(entity, Enum.filter(active(entity), &(&1.entry == entry)))
+  def dismiss_entry(%{internal: %Internal{}} = entity, entry, now) when is_integer(entry) and entry > 0 do
+    dismiss(entity, Enum.filter(active(entity), &(&1.entry == entry)), now)
   end
 
-  defp dismiss(entity, refs) do
+  def on_death(%Mob{internal: %{guardian: %Guardian{cooldown_started_at: started_at}, pet: %Pet{}}} = entity)
+      when is_integer(started_at) do
+    effect = %Effects.ActivateCooldown{
+      target_guid: entity.internal.pet.owner_guid,
+      spell_id: entity.unit.created_by_spell,
+      started_at: started_at
+    }
+
+    guardian = %{entity.internal.guardian | cooldown_started_at: nil}
+    entity = %{entity | internal: %{entity.internal | guardian: guardian}}
+    Effects.enqueue(entity, effect)
+  end
+
+  def on_death(entity), do: entity
+
+  defp release_cooldown(entity, %EntityRef{spell_id: spell_id, cooldown_started_at: started_at}, now)
+       when is_integer(started_at) do
+    {entity, events} = Cooldowns.activate(entity, spell_id, now, started_at)
+    Effects.enqueue(entity, events)
+  end
+
+  defp release_cooldown(entity, _ref, _now), do: entity
+
+  defp dismiss(entity, refs, now) do
     Enum.reduce(refs, entity, fn %EntityRef{guid: guid}, entity ->
-      entity |> removed(guid) |> Effects.enqueue(%Effects.DespawnEntity{target_guid: guid})
+      entity |> removed(guid, now) |> Effects.enqueue(%Effects.DespawnEntity{target_guid: guid})
     end)
   end
 end

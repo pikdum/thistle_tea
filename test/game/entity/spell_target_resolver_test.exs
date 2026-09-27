@@ -9,8 +9,11 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.EffectResolver.Spells
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
@@ -25,6 +28,40 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   alias ThistleTea.Game.WorldRef
 
   describe "resolve/3" do
+    test "triggered area casts retain damage and caster recipients separately" do
+      source = player_guid()
+      enemy = mob_guid()
+      put_spatial_target(:players, source, {0.0, 0.0, 0.0})
+      put_spatial_target(:mobs, enemy, {3.0, 0.0, 0.0})
+
+      spell = %Spell{
+        id: 90_990_111,
+        effects: [
+          %Effect{index: 0, type: :school_damage, implicit_target_a: :aoe_enemy_at_caster, radius_yards: 10.0},
+          %Effect{index: 1, type: :trigger_spell, implicit_target_a: :caster, trigger_spell_id: 3617},
+          %Effect{index: 2, type: :dummy, implicit_target_a: :caster_destination}
+        ]
+      }
+
+      caster = caster(source, {0.0, 0.0, 0.0})
+
+      caster = %Character{
+        object: %Object{guid: source},
+        unit: %Unit{health: 100, level: 60},
+        player: %Player{},
+        internal: %{caster.internal | spellbook: %{spell.id => spell}},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      recipients =
+        caster
+        |> Spells.resolve(Effects.trigger_spell(source, 60, enemy, spell.id))
+        |> Enum.filter(&is_struct(&1, Effects.DeliverSpell))
+        |> Map.new(&{&1.target_guid, &1.cast_context.effect_indices})
+
+      assert recipients == %{enemy => [0], source => [1, 2]}
+    end
+
     test "controlled summon destinations execute only on the caster despite a selected enemy" do
       source = player_guid()
       enemy = mob_guid()

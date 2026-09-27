@@ -16,8 +16,8 @@ defmodule ThistleTea.Game.Entity.Server.GuardianOwner do
   alias ThistleTea.Game.World.Pathfinding
 
   def summon(entity, monitors, %Effects.SummonGuardians{} = effect) do
-    {prepared, summon?} = Guardians.prepare(entity, effect)
     now = Time.now()
+    {prepared, summon?} = Guardians.prepare(entity, effect, now)
 
     guardians =
       if summon? do
@@ -35,7 +35,13 @@ defmodule ThistleTea.Game.Entity.Server.GuardianOwner do
     Enum.reduce(guardians, {prepared, monitors}, fn guardian, {owner, monitors} ->
       case MobLoader.start_mob(guardian) do
         {:ok, pid} ->
-          ref = %EntityRef{guid: guardian.object.guid, entry: effect.entry, spell_id: effect.spell_id}
+          ref = %EntityRef{
+            guid: guardian.object.guid,
+            entry: effect.entry,
+            spell_id: effect.spell_id,
+            cooldown_started_at: guardian.internal.guardian.cooldown_started_at
+          }
+
           token = Process.monitor(pid)
           update_owner(owner, ref.guid)
           {Guardians.activate(owner, ref), Map.put(monitors, token, ref.guid)}
@@ -48,7 +54,7 @@ defmodule ThistleTea.Game.Entity.Server.GuardianOwner do
 
   def dismiss(entity, monitors) do
     Enum.each(monitors, fn {token, _guid} -> Process.demonitor(token, [:flush]) end)
-    {entity |> Guardians.dismiss_all() |> EventSink.emit_pending(), %{}}
+    {entity |> Guardians.dismiss_all(Time.now()) |> EventSink.emit_pending(), %{}}
   end
 
   def owner_stopped(entity) do
@@ -61,7 +67,7 @@ defmodule ThistleTea.Game.Entity.Server.GuardianOwner do
   def process_down(entity, monitors, token) do
     case Map.pop(monitors, token) do
       {nil, _monitors} -> {entity, monitors}
-      {guid, monitors} -> {Guardians.removed(entity, guid), monitors}
+      {guid, monitors} -> {entity |> Guardians.removed(guid, Time.now()) |> EventSink.emit_pending(), monitors}
     end
   end
 

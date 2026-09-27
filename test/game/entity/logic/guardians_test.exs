@@ -4,6 +4,8 @@ defmodule ThistleTea.Game.Entity.Logic.GuardiansTest do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Guardian
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -11,49 +13,97 @@ defmodule ThistleTea.Game.Entity.Logic.GuardiansTest do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Guardians
   alias ThistleTea.Game.Entity.Logic.MiniPet
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
 
   setup [:owner]
 
-  describe "prepare/2" do
+  describe "prepare/3" do
     test "direct casts toggle only matching guardians", %{owner: owner} do
       owner =
         owner |> Guardians.activate(ref(2, 10)) |> Guardians.activate(ref(3, 10)) |> Guardians.activate(ref(4, 20))
 
-      {removed, false} = Guardians.prepare(owner, request())
+      {removed, false} = Guardians.prepare(owner, request(), 1000)
       assert Guardians.active(removed) == [ref(4, 20)]
       assert Companion.active_guid(removed) == 88
       assert MiniPet.active_ref(removed).guid == 99
       assert removed.unit.summon == 88
       assert Enum.sort(Enum.map(removed.internal.events, & &1.target_guid)) == [2, 3]
-      assert {^owner, true} = Guardians.prepare(owner, %{request() | triggered?: true})
-      assert {^removed, true} = Guardians.prepare(owner, %{request() | replace?: true})
-      assert Guardians.removed(removed, 2) == removed
+      assert {^owner, true} = Guardians.prepare(owner, %{request() | triggered?: true}, 1000)
+      assert {^removed, true} = Guardians.prepare(owner, %{request() | replace?: true}, 1000)
+      assert Guardians.removed(removed, 2, 1000) == removed
     end
 
     test "creature casters stop adding an entry once sixteen are active", %{owner: owner} do
       mob = %Mob{object: owner.object, unit: owner.unit, internal: %Internal{}}
       fifteen = Enum.reduce(1..15, mob, &Guardians.activate(&2, ref(&1, 10)))
-      assert {^fifteen, true} = Guardians.prepare(fifteen, request())
+      assert {^fifteen, true} = Guardians.prepare(fifteen, request(), 1000)
       sixteen = Guardians.activate(fifteen, ref(16, 10))
-      assert {^sixteen, false} = Guardians.prepare(sixteen, request())
-      assert {^sixteen, true} = Guardians.prepare(sixteen, %{request() | entry: 20})
+      assert {^sixteen, false} = Guardians.prepare(sixteen, request(), 1000)
+      assert {^sixteen, true} = Guardians.prepare(sixteen, %{request() | entry: 20}, 1000)
     end
   end
 
-  describe "dismiss_all/1" do
+  describe "dismiss_all/2" do
+    test "departure activates the retained item cooldown before the owner is saved", %{owner: owner} do
+      spell = deferred_spell()
+      ref = %{ref(2, 2675) | cooldown_started_at: 100}
+      owner = owner |> Cooldowns.start(spell, 100, 4384) |> Guardians.activate(ref)
+      removed = Guardians.dismiss_all(owner, 1000)
+      assert Cooldowns.pending(removed, 500) == nil
+      assert Cooldowns.ready_at(removed, spell) == 61_000
+      assert [%{item_id: 4384, category_ms: 60_000}] = Cooldowns.initial(removed, %{}, 1000)
+      assert [%Effects.CooldownEvent{spell_id: 500}, %Effects.DespawnEntity{target_guid: 2}] = removed.internal.events
+      assert Guardians.removed(removed, 2, 2000) == removed
+    end
+
+    test "an old guardian cannot activate a newer cast", %{owner: owner} do
+      spell = deferred_spell()
+
+      owner =
+        owner |> Cooldowns.start(spell, 200, 4384) |> Guardians.activate(%{ref(2, 2675) | cooldown_started_at: 100})
+
+      removed = Guardians.removed(owner, 2, 1000)
+      assert Cooldowns.pending(removed, 500).started_at == 200
+      assert removed.internal.events == []
+    end
+
     test "clears the collection once", %{owner: owner} do
       owner = Guardians.activate(owner, ref(2, 10))
-      removed = Guardians.dismiss_all(owner)
+      removed = Guardians.dismiss_all(owner, 1000)
       assert Guardians.active(removed) == []
       assert [%Effects.DespawnEntity{target_guid: 2}] = removed.internal.events
-      assert Guardians.dismiss_all(removed) == removed
+      assert Guardians.dismiss_all(removed, 1000) == removed
+    end
+  end
+
+  describe "on_death/1" do
+    test "lethal damage releases the summoning cast once through the death transition", %{owner: owner} do
+      guardian = %Mob{
+        object: %Object{guid: 2},
+        unit: %{owner.unit | created_by_spell: 500, max_health: 100},
+        movement_block: owner.movement_block,
+        internal: %Internal{
+          guardian: %Guardian{cooldown_started_at: 100},
+          pet: %Pet{owner_guid: 1, kind: :guardian}
+        }
+      }
+
+      dead = Core.take_damage(guardian, 100, 1000)
+      assert dead.unit.health == 0
+
+      assert [%Effects.ActivateCooldown{target_guid: 1, spell_id: 500, started_at: 100}] =
+               Enum.filter(dead.internal.events, &is_struct(&1, Effects.ActivateCooldown))
+
+      assert dead.internal.guardian.cooldown_started_at == nil
+      assert Guardians.on_death(dead) == dead
     end
   end
 
@@ -118,4 +168,8 @@ defmodule ThistleTea.Game.Entity.Logic.GuardiansTest do
 
   defp ref(guid, entry), do: %EntityRef{guid: guid, entry: entry, spell_id: 500}
   defp request, do: %Effects.SummonGuardians{entry: 10, spell_id: 500, count: 1, duration_ms: 0}
+
+  defp deferred_spell do
+    %Spell{id: 500, attributes: MapSet.new([:cooldown_on_event]), category: 24, category_recovery_time_ms: 60_000}
+  end
 end

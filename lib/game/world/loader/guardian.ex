@@ -7,7 +7,6 @@ defmodule ThistleTea.Game.World.Loader.Guardian do
   import Bitwise, only: [&&&: 2, |||: 2, bnot: 1]
 
   alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Guardian
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
@@ -20,6 +19,7 @@ defmodule ThistleTea.Game.World.Loader.Guardian do
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon
@@ -61,7 +61,9 @@ defmodule ThistleTea.Game.World.Loader.Guardian do
       autocast: MapSet.new(mob.internal.creature.spells || [], & &1.spell_id)
     }
 
-    guardian = %Guardian{expires_at: if(effect.duration_ms > 0, do: now + effect.duration_ms)}
+    guardian = Engineering.guardian_lifetime(effect.entry, effect.duration_ms, now)
+    pending = Cooldowns.pending(owner, effect.spell_id)
+    guardian = %{guardian | cooldown_started_at: if(pending, do: pending.started_at)}
 
     internal = %{mob.internal | pet: pet, guardian: guardian, loot: nil}
     mob = %{mob | object: %{mob.object | guid: guid}, unit: Stats.recompute(unit), internal: internal}

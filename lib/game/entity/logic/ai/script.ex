@@ -264,11 +264,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
          blackboard,
          %ScriptStep{command: :remove_guardians, datalong: entry},
          _target,
-         _now,
+         now,
          _context
        )
        when is_integer(entry) and entry >= 0 do
-    state = if entry == 0, do: Guardians.dismiss_all(state), else: Guardians.dismiss_entry(state, entry)
+    state = if entry == 0, do: Guardians.dismiss_all(state, now), else: Guardians.dismiss_entry(state, entry, now)
     {state, blackboard, :continue}
   end
 

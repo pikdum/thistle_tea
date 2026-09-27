@@ -302,9 +302,10 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   end
 
   defp resolve_area_trigger(entity, effect, spell) do
-    targets = SpellTargetResolver.resolve(entity, spell, Target.unit(effect.target_guid), triggered?: true)
+    selection = Target.unit(effect.target_guid)
+    targets = SpellTargetResolver.resolve_plan(entity, spell, selection, %UnitTargets{}, triggered?: true)
 
-    triggered_cast(entity, effect, spell, targets, Target.unit(effect.target_guid))
+    triggered_cast(entity, effect, spell, targets, selection)
   end
 
   defp triggered_cast(entity, effect, spell, targets, selection) do

@@ -19,6 +19,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.GuardianTest do
   setup [:guardian]
 
   describe "lifetime/3" do
+    test "expiration casts once and holds the pet tree until death", %{guardian: guardian} do
+      lifetime = %Guardian{expires_at: 1000, expiration_spell_id: 4050}
+      guardian = %{guardian | internal: %{guardian.internal | guardian: lifetime, in_combat: true}}
+      assert {:success, expired, blackboard} = GuardianBT.lifetime(guardian, %Blackboard{}, context(owner()))
+
+      assert [%Effects.TriggerSpell{source_guid: 2, target_guid: 2, spell_id: 4050, resolve_targets?: true}] =
+               expired.internal.events
+
+      assert blackboard.guardian.expired?
+      assert {{:running, _}, ^expired, ^blackboard} = GuardianBT.lifetime(expired, blackboard, context(owner()))
+      corpse = %{guardian | unit: %{guardian.unit | health: 0}}
+      assert {{:running, _}, ^corpse, _} = GuardianBT.lifetime(corpse, %Blackboard{}, context(owner()))
+      assert {:success, removed, _} = GuardianBT.lifetime(guardian, %Blackboard{}, context(nil))
+      assert [%Effects.DespawnSelf{}] = removed.internal.events
+    end
+
     test "dead owners retain fighting guardians until combat ends", %{guardian: guardian} do
       dead_owner = %{owner() | metadata: %{alive?: false}}
       fighting = %{guardian | internal: %{guardian.internal | in_combat: true}}

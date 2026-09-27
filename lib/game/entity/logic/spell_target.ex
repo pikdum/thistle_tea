@@ -240,7 +240,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   defp caster_only_spell?(%Spell{effects: [_ | _] = effects}) do
     Enum.all?(effects, fn %Effect{implicit_target_a: a, implicit_target_b: b} = effect ->
       CasterLocation.caster_only?(effect) or
-        (a in [nil, :caster] and b in [nil, :caster] and (a == :caster or b == :caster))
+        (a in [nil, :caster, :caster_destination] and b in [nil, :caster, :caster_destination] and
+           (a != nil or b != nil))
     end)
   end
 

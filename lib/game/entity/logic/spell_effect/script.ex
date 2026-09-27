@@ -124,6 +124,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
     Engineering.net_o_matic(state, context)
   end
 
+  defp apply_class_dummy(state, context, _spell, %Effect{index: 0}, :goblin_bomb, _now) do
+    Engineering.goblin_bomb(state, context)
+  end
+
   defp apply_class_dummy(%Mob{unit: %{health: 0}} = state, _context, _spell, _effect, :capture_corpse, _now) do
     {state, [Effects.despawn_self(1_000, 0)]}
   end

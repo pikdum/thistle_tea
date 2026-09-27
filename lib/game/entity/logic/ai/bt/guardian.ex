@@ -25,8 +25,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Guardian do
       Core.dead?(state) ->
         {{:running, 500}, state, blackboard}
 
+      blackboard.guardian.expired? ->
+        {{:running, 500}, state, blackboard}
+
       expired?(state.internal.guardian.expires_at, now) ->
-        {:success, Effects.enqueue(state, Effects.despawn_self(0, 0)), blackboard}
+        blackboard = %{blackboard | guardian: %{blackboard.guardian | expired?: true}}
+        {:success, Effects.enqueue(state, expiration_effect(state)), blackboard}
 
       true ->
         {:failure, state, blackboard}
@@ -46,4 +50,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Guardian do
   end
 
   defp expired?(deadline, now), do: is_integer(deadline) and now >= deadline
+
+  defp expiration_effect(%Mob{internal: %{guardian: %Guardian{expiration_spell_id: id}}} = state) when is_integer(id) do
+    Effects.trigger_spell(state.object.guid, state.unit.level, state.object.guid, id, resolve_targets?: true)
+  end
+
+  defp expiration_effect(_state), do: Effects.despawn_self(0, 0)
 end

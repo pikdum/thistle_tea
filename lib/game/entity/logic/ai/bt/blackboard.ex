@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
 
   alias __MODULE__.Combat
   alias __MODULE__.EventAI
+  alias __MODULE__.Guardian
   alias __MODULE__.Maintenance
   alias __MODULE__.Navigation
   alias __MODULE__.Spells
@@ -23,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
             charm: nil,
             critter: nil,
             formation: nil,
+            guardian: %Guardian{},
             combat: %Combat{},
             spells: %Spells{},
             event_ai: %EventAI{},
