@@ -128,7 +128,17 @@ defmodule ThistleTea.Game.Entity.Server.GuardianOwnerTest do
         template = %{prototype.creature_template | entry: entry}
         saved_template = :ets.take(Summon, entry)
         saved_spell = :ets.take(SpellLoader, {:spell, passive})
-        :ets.insert(Summon, {entry, %{prototype | id: entry, creature_template: template}})
+
+        suicide = %Spell{
+          id: 8327,
+          duration_ms: -1,
+          effects: [
+            %Effect{type: :apply_aura, aura: :periodic_trigger_spell, amplitude_ms: 180_000, trigger_spell_id: 8329}
+          ]
+        }
+
+        addons = if entry == 2675, do: [suicide], else: []
+        :ets.insert(Summon, {entry, %{prototype | id: entry, creature_template: template, addon_auras: addons}})
 
         spell = %Spell{
           id: passive,
@@ -154,6 +164,7 @@ defmodule ThistleTea.Game.Entity.Server.GuardianOwnerTest do
         assert guardian.internal.guardian.corpse_delay_ms == 5000
         assert guardian.internal.guardian.cooldown_started_at == 100
         assert [%{spell: %{id: ^passive}, charges: 1}] = guardian.unit.auras
+        assert Summon.prototype(entry).addon_auras == addons
       end
     end
 

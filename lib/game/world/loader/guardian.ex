@@ -72,8 +72,15 @@ defmodule ThistleTea.Game.World.Loader.Guardian do
     mob = %{mob | unit: %{mob.unit | flags: flags}}
 
     mob
-    |> Mob.apply_addon_auras(now)
+    |> apply_addon_auras(now)
     |> apply_creation_passive(now)
+  end
+
+  defp apply_addon_auras(%Mob{internal: %{creature: creature}} = mob, now) do
+    spells = Engineering.guardian_addon_auras(mob.object.entry, creature.addon_auras || [])
+    creature = %{creature | addon_auras: spells}
+    mob = %{mob | internal: %{mob.internal | creature: creature}}
+    Mob.apply_addon_auras(mob, now)
   end
 
   defp apply_creation_passive(%Mob{} = mob, now) do

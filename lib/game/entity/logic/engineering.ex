@@ -9,6 +9,9 @@ defmodule ThistleTea.Game.Entity.Logic.Engineering do
 
   def guardian_passive(entry), do: Map.get(@guardian_passives, entry)
 
+  def guardian_addon_auras(2675, spells), do: Enum.reject(spells, &(&1.id in [4051, 8327]))
+  def guardian_addon_auras(entry, spells), do: Enum.reject(spells, &(&1.id == guardian_passive(entry)))
+
   def guardian_lifetime(2675, _duration, now),
     do: %Guardian{expires_at: now + 180_000, expiration_spell_id: 4050, corpse_delay_ms: 5_000}
 
