@@ -33,6 +33,15 @@ defmodule ThistleTea.Game.World.Loader.SpellUnitTargetDbcTest do
   end
 
   describe "load/1" do
+    test "decodes scripted areas and marks scripted cones as area effects" do
+      assert UnitTargets.area?(SpellLoader.load(5628))
+      assert UnitTargets.area?(SpellLoader.load(26_393))
+      cannon = SpellLoader.load(24_933)
+      assert UnitTargets.area?(cannon)
+      assert Enum.all?(cannon.effects, & &1.area_target?)
+      assert hd(cannon.effects).implicit_target_a == :script_units_in_cone
+    end
+
     test "decodes nearest-creature selection while retaining caster and mixed effects" do
       phial = SpellLoader.load(11_513)
 

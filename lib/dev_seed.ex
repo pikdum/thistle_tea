@@ -351,6 +351,13 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(68, @base_low_guid + 2400, {x - 180.0, y - 100.0, z}, nil, 30)
     spawn_mob(6213, @base_low_guid + 2500, {x + 220.0, y - 100.0, z}, nil, 180)
     spawn_mob(6329, @base_low_guid + 2501, {x + 230.0, y - 100.0, z}, nil, 180)
+    spawn_mob(2006, @base_low_guid + 2600, {x - 220.0, y + 80.0, z}, nil, 30)
+    spawn_mob(2007, @base_low_guid + 2601, {x - 224.0, y + 84.0, z}, nil, 30)
+    spawn_mob(1412, @base_low_guid + 2602, {x - 224.0, y + 80.0, z}, nil, 30)
+
+    for {{dx, dy}, index} <- Enum.with_index([{5.0, 0.0}, {5.0, 1.0}, {5.0, 4.0}, {-5.0, 0.0}]) do
+      spawn_mob(15_328, @base_low_guid + 2700 + index, {x + 220.0 + dx, y + 80.0 + dy, z}, nil, 30)
+    end
 
     spawn_mob(
       @hostile_entry,
@@ -388,7 +395,7 @@ defmodule ThistleTea.DevSeed do
     z = z + Keyword.get(opts, :altitude, 0.0)
     wander = Keyword.get(opts, :wander, 0.0)
 
-    case Mangos.Repo.one(from(c in Mangos.Creature, where: c.id == ^entry, limit: 1, preload: [:creature_template])) do
+    case seed_creature(entry) do
       %Mangos.Creature{} = creature ->
         creature = %{
           creature
@@ -419,8 +426,16 @@ defmodule ThistleTea.DevSeed do
         MobLoader.start_mob(mob)
 
       _ ->
-        Logger.warning("Debug seed: creature #{entry} has no spawn row, skipping")
+        Logger.warning("Debug seed: creature #{entry} has no template, skipping")
     end
+  end
+
+  defp seed_creature(entry) do
+    Mangos.Repo.one(from(c in Mangos.Creature, where: c.id == ^entry, limit: 1, preload: [:creature_template])) ||
+      case Mangos.Repo.get(Mangos.CreatureTemplate, entry) do
+        %Mangos.CreatureTemplate{} = template -> %Mangos.Creature{id: entry, creature_template: template}
+        nil -> nil
+      end
   end
 
   defp select_ai_events(mob, nil), do: mob

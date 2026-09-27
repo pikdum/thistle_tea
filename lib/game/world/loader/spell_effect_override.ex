@@ -26,7 +26,23 @@ defmodule ThistleTea.Game.World.Loader.SpellEffectOverride do
     load_spell_mods()
     load_effect_mods()
     load_spell_template_fixes()
+    load_cones()
     :ok
+  end
+
+  defp load_cones do
+    Mangos.SpellCone
+    |> Mangos.Repo.all()
+    |> Enum.each(&:ets.insert(__MODULE__, {{:cone_degrees, &1.entry}, &1.cone_degrees}))
+  end
+
+  def cone_degrees(spell_id) do
+    case :ets.lookup(__MODULE__, {:cone_degrees, spell_id}) do
+      [{_key, degrees}] -> degrees
+      _ -> 60
+    end
+  rescue
+    ArgumentError -> 60
   end
 
   defp load_spell_mods do

@@ -33,7 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.Autocast do
       :caster_master -> [owner]
       {:party_aoe, radius} -> within_radius(allies, pet, radius, context)
       {:caster_aoe, radius} -> within_radius([pet.unit.target], pet, radius, context)
-      {:caster_cone, radius} -> within_radius([pet.unit.target], pet, radius, context)
+      {:caster_cone, radius, _degrees} -> within_radius([pet.unit.target], pet, radius, context)
       {:party_unit, _} -> allies
       _ -> if Spell.harmful?(spell), do: [pet.unit.target], else: enemies ++ allies
     end

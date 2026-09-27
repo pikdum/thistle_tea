@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.AuraRank
   alias ThistleTea.Game.Spell.CastValidation
+  alias ThistleTea.Game.Spell.Cone
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Spell.TargetLimit
@@ -25,8 +26,6 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.World.ResurrectionTarget
   alias ThistleTea.Game.World.SpellMagnets
   alias ThistleTea.Game.World.System.Party, as: PartySystem
-
-  @cone_arc_radians :math.pi() / 3
 
   def resolve(caster, spell, targets, opts \\ [])
 
@@ -215,8 +214,8 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
       {:caster_aoe, radius} ->
         nearby_enemy_guids(caster, caster_guid, radius)
 
-      {:caster_cone, radius} ->
-        nearby_cone_enemy_guids(caster, caster_guid, radius)
+      {:caster_cone, radius, degrees} ->
+        nearby_cone_enemy_guids(caster, caster_guid, radius, degrees)
 
       {:targeted_aoe, position, radius} ->
         nearby_enemy_guids_at(caster, caster_guid, position, radius)
@@ -246,7 +245,12 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
 
   defp nearby_enemy_guids(_caster, _caster_guid, _radius), do: []
 
-  defp nearby_cone_enemy_guids(%{movement_block: %{position: {_x, _y, _z, orientation}}} = caster, caster_guid, radius)
+  defp nearby_cone_enemy_guids(
+         %{movement_block: %{position: {_x, _y, _z, orientation}}} = caster,
+         caster_guid,
+         radius,
+         degrees
+       )
        when is_number(radius) and radius > 0 do
     now = Time.now()
 
@@ -255,34 +259,22 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
         world
         |> nearby_units_at({x, y, z}, radius, now)
         |> hostile_living_guids(caster, caster_guid)
-        |> Enum.filter(&in_cone?(&1, {x, y}, orientation))
+        |> Enum.filter(&in_cone?(&1, {x, y, z, orientation}, degrees))
 
       nil ->
         []
     end
   end
 
-  defp nearby_cone_enemy_guids(_caster, _caster_guid, _radius), do: []
+  defp nearby_cone_enemy_guids(_caster, _caster_guid, _radius, _degrees), do: []
 
-  defp in_cone?(guid, {x, y}, orientation) do
+  defp in_cone?(guid, caster_position, degrees) do
     case World.position(guid) do
-      {_map, tx, ty, _tz} ->
-        angle = :math.atan2(ty - y, tx - x)
-        abs(normalize_angle(angle - orientation)) <= @cone_arc_radians / 2
+      {_map, tx, ty, tz} ->
+        Cone.contains?(degrees, caster_position, {tx, ty, tz})
 
       _ ->
         false
-    end
-  end
-
-  defp normalize_angle(angle) do
-    two_pi = 2 * :math.pi()
-    angle = :math.fmod(angle, two_pi)
-
-    cond do
-      angle > :math.pi() -> angle - two_pi
-      angle < -:math.pi() -> angle + two_pi
-      true -> angle
     end
   end
 

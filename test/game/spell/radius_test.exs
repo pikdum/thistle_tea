@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Spell.RadiusTest do
     test "applies matching flat and percent modifiers across area shapes", %{caster: caster} do
       for {target, query} <- [
             {:aoe_enemy_at_caster, {:caster_aoe, 22.5}},
-            {:aoe_enemy_in_cone, {:caster_cone, 22.5}},
+            {:aoe_enemy_in_cone, {:caster_cone, 22.5, 60}},
             {:aoe_enemy_at_dest, {:targeted_aoe, {1.0, 2.0, 3.0}, 22.5}},
             {:party_around_caster, {:party_aoe, 22.5}},
             {:party_around_target, {:target_party_aoe, 2, 22.5}},

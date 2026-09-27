@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Radius
   alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Spell.UnitTargets
 
   def aim_at_unit(%Spell{} = spell, guid, {x, y, z}) do
     targets = Target.unit(guid)
@@ -71,7 +72,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   defp area_query(spell, targets, radius) do
     cond do
       caster_aoe_spell?(spell) -> {:caster_aoe, radius}
-      cone_aoe_spell?(spell) -> {:caster_cone, radius}
+      cone_aoe_spell?(spell) -> {:caster_cone, radius, spell.cone_degrees}
       query = targeted_aoe_query(spell, targets, radius) -> query
       true -> friendly_aoe_query(spell, targets, radius)
     end
@@ -79,7 +80,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
 
   def area_targeted?(%Spell{} = spell) do
     caster_aoe_spell?(spell) or cone_aoe_spell?(spell) or targeted_aoe_spell?(spell) or party_aoe_spell?(spell) or
-      target_party_aoe_spell?(spell) or friendly_aoe_spell?(spell)
+      target_party_aoe_spell?(spell) or friendly_aoe_spell?(spell) or UnitTargets.area?(spell)
   end
 
   def area_targeted?(_spell), do: false

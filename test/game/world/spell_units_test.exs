@@ -66,7 +66,10 @@ defmodule ThistleTea.Game.World.SpellUnitsTest do
           ]
       }
 
-      assert %UnitTargets{by_effect: %{0 => [living.object.guid], 1 => [dead.object.guid]}} ==
+      assert %UnitTargets{
+               selected_guid: living.object.guid,
+               by_effect: %{0 => [living.object.guid], 1 => [dead.object.guid]}
+             } ==
                SpellUnits.resolve(caster, spell, Target.none())
 
       assert selected(caster, %{spell | effects: [hd(spell.effects)]}, Target.unit(dead.object.guid)) ==
@@ -97,6 +100,138 @@ defmodule ThistleTea.Game.World.SpellUnitsTest do
       assert selected(caster, spell, Target.none()) == mob.object.guid
       spell = %{spell | effects: [%{hd(spell.effects) | radius_yards: 3.0}]}
       assert %UnitTargets{error: :bad_targets} = SpellUnits.resolve(caster, spell, Target.none())
+    end
+  end
+
+  describe "area resolution" do
+    test "source areas select every matching creature and exclude the caster", %{caster: caster, spell: spell} do
+      first = spawn_mob(caster, 100, {1.0, 0.0, 0.0})
+      second = spawn_mob(caster, 100, {2.0, 0.0, 0.0})
+      spawn_mob(caster, 200, {0.0, 0.0, 0.0})
+      spawn_mob(caster, 100, {0.0, 0.0, 20.0})
+      spell = area_spell(spell, :script_units_at_source)
+      units = SpellUnits.resolve(caster, spell, Target.self(caster.object.guid))
+      assert units.by_effect == %{0 => [first.object.guid, second.object.guid]}
+      assert units.selected_guid == nil
+      assert UnitTargets.item_selection(Target.none(), units, 123) == Target.none()
+    end
+
+    test "respects source and destination locations independently", %{caster: caster, spell: spell} do
+      source = spawn_mob(caster, 100, {30.0, 0.0, 0.0})
+      destination = spawn_mob(caster, 100, {-30.0, 0.0, 0.0})
+      spawn_mob(caster, 100, {1.0, 0.0, 0.0})
+      spell = area_spell(spell, :script_units_at_source)
+
+      spell = %{
+        spell
+        | effects: [hd(spell.effects), %{hd(spell.effects) | index: 1, implicit_target_a: :script_units_at_destination}]
+      }
+
+      targets = %{Target.none() | source_location: {30.0, 0.0, 0.0}, destination_location: {-30.0, 0.0, 0.0}}
+
+      assert SpellUnits.resolve(caster, spell, targets).by_effect ==
+               %{0 => [source.object.guid], 1 => [destination.object.guid]}
+    end
+
+    test "caster origin modes override supplied coordinates", %{caster: caster, spell: spell} do
+      near = spawn_mob(caster, 100, {1.0, 0.0, 0.0})
+      spawn_mob(caster, 100, {30.0, 0.0, 0.0})
+      targets = %{Target.at({30.0, 0.0, 0.0}) | source_location: {30.0, 0.0, 0.0}}
+
+      for {origin, mode} <- [
+            {:caster_source, :script_units_at_source},
+            {:caster_destination, :script_units_at_destination}
+          ] do
+        spell = area_spell(spell, mode)
+        spell = %{spell | effects: [%{hd(spell.effects) | implicit_target_a: origin, implicit_target_b: mode}]}
+        assert SpellUnits.resolve(caster, spell, targets).by_effect == %{0 => [near.object.guid]}
+      end
+    end
+
+    test "unrestricted destination areas include their caster and permit empty areas", %{caster: caster, spell: spell} do
+      mob = spawn_mob(caster, 200, {2.0, 0.0, 0.0})
+      spell = %{area_spell(spell, :script_units_at_destination) | unit_targets: []}
+      units = SpellUnits.resolve(caster, spell, Target.none())
+      assert units.by_effect == %{0 => [caster.object.guid, mob.object.guid]}
+      empty = SpellUnits.resolve(caster, spell, Target.at({100.0, 0.0, 0.0}))
+      assert empty.by_effect == %{0 => []}
+      assert UnitTargets.validate(spell, empty) == :ok
+    end
+
+    test "an excluded selector does not turn into an unrestricted area", %{caster: caster, spell: spell} do
+      spawn_mob(caster, 100, {1.0, 0.0, 0.0})
+
+      spell = %{
+        area_spell(spell, :script_units_at_source)
+        | unit_targets: [%Selector{entry: 100, inverse_effect_mask: 1}]
+      }
+
+      assert SpellUnits.resolve(caster, spell, Target.none()).by_effect == %{0 => []}
+    end
+
+    test "retains life state and target caps per effect", %{caster: caster, spell: spell} do
+      first = spawn_mob(caster, 100, {1.0, 0.0, 0.0})
+      selected = spawn_mob(caster, 100, {3.0, 0.0, 0.0})
+      dead = spawn_mob(caster, 100, {2.0, 0.0, 0.0}, health: 0)
+      spell = %{area_spell(spell, :script_units_at_source) | max_targets: 1}
+
+      spell = %{
+        spell
+        | effects: [hd(spell.effects), %{hd(spell.effects) | index: 1}],
+          unit_targets: [
+            %Selector{entry: 100, inverse_effect_mask: 2},
+            %Selector{entry: 100, alive?: false, inverse_effect_mask: 1}
+          ]
+      }
+
+      units = SpellUnits.resolve(caster, spell, Target.unit(selected.object.guid))
+      assert units.by_effect == %{0 => [selected.object.guid], 1 => [dead.object.guid]}
+      refute first.object.guid in UnitTargets.guids(units)
+    end
+
+    test "uses a sixty-degree cone and wraps the caster's orientation", %{caster: caster, spell: spell} do
+      front = spawn_mob(caster, 100, {5.0, 0.0, 0.0})
+      edge = spawn_mob(caster, 100, {4.0, 2.0, 0.0})
+      side = spawn_mob(caster, 100, {4.0, 3.0, 0.0})
+      rear = spawn_mob(caster, 100, {-5.0, 0.0, 0.0})
+      spell = area_spell(spell, :script_units_in_cone)
+      units = SpellUnits.resolve(caster, spell, Target.unit(rear.object.guid))
+      assert MapSet.new(UnitTargets.guids(units)) == MapSet.new([front.object.guid, edge.object.guid])
+      refute side.object.guid in UnitTargets.guids(units)
+      turned = %{caster | movement_block: %{caster.movement_block | position: {0.0, 0.0, 0.0, :math.pi()}}}
+      assert UnitTargets.guids(SpellUnits.resolve(turned, spell, Target.none())) == [rear.object.guid]
+      wrapped = %{caster | movement_block: %{caster.movement_block | position: {0.0, 0.0, 0.0, 2 * :math.pi()}}}
+      assert UnitTargets.guids(SpellUnits.resolve(wrapped, spell, Target.none())) == UnitTargets.guids(units)
+    end
+
+    test "destination summon and ground effects do not execute on nearby units", %{caster: caster, spell: spell} do
+      spawn_mob(caster, 100, {1.0, 0.0, 0.0})
+
+      for type <- [:summon, :summon_wild, :summon_object_wild, :persistent_area_aura] do
+        spell = area_spell(spell, :script_units_at_destination)
+        spell = %{spell | effects: [%{hd(spell.effects) | type: type}]}
+        assert SpellUnits.resolve(caster, spell, Target.none()).by_effect == %{0 => []}
+      end
+    end
+
+    test "mixed areas deliver each heal only to its own recipients", %{caster: caster, spell: spell} do
+      first = spawn_mob(caster, 100, {1.0, 0.0, 0.0})
+      second = spawn_mob(caster, 100, {2.0, 0.0, 0.0})
+      other = spawn_mob(caster, 200, {3.0, 0.0, 0.0})
+      spell = mixed_spell(spell)
+
+      effects =
+        Enum.map(spell.effects, fn effect ->
+          if effect.index < 2, do: %{effect | implicit_target_a: :script_units_at_source}, else: effect
+        end)
+
+      spell = %{spell | effects: effects, attributes: MapSet.new([:ignore_line_of_sight])}
+      completed = launch(caster, spell)
+      assert completed.unit.health == 50
+      deliveries = Enum.filter(completed.internal.events, &is_struct(&1, Effects.DeliverSpell))
+      assert_delivery(deliveries, first, 0, 30)
+      assert_delivery(deliveries, second, 0, 30)
+      assert_delivery(deliveries, other, 1, 40)
     end
   end
 
@@ -277,6 +412,14 @@ defmodule ThistleTea.Game.World.SpellUnitsTest do
   defp selected(caster, spell, targets) do
     %UnitTargets{error: nil, by_effect: %{0 => [guid]}} = SpellUnits.resolve(caster, spell, targets)
     guid
+  end
+
+  defp area_spell(spell, mode) do
+    %{
+      spell
+      | attributes: MapSet.new([:ignore_line_of_sight]),
+        effects: [%{hd(spell.effects) | implicit_target_a: mode}]
+    }
   end
 
   defp mixed_spell(spell) do
