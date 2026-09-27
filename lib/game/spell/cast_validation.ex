@@ -45,6 +45,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Spell.Destination
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Environment
+  alias ThistleTea.Game.Spell.Facing
   alias ThistleTea.Game.Spell.Focus
   alias ThistleTea.Game.Spell.LocationTargets
   alias ThistleTea.Game.Spell.ObjectTargets
@@ -107,24 +108,24 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_duel(spell, Keyword.get(opts, :duel_context)),
          :ok <- CorpseTarget.validate(spell, Keyword.get(opts, :spell_corpse)),
          :ok <- Destination.validate(caster, spell, targets, Keyword.get(opts, :destination_los?)) do
-      if CorpseTarget.required?(spell), do: :ok, else: validate_target(caster, spell, targets, target_info)
+      if CorpseTarget.required?(spell), do: :ok, else: validate_target(caster, spell, targets, target_info, opts)
     end
   end
 
-  def validate_target(caster, %Spell{} = spell, %Target{} = targets, target_info) do
+  def validate_target(caster, %Spell{} = spell, %Target{} = targets, target_info, opts \\ []) do
     cond do
       Insignia.spell?(spell) ->
         Insignia.validate(caster, target_info)
 
       UnitTargets.required?(spell) or LocationTargets.required?(spell) ->
-        validate_explicit_effects(caster, spell, targets, target_info)
+        validate_explicit_effects(caster, spell, targets, target_info, opts)
 
       true ->
-        validate_unit_target(caster, spell, targets, target_info)
+        validate_unit_target(caster, spell, targets, target_info, opts)
     end
   end
 
-  defp validate_explicit_effects(caster, spell, targets, target_info) do
+  defp validate_explicit_effects(caster, spell, targets, target_info, opts) do
     effects =
       Enum.filter(spell.effects, fn effect ->
         not UnitTargets.scripted?(effect) and effect.implicit_target_a != :script_location_near_caster and
@@ -136,17 +137,17 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
     if effects == [],
       do: :ok,
-      else: validate_unit_target(caster, %{spell | effects: effects}, targets, target_info)
+      else: validate_unit_target(caster, %{spell | effects: effects}, targets, target_info, opts)
   end
 
-  defp validate_unit_target(caster, spell, targets, target_info) do
+  defp validate_unit_target(caster, spell, targets, target_info, opts) do
     with :ok <- check_target_flags(caster, spell, target_info),
          :ok <- Shapeshift.validate_target(caster, spell, target_info),
          :ok <- check_target(spell, target_info),
          :ok <- check_target_power_type(spell, targets, target_info),
          :ok <- check_dispel_target(caster, spell, targets, target_info),
          :ok <- check_creature_type(spell, target_info),
-         :ok <- check_position(caster, spell, target_info),
+         :ok <- Facing.validate(caster, spell, target_info, opts),
          :ok <- check_target_aura_state(spell, target_info),
          :ok <- check_warlock_target(caster, spell, target_info),
          :ok <- PlayerPossession.validate(caster, spell, target_info),
@@ -276,43 +277,6 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_warlock_target(_caster, %Spell{} = spell, _target_info) do
     if Warlock.conflagrate?(spell), do: {:error, :target_aurastate}, else: :ok
-  end
-
-  defp check_position(caster, %Spell{} = spell, target_info) do
-    cond do
-      Spell.attribute?(spell, :from_behind) and not behind_target?(caster, target_info) -> {:error, :not_behind}
-      Spell.attribute?(spell, :target_facing_caster) and behind_target?(caster, target_info) -> {:error, :not_infront}
-      Spell.auto_repeat?(spell) and not facing_target?(caster, target_info) -> {:error, :not_infront}
-      true -> :ok
-    end
-  end
-
-  defp facing_target?(%{movement_block: %{position: {x, y, _z, orientation}}}, %{position: {_world, tx, ty, _tz}}) do
-    :math.cos(:math.atan2(ty - y, tx - x) - orientation) >= 0
-  end
-
-  defp facing_target?(_caster, _target), do: true
-
-  defp behind_target?(%{movement_block: %{position: {caster_x, caster_y, _caster_z, _caster_o}}}, %{
-         position: {_map, target_x, target_y, _target_z},
-         orientation: target_o
-       })
-       when is_number(target_o) do
-    angle = :math.atan2(caster_y - target_y, caster_x - target_x)
-    abs(normalize_angle(angle - target_o)) > :math.pi() / 2
-  end
-
-  defp behind_target?(_caster, _target_info), do: false
-
-  defp normalize_angle(angle) do
-    two_pi = 2 * :math.pi()
-    angle = :math.fmod(angle, two_pi)
-
-    cond do
-      angle > :math.pi() -> angle - two_pi
-      angle < -:math.pi() -> angle + two_pi
-      true -> angle
-    end
   end
 
   defp check_stronger_rank(caster, %Spell{} = spell, %Target{} = targets) do

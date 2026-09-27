@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Spell.Requirements do
-  @moduledoc "Pure cast requirements that depend on current terrain and nearby world objects."
+  @moduledoc "Pure cast requirements that depend on current terrain, target positions, and nearby world objects."
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Spell
@@ -7,19 +7,24 @@ defmodule ThistleTea.Game.Spell.Requirements do
   alias ThistleTea.Game.Spell.AuraRank
   alias ThistleTea.Game.Spell.CorpseTarget
   alias ThistleTea.Game.Spell.Environment
+  alias ThistleTea.Game.Spell.Facing
   alias ThistleTea.Game.Spell.Focus
   alias ThistleTea.Game.Spell.LocationTargets
   alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.UnitTargets
 
-  defstruct [:focus, :corpse, :objects, :units, :locations, :aura_target, :spell_area, :outdoors?]
+  defstruct [:focus, :corpse, :objects, :units, :locations, :aura_target, :facing_target, :spell_area, :outdoors?]
 
   def required?(caster, %Spell{} = spell, opts \\ []),
     do:
       Focus.required?(caster, spell) or CorpseTarget.required?(spell) or ObjectTargets.required?(spell) or
-        UnitTargets.required?(spell) or LocationTargets.required?(spell) or
-        AuraRank.requires_check?(caster, spell, opts) or Area.restricted?(spell) or
+        target_required?(caster, spell, opts) or Area.restricted?(spell) or
         (match?(%Character{}, caster) and Environment.restricted?(spell))
+
+  defp target_required?(caster, spell, opts) do
+    UnitTargets.required?(spell) or LocationTargets.required?(spell) or
+      AuraRank.requires_check?(caster, spell, opts) or Facing.required?(caster, spell, opts)
+  end
 
   def validate(
         caster,
@@ -31,6 +36,7 @@ defmodule ThistleTea.Game.Spell.Requirements do
           units: units,
           locations: locations,
           aura_target: target,
+          facing_target: facing_target,
           spell_area: area,
           outdoors?: outdoors
         },
@@ -41,6 +47,7 @@ defmodule ThistleTea.Game.Spell.Requirements do
          :ok <- Environment.validate(caster, spell, outdoors),
          :ok <- CorpseTarget.validate(spell, corpse),
          :ok <- AuraRank.validate(caster, spell, target, opts),
+         :ok <- Facing.validate(caster, spell, facing_target, opts),
          :ok <- ObjectTargets.validate(spell, objects),
          :ok <- LocationTargets.validate(spell, locations),
          do: UnitTargets.validate(spell, units)

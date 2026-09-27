@@ -51,6 +51,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     only_battlegrounds: 0x87,
     not_behind: 0x33,
     not_infront: 0x36,
+    unit_not_infront: 0x7C,
     not_here: 0x35,
     not_fishable: 0x34,
     not_ready: 0x3C,

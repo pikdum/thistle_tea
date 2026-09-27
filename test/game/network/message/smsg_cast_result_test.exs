@@ -6,6 +6,12 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResultTest do
   alias ThistleTea.Game.Spell.Area
 
   describe "to_binary/1" do
+    test "distinguishes caster-facing and target-facing failures" do
+      for {reason, code} <- [unit_not_infront: 0x7C, not_infront: 0x36, not_behind: 0x33] do
+        assert SmsgCastResult.to_binary(SmsgCastResult.failure(1776, reason)) == <<1776::little-size(32), 2, code>>
+      end
+    end
+
     test "encodes indoor and outdoor failures without extra payloads" do
       for {reason, code} <- [only_indoors: 0x52, only_outdoors: 0x55] do
         assert SmsgCastResult.to_binary(SmsgCastResult.failure(783, reason)) == <<783::little-size(32), 2, code>>

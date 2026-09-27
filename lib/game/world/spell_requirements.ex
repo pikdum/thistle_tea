@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.World.SpellRequirements do
       requirements
       | corpse: corpse(caster, spell),
         aura_target: aura_target(caster, targets),
+        facing_target: facing_target(caster, targets),
         spell_area: SpellAreas.context(caster, spell),
         outdoors?: SpellEnvironment.context(caster, spell)
     }
@@ -49,6 +50,15 @@ defmodule ThistleTea.Game.World.SpellRequirements do
   defp aura_target(caster, targets) do
     guid = Target.unit_guid(targets)
     if is_integer(guid) and guid != caster.object.guid, do: Metadata.query(guid, [:level])
+  end
+
+  defp facing_target(caster, targets) do
+    guid = Target.unit_guid(targets)
+
+    if is_integer(guid) and guid != caster.object.guid do
+      metadata = Metadata.query(guid, [:orientation]) || %{}
+      Map.put(metadata, :position, World.position(guid))
+    end
   end
 
   def corpse(caster, %Spell{} = spell) do

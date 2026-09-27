@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.SpellRequirementsTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.CorpseTarget
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -111,6 +112,45 @@ defmodule ThistleTea.Game.World.SpellRequirementsTest do
   end
 
   describe "complete/2" do
+    test "turning away during a cast rejects launch without spending power or starting cooldown", %{caster: caster} do
+      spell = facing_spell()
+      target = body(:mob, caster.internal.world, {10.0, 0.0, 0.0}, %{alive?: true})
+      started = Casting.start(caster, spell, Target.unit(target), 1_000)
+      turned = %{started | movement_block: %{started.movement_block | position: {0.0, 0.0, 0.0, :math.pi()}}}
+      failed = turned |> Casting.complete(3_000) |> EventSink.emit_pending(Context.new(self()))
+
+      assert failed.internal.casting == nil
+      assert failed.unit.power1 == 100
+      assert failed.internal.cooldowns == %{}
+      assert_received {:"$gen_cast", {:send_packet, %SmsgCastResult{reason: 0x7C}}}
+      refute_received {:"$gen_cast", {:send_packet, %SmsgCastResult{result: 0}}}
+
+      retried = Casting.start(%{failed | movement_block: caster.movement_block}, spell, Target.unit(target), 4_000)
+
+      completed = retried |> Casting.complete(6_000) |> EventSink.emit_pending(Context.new(self()))
+      assert completed.internal.casting == nil
+      assert completed.unit.power1 == 90
+      assert Map.has_key?(completed.internal.cooldowns, spell.id)
+      assert_received {:"$gen_cast", {:send_packet, %SmsgCastResult{result: 0}}}
+    end
+
+    test "launch uses the target's latest position and orientation", %{caster: caster} do
+      spell = facing_spell()
+      target = body(:mob, caster.internal.world, {10.0, 0.0, 0.0}, %{alive?: true, orientation: 0.0})
+      started = Casting.start(caster, spell, Target.unit(target), 1_000)
+      SpatialHash.update(:mobs, target, caster.internal.world, -10.0, 0.0, 0.0)
+      Metadata.update(target, %{orientation: 1.0})
+      snapshot = SpellRequirements.resolve(caster, spell, Target.unit(target))
+      assert snapshot.facing_target == %{position: {caster.internal.world, -10.0, 0.0, 0.0}, orientation: 1.0}
+
+      failed = started |> Casting.complete(3_000) |> EventSink.emit_pending(Context.new(self()))
+      assert failed.internal.casting == nil
+      assert failed.unit.power1 == 100
+      assert failed.internal.cooldowns == %{}
+      assert_received {:"$gen_cast", {:send_packet, %SmsgCastResult{reason: 0x7C}}}
+      refute_received {:"$gen_cast", {:send_packet, %SmsgCastResult{result: 0}}}
+    end
+
     test "lost corpses reject launch before costs or cooldown", %{caster: caster, spell: spell} do
       guid = body(:mob, caster.internal.world, {1.0, 0.0, 0.0})
       assert %CorpseTarget{} = SpellRequirements.corpse(caster, spell)
@@ -135,6 +175,21 @@ defmodule ThistleTea.Game.World.SpellRequirementsTest do
       assert Map.has_key?(completed.internal.cooldowns, spell.id)
       assert Enum.any?(completed.internal.events, &match?(%Effects.TriggerSpell{spell_id: 20_578}, &1))
     end
+  end
+
+  defp facing_spell do
+    %Spell{
+      id: 900_781,
+      custom_flags: 0x80,
+      cast_time_ms: 2_000,
+      mana_cost: 10,
+      power_type: 0,
+      school: :fire,
+      range_yards: 30.0,
+      recovery_time_ms: 60_000,
+      attributes: MapSet.new([:ignore_line_of_sight]),
+      effects: [%Effect{index: 0, type: :school_damage, implicit_target_a: :target_enemy, base_points: 10}]
+    }
   end
 
   defp caster(_context) do
