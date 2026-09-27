@@ -29,9 +29,10 @@ Caster-executed summons now survive that filter. Summon Screecher Spirit can
 therefore create its spirit at the corpse while its separate dummy effect uses
 the existing corpse-removal lifecycle.
 
-This milestone covers target 46 for unit casts and triggered spells. Raw
-game-object spell entry points and content-specific NPC scripts remain separate
-work. In particular, `npc_pats_firework_guy` does not yet automatically execute
+This milestone covers target 46 for unit casts and triggered spells. The later
+[game-object targeting milestone](game-object-spell-targeting-playtest.md)
+extends target resolution to trap and quest-object casts. Content-specific NPC
+scripts remain separate work. In particular, `npc_pats_firework_guy` does not yet automatically execute
 the holiday firework sequence; the native tests below cast its two spells
 separately. They do not claim complete Lunar Festival behavior.
 
