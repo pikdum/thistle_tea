@@ -104,6 +104,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Database-selected creature targets](docs/spell-creature-targets-playtest.md), with living and corpse selectors, per-effect delivery, and native quest-item acceptance
 - [Scripted spell areas and configured cones](docs/spell-scripted-areas-playtest.md), with source and destination areas, per-effect selectors, narrow and rear arcs, and native Steam Tonk acceptance
 - [Scripted spell destinations](docs/spell-scripted-locations-playtest.md), with nearby creature, corpse, and object locations, triggered delivery, and native summon placement and expiry
+- [Database spell destinations](docs/spell-database-locations-playtest.md), with fixed summon and ground-effect locations, world-copy isolation, and configured teleport arrival facing
 - [Game-object spell targeting](docs/game-object-spell-targeting-playtest.md), with per-effect trap and quest-object recipients, owner attribution, and native linked-trap and combat lifecycle acceptance
 - [Combo point builders](docs/combo-points-playtest.md), with Premeditation expiry, talent-generated points, finisher consumption, and single melee proc delivery
 - [Avoided ability power refunds](docs/ability-refunds-playtest.md), using paid energy and rage costs across charged discounts, immunity, and queued melee attacks
