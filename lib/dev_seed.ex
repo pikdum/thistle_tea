@@ -40,6 +40,8 @@ defmodule ThistleTea.DevSeed do
   {16603.2, 16438.1} support civilian protection and vertical aggro checks.
   A Defias Thug and Cutpurse at {16653.2, 16268.1} and {16657.2, 16268.1}
   support defensive pet target transitions between multiple attackers.
+  A stationary Skeletal Flayer at {16653.2, 16198.1} casts Fireball to test
+  ranged damage against pets commanded to Stay.
   """
   import Ecto.Query
 
@@ -381,6 +383,12 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(38, @base_low_guid + 3300, {x + 350.0, y - 50.0, z}, nil, 30)
     spawn_mob(94, @base_low_guid + 3301, {x + 354.0, y - 50.0, z}, nil, 30)
 
+    spawn_mob(@hostile_entry, @base_low_guid + 3302, {x + 350.0, y - 120.0, z}, nil, 30,
+      ai_events: [],
+      stationary: true,
+      spells: [%CreatureSpell{spell_id: 9053, delay_repeat_min_ms: 1_000, delay_repeat_max_ms: 1_000}]
+    )
+
     spawn_mob(2006, @base_low_guid + 2600, {x - 220.0, y + 80.0, z}, nil, 30)
     spawn_mob(2007, @base_low_guid + 2601, {x - 224.0, y + 84.0, z}, nil, 30)
     spawn_mob(1412, @base_low_guid + 2602, {x - 224.0, y + 80.0, z}, nil, 30)
@@ -455,6 +463,7 @@ defmodule ThistleTea.DevSeed do
           |> Mob.build()
           |> select_ai_events(Keyword.get(opts, :ai_events))
           |> select_spells(Keyword.get(opts, :spells))
+          |> stationary(Keyword.get(opts, :stationary, false))
 
         mob = %{mob | internal: %{mob.internal | loot: %{mob.internal.loot | override: loot_override}}}
         MobLoader.start_mob(mob)
@@ -471,6 +480,12 @@ defmodule ThistleTea.DevSeed do
         nil -> nil
       end
   end
+
+  defp stationary(%Mob{internal: %{creature: creature}} = mob, true) do
+    %{mob | internal: %{mob.internal | creature: %{creature | stationary?: true}}}
+  end
+
+  defp stationary(mob, false), do: mob
 
   defp select_ai_events(mob, nil), do: mob
 
