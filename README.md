@@ -164,6 +164,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Detect Magic](docs/detect-magic-playtest.md), with enemy buff revelation, live buff updates, and dispel, expiry, and death cleanup
 - pets
 - [Hunter trap procs](docs/trap-procs-playtest.md), with Entrapment, Frost Trap's periodic root checks, diminishing returns, talent reset, and trap activation restrictions
+- [Trap detection and disarming](docs/trap-detection-playtest.md), with hostile trap visibility, Detect Traps, safe Disarm Trap completion, and static trap respawn
 - [Noncombat critter companions](docs/mini-pet-playtest.md), with separate ownership, following, item toggles, replacement, creation passives, and lifecycle cleanup alongside combat pets
 - [Autonomous guardians](docs/guardian-playtest.md), with multiple summons, Engineering scaling, combat and following, creature stat buffs, and monitored lifetime cleanup alongside combat pets
 - [Wild creature summons](docs/wild-summon-playtest.md), with independent lifetimes, Target Dummy taunts and salvage, timed death and corpse cleanup, and usable Field Repair Bots
