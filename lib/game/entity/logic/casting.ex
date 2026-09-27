@@ -1428,7 +1428,11 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
           selected_target_guid: casting.resolution.followups.selected_unit_guid,
           destination_position: Target.ground_location(casting.targets),
           target_hostile?:
-            target_guid != caster_guid and Hostility.valid_attack_target?(caster, target_guid, area?: true),
+            target_guid != caster_guid and
+              Hostility.valid_attack_target?(caster, target_guid,
+                area?: true,
+                allow_dead?: Spell.attribute?(spell, :allow_dead_target)
+              ),
           target_role: target_role,
           chain_effects: impact.chain_effects,
           hit_outcome: impact.hit_outcome

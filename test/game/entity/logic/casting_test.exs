@@ -851,6 +851,57 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
       assert Enum.any?(character.internal.events, &match?(%Effects.DismissPet{target_guid: 44}, &1))
     end
 
+    test "delivers corpse capture separately from its caster reward" do
+      target_guid = Guid.from_low_guid(:mob, 7584, System.unique_integer([:positive]))
+      Metadata.put(target_guid, %{alive?: false, unit_flags: 0})
+      on_exit(fn -> Metadata.delete(target_guid) end)
+
+      spell = %Spell{
+        id: 11_885,
+        attributes: MapSet.new([:allow_dead_target]),
+        effects: [
+          %Effect{index: 0, type: :dummy, implicit_target_a: :target_enemy},
+          %Effect{index: 1, type: :create_item, misc_value: 9593, base_points: 1, implicit_target_a: :caster}
+        ]
+      }
+
+      resolution = %{
+        channel_resolution()
+        | hits: [target_guid, 1],
+          impacts: [
+            %Impact{target_guid: target_guid, target_role: :other},
+            %Impact{target_guid: 1, target_role: :caster}
+          ]
+      }
+
+      casting = %Cast{
+        spell: spell,
+        targets: Target.unit(target_guid),
+        phase: :impact,
+        resolution: resolution,
+        ends_at: 1_000
+      }
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, level: 50},
+        player: %Player{},
+        internal: %Internal{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      character = Casting.complete(character, casting, 1_000)
+      delivery = Enum.find(character.internal.events, &is_struct(&1, Effects.DeliverSpell))
+      assert delivery.target_guid == target_guid
+
+      corpse = %Mob{object: %Object{guid: target_guid}, unit: %Unit{health: 0}, internal: %Internal{}}
+      {corpse, events} = SpellEffect.receive(corpse, delivery.cast_context, delivery.spell, 1_000)
+      assert corpse.unit.health == 0
+      assert [%Effects.DespawnSelf{duration_ms: 1_000}] = events
+      assert Enum.any?(character.internal.events, &match?(%Effects.CreateItem{item_id: 9593}, &1))
+      refute Enum.any?(character.internal.events, &is_struct(&1, Effects.DespawnSelf))
+    end
+
     test "queues a take-side outcome when a hostile magic spell is fully resisted" do
       caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
       target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
