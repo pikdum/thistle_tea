@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
 
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cone
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Target
 
@@ -91,7 +92,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
     test "returns caster cone query for cone spells" do
       spell = aoe_spell(:aoe_enemy_in_cone)
 
-      assert SpellTarget.target_query(spell, Target.unit(2)) == {:caster_cone, 10.0, 60}
+      assert SpellTarget.target_query(spell, Target.unit(2)) == {:caster_cone, 10.0, %Cone{}}
     end
 
     test "returns unit query for direct unit targets" do

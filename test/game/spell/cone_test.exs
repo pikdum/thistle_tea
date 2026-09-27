@@ -4,6 +4,15 @@ defmodule ThistleTea.Game.Spell.ConeTest do
   alias ThistleTea.Game.Spell.Cone
 
   describe "contains?/3" do
+    test "offsets follow the caster's facing without changing the arc" do
+      cone = %Cone{degrees: 120, offset_radians: :math.pi() / 2}
+      caster = {0.0, 0.0, 0.0, :math.pi() / 2}
+      assert Cone.contains?(cone, caster, {-10.0, 0.0, 0.0})
+      assert Cone.contains?(cone, caster, {-10.0, 15.0, 0.0})
+      refute Cone.contains?(cone, caster, {0.0, 10.0, 0.0})
+      refute Cone.contains?(cone, caster, {10.0, 0.0, 0.0})
+    end
+
     test "respects narrow and wide forward arcs" do
       caster = {0.0, 0.0, 0.0, 0.0}
       assert Cone.contains?(7, caster, {10.0, 0.5, 0.0})

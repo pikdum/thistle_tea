@@ -21,7 +21,7 @@ defmodule ThistleTea.Game.World.Loader.SpellAvoidanceDbcTest do
     end
 
     test "classifies bursts, cones, ground spells, and channels from their targets" do
-      for id <- [10, 120, 122, 1449, 2120, 26_573] do
+      for id <- [10, 120, 122, 1449, 2120, 19_272, 21_333, 24_820, 26_102, 26_573] do
         spell = SpellLoader.load(id)
         assert Spell.area_of_effect?(spell), "expected area spell #{spell.name} (#{id})"
         assert spell.semantics.area_of_effect?

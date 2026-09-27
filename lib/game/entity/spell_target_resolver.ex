@@ -243,8 +243,8 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
       {:caster_aoe, radius} ->
         nearby_enemy_guids(caster, caster_guid, radius)
 
-      {:caster_cone, radius, degrees} ->
-        nearby_cone_enemy_guids(caster, caster_guid, radius, degrees)
+      {:caster_cone, radius, cone} ->
+        nearby_cone_enemy_guids(caster, caster_guid, radius, cone)
 
       {:targeted_aoe, position, radius} ->
         nearby_enemy_guids_at(caster, caster_guid, position, radius)
@@ -278,7 +278,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
          %{movement_block: %{position: {_x, _y, _z, orientation}}} = caster,
          caster_guid,
          radius,
-         degrees
+         cone
        )
        when is_number(radius) and radius > 0 do
     now = Time.now()
@@ -288,19 +288,19 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
         world
         |> nearby_units_at({x, y, z}, radius, now)
         |> hostile_living_guids(caster, caster_guid)
-        |> Enum.filter(&in_cone?(&1, {x, y, z, orientation}, degrees))
+        |> Enum.filter(&in_cone?(&1, {x, y, z, orientation}, cone))
 
       nil ->
         []
     end
   end
 
-  defp nearby_cone_enemy_guids(_caster, _caster_guid, _radius, _degrees), do: []
+  defp nearby_cone_enemy_guids(_caster, _caster_guid, _radius, _cone), do: []
 
-  defp in_cone?(guid, caster_position, degrees) do
+  defp in_cone?(guid, caster_position, cone) do
     case World.position(guid) do
       {_map, tx, ty, tz} ->
-        Cone.contains?(degrees, caster_position, {tx, ty, tz})
+        Cone.contains?(cone, caster_position, {tx, ty, tz})
 
       _ ->
         false

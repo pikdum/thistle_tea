@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   alias ThistleTea.Game.Entity.Logic.Priest
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cone
   alias ThistleTea.Game.Spell.Consumable
   alias ThistleTea.Game.Spell.Slow
 
@@ -58,6 +59,20 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @no_autocast_ai 0x00020000
 
   @immediate_periodic_spells [8145, 6474, 8179, 8172, 8167, 8515, 10_609, 10_612]
+  @shadow_bolt_whirl [24_820, 24_821, 24_822, 24_823, 24_835, 24_836, 24_837, 24_838]
+
+  def cone(spell_id, _degrees) when spell_id in @shadow_bolt_whirl do
+    step = Enum.find_index(@shadow_bolt_whirl, &(&1 == spell_id))
+    %Cone{degrees: 120, offset_radians: step * :math.pi() / 4}
+  end
+
+  def cone(_spell_id, degrees), do: %Cone{degrees: degrees}
+
+  def periodic_trigger_spell_id(%Spell{id: 24_834}, _trigger_id, tick_count) do
+    Enum.at(@shadow_bolt_whirl, rem(tick_count, length(@shadow_bolt_whirl)))
+  end
+
+  def periodic_trigger_spell_id(_spell, trigger_id, _tick_count), do: trigger_id
 
   def initial_periodic_delay(%Spell{id: id}, _interval) when id in @immediate_periodic_spells, do: 0
   def initial_periodic_delay(%Spell{}, interval), do: interval

@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Spell do
   """
   import Bitwise, only: [<<<: 2, &&&: 2]
 
+  alias ThistleTea.Game.Spell.Cone
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Modifiers
 
@@ -43,7 +44,7 @@ defmodule ThistleTea.Game.Spell do
     hidden_aura?: false,
     object_targets: [],
     unit_targets: [],
-    cone_degrees: 60,
+    cone: %Cone{},
     area_rules: [],
     family_flags_0: 0,
     family_flags_1: 0,

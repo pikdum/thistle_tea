@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.PersistentArea
   alias ThistleTea.Game.Spell.PersistentArea.Check
+  alias ThistleTea.Game.Spell.Scripts
 
   @aura_interrupt_damage 0x02
 
@@ -152,7 +153,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
         current
 
       %Holder{} = updated ->
-        auras = Enum.map(current.auras, &merge_tick_deadline(&1, updated.auras))
+        auras = Enum.map(current.auras, &merge_aura_tick(&1, updated.auras))
 
         %{
           current
@@ -163,10 +164,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     end
   end
 
-  defp merge_tick_deadline(%Aura{index: index} = current, ticked) do
+  defp merge_aura_tick(%Aura{index: index} = current, ticked) do
     case Enum.find(ticked, &(&1.index == index)) do
       nil -> current
-      %Aura{next_tick_at: at} -> %{current | next_tick_at: at}
+      %Aura{next_tick_at: at, tick_count: count} -> %{current | next_tick_at: at, tick_count: count}
     end
   end
 
@@ -175,6 +176,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
     {entity, new_auras, events} =
       Enum.reduce(auras, {entity, [], []}, fn aura, {ent, acc, events} ->
+        aura = count_due_tick(aura, now)
         {ent, new_aura, aura_events} = tick_checked_aura(ent, holder, aura, now)
         {ent, [new_aura | acc], events ++ aura_events}
       end)
@@ -182,6 +184,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     {holder, area_events} = tick_area_refresh(entity, %{holder | auras: Enum.reverse(new_auras)}, now)
     {entity, holder, events ++ area_events}
   end
+
+  defp count_due_tick(%Aura{next_tick_at: at, tick_count: count} = aura, now) when is_integer(at) and now >= at,
+    do: %{aura | tick_count: count + 1}
+
+  defp count_due_tick(aura, _now), do: aura
 
   defp tick_area_refresh(entity, %Holder{next_area_refresh_at: at, area_radius: radius, spell: spell} = holder, now)
        when is_integer(at) and now >= at and is_number(radius) do
@@ -396,8 +403,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_trigger_spell, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
+    trigger_id = Scripts.periodic_trigger_spell_id(holder.spell, aura.trigger_spell_id, aura.tick_count)
+
     events =
-      case {Warlock.allow_periodic_trigger?(entity, holder), aura.trigger_spell_id} do
+      case {Warlock.allow_periodic_trigger?(entity, holder), trigger_id} do
         {false, _spell_id} ->
           []
 

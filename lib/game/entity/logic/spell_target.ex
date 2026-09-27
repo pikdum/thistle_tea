@@ -70,7 +70,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   defp area_query(spell, targets, radius) do
     cond do
       caster_aoe_spell?(spell) -> {:caster_aoe, radius}
-      cone_aoe_spell?(spell) -> {:caster_cone, radius, spell.cone_degrees}
+      cone_aoe_spell?(spell) -> {:caster_cone, radius, spell.cone}
       query = targeted_aoe_query(spell, targets, radius) -> query
       true -> friendly_aoe_query(spell, targets, radius)
     end

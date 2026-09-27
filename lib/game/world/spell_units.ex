@@ -70,7 +70,7 @@ defmodule ThistleTea.Game.World.SpellUnits do
 
     area_candidates(caster, origin, radius)
     |> Enum.uniq()
-    |> Enum.flat_map(&area_candidate(caster, &1, origin, radius, mode, spell.cone_degrees))
+    |> Enum.flat_map(&area_candidate(caster, &1, origin, radius, mode, spell.cone))
     |> Enum.filter(fn {guid, metadata, _distance} ->
       area_recipient?(caster, spell, effect, mode, guid, metadata, selectors) and
         line_of_sight?(caster, spell, guid)
@@ -105,19 +105,19 @@ defmodule ThistleTea.Game.World.SpellUnits do
   defp caster_units(%{object: %{guid: guid}, unit: _unit}), do: [guid]
   defp caster_units(_caster), do: []
 
-  defp area_candidate(caster, guid, origin, radius, mode, cone_degrees) do
+  defp area_candidate(caster, guid, origin, radius, mode, cone) do
     with {position, metadata} <- area_facts(caster, guid),
          true <- mode == :script_units_at_destination or guid != caster.object.guid,
          distance = Math.distance(origin, position),
          true <- distance <= radius + area_reach(guid, metadata),
-         true <- area_shape?(mode, cone_degrees, caster.movement_block.position, position) do
+         true <- area_shape?(mode, cone, caster.movement_block.position, position) do
       [{guid, metadata, distance}]
     else
       _ -> []
     end
   end
 
-  defp area_shape?(:script_units_in_cone, degrees, caster, target), do: Cone.contains?(degrees, caster, target)
+  defp area_shape?(:script_units_in_cone, cone, caster, target), do: Cone.contains?(cone, caster, target)
   defp area_shape?(_mode, _degrees, _caster, _target), do: true
 
   defp area_facts(%{object: %{guid: guid}} = caster, guid) do

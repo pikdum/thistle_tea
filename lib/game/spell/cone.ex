@@ -1,5 +1,11 @@
 defmodule ThistleTea.Game.Spell.Cone do
-  @moduledoc "Pure cone geometry, including configured forward arcs and negative rear arcs."
+  @moduledoc "Pure cone geometry with forward or rear arcs and offsets from the caster's facing."
+
+  defstruct degrees: 60, offset_radians: 0.0
+
+  def contains?(%__MODULE__{degrees: degrees, offset_radians: offset}, {x, y, z, orientation}, target) do
+    contains?(degrees, {x, y, z, orientation + offset}, target)
+  end
 
   def contains?(degrees, {x, y, _z, orientation}, {tx, ty, _tz}) when is_number(degrees) do
     angle = :math.atan2(ty - y, tx - x) - orientation

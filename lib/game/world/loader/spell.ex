@@ -260,7 +260,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       custom_flags: SpellEffectOverrideLoader.custom_flags(row.id),
       object_targets: SpellObjectTargetLoader.get(row.id),
       unit_targets: SpellUnitTargetLoader.get(row.id),
-      cone_degrees: SpellEffectOverrideLoader.cone_degrees(row.id),
+      cone: Scripts.cone(row.id, SpellEffectOverrideLoader.cone_degrees(row.id)),
       area_rules: SpellAreaLoader.get(row.id),
       effects: build_effects(row, radius_lookup),
       script_steps: SpellScriptLoader.get(row.id),
@@ -523,7 +523,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   defp float_field(nil, _mod_key, row, row_key), do: Map.get(row, row_key)
 
-  @area_target_ints [7, 8, 15, 16, 20, 24, 28, 30, 31, 33, 34, 37, 52, 56, 60, 61]
+  @area_target_ints [7, 8, 15, 16, 20, 24, 28, 30, 31, 33, 34, 37, 52, 54, 56, 60, 61]
 
   defp area_target?(target_int), do: target_int in @area_target_ints
 
@@ -956,6 +956,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(51), do: :game_objects_at_source
   defp target_type(52), do: :game_objects_at_destination
   defp target_type(24), do: :aoe_enemy_in_cone
+  defp target_type(54), do: :aoe_enemy_in_cone
   defp target_type(25), do: :any_unit
   defp target_type(27), do: :caster_master
   defp target_type(28), do: :aoe_enemy_at_channel
