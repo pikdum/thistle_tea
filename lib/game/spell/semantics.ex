@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Spell.Semantics.Rules do
     :dummy,
     :apply_trigger_spell_id,
     :finish_trigger_spell_id,
+    :shared_damage_effects,
     :judgement_damage?,
     :attack_power_damage?,
     :melee_spell_crit?
@@ -15,6 +16,7 @@ defmodule ThistleTea.Game.Spell.Semantics.Rules do
     :dummy,
     :apply_trigger_spell_id,
     :finish_trigger_spell_id,
+    :shared_damage_effects,
     :judgement_damage?,
     :attack_power_damage?,
     :melee_spell_crit?
@@ -204,6 +206,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
           dummy: Scripts.dummy_effect(spell),
           apply_trigger_spell_id: Scripts.apply_trigger(spell),
           finish_trigger_spell_id: Scripts.successful_finish_trigger(spell),
+          shared_damage_effects: Scripts.shared_damage_effects(spell),
           judgement_damage?: Scripts.judgement_of_command_damage?(spell),
           attack_power_damage?: Scripts.ap_percent_damage?(spell),
           melee_spell_crit?: Scripts.uses_melee_spell_crit?(spell)

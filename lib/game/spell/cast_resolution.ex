@@ -12,13 +12,14 @@ defmodule ThistleTea.Game.Spell.CastResolution do
   alias __MODULE__.PowerCost
 
   @enforce_keys [:hits, :misses, :costs, :impacts, :followups]
-  defstruct [:hits, :misses, :costs, :impacts, :followups]
+  defstruct [:hits, :misses, :costs, :impacts, :followups, effect_target_counts: %{}]
 
   @type t :: %__MODULE__{
           hits: [non_neg_integer()],
           misses: [map()],
           costs: Costs.t(),
           impacts: [Impact.t()],
+          effect_target_counts: %{non_neg_integer() => non_neg_integer()},
           followups: Followups.t()
         }
 

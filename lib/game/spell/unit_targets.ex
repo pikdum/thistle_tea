@@ -45,6 +45,11 @@ defmodule ThistleTea.Game.Spell.UnitTargets do
 
   def indices(nil, _guid), do: nil
 
+  def counts(%__MODULE__{by_effect: targets}),
+    do: Map.new(targets, fn {index, guids} -> {index, guids |> Enum.uniq() |> length()} end)
+
+  def counts(nil), do: %{}
+
   def filter_effects(effects, nil), do: effects
   def filter_effects(effects, indices), do: Enum.filter(effects, &(&1.index in indices))
 

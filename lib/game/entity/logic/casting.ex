@@ -58,6 +58,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Spell.Requirements
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
+  alias ThistleTea.Game.Spell.SharedDamage
   alias ThistleTea.Game.Spell.Stealth
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Spell.UnitTargets
@@ -411,6 +412,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       misses: misses,
       costs: casting_costs(entity, casting),
       impacts: resolved_impacts(entity, spell, hits, misses, chain, unit_plan),
+      effect_target_counts: UnitTargets.counts(unit_plan),
       followups: %Followups{
         packet_hits: Enum.uniq(hits ++ object_hit(object_guid) ++ object_guids(casting)),
         selected_unit_guid: selected_unit_guid(entity.object.guid, spell, targets, resolved_targets),
@@ -1453,6 +1455,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
               ),
           target_role: target_role,
           effect_indices: impact.effect_indices,
+          effect_target_counts: casting.resolution.effect_target_counts,
           chain_effects: impact.chain_effects,
           hit_outcome: impact.hit_outcome
       }
@@ -1498,8 +1501,9 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp resolve_targets(caster, %Cast{spell: %Spell{} = spell, targets: %Target{} = targets} = cast) do
     opts = [triggered?: cast.triggered?, cast_item_guid: cast.cast_item_guid, locations: cast.requirements.locations]
 
-    if UnitTargets.required?(spell) or LocationTargets.required?(spell) do
-      plan = SpellTargetResolver.resolve_plan(caster, spell, targets, cast.requirements.units, opts)
+    if UnitTargets.required?(spell) or LocationTargets.required?(spell) or SharedDamage.required?(spell) do
+      units = cast.requirements.units || %UnitTargets{}
+      plan = SpellTargetResolver.resolve_plan(caster, spell, targets, units, opts)
       {UnitTargets.guids(plan), plan}
     else
       {SpellTargetResolver.resolve(caster, spell, targets, opts), nil}

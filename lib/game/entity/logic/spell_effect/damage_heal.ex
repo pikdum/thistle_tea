@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   alias ThistleTea.Game.Spell.ProcOrigin
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
+  alias ThistleTea.Game.Spell.SharedDamage
 
   @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
   @weapon_effect_types [:weapon_damage, :weapon_damage_noschool, :normalized_weapon_damage, :weapon_percent_damage]
@@ -228,7 +229,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
   defp apply_damage_effect(state, %CastContext{} = context, spell, %Effect{} = effect, now, opts \\ [])
        when is_integer(now) do
-    base = base_amount(spell, effect, context)
+    base = SharedDamage.divide(base_amount(spell, effect, context), spell, effect, context)
     rolled = Chain.scale(base + damage_bonus(state, context, spell, effect, opts), effect, context)
 
     apply_damage_amount(state, context, spell, rolled, now, Keyword.put(opts, :damage_effect, effect))

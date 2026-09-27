@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.ProcOrigin
   alias ThistleTea.Game.Spell.Scripts
+  alias ThistleTea.Game.Spell.SharedDamage
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Spell.UnitTargets
   alias ThistleTea.Game.Time
@@ -212,7 +213,9 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   end
 
   defp target_requirements?(spell),
-    do: UnitTargets.required?(spell) or LocationTargets.required?(spell) or Area.restricted?(spell)
+    do:
+      UnitTargets.required?(spell) or LocationTargets.required?(spell) or Area.restricted?(spell) or
+        SharedDamage.required?(spell)
 
   defp validate_trigger_focus(entity, effect, spell) do
     with :ok <- Focus.validate(entity, spell, SpellFocus.find(entity, spell)),
@@ -229,7 +232,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
       Spell.attribute?(spell, :channeled) ->
         resolve_triggered_channel(entity, effect, spell)
 
-      UnitTargets.required?(spell) or LocationTargets.required?(spell) ->
+      UnitTargets.required?(spell) or LocationTargets.required?(spell) or SharedDamage.required?(spell) ->
         resolve_scripted_trigger(entity, effect, spell)
 
       effect.resolve_targets? or SpellTarget.area_targeted?(spell) or Chain.spell?(spell) ->
@@ -339,6 +342,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
     {hits, misses} = Enum.split_with(contexts, &(&1.hit_outcome == :hit))
     hit_guids = Enum.map(hits, & &1.target_guid)
     chain = Chain.plan(entity, spell, targets, hit_guids)
+    target_counts = UnitTargets.counts(units)
     misses = Enum.map(misses, &%{guid: &1.target_guid, reason: 2})
 
     launch =
@@ -356,6 +360,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
         context = %{
           Chain.put_context(context, chain)
           | effect_indices: UnitTargets.indices(units, context.target_guid),
+            effect_target_counts: target_counts,
             destination_position: Target.ground_location(selection),
             selected_target_guid: Target.unit_guid(selection)
         }

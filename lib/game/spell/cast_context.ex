@@ -92,6 +92,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :persistent_area,
     :required_aura_source,
     :feign_death,
+    effect_target_counts: %{},
     damage_sharing_targets: MapSet.new(),
     triggered_by_aura?: false,
     triggered_by_proc?: false,

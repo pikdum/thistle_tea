@@ -118,6 +118,10 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def successful_finish_trigger(_spell), do: nil
 
+  def shared_damage_effects(%Spell{} = spell) do
+    if Spell.vmangos_script?(spell, "spell_meteor"), do: [0], else: []
+  end
+
   def proc_trigger_spell_id(%Spell{} = spell, triggering_spell_id) do
     if Priest.touch_of_weakness?(spell) do
       Priest.touch_of_weakness_damage_id(triggering_spell_id)
