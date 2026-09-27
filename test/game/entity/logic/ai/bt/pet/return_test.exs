@@ -15,11 +15,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.ReturnTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet.Targeting
   alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.WorldRef
 
   setup [:pet]
@@ -59,6 +62,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet.ReturnTest do
   end
 
   describe "tree/0" do
+    test "a newly commanded spell advances before return movement", %{pet: pet, target: target} do
+      pet = %{pet | movement_block: %{pet.movement_block | position: {20.0, 2.0, 0.0, 0.0}}}
+      spell = %Spell{id: 10, cast_time_ms: 1_000, mana_cost: 0, effects: []}
+      pet = pet |> PetBT.command(:follow, 0, 1_000) |> Casting.start(spell, Target.none(), 1_000)
+      context = context(pet, target)
+      assert {{:running, 1_000}, preparing} = BT.tick(PetBT.tree(), pet, context)
+      assert preparing.internal.navigation_intents == []
+      assert preparing.internal.blackboard.pet.returning == :command
+      assert {:success, finished} = BT.tick(PetBT.tree(), preparing, %{context | now: 2_000})
+      assert finished.internal.casting == nil
+      assert finished.internal.blackboard.pet.returning == :command
+    end
+
     test "returns to the saved Stay position after the commanded victim dies", %{pet: pet, target: target} do
       pet = pet |> PetBT.command(:stay, 0, 1_000) |> PetBT.command(:attack, target, 1_000)
       pet = %{pet | movement_block: %{pet.movement_block | position: {20.0, 2.0, 0.0, 0.0}}}
