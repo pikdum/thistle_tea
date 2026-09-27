@@ -23,6 +23,20 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
+  describe "visibility_metadata/1" do
+    test "projects civilian status for proximity acquisition" do
+      mob = %Mob{
+        object: %Object{entry: 1},
+        unit: %Unit{},
+        internal: %Internal{creature: %Creature{civilian?: true}}
+      }
+
+      assert Mob.visibility_metadata(mob).civilian?
+      mob = %{mob | internal: %{mob.internal | creature: %{mob.internal.creature | civilian?: false}}}
+      refute Mob.visibility_metadata(mob).civilian?
+    end
+  end
+
   describe "build/1" do
     test "projects drawn weapons and aura flags independently of database extra flags" do
       creature = %Mangos.Creature{

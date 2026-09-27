@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.Possession
+  alias ThistleTea.Game.Entity.Logic.Aggro
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Navigation, as: NavigationMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Confusion
@@ -36,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Server.FormationEnvironment
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.SpellReception
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Player.LiquidSpells
   alias ThistleTea.Game.Player.Movement, as: PlayerMovement
@@ -187,10 +189,13 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
 
   defp game_object_observation_radius(_entity), do: 0.0
 
+  defp base_observation_radius(%Mob{internal: %Internal{pet: %Pet{reaction_state: :aggressive}}} = entity),
+    do: max(@pet_observation_radius, Aggro.search_radius(entity))
+
   defp base_observation_radius(%Mob{internal: %Internal{pet: %Pet{}}}), do: @pet_observation_radius
   defp base_observation_radius(%Mob{internal: %Internal{totem: %Totem{}}}), do: @totem_observation_radius
   defp base_observation_radius(%Mob{internal: %Internal{in_combat: true}}), do: MobBT.combat_observation_radius()
-  defp base_observation_radius(%Mob{}), do: MobBT.max_aggro_radius()
+  defp base_observation_radius(%Mob{} = entity), do: max(MobBT.max_aggro_radius(), Aggro.search_radius(entity))
 
   defp waypoint_observation_radius(%Mob{} = entity) do
     entity
@@ -441,17 +446,32 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
 
   defp observe(entity, guid, now, line_of_sight_guids) do
     position = World.position(guid, now)
+    metadata = Metadata.get(guid)
 
     %Observation{
       guid: guid,
       position: position,
       grounded_position: World.grounded_target_position(guid, now),
       distance: distance(origin(entity), position),
-      metadata: Metadata.get(guid),
+      metadata: metadata,
+      controller_level: controller_level(metadata),
       swimmable?: swimmable_target?(entity, position),
       moving?: World.moving?(guid, now),
       line_of_sight?: line_of_sight?(entity, guid, line_of_sight_guids)
     }
+  end
+
+  defp controller_level(%{charmed_by: guid}) when is_integer(guid) and guid > 0, do: player_level(guid)
+  defp controller_level(%{owner_guid: guid}) when is_integer(guid) and guid > 0, do: player_level(guid)
+  defp controller_level(_metadata), do: nil
+
+  defp player_level(guid) do
+    if Guid.entity_type(guid) == :player do
+      case Metadata.query(guid, [:level]) do
+        %{level: level} when is_integer(level) -> level
+        _ -> nil
+      end
+    end
   end
 
   defp swimmable_target?(%Mob{} = entity, {%{map_id: map_id}, x, y, z}) do
@@ -486,6 +506,12 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   end
 
   defp nearby_line_of_sight_needed?(%Mob{internal: %Internal{totem: %Totem{}}}, _now), do: true
+
+  defp nearby_line_of_sight_needed?(
+         %Mob{internal: %Internal{pet: %Pet{reaction_state: :aggressive}, in_combat: in_combat}},
+         _now
+       )
+       when in_combat != true, do: true
 
   defp nearby_line_of_sight_needed?(
          %Mob{internal: %Internal{pet: nil, in_combat: false, blackboard: blackboard}} = entity,

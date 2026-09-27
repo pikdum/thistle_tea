@@ -8,6 +8,21 @@ defmodule ThistleTea.Game.World.AggroProbeTest do
   alias ThistleTea.Game.World.SpatialHash
 
   describe "notify_player_moved/4" do
+    test "uses the creature's published detect range modifier" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+      put_hostile_pair(player_guid, mob_guid, {15.0, 0.0, 0.0})
+      Metadata.update(mob_guid, %{detect_range_modifier: -10})
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+      refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+
+      Metadata.update(mob_guid, %{detect_range_modifier: 0})
+      AggroProbe.notify_player_moved(player_guid, 0, {3.0, 0.0, 0.0}, table)
+      assert_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
     test "taxi passengers do not attract mobs until they land" do
       table = table()
       player_guid = player_guid()

@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aggro
   alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Acquisition
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Formation, as: FormationMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Navigation, as: NavigationMemory
@@ -24,7 +25,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
   alias ThistleTea.Game.Entity.Logic.AI.BT.Critter, as: CritterBT
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Detection
   alias ThistleTea.Game.Entity.Logic.AI.BT.Distancing
   alias ThistleTea.Game.Entity.Logic.AI.BT.Fear, as: FearBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Flee
@@ -75,7 +75,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @deep_bounds_factor 0.5
   @distance_sqr_size_factor 1.0
 
-  @default_detection_range 20.0
   @max_db_detection_range 45.0
   @max_level_aggro_bonus 25
   @max_aggro_radius @max_db_detection_range + @max_level_aggro_bonus
@@ -317,7 +316,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   def try_aggro(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
     blackboard = Blackboard.put_next_at(blackboard, :next_aggro_at, @aggro_check_delay, now)
 
-    case pick_aggro_target(state, context) do
+    case Acquisition.nearest(state, context) do
       nil ->
         {:failure, state, blackboard}
 
@@ -328,78 +327,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp pick_aggro_target(%Mob{} = state, %Context{perception: perception} = context) do
-    if Hostility.can_initiate_attack?(perception_actor(state, perception)) do
-      state
-      |> nearby_aggro_candidates(context)
-      |> Enum.filter(fn {guid, distance} -> aggro_candidate?(state, guid, distance, context) end)
-      |> Enum.min_by(fn {_guid, distance} -> distance end, fn -> nil end)
-      |> case do
-        nil -> nil
-        {guid, _distance} -> guid
-      end
-    end
-  end
-
-  defp nearby_aggro_candidates(%Mob{} = state, %Context{perception: perception}) do
-    radius = detection_range(state) + @max_level_aggro_bonus
-    Perception.nearby(perception, :players, radius) ++ Perception.nearby(perception, :mobs, radius)
-  end
-
-  defp aggro_candidate?(%Mob{} = state, guid, distance, %Context{perception: perception} = context)
-       when is_integer(guid) and is_number(distance) do
-    Hostility.valid_hostile_target?(
-      perception_actor(state, perception),
-      perception_target(perception, guid)
-    ) and
-      distance <= aggro_radius(state, guid, perception) and
-      CreatureMovement.accessible?(state, Perception.swimmable?(perception, guid)) and
-      Detection.detectable?(state, guid, context) and
-      Perception.line_of_sight?(perception, guid)
-  end
-
-  defp aggro_candidate?(_state, _guid, _distance, %Context{}), do: false
-
-  defp perception_target(perception, guid) do
-    Perception.actor(perception, guid)
-  end
-
   defp perception_actor(%Mob{object: %{guid: guid}}, perception) do
     Perception.actor(perception, guid)
   end
 
-  defp aggro_radius(%Mob{unit: %Unit{level: level}} = state, target_guid, perception)
-       when is_integer(level) and is_integer(target_guid) do
-    aggro_radius_for(detection_range(state), level, target_level(target_guid, perception), detect_range_modifier(state))
-  end
-
-  defp aggro_radius(%Mob{} = state, _target_guid, _perception), do: detection_range(state)
-
   defdelegate aggro_radius_for(detection_range, level, target_level, modifier \\ 0), to: Aggro, as: :radius_for
 
-  def detection_range(%Mob{internal: %Internal{creature: %Creature{detection_range: range}}}) when is_number(range) do
-    range
-  end
-
-  def detection_range(%{detection_range: range}) when is_number(range), do: range
-
-  def detection_range(_state), do: @default_detection_range
-
-  defp detect_range_modifier(%Mob{} = state) do
-    state
-    |> AuraLogic.auras_of_type(:mod_detect_range)
-    |> Enum.reduce(0, fn
-      %{amount: amount}, acc when is_integer(amount) -> acc + amount
-      _aura, acc -> acc
-    end)
-  end
-
-  defp target_level(guid, perception) when is_integer(guid) do
-    case Perception.metadata(perception, guid) do
-      %{level: level} when is_integer(level) -> level
-      _ -> 1
-    end
-  end
+  defdelegate detection_range(entity), to: Aggro
 
   defp apply_aggro(%Mob{} = state, target_guid, now, %Context{} = context) do
     %Engagement.Result{entity: state} =
@@ -559,7 +493,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     UnreachableTarget.expired?(state, blackboard, now) or
       Core.should_tether?(state, now,
         shared_time: context.shared_leash_time,
-        attack_distance: aggro_radius(state, target, perception),
+        attack_distance: Acquisition.radius(state, target, perception),
         victim_position: Perception.position(perception, target)
       )
   end

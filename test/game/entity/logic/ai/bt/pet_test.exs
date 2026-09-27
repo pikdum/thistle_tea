@@ -66,10 +66,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.PetTest do
         neutral_guid => %Observation{guid: neutral_guid, metadata: %{faction_template: neutral, alive?: true}},
         obstructed_guid => %Observation{
           guid: obstructed_guid,
+          position: {world(), 2.0, 2.0, 0.0},
+          distance: 2.0,
           metadata: %{faction_template: enemy, alive?: true},
           line_of_sight?: false
         },
-        player_guid => %Observation{guid: player_guid, metadata: %{faction_template: enemy, alive?: true, pvp?: true}}
+        player_guid => %Observation{
+          guid: player_guid,
+          position: {world(), 3.0, 2.0, 0.0},
+          distance: 3.0,
+          metadata: %{faction_template: enemy, alive?: true, pvp?: true}
+        }
       }
 
       perception =

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Acquisition
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Confusion
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
@@ -22,7 +23,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
-  alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Time
 
@@ -135,18 +135,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   defp aggressive?(%Mob{internal: %Internal{pet: %Pet{reaction_state: :aggressive}}}, _blackboard), do: true
   defp aggressive?(_state, _blackboard), do: false
 
-  defp acquire_aggressive_target(state, blackboard, %Context{now: now, perception: perception}) do
-    target_guid =
-      [:mobs, :players]
-      |> Enum.flat_map(&Perception.nearby(perception, &1, 20.0))
-      |> Enum.sort_by(&elem(&1, 1))
-      |> Enum.find_value(fn {guid, _distance} ->
-        source = Perception.actor(perception, state.object.guid)
-        target = Perception.actor(perception, guid)
-        if Hostility.valid_hostile_target?(source, target) and Perception.line_of_sight?(perception, guid), do: guid
-      end)
-
-    case target_guid do
+  defp acquire_aggressive_target(state, blackboard, %Context{now: now} = context) do
+    case Acquisition.nearest(state, context) do
       guid when is_integer(guid) ->
         %Engagement.Result{entity: state} = Engagement.enter(state, guid, now, selection: :target)
         {:success, state, blackboard}

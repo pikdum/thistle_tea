@@ -65,6 +65,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception do
     end
   end
 
+  def aggro_level(%__MODULE__{} = perception, guid) do
+    case observation(perception, guid) do
+      %Observation{controller_level: level} when is_integer(level) -> level
+      %Observation{metadata: %{level: level}} when is_integer(level) -> level
+      _ -> 1
+    end
+  end
+
   def entry(%__MODULE__{} = perception, guid) do
     case metadata(perception, guid) do
       %{entry: entry} when is_integer(entry) -> entry

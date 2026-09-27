@@ -53,6 +53,60 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   end
 
   describe "context/3" do
+    test "aggressive pets observe and check sight beyond twenty yards" do
+      world = WorldRef.open(999)
+      target_guid = Guid.from_low_guid(:mob, 1, 98_200)
+      put_actor(:mobs, target_guid, world, 30.0)
+      on_exit(fn -> remove_actor(:mobs, target_guid) end)
+      tracer = start_line_of_sight_trace()
+      entity = mob(world)
+
+      entity = %{
+        entity
+        | internal: %{
+            entity.internal
+            | pet: %Internal.Pet{kind: :guardian, reaction_state: :aggressive},
+              creature: %Creature{detection_range: 20.0}
+          }
+      }
+
+      perception = AIEnvironment.context(entity, 1_000).perception
+      assert Perception.nearby(perception, :mobs, 45.0) == [{target_guid, 30.0}]
+      assert line_of_sight_call_count(tracer) == 1
+    end
+
+    test "snapshots the current player controller level without replacing creature level" do
+      world = WorldRef.open(999)
+      target_guid = Guid.from_low_guid(:mob, 1, 98_201)
+      owner_guid = Guid.from_low_guid(:player, 98_202)
+      charmer_guid = Guid.from_low_guid(:player, 98_203)
+      put_actor(:mobs, target_guid, world, 10.0)
+      Metadata.update(target_guid, %{owner_guid: owner_guid})
+      Metadata.put(owner_guid, %{level: 60})
+      Metadata.put(charmer_guid, %{level: 40})
+
+      on_exit(fn ->
+        remove_actor(:mobs, target_guid)
+        Metadata.delete(owner_guid)
+        Metadata.delete(charmer_guid)
+      end)
+
+      entity = mob(world)
+      owned = AIEnvironment.context(entity, 1_000).perception
+      assert Perception.aggro_level(owned, target_guid) == 60
+      assert Perception.metadata(owned, target_guid).level == 10
+
+      Metadata.update(target_guid, %{charmed_by: charmer_guid})
+      charmed = AIEnvironment.context(entity, 2_000).perception
+      assert Perception.aggro_level(charmed, target_guid) == 40
+      assert Perception.aggro_level(owned, target_guid) == 60
+
+      Metadata.update(charmer_guid, %{level: 41})
+      assert Perception.aggro_level(AIEnvironment.context(entity, 3_000).perception, target_guid) == 41
+      Metadata.delete(charmer_guid)
+      assert Perception.aggro_level(AIEnvironment.context(entity, 4_000).perception, target_guid) == 10
+    end
+
     @tag :namigator_maps
     test "prepares random movement regions for EventAI and explicit script continuations" do
       world = WorldRef.open(1)

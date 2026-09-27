@@ -317,6 +317,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       spirit_service?: ((unit.npc_flags || 0) &&& @npc_flag_spirit_service) != 0,
       ghost_visible?: ((creature.type_flags || 0) &&& @creature_type_flag_ghost_visible) != 0,
       creature_type: creature.creature_type,
+      civilian?: creature.civilian?,
       pickpocket_id: if(loot, do: loot.pickpocket_id),
       skinning_id: if(loot, do: loot.skinning_id),
       skinned?: loot && loot.skinned?,

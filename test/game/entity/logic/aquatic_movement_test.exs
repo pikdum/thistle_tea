@@ -26,11 +26,11 @@ defmodule ThistleTea.Game.Entity.Logic.AquaticMovementTest do
   describe "try_aggro/3" do
     test "fish aggro swimmers while ignoring equally close dry targets", %{fish: fish} do
       idle = %{fish | unit: %{fish.unit | target: 0}, internal: %{fish.internal | in_combat: false, threat: %{}}}
-      dry = context(fish, 1_000, false)
+      dry = context(fish, 1_000, false, -18.0)
       assert {:failure, ignored, _} = MobBT.try_aggro(idle, Blackboard.new(), dry)
       refute ignored.internal.in_combat
 
-      assert {:failure, engaged, _} = MobBT.try_aggro(idle, Blackboard.new(), context(fish, 1_000, true))
+      assert {:failure, engaged, _} = MobBT.try_aggro(idle, Blackboard.new(), context(fish, 1_000, true, -18.0))
       assert engaged.unit.target == 7
       assert engaged.internal.in_combat
     end

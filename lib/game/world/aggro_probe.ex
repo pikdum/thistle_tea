@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.AggroProbe do
   Movement-triggered aggro probes for nearby idle mobs.
   """
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Logic.Aggro
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.StealthDetection
@@ -93,6 +94,7 @@ defmodule ThistleTea.Game.World.AggroProbe do
         :unit_flags,
         :level,
         :detection_range,
+        :detect_range_modifier,
         :proximity_aggro?,
         :invisibility,
         :invisibility_detection,
@@ -110,7 +112,7 @@ defmodule ThistleTea.Game.World.AggroProbe do
        when is_integer(level) and is_integer(player_level) do
     Hostility.can_initiate_attack?(mob) and
       Hostility.valid_hostile_target?(mob, player) and
-      distance <= MobBT.aggro_radius_for(MobBT.detection_range(mob), level, player_level) and
+      distance <= Aggro.radius(mob, player_level) and
       StealthDetection.detectable?(mob, player, distance, Time.now())
   end
 
