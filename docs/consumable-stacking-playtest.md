@@ -18,9 +18,11 @@ the later battle/guardian restrictions.
 Reference: VMangos `8f4e608450460efe1e38743e4da74397d4773a3a`,
 `src/game/Spells/SpellEntry.cpp` `GetSpellSpecific`, `SpellEntry.h`
 `IsSingleFromSpellSpecificPerTarget`, `SpellMgr.h` `GetSpellElixirSpecific`,
-and `Objects/Unit.cpp` aura replacement. Some named food bonuses, such as
-Grilled Squid's Increased Agility, lack the reference's Well Fed classification
-and keep their existing stacking behavior.
+and `Objects/Unit.cpp` aura replacement. At this acceptance commit, named
+food bonuses such as Grilled Squid's Increased Agility lacked the Well Fed
+classification and retained their existing stacking behavior. The subsequent
+[explicit spell group implementation](spell-groups-playtest.md) supplies
+their exclusivity rules and verifies Grilled Squid replacement natively.
 
 ## Native acceptance
 
