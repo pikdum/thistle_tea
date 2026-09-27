@@ -303,7 +303,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
       despawn_delay_ms: summon_duration(spell),
       despawn_type: 1,
       run?: false,
-      unique?: true,
+      unique?: false,
       attack_target: nil,
       script_id: 0,
       post_spawn_spells: [],

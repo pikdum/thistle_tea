@@ -16,7 +16,12 @@ defmodule ThistleTea.Game.Entity.Server.WildSummonTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Passive
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
+  alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.Stats
+  alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
@@ -77,6 +82,34 @@ defmodule ThistleTea.Game.Entity.Server.WildSummonTest do
   end
 
   describe "EventSink.emit/3" do
+    test "possessed spell summons retain separate owners without script proximity limits", %{caster: caster} do
+      second_guid = System.unique_integer([:positive]) + 22_000_000
+      Entity.register(second_guid)
+      second = %{caster | object: %Object{guid: second_guid}}
+
+      spell = %Spell{
+        id: 126,
+        duration_ms: 45_000,
+        effects: [%Effect{type: :summon_possessed, misc_value: 990_211, implicit_target_a: :minion_position}]
+      }
+
+      guids =
+        for owner <- [caster, second] do
+          context = %{CastContext.from_caster(owner, spell, owner.object.guid) | destination_position: {2.0, 3.0, 0.0}}
+          {_, [request]} = SpellEffect.receive(owner, context, spell, 1_000)
+          assert EventSink.emit(owner, request) == owner
+          assert_receive %Attachment{kind: :possession, entity_ref: %{guid: guid, spell_id: 126}, pid: pid}
+          summoned = :sys.get_state(pid)
+          assert summoned.unit.charmed_by == owner.object.guid
+          assert summoned.internal.pet.owner_guid == owner.object.guid
+          assert summoned.movement_block.position == {2.0, 3.0, 0.0, 0.0}
+          guid
+        end
+
+      assert length(Enum.uniq(guids)) == 2
+      assert Enum.all?(guids, &Entity.online?/1)
+    end
+
     test "repeated casts create independent actors without replacing companions", %{caster: caster} do
       effect = %{request() | count: 2}
       assert EventSink.emit(caster, effect) == caster
