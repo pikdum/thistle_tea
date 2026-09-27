@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.OpenLockTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Gathering
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot, as: InternalLoot
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Trap
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.GameObject
@@ -26,6 +27,19 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.OpenLockTest do
   setup [:vein]
 
   describe "open/5" do
+    test "disarming produces no activation, loot, viewer, or skill gain", %{state: state} do
+      state = %{state | internal: %{state.internal | loot: nil, trap: %Trap{charges: 1}}}
+      opened = %OpenLock{lock_id: 38, lock_type: 4}
+      assert {{:ok, :disarmed, false}, disarmed} = ObjectLock.open(state, @actor, opened, false, owner_pid: self())
+      assert disarmed.internal.gathering.viewer_monitors == %{}
+      assert disarmed.internal.gathering.skilled_players == MapSet.new()
+
+      depleted = %{state | internal: %{state.internal | trap: %Trap{depleted?: true}}}
+      assert {{:error, :bad_targets}, ^depleted} = ObjectLock.open(depleted, @actor, opened, false)
+      assert {{:error, :out_of_range}, ^state} = ObjectLock.open(state, %{@actor | distance: 6.0}, opened, false)
+      assert {{:error, :bad_targets}, ^state} = ObjectLock.open(state, @actor, %{opened | lock_id: 12}, false)
+    end
+
     test "direct loot and concurrent opens cannot bypass access", %{state: state} do
       assert {{:error, :locked}, ^state} = Chest.view(state, @actor)
       assert {{:error, :locked}, ^state} = Chest.reserve_item(state, @actor, 0, self())

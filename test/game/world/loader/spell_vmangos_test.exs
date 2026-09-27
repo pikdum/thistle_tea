@@ -18,6 +18,14 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
   @moduletag :dbc_db
 
   describe "owned game object slots" do
+    test "Detect Traps supplies its distinct detection type and Disarm Trap opens trap locks" do
+      detection = SpellLoader.load(2836)
+      assert Enum.any?(detection.effects, &match?(%Effect{aura: :mod_invisibility_detect, misc_value: 3}, &1))
+      disarm = SpellLoader.load(1842)
+      assert [%Effect{type: :open_lock, misc_value: 4}] = disarm.effects
+      assert Spell.attribute?(disarm, :allow_while_stealthed)
+    end
+
     test "loads trap and legacy standard slots independently of totem slots" do
       for {id, slot, entry} <- [{1499, 1, 2561}, {22_996, 2, 179_604}, {23_005, 2, 179_624}] do
         assert [%Effect{type: :summon_game_object, summon_slot: ^slot, misc_value: ^entry}] =

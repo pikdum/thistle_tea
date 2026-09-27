@@ -169,6 +169,7 @@ defmodule ThistleTea.Game.Player.Gathering do
   end
 
   defp project(state, guid, :activate), do: GameObjects.open_object(state, guid)
+  defp project(state, _guid, :disarmed), do: state
 
   defp project(state, guid, loot) do
     state = Quests.credit_entity_interaction(state, guid)

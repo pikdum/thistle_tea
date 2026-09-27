@@ -14,6 +14,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObjectSummonsTest do
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Loot.Actor
+  alias ThistleTea.Game.Entity.Logic.OpenLock
   alias ThistleTea.Game.Entity.Server.GameObjectSummons
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Entity.Server.Player
@@ -74,6 +76,27 @@ defmodule ThistleTea.Game.Entity.Server.GameObjectSummonsTest do
       assert Metadata.get(entry.guid) == nil
       assert {:noreply, state} = Player.handle_info(down, %State{character: caster, game_object_monitors: monitors})
       assert state.game_object_monitors == %{}
+    end
+
+    test "disarming releases the owner's slot without activating the trap", %{caster: caster} do
+      effect = %{request(caster, 1) | entry: 950_105}
+      monitors = GameObjectSummons.summon(caster, %{}, effect, Context.new(self()))
+      [{token, entry}] = Map.to_list(monitors)
+      actor = %Actor{guid: 43, group_id: nil, needed_items: MapSet.new(), distance: 4.0}
+      assert Metadata.get(entry.guid).go_trap_stealthed?
+      assert Metadata.get(entry.guid).owner_guid == caster.object.guid
+
+      assert Entity.call(entry.guid, {:open_lock, actor, %OpenLock{lock_id: 12, lock_type: 4}, false}) ==
+               {:ok, :disarmed, false}
+
+      assert_receive {:game_object_down, ^token, :process, _, _} = down, 1_000
+      assert Entity.pid(entry.guid) == nil
+      assert World.position(entry.guid) == nil
+      assert Metadata.get(entry.guid) == nil
+      state = %State{character: caster, game_object_monitors: monitors}
+      assert {:noreply, state} = Player.handle_info(down, state)
+      assert state.game_object_monitors == %{}
+      refute_receive {:receive_spell, _, _}
     end
 
     test "keeps objects on death and removes them when a creature's corpse leaves", %{caster: caster} do
@@ -269,7 +292,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObjectSummonsTest do
 
     trap = %GameObjectTemplate{entry: 950_103, type: 6, size: 1.0, flags: 0, faction: 0, data: [0, 0, 0, 0, 1, 0, 0, 0]}
     ritual = %GameObjectTemplate{entry: 950_104, type: 18, size: 1.0, flags: 0, faction: 0, data: [2, 0, 0, 1]}
-    for template <- [plain, chest, trap, ritual], do: TemplateLoader.put(template)
+    hidden = %{trap | entry: 950_105, data: [12, 0, 0, 0, 1, 0, 0, 0, 0, 1]}
+    for template <- [plain, chest, trap, ritual, hidden], do: TemplateLoader.put(template)
 
     caster = %Character{
       object: %Object{guid: 42},
@@ -281,7 +305,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObjectSummonsTest do
 
     on_exit(fn ->
       for {guid, _} <- World.nearby_game_objects(caster, 100), do: World.stop_entity(guid)
-      for template <- [plain, chest, trap, ritual], do: :ets.delete(TemplateLoader, template.entry)
+      for template <- [plain, chest, trap, ritual, hidden], do: :ets.delete(TemplateLoader, template.entry)
       Metadata.delete(caster.object.guid)
     end)
 

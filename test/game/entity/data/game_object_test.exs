@@ -89,7 +89,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTest do
     end
 
     test "hunter trap templates retain their trigger definition" do
-      data = [12, 0, 5, 13_797, 1, 0, 0, 0] ++ List.duplicate(0, 16)
+      data = [12, 0, 5, 13_797, 1, 0, 0, 0, 0, 1] ++ List.duplicate(0, 14)
 
       template = %GameObjectTemplate{
         entry: 164_638,
@@ -108,6 +108,8 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTest do
       assert trap.internal.trap.spell_id == 13_797
       assert trap.internal.trap.radius == 2.5
       assert trap.internal.trap.charges == 1
+      assert trap.internal.trap.stealthed?
+      assert trap.internal.gathering.lock_id == 12
     end
 
     test "summoning ritual templates retain target and participant data" do
@@ -160,6 +162,27 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTest do
       assert portal.internal.ritual.caster_target_spell_id == 20_625
       assert portal.internal.ritual.caster_target_spell_targets == 1
       assert portal.internal.ritual.casters_grouped?
+    end
+  end
+
+  describe "build/1" do
+    test "static traps retain their spawn's respawn delay and stealth flag" do
+      row = %Mangos.GameObject{
+        guid: 1,
+        id: 2,
+        map: 0,
+        spawntimesecsmin: 90,
+        orientation: 0.0,
+        position_x: 0.0,
+        position_y: 0.0,
+        position_z: 0.0,
+        game_object_template: %Mangos.GameObjectTemplate{entry: 2, type: 6, data0: 12, data9: 1}
+      }
+
+      object = GameObject.build(row)
+      assert object.internal.spawn.respawn_delay_ms == 90_000
+      assert object.internal.trap.stealthed?
+      assert object.internal.gathering.lock_id == 12
     end
   end
 

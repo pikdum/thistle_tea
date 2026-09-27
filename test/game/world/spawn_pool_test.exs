@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.Loot.Actor
+  alias ThistleTea.Game.Entity.Logic.OpenLock
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World
@@ -20,6 +22,39 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
   alias ThistleTea.Game.WorldRef
 
   describe "singleton lifecycle" do
+    test "disarmed and triggered static traps respawn through their pool with fresh state" do
+      {guid, group, world, _key, cell} = singleton_fixture()
+      blueprint = game_object(guid)
+
+      blueprint = %{
+        blueprint
+        | internal: %{
+            blueprint.internal
+            | trap: %Internal.Trap{charges: 1, radius: 0, start_delay_ms: 0},
+              gathering: %Internal.Gathering{lock_id: 12},
+              spawn: %Internal.Spawn{respawn_delay_ms: 300}
+          }
+      }
+
+      on_exit(fn -> SpawnPool.stop_world(world) end)
+      :ok = SpawnPool.activate(group, cell, blueprint)
+      first = await_entity(guid)
+      actor = %Actor{guid: 42, group_id: nil, needed_items: MapSet.new(), distance: 4.0}
+
+      assert Entity.call(guid, {:open_lock, actor, %OpenLock{lock_id: 12, lock_type: 4}, false}) ==
+               {:ok, :disarmed, false}
+
+      await_absent(guid)
+      assert Metadata.get(guid) == nil
+      replacement = await_replacement(guid, first)
+      refute :sys.get_state(replacement).internal.trap.depleted?
+      assert :sys.get_state(replacement).internal.gathering.opened_by == %{}
+      send(replacement, {:script_activate_object, actor.guid})
+      await_absent(guid)
+      triggered = await_replacement(guid, replacement)
+      refute :sys.get_state(triggered).internal.trap.depleted?
+    end
+
     test "battleground ownership gates first activation, refresh, and delayed reactivation" do
       db_guid = 8_000_000 + System.unique_integer([:positive])
       guid = Guid.from_low_guid(:game_object, 1, db_guid)

@@ -291,7 +291,21 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   def handle_call({:open_lock, %Actor{} = actor, opened, gain?}, {owner_pid, _tag}, %GameObject{} = state) do
     {result, state} = __MODULE__.OpenLock.open(state, actor, opened, gain?, owner_pid: owner_pid)
-    if match?({:ok, _, _}, result) and is_nil(state.internal.goober), do: trigger_linked_objects(state, actor.guid)
+
+    state =
+      case result do
+        {:ok, :disarmed, _gained?} ->
+          {:noreply, state} = deplete_trap(state)
+          state
+
+        {:ok, _, _} when is_nil(state.internal.goober) ->
+          trigger_linked_objects(state, actor.guid)
+          state
+
+        _ ->
+          state
+      end
+
     {:reply, result, state}
   rescue
     error ->
@@ -745,13 +759,27 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
     case TrapServer.consume(trap) do
       :depleted ->
-        state = %{state | internal: %{state.internal | trap: %{trap | depleted?: true}}}
-        despawn(state)
+        deplete_trap(state)
 
       %Trap{} = remaining ->
         if remaining.radius > 0, do: Process.send_after(self(), :trap_tick, remaining.cooldown_ms)
         remaining = %{remaining | ready_at: now + remaining.cooldown_ms}
         {:noreply, %{state | internal: %{state.internal | trap: remaining}}}
+    end
+  end
+
+  defp deplete_trap(%GameObject{internal: %{trap: %Trap{} = trap}} = state) do
+    state = %{state | internal: %{state.internal | trap: %{trap | depleted?: true}}}
+
+    result =
+      case state.internal.spawn do
+        %Internal.Spawn{respawn_delay_ms: delay} when is_integer(delay) and delay > 0 -> SpawnPool.suspend(state, delay)
+        _ -> SpawnPool.recycle(state)
+      end
+
+    case result do
+      :pooled -> {:noreply, state}
+      :unpooled -> despawn(state)
     end
   end
 
@@ -832,6 +860,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
         db_guid: GameObject.db_guid(state),
         go_spawned?: spawned?,
         go_state: state.game_object.state,
+        owner_guid: state.game_object.created_by,
+        go_trap_stealthed?: match?(%Trap{stealthed?: true}, state.internal.trap),
         go_lock_override: state.internal.object_action.lock_override
       })
 

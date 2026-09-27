@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Trap do
     :ready_at,
     level: 0,
     cooldown_ms: 4_000,
+    stealthed?: false,
     depleted?: false
   ]
 end

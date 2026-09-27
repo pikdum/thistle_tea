@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.OpenLock do
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Entity.Data.Component.Internal.Gathering, as: GatheringState
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Trap
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Logic.Gathering
   alias ThistleTea.Game.Entity.Logic.Loot
@@ -23,7 +24,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.OpenLock do
       gathering = %{gathering | opened_by: Map.put(gathering.opened_by, actor.guid, opened), skilled_players: players}
       updated = %{state | internal: %{state.internal | gathering: gathering}}
 
-      case content(updated, actor) do
+      case content(updated, actor, opened) do
         {{:ok, content}, updated} ->
           {{:ok, content, gained?}, monitor_viewer(updated, actor, content, opts)}
 
@@ -53,7 +54,10 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.OpenLock do
 
   defp monitor_viewer(state, _actor, _content, _opts), do: state
 
-  defp content(state, actor) do
+  defp content(%GameObject{internal: %{trap: %Trap{}}} = state, _actor, %OpenLock{lock_type: 4}),
+    do: {{:ok, :disarmed}, state}
+
+  defp content(state, actor, _opened) do
     if Chest.lootable?(state), do: Chest.view(state, actor), else: {{:ok, :activate}, state}
   end
 
@@ -68,6 +72,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.OpenLock do
 
   defp validate_open(_state, _actor, _opened), do: {:error, :bad_targets}
 
+  defp removed?(%GameObject{internal: %{trap: %Trap{depleted?: true}}}), do: true
   defp removed?(%GameObject{internal: %{loot: %{corpse_removed?: true}}}), do: true
   defp removed?(_state), do: false
 

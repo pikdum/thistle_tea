@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.World.Visibility do
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility.Filter
+  alias ThistleTea.Game.World.Visibility.GameObjects
   alias ThistleTea.Game.World.Visibility.QuestGivers
   alias ThistleTea.Game.WorldRef
 
@@ -121,6 +122,7 @@ defmodule ThistleTea.Game.World.Visibility do
     |> Map.put(:visibility_cells, nil)
     |> Map.put(:player_guids, [])
     |> Map.put(:mob_guids, [])
+    |> put_game_objects([])
     |> Map.put(:tracked_entities, MapSet.new())
   end
 
@@ -272,6 +274,7 @@ defmodule ThistleTea.Game.World.Visibility do
         meta = Metadata.get(guid) || %{}
 
         Filter.can_see?(ghost?, type, meta, distance) and
+          GameObjects.can_see?(character, guid, meta) and
           (owned_or_grouped?(character.object.guid, guid, meta) or detectable?(character, guid, meta))
 
       _missing ->
@@ -283,12 +286,19 @@ defmodule ThistleTea.Game.World.Visibility do
       when is_reference(ref) do
     (Map.get(state, :player_guids, []) ++ Map.get(state, :mob_guids, []))
     |> Enum.filter(&match?(%{stealthed?: true}, Metadata.get(&1)))
+    |> Kernel.++(stealthed_traps(state))
     |> Enum.reduce(state, &reevaluate_entity(&2, &1))
     |> QuestGivers.refresh()
     |> schedule_stealth_detection()
   end
 
   def stealth_detection_tick(state, _ref), do: state
+
+  defp stealthed_traps(state) do
+    state
+    |> Map.get(:game_object_guids, [])
+    |> Enum.filter(&match?(%{go_trap_stealthed?: true}, Metadata.get(&1)))
+  end
 
   def schedule_stealth_detection(%{visibility_cells: %MapSet{}} = state) do
     ref = :erlang.start_timer(@stealth_detection_ms, self(), :stealth_detection)
@@ -504,6 +514,7 @@ defmodule ThistleTea.Game.World.Visibility do
     state
     |> Map.put(:player_guids, guids_for(visible, :player))
     |> Map.put(:mob_guids, guids_for(visible, :mob))
+    |> put_game_objects(guids_for(visible, :game_object))
   end
 
   defp add_to_entity_lists(state, %{guid: guid, type: :player}) do
@@ -513,6 +524,9 @@ defmodule ThistleTea.Game.World.Visibility do
   defp add_to_entity_lists(state, %{guid: guid, type: :mob}) do
     Map.update(state, :mob_guids, [guid], &Enum.uniq([guid | &1]))
   end
+
+  defp add_to_entity_lists(state, %{guid: guid, type: :game_object}),
+    do: put_game_objects(state, Enum.uniq([guid | Map.get(state, :game_object_guids, [])]))
 
   defp add_to_entity_lists(state, _meta), do: state
 
@@ -524,7 +538,13 @@ defmodule ThistleTea.Game.World.Visibility do
     Map.update(state, :mob_guids, [], &List.delete(&1, guid))
   end
 
+  defp remove_from_entity_lists(state, guid, :game_object),
+    do: put_game_objects(state, List.delete(Map.get(state, :game_object_guids, []), guid))
+
   defp remove_from_entity_lists(state, _guid, _type), do: state
+
+  defp put_game_objects(%State{} = state, guids), do: %{state | game_object_guids: guids}
+  defp put_game_objects(state, guids), do: Map.put(state, :game_object_guids, guids)
 
   defp guids_for(visible, type) do
     visible

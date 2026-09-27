@@ -131,6 +131,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
       radius: trap_radius(template),
       spell_id: Enum.at(data, 3),
       charges: max(Enum.at(data, 4) || 0, 0),
+      stealthed?: enabled?(Enum.at(data, 9)),
       start_delay_ms: max(Enum.at(data, 7) || 0, 0) * 1_000,
       cooldown_ms: max(Enum.at(data, 5) || 0, 0) |> then(&if(&1 == 0, do: 4_000, else: &1 * 1_000))
     }
@@ -232,7 +233,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
         loot: chest_loot(ot),
         gathering: gathering(template),
         trap: trap(template, nil),
-        spawn: chest_spawn(ot, o)
+        spawn: object_spawn(ot, o)
       }
     }
   end
@@ -391,13 +392,13 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
 
   defp fishing_hole(_template), do: nil
 
-  defp chest_spawn(%Mangos.GameObjectTemplate{type: type}, %Mangos.GameObject{} = o)
-       when type in [@go_type_chest, @go_type_fishing_hole, 10] do
+  defp object_spawn(%Mangos.GameObjectTemplate{type: type}, %Mangos.GameObject{} = o)
+       when type in [@go_type_chest, @go_type_fishing_hole, @go_type_trap, 10] do
     case o.spawntimesecsmin do
       seconds when is_integer(seconds) and seconds > 0 -> %Internal.Spawn{respawn_delay_ms: seconds * 1000}
       _instant -> nil
     end
   end
 
-  defp chest_spawn(_template, _row), do: nil
+  defp object_spawn(_template, _row), do: nil
 end
