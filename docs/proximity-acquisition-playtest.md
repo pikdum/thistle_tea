@@ -33,7 +33,7 @@ in `PetAI`; `GetDistanceZ` subtracts both bounding radii.
 | Scenario | Observed result |
 | --- | --- |
 | Explosive Sheep, level 30, summoned through item 4384 | Acquired a Prairie Wolf Alpha about 35.7 yards away, chased it, detonated, and killed it. The guardian reached zero health and cleared combat, then disappeared from its registry, world position, and metadata. |
-| Hunter pet, level 49, on passive/Stay | Stayed idle with a live Defias Thug 36.45 yards away. Native `PetAggressiveMode()` selected that enemy without an Attack command. Stay kept the pet in place; passive/follow cleared combat and returned it to the owner. |
+| Hunter pet, level 49, on passive/Stay | The original run selected a Defias Thug 36.45 yards away after `PetAggressiveMode()`, while Stay kept the pet stationary. Follow-up reference review identified that selection as a bug: Stay should permit automatic attacks only within melee reach. Fixed in `c616a49a` and revalidated in [pet targeting acceptance](pet-targeting-playtest.md). |
 | Aggressive hunter pet near Vharr | Stayed idle for 20 observations over 10 seconds, at 20 yards from a hostile, visible level-40 civilian. Target remained zero and combat stayed false. |
 | Explicit `PetAttack()` against Vharr | Entered combat with command state `:attack`; Vharr's health fell from 1,753 to 1,515 during the observation window. The client displayed the reduced health and Vharr targeting the pet. |
 | Aggressive hunter pet below an elevated Defias Thug | Stayed idle for 20 observations over 10 seconds despite hostility and clear line of sight. Pet height was 69.685; enemy height was 79.9976, with 10 yards of horizontal separation. |
