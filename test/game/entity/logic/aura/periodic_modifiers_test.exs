@@ -50,15 +50,45 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PeriodicModifiersTest do
       end
     end
 
-    test "refresh preserves the pending tick while adopting the new cadence", %{caster: caster} do
+    test "refresh restarts the interval with the new cadence", %{caster: caster} do
       spell = spell()
       {target, _events} = AuraLogic.apply_spell(target(), CastContext.from_caster(caster, spell, 2), spell, 1_000)
       untalented = %{caster | unit: %{caster.unit | auras: []}}
       {target, _events} = AuraLogic.apply_spell(target, CastContext.from_caster(untalented, spell, 2), spell, 2_000)
-      assert [%Holder{auras: [%Aura{amplitude_ms: 4_000, next_tick_at: 3_000}]}] = target.unit.auras
-      {target, events} = AuraLogic.tick(target, 3_000)
+      assert [%Holder{auras: [%Aura{amplitude_ms: 4_000, next_tick_at: 6_000}]}] = target.unit.auras
+      assert {^target, []} = AuraLogic.tick(target, 3_000)
+      {target, events} = AuraLogic.tick(target, 6_000)
       assert trigger_count(events) == 1
-      assert AuraLogic.next_event_at(target) == 7_000
+      assert AuraLogic.next_event_at(target) == 10_000
+    end
+
+    test "reference exceptions retain their pending tick while resetting their count", %{caster: caster} do
+      spells =
+        Enum.map(
+          [8145, 6474, 8179, 8172, 8167, 8515, 10_609, 10_612, 13_797, 14_298, 14_299, 14_300, 14_301, 23_184, 25_041],
+          &%{spell() | id: &1}
+        ) ++ [%{spell() | spell_visual: 0, spell_icon: 689}]
+
+      for spell <- spells do
+        {target, _events} = AuraLogic.apply_spell(target(), CastContext.from_caster(caster, spell, 2), spell, 1_000)
+        {target, _events} = AuraLogic.tick(target, 3_000)
+        at = AuraLogic.next_event_at(target)
+        {target, _events} = AuraLogic.apply_spell(target, CastContext.from_caster(caster, spell, 2), spell, 3_500)
+        assert AuraLogic.next_event_at(target) == at
+        assert [%Holder{auras: [%Aura{tick_count: 0}]}] = target.unit.auras
+      end
+    end
+
+    test "adding stacks retains both the pending tick and executed count", %{caster: caster} do
+      spell = %{spell() | stack_amount: 3}
+      context = CastContext.from_caster(caster, spell, 2)
+      {target, _events} = AuraLogic.apply_spell(target(), context, spell, 1_000)
+      {target, _events} = AuraLogic.tick(target, 3_000)
+      {target, _events} = AuraLogic.apply_spell(target, context, spell, 3_500)
+      assert [%Holder{stacks: 2, auras: [%Aura{next_tick_at: 5_000, tick_count: 1}]}] = target.unit.auras
+      {target, events} = AuraLogic.tick(target, 5_000)
+      assert trigger_count(events) == 1
+      assert [%Holder{auras: [%Aura{tick_count: 2}]}] = target.unit.auras
     end
 
     test "immediate pulses keep their initial tick and use the modified cadence afterward", %{caster: caster} do

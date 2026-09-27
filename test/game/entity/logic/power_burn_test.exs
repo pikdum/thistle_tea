@@ -164,16 +164,16 @@ defmodule ThistleTea.Game.Entity.Logic.PowerBurnTest do
       assert Aura.next_event_at(entity) == 2_100
     end
 
-    test "refresh preserves the pending tick and removal clears it", %{entity: entity, context: context} do
+    test "refresh restarts the interval and removal clears it", %{entity: entity, context: context} do
       spell = burn_spell(:apply_aura)
       {entity, _} = Aura.apply_spell(entity, context, spell, 100)
       {entity, _} = Aura.apply_spell(entity, context, spell, 500)
       assert length(entity.unit.auras) == 1
-      assert Aura.next_event_at(entity) == 1_100
+      assert Aura.next_event_at(entity) == 1_500
       assert hd(entity.unit.auras).expires_at == 3_500
-      {entity, []} = Aura.tick(entity, 1_099)
+      {entity, []} = Aura.tick(entity, 1_100)
       assert entity.unit.power1 == 150
-      {entity, _} = Aura.remove_spells(entity, [spell.id], 1_099)
+      {entity, _} = Aura.remove_spells(entity, [spell.id], 1_200)
       {entity, []} = Aura.tick(entity, 1_500)
       assert entity.unit.power1 == 150
       assert Aura.next_event_at(entity) == nil

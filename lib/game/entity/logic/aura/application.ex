@@ -480,7 +480,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
             stacks: next_stacks(old, incoming),
             next_proc_at: old.next_proc_at,
             heartbeat: old.heartbeat,
-            auras: carry_tick_times(old.auras, incoming.auras)
+            auras: refresh_tick_state(old.auras, incoming.auras, spell)
         }
 
         List.replace_at(existing, index, AreaSources.merge(old, refreshed))
@@ -558,13 +558,23 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp next_stacks(_old, _incoming), do: 1
 
-  defp carry_tick_times(old_auras, new_auras) do
+  defp refresh_tick_state(old_auras, new_auras, spell) do
     Enum.map(new_auras, fn %Aura{} = aura ->
       case Enum.find(old_auras, &(&1.index == aura.index and &1.type == aura.type)) do
-        %Aura{next_tick_at: at} when is_integer(at) -> %{aura | next_tick_at: at}
+        %Aura{} = old -> refresh_aura_tick(old, aura, spell)
         _ -> aura
       end
     end)
+  end
+
+  defp refresh_aura_tick(%Aura{} = old, %Aura{} = incoming, %Spell{} = spell) do
+    stacking? = is_integer(spell.stack_amount) and spell.stack_amount > 0
+
+    %{
+      incoming
+      | next_tick_at: if(Scripts.preserve_periodic_timer?(spell), do: old.next_tick_at, else: incoming.next_tick_at),
+        tick_count: if(stacking?, do: old.tick_count, else: incoming.tick_count)
+    }
   end
 
   defp expires_at(_now, 0), do: nil

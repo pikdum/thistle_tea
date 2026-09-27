@@ -66,13 +66,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PeriodicSequenceTest do
   end
 
   describe "apply_spell/5" do
-    test "refresh restarts the sequence while preserving the next deadline", %{entity: entity, spell: spell} do
+    test "refresh restarts the sequence and interval", %{entity: entity, spell: spell} do
       {entity, _events} = Aura.tick(entity, 5_000)
       {entity, _events} = Aura.tick(entity, 10_000)
       {refreshed, _events} = Aura.apply_spell(entity, 1, 60, spell, 11_000)
       assert hd(hd(refreshed.unit.auras).auras).tick_count == 0
-      assert Aura.next_event_at(refreshed) == 15_000
-      {_entity, events} = Aura.tick(refreshed, 15_000)
+      assert Aura.next_event_at(refreshed) == 16_000
+      assert {^refreshed, []} = Aura.tick(refreshed, 15_000)
+      {_entity, events} = Aura.tick(refreshed, 16_000)
       assert [%Effects.TriggerSpell{spell_id: 24_821}] = triggers(events)
     end
   end

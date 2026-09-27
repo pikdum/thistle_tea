@@ -25,13 +25,14 @@ defmodule ThistleTea.Game.Entity.Logic.PercentManaRecoveryTest do
       end
     end
 
-    test "preserves explicit amplitudes and refresh cadence", %{entity: entity} do
+    test "preserves explicit amplitudes and restarts the interval on refresh", %{entity: entity} do
       spell = recovery(amplitude_ms: 4_000)
       {entity, _events} = Aura.apply_spell(entity, 2, 60, spell, 0)
       {entity, _events} = Aura.apply_spell(entity, 2, 60, spell, 3_000)
-      assert Aura.next_event_at(entity) == 4_000
+      assert Aura.next_event_at(entity) == 7_000
       assert hd(entity.unit.auras).expires_at == 8_000
-      {entity, _events} = Aura.tick(entity, 4_000)
+      assert {^entity, []} = Aura.tick(entity, 4_000)
+      {entity, _events} = Aura.tick(entity, 7_000)
       assert entity.unit.power1 == 200
       assert Aura.next_event_at(entity) == 8_000
     end

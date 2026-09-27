@@ -2430,17 +2430,18 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
   end
 
   describe "periodic refresh" do
-    test "reapplying the same spell keeps the periodic tick schedule" do
+    test "reapplying the same spell restarts the periodic interval" do
       entity = fixture_entity()
       entity = %{entity | unit: %{entity.unit | health: 50}}
 
       {entity, _events} = apply_spell(entity, 1, 1, renew_fixture())
       [%Holder{auras: [%{next_tick_at: first_tick}]}] = entity.unit.auras
+      assert first_tick == 4_000
 
       {entity, _events} = Aura.apply_spell(entity, 1, 1, renew_fixture(), 2_000)
       [%Holder{auras: [%{next_tick_at: tick_after_refresh}]}] = entity.unit.auras
 
-      assert tick_after_refresh == first_tick
+      assert tick_after_refresh == 5_000
     end
 
     test "Ignite accumulates its tick amount through five refreshed stacks" do

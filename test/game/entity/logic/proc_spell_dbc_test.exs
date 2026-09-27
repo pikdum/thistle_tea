@@ -64,10 +64,11 @@ defmodule ThistleTea.Game.Entity.Logic.ProcSpellDbcTest do
       hot = Enum.find(character.unit.auras, &(&1.spell.id == 27_818))
       assert hot.stacks == 1
       assert hot.expires_at == 9_000
-      assert [%{amount: 75, next_tick_at: 4_000}] = hot.auras
-      {character, _} = Aura.tick(character, 4_000)
+      assert [%{amount: 75, next_tick_at: 5_000}] = hot.auras
+      assert {^character, []} = Aura.tick(character, 4_000)
+      {character, _} = Aura.tick(character, 5_000)
       assert character.unit.health == 1_100
-      dead = Core.take_damage(character, 5_000, 4_500)
+      dead = Core.take_damage(character, 5_000, 5_500)
       {dead, events} = Aura.tick(dead, 6_000)
       assert dead.unit.health == 0
       refute Enum.any?(events, &is_struct(&1, Effects.PeriodicAuraLog))

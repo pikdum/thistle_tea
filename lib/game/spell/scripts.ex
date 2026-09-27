@@ -59,6 +59,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @no_autocast_ai 0x00020000
 
   @immediate_periodic_spells [8145, 6474, 8179, 8172, 8167, 8515, 10_609, 10_612]
+  @preserved_periodic_timers @immediate_periodic_spells ++ [13_797, 14_298, 14_299, 14_300, 14_301, 23_184, 25_041]
   @shadow_bolt_whirl [24_820, 24_821, 24_822, 24_823, 24_835, 24_836, 24_837, 24_838]
 
   def cone(spell_id, _degrees) when spell_id in @shadow_bolt_whirl do
@@ -76,6 +77,10 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def initial_periodic_delay(%Spell{id: id}, _interval) when id in @immediate_periodic_spells, do: 0
   def initial_periodic_delay(%Spell{}, interval), do: interval
+
+  def preserve_periodic_timer?(%Spell{stack_amount: cap}) when is_integer(cap) and cap > 0, do: true
+  def preserve_periodic_timer?(%Spell{spell_visual: 0, spell_icon: 689}), do: true
+  def preserve_periodic_timer?(%Spell{id: id}), do: id in @preserved_periodic_timers
 
   def apply_trigger(%Spell{} = spell) do
     cond do

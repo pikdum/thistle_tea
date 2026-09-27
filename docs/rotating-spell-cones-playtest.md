@@ -17,8 +17,8 @@ VMangos increments the tick counter before selecting the child, so the order
 starts with 24821, then 24822, 24823, 24835, 24836, 24837, 24838, and 24820.
 
 Aura tick counts advance once per executed tick. Delayed wakeups do not emit
-a burst of catch-up casts. Refresh resets the count while retaining the pending
-deadline. Tick merging copies only scheduling state and the counter, preserving
+a burst of catch-up casts. Refresh resets the count and restarts the interval
+(corrected by the periodic damage ramp follow-up). Tick merging copies only scheduling state and the counter, preserving
 current holder mutations such as consumed absorption.
 
 ## Native acceptance

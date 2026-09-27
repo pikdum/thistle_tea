@@ -22,6 +22,20 @@ defmodule ThistleTea.Game.World.Loader.PeriodicDamageRampsDbcTest do
   setup [:target]
 
   describe "load/1" do
+    test "Renew and Corruption restart their interval when recast", %{target: target} do
+      for id <- [139, 172] do
+        spell = SpellLoader.load(id)
+        assert hd(spell.effects).amplitude_ms == 3_000
+        {target, _events} = Aura.apply_spell(target, 2, 60, spell, 0)
+        {target, _events} = Aura.tick(target, 3_000)
+        {target, _events} = Aura.apply_spell(target, 2, 60, spell, 3_500)
+        assert [%{auras: [%{tick_count: 0, next_tick_at: 6_500}]}] = target.unit.auras
+        assert {^target, []} = Aura.tick(target, 6_000)
+        {target, _events} = Aura.tick(target, 6_500)
+        assert [%{auras: [%{tick_count: 1, next_tick_at: 9_500}]}] = target.unit.auras
+      end
+    end
+
     test "every player rank ramps from its own unmodified base", %{target: target} do
       ranks = [
         {4, 2, [980, 1014, 6217, 11_711, 11_712, 11_713]},

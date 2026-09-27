@@ -111,8 +111,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PeriodicDamageTest do
       assert hd(hd(target.unit.auras).auras).tick_count == 2
       {target, _events} = Aura.apply_spell(target, 2, 60, spell, 9_500)
       assert hd(hd(target.unit.auras).auras).tick_count == 0
-      assert Aura.next_event_at(target) == 10_000
-      {_target, [%Effects.SpellDamage{damage: 15}]} = Aura.tick(target, 10_000)
+      assert Aura.next_event_at(target) == 10_500
+      assert {^target, []} = Aura.tick(target, 10_000)
+      {_target, [%Effects.SpellDamage{damage: 15}]} = Aura.tick(target, 10_500)
     end
 
     test "resistance and absorption consume the modified tick once", %{target: target} do
