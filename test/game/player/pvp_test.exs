@@ -20,7 +20,7 @@ defmodule ThistleTea.Game.Player.PvpTest do
 
   describe "arrive/2" do
     test "publishes, saves, and schedules a granted aura through its owner" do
-      guid = System.unique_integer([:positive, :monotonic])
+      guid = System.unique_integer([:positive, :monotonic]) + 91_000_000
 
       character = %Character{
         id: guid,
