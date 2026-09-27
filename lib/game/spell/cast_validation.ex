@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Environment
   alias ThistleTea.Game.Spell.Focus
+  alias ThistleTea.Game.Spell.LocationTargets
   alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.Range
   alias ThistleTea.Game.Spell.Scripts
@@ -112,16 +113,21 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   def validate_target(caster, %Spell{} = spell, %Target{} = targets, target_info) do
     cond do
-      Insignia.spell?(spell) -> Insignia.validate(caster, target_info)
-      UnitTargets.required?(spell) -> validate_explicit_effects(caster, spell, targets, target_info)
-      true -> validate_unit_target(caster, spell, targets, target_info)
+      Insignia.spell?(spell) ->
+        Insignia.validate(caster, target_info)
+
+      UnitTargets.required?(spell) or LocationTargets.required?(spell) ->
+        validate_explicit_effects(caster, spell, targets, target_info)
+
+      true ->
+        validate_unit_target(caster, spell, targets, target_info)
     end
   end
 
   defp validate_explicit_effects(caster, spell, targets, target_info) do
     effects =
       Enum.filter(spell.effects, fn effect ->
-        not UnitTargets.scripted?(effect) and
+        not UnitTargets.scripted?(effect) and effect.implicit_target_a != :script_location_near_caster and
           Enum.any?(
             [effect.implicit_target_a, effect.implicit_target_b],
             &(&1 in [:target_enemy, :target_ally, :any_unit, :party_member])

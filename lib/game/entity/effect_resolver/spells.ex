@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Spell.Chain
   alias ThistleTea.Game.Spell.Combat, as: SpellCombat
   alias ThistleTea.Game.Spell.Focus
+  alias ThistleTea.Game.Spell.LocationTargets
   alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.ProcOrigin
   alias ThistleTea.Game.Spell.Scripts
@@ -35,7 +36,6 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.World.SpellMagnets
   alias ThistleTea.Game.World.SpellObjects
   alias ThistleTea.Game.World.SpellRequirements
-  alias ThistleTea.Game.World.SpellUnits
 
   @heal_threat_radius 100.0
 
@@ -211,7 +211,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
          (Focus.required?(spell) and Guid.entity_type(effect.source_guid) == :player))
   end
 
-  defp target_requirements?(spell), do: UnitTargets.required?(spell) or Area.restricted?(spell)
+  defp target_requirements?(spell),
+    do: UnitTargets.required?(spell) or LocationTargets.required?(spell) or Area.restricted?(spell)
 
   defp validate_trigger_focus(entity, effect, spell) do
     with :ok <- Focus.validate(entity, spell, SpellFocus.find(entity, spell)),
@@ -228,7 +229,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
       Spell.attribute?(spell, :channeled) ->
         resolve_triggered_channel(entity, effect, spell)
 
-      UnitTargets.required?(spell) ->
+      UnitTargets.required?(spell) or LocationTargets.required?(spell) ->
         resolve_scripted_trigger(entity, effect, spell)
 
       effect.resolve_targets? or SpellTarget.area_targeted?(spell) or Chain.spell?(spell) ->
@@ -274,14 +275,24 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
 
   defp resolve_scripted_trigger(entity, effect, spell) do
     selection = Target.unit(effect.target_guid || entity.object.guid)
-    units = SpellUnits.resolve(entity, spell, selection)
+    requirements = SpellRequirements.resolve(entity, spell, selection)
 
-    case UnitTargets.validate(spell, units) do
-      :ok ->
-        selection = UnitTargets.item_selection(selection, units, effect.cast_item_guid)
-        plan = SpellTargetResolver.resolve_plan(entity, spell, selection, units, triggered?: true)
-        triggered_cast(entity, effect, spell, plan, selection)
+    with :ok <- LocationTargets.validate(spell, requirements.locations),
+         :ok <- UnitTargets.validate(spell, requirements.units),
+         :ok <- ObjectTargets.validate(spell, requirements.objects) do
+      selection =
+        selection
+        |> LocationTargets.apply(requirements.locations)
+        |> UnitTargets.item_selection(requirements.units, effect.cast_item_guid)
 
+      plan =
+        SpellTargetResolver.resolve_plan(entity, spell, selection, requirements.units,
+          triggered?: true,
+          locations: requirements.locations
+        )
+
+      triggered_cast(entity, effect, spell, plan, selection, requirements.objects)
+    else
       {:error, reason} ->
         [Effects.spell_cast_failed(spell, reason)]
     end
@@ -345,6 +356,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
         context = %{
           Chain.put_context(context, chain)
           | effect_indices: UnitTargets.indices(units, context.target_guid),
+            destination_position: Target.ground_location(selection),
             selected_target_guid: Target.unit_guid(selection)
         }
 

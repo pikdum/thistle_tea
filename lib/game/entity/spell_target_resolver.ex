@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.Spell.AuraRank
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Cone
+  alias ThistleTea.Game.Spell.LocationTargets
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Spell.TargetLimit
@@ -54,18 +55,35 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     by_effect =
       Map.new(spell.effects, fn effect ->
         recipients =
-          if UnitTargets.scripted?(effect) do
-            units.by_effect
-            |> Map.get(effect.index, [])
-            |> append_caster_execution_target(%{spell | effects: [effect]}, caster.object.guid)
-          else
-            resolve(caster, %{spell | effects: [effect]}, targets, opts)
+          cond do
+            UnitTargets.scripted?(effect) ->
+              units.by_effect
+              |> Map.get(effect.index, [])
+              |> append_caster_execution_target(%{spell | effects: [effect]}, caster.object.guid)
+
+            LocationTargets.scripted?(effect) ->
+              resolve_location_effect(caster, spell, effect, targets, opts)
+
+            true ->
+              resolve(caster, %{spell | effects: [effect]}, targets, opts)
           end
 
         {effect.index, recipients}
       end)
 
     %{units | by_effect: by_effect}
+  end
+
+  defp resolve_location_effect(caster, spell, effect, targets, opts) do
+    direct = LocationTargets.direct_guids(Keyword.get(opts, :locations), effect, :unit)
+
+    targets =
+      if effect.implicit_target_a == :script_location_near_caster and
+           effect.implicit_target_b not in [:target_enemy, :target_ally, :any_unit, :party_member],
+         do: %{targets | selection: :none},
+         else: targets
+
+    Enum.uniq(direct ++ resolve(caster, %{spell | effects: [effect]}, targets, opts))
   end
 
   def insignia_target(caster, spell, targets) do

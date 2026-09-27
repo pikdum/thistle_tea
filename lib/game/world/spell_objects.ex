@@ -9,8 +9,11 @@ defmodule ThistleTea.Game.World.SpellObjects do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Focus
+  alias ThistleTea.Game.Spell.LocationTargets
+  alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.ObjectTargets.Selector
+  alias ThistleTea.Game.Spell.Radius
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Spell.TargetLimit
   alias ThistleTea.Game.World
@@ -18,11 +21,11 @@ defmodule ThistleTea.Game.World.SpellObjects do
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.System.ScriptedEvent
 
-  def resolve(caster, %Spell{} = spell, %Target{} = targets, focus \\ nil) do
+  def resolve(caster, %Spell{} = spell, %Target{} = targets, focus \\ nil, locations \\ nil) do
     spell.effects
     |> Enum.filter(&(&1.type == :activate_object))
     |> Enum.reduce_while(%ObjectTargets{}, fn effect, snapshot ->
-      case effect_targets(caster, spell, effect, targets, focus) do
+      case effect_targets(caster, spell, effect, targets, focus, locations) do
         {:ok, guids} ->
           selected = TargetLimit.select(guids, spell)
           {:cont, %{snapshot | by_effect: Map.put(snapshot.by_effect, effect.index, selected)}}
@@ -33,10 +36,13 @@ defmodule ThistleTea.Game.World.SpellObjects do
     end)
   end
 
-  defp effect_targets(caster, spell, effect, targets, focus) do
+  defp effect_targets(caster, spell, effect, targets, focus, locations) do
     modes = [effect.implicit_target_a, effect.implicit_target_b]
 
     cond do
+      LocationTargets.scripted?(effect) ->
+        {:ok, LocationTargets.direct_guids(locations, effect, :game_object)}
+
       :game_object in modes ->
         explicit(caster, spell, targets)
 
@@ -75,17 +81,27 @@ defmodule ThistleTea.Game.World.SpellObjects do
   defp nearest(_caster, %Spell{object_targets: []}, _effect, _focus), do: {:error, :bad_targets}
 
   defp nearest(caster, spell, effect, focus) do
-    selectors = selectors(spell, effect)
-    range = Focus.range(radius(spell, effect), caster_radius(caster))
-
     guids =
-      caster
-      |> candidates(position(caster), range)
-      |> Enum.filter(fn {guid, _distance} -> Enum.any?(selectors, &matches?(caster, guid, &1, focus)) end)
-      |> Enum.take(1)
-      |> Enum.map(&elem(&1, 0))
+      case nearest_candidate(caster, spell, effect, focus) do
+        {guid, _distance} -> [guid]
+        nil -> []
+      end
 
     if guids == [] and spell.id in [15_958, 16_447, 24_973], do: {:error, :bad_targets}, else: {:ok, guids}
+  end
+
+  def nearest_candidate(caster, %Spell{} = spell, %Effect{} = effect, focus) do
+    selectors = selectors(spell, effect)
+    radius = Radius.effect(effect, Modifiers.snapshot(caster, spell), spell.range_yards || 0)
+    object_reach = Focus.range(0, caster_radius(caster))
+
+    caster
+    |> candidates(position(caster), radius + object_reach)
+    |> Enum.find(fn {guid, _distance} -> Enum.any?(selectors, &matches?(caster, guid, &1, focus)) end)
+    |> case do
+      {guid, distance} -> {guid, max(distance - object_reach, 0)}
+      nil -> nil
+    end
   end
 
   defp area(caster, spell, effect, origin) do

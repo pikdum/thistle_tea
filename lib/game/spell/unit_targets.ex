@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Spell.UnitTargets do
 
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.LocationTargets
   alias ThistleTea.Game.Spell.Target
 
   @area_modes [:script_units_at_source, :script_units_at_destination, :script_units_in_cone]
@@ -53,6 +54,7 @@ defmodule ThistleTea.Game.Spell.UnitTargets do
   def item_selection(%Target{} = targets, _units, _item_guid), do: targets
 
   def corpse_effect?(spell, effect, %{object: %{entry: entry}}) do
-    scripted?(effect) and Enum.any?(selectors(spell, effect), &(&1.entry == entry and not &1.alive?))
+    (scripted?(effect) or LocationTargets.scripted?(effect)) and
+      Enum.any?(selectors(spell, effect), &(&1.entry == entry and not &1.alive?))
   end
 end

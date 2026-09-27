@@ -48,6 +48,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Spell.Battleground
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastValidation
+  alias ThistleTea.Game.Spell.Focus
+  alias ThistleTea.Game.Spell.LocationTargets
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Stealth
   alias ThistleTea.Game.Spell.Target
@@ -66,6 +68,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.World.SpellAreas
   alias ThistleTea.Game.World.SpellEnvironment
   alias ThistleTea.Game.World.SpellFocus
+  alias ThistleTea.Game.World.SpellLocations
   alias ThistleTea.Game.World.SpellObjects
   alias ThistleTea.Game.World.SpellRequirements
   alias ThistleTea.Game.World.SpellUnits
@@ -378,9 +381,13 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp validate_cast(%{character: character} = state, %Spell{} = spell, %Target{} = targets, cast_item_guid) do
     enchant_guid = Enchantments.target_guid(character.player, spell, Target.item_guid(targets))
     focus = SpellFocus.find(character, spell)
+    locations = SpellLocations.resolve(character, spell, targets, focus)
+    targets = LocationTargets.apply(targets, locations)
 
-    with :ok <- check_party_unit_target(character, spell, targets),
+    with :ok <- Focus.validate(character, spell, focus),
+         :ok <- check_party_unit_target(character, spell, targets),
          :ok <- check_object_target(state, spell, targets),
+         :ok <- LocationTargets.validate(spell, locations),
          :ok <- UnitTargets.validate(spell, SpellUnits.resolve(character, spell, targets)) do
       CastValidation.validate(
         character,
@@ -393,7 +400,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
         count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end,
         equipped_items: equipped_weapon_templates(character),
         spell_focus: focus,
-        spell_objects: SpellObjects.resolve(character, spell, targets, focus),
+        spell_objects: SpellObjects.resolve(character, spell, targets, focus, locations),
         spell_corpse: SpellRequirements.corpse(character, spell),
         lock_context: Gathering.context(state, spell, targets, cast_item_guid),
         disenchant_item: Disenchant.owned_item(character, Target.item_guid(targets)),

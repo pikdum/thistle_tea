@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.SpellRequirements do
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CorpseTarget
+  alias ThistleTea.Game.Spell.LocationTargets
   alias ThistleTea.Game.Spell.Requirements
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World
@@ -13,12 +14,16 @@ defmodule ThistleTea.Game.World.SpellRequirements do
   alias ThistleTea.Game.World.SpellAreas
   alias ThistleTea.Game.World.SpellEnvironment
   alias ThistleTea.Game.World.SpellFocus
+  alias ThistleTea.Game.World.SpellLocations
   alias ThistleTea.Game.World.SpellObjects
   alias ThistleTea.Game.World.SpellUnits
   alias ThistleTea.Game.World.Visibility
 
   def resolve(caster, %Spell{} = spell, targets \\ Target.none()) do
     focus = SpellFocus.find(caster, spell)
+    locations = SpellLocations.resolve(caster, spell, targets, focus)
+    targets = LocationTargets.apply(targets, locations)
+    objects = SpellObjects.resolve(caster, spell, targets, focus, locations)
 
     %Requirements{
       focus: focus,
@@ -26,7 +31,8 @@ defmodule ThistleTea.Game.World.SpellRequirements do
       aura_target: aura_target(caster, targets),
       spell_area: SpellAreas.context(caster, spell),
       outdoors?: SpellEnvironment.context(caster, spell),
-      objects: SpellObjects.resolve(caster, spell, targets, focus),
+      locations: locations,
+      objects: LocationTargets.put_objects(objects, spell, locations),
       units: SpellUnits.resolve(caster, spell, targets)
     }
   end

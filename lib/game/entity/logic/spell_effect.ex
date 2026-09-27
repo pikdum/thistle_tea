@@ -274,7 +274,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp applicable_effects(_target, %CastContext{target_role: :caster}, effects) do
     Enum.reject(effects, fn effect ->
-      hostile_target_effect?(effect) or
+      (hostile_target_effect?(effect) and not caster_execution_effect?(effect)) or
         (pet_target_effect?(effect) and not caster_execution_effect?(effect)) or
         master_target_effect?(effect)
     end)
@@ -292,7 +292,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp applicable_effects(%{object: %{guid: guid}}, %CastContext{caster_guid: guid}, effects) do
-    Enum.reject(effects, &hostile_target_effect?/1)
+    Enum.reject(effects, &(hostile_target_effect?(&1) and not caster_execution_effect?(&1)))
   end
 
   defp applicable_effects(_target, _context, effects), do: Enum.reject(effects, &caster_target_effect?/1)

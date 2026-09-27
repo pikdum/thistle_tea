@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.Loader.SpellUnitTargetDbcTest do
 
   alias ThistleTea.DB.Mangos.SpellEffectMod
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.LocationTargets
   alias ThistleTea.Game.Spell.UnitTargets
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride
@@ -33,6 +34,15 @@ defmodule ThistleTea.Game.World.Loader.SpellUnitTargetDbcTest do
   end
 
   describe "load/1" do
+    test "decodes creature, corpse and object destination spells" do
+      for id <- [9082, 12_699, 26_286, 26_344] do
+        assert LocationTargets.required?(SpellLoader.load(id))
+      end
+
+      assert hd(SpellLoader.load(12_699).effects).implicit_target_b == :script_location_near_caster
+      assert hd(SpellLoader.load(9082).effects).implicit_target_a == :script_location_near_caster
+    end
+
     test "decodes scripted areas and marks scripted cones as area effects" do
       assert UnitTargets.area?(SpellLoader.load(5628))
       assert UnitTargets.area?(SpellLoader.load(26_393))

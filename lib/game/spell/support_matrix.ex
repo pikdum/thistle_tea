@@ -31,7 +31,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
     42 => :back_left_totem,
     43 => :back_right_totem,
     44 => :front_right_totem,
-    46 => :script_location,
     47 => :caster_front,
     52 => :gameobjects_at_dest,
     55 => :caster_front_leap,

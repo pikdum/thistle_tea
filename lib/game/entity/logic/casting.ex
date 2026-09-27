@@ -49,6 +49,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Chain
   alias ThistleTea.Game.Spell.Cooldowns
+  alias ThistleTea.Game.Spell.LocationTargets
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.Proc
@@ -191,7 +192,11 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   def resolve_requirements(%{internal: %Internal{casting: cast}} = entity, %Cast{} = cast, requirements, now) do
     case Requirements.validate(entity, cast.spell, requirements, cast_options(cast)) do
       :ok ->
-        targets = UnitTargets.item_selection(cast.targets, requirements.units, cast.cast_item_guid)
+        targets =
+          cast.targets
+          |> LocationTargets.apply(requirements.locations)
+          |> UnitTargets.item_selection(requirements.units, cast.cast_item_guid)
+
         complete(entity, %{cast | requirements: requirements, targets: targets}, now)
 
       {:error, reason} ->
@@ -1484,9 +1489,9 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp dispatch_to_target(character, _context, _spell, _target_guid, _now), do: character
 
   defp resolve_targets(caster, %Cast{spell: %Spell{} = spell, targets: %Target{} = targets} = cast) do
-    opts = [triggered?: cast.triggered?, cast_item_guid: cast.cast_item_guid]
+    opts = [triggered?: cast.triggered?, cast_item_guid: cast.cast_item_guid, locations: cast.requirements.locations]
 
-    if UnitTargets.required?(spell) do
+    if UnitTargets.required?(spell) or LocationTargets.required?(spell) do
       plan = SpellTargetResolver.resolve_plan(caster, spell, targets, cast.requirements.units, opts)
       {UnitTargets.guids(plan), plan}
     else

@@ -172,6 +172,13 @@ defmodule ThistleTea.Game.World.SpellUnits do
     do: Spell.attribute?(spell, :ignore_line_of_sight) or World.line_of_sight?(caster, guid)
 
   defp nearest(caster, spell, effect, targets) do
+    case nearest_candidate(caster, spell, effect, targets) do
+      nil -> nil
+      {_unselected, _distance, guid} -> guid
+    end
+  end
+
+  def nearest_candidate(caster, %Spell{} = spell, %Effect{} = effect, %Target{} = targets) do
     selectors = UnitTargets.selectors(spell, effect)
     radius = Radius.effect(effect, Modifiers.snapshot(caster, spell), spell.range_yards || 0)
     selected = Target.unit_guid(targets)
@@ -184,10 +191,6 @@ defmodule ThistleTea.Game.World.SpellUnits do
       end
     end)
     |> Enum.min(fn -> nil end)
-    |> case do
-      nil -> nil
-      {_unselected, _distance, guid} -> guid
-    end
   end
 
   defp candidates(caster, radius) when radius > 200 do
