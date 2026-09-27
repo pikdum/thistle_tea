@@ -113,13 +113,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   def apply(state, %CastContext{} = context, spell, %Effect{type: :heal} = effect, now) do
     {state, swiftmend_healing, swiftmend_events} = Druid.consume_swiftmend_hot(state, spell, now)
 
-    bonus = Coefficient.bonus(context.healing_bonus || 0, spell, effect, :direct)
-
-    healing =
-      trunc(
-        (base_amount(spell, effect, context) + swiftmend_healing + bonus) * Chain.multiplier(effect, context) *
-          (context.effect_healing_multiplier || 1.0)
-      )
+    base = base_amount(spell, effect, context) + swiftmend_healing
+    healing = healing_done(base, context, spell, effect)
 
     healing =
       HealingReceived.spell_amount(state, healing, spell, effect,
@@ -205,7 +200,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         else: context.attack_time_ms
 
     kind = if Spell.ranged_attack?(spell), do: :ranged, else: :melee
-    if Spell.wand?(spell), do: 0, else: TargetAttackPower.damage(state, context.target_attack_power, kind, speed)
+
+    if Spell.wand?(spell) or Spell.attribute?(spell, :ignore_caster_modifiers),
+      do: 0,
+      else: TargetAttackPower.damage(state, context.target_attack_power, kind, speed)
   end
 
   defp leech_multiplier(%Effect{multiple_value: multiple}) when is_number(multiple) and multiple > 0, do: multiple
@@ -216,6 +214,15 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   end
 
   defp heal_crit?(_context, _spell), do: false
+
+  defp healing_done(base, context, spell, effect) do
+    if Spell.attribute?(spell, :ignore_caster_modifiers) do
+      trunc(base * Chain.multiplier(effect, context))
+    else
+      bonus = Coefficient.bonus(context.healing_bonus || 0, spell, effect, :direct)
+      trunc((base + bonus) * Chain.multiplier(effect, context) * (context.effect_healing_multiplier || 1.0))
+    end
+  end
 
   defp apply_damage_effect(state, %CastContext{} = context, spell, %Effect{} = effect, now, opts \\ [])
        when is_integer(now) do
@@ -230,14 +237,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     opts = Keyword.put(opts, :triggered_by_proc?, context.triggered_by_proc?)
     origin = if Keyword.get(opts, :periodic?, false), do: :cast, else: ProcOrigin.classify(spell, context)
     opts = Keyword.put(opts, :proc_origin, origin)
-    rolled = amount
-
-    rolled =
-      trunc(
-        rolled * (context.effect_damage_multiplier || 1.0) * (context.damage_done_multiplier || 1.0) *
-          context.happiness_multiplier * versus_damage_multiplier(state, context) *
-          scripted_damage_multiplier(state, spell)
-      )
+    rolled = spell_damage_done(state, context, spell, amount)
 
     damage_type = if Keyword.get(opts, :periodic?, false), do: :dot, else: :direct
     rolled = DamageReceived.spell_amount(state, rolled, spell, Keyword.get(opts, :damage_effect), damage_type)
@@ -332,6 +332,22 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     max(100 + Aura.versus_amount(pairs, CreatureType.mask(state)), 0) / 100
   end
 
+  defp spell_damage_done(state, context, spell, amount) do
+    if Spell.attribute?(spell, :ignore_caster_modifiers) do
+      amount
+    else
+      trunc(
+        amount * damage_done_multiplier(context) * versus_damage_multiplier(state, context) *
+          scripted_damage_multiplier(state, spell)
+      )
+    end
+  end
+
+  defp damage_done_multiplier(context) do
+    (context.effect_damage_multiplier || 1.0) * (context.damage_done_multiplier || 1.0) *
+      context.happiness_multiplier
+  end
+
   defp versus_crit_bonus(state, %CastContext{crit_damage_versus: pairs}, bonus) do
     bonus * max(100 + Aura.versus_amount(pairs, CreatureType.mask(state)), 0) / 100
   end
@@ -354,6 +370,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     chance > 0 and
       (not Keyword.get(opts, :periodic?, false) or Keyword.get(opts, :periodic_can_crit?, false)) and
       not Spell.attribute?(spell, :cant_crit) and
+      not Spell.attribute?(spell, :ignore_caster_modifiers) and
       spell.dmg_class in [1, 3] and (chance >= 100 or :rand.uniform() * 100 <= chance)
   end
 
@@ -389,7 +406,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   end
 
   defp damage_bonus(state, %CastContext{} = context, %Spell{} = spell, %Effect{} = effect, opts) do
-    if Keyword.get(opts, :periodic?, false) do
+    if Keyword.get(opts, :periodic?, false) or Spell.attribute?(spell, :ignore_caster_modifiers) do
       0
     else
       Coefficient.bonus(TargetSpellPower.benefit(state, context, spell), spell, effect, :direct) +
@@ -487,17 +504,15 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
   defp melee_ability_damage(state, %CastContext{} = context, spell, damage, now, effect \\ nil) do
     school = school_atom(spell)
+    ignore_modifiers? = Spell.attribute?(spell, :ignore_caster_modifiers)
+    crit? = context.melee_crit? == true and not ignore_modifiers?
 
-    damage =
-      trunc(
-        damage * (context.effect_damage_multiplier || 1.0) * (context.damage_done_multiplier || 1.0) *
-          context.happiness_multiplier
-      )
+    damage = if ignore_modifiers?, do: damage, else: trunc(damage * damage_done_multiplier(context))
 
     unmitigated_damage = DamageReceived.spell_amount(state, damage, spell, effect)
 
     damage =
-      if context.melee_crit? do
+      if crit? do
         unmitigated_damage + weapon_crit_bonus(context, spell, unmitigated_damage)
       else
         unmitigated_damage
@@ -517,7 +532,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         source: context.caster_guid,
         source_owner: context.caster_owner_guid,
         reflected_by: context.reflected_by_guid,
-        threat_multiplier: SpellThreat.multiplier(context, context.melee_crit?),
+        threat_multiplier: SpellThreat.multiplier(context, crit?),
         source_level: context.caster_level,
         resistance_penetration: context.resistance_penetration,
         damage_sharing_targets: context.damage_sharing_targets,
@@ -527,7 +542,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     event =
       Effects.spell_damage(context.caster_guid, state.object.guid, spell, damage,
         absorbed: absorbed,
-        crit?: context.melee_crit? || false,
+        crit?: crit?,
         resisted: resisted,
         proc_damage: proc_damage,
         proc_origin: ProcOrigin.classify(spell, context),

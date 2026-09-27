@@ -104,7 +104,11 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   def snapshot_all(_entity), do: []
 
   def for_spell(snapshot, %Spell{spell_family: family} = spell) when is_list(snapshot) do
-    for {^family, %Aura{} = aura} <- snapshot, class_mask_applies?(aura.class_mask, spell), do: aura
+    if Spell.attribute?(spell, :ignore_caster_modifiers) do
+      []
+    else
+      for {^family, %Aura{} = aura} <- snapshot, class_mask_applies?(aura.class_mask, spell), do: aura
+    end
   end
 
   def for_spell(_snapshot, _spell), do: []
@@ -169,7 +173,7 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   defp class_mask_applies?(_mask, _spell), do: false
 
   defp holder_used_by_spell?(%Holder{} = holder, %Spell{} = spell) do
-    modifier_applies?(holder.spell, spell) and
+    not Spell.attribute?(spell, :ignore_caster_modifiers) and modifier_applies?(holder.spell, spell) and
       Enum.any?(holder.auras, &(class_mask_applies?(&1.class_mask, spell) and modifier_used_by_spell?(&1, spell)))
   end
 

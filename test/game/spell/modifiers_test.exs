@@ -56,6 +56,41 @@ defmodule ThistleTea.Game.Spell.ModifiersTest do
       assert Resources.power_cost(entity, spell) == 0
     end
 
+    test "ignored caster modifiers preserve costs, intervals, amounts, and charges" do
+      holders =
+        for operation <- [14, 19, 8, 22, 1] do
+          modifier_holder(:add_pct_modifier, -50, operation, 1, charges: 1, id: operation + 100)
+        end
+
+      entity = entity(holders)
+
+      spell = %Spell{
+        id: 90_001,
+        spell_family: 8,
+        family_flags_0: 1,
+        mana_cost: 200,
+        power_type: 0,
+        duration_ms: 6_000,
+        attributes: MapSet.new([:ignore_caster_modifiers]),
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :periodic_damage, base_points: 100, amplitude_ms: 2_000}]
+      }
+
+      assert Modifiers.snapshot(entity, spell) == []
+      assert Modifiers.for_spell(Modifiers.snapshot_all(entity), spell) == []
+      assert Modifiers.consumable_holder_ids(entity, spell) == []
+      assert Resources.power_cost(entity, spell) == 200
+      context = CastContext.from_caster(entity, spell, 2)
+      target = %{object: %Object{guid: 2}, unit: %Unit{level: 60, health: 1_000, max_health: 1_000, auras: []}}
+      {target, _events} = AuraLogic.apply_spell(target, context, spell, 0)
+
+      assert [%Holder{expires_at: 6_000, auras: [%Aura{amount: 100, amplitude_ms: 2_000, next_tick_at: 2_000}]}] =
+               target.unit.auras
+
+      ordinary = %{spell | attributes: MapSet.new()}
+      assert Resources.power_cost(entity, ordinary) == 100
+      assert Enum.sort(Modifiers.consumable_holder_ids(entity, ordinary)) == [101, 108, 114, 119, 122]
+    end
+
     test "all-effects modifiers snapshot into periodic aura amounts" do
       entity = entity([modifier_holder(:add_pct_modifier, 50, 8, 0x400)])
 

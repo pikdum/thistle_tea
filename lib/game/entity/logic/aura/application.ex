@@ -695,6 +695,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp modified_aura_amount(entity, %Spell{} = spell, %Effect{} = effect, amount_override, %CastContext{} = context) do
     amount = aura_amount(spell, effect, amount_override, context)
+
+    if Spell.attribute?(spell, :ignore_caster_modifiers),
+      do: amount,
+      else: apply_aura_bonuses(entity, spell, effect, amount, context)
+  end
+
+  defp apply_aura_bonuses(entity, spell, effect, amount, context) do
     amount = modify_aura_base_amount(effect.aura, amount, context)
     amount = amount + periodic_benefit(entity, spell, effect, context)
 

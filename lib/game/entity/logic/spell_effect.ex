@@ -197,6 +197,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp prepare_melee(target, %Resolution{context: context} = resolution) do
     if melee_roll_required?(target, context, context.spell) do
       result = AttackTable.roll_special(target, special_attack(context, context.spell))
+
+      result =
+        if result.crit? and Spell.attribute?(context.spell, :ignore_caster_modifiers),
+          do: %{result | outcome: :normal, crit?: false},
+          else: result
+
       resolution = %{resolution | kind: :melee, melee_result: result}
 
       if result.outcome in [:normal, :crit] do
