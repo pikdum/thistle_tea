@@ -38,6 +38,45 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.RangedTest do
   end
 
   describe "sequence/0" do
+    test "Hawk Eye extends repeat shots and removal restores their range" do
+      spell = %Spell{id: 75, spell_family: 9, family_flags_0: 1, min_range_yards: 8.0, range_yards: 35.0}
+
+      holder = %Holder{
+        spell: %Spell{id: 19_500, spell_family: 9},
+        auras: [%Aura{type: :add_flat_modifier, misc_value: 5, amount: 6, class_mask: 1}]
+      }
+
+      character = %Character{
+        object: %Object{guid: 1},
+        player: %Player{},
+        unit: %Unit{health: 100, auras: [holder], ranged_attack_time: 2_000},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{
+          world: WorldRef.open(0),
+          auto_shot: %{target_guid: 7, next_at: 0, spell: spell, targets: Target.unit(7)}
+        }
+      }
+
+      observation = %Observation{
+        guid: 7,
+        position: {WorldRef.open(0), 40.0, 0.0, 0.0},
+        distance: 40.0,
+        line_of_sight?: true,
+        metadata: %{alive?: true}
+      }
+
+      perception = Perception.new(1_000, nil, %{7 => observation}, %{mobs: [], players: []})
+      context = Context.new(1_000, perception: perception)
+      {_status, result} = BT.tick(Ranged.sequence(), character, context)
+      assert Enum.any?(result.internal.events, &is_struct(&1, Effects.LaunchRanged))
+      assert result.internal.auto_shot.spell.range_yards == 35.0
+
+      reset = %{result | unit: %{result.unit | auras: []}, internal: %{result.internal | events: []}}
+      assert {:failure, result} = BT.tick(Ranged.sequence(), reset, Context.new(3_000, perception: perception))
+      assert result.internal.auto_shot == nil
+      assert [%Effects.CancelAutoRepeat{}] = result.internal.events
+    end
+
     test "pacify cancels ranged attacks without firing or consuming ammunition" do
       spell = %Spell{id: 75, prevention_type: 2}
 

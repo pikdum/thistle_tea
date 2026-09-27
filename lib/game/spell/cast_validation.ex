@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Spell.Environment
   alias ThistleTea.Game.Spell.Focus
   alias ThistleTea.Game.Spell.ObjectTargets
+  alias ThistleTea.Game.Spell.Range
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.StackRules
   alias ThistleTea.Game.Spell.Stealth
@@ -55,8 +56,6 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   @power_fields %{0 => :power1, 1 => :power2, 2 => :power3, 3 => :power4, 4 => :power5}
   @health_power_type -2
   @range_leeway_yards 5.0
-  @hostile_channel_range_multiplier 1.33
-  @friendly_channel_range_leeway_yards 1.25
 
   def validate(caster, %Spell{} = spell, %Target{} = targets, target_info, now, opts \\ []) do
     with :ok <- check_caster_alive(caster),
@@ -136,12 +135,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   def channel_in_range?(caster, %Spell{range_yards: range} = spell, target_info) when is_number(range) and range > 0 do
     hostile? = Map.get(target_info, :hostile?, Spell.harmful?(spell))
 
-    max_range =
-      if hostile? do
-        range * @hostile_channel_range_multiplier
-      else
-        range + @friendly_channel_range_leeway_yards
-      end
+    max_range = Range.channel_maximum(caster, spell, hostile?)
 
     case combat_distance(caster, target_info) do
       {:ok, distance} -> distance <= max_range
@@ -660,7 +654,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   defp check_range(caster, %Spell{range_yards: range} = spell, %{position: position} = target_info)
        when is_tuple(position) and tuple_size(position) == 4 and is_number(range) and range > 0 do
     case combat_distance(caster, target_info) do
-      {:ok, distance} -> check_distance(distance, spell)
+      {:ok, distance} -> check_distance(distance, spell, Range.maximum(caster, spell))
       :different_world -> {:error, :out_of_range}
       :unknown -> :ok
     end
@@ -691,7 +685,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   defp combat_reach(reach) when is_number(reach) and reach > 0, do: reach
   defp combat_reach(_reach), do: 0.0
 
-  defp check_distance(distance, %Spell{range_yards: range, min_range_yards: min_range} = spell) do
+  defp check_distance(distance, %Spell{min_range_yards: min_range} = spell, range) do
     cond do
       spell.melee_range? and Spell.attribute?(spell, :on_next_swing) -> :ok
       distance > range + @range_leeway_yards -> {:error, :out_of_range}

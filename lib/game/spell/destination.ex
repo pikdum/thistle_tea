@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Spell.Destination do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Modifiers
+  alias ThistleTea.Game.Spell.Range
   alias ThistleTea.Game.Spell.Target
 
   def validate(caster, %Spell{} = spell, %Target{selection: :none, destination_location: destination}, los?)
@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Spell.Destination do
        when is_number(range) and range > 0 do
     radius = if is_number(unit.bounding_radius), do: max(unit.bounding_radius, 0), else: 0
     distance = max(Math.distance({x, y, z}, destination) - radius, 0)
-    maximum = Modifiers.value(caster, spell, :range, range) + leeway(caster)
+    maximum = Range.maximum(caster, spell) + leeway(caster)
 
     cond do
       distance > maximum -> {:error, :out_of_range}

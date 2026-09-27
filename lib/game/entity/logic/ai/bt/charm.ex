@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Charm do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.Cooldowns
+  alias ThistleTea.Game.Spell.Range
 
   def maintain(%Character{internal: %{possession: %Possession{kind: :charm} = control}} = entity, blackboard, context) do
     controller = Perception.metadata(context.perception, control.caster_guid)
@@ -185,7 +186,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Charm do
   end
 
   defp spell_available?(entity, spell, distance, now) do
-    distance <= max(spell.range_yards || 0, 5.0) and distance >= (spell.min_range_yards || 0) and
+    distance <= max(Range.maximum(entity, spell) || 0, 5.0) and distance >= (spell.min_range_yards || 0) and
       CombatControl.prevention(entity, spell) == :ok and
       Resources.can_pay_cost?(entity, spell.power_type, Resources.power_cost(entity, spell)) and
       not Cooldowns.on_cooldown?(entity, spell, now) and not Cooldowns.on_gcd?(entity, spell, now) and

@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastValidation
+  alias ThistleTea.Game.Spell.Range
   alias ThistleTea.Game.Spell.Target
 
   @list_tick_ms 1_200
@@ -42,17 +43,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   def list_tick_ms, do: @list_tick_ms
 
-  def observation_radius(%Mob{internal: %Internal{pet: %Pet{}, spellbook: spellbook}}) when is_map(spellbook) do
-    Enum.reduce(spellbook, 0.0, fn {_id, spell}, radius -> max(radius, spell.range_yards || 0.0) end)
+  def observation_radius(%Mob{internal: %Internal{pet: %Pet{}, spellbook: spellbook}} = state) when is_map(spellbook) do
+    Enum.reduce(spellbook, 0.0, fn {_id, spell}, radius -> max(radius, Range.maximum(state, spell) || 0.0) end)
   end
 
-  def observation_radius(%Mob{internal: %Internal{creature: %Creature{spells: spells}, spellbook: spellbook}})
+  def observation_radius(%Mob{internal: %Internal{creature: %Creature{spells: spells}, spellbook: spellbook}} = state)
       when is_list(spells) and is_map(spellbook) do
     Enum.reduce(spells, 0.0, fn
       %CreatureSpell{cast_target: target} = entry, radius
       when target in [:friendly_injured, :friendly_injured_except] ->
         spell = Map.get(spellbook, entry.spell_id)
-        max(radius, injured_search_radius(entry, spell))
+        max(radius, injured_search_radius(state, entry, spell))
 
       _entry, radius ->
         radius
@@ -440,7 +441,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
          except_guid,
          %Context{} = context
        ) do
-    radius = injured_search_radius(entry, spell)
+    radius = injured_search_radius(state, entry, spell)
     threshold = injured_threshold(entry)
 
     candidates =
@@ -494,15 +495,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   defp missing_health_pct(%{health_pct: health_pct}) when is_number(health_pct), do: 100 - health_pct
   defp missing_health_pct(_metadata), do: nil
 
-  defp injured_search_radius(%CreatureSpell{target_param1: param1}, _spell) when is_number(param1) and param1 > 0 do
+  defp injured_search_radius(_state, %CreatureSpell{target_param1: param1}, _spell)
+       when is_number(param1) and param1 > 0 do
     param1 * 1.0
   end
 
-  defp injured_search_radius(_entry, %Spell{range_yards: range}) when is_number(range) and range > 0 do
-    range
+  defp injured_search_radius(state, _entry, %Spell{range_yards: range} = spell) when is_number(range) and range > 0 do
+    Range.maximum(state, spell)
   end
 
-  defp injured_search_radius(_entry, _spell), do: @injured_default_radius
+  defp injured_search_radius(_state, _entry, _spell), do: @injured_default_radius
 
   defp injured_threshold(%CreatureSpell{target_param2: param2}) when is_integer(param2) and param2 in 1..100 do
     param2

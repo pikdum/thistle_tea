@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
   alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Range
 
   def sequence do
     BT.sequence([BT.condition(&active?/2), BT.action(&shoot_with_context/3), BT.action(&wait/3)])
@@ -52,7 +53,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
       not is_number(distance) ->
         {:failure, stop(character), blackboard}
 
-      outside_range?(distance, auto_shot.spell) ->
+      outside_range?(character, distance, auto_shot.spell) ->
         {:failure, stop(character), blackboard}
 
       now < auto_shot.next_at ->
@@ -114,8 +115,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
   defp combat_reach(reach) when is_number(reach) and reach > 0, do: reach
   defp combat_reach(_reach), do: 0.0
 
-  defp outside_range?(distance, %Spell{min_range_yards: min_range, range_yards: max_range}) do
+  defp outside_range?(character, distance, %Spell{min_range_yards: min_range, range_yards: base_range} = spell) do
     (is_number(min_range) and min_range > 0 and distance < min_range) or
-      (is_number(max_range) and max_range > 0 and distance > max_range)
+      (is_number(base_range) and base_range > 0 and distance > Range.maximum(character, spell))
   end
 end
