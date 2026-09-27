@@ -3,6 +3,22 @@ defmodule ThistleTea.Game.MathTest do
 
   alias ThistleTea.Game.Math
 
+  describe "dither/2" do
+    test "preserves whole values without consuming a roll" do
+      for value <- [0, 10, 10.0] do
+        assert Math.dither(value, fn -> flunk("unexpected roll") end) == value
+      end
+    end
+
+    test "rounds fractional values with their original expected value" do
+      for value <- [0.25, 7.5, 19.75] do
+        samples = for n <- 0..99, do: Math.dither(value, fn -> (n + 0.5) / 100 end)
+        assert Enum.all?(samples, &(&1 in [floor(value), ceil(value)]))
+        assert_in_delta Enum.sum(samples) / 100, value, 0.00001
+      end
+    end
+  end
+
   describe "random_int/2" do
     test "returns integer in range with integer inputs" do
       result = Math.random_int(1, 10)

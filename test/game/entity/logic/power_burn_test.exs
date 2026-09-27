@@ -143,7 +143,8 @@ defmodule ThistleTea.Game.Entity.Logic.PowerBurnTest do
       context = %{context | spell_crit_chance: 100}
       {entity, _} = Aura.apply_spell(entity, context, burn_spell(:apply_aura), 100)
       {entity, [event]} = Aura.tick(entity, 1_100)
-      assert entity.unit.health == 888
+      assert event.damage in [112, 113]
+      assert entity.unit.health == 1_000 - event.damage
       assert event.crit?
       assert event.periodic?
     end

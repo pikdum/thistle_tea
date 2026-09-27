@@ -164,6 +164,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
     {entity, damage, absorbed} =
       if result.damage > 0 do
         Core.take_damage_with_mitigation(entity, result.damage, now,
+          damage_taken_applied?: true,
           school: attack_school(attack),
           source: Map.get(attack, :caster, 0),
           source_level: Map.get(attack, :caster_level, 1),

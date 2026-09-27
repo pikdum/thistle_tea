@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.PowerBurn do
   Consumes the target's active power and converts the actual loss into spell
   damage. Absorption protects health without refunding the consumed resource.
   """
+  alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
@@ -11,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.PowerBurn do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Combat, as: SpellCombat
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.ProcOrigin
 
@@ -24,12 +26,16 @@ defmodule ThistleTea.Game.Entity.Logic.PowerBurn do
         entity = damage_contact(entity, context, spell, now, opts)
 
         damage = trunc(consumed * multiplier(context, effect.multiple_value, opts))
+        opts = Keyword.put(opts, :damage_effect, damage_effect(spell, effect))
         apply_damage(entity, context, spell, damage, now, opts)
       else
         {entity, []}
       end
     end
   end
+
+  defp damage_effect(_spell, %Effect{} = effect), do: effect
+  defp damage_effect(%Spell{effects: effects}, %Aura{index: index}), do: Enum.find(effects, &(&1.index == index))
 
   defp damage_contact(entity, context, spell, now, opts) do
     if SpellCombat.damage_contact?(spell, Keyword.get(opts, :periodic?, false), context.triggered_by_proc?),

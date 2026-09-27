@@ -2,11 +2,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   @moduledoc false
 
   alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Logic.AttackDamageTaken
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.CreatureType
+  alias ThistleTea.Game.Entity.Logic.DamageReceived
   alias ThistleTea.Game.Entity.Logic.Druid
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.EnvironmentalDamage
@@ -239,19 +239,22 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
           scripted_damage_multiplier(state, spell)
       )
 
-    rolled = AttackDamageTaken.spell_amount(state, rolled, spell, Keyword.get(opts, :damage_effect))
+    damage_type = if Keyword.get(opts, :periodic?, false), do: :dot, else: :direct
+    rolled = DamageReceived.spell_amount(state, rolled, spell, Keyword.get(opts, :damage_effect), damage_type)
 
     crit? = direct_spell_crit?(state, context, spell, opts)
     rolled = if crit?, do: rolled + versus_crit_bonus(state, context, crit_bonus(context, spell, rolled)), else: rolled
 
-    damage = max(rolled + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
+    damage = Math.dither(rolled)
 
     school = school_atom(spell)
+    damage = mitigate_physical(state, context, school, damage, spell)
     resisted = school_resisted_amount(state, damage, school, context, Keyword.put(opts, :spell, spell))
     damage = damage - resisted
 
     {state, damage, absorbed} =
       Core.take_damage_with_mitigation(state, damage, now,
+        damage_taken_applied?: true,
         school: school,
         spell: spell,
         source: context.caster_guid,
@@ -330,7 +333,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   end
 
   defp versus_crit_bonus(state, %CastContext{crit_damage_versus: pairs}, bonus) do
-    trunc(bonus * max(100 + Aura.versus_amount(pairs, CreatureType.mask(state)), 0) / 100)
+    bonus * max(100 + Aura.versus_amount(pairs, CreatureType.mask(state)), 0) / 100
   end
 
   defp scripted_damage_multiplier(state, %Spell{} = spell) do
@@ -358,7 +361,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
   defp crit_bonus(%CastContext{} = context, %Spell{} = spell, damage) do
     base_bonus = damage * (spell_crit_multiplier(spell) - 1.0)
-    trunc(Modifiers.value(context.spell_modifiers, :crit_damage_bonus, base_bonus))
+    Modifiers.value(context.spell_modifiers, :crit_damage_bonus, base_bonus)
   end
 
   defp spell_crit_multiplier(%Spell{dmg_class: 3}), do: 2.0
@@ -491,30 +494,24 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
           context.happiness_multiplier
       )
 
-    damage = AttackDamageTaken.spell_amount(state, damage, spell, effect)
-
-    unmitigated_damage =
-      max(damage + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
-
-    damage = mitigate_physical(state, context, school, unmitigated_damage)
+    unmitigated_damage = DamageReceived.spell_amount(state, damage, spell, effect)
 
     damage =
       if context.melee_crit? do
-        damage + weapon_crit_bonus(context, spell, damage)
+        unmitigated_damage + weapon_crit_bonus(context, spell, unmitigated_damage)
       else
-        damage
+        unmitigated_damage
       end
 
-    proc_damage =
-      if context.melee_crit?,
-        do: unmitigated_damage + weapon_crit_bonus(context, spell, unmitigated_damage),
-        else: unmitigated_damage
+    proc_damage = Math.dither(damage)
+    damage = mitigate_physical(state, context, school, proc_damage, spell)
 
     resisted = school_resisted_amount(state, damage, school, context, spell: spell)
     damage = max(damage - resisted, 0)
 
     {state, damage, absorbed} =
       Core.take_damage_with_mitigation(state, damage, now,
+        damage_taken_applied?: true,
         school: school,
         spell: spell,
         source: context.caster_guid,
@@ -551,7 +548,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
   defp weapon_crit_bonus(context, spell, damage) do
     bonus = if Spell.wand?(spell), do: damage * 0.5, else: damage * 1.0
-    trunc(Modifiers.value(context.spell_modifiers, :crit_damage_bonus, bonus))
+    Modifiers.value(context.spell_modifiers, :crit_damage_bonus, bonus)
   end
 
   defp incoming_melee_ability_reactions(state, %CastContext{} = context, %Spell{} = spell, hit, now) do
@@ -605,13 +602,17 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     end
   end
 
-  defp mitigate_physical(%{unit: %{normal_resistance: armor}}, %CastContext{} = context, :physical, damage)
+  defp mitigate_physical(%{unit: %{normal_resistance: armor}}, %CastContext{} = context, :physical, damage, spell)
        when damage > 0 do
-    armor = ResistancePenetration.resistance(armor, context.resistance_penetration, :physical)
-    AttackTable.armor_reduced_damage(damage, armor, context.caster_level)
+    if Spell.custom?(spell, :ignore_armor) do
+      damage
+    else
+      armor = ResistancePenetration.resistance(armor, context.resistance_penetration, :physical)
+      AttackTable.armor_reduced_damage(damage, armor, context.caster_level)
+    end
   end
 
-  defp mitigate_physical(_state, _context, _school, damage), do: damage
+  defp mitigate_physical(_state, _context, _school, damage, _spell), do: damage
 
   defp attack_position({_map, x, y, z}), do: {x, y, z}
   defp attack_position(_position), do: nil

@@ -5,6 +5,11 @@ defmodule ThistleTea.Game.Math do
 
   @range 250
 
+  def dither(value, roll \\ &:rand.uniform/0) when is_number(value) and value >= 0 do
+    whole = trunc(value)
+    if value > whole and roll.() < value - whole, do: whole + 1, else: whole
+  end
+
   def random_int(min, max) when is_float(min) and is_float(max) do
     random_int(round(min), round(max))
   end

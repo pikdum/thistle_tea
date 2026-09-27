@@ -14,7 +14,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.AttackDamageTaken
   alias ThistleTea.Game.Entity.Logic.AttackSchool
   alias ThistleTea.Game.Entity.Logic.AttackSpeed
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -22,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Logic.CombatWeapon
   alias ThistleTea.Game.Entity.Logic.ControlOwner
   alias ThistleTea.Game.Entity.Logic.CreatureType
+  alias ThistleTea.Game.Entity.Logic.DamageReceived
   alias ThistleTea.Game.Entity.Logic.Daze
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.MechanicResistance
@@ -134,7 +134,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     bonus = target_attack_power_damage(defender, attack) + target_damage(defender, attack)
     damage = scale_versus_damage(ctx, max(trunc(damage + bonus), 0))
     school = AttackSchool.from_mask(Map.get(attack, :spell_school_mask))
-    damage = AttackDamageTaken.swing_amount(defender, damage, if(ctx.ranged?, do: :ranged, else: :melee), school)
+    damage = DamageReceived.swing_amount(defender, damage, if(ctx.ranged?, do: :ranged, else: :melee), school)
+    damage = Math.dither(damage)
     roll = Keyword.get_lazy(opts, :roll, fn -> Math.random_int(0, 9_999) end)
     outcome = roll_outcome(ctx, roll)
     result = apply_outcome(outcome, ctx, damage, opts)

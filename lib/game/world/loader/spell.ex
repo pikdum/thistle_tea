@@ -1075,6 +1075,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex3, @dot_stacking_rule_ex3, :dot_stacking_rule)
     |> add_if(attrs_ex4, 0x00000002, :class_trigger_only_on_caster)
     |> add_if(attrs_ex4, 0x00000008, :no_helpful_threat)
+    |> add_if(attrs_ex4, 0x00000100, :ignore_damage_taken_modifiers)
   end
 
   defp attributes(_, _, _, _, _), do: MapSet.new()

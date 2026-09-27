@@ -7,18 +7,17 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PeriodicDamage do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.AttackDamageTaken
-  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.DamageReceived
   alias ThistleTea.Game.Entity.Logic.Warlock
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Coefficient
   alias ThistleTea.Game.Spell.Effect
 
   def amount(entity, %Holder{} = holder, %Aura{} = aura, roll \\ &:rand.uniform/0) do
     effect = Enum.find(holder.spell.effects, &(&1.index == aura.index))
     damage = base_amount(entity, holder, aura)
-    damage = received_amount(entity, holder, effect, damage)
-    rounded_amount(damage, roll)
+    damage = DamageReceived.spell_amount(entity, damage, holder.spell, effect, :dot, max(holder.stacks || 1, 1))
+    Math.dither(damage, roll)
   end
 
   defp base_amount(%{unit: %Unit{max_health: health}}, %Holder{stacks: stacks}, %Aura{
@@ -51,29 +50,4 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PeriodicDamage do
   end
 
   defp ramp_offset(_spell, _aura), do: 0
-
-  defp received_amount(entity, %Holder{spell: spell, stacks: stacks}, effect, damage) do
-    stacks = max(stacks || 1, 1)
-
-    damage =
-      if spell.dmg_class in [2, 3] do
-        AttackDamageTaken.spell_amount(entity, damage, spell, effect, :dot, stacks)
-      else
-        flat = AuraLogic.flat_modifier(entity, :mod_damage_taken, Spell.school_mask(spell))
-        damage + max(flat * coefficient(spell, effect) * stacks, -damage / 2)
-      end
-
-    max(damage * AuraLogic.percent_multiplier(entity, :mod_damage_percent_taken, Spell.school_mask(spell)), 0)
-  end
-
-  defp coefficient(%Spell{} = spell, %Effect{} = effect) do
-    if Spell.custom?(spell, :fixed_damage), do: 0, else: Coefficient.value(spell, effect, :dot)
-  end
-
-  defp coefficient(_spell, nil), do: 0
-
-  defp rounded_amount(damage, roll) do
-    whole = trunc(damage)
-    if damage > whole and roll.() < damage - whole, do: whole + 1, else: whole
-  end
 end

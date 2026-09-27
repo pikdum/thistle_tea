@@ -1449,7 +1449,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert [%Effects.SummonTotem{entry: 2523, slot: 1, duration_ms: 30_000}] = events
     end
 
-    test "mod_damage_taken reduces incoming spell damage" do
+    test "mod_damage_taken scales with the receiving effect coefficient" do
       dampen = %Spell{
         id: 604,
         name: "Dampen Magic",
@@ -1475,14 +1475,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
         id: 133,
         name: "Fireball",
         school: :fire,
-        effects: [%Effect{index: 0, type: :school_damage, base_points: 15, die_sides: 0}]
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 15, die_sides: 0, bonus_coefficient: 0.5}]
       }
 
       context = %CastContext{caster_guid: 999, caster_level: 10}
       {target, events} = SpellEffect.receive(target, context, fireball, 1_000)
 
-      assert [%Effects.SpellDamage{damage: 5}] = events
-      assert target.unit.health == 15
+      assert [%Effects.SpellDamage{damage: 10}] = events
+      assert target.unit.health == 10
     end
 
     test "mod_healing scales with the receiving heal coefficient" do

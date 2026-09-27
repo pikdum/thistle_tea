@@ -1,8 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Amount do
   @moduledoc false
 
-  alias ThistleTea.Game.Entity.Logic.AttackDamageTaken
-  alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.DamageReceived
   alias ThistleTea.Game.Entity.Logic.TargetDamage
   alias ThistleTea.Game.Entity.Logic.TargetSpellPower
   alias ThistleTea.Game.Spell
@@ -19,10 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Amount do
 
   def with_damage_bonuses(entity, %CastContext{} = context, %Spell{} = spell, %Effect{} = effect, base) do
     amount = outgoing_amount(entity, context, spell, effect, base)
-    amount = AttackDamageTaken.spell_amount(entity, amount, spell, effect)
-    mask = Spell.school_mask(spell)
-    taken = Aura.percent_multiplier(entity, :mod_damage_percent_taken, mask)
-    max(trunc((amount + Aura.flat_modifier(entity, :mod_damage_taken, mask)) * taken), 0)
+    trunc(DamageReceived.spell_amount(entity, amount, spell, effect))
   end
 
   defp outgoing_amount(entity, context, spell, effect, base) do

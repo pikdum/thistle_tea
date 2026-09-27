@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Critter
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.DamageOrigin
+  alias ThistleTea.Game.Entity.Logic.DamageReceived
   alias ThistleTea.Game.Entity.Logic.DamageSharing
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Durability
@@ -236,12 +237,8 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   defp enqueue_duel_outcome(entity, _outcome), do: entity
 
-  defp scale_damage_taken(entity, damage, school) when is_integer(damage) and damage > 0 do
-    case Aura.percent_multiplier(entity, :mod_damage_percent_taken, Spell.school_mask(school)) do
-      multiplier when multiplier != 1.0 -> max(trunc(damage * multiplier), 0)
-      _unchanged -> damage
-    end
-  end
+  defp scale_damage_taken(entity, damage, school) when is_integer(damage) and damage > 0,
+    do: trunc(DamageReceived.amount(entity, damage, school))
 
   defp scale_damage_taken(_entity, damage, _school), do: damage
 
