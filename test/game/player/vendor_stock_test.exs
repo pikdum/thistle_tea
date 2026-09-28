@@ -13,17 +13,24 @@ defmodule ThistleTea.Game.Player.VendorStockTest do
   alias ThistleTea.Game.Entity.Data.VendorItem
   alias ThistleTea.Game.Entity.Data.VendorStock.Receipt
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Entity.Registry
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.SmsgBuyFailed
   alias ThistleTea.Game.Network.Message.SmsgBuyItem
+  alias ThistleTea.Game.Network.Message.SmsgInventoryChangeFailure
+  alias ThistleTea.Game.Network.Message.SmsgItemCooldown
   alias ThistleTea.Game.Network.Message.SmsgItemPushResult
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Vendor
   alias ThistleTea.Game.Player.VendorPurchase
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cooldowns
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemProperty, as: PropertyLoader
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -87,7 +94,163 @@ defmodule ThistleTea.Game.Player.VendorStockTest do
     end
   end
 
+  describe "buy_in_slot/6" do
+    test "uses the selected backpack slot and retains it through recovery", %{state: state, vendor: vendor, item: item} do
+      bought = Vendor.buy_in_slot(state, vendor, item.template.entry, 1, state.guid, 30)
+      assert bought.character.player.inv1 == nil
+      assert bought.character.player.inv8 > 0
+      assert bought.character.player.coinage == 98
+      assert [stored] = owned(bought)
+      assert stored.item.stack_count == 3
+      assert stored.item.contained == state.guid
+      assert [%VendorItem{available: 3}] = Vendor.visible_items(bought.character, vendor)
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgItemPushResult{bag_slot: 255, item_slot: 30, count: 3}}}
+      assert VendorPurchase.recover(CharacterStore.get(state.guid)) == bought.character
+    end
+
+    test "resolves equipped bag GUIDs and spills bundles into the same bag", context do
+      %{state: state, vendor: vendor, item: item} = context
+
+      bag =
+        ItemStore.prepare(%ItemTemplate{entry: 999_945, class: 1, inventory_type: 18, container_slots: 4},
+          owner: state.guid
+        )
+
+      ItemStore.put(bag)
+      state = %{state | character: %{state.character | player: %{state.character.player | bag1: bag.object.guid}}}
+
+      bought = Vendor.buy_in_slot(state, vendor, item.template.entry, 2, bag.object.guid, 2)
+      bag = ItemStore.get(bag.object.guid)
+      assert ItemStore.get(bag.container.slot_3).item.stack_count == 5
+      assert ItemStore.get(bag.container.slot_1).item.stack_count == 1
+      assert bought.character.player.inv1 == nil
+      assert bought.character.player.coinage == 96
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgItemPushResult{bag_slot: 19, item_slot: 2, count: 6}}}
+    end
+
+    test "rejects occupied slots without spending stock, money or item rows", context do
+      %{state: state, vendor: vendor, item: item} = context
+      {:ok, state, _position} = Items.store(state, %ItemTemplate{entry: 999_944}, 1)
+      before = owned(state)
+      assert Vendor.buy_in_slot(state, vendor, item.template.entry, 1, state.guid, 23) == state
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgInventoryChangeFailure{code: 19}}}
+      assert owned(state) == before
+      assert [%VendorItem{available: 6}] = Vendor.visible_items(state.character, vendor)
+      assert VendorStockStore.pending(state.guid) == nil
+      assert CharacterStore.get(state.guid).player.coinage == 100
+    end
+
+    test "rejects bank slots and foreign or unequipped bag GUIDs", context do
+      %{state: state, vendor: vendor, item: item} = context
+      template = %ItemTemplate{entry: 999_945, class: 1, inventory_type: 18, container_slots: 4}
+      bag = ItemStore.prepare(template, owner: state.guid)
+      foreign = ItemStore.prepare(template, owner: state.guid + 1)
+      ItemStore.put(bag)
+      ItemStore.put(foreign)
+      on_exit(fn -> ItemStore.delete(foreign.object.guid) end)
+      player = %{state.character.player | inv1: bag.object.guid, bag1: foreign.object.guid, bank_bag1: bag.object.guid}
+      state = %{state | character: %{state.character | player: player}}
+
+      for guid <- [0, bag.object.guid, foreign.object.guid, state.guid + 1] do
+        assert Vendor.buy_in_slot(state, vendor, item.template.entry, 1, guid, 0) == state
+      end
+
+      for slot <- [39, 63, 100] do
+        assert Vendor.buy_in_slot(state, vendor, item.template.entry, 1, state.guid, slot) == state
+        assert_receive {:"$gen_cast", {:send_packet, %SmsgInventoryChangeFailure{code: 3}}}
+      end
+
+      assert [%VendorItem{available: 6}] = Vendor.visible_items(state.character, vendor)
+      assert VendorStockStore.pending(state.guid) == nil
+      refute_received {:"$gen_cast", {:send_packet, %SmsgBuyItem{}}}
+    end
+
+    test "equips into an empty slot despite a full backpack and starts stats, binding and cooldowns", context do
+      %{state: state, vendor: vendor} = context
+      {item, spell} = equipment_offer(context)
+      {:ok, state, _position} = Items.store(state, %ItemTemplate{entry: 999_944}, 16)
+      before = Time.now()
+      bought = Vendor.buy_in_slot(state, vendor, item.template.entry, 1, state.guid, 12)
+      equipped = ItemStore.get(bought.character.player.trinket1)
+      assert equipped.item.flags == 1
+      assert equipped.item.contained == state.guid
+      assert bought.character.unit.equipment_bonuses.stamina == 7
+      assert bought.character.player.coinage == 98
+      assert Cooldowns.ready_at(bought.character, spell) >= before + 30_000
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgItemCooldown{item_guid: guid, spell_id: spell_id}}}
+      assert guid == equipped.object.guid
+      assert spell_id == spell.id
+
+      assert Vendor.buy_in_slot(bought, vendor, item.template.entry, 1, state.guid, 12) == bought
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgInventoryChangeFailure{code: 9}}}
+      assert [%VendorItem{available: 5}] = Vendor.visible_items(bought.character, vendor)
+    end
+
+    test "equipment count, level, proficiency and combat failures preserve the purchase", context do
+      %{state: state, vendor: vendor} = context
+      {item, _spell} = equipment_offer(context)
+
+      assert Vendor.buy_in_slot(state, vendor, item.template.entry, 2, state.guid, 12) == state
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgInventoryChangeFailure{code: 20}}}
+
+      put_offer(vendor, %{item | template: %{item.template | required_level: 60}})
+      assert Vendor.buy_in_slot(state, vendor, item.template.entry, 1, state.guid, 12) == state
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgInventoryChangeFailure{code: 1, required_level: 60}}}
+
+      put_offer(vendor, %{item | template: %{item.template | required_skill: 202, required_skill_rank: 100}})
+      assert Vendor.buy_in_slot(state, vendor, item.template.entry, 1, state.guid, 12) == state
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgInventoryChangeFailure{code: 8}}}
+
+      put_offer(vendor, item)
+      combat = %{state | character: %{state.character | internal: %{state.character.internal | in_combat: true}}}
+      assert Vendor.buy_in_slot(combat, vendor, item.template.entry, 1, state.guid, 12) == combat
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgInventoryChangeFailure{code: 60}}}
+      assert [%VendorItem{available: 6}] = Vendor.visible_items(state.character, vendor)
+      assert owned(state) == []
+      assert VendorStockStore.pending(state.guid) == nil
+    end
+  end
+
   describe "recover/1 and finish_recovery/1" do
+    test "restores an interrupted equipment purchase with a single equip cooldown", context do
+      %{state: state, vendor: vendor} = context
+      {item, spell} = equipment_offer(context)
+      character = %{state.character | player: %{state.character.player | coinage: 98}}
+
+      {:ok, changes, position} =
+        Items.plan_store(character, item.template, 1,
+          destination: {255, 12},
+          unit: character.unit,
+          proficiency: Proficiency.all()
+        )
+
+      offer = %Receipt{
+        id: make_ref(),
+        guid: state.guid,
+        changes: changes,
+        old_counts: %{},
+        vendor_guid: vendor,
+        vendor_item: item,
+        count: 1,
+        available: nil,
+        position: position
+      }
+
+      CharacterStore.put(state.character)
+      assert {:ok, _receipt} = VendorStock.purchase(character.internal.world, offer)
+      before = Time.now()
+      recovered = VendorPurchase.recover(CharacterStore.get(state.guid))
+      assert recovered.player.trinket1 > 0
+      assert recovered.player.coinage == 98
+      assert recovered.unit.equipment_bonuses.stamina == 7
+      assert Cooldowns.ready_at(recovered, spell) >= before + 30_000
+      assert VendorPurchase.recover(recovered) == recovered
+      assert [%VendorItem{available: 5}] = Vendor.visible_items(recovered, vendor)
+      recovered_state = VendorPurchase.finish_recovery(%{state | character: recovered})
+      assert VendorStockStore.pending(state.guid) == nil
+      assert VendorPurchase.settle(recovered_state) == recovered_state
+    end
+
     test "recovers an interrupted purchase exactly once without replenishing stock", context do
       %{state: state, vendor: vendor, item: item} = context
       character = %{state.character | player: %{state.character.player | coinage: 98}}
@@ -164,4 +327,28 @@ defmodule ThistleTea.Game.Player.VendorStockTest do
   end
 
   defp owned(state), do: Inventory.owned_items(state.character.player, &ItemStore.get/1)
+
+  defp equipment_offer(%{item: item, vendor: vendor}) do
+    spell = %Spell{id: 999_946}
+    :ets.insert(SpellLoader, {{:spell, spell.id}, spell})
+    on_exit(fn -> :ets.delete(SpellLoader, {:spell, spell.id}) end)
+
+    template = %{
+      item.template
+      | buy_count: 1,
+        stackable: 1,
+        class: 4,
+        inventory_type: 12,
+        bonding: 2,
+        stat_type1: 7,
+        stat_value1: 7,
+        spellid_1: spell.id
+    }
+
+    item = %{item | template: template}
+    put_offer(vendor, item)
+    {item, spell}
+  end
+
+  defp put_offer(vendor, item), do: :ets.insert(VendorLoader, {Guid.entry(vendor), [item]})
 end

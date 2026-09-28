@@ -7,43 +7,70 @@ defmodule ThistleTea.Game.Player.VendorPurchase do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.VendorItem
   alias ThistleTea.Game.Entity.Data.VendorStock.Receipt
+  alias ThistleTea.Game.Entity.Logic.EquipmentTransitions
+  alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
+  alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.Player.Reputation
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.System.VendorStock
   alias ThistleTea.Game.World.VendorStockStore
 
-  def buy(state, vendor_guid, %VendorItem{} = item, count, price) do
+  def buy(state, vendor_guid, %VendorItem{} = item, count, price, destination \\ :carried) do
     character = state.character
     purchase = %{character | player: %{character.player | coinage: character.player.coinage - price}}
 
-    case Items.plan_store(purchase, item.template, count * max(item.template.buy_count, 1)) do
-      {:ok, changes, position} ->
-        receipt = %Receipt{
-          id: make_ref(),
-          guid: state.guid,
-          changes: changes,
-          old_counts: Quests.quest_item_counts(character),
-          vendor_guid: vendor_guid,
-          vendor_item: item,
-          count: count,
-          available: nil,
-          position: position
-        }
+    opts = [
+      destination: destination,
+      unit: character.unit,
+      proficiency: Proficiency.from_character(character),
+      validate_item: &Reputation.validate_item_requirement(character, &1)
+    ]
 
-        CharacterStore.put(character)
-        result = request(character.internal.world, receipt)
+    with {:ok, changes, position} <-
+           Items.plan_store(purchase, item.template, count * max(item.template.buy_count, 1), opts),
+         :ok <- validate_equipment(character, changes) do
+      receipt = %Receipt{
+        id: make_ref(),
+        guid: state.guid,
+        changes: changes,
+        old_counts: Quests.quest_item_counts(character),
+        vendor_guid: vendor_guid,
+        vendor_item: item,
+        count: count,
+        available: nil,
+        position: position
+      }
 
-        case VendorStockStore.pending(state.guid) do
-          %Receipt{} -> settle(state)
-          nil -> failure(state, vendor_guid, item.template.entry, result)
-        end
+      CharacterStore.put(character)
+      result = request(character.internal.world, receipt)
 
-      {:error, _reason} ->
-        failure(state, vendor_guid, item.template.entry, {:error, :cant_carry_more})
+      case VendorStockStore.pending(state.guid) do
+        %Receipt{} -> settle(state)
+        nil -> failure(state, vendor_guid, item.template.entry, result)
+      end
+    else
+      {:error, reason} ->
+        placement_failure(state, vendor_guid, item.template, destination, reason)
+    end
+  end
+
+  defp validate_equipment(character, changes) do
+    get_item = fn
+      guid when is_integer(guid) -> ChangeSet.get_item(changes, guid, &ItemStore.get/1)
+      _missing -> nil
+    end
+
+    case EquipmentTransitions.validate(character, changes.player, get_item, Time.now()) do
+      :ok -> :ok
+      {:error, reason, _new_guid, _old_guid} -> {:error, reason}
     end
   end
 
@@ -82,7 +109,7 @@ defmodule ThistleTea.Game.Player.VendorPurchase do
   defp project(%{character: %{internal: %{last_vendor_purchase_id: id}}} = state, %Receipt{id: id}), do: state
 
   defp project(state, receipt) do
-    character = receipt_character(state.character, receipt)
+    character = mark_receipt(state.character, receipt)
     InventoryUpdate.apply_committed(%{state | character: character}, receipt.changes, receipt.old_counts)
   end
 
@@ -97,7 +124,13 @@ defmodule ThistleTea.Game.Player.VendorPurchase do
     do: character
 
   defp receipt_character(%Character{} = character, receipt) do
-    %{character | player: receipt.changes.player, internal: %{character.internal | last_vendor_purchase_id: receipt.id}}
+    character
+    |> InventoryUpdate.sync_character(receipt.changes.player)
+    |> mark_receipt(receipt)
+  end
+
+  defp mark_receipt(%Character{} = character, receipt) do
+    %{character | internal: %{character.internal | last_vendor_purchase_id: receipt.id}}
   end
 
   defp success(receipt) do
@@ -133,6 +166,19 @@ defmodule ThistleTea.Game.Player.VendorPurchase do
   defp failure(state, vendor, item, {:error, reason}) do
     reason = if reason in [:item_already_sold, :cant_carry_more], do: reason, else: :cant_find_item
     Network.send_packet(%Message.SmsgBuyFailed{vendor_guid: vendor, item_id: item, error: reason})
+    state
+  end
+
+  defp placement_failure(state, vendor, template, :carried, _reason) do
+    failure(state, vendor, template.entry, {:error, :cant_carry_more})
+  end
+
+  defp placement_failure(state, _vendor, template, _destination, reason) do
+    Network.send_packet(%Message.SmsgInventoryChangeFailure{
+      code: Inventory.error_code(reason),
+      required_level: template.required_level
+    })
+
     state
   end
 end

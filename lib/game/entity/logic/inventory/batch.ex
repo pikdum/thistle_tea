@@ -35,6 +35,12 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory.Batch do
     defstruct @enforce_keys
   end
 
+  defmodule Addition do
+    @moduledoc false
+    @enforce_keys [:item, :destination]
+    defstruct @enforce_keys
+  end
+
   @enforce_keys [:player]
   defstruct [:player, removals: [], replacements: [], relocations: [], additions: [], updates: []]
 
@@ -45,8 +51,9 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory.Batch do
     %{batch | removals: [%Removal{entry: entry, count: count} | removals]}
   end
 
-  def add(%__MODULE__{additions: additions} = batch, %Item{} = item) do
-    %{batch | additions: [item | additions]}
+  def add(%__MODULE__{additions: additions} = batch, %Item{} = item, destination \\ :carried) do
+    addition = %Addition{item: item, destination: destination}
+    %{batch | additions: [addition | additions]}
   end
 
   def update(%__MODULE__{updates: updates} = batch, %Item{} = item) do

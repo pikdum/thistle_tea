@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Player.Vendor do
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Logic.Condition
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
   alias ThistleTea.Game.Entity.Logic.Death
@@ -13,6 +14,7 @@ defmodule ThistleTea.Game.Player.Vendor do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.ItemCosts
@@ -37,17 +39,55 @@ defmodule ThistleTea.Game.Player.Vendor do
 
   def list(state, _vendor_guid), do: state
 
-  def buy(%{ready: true, character: %Character{} = character} = state, vendor_guid, item_id, requested_count) do
+  def buy(state, vendor_guid, item_id, requested_count, destination \\ :carried)
+
+  def buy(
+        %{ready: true, character: %Character{} = character} = state,
+        vendor_guid,
+        item_id,
+        requested_count,
+        destination
+      ) do
     if valid_vendor?(character, vendor_guid) do
       state = state |> VendorPurchase.settle() |> ItemCosts.settle()
-      buy_authorized(state, state.character, vendor_guid, item_id, max(requested_count, 1))
+      buy_authorized(state, vendor_guid, item_id, max(requested_count, 1), destination)
     else
       send_buy_failed(vendor_guid, item_id, :distance_too_far)
       state
     end
   end
 
-  def buy(state, _vendor_guid, _item_id, _count), do: state
+  def buy(state, _vendor_guid, _item_id, _count, _destination), do: state
+
+  def buy_in_slot(%{ready: true, character: %Character{} = character} = state, vendor, item, count, bag_guid, slot) do
+    with bag when is_integer(bag) <- destination_bag(character, bag_guid),
+         true <- slot == 255 or Inventory.carried_position?({bag, slot}) do
+      destination = if slot == 255, do: {:bag, bag}, else: {bag, slot}
+      buy(state, vendor, item, count, destination)
+    else
+      nil ->
+        state
+
+      false ->
+        InventoryUpdate.send_failure(:item_doesnt_go_to_slot, 0, 0)
+        state
+    end
+  end
+
+  def buy_in_slot(state, _vendor, _item, _count, _bag, _slot), do: state
+
+  defp destination_bag(%Character{object: %{guid: guid}}, guid), do: Inventory.bag_0()
+
+  defp destination_bag(%Character{} = character, guid) do
+    Enum.find(Inventory.slot_index(:bag1)..Inventory.slot_index(:bag4), fn slot ->
+      with ^guid <- Inventory.item_guid_at(character.player, {Inventory.bag_0(), slot}, &ItemStore.get/1),
+           %Item{item: %{owner: owner}} = item <- ItemStore.get(guid) do
+        owner == character.object.guid and Item.container?(item)
+      else
+        _missing -> false
+      end
+    end)
+  end
 
   def valid_vendor?(%Character{} = character, vendor_guid) do
     with true <- Death.alive?(character),
@@ -64,10 +104,10 @@ defmodule ThistleTea.Game.Player.Vendor do
     end
   end
 
-  defp buy_authorized(state, character, vendor_guid, item_id, count) do
-    case Enum.find(visible_items(character, vendor_guid), &(&1.template.entry == item_id)) do
-      %{template: template} = vendor_item ->
-        buy_visible(state, character, vendor_guid, vendor_item, template, count)
+  defp buy_authorized(state, vendor_guid, item_id, count, destination) do
+    case Enum.find(visible_items(state.character, vendor_guid), &(&1.template.entry == item_id)) do
+      %{template: _template} = vendor_item ->
+        buy_visible(state, vendor_guid, vendor_item, count, destination)
 
       _missing_or_condition_failed ->
         send_buy_failed(vendor_guid, item_id, :cant_find_item)
@@ -100,9 +140,10 @@ defmodule ThistleTea.Game.Player.Vendor do
     ConditionContext.build(character, conditions, source: source)
   end
 
-  defp buy_visible(state, character, vendor_guid, vendor_item, template, count) do
+  defp buy_visible(state, vendor_guid, vendor_item, count, destination) do
+    character = state.character
+    template = vendor_item.template
     price = Reputation.price(character, vendor_guid, template.buy_price * count)
-    total_count = max(template.buy_count, 1) * count
 
     cond do
       not Reputation.can_interact?(character, vendor_guid) ->
@@ -120,12 +161,8 @@ defmodule ThistleTea.Game.Player.Vendor do
         send_buy_failed(vendor_guid, template.entry, :not_enough_money)
         state
 
-      not Inventory.can_store?(character.player, template, total_count, &ItemStore.get/1) ->
-        send_buy_failed(vendor_guid, template.entry, :cant_carry_more)
-        state
-
       true ->
-        VendorPurchase.buy(state, vendor_guid, vendor_item, count, price)
+        VendorPurchase.buy(state, vendor_guid, vendor_item, count, price, destination)
     end
   end
 

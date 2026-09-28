@@ -116,14 +116,37 @@ defmodule ThistleTea.Game.Player.Items do
 
   def plan_store(%Character{} = character, %ItemTemplate{} = template, count, opts \\ [])
       when is_integer(count) and count > 0 do
-    items = prepare_stacks(template, character.object.guid, count, opts)
-    batch = Enum.reduce(items, Batch.new(character.player), &Batch.add(&2, &1))
+    destination = Keyword.get(opts, :destination, :carried)
 
-    with {:ok, changes} <- Inventory.plan(batch, &ItemStore.get/1) do
+    with :ok <- validate_store_count(destination, count) do
+      plan_stacks(character, template, count, destination, opts)
+    end
+  end
+
+  defp plan_stacks(character, template, count, destination, opts) do
+    items = prepare_stacks(template, character.object.guid, count, Keyword.take(opts, [:random_property]))
+    [first | rest] = items
+    batch = Batch.add(Batch.new(character.player), first, destination)
+    remainder = remainder_destination(destination)
+    batch = Enum.reduce(rest, batch, &Batch.add(&2, &1, remainder))
+    inventory_opts = Keyword.take(opts, [:unit, :proficiency, :validate_item])
+
+    with {:ok, changes} <- Inventory.plan(batch, &ItemStore.get/1, inventory_opts) do
       position = placement_position(ChangeSet.placement(changes, hd(items).object.guid))
       {:ok, changes, position}
     end
   end
+
+  defp validate_store_count({bag, slot}, count) when count != 1 do
+    if bag == Inventory.bag_0() and (Inventory.equipment_slot?(slot) or Inventory.bag_slot?(slot)),
+      do: {:error, :item_cant_be_equipped},
+      else: :ok
+  end
+
+  defp validate_store_count(_destination, _count), do: :ok
+
+  defp remainder_destination({bag, slot}) when is_integer(bag) and is_integer(slot), do: {:bag, bag}
+  defp remainder_destination(destination), do: destination
 
   def store_many(state, entries) when is_list(entries) do
     items =

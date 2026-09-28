@@ -125,7 +125,7 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
     finish_update(state)
   end
 
-  defp sync_character(%Character{} = character, %Player{} = player) do
+  def sync_character(%Character{} = character, %Player{} = player) do
     now = Time.now()
 
     %{character | player: player}

@@ -86,10 +86,12 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     nonempty_bag_over_other_bag: 5,
     cant_trade_equip_bags: 6,
     no_required_proficiency: 8,
+    no_equipment_slot_available: 9,
     you_can_never_use_that_item: 10,
     cant_equip_with_twohanded: 13,
     cant_dual_wield: 14,
     cant_carry_more_of_this: 17,
+    item_cant_stack: 19,
     item_cant_be_equipped: 20,
     items_cant_be_swapped: 21,
     slot_is_empty: 22,
@@ -222,7 +224,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     with {:ok, change_set} <- plan_removals(change_set, Batch.removals(batch), get_item),
          {:ok, change_set} <- plan_replacements(change_set, Batch.replacements(batch), get_item, opts),
          {:ok, change_set} <- plan_relocations(change_set, Batch.relocations(batch), get_item),
-         {:ok, change_set} <- plan_additions(change_set, Batch.additions(batch), get_item) do
+         {:ok, change_set} <- plan_additions(change_set, Batch.additions(batch), get_item, opts) do
       plan_updates(change_set, Batch.updates(batch), get_item)
     end
   end
@@ -320,15 +322,20 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     end
   end
 
-  defp plan_additions(change_set, [], _get_item), do: {:ok, change_set}
+  defp plan_additions(change_set, [], _get_item, _opts), do: {:ok, change_set}
 
-  defp plan_additions(%ChangeSet{} = change_set, [%Item{} = item | rest], get_item) do
+  defp plan_additions(
+         %ChangeSet{} = change_set,
+         [%Batch.Addition{item: item, destination: destination} | rest],
+         get_item,
+         opts
+       ) do
     lookup = &ChangeSet.get_item(change_set, &1, get_item)
 
-    case store(change_set.player, item.item.owner, item, lookup) do
+    case store(change_set.player, item.item.owner, item, destination, lookup, opts) do
       {:ok, result, placement} ->
         change_set = change_set |> ChangeSet.absorb(result) |> ChangeSet.place(item, placement)
-        plan_additions(change_set, rest, get_item)
+        plan_additions(change_set, rest, get_item, opts)
 
       {:error, error} ->
         {:error, error}
@@ -504,11 +511,12 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     store(player, owner_guid, item, :carried, get_item)
   end
 
-  def store(%Player{} = player, owner_guid, %Item{} = item, scope, get_item) when scope in [:carried, :bank] do
+  def store(%Player{} = player, owner_guid, %Item{} = item, destination, get_item, opts \\ []) do
     if limit_new_count(player, Item.template(item), stack_count(item), get_item) < stack_count(item) do
       {:error, :cant_carry_more_of_this}
     else
-      store_available(player, owner_guid, item, scope, get_item)
+      ctx = ctx(player, opts[:unit], opts[:proficiency], owner_guid, get_item, opts)
+      store_destination(ctx, item, destination)
     end
   end
 
@@ -519,10 +527,87 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
 
   def limit_new_count(%Player{}, %ItemTemplate{}, count, _get_item), do: count
 
-  defp store_available(player, owner_guid, item, scope, get_item) do
-    ctx = ctx(player, nil, nil, owner_guid, get_item)
+  defp store_destination(ctx, item, scope) when scope in [:carried, :bank], do: store_available(ctx, item, scope)
+
+  defp store_destination(ctx, item, {:bag, bag}) do
+    position = if bag == @bag_0, do: {@bag_0, @backpack_slot_start}, else: {bag, 0}
+
+    with {:ok, _position} <- valid_destination(ctx, position),
+         :ok <- validate_placement(ctx, item, position) do
+      store_preferred_bag(ctx, item, bag)
+    end
+  end
+
+  defp store_destination(ctx, item, {bag, slot} = position) when is_integer(bag) and is_integer(slot) do
+    with {:ok, _position} <- valid_destination(ctx, position),
+         :ok <- validate_placement(ctx, item, position) do
+      if storage_pos?(position),
+        do: store_in_slot(ctx, item, position),
+        else: equip_new_item(ctx, item, position)
+    end
+  end
+
+  defp store_destination(_ctx, _item, _destination), do: {:error, :item_doesnt_go_to_slot}
+
+  defp equip_new_item(ctx, item, position) do
+    cond do
+      stack_count(item) != 1 ->
+        {:error, :item_cant_be_equipped}
+
+      item_at(ctx, position) != nil ->
+        {:error, :no_equipment_slot_available}
+
+      true ->
+        with :ok <- validate_two_hand(ctx, item, position, position, nil) do
+          ctx = ctx |> put_pos(position, item) |> store_offhand_if_two_hand(item, position)
+          placed_result(ctx, item, position)
+        end
+    end
+  end
+
+  defp store_in_slot(ctx, item, {bag, _slot} = position) do
+    case item_at(ctx, position) do
+      nil ->
+        ctx |> put_pos(position, item) |> placed_result(item, position)
+
+      %Item{} = stack ->
+        cond do
+          Item.loot_generated?(stack) ->
+            {:error, :already_looted}
+
+          mergeable?(item, stack) ->
+            merge_into_slot(ctx, item, stack, bag)
+
+          true ->
+            {:error, :item_cant_stack}
+        end
+    end
+  end
+
+  defp merge_into_slot(ctx, item, stack, bag) do
+    moved = min(stack_count(item), max_stack(stack) - stack_count(stack))
+    ctx = mark_changed(ctx, add_stack(stack, moved))
+
+    if moved == stack_count(item),
+      do: {:ok, result(ctx), :merged},
+      else: store_preferred_bag(ctx, add_stack(item, -moved), bag)
+  end
+
+  defp store_preferred_bag(ctx, item, bag) do
+    scope = {:bag, bag}
     {ctx, remaining} = merge_into_stacks(ctx, item, scope)
 
+    if remaining > 0 and free_position(ctx, scope, item) == nil,
+      do: store_available(ctx, put_stack_count(item, remaining), :carried),
+      else: store_remainder(ctx, item, remaining, scope)
+  end
+
+  defp store_available(ctx, item, scope) do
+    {ctx, remaining} = merge_into_stacks(ctx, item, scope)
+    store_remainder(ctx, item, remaining, scope)
+  end
+
+  defp store_remainder(ctx, item, remaining, scope) do
     cond do
       remaining == 0 ->
         {:ok, result(ctx), :merged}
@@ -534,9 +619,13 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
         pos = free_position(ctx, scope, item)
         item = put_stack_count(item, remaining)
         ctx = ctx |> mark_changed(item) |> put_pos(pos, item)
-        {ctx, placed} = pop_changed(ctx, item)
-        {:ok, result(ctx), {:placed, pos, placed}}
+        placed_result(ctx, item, pos)
     end
+  end
+
+  defp placed_result(ctx, item, position) do
+    {ctx, placed} = pop_changed(ctx, item)
+    {:ok, result(ctx), {:placed, position, placed}}
   end
 
   def auto_store(%Player{} = player, owner_guid, src_pos, scope, get_item) when scope in [:carried, :bank] do
