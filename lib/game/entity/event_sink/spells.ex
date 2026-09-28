@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Resurrection
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
@@ -272,6 +273,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   end
 
   def emit(entity, %Effects.AuraDuration{}, _context), do: entity
+
+  def emit(%Character{} = entity, %Effects.OfferResurrection{} = effect, context) do
+    {entity, events} = Resurrection.offer(entity, effect.cast_context, effect.spell, effect.health, effect.mana)
+    EventSink.emit(entity, events, context)
+  end
+
+  def emit(entity, %Effects.OfferResurrection{}, _context), do: entity
 
   def emit(%Character{} = entity, %Effects.ResurrectRequest{} = effect, context) do
     Context.send_packet(context, %Message.SmsgResurrectRequest{guid: effect.source_guid, delayed?: effect.delayed?})

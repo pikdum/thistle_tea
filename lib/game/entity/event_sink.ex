@@ -146,6 +146,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.HealEntity,
     Effects.PeriodicAuraLog,
     Effects.RemoveAura,
+    Effects.OfferResurrection,
     Effects.ResurrectRequest,
     Effects.SpellCastFailed,
     Effects.SpellCastResult,

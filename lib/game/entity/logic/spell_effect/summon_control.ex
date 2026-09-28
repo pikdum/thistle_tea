@@ -399,7 +399,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
     if resurrectable?(state) do
       health = max(Amount.roll(spell, effect, context), 1)
       mana = max(effect.misc_value || 0, 0)
-      Resurrection.offer(state, context, spell, health, mana)
+      Resurrection.request(state, context, spell, health, mana)
     else
       {state, []}
     end
@@ -410,7 +410,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
       percent = max(Amount.roll(spell, effect, context), 0) / 100
       health = max(trunc((state.unit.max_health || 1) * percent), 1)
       mana = max(trunc((state.unit.max_power1 || 0) * percent), 0)
-      Resurrection.offer(state, context, spell, health, mana)
+      Resurrection.request(state, context, spell, health, mana)
     else
       {state, []}
     end

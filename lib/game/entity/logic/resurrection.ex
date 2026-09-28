@@ -5,8 +5,18 @@ defmodule ThistleTea.Game.Entity.Logic.Resurrection do
   alias ThistleTea.Game.Entity.Data.ResurrectionOffer
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.ItemSpell
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+
+  def request(character, %CastContext{} = context, %Spell{} = spell, health, mana) do
+    offer = %Effects.OfferResurrection{cast_context: context, spell: spell, health: health, mana: mana}
+
+    case ItemSpell.resurrection_outcome(offer) do
+      nil -> offer(character, context, spell, health, mana)
+      choice -> {character, [choice]}
+    end
+  end
 
   def offer(%Character{internal: %{pending_resurrect: nil}} = character, %CastContext{} = context, spell, health, mana) do
     if Death.alive?(character) do

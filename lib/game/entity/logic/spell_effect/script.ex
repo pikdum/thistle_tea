@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engineering
   alias ThistleTea.Game.Entity.Logic.Hunter
+  alias ThistleTea.Game.Entity.Logic.ItemSpell
   alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.PetTraining
@@ -124,6 +125,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
   end
 
   defp trigger_target_guid(state, _context, _effect), do: state.object.guid
+
+  defp apply_class_dummy(state, context, _spell, %Effect{index: 0}, :six_demon_bag, _now) do
+    ItemSpell.six_demon_bag(state, context)
+  end
 
   defp apply_class_dummy(state, context, _spell, %Effect{index: 0}, :net_o_matic, _now) do
     Engineering.net_o_matic(state, context)

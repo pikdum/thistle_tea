@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
     {:RemoveAura, [:source_guid, :target_guid, :spell_id], []},
     {:HealEntity, [:target_guid, :amount], [source_guid: nil, spell: nil]},
     {:HealThreat, [:source_guid, :target_guid, :amount], []},
+    {:OfferResurrection, [:cast_context, :spell, :health, :mana], []},
     {:ResurrectRequest, [:source_guid, :spell_id, :health, :mana], [delayed?: true]},
     {:SpellCastResult, [:spell_id], []},
     {:SpellCastFailed, [:spell_id, :reason],
