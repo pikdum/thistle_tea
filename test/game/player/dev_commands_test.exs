@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
   alias ThistleTea.Game.Player.DevCommands
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cooldowns.Entry, as: CooldownEntry
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
@@ -61,6 +62,26 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
         assert_received {:"$gen_cast",
                          {:send_packet, %Message.SmsgMessagechat{message: "Stuck recovery is unavailable right now."}}}
       end
+    end
+  end
+
+  describe ".debug cooldowns" do
+    test "clears item, spell, category, global, and school timers without a learned spell" do
+      cooldowns = %{
+        23_453 => %CooldownEntry{spell: %Spell{id: 23_453}, item_id: 18_986, ready_at: 99_000},
+        133 => 99_000,
+        {:category, 1} => 99_000,
+        {:gcd, 133} => 2_000,
+        {:school, 2} => 3_000
+      }
+
+      character = debug_character()
+      character = %{character | object: %Object{guid: 1}, internal: %{character.internal | cooldowns: cooldowns}}
+      assert {:handled, updated} = DevCommands.run(%{character: character}, ".debug cooldowns")
+      assert updated.character.internal.cooldowns == %{}
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgClearCooldown{spell_id: 23_453}}}
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgClearCooldown{spell_id: 133}}}
+      refute_received {:"$gen_cast", {:send_packet, %Message.SmsgClearCooldown{}}}
     end
   end
 

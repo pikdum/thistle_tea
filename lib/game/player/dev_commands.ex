@@ -50,6 +50,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Player.Taxi, as: PlayerTaxi
   alias ThistleTea.Game.Player.Weather
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
@@ -144,6 +145,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".addquest <quest_id> - add a quest to your quest log",
       ".debug random equipment - add a random player-obtainable equipment set",
       ".debug professions - set known professions to 300/300",
+      ".debug cooldowns - reset spell and item cooldowns",
       ".debug position <guid> - show an entity's projected world position",
       ".debug reputation <faction_id> - show standing and flags",
       ".debug honor [points <0..65000>] - show or set honor rank points",
@@ -340,6 +342,17 @@ defmodule ThistleTea.Game.Player.DevCommands do
     state
     |> PlayerTaxi.unlock_all(TaxiLoader.get())
     |> system_message("All flight paths unlocked.")
+    |> handled()
+  end
+
+  def run(%{character: %Character{} = character} = state, ".debug cooldowns") do
+    keys = Map.keys(character.internal.cooldowns)
+    events = for id <- keys, is_integer(id), do: Effects.clear_cooldown(character.object.guid, id)
+
+    character = character |> Cooldowns.reset(keys) |> Effects.enqueue(events) |> EventSink.emit_pending()
+
+    %{state | character: character}
+    |> system_message("Spell and item cooldowns reset.")
     |> handled()
   end
 
