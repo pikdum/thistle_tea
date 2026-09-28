@@ -2,12 +2,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
   @moduledoc false
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
+  alias ThistleTea.Game.Entity.Logic.PetResurrection
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Resurrection
   alias ThistleTea.Game.Entity.Logic.Rogue
@@ -388,6 +390,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :interrupt_cast}, now),
     do: SpellInterrupt.apply(state, context, spell, now)
+
+  def apply(%Mob{} = state, %CastContext{} = context, spell, %Effect{type: :resurrect_new} = effect, now) do
+    PetResurrection.revive(state, context, Amount.roll(spell, effect, context), now)
+  end
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :resurrect_new} = effect, _now) do
     if resurrectable?(state) do

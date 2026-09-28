@@ -53,7 +53,7 @@ defmodule ThistleTea.Game.World.SpellTargetInfo do
 
     cond do
       Insignia.spell?(spell) -> InsigniaTarget.info(character, targets)
-      Spell.resurrect_spell?(spell) -> ResurrectionTarget.info(character, targets)
+      Spell.resurrect_spell?(spell) -> ResurrectionTarget.info(character, targets, spell)
       is_integer(pet_guid) -> build(character, pet_guid, spell)
       is_integer(explicit_guid) -> build(character, explicit_guid, spell)
       is_integer(fallback_guid) -> build(character, fallback_guid, spell)

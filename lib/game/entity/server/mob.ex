@@ -70,6 +70,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
   alias ThistleTea.Game.Entity.Logic.PetNaming
   alias ThistleTea.Game.Entity.Logic.PetProgression
+  alias ThistleTea.Game.Entity.Logic.PetResurrection
   alias ThistleTea.Game.Entity.Logic.PetSpellModifiers
   alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.PetUntraining
@@ -209,6 +210,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
       Core.update_object(state)
       |> Network.send_packet(pid)
+
+      case Message.SmsgPetNameQueryResponse.for_pet(state) do
+        %Message.SmsgPetNameQueryResponse{} = packet -> Network.send_packet(packet, pid)
+        nil -> :ok
+      end
 
       send_resume_move(state, pid, now)
 
@@ -1515,6 +1521,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, Respawn.despawn(state, respawn_delay_ms)}
   end
 
+  def handle_info({:pet_corpse_expired, generation}, %Mob{} = state) do
+    if PetResurrection.corpse_expired?(state, generation), do: {:stop, :normal, state}, else: {:noreply, state}
+  end
+
   def handle_info(:pet_stop, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
     pid = self()
     Task.start(fn -> World.stop_entity(pid) end)
@@ -1745,10 +1755,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp behavior_tree(%Mob{}), do: MobBT.tree()
 
   defp sync_behavior_tree(%Mob{} = state, %Mob{} = previous) do
-    if control_mode(state) == control_mode(previous) do
-      state
-    else
-      BT.init(state, behavior_tree(state))
+    cond do
+      Core.dead?(previous) and not Core.dead?(state) ->
+        blackboard = RegenBT.initialize(state, Blackboard.new(), Time.now())
+        BT.init(state, behavior_tree(state), blackboard)
+
+      control_mode(state) != control_mode(previous) ->
+        BT.init(state, behavior_tree(state))
+
+      true ->
+        state
     end
   end
 
@@ -1756,14 +1772,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp control_mode(%Mob{}), do: :mob
 
   defp control_metadata(%Mob{internal: %Internal{pet: %Pet{} = pet}}) do
-    %{owner_guid: pet.owner_guid, pet_profile: pet.profile}
+    %{owner_guid: pet.owner_guid, pet_profile: pet.profile, pet_kind: pet.kind}
   end
 
   defp control_metadata(%Mob{internal: %Internal{totem: %Totem{owner_guid: owner}}}) do
     %{owner_guid: owner, pet_profile: nil}
   end
 
-  defp control_metadata(%Mob{}), do: %{owner_guid: nil, pet_profile: nil}
+  defp control_metadata(%Mob{}), do: %{owner_guid: nil, pet_profile: nil, pet_kind: nil}
 
   defp control_owner(%Mob{internal: %Internal{pet: %Pet{owner_guid: owner}}}), do: owner
   defp control_owner(%Mob{internal: %Internal{totem: %Totem{owner_guid: owner}}}), do: owner
@@ -2189,7 +2205,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp maybe_finalize_death(%Mob{internal: %Internal{pet: %Pet{}}} = state) do
     if Core.dead?(state) do
-      Process.send_after(self(), :pet_stop, pet_corpse_delay(state))
+      state = PetResurrection.prepare_corpse(state)
+
+      Process.send_after(
+        self(),
+        {:pet_corpse_expired, state.internal.pet.corpse_generation},
+        PetResurrection.corpse_delay(state)
+      )
 
       state
       |> PetHappiness.on_death(MapTemplate.battleground?(state.internal.world.map_id))
@@ -2229,10 +2251,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       state
     end
   end
-
-  defp pet_corpse_delay(%Mob{internal: %{guardian: %{corpse_delay_ms: delay}}}), do: delay
-  defp pet_corpse_delay(%Mob{internal: %{pet: %{kind: kind}}}) when kind in [:guardian, :creature_pet], do: 15_000
-  defp pet_corpse_delay(_state), do: 100
 
   defp mark_death_finalized(%Mob{internal: internal} = state) do
     SummonLifecycle.notify(state, :summoned_just_died)

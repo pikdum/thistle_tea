@@ -99,7 +99,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   end
 
   def resurrection_target(caster, spell, targets) do
-    info = ResurrectionTarget.info(caster, targets)
+    info = ResurrectionTarget.info(caster, targets, spell)
     with :ok <- CastValidation.validate_target(caster, spell, targets, info), do: {:ok, info.guid}
   end
 

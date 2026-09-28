@@ -131,6 +131,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     %{
       owner_guid: owner_guid,
       pet_profile: profile,
+      pet_kind: mob.internal.pet.kind,
       pet_number: mob.unit.pet_number,
       pet_name_timestamp: mob.unit.pet_name_timestamp
     }

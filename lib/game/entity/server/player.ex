@@ -75,6 +75,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
+  alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Entity.Server.GameObjectSummons
   alias ThistleTea.Game.Entity.Server.GuardianOwner
@@ -1621,6 +1622,26 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, %{state | character: character}}
   end
 
+  def handle_info(%Effects.PetRevived{source_guid: guid, health: health}, %State{character: %Character{}} = state) do
+    cond do
+      Companion.controls?(state.character, guid) ->
+        character = state.character |> Companion.capture_death(false) |> Companion.capture_health(health)
+        state = project_living_companion(%{state | character: character}, guid)
+        {:noreply, state, {:continue, :maybe_broadcast_update}}
+
+      Map.has_key?(state.character.internal.guardians, guid) ->
+        {character, events} = Aura.remove_spells(state.character, Warlock.sacrifice_buff_ids(), Time.now())
+        {:noreply, %{state | character: EventSink.emit(character, events)}, {:continue, :maybe_broadcast_update}}
+
+      true ->
+        {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Pet resurrection failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_info(%Effects.LearnPetSpell{} = effect, %State{} = state) do
     {:noreply, PetTraining.learn(state, effect)}
   rescue
@@ -1659,7 +1680,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
              Effects.PetProgressChanged,
              Effects.PetReactionChanged,
              Effects.PetBroke,
-             Effects.PetDied
+             Effects.PetDied,
+             Effects.PetRevived
            ] do
     {:noreply, state}
   end
@@ -2072,21 +2094,9 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp passive_pet_aura_events(_character, _pet_guid), do: []
 
-  defp project_companion_attachment(%State{character: %Character{} = character} = state, %Attachment{
-         kind: kind,
-         entity_ref: %EntityRef{guid: guid}
-       })
+  defp project_companion_attachment(%State{} = state, %Attachment{kind: kind, entity_ref: %EntityRef{guid: guid}})
        when kind in [:hunter_pet, :guardian] do
-    {character, aura_events} = Aura.remove_spells(character, [18_789, 18_790, 18_791, 18_792, 25_228], Time.now())
-
-    character =
-      character
-      |> EventSink.emit(aura_events)
-      |> EventSink.emit(passive_pet_aura_events(character, guid))
-      |> EventSink.emit(Effects.pet_spell_modifiers(character.object.guid, guid, Modifiers.holders(character)))
-      |> Core.mark_broadcast_update()
-
-    %{state | character: character}
+    project_living_companion(state, guid)
   end
 
   defp project_companion_attachment(%State{character: %Character{} = character} = state, %Attachment{
@@ -2114,6 +2124,19 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp project_companion_attachment(%State{character: %Character{} = character} = state, %Attachment{}) do
     %{state | character: Core.mark_broadcast_update(character)}
+  end
+
+  defp project_living_companion(%State{character: character} = state, guid) do
+    {character, aura_events} = Aura.remove_spells(character, [25_228 | Warlock.sacrifice_buff_ids()], Time.now())
+
+    character =
+      character
+      |> EventSink.emit(aura_events)
+      |> EventSink.emit(passive_pet_aura_events(character, guid))
+      |> EventSink.emit(Effects.pet_spell_modifiers(character.object.guid, guid, Modifiers.holders(character)))
+      |> Core.mark_broadcast_update()
+
+    %{state | character: character}
   end
 
   defp project_companion_detachment(%State{} = state, %EntityRef{} = entity_ref) do

@@ -186,6 +186,7 @@ defmodule ThistleTea.Game.Player.PetStableTest do
       pet: pet
     } do
       state = with_stabled_pet(state, 77)
+      pet = %{pet | unit: %{pet.unit | pet_number: 77}}
 
       retrieved =
         PetStable.transfer(state, master, {:retrieve, 77},
@@ -196,7 +197,11 @@ defmodule ThistleTea.Game.Player.PetStableTest do
       assert Companion.active_guid(retrieved.character) == pet.object.guid
       assert retrieved.character.internal.companion.pet_number == 77
       assert retrieved.companion_monitor.pid == Entity.pid(pet.object.guid)
-      assert_receive %Attachment{name_response: %Message.SmsgPetNameQueryResponse{name: "Boar"}} = pending
+
+      assert_receive %Attachment{
+                       name_response: %Message.SmsgPetNameQueryResponse{pet_number: 77, name: "Boar", timestamp: 0}
+                     } = pending
+
       stored = PetStable.transfer(retrieved, master, :store)
       assert stored.character.internal.pet_stable.pets[1].pet_number == 77
       refute Entity.online?(pet.object.guid)

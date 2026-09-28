@@ -104,6 +104,8 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
   def demonic_sacrifice?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_warlock_demonic_sacrifice")
   def demonic_sacrifice?(_spell), do: false
 
+  def sacrifice_buff_ids, do: Map.values(@sacrifice_buffs)
+
   def devour_magic_heal(%Spell{id: id} = spell) do
     if Spell.vmangos_script?(spell, "spell_warlock_devour_magic"), do: Map.get(@devour_magic_heals, id)
   end

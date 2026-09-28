@@ -32,11 +32,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment do
       create: Core.update_object(entity),
       progress: PetProgression.snapshot(entity),
       restore_automatically?: restore_automatically?(entity.internal.spawn),
-      name_response: %SmsgPetNameQueryResponse{
-        pet_number: entity.unit.pet_number,
-        name: entity.internal.name,
-        timestamp: entity.unit.pet_name_timestamp
-      }
+      name_response: SmsgPetNameQueryResponse.for_pet(entity)
     }
   end
 

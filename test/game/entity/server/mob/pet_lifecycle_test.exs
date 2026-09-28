@@ -17,28 +17,177 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetLifecycleTest do
   alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
+  alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
+  alias ThistleTea.Game.Entity.Logic.PetResurrection
   alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.PetTraining
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.PetTraining, as: TrainingLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Game.World.SpellRequirements
   alias ThistleTea.Game.WorldRef
 
   setup [:build_pet]
+
+  describe "pet visibility" do
+    test "sends the current name with a corpse reveal after an earlier query was lost", %{pet: pet} do
+      pet = %{
+        pet
+        | unit: %{pet.unit | health: 0, pet_number: 77, pet_name_timestamp: 99},
+          internal: %{pet.internal | name: "Briar"}
+      }
+
+      {:ok, pid} = World.start_entity(pet)
+      parent = self()
+
+      observer =
+        spawn(fn ->
+          for _ <- 1..2 do
+            receive do
+              packet -> send(parent, {:observer, packet})
+            end
+          end
+        end)
+
+      GenServer.cast(pid, {:send_update_to, observer})
+      assert_receive {:observer, {:"$gen_cast", {:send_packet, %UpdateObject{update_type: :create_object2}}}}
+
+      assert_receive {:observer,
+                      {:"$gen_cast",
+                       {:send_packet, %Message.SmsgPetNameQueryResponse{pet_number: 77, name: "Briar", timestamp: 99}}}}
+    end
+  end
+
+  describe "resurrection lifecycle" do
+    test "reviving a guardian removes sacrifice without reviving a different retained pet", %{pet: pet} do
+      state = attach_owner(pet, self())
+      guardian = %EntityRef{guid: pet.object.guid + 1, entry: 2675, spell_id: 4073}
+      character = Companion.remember_death(state.character, pet.object.guid)
+      character = %{character | internal: %{character.internal | guardians: %{guardian.guid => guardian}}}
+
+      spell = %Spell{
+        id: 18_789,
+        duration_ms: 60_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :override_class_scripts, misc_value: 2228}]
+      }
+
+      {character, _events} = Aura.apply_spell(character, character.object.guid, 50, spell, 0)
+      effect = %Effects.PetRevived{source_guid: guardian.guid, target_guid: state.guid, health: 70}
+
+      assert {:noreply, updated, {:continue, :maybe_broadcast_update}} =
+               PlayerServer.handle_info(effect, %{state | character: character})
+
+      assert Companion.relationship(updated.character).dead?
+      assert Companion.relationship(updated.character).health == 0
+      refute Enum.any?(updated.character.unit.auras, &(&1.spell.id == 18_789))
+    end
+
+    test "publishes a retained corpse, revives the same process, and ignores stale expiry", %{pet: pet, guid: guid} do
+      owner = attach_owner(pet, self()).character
+      owner = %{owner | movement_block: pet.movement_block, unit: %{owner.unit | faction_template: 1}}
+      Presence.enter(owner, %{alive?: true, faction_template: 1})
+      on_exit(fn -> Presence.leave(owner) end)
+      pet = %{pet | unit: %{pet.unit | faction_template: 1}}
+      dead = Core.kill(pet, ThistleTea.Game.Time.now())
+      {:ok, pid} = World.start_entity(dead)
+      monitor = Process.monitor(pid)
+      assert_receive %Effects.PetDied{}, 1_000
+      corpse = :sys.get_state(pid)
+      assert corpse.internal.death_finalized?
+      generation = corpse.internal.pet.corpse_generation
+      assert Metadata.query(guid, [:alive?, :pet_kind]) == %{alive?: false, pet_kind: :hunter}
+      assert PetResurrection.corpse_delay(corpse) == 3_600_000
+
+      spell = %Spell{
+        id: 2006,
+        range_yards: 30.0,
+        effects: [%Effect{index: 0, type: :resurrect_new, base_points: 69, base_dice: 1, misc_value: 135}]
+      }
+
+      assert SpellTargetResolver.resolve(owner, spell, Target.unit(guid)) == [guid]
+      old_spell = %{spell | effects: [%Effect{type: :resurrect}]}
+      assert SpellTargetResolver.resolve(owner, old_spell, Target.unit(guid)) == []
+      casting_spell = %{spell | cast_time_ms: 1_000, mana_cost: 10, power_type: 0}
+      caster = %{owner | unit: %{owner.unit | power1: 80, max_power1: 100}}
+      casting = Casting.start(caster, casting_spell, Target.unit(guid), 100)
+
+      context = %CastContext{
+        caster_guid: owner.object.guid,
+        caster_level: 60,
+        caster_position: {pet.internal.world, 2.0, 0.0, 0.0},
+        caster_orientation: 0.0
+      }
+
+      Entity.receive_spell(guid, context, spell)
+      assert_receive %Effects.PetRevived{source_guid: ^guid, health: 70} = revived, 1_000
+      send(pid, {:pet_corpse_expired, generation})
+      live = :sys.get_state(pid)
+      assert live.unit.health == 70
+      assert live.internal.blackboard.maintenance.next_regen_at > ThistleTea.Game.Time.now()
+      assert Metadata.query(guid, [:alive?]) == %{alive?: true}
+      assert World.position(guid) == {pet.internal.world, 2.0, 0.0, 0.0}
+      assert Entity.pid(guid) == pid
+      assert SpellTargetResolver.resolve(owner, spell, Target.unit(guid)) == []
+      pending = Casting.complete(casting, 1_100)
+      cast = pending.internal.casting
+      requirements = SpellRequirements.resolve(pending, cast.spell, cast.targets)
+      aborted = Casting.resolve_requirements(pending, cast, requirements, 1_100)
+      assert aborted.unit.power1 == 80
+      assert Enum.any?(aborted.internal.events, &match?(%Effects.SpellCastFailed{reason: :target_not_dead}, &1))
+
+      state = attach_owner(pet, pid)
+      character = Companion.remember_death(state.character, guid)
+
+      sacrifice = %Spell{
+        id: 18_789,
+        duration_ms: 60_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :override_class_scripts, misc_value: 2228}]
+      }
+
+      {character, _events} = Aura.apply_spell(character, character.object.guid, 50, sacrifice, 0)
+      assert Enum.any?(character.unit.auras, &(&1.spell.id == 18_789))
+
+      assert {:noreply, state, {:continue, :maybe_broadcast_update}} =
+               PlayerServer.handle_info(revived, %{state | character: character})
+
+      refute Companion.relationship(state.character).dead?
+      assert Companion.relationship(state.character).health == 70
+      refute Enum.any?(state.character.unit.auras, &(&1.spell.id == 18_789))
+      assert PlayerServer.handle_info(%{revived | source_guid: guid + 1}, state) == {:noreply, state}
+      assert PlayerServer.handle_info(revived, %State{}) == {:noreply, %State{}}
+
+      kill = %Spell{id: 5, effects: [%Effect{index: 0, type: :instakill}]}
+      Entity.receive_spell(guid, context, kill)
+      assert_receive %Effects.PetDied{}, 1_000
+      corpse = :sys.get_state(pid)
+      assert corpse.internal.pet.corpse_generation == generation + 1
+      send(pid, {:pet_corpse_expired, generation})
+      assert :sys.get_state(pid).unit.health == 0
+      send(pid, {:pet_corpse_expired, generation + 1})
+      assert_receive {:DOWN, ^monitor, :process, ^pid, :normal}, 1_000
+      assert Metadata.get(guid) == nil
+      assert World.position(guid) == nil
+    end
+  end
 
   describe "taming lifecycle" do
     test "stops the wild creature without leaving threat or world projections", %{pet: pet, guid: guid, owner: owner} do

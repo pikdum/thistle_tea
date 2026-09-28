@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Pet do
     :possession_original_unit_flags,
     :possession_original_command_state,
     :possession_original_reaction_state,
+    corpse_generation: 0,
     loyalty_points: 1_000,
     training_points: 0,
     last_untrain_cost: 0,

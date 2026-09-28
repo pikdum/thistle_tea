@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   alias ThistleTea.Game.Entity.Server.GameObjectSummons
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Modifiers
@@ -376,6 +377,14 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     case Entity.pid(guid) do
       pid when is_pid(pid) -> send(pid, effect)
       _ -> Context.send(context, :pet_stop)
+    end
+
+    entity
+  end
+
+  def emit(entity, %Effects.PetRevived{target_guid: guid} = effect, _context) do
+    with :player <- Guid.entity_type(guid), pid when is_pid(pid) <- Entity.pid(guid) do
+      send(pid, effect)
     end
 
     entity

@@ -1,20 +1,32 @@
 defmodule ThistleTea.Game.World.ResurrectionTarget do
-  @moduledoc "Projects the owned body for resurrection while the released player is elsewhere."
+  @moduledoc "Projects player bodies and eligible pet corpses for resurrection targeting."
 
   alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.PetResurrection
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Visibility
 
-  def info(caster, %Target{} = targets) do
+  def info(caster, %Target{} = targets, spell \\ nil) do
     guid = Target.unit_guid(targets)
 
-    with true <- is_integer(guid) and Guid.entity_type(guid) == :player,
+    with true <- is_integer(guid),
          %{} = metadata <-
-           Metadata.query(guid, [:alive?, :ghost?, :faction_template, :unit_flags, :creature_type, :combat_reach]),
+           Metadata.query(guid, [
+             :alive?,
+             :ghost?,
+             :faction_template,
+             :unit_flags,
+             :creature_type,
+             :combat_reach,
+             :owner_guid,
+             :pet_kind
+           ]),
+         true <- eligible?(guid, metadata, spell),
          body when is_integer(body) <- body_guid(targets, guid, metadata),
          {world, _x, _y, _z} = position <- World.position(body),
          true <- world == caster.internal.world do
@@ -36,6 +48,17 @@ defmodule ThistleTea.Game.World.ResurrectionTarget do
       _invalid -> :unknown
     end
   end
+
+  defp eligible?(guid, metadata, spell) do
+    Guid.entity_type(guid) == :player or eligible_pet?(metadata, spell)
+  end
+
+  defp eligible_pet?(%{owner_guid: owner, pet_kind: kind}, %Spell{effects: effects}) when is_integer(owner) do
+    PetResurrection.resurrectable_kind?(kind) and World.position(owner) != nil and
+      Enum.any?(effects, &(&1.type == :resurrect_new))
+  end
+
+  defp eligible_pet?(_metadata, _spell), do: false
 
   defp body_guid(%Target{selection: {:corpse, corpse, guid}}, guid, %{ghost?: true}) do
     if corpse == Corpse.guid_for(guid) and Metadata.query(corpse, [:owner]) == %{owner: guid}, do: corpse
