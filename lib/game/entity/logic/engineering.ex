@@ -62,4 +62,27 @@ defmodule ThistleTea.Game.Entity.Logic.Engineering do
 
     {entity, [trigger]}
   end
+
+  def universal_remote(target, %CastContext{} = context) do
+    control = device_trigger(context.caster_guid, context.caster_level, target.object.guid, 8345)
+    malfunction = device_trigger(context.caster_guid, context.caster_level, target.object.guid, 8346)
+    enrage = device_trigger(target.object.guid, target.unit.level, target.object.guid, 8599)
+
+    {target, [%Effects.RandomChoice{choices: [{1, [control]}, {1, [malfunction]}, {1, [enrage]}]}]}
+  end
+
+  def mind_control_cap(target, %CastContext{} = context) do
+    control = device_trigger(context.caster_guid, context.caster_level, target.object.guid, 13_181)
+
+    backfire =
+      if context.caster_shapeshift_form in [nil, 0],
+        do: [device_trigger(target.object.guid, target.unit.level, context.caster_guid, 13_181)],
+        else: []
+
+    {target, [%Effects.RandomChoice{choices: [{1, []}, {1, backfire}, {4, [control]}]}]}
+  end
+
+  defp device_trigger(source_guid, level, target_guid, spell_id) do
+    Effects.trigger_spell(source_guid, level || 1, target_guid, spell_id, resolve_targets?: true)
+  end
 end

@@ -15,6 +15,20 @@ defmodule ThistleTea.Game.Spell.CastContextTest do
   alias ThistleTea.Game.World.Loader.Item
 
   describe "from_caster/3" do
+    test "snapshots the caster's form for device backfires" do
+      caster = %Character{
+        object: %Object{guid: 5},
+        unit: %Unit{level: 60, class: 11, auras: [], shapeshift_form: 1},
+        player: %Player{},
+        internal: %Internal{}
+      }
+
+      spell = %Spell{id: 13_180, school: :physical}
+      assert CastContext.from_caster(caster, spell, 7).caster_shapeshift_form == 1
+      caster = %{caster | unit: %{caster.unit | shapeshift_form: nil}}
+      assert CastContext.from_caster(caster, spell, 7).caster_shapeshift_form == 0
+    end
+
     test "nonweapon abilities use level skill while weapon attacks retain learned skill" do
       caster = %Character{
         object: %Object{guid: 5},

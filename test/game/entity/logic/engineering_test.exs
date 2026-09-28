@@ -15,6 +15,65 @@ defmodule ThistleTea.Game.Entity.Logic.EngineeringTest do
   alias ThistleTea.Game.Spell.Effect
 
   describe "receive/4" do
+    test "the remote selects possession, rooting, or a target-owned enrage with equal weights" do
+      entity = target()
+      context = %CastContext{caster_guid: 1, caster_level: 60, target_guid: 2, cast_item_guid: 42}
+      spell = device_spell(8344)
+      assert {^entity, [%RandomChoice{} = choice]} = SpellEffect.receive(entity, context, spell, 0)
+      assert RandomChoice.total_weight(choice) == 3
+
+      for {roll, id, source, level} <- [{1, 8345, 1, 60}, {2, 8346, 1, 60}, {3, 8599, 2, 30}] do
+        assert [
+                 %Effects.TriggerSpell{
+                   source_guid: ^source,
+                   source_level: ^level,
+                   target_guid: 2,
+                   spell_id: ^id,
+                   resolve_targets?: true,
+                   cast_item_guid: nil
+                 }
+               ] = RandomChoice.select(choice, roll)
+      end
+    end
+
+    test "the cap preserves failures and reversed control as distinct outcomes" do
+      entity = target()
+      context = %CastContext{caster_guid: 1, caster_level: 60, target_guid: 2, caster_shapeshift_form: 0}
+      assert {^entity, [%RandomChoice{} = choice]} = SpellEffect.receive(entity, context, device_spell(13_180), 0)
+      assert RandomChoice.total_weight(choice) == 6
+      assert RandomChoice.select(choice, 1) == []
+
+      assert [%Effects.TriggerSpell{source_guid: 2, source_level: 30, target_guid: 1, spell_id: 13_181}] =
+               RandomChoice.select(choice, 2)
+
+      for roll <- 3..6 do
+        assert [%Effects.TriggerSpell{source_guid: 1, source_level: 60, target_guid: 2, spell_id: 13_181}] =
+                 RandomChoice.select(choice, roll)
+      end
+
+      for form <- [1, 8, 17, 28] do
+        {^entity, [%RandomChoice{} = shifted]} =
+          SpellEffect.receive(entity, %{context | caster_shapeshift_form: form}, device_spell(13_180), 0)
+
+        assert RandomChoice.total_weight(shifted) == 6
+        assert RandomChoice.select(shifted, 2) == []
+        assert RandomChoice.select(shifted, 3) == RandomChoice.select(choice, 3)
+      end
+    end
+
+    test "control device effects execute only once and ignore dead recipients" do
+      entity = target()
+      context = %CastContext{caster_guid: 1, caster_level: 60, target_guid: 2}
+
+      for id <- [8344, 13_180] do
+        spell = device_spell(id)
+        second = %{spell | effects: [%{hd(spell.effects) | index: 1}]}
+        assert {^entity, []} = SpellEffect.receive(entity, context, second, 0)
+        dead = %{entity | unit: %{entity.unit | health: 0}}
+        assert {^dead, []} = SpellEffect.receive(dead, context, spell, 0)
+      end
+    end
+
     test "the dispenser selects a summon or malfunction only for an item cast" do
       entity = target()
       context = %CastContext{caster_guid: 2, caster_level: 60, target_guid: 2, cast_item_guid: 42}
@@ -64,6 +123,13 @@ defmodule ThistleTea.Game.Entity.Logic.EngineeringTest do
   end
 
   defp target do
-    %Mob{object: %Object{guid: 2}, unit: %Unit{health: 100, max_health: 100, auras: []}, internal: %Internal{}}
+    %Mob{
+      object: %Object{guid: 2},
+      unit: %Unit{level: 30, health: 100, max_health: 100, auras: []},
+      internal: %Internal{}
+    }
   end
+
+  defp device_spell(id),
+    do: %Spell{id: id, effects: [%Effect{index: 0, type: :dummy, implicit_target_a: :target_enemy}]}
 end

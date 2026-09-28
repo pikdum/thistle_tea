@@ -129,6 +129,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
     Engineering.net_o_matic(state, context)
   end
 
+  defp apply_class_dummy(state, context, _spell, %Effect{index: 0}, :universal_remote, _now) do
+    Engineering.universal_remote(state, context)
+  end
+
+  defp apply_class_dummy(state, context, _spell, %Effect{index: 0}, :mind_control_cap, _now) do
+    Engineering.mind_control_cap(state, context)
+  end
+
   defp apply_class_dummy(state, context, _spell, %Effect{index: 0}, :goblin_bomb, _now) do
     Engineering.goblin_bomb(state, context)
   end

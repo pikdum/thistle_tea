@@ -163,6 +163,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def dummy_effect(%Spell{id: @preparation}), do: :preparation
   def dummy_effect(%Spell{id: 9033, spell_family: 7}), do: :shapeshift_cleanse
   def dummy_effect(%Spell{id: 13_120}), do: :net_o_matic
+  def dummy_effect(%Spell{id: 8344}), do: :universal_remote
+  def dummy_effect(%Spell{id: 13_180}), do: :mind_control_cap
   def dummy_effect(%Spell{id: 23_134}), do: :goblin_bomb
   def dummy_effect(%Spell{id: 25_860}), do: :reindeer_transformation
   def dummy_effect(%Spell{id: 28_006}), do: {:trigger_spell, 29_296}
