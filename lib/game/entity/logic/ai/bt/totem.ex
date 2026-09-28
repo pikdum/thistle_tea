@@ -5,7 +5,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Totem do
   """
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
@@ -79,13 +78,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Totem do
     {status, state, blackboard}
   end
 
-  defp select_hostile_target(
-         %Mob{internal: %Internal{spellbook: spellbook, creature: %Creature{spells: [entry | _]}}} = state,
-         %Blackboard{} = blackboard,
-         %Context{} = context
-       ) do
-    case Map.get(spellbook, entry.spell_id) do
-      %Spell{} = spell -> {:failure, put_target(state, spell, context), blackboard}
+  defp select_hostile_target(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
+    with [entry | _] <- MobSpells.entries(state, blackboard),
+         %Spell{} = spell <- Map.get(state.internal.spellbook, entry.spell_id) do
+      {:failure, put_target(state, spell, context), blackboard}
+    else
       _ -> {:failure, state, blackboard}
     end
   end

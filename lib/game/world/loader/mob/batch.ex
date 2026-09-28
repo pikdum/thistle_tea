@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
+  alias ThistleTea.Game.World.Loader.CreatureSpellList, as: CreatureSpellListLoader
   alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
@@ -314,16 +315,8 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
 
     lists =
       list_ids
-      |> fetch_by_ids(Mangos.CreatureSpells, :entry)
-      |> Map.new(fn {entry, row} ->
-        spells =
-          row
-          |> Mangos.CreatureSpells.slots()
-          |> Enum.map(&CreatureSpell.build/1)
-          |> Enum.reject(&is_nil/1)
-
-        {entry, spells}
-      end)
+      |> CreatureSpellListLoader.load()
+      |> Map.new(fn {entry, list} -> {entry, list.spells} end)
 
     addons =
       creatures
@@ -447,7 +440,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
 
     (event_steps ++ movement_steps)
     |> Enum.flat_map(fn steps -> Enum.flat_map(steps, &locally_run_steps/1) end)
-    |> Enum.map(&ScriptStep.cast_spell_id/1)
+    |> Enum.flat_map(&ScriptStep.spell_ids/1)
     |> Enum.filter(&positive?/1)
     |> Enum.uniq()
   end

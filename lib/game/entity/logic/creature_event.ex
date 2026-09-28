@@ -83,11 +83,13 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEvent do
   end
 
   defp reset_spell_timers(mob, previous) do
-    if mob.internal.creature.spells == previous.internal.creature.spells do
+    changed_entry? = mob.object.entry != previous.object.entry and mob.internal.creature.spell_list_id not in [nil, 0]
+
+    if not changed_entry? and mob.internal.creature.spells == previous.internal.creature.spells do
       mob
     else
       blackboard = Blackboard.ensure(mob.internal.blackboard)
-      blackboard = %{blackboard | spells: %{blackboard.spells | timers: nil, next_list_at: 0}}
+      blackboard = %{blackboard | spells: %{blackboard.spells | list: nil, timers: nil, next_list_at: 0}}
       %{mob | internal: %{mob.internal | blackboard: blackboard}}
     end
   end

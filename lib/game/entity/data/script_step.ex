@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
             buddy_guid: nil,
             game_object_spawn: nil,
             equipment_items: [],
+            creature_spell_lists: %{},
             position: nil,
             condition_id: 0,
             condition: nil,
@@ -95,6 +96,22 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   end
 
   def cast_spell_id(%__MODULE__{}), do: nil
+
+  def spell_ids(%__MODULE__{command: :creature_spells, creature_spell_lists: lists}) do
+    lists |> Map.values() |> Enum.flat_map(& &1.spells) |> Enum.map(& &1.spell_id) |> Enum.uniq()
+  end
+
+  def spell_ids(%__MODULE__{} = step), do: List.wrap(cast_spell_id(step))
+
+  def creature_spell_list_options(%__MODULE__{command: :creature_spells} = step) do
+    Enum.zip(
+      [step.datalong, step.datalong2, step.datalong3, step.datalong4],
+      [step.dataint, step.dataint2, step.dataint3, step.dataint4]
+    )
+    |> Enum.filter(fn {id, chance} -> id >= 0 and chance > 0 end)
+  end
+
+  def creature_spell_list_options(%__MODULE__{}), do: []
 
   defp flag?(flags, bit) when is_integer(flags), do: (flags &&& bit) != 0
   defp flag?(_flags, _bit), do: false
@@ -244,6 +261,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(51), do: :set_sheath
   defp command(52), do: :invincibility
   defp command(54), do: :set_server_variable
+  defp command(55), do: :creature_spells
   defp command(56), do: :remove_guardians
   defp command(60), do: :start_waypoints
   defp command(61), do: :start_map_event

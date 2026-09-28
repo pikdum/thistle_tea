@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEntryTest do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.CreatureArchetype
   alias ThistleTea.Game.Entity.Data.CreatureSpell
+  alias ThistleTea.Game.Entity.Data.CreatureSpellList
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -199,11 +200,13 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEntryTest do
       step = %ScriptStep{command: :update_entry, datalong: 20}
       faction = %ScriptStep{command: :set_faction, datalong: 113}
       blackboard = Blackboard.new() |> Blackboard.put_spell_timer(0, 10_000, 0)
+      blackboard = %{blackboard | spells: %{blackboard.spells | list: %CreatureSpellList{id: 1}}}
       context = Context.new(1_000, creature_archetypes: %{20 => [{1, template}]})
       {changed, blackboard} = Script.run(mob, blackboard, [step, faction], 0, context)
       assert changed.object.entry == 20
       assert changed.unit.faction_template == 113
       assert blackboard.spells.timers == nil
+      assert blackboard.spells.list == nil
     end
 
     test "selects target entries from current perception", %{mob: mob} do

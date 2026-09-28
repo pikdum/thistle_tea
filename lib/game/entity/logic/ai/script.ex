@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
+  alias ThistleTea.Game.Entity.Data.CreatureSpellList
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
@@ -277,6 +278,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     failed(state, blackboard, step)
   end
 
+  defp execute_command(
+         %Mob{} = state,
+         blackboard,
+         %ScriptStep{command: :creature_spells} = step,
+         _target,
+         _now,
+         context
+       ) do
+    id = choose_option(ScriptStep.creature_spell_list_options(step), Random.integer(context.random, 100), 0) || 0
+    list = if id == 0, do: %CreatureSpellList{id: 0}, else: Map.get(step.creature_spell_lists, id)
+
+    case list do
+      %CreatureSpellList{} -> {state, MobSpells.set_list(blackboard, list, context), :continue}
+      nil -> {state, blackboard, :continue}
+    end
+  end
+
+  defp execute_command(state, blackboard, %ScriptStep{command: :creature_spells} = step, _target, _now, _context) do
+    failed(state, blackboard, step)
+  end
+
   defp execute_command(state, blackboard, step, target_guid, now, context) do
     {state, blackboard} = execute(state, blackboard, step, target_guid, now, context)
     {state, blackboard, :continue}
@@ -407,9 +429,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     updated = CreatureEntry.apply(state, template, now)
 
     blackboard =
-      if updated.internal.creature.spells == state.internal.creature.spells,
-        do: blackboard,
-        else: %{blackboard | spells: %{blackboard.spells | timers: nil, next_list_at: 0}}
+      if updated.object.entry != state.object.entry and updated.internal.creature.spell_list_id not in [nil, 0],
+        do: %{blackboard | spells: %{blackboard.spells | list: nil, timers: nil, next_list_at: 0}},
+        else: blackboard
 
     {updated, blackboard}
   end
@@ -1339,16 +1361,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   defp choose_start_script(%ScriptStep{} = step, random) do
     step
     |> ScriptStep.start_script_options()
-    |> choose_start_script(Random.integer(random, 100), 0)
+    |> choose_option(Random.integer(random, 100), 0)
   end
 
-  defp choose_start_script([], _roll, _sum), do: nil
+  defp choose_option([], _roll, _sum), do: nil
 
-  defp choose_start_script([{script_id, chance} | rest], roll, sum) do
+  defp choose_option([{id, chance} | rest], roll, sum) do
     if roll > sum and roll <= sum + chance do
-      script_id
+      id
     else
-      choose_start_script(rest, roll, sum + chance)
+      choose_option(rest, roll, sum + chance)
     end
   end
 

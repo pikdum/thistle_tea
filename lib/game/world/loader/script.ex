@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Loader.Script do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
+  alias ThistleTea.Game.World.Loader.CreatureSpellList, as: CreatureSpellListLoader
   alias ThistleTea.Game.World.Loader.GameObject, as: GameObjectLoader
 
   def load_by_ids(schema, script_ids), do: load_by_ids(schema, script_ids, MapSet.new())
@@ -30,6 +31,7 @@ defmodule ThistleTea.Game.World.Loader.Script do
     |> resolve_buddy_guids()
     |> resolve_game_object_spawns()
     |> resolve_equipment()
+    |> resolve_creature_spell_lists()
     |> resolve_texts()
     |> resolve_nested_scripts(visited)
     |> attach_conditions()
@@ -133,6 +135,20 @@ defmodule ThistleTea.Game.World.Loader.Script do
   defp equipment_item(entry, _templates) when entry < 0, do: :unchanged
   defp equipment_item(0, _templates), do: nil
   defp equipment_item(entry, templates), do: Map.get(templates, entry)
+
+  defp resolve_creature_spell_lists(steps) do
+    lists =
+      steps
+      |> Enum.flat_map(&ScriptStep.creature_spell_list_options/1)
+      |> Enum.map(&elem(&1, 0))
+      |> Enum.filter(&(&1 > 0))
+      |> CreatureSpellListLoader.load()
+
+    Enum.map(steps, fn step ->
+      ids = step |> ScriptStep.creature_spell_list_options() |> Enum.map(&elem(&1, 0))
+      %{step | creature_spell_lists: Map.take(lists, ids)}
+    end)
+  end
 
   defp load_equipment_templates([]), do: %{}
 

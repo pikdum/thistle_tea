@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Entity.Server.ScriptSpells do
       {route_steps, visited} = route_steps(mob, step, waypoints, visited)
       nested = step.sub_scripts |> Map.values() |> List.flatten()
       {nested_ids, visited} = spell_ids(mob, nested ++ route_steps, waypoints, visited)
-      {List.wrap(ScriptStep.cast_spell_id(step)) ++ nested_ids ++ ids, visited}
+      {ScriptStep.spell_ids(step) ++ nested_ids ++ ids, visited}
     end)
   end
 

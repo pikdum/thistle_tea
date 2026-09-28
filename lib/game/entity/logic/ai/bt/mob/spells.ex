@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
+  alias ThistleTea.Game.Entity.Data.CreatureSpellList
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -47,8 +48,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     Enum.reduce(spellbook, 0.0, fn {_id, spell}, radius -> max(radius, Range.maximum(state, spell) || 0.0) end)
   end
 
-  def observation_radius(%Mob{internal: %Internal{creature: %Creature{spells: spells}, spellbook: spellbook}} = state)
-      when is_list(spells) and is_map(spellbook) do
+  def observation_radius(%Mob{internal: %Internal{spellbook: spellbook}} = state) when is_map(spellbook) do
+    spells = entries(state, Blackboard.ensure(state.internal.blackboard))
+
     Enum.reduce(spells, 0.0, fn
       %CreatureSpell{cast_target: target} = entry, radius
       when target in [:friendly_injured, :friendly_injured_except] ->
@@ -76,7 +78,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     ])
   end
 
-  def has_spells?(%Mob{internal: %Internal{creature: %Creature{spells: [_ | _]}}}, _blackboard), do: true
+  def has_spells?(%Mob{} = state, %Blackboard{} = blackboard), do: entries(state, blackboard) != []
   def has_spells?(_state, _blackboard), do: false
 
   def holding_ranged?(%Mob{} = state, %Blackboard{} = blackboard) do
@@ -93,7 +95,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   end
 
   def try_cast(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now, random: random} = context, options \\ []) do
-    spells = spell_entries(state)
+    spells = entries(state, blackboard)
     blackboard = ensure_spell_timers(blackboard, spells, now, random)
 
     if Blackboard.ready_for?(blackboard, :next_spell_list_at, now) do
@@ -110,11 +112,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     {BT.running(min(delay_ms, @list_tick_ms), :spell_list), state, blackboard}
   end
 
-  defp spell_entries(%Mob{internal: %Internal{creature: %Creature{spells: spells}}}) when is_list(spells) do
+  def entries(%Mob{}, %Blackboard{spells: %{list: %CreatureSpellList{spells: spells}}}), do: spells
+
+  def entries(%Mob{internal: %Internal{creature: %Creature{spells: spells}}}, %Blackboard{}) when is_list(spells) do
     spells
   end
 
-  defp spell_entries(%Mob{}), do: []
+  def entries(%Mob{}, %Blackboard{}), do: []
+
+  def set_list(%Blackboard{} = blackboard, %CreatureSpellList{} = list, %Context{now: now, random: random}) do
+    timers =
+      list.spells
+      |> Enum.with_index()
+      |> Map.new(fn {entry, index} -> {index, now + roll_initial_delay(entry, random)} end)
+
+    %{blackboard | spells: %{blackboard.spells | list: list, timers: timers, next_list_at: 0}}
+  end
 
   defp ensure_spell_timers(%Blackboard{} = blackboard, spells, now, random) do
     case blackboard.spells.timers do
