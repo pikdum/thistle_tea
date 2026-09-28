@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   alias __MODULE__.Pet
   alias __MODULE__.Spells
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
+  alias ThistleTea.Game.Entity.Logic.TargetRef
 
   defstruct navigation: %Navigation{},
             fear: nil,
@@ -276,6 +277,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   def enable_auto_attack(%__MODULE__{combat: combat} = blackboard, target) do
     %{blackboard | combat: %{combat | auto_attacking: true, auto_attack_target: target}}
   end
+
+  def auto_attack_target(%__MODULE__{combat: %Combat{auto_attacking: true, auto_attack_target: %TargetRef{} = target}}),
+    do: target
+
+  def auto_attack_target(_blackboard), do: nil
 
   defp deadline(%__MODULE__{navigation: %Navigation{next_chase_at: at}}, :next_chase_at), do: at
   defp deadline(%__MODULE__{navigation: %Navigation{next_wander_at: at}}, :next_wander_at), do: at

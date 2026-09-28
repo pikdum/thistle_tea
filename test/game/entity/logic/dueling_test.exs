@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.DuelingTest do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Spell
 
   describe "requested/2 and started/2" do
@@ -80,7 +81,11 @@ defmodule ThistleTea.Game.Entity.Logic.DuelingTest do
             | combo_target_guid: 2,
               blackboard: %Blackboard{
                 navigation: %Blackboard.Navigation{target: 2},
-                combat: %Blackboard.Combat{auto_attacking: true, attack_started: true}
+                combat: %Blackboard.Combat{
+                  auto_attacking: true,
+                  attack_started: true,
+                  auto_attack_target: %TargetRef{guid: 2}
+                }
               }
           }
       }
@@ -97,6 +102,22 @@ defmodule ThistleTea.Game.Entity.Logic.DuelingTest do
       refute character.internal.in_combat
       refute character.internal.blackboard.combat.auto_attacking
       assert Enum.any?(events, &match?(%Effects.AttackStop{source_guid: 1, target_guid: 2}, &1))
+    end
+
+    test "finishing notifies the attacked opponent after selection changes" do
+      character = active_character()
+      memory = Blackboard.enable_auto_attack(Blackboard.new(), %TargetRef{guid: 2})
+
+      character = %{
+        character
+        | unit: %{character.unit | target: 77},
+          internal: %{character.internal | blackboard: memory}
+      }
+
+      {finished, events} = Dueling.finish(character, %{opponent_guid: 2, started_at: 4_000, now: 6_000})
+      assert finished.unit.target == 0
+      assert Enum.count(events, &match?(%Effects.AttackStop{target_guid: 2}, &1)) == 1
+      refute Enum.any?(events, &match?(%Effects.AttackStop{target_guid: 77}, &1))
     end
   end
 

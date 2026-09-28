@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Aura.ProcChance
   alias ThistleTea.Game.Entity.Logic.Companion
@@ -15,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
@@ -131,6 +133,7 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
         unit: %Unit{target: 2, flags: 0, stand_state: 0},
         internal: %Internal{
           in_combat: true,
+          blackboard: Blackboard.enable_auto_attack(Blackboard.new(), %TargetRef{guid: 2}),
           threat_refs: MapSet.new([{2, 1}, {3, 1}]),
           auto_shot: %{target_guid: 2}
         }

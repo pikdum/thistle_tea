@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.PossessionOwnerTest do
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SafePosition
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.PossessionOwner
   alias ThistleTea.Game.Entity.Server.Player.State
@@ -78,7 +79,13 @@ defmodule ThistleTea.Game.Entity.Server.Player.PossessionOwnerTest do
             character.internal
             | casting: cast,
               next_swing_spell: %Spell{id: 78},
-              blackboard: %Blackboard{combat: %Blackboard.Combat{auto_attacking: true, attack_started: true}}
+              blackboard: %Blackboard{
+                combat: %Blackboard.Combat{
+                  auto_attacking: true,
+                  attack_started: true,
+                  auto_attack_target: %TargetRef{guid: 123}
+                }
+              }
           }
       }
 

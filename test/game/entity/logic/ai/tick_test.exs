@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.Reactive
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Spell.Cast
 
   describe "mob_delay/3" do
@@ -64,11 +65,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
       assert Tick.needs_tick?(fixture(in_combat: true))
     end
 
-    test "ticks while auto-attacking a target before the combat flag is set" do
+    test "ticks an active melee victim before combat even after selection is cleared" do
       character =
         fixture(
-          blackboard: %Blackboard{combat: %Blackboard.Combat{auto_attacking: true}},
-          target: 42
+          blackboard: Blackboard.enable_auto_attack(Blackboard.new(), %TargetRef{guid: 42}),
+          target: 0
         )
 
       assert Tick.needs_tick?(character)

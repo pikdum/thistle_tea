@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Entity.Logic.Rest
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.Logic.TemporarySummon
   alias ThistleTea.Game.Spell.Cast
 
@@ -44,10 +45,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   def needs_tick?(%{internal: %Internal{in_combat: true}}), do: true
 
   def needs_tick?(%{
-        internal: %Internal{blackboard: %Blackboard{combat: %Combat{auto_attacking: true}}},
-        unit: %Unit{target: target}
-      })
-      when is_integer(target) and target > 0 do
+        internal: %Internal{
+          blackboard: %Blackboard{combat: %Combat{auto_attacking: true, auto_attack_target: %TargetRef{}}}
+        }
+      }) do
     true
   end
 

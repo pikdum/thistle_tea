@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.Resources
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
@@ -47,12 +48,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     ])
   end
 
-  def in_combat?(%Character{unit: %Unit{target: target}}, %Blackboard{combat: %CombatMemory{auto_attacking: true}})
-      when is_integer(target) and target > 0 do
-    true
-  end
-
-  def in_combat?(%Character{}, _blackboard), do: false
+  def in_combat?(%Character{}, blackboard), do: Blackboard.auto_attack_target(blackboard) != nil
 
   def in_combat?(%{internal: %Internal{in_combat: true}, unit: %Unit{target: target}}, _blackboard)
       when is_integer(target) and target > 0 do
@@ -61,17 +57,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def in_combat?(_state, _blackboard), do: false
 
-  def target_valid_same_map?(%{unit: %Unit{target: target}} = state, _blackboard, %Context{} = context) do
+  def target_valid_same_map?(state, blackboard, %Context{} = context) do
+    target = melee_target(state, blackboard)
+
     Navigation.target_valid_same_map?(state, target, context) and
       Detection.detectable?(state, target, context)
   end
 
-  def target_valid_same_map?(_state, _blackboard, %Context{}), do: false
-
-  def in_combat_range?(%{unit: %Unit{target: target}} = state, _blackboard, %Context{} = context),
-    do: in_melee_range?(state, target, context)
-
-  def in_combat_range?(_state, _blackboard, %Context{}), do: false
+  def in_combat_range?(state, blackboard, %Context{} = context),
+    do: in_melee_range?(state, melee_target(state, blackboard), context)
 
   def in_melee_range?(%{movement_block: %{position: {x, y, z, _orientation}}} = state, target, %Context{
         perception: perception
@@ -91,12 +85,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   def melee_attack_with_context(%{internal: %Internal{casting: %Cast{}}} = state, blackboard, %Context{}),
     do: {:success, state, blackboard}
 
-  def melee_attack_with_context(
-        %{unit: %Unit{target: target}} = state,
-        %Blackboard{} = blackboard,
-        %Context{now: now} = context
-      )
-      when is_integer(target) and target > 0 do
+  def melee_attack_with_context(state, %Blackboard{} = blackboard, %Context{} = context) do
+    case melee_target(state, blackboard) do
+      target when is_integer(target) and target > 0 -> melee_attack(state, target, blackboard, context)
+      _ -> {:success, state, blackboard}
+    end
+  end
+
+  defp melee_attack(state, target, blackboard, %Context{now: now} = context) do
     {state, blackboard} = maybe_start_melee_attack(state, target, blackboard)
     attack_ready = Blackboard.ready_for?(blackboard, :next_attack_at, now)
     offhand_ready = offhand_ready?(state, blackboard, now)
@@ -115,8 +111,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
     {:success, state, blackboard}
   end
-
-  def melee_attack_with_context(state, blackboard, %Context{}), do: {:success, state, blackboard}
 
   defp perform_ready_attacks(state, target, blackboard, main_ready?, now) do
     {state, events} = Aura.remove_with_interrupt_flags(state, Aura.interrupt_mask(:attack), now)
@@ -247,7 +241,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     if extra_attack_ready?(state, blackboard, context) do
       {state, events} = Aura.remove_with_interrupt_flags(state, Aura.interrupt_mask(:attack), context.now)
       state = Effects.enqueue(state, events)
-      state = Enum.reduce(1..count, state, fn _attack, entity -> send_white_swing(entity, entity.unit.target, true) end)
+      target = melee_target(state, blackboard)
+      state = Enum.reduce(1..count, state, fn _attack, entity -> send_white_swing(entity, target, true) end)
       blackboard = %{blackboard | combat: %{blackboard.combat | extra_attacks: 0}}
       blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, CombatLogic.attack_speed_ms(state), context.now)
       {:failure, state, blackboard}
@@ -266,10 +261,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     cond do
       CombatControl.auto_attack_blocked?(state) -> :cannot_attack
       not Death.alive?(state) -> :dead
-      match?(%{alive?: false}, Perception.metadata(context.perception, state.unit.target)) -> :dead
+      match?(%{alive?: false}, Perception.metadata(context.perception, melee_target(state, blackboard))) -> :dead
       not target_valid_same_map?(state, blackboard, context) -> :unavailable
       not in_combat_range?(state, blackboard, context) -> :not_in_range
-      not facing_target?(state, context) -> :bad_facing
+      not facing_target?(state, melee_target(state, blackboard), context) -> :bad_facing
       true -> :ok
     end
   end
@@ -286,7 +281,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   defp face_melee_victim(state, _blackboard, _context), do: state
 
-  defp facing_target?(%{unit: %Unit{target: target}, movement_block: %{position: {x, y, _z, orientation}}}, context) do
+  defp facing_target?(%{movement_block: %{position: {x, y, _z, orientation}}}, target, context) do
     case Perception.position(context.perception, target) do
       {_world, tx, ty, _tz} ->
         dx = tx - x
@@ -297,6 +292,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
         false
     end
   end
+
+  defp melee_target(%Character{}, blackboard) do
+    case Blackboard.auto_attack_target(blackboard) do
+      %TargetRef{guid: guid} -> guid
+      nil -> nil
+    end
+  end
+
+  defp melee_target(%{unit: %Unit{target: target}}, _blackboard), do: target
+  defp melee_target(_entity, _blackboard), do: nil
 
   defp send_white_swing(state, target, extra_attack? \\ false) do
     attack = state |> melee_attack_payload() |> Map.put(:extra_attack?, extra_attack?) |> CombatLogic.finalize_attack()

@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
@@ -31,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
 
   defp melee_attack(entity, blackboard, now) do
     target = entity.unit.target
+    blackboard = Blackboard.enable_auto_attack(blackboard, %TargetRef{guid: target})
     position = World.target_position(target)
     {x, y, z, _o} = entity.movement_block.position
     {_world, tx, ty, tz} = position
@@ -79,12 +81,54 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
         context = Context.new(1_000, perception: perception)
         attacker = %{character | movement_block: %{character.movement_block | position: {0.0, 0.0, 0.0, orientation}}}
 
-        assert Combat.target_valid_same_map?(attacker, Blackboard.new(), context) == detectable?
+        blackboard = Blackboard.enable_auto_attack(Blackboard.new(), %TargetRef{guid: 2})
+        assert Combat.target_valid_same_map?(attacker, blackboard, context) == detectable?
       end
     end
   end
 
   describe "melee_attack_with_context/3" do
+    test "swings and extra attacks use the melee victim after selection changes" do
+      blackboard = Blackboard.enable_auto_attack(Blackboard.new(), %TargetRef{guid: 2})
+      observation = %Observation{guid: 2, position: {WorldRef.open(0), 1.0, 0.0, 0.0}, metadata: %{alive?: true}}
+      context = Context.new(1_000, perception: Perception.new(1_000, nil, %{2 => observation}, %{}))
+
+      for selection <- [0, 3] do
+        character = %Character{
+          object: %Object{guid: 1},
+          unit: %Unit{
+            target: selection,
+            health: 100,
+            level: 1,
+            min_damage: 10.0,
+            max_damage: 10.0,
+            base_attack_time: 2_000
+          },
+          player: %Player{},
+          internal: %Internal{world: WorldRef.open(0)},
+          movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+        }
+
+        assert Combat.in_combat?(character, blackboard)
+        assert Combat.target_valid_same_map?(character, blackboard, context)
+        assert {:success, swung, memory} = Combat.melee_attack_with_context(character, blackboard, context)
+        assert swung.unit.target == selection
+        assert [%Effects.AttackStart{target_guid: 2}, %Effects.DeliverAttack{target_guid: 2}] = swung.internal.events
+        assert memory.combat.attack_started
+        assert memory.combat.next_attack_at == 3_000
+
+        memory = %{memory | combat: %{memory.combat | extra_attacks: 2}}
+        character = %{swung | internal: %{swung.internal | events: []}}
+        assert {:failure, extra, memory} = Combat.consume_extra_attacks(character, memory, context)
+        assert [%Effects.DeliverAttack{target_guid: 2}, %Effects.DeliverAttack{target_guid: 2}] = extra.internal.events
+        assert memory.combat.extra_attacks == 0
+        assert extra.unit.target == selection
+
+        assert {:success, ^character, %Blackboard{}} =
+                 Combat.melee_attack_with_context(character, Blackboard.new(), context)
+      end
+    end
+
     test "white swings and abilities share bonuses and leave progression to the defender" do
       target_guid = Guid.from_low_guid(:unit, 1, 99_876)
       sword = %ItemTemplate{entry: 99_987_655, class: 2, subclass: 7}
@@ -637,7 +681,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
 
       assert Combat.in_combat?(
                character,
-               %Blackboard{combat: %Blackboard.Combat{auto_attacking: true}}
+               Blackboard.enable_auto_attack(Blackboard.new(), %TargetRef{guid: 2})
              )
     end
 

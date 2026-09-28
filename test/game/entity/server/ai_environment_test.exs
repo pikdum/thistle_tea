@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
@@ -55,6 +56,26 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   end
 
   describe "context/3" do
+    test "observes the active melee victim after selection is cleared" do
+      world = WorldRef.open(999)
+      target = Guid.runtime(:mob, 19)
+      put_actor(:mobs, target, world, 130.0)
+      on_exit(fn -> remove_actor(:mobs, target) end)
+
+      character = %Character{
+        object: %Object{guid: 98_206},
+        unit: %Unit{target: 0},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{
+          world: world,
+          blackboard: Blackboard.enable_auto_attack(Blackboard.new(), %TargetRef{guid: target})
+        }
+      }
+
+      perception = AIEnvironment.context(character, 1_000).perception
+      assert Perception.position(perception, target) == {world, 130.0, 0.0, 0.0}
+    end
+
     test "owners snapshot distant pet and direct combat references" do
       world = WorldRef.open(999)
       guid = Guid.runtime(:pet, 18)

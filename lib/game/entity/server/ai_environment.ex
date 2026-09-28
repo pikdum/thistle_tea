@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Logic.Condition.Requirements
   alias ThistleTea.Game.Entity.Logic.CreatureMovement
   alias ThistleTea.Game.Entity.Logic.Fear
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.Server.FormationEnvironment
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.SpellReception
@@ -300,7 +301,12 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   defp player_combat_guids(%Character{internal: %{threat_refs: refs}} = entity) do
     companion = Companion.summon_guid(entity)
     metadata = Metadata.get(companion) || %{}
-    [companion | CombatReferences.targets(refs) ++ CombatReferences.targets(metadata[:threat_refs])]
+
+    [
+      melee_target(entity.internal.blackboard),
+      companion
+      | CombatReferences.targets(refs) ++ CombatReferences.targets(metadata[:threat_refs])
+    ]
   end
 
   defp player_attackers(%Mob{object: %{guid: guid}, internal: %{in_combat: true}} = entity, owner) do
@@ -437,6 +443,13 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
 
   defp auto_repeat_target(%{target_guid: target_guid}), do: target_guid
   defp auto_repeat_target(_auto_repeat), do: nil
+
+  defp melee_target(blackboard) do
+    case Blackboard.auto_attack_target(blackboard) do
+      %TargetRef{guid: guid} -> guid
+      nil -> nil
+    end
+  end
 
   defp own_guid(%{object: %{guid: guid}}) when is_integer(guid) and guid > 0, do: guid
   defp own_guid(_entity), do: nil

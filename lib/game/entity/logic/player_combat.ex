@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   alias ThistleTea.Game.Entity.Logic.CombatState
   alias ThistleTea.Game.Entity.Logic.CombatTimer
   alias ThistleTea.Game.Entity.Logic.ControlledCombat
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
@@ -106,6 +107,28 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   def mark_temporary_at_war(character, _faction_id), do: character
 
+  def start_melee_attack(%Character{} = character, %TargetRef{} = target) do
+    previous = Blackboard.auto_attack_target(character.internal.blackboard)
+
+    if previous == target do
+      {character, []}
+    else
+      {character, effects} = if previous, do: stop_melee_attack(character), else: {character, []}
+
+      blackboard =
+        character.internal.blackboard
+        |> Blackboard.ensure()
+        |> Blackboard.clear_attack_started()
+        |> Blackboard.enable_auto_attack(target)
+
+      {%{
+         character
+         | unit: %{character.unit | target: target.guid},
+           internal: %{character.internal | blackboard: blackboard}
+       }, effects}
+    end
+  end
+
   def stop_attack(%Character{} = character) do
     {character, ranged_effects} = AutoRepeat.cancel(character)
     {character, melee_effects} = stop_melee_attack(character)
@@ -117,42 +140,42 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   def stop_melee_attack(
         %Character{object: %{guid: guid}, unit: %Unit{} = unit, internal: %Internal{} = internal} = character
       ) do
+    target = Blackboard.auto_attack_target(internal.blackboard)
     blackboard = internal.blackboard |> Blackboard.ensure() |> Blackboard.clear_auto_attack()
+    unit = if target, do: %{unit | target: 0}, else: unit
 
     character =
-      %{character | unit: %{unit | target: 0}, internal: %{internal | blackboard: blackboard}}
+      %{character | unit: unit, internal: %{internal | blackboard: blackboard}}
       |> MeleeSpell.interrupt()
 
-    {character, attack_stop_effects(guid, unit.target)}
+    character = if target, do: Core.mark_broadcast_update(character), else: character
+    {character, attack_stop_effects(guid, target)}
   end
 
   def stop_melee_attack(character), do: {character, []}
 
-  def disengage(%Character{object: %{guid: guid}} = character) do
-    {character, auto_repeat_effects} = AutoRepeat.cancel(character)
-    %Character{unit: %Unit{} = unit, internal: %Internal{} = internal} = character
+  def disengage(%Character{} = character) do
+    {character, attack_effects} = stop_attack(character)
+    %Character{internal: %Internal{} = internal} = character
     refs = internal.threat_refs || MapSet.new()
-    blackboard = internal.blackboard |> Blackboard.ensure() |> Blackboard.clear_auto_attack()
 
     character =
       %{
         character
-        | unit: %{unit | target: 0},
+        | unit: %{character.unit | target: 0},
           internal: %{
             internal
             | threat_refs: MapSet.new(),
-              in_combat: false,
-              blackboard: blackboard
+              in_combat: false
           }
       }
       |> CombatTimer.clear()
       |> CombatLogic.sync_combat_flag()
 
     effects =
-      auto_repeat_effects ++
+      attack_effects ++
         [Effects.drop_nearby_threat()] ++
-        Enum.map(threat_ref_guids(refs), &Effects.drop_threat/1) ++
-        attack_stop_effects(guid, unit.target)
+        Enum.map(threat_ref_guids(refs), &Effects.drop_threat/1)
 
     {character, temporary_war_effects} = clear_temporary_at_war(character)
     {character, effects ++ temporary_war_effects}
@@ -215,16 +238,27 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   def lose_threat_ref(character, _mob_guid, _incarnation_id), do: character
 
-  def sync(
-        %Character{internal: %Internal{in_combat: true}} = character,
-        %Blackboard{} = blackboard,
-        %Context{now: now} = context
-      ) do
-    blackboard =
-      if auto_attacking_target?(character, blackboard, context.perception),
-        do: blackboard,
-        else: clear_inactive_attack(blackboard)
+  def sync(%Character{} = character, %Blackboard{} = blackboard, %Context{} = context) do
+    {character, blackboard} =
+      if Blackboard.auto_attack_target(blackboard) &&
+           not auto_attacking_target?(character, blackboard, context.perception) do
+        character = %{character | internal: %{character.internal | blackboard: blackboard}}
+        {character, effects} = stop_melee_attack(character)
+        {Effects.enqueue(character, effects), character.internal.blackboard}
+      else
+        {character, blackboard}
+      end
 
+    sync_combat(character, blackboard, context)
+  end
+
+  def sync(character, %Blackboard{} = blackboard, %Context{}), do: {character, blackboard}
+
+  defp sync_combat(
+         %Character{internal: %Internal{in_combat: true}} = character,
+         %Blackboard{} = blackboard,
+         %Context{now: now} = context
+       ) do
     character = prune_threat_refs(character, context.perception)
 
     if threat_refs?(character) or ControlledCombat.holds_combat?(character, context) or
@@ -235,12 +269,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
     end
   end
 
-  def sync(character, %Blackboard{} = blackboard, %Context{}), do: {character, blackboard}
-
-  defp clear_inactive_attack(%Blackboard{combat: %{auto_attacking: true}} = blackboard),
-    do: Blackboard.clear_auto_attack(blackboard)
-
-  defp clear_inactive_attack(%Blackboard{} = blackboard), do: blackboard
+  defp sync_combat(character, blackboard, _context), do: {character, blackboard}
 
   defp prune_threat_refs(%Character{internal: %Internal{} = internal} = character, perception) do
     refs = CombatReferences.prune(internal.threat_refs, internal.world, perception)
@@ -255,7 +284,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
     |> Enum.uniq()
   end
 
-  defp attack_stop_effects(source_guid, target_guid)
+  defp attack_stop_effects(source_guid, %TargetRef{guid: target_guid})
        when is_integer(source_guid) and is_integer(target_guid) and target_guid > 0 do
     [Effects.attack_stop(source_guid, target_guid)]
   end
@@ -291,11 +320,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   defp auto_attacking_target?(_character, _blackboard, _perception), do: false
 
-  defp active_target?(
-         %Character{internal: %Internal{world: world}, unit: %Unit{target: target}},
-         %TargetRef{guid: target} = target_ref,
-         perception
-       )
+  defp active_target?(%Character{internal: %Internal{world: world}}, %TargetRef{guid: target} = target_ref, perception)
        when is_integer(target) and target > 0 do
     case Perception.position(perception, target) do
       {^world, _x, _y, _z} -> TargetRef.active?(target_ref, Perception.metadata(perception, target) || %{})

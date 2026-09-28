@@ -62,8 +62,23 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
   end
 
   describe "stop_melee_attack/1" do
+    test "preserves selection when no attack is running" do
+      character = character(target: 456)
+      {stopped, []} = PlayerCombat.stop_melee_attack(character)
+      assert stopped.unit.target == 456
+      assert {^stopped, []} = PlayerCombat.stop_melee_attack(stopped)
+    end
+
+    test "notifies the melee victim after selection changes" do
+      character = character(target: 123) |> attacking(123)
+      character = %{character | unit: %{character.unit | target: 456}}
+      {stopped, [%Effects.AttackStop{target_guid: 123}]} = PlayerCombat.stop_melee_attack(character)
+      assert stopped.unit.target == 0
+      assert Blackboard.auto_attack_target(stopped.internal.blackboard) == nil
+    end
+
     test "cancels a queued swing while preserving ranged repetition and ordinary casting" do
-      character = character(in_combat: true, target: 123)
+      character = character(in_combat: true, target: 123) |> attacking(123)
       cast = %Cast{spell: %Spell{id: 116}, phase: :preparing}
       shot = %{target_guid: 123, next_at: 4_000}
 
@@ -87,12 +102,46 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
     end
   end
 
+  describe "start_melee_attack/2" do
+    test "switching stops the old victim and preserves swing deadlines" do
+      character = character(target: 456) |> attacking(123)
+      memory = character.internal.blackboard
+
+      memory = %{
+        memory
+        | combat: %{memory.combat | attack_started: true, next_attack_at: 5_000, next_offhand_attack_at: 6_000}
+      }
+
+      character = %{character | internal: %{character.internal | blackboard: memory, next_swing_spell: %Spell{id: 78}}}
+      target = %TargetRef{guid: 456, incarnation_id: 7}
+
+      {started, [%Effects.AttackStop{target_guid: 123}]} = PlayerCombat.start_melee_attack(character, target)
+      assert Blackboard.auto_attack_target(started.internal.blackboard) == target
+      refute started.internal.blackboard.combat.attack_started
+      assert started.internal.blackboard.combat.next_attack_at == 5_000
+      assert started.internal.blackboard.combat.next_offhand_attack_at == 6_000
+      assert started.internal.next_swing_spell == nil
+      assert started.unit.target == 456
+      assert {^started, []} = PlayerCombat.start_melee_attack(started, target)
+    end
+
+    test "first attack retains an already queued swing and extra attacks" do
+      character = character(target: 123)
+      memory = %Blackboard{combat: %Blackboard.Combat{extra_attacks: 2}}
+      character = %{character | internal: %{character.internal | blackboard: memory, next_swing_spell: %Spell{id: 78}}}
+      {started, []} = PlayerCombat.start_melee_attack(character, %TargetRef{guid: 123})
+      assert started.internal.next_swing_spell.id == 78
+      assert started.internal.blackboard.combat.extra_attacks == 2
+    end
+  end
+
   describe "stop_attack/1" do
     test "clears melee and ranged auto attacks without leaving combat" do
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
 
       character =
         character(in_combat: true, target: target_guid)
+        |> attacking(target_guid)
         |> then(fn character ->
           %{character | internal: %{character.internal | auto_shot: %{target_guid: target_guid}}}
         end)
@@ -143,6 +192,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
 
       character =
         character(in_combat: true, target: target_guid, last_hostile_time: 1_000)
+        |> attacking(target_guid)
         |> PlayerCombat.gain_threat_ref(target_guid, 1, 0)
         |> PlayerCombat.gain_threat_ref(other_guid, 2, 0)
         |> then(fn character ->
@@ -166,6 +216,33 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
   end
 
   describe "sync/3" do
+    test "selection changes retain the live melee victim" do
+      target = Guid.runtime(:mob, 1)
+      SpatialHash.update(:mobs, target, 0, 1.0, 0.0, 0.0)
+      Metadata.put(target, %{alive?: true, incarnation_id: 1})
+
+      on_exit(fn ->
+        SpatialHash.remove(:mobs, target)
+        Metadata.delete(target)
+      end)
+
+      character = character(in_combat: true, target: 456, last_hostile_time: 1_000) |> attacking(target)
+      {synced, memory} = sync(character, character.internal.blackboard, 2_000)
+      assert synced.unit.target == 456
+      assert Blackboard.auto_attack_target(memory).guid == target
+      assert synced.internal.events == []
+    end
+
+    test "a missing victim stops an attack before combat has begun" do
+      character = character(target: 456) |> attacking(123)
+      {synced, memory} = sync(character, character.internal.blackboard, 2_000)
+      assert synced.unit.target == 0
+      assert Blackboard.auto_attack_target(memory) == nil
+      assert [%Effects.AttackStop{target_guid: 123}] = synced.internal.events
+      {again, ^memory} = sync(synced, memory, 2_001)
+      assert again.internal.events == synced.internal.events
+    end
+
     test "an interrupt-regen aura retains existing combat until it leaves" do
       holder = %Holder{spell: %Spell{id: 2687}, auras: [%Aura{type: :interrupt_regen}]}
       character = PlayerCombat.hold_combat(character(), 0, 5_000)
@@ -391,8 +468,10 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
   end
 
   defp sync(character, blackboard, now) do
+    attack = Blackboard.auto_attack_target(blackboard)
+
     observations =
-      [character.unit.target | CombatReferences.targets(character.internal.threat_refs)]
+      [if(attack, do: attack.guid), character.unit.target | CombatReferences.targets(character.internal.threat_refs)]
       |> Enum.filter(&(is_integer(&1) and &1 > 0))
       |> Map.new(fn guid ->
         {guid, %Observation{guid: guid, position: World.position(guid), metadata: Metadata.get(guid)}}
@@ -400,6 +479,11 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
 
     context = Context.new(now, perception: Perception.new(now, nil, observations, %{}))
     PlayerCombat.sync(character, blackboard, context)
+  end
+
+  defp attacking(character, guid) do
+    blackboard = Blackboard.enable_auto_attack(Blackboard.new(), %TargetRef{guid: guid})
+    %{character | internal: %{character.internal | blackboard: blackboard}}
   end
 
   defp character(opts \\ []) do

@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MeleeReadinessTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Entity.Logic.AttackTimers
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
@@ -248,7 +249,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MeleeReadinessTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         internal: %Internal{world: WorldRef.open(0)}
       },
-      blackboard: %Blackboard{combat: %Blackboard.Combat{attack_started: true, auto_attacking: true}}
+      blackboard: %Blackboard{
+        combat: %Blackboard.Combat{attack_started: true, auto_attacking: true, auto_attack_target: %TargetRef{guid: 2}}
+      }
     }
   end
 

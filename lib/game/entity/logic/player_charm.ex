@@ -36,7 +36,13 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCharm do
         entity = Casting.interrupt(entity, now)
         {entity, effects} = PlayerCombat.stop_attack(entity)
         control = if command == :passive, do: %{control | reaction: :passive}, else: %{control | command: command}
-        entity = %{entity | internal: %{entity.internal | possession: %{control | command_target: nil}}}
+
+        entity = %{
+          entity
+          | unit: %{entity.unit | target: 0},
+            internal: %{entity.internal | possession: %{control | command_target: nil}}
+        }
+
         Effects.enqueue(entity, effects)
 
       reaction when reaction in [:defensive, :aggressive] ->

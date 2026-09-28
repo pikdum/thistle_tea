@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerPossessionTest do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.PlayerPossession
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Input
@@ -38,7 +39,9 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerPossessionTest do
     end
 
     test "possession stops casting and attacks and grants an empty spell list", %{character: character} do
-      character = character |> BT.enable_auto_attack(99) |> put_in([Access.key(:unit), Access.key(:target)], 99)
+      character =
+        character |> BT.enable_auto_attack(%TargetRef{guid: 99}) |> put_in([Access.key(:unit), Access.key(:target)], 99)
+
       character = put_in(character.internal.casting, %Cast{spell: %Spell{id: 133}})
       {possessed, events} = change(character, [holder(2)], :applied)
 

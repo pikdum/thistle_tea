@@ -1,10 +1,8 @@
 defmodule ThistleTea.Game.Player.Attacking do
   @moduledoc "Validates player melee targets and starts the shared attack behavior."
   alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
-  alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
@@ -33,11 +31,9 @@ defmodule ThistleTea.Game.Player.Attacking do
     if valid_attack_target?(state, target_guid) do
       target_ref = TargetRef.new(target_guid, Metadata.query(target_guid, [:incarnation_id]) || %{})
 
-      character =
-        character
-        |> maybe_reset_attack_started(target_guid)
-        |> set_attack_target(target_guid)
-        |> BT.enable_auto_attack(target_ref)
+      {character, events} = PlayerCombat.start_melee_attack(character, target_ref)
+      context = Context.new(self())
+      character = character |> EventSink.emit(events, context) |> EventSink.emit_pending(context)
 
       Core.update_object(character, :values)
       |> World.broadcast_packet(character)
@@ -70,17 +66,6 @@ defmodule ThistleTea.Game.Player.Attacking do
 
   def stop(state), do: state
 
-  defp maybe_reset_attack_started(%Character{unit: %Unit{target: target}} = character, target_guid)
-       when is_integer(target_guid) do
-    if target == target_guid do
-      character
-    else
-      BT.reset_attack_started(character)
-    end
-  end
-
-  defp maybe_reset_attack_started(character, _target_guid), do: character
-
   defp valid_attack_target?(
          %{guid: guid, character: %Character{internal: %{world: world}} = character} = state,
          target_guid
@@ -104,10 +89,4 @@ defmodule ThistleTea.Game.Player.Attacking do
   end
 
   defp send_attack_stop(state, _target_guid), do: state
-
-  defp set_attack_target(%Character{unit: unit} = character, target_guid) when is_integer(target_guid) do
-    %{character | unit: %{unit | target: target_guid}}
-  end
-
-  defp set_attack_target(character, _target_guid), do: character
 end

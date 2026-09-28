@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.Dueling do
   alias ThistleTea.Game.Entity.Logic.CombatTimer
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
 
   def requested(%Character{internal: %Internal{} = internal, player: %Player{} = player} = character, %{
@@ -121,9 +122,9 @@ defmodule ThistleTea.Game.Entity.Logic.Dueling do
   defp remove_duel_auras(character, _opponents, _started_at, _now), do: {character, []}
 
   defp clear_duel_combat({%Character{} = character, events}, opponents) do
-    guid = character.object.guid
     target_guid = character.unit.target
     clear_target? = target_guid in opponents
+    {character, attack_events} = PlayerCombat.stop_attack(character)
     blackboard = Blackboard.ensure(character.internal.blackboard)
 
     blackboard =
@@ -153,14 +154,7 @@ defmodule ThistleTea.Game.Entity.Logic.Dueling do
     unit = if clear_target?, do: %{character.unit | target: 0}, else: character.unit
     character = %{character | internal: internal, unit: unit} |> Combat.sync_combat_flag()
 
-    events =
-      if clear_target? and is_integer(target_guid) and target_guid > 0 do
-        events ++ [Effects.attack_stop(guid, target_guid)]
-      else
-        events
-      end
-
-    {character, events}
+    {character, events ++ attack_events}
   end
 
   defp clear_projection(%Character{internal: %Internal{} = internal, player: %Player{} = player} = character) do
