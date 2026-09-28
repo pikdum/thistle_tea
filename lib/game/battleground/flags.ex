@@ -9,6 +9,8 @@ defmodule ThistleTea.Game.Battleground.Flags do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.WorldRef
 
+  def remove(%Character{} = character, now), do: Aura.remove_spells(character, [23_333, 23_335], now)
+
   def admit(%Character{internal: %{world: %WorldRef{map_id: 489, instance_id: instance_id}}} = character, %Spell{id: id})
       when is_integer(instance_id) and id in [23_333, 23_335] do
     if GameObjectInteraction.battleground_allowed?(character),

@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Party.Notifier
+  alias ThistleTea.Game.Player.Battlegrounds
   alias ThistleTea.Game.Player.Buyback
   alias ThistleTea.Game.Player.Guilds
   alias ThistleTea.Game.Player.Instances
@@ -116,6 +117,8 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   ]
 
   def prepare_worldport(%__MODULE__{} = state, origin, destination) do
+    state = if origin == destination, do: state, else: Battlegrounds.remove_flags(state)
+
     state
     |> clear_scripts()
     |> detach_single_target_auras()
@@ -177,6 +180,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     state = close_mailbox(state)
     state = Buyback.logout(state)
     state = ItemDurations.logout(state)
+    state = Battlegrounds.remove_flags(state)
 
     if state.guid && state.character do
       BattlegroundSystem.disconnect(state.guid, state.character.movement_block.position)

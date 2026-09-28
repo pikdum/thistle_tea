@@ -10,9 +10,12 @@ defmodule ThistleTea.Game.Player.BattlegroundsTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Battlegrounds
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
@@ -20,6 +23,36 @@ defmodule ThistleTea.Game.Player.BattlegroundsTest do
   alias ThistleTea.Game.WorldRef
 
   setup [:catalog, :players]
+
+  describe "leave_world/1" do
+    test "logout removes carrier auras before retaining the character", %{leader: leader} do
+      character = carrier(leader)
+      on_exit(fn -> :ets.delete(CharacterStore, character.id) end)
+
+      State.leave_world(%State{guid: character.object.guid, character: character})
+
+      saved = CharacterStore.get(character.id)
+      refute Aura.has_spell?(saved, 23_333)
+      refute Aura.has_spell?(saved, 23_335)
+      assert Aura.has_spell?(saved, 99_999)
+    end
+  end
+
+  describe "prepare_worldport/3" do
+    test "world transfer removes flags while local travel retains them", %{leader: leader} do
+      character = carrier(leader)
+      world = character.internal.world
+      state = %State{guid: character.object.guid, character: character}
+
+      local = State.prepare_worldport(state, world, world)
+      assert Aura.has_spell?(local.character, 23_333)
+
+      departing = State.prepare_worldport(state, world, WorldRef.open(0))
+      refute Aura.has_spell?(departing.character, 23_333)
+      refute Aura.has_spell?(departing.character, 23_335)
+      assert Aura.has_spell?(departing.character, 99_999)
+    end
+  end
 
   describe "join/4" do
     test "native solo admission reports Deserter without queueing", %{leader: leader} do
@@ -143,6 +176,16 @@ defmodule ThistleTea.Game.Player.BattlegroundsTest do
   defp deserter(character) do
     holder = %Holder{spell: %Spell{id: 26_013}, negative?: true}
     %{character | unit: %{character.unit | auras: [holder]}}
+  end
+
+  defp carrier(character) do
+    holders = Enum.map([23_333, 23_335, 99_999], &%Holder{spell: %Spell{id: &1}, caster_guid: character.object.guid})
+
+    %{
+      character
+      | internal: %{character.internal | world: WorldRef.instance(489, 123)},
+        unit: %{character.unit | auras: holders}
+    }
   end
 
   defp character do

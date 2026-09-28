@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
   alias ThistleTea.Game.Battleground
   alias ThistleTea.Game.Battleground.AlteracValley.Armor
   alias ThistleTea.Game.Battleground.Deserter
+  alias ThistleTea.Game.Battleground.Flags
   alias ThistleTea.Game.Battleground.Resurrection, as: BattlegroundResurrection
   alias ThistleTea.Game.Battleground.Rules
   alias ThistleTea.Game.Entity
@@ -35,6 +36,13 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
   alias ThistleTea.Game.WorldRef
 
   @interaction_range 10.0
+
+  def remove_flags(%{character: %Character{} = character} = state) do
+    {character, events} = Flags.remove(character, Time.now())
+    %{state | character: EventSink.emit(character, events)}
+  end
+
+  def remove_flags(state), do: state
 
   def quest_rewarded(%{character: %Character{internal: %{world: %WorldRef{instance_id: id} = world}}} = state, quest_id)
       when is_integer(id) do

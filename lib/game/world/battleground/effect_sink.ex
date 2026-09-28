@@ -78,7 +78,7 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
         :captured -> "The #{faction} has taken the #{node}!"
       end
 
-    packet = battleground_message(replace_actor(text, effect.actor_guid), effect.team, effect.actor_guid)
+    packet = battleground_message(replace_actor(match, text, effect.actor_guid), effect.team, effect.actor_guid)
     send_to(match, :all, packet)
   end
 
@@ -177,7 +177,7 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
   defp emit_effect(match, %Effects.Announce{} = effect) do
     case BroadcastTextLoader.get(effect.broadcast_text_id) do
       %{text: text} ->
-        text = replace_actor(text, effect.actor_guid)
+        text = replace_actor(match, text, effect.actor_guid)
         packet = battleground_message(text, effect.audience, effect.actor_guid)
         send_to(match, :all, packet)
 
@@ -272,11 +272,11 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
     }
   end
 
-  defp replace_actor(text, nil), do: text
+  defp replace_actor(_match, text, nil), do: text
 
-  defp replace_actor(text, guid) do
+  defp replace_actor(match, text, guid) do
     name =
-      case Metadata.query(guid, [:name]) do
+      case Map.get(match.players, guid) || Metadata.query(guid, [:name]) do
         %{name: name} when is_binary(name) -> name
         _missing -> "Unknown"
       end

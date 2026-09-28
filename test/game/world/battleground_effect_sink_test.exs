@@ -10,10 +10,40 @@ defmodule ThistleTea.Game.World.BattlegroundEffectSinkTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Battleground.EffectSink
+  alias ThistleTea.Game.World.Loader.BroadcastText
   alias ThistleTea.Game.World.System.Honor
   alias ThistleTea.Game.WorldRef
 
   describe "emit/2" do
+    test "keeps the offline carrier's name after live metadata disappears" do
+      observer = System.unique_integer([:positive, :monotonic])
+      carrier = System.unique_integer([:positive, :monotonic])
+      text_id = System.unique_integer([:positive, :monotonic])
+      Entity.register(observer)
+      :ets.insert(BroadcastText, {text_id, %{text: "The Horde Flag was dropped by $n!"}})
+      on_exit(fn -> :ets.delete(BroadcastText, text_id) end)
+
+      match = %WarsongGulch{
+        world: WorldRef.instance(489, 7),
+        client_instance_id: 7,
+        bracket: 5,
+        template: %Template{},
+        players: %{
+          observer => %Player{guid: observer, name: "Observer", team: :alliance, status: :inside},
+          carrier => %Player{guid: carrier, name: "Carrier", team: :alliance, status: :offline}
+        }
+      }
+
+      EffectSink.emit(match, [%Effects.Announce{broadcast_text_id: text_id, audience: :alliance, actor_guid: carrier}])
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet,
+                       %Message.SmsgMessagechat{
+                         sender_guid: ^carrier,
+                         message: "The Horde Flag was dropped by Carrier!"
+                       }}}
+    end
+
     test "delivers departure penalties to the departing player's owner" do
       guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
       Entity.register(guid)
