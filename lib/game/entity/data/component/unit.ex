@@ -53,6 +53,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Unit do
     base_combat_reach: :virtual,
     display_id: {0x0083, 1, :int},
     native_display_id: {0x0084, 1, :int},
+    native_model_id: :virtual,
     mount_display_id: {0x0085, 1, :int},
     min_damage: {0x0086, 1, :float, :special_info},
     max_damage: {0x0087, 1, :float, :special_info},

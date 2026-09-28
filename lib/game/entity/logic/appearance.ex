@@ -75,6 +75,7 @@ defmodule ThistleTea.Game.Entity.Logic.Appearance do
   def shapeshift_model(4, _race), do: %Model{display_id: 2428, scale: 0.8}
   def shapeshift_model(form, 6) when form in [5, 8], do: %Model{display_id: 2289}
   def shapeshift_model(form, _race) when form in [5, 8], do: %Model{display_id: 2281}
+  def shapeshift_model(14, _race), do: %Model{display_id: 902}
   def shapeshift_model(16, _race), do: %Model{display_id: 4613, scale: 0.8}
   def shapeshift_model(31, 6), do: %Model{display_id: 15_375}
   def shapeshift_model(31, _race), do: %Model{display_id: 15_374}
@@ -113,7 +114,8 @@ defmodule ThistleTea.Game.Entity.Logic.Appearance do
         model
 
       %Aura{type: ^type, appearance: models} when is_map(models) ->
-        Map.get(models, {unit.race, unit.gender}) || Map.get(models, unit.race) || Map.get(models, :default)
+        Map.get(models, {:native_model, unit.native_model_id}) || Map.get(models, {unit.race, unit.gender}) ||
+          Map.get(models, unit.race) || Map.get(models, :default)
 
       %Aura{type: :transform, misc_value: display} when type == :transform and is_integer(display) and display > 0 ->
         %Model{display_id: display}

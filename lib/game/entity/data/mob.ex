@@ -83,6 +83,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       base_combat_reach: mob_combat_reach(display_info_addon, effective_scale),
       display_id: c.modelid,
       native_display_id: c.modelid,
+      native_model_id: c.display_model_id,
       min_damage: min_damage,
       max_damage: max_damage,
       base_min_damage: min_damage,

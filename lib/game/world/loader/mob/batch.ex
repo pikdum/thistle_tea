@@ -111,20 +111,22 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
       )
       |> Enum.reduce(%{}, fn row, acc -> Map.put_new(acc, row.display_id, row) end)
 
-    scales = display_scales(display_ids)
+    models = display_models(display_ids)
 
     Enum.map(creatures, fn creature ->
-      scale = positive_scale(creature.display_scale) || Map.get(scales, creature.modelid)
+      model = Map.get(models, creature.modelid, %{scale: nil, model_id: nil})
+      scale = positive_scale(creature.display_scale) || model.scale
 
       %{
         creature
         | display_scale: scale,
+          display_model_id: model.model_id,
           creature_display_info_addon: Map.get(addons, creature.modelid)
       }
     end)
   end
 
-  defp display_scales(display_ids) do
+  defp display_models(display_ids) do
     display_rows =
       DBC.all(from(row in CreatureDisplayInfo, where: row.id in ^display_ids))
 
@@ -144,7 +146,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
           _ -> nil
         end
 
-      {display.id, scale}
+      {display.id, %{scale: scale, model_id: display.model}}
     end)
   end
 

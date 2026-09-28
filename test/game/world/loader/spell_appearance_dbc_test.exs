@@ -15,6 +15,32 @@ defmodule ThistleTea.Game.World.Loader.SpellAppearanceDbcTest do
   setup [:model_cache]
 
   describe "load/1" do
+    test "creature bear form changes the model and restores native appearance" do
+      spell = SpellLoader.load(19_030)
+      original = entity(1, 0)
+      {bear, _events} = Aura.apply_spell(original, 1, 60, spell, 1_000)
+      assert bear.unit.display_id == 902
+      assert bear.unit.shapeshift_form == 14
+      {restored, _events} = Aura.remove_spells(bear, [spell.id], 2_000)
+      assert restored.unit.display_id == original.unit.native_display_id
+      assert restored.object.scale_x == original.object.base_scale_x
+    end
+
+    test "creature bear form selects from the native model instead of race or current disguise" do
+      spell = SpellLoader.load(19_030)
+
+      for {native_model, expected} <- [{55, 2281}, {56, 2281}, {59, 2289}, {60, 2289}, {53, 902}] do
+        original = entity(1, 0)
+        original = %{original | unit: %{original.unit | native_model_id: native_model, display_id: 999}}
+        {bear, _events} = Aura.apply_spell(original, 1, 60, spell, 1_000)
+        assert bear.unit.display_id == expected
+        assert bear.object.scale_x == 1.0
+        assert bear.unit.native_model_id == native_model
+      end
+
+      assert ModelGeometry.get(6832).model_id == 59
+    end
+
     test "all mage polymorph ranks and alternate animals qualify for regeneration" do
       for id <- [118, 12_824, 12_825, 12_826, 28_271, 28_272] do
         assert Spell.polymorph?(SpellLoader.load(id)), "spell #{id}"

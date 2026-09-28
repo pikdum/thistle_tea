@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.World.Loader.ModelGeometry do
       on: race.id == extra.display_race,
       select: %{
         id: display.id,
+        model_id: display.model,
         display_scale: display.creature_model_scale,
         model_scale: model.model_scale,
         collision_height: model.collision_height,
@@ -43,6 +44,7 @@ defmodule ThistleTea.Game.World.Loader.ModelGeometry do
     Enum.each(rows, fn row ->
       model = %Model{
         display_id: row.id,
+        model_id: Map.get(row, :model_id),
         height: normalized_height(row),
         scale: native_scale(row),
         can_mount?: can_mount?(row)

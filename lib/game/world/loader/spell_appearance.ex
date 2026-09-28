@@ -26,6 +26,21 @@ defmodule ThistleTea.Game.World.Loader.SpellAppearance do
   def load(:transform, 0, 16_739), do: deception_models()
   def load(:transform, entry, _spell_id), do: creature_model(entry)
 
+  def load(:mod_shapeshift, 14, _spell_id) do
+    Map.new(
+      [
+        {{:native_model, 55}, 2281},
+        {{:native_model, 56}, 2281},
+        {{:native_model, 59}, 2289},
+        {{:native_model, 60}, 2289},
+        {:default, 902}
+      ],
+      fn {key, display} ->
+        {key, %{ModelGeometry.get(display) | scale: 1.0}}
+      end
+    )
+  end
+
   def load(:mod_shapeshift, form, _spell_id) do
     Map.new([{:default, 0}, {6, 6}], fn {key, race} ->
       model =

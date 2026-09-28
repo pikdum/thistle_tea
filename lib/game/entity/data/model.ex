@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Data.Model do
 
   defstruct [
     :display_id,
+    :model_id,
     :equipment,
     scale: 1.0,
     bounding_radius: 0.389,

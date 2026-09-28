@@ -48,6 +48,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEvent do
     unit = %{
       template.unit
       | native_display_id: model.display_id,
+        native_model_id: model.model_id,
         display_id: model.display_id,
         base_bounding_radius: model.bounding_radius * scale,
         base_combat_reach: model.combat_reach * scale,

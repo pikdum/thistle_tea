@@ -77,6 +77,7 @@ defmodule ThistleTea.Game.World.Loader.Character do
         base_combat_reach: model.combat_reach * model.scale,
         display_id: unit_display_id,
         native_display_id: unit_display_id,
+        native_model_id: model.model_id,
         min_damage: 10,
         max_damage: 50,
         mod_cast_speed: 1.0,
