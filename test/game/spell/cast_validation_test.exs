@@ -113,7 +113,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
     test "creatures require health strictly above a health cost" do
       npc = caster(health: 60, power1: 0, max_power1: 0, base_mana: 0)
       spell = helpful_spell(mana_cost: 60, power_type: -2)
-      assert {:error, :no_power} = CastValidation.validate(npc, spell, Target.none(), nil, @now)
+      assert {:error, :caster_aurastate} = CastValidation.validate(npc, spell, Target.none(), nil, @now)
     end
 
     test "weapon item restrictions apply to player inventories" do
@@ -482,7 +482,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       spell = helpful_spell(mana_cost: 30, power_type: -2)
 
       assert :ok = CastValidation.validate(caster(health: 31), spell, Target.none(), nil, @now)
-      assert {:error, :no_power} = CastValidation.validate(caster(health: 30), spell, Target.none(), nil, @now)
+      assert {:error, :caster_aurastate} = CastValidation.validate(caster(health: 30), spell, Target.none(), nil, @now)
     end
 
     test "restricts Exorcism and Holy Wrath to undead or demons" do

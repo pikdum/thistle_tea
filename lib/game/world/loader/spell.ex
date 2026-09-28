@@ -231,6 +231,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       melee_range?: row.range == 2,
       prevention_type: row.prevention_type || 0,
       mana_cost: row.mana_cost || 0,
+      mana_cost_per_level: row.mana_cost_per_level || 0,
+      cost_skill_id: cost_skill_id(row),
       mana_cost_per_second: row.mana_cost_per_second || 0,
       mana_cost_per_second_per_level: row.mana_cost_per_second_per_level || 0,
       power_type: row.power_type || 0,
@@ -322,6 +324,12 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
     %{spell | linked_auras: Enum.uniq_by(linked, & &1.id)}
   end
+
+  defp cost_skill_id(%Spell{id: id, mana_cost_per_level: per_level}) when is_integer(per_level) and per_level != 0 do
+    DBC.one(from(a in SkillLineAbility, where: a.spell == ^id, order_by: a.id, limit: 1, select: a.skill_line))
+  end
+
+  defp cost_skill_id(_row), do: nil
 
   defp power_fields(row) do
     %{
@@ -1016,6 +1024,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @hidden_in_combat_log, :hidden_in_combat_log)
       |> add_if(attrs, @not_while_shapeshifted, :not_while_shapeshifted)
       |> add_if(attrs, @not_in_combat, :not_in_combat)
+      |> add_if(attrs, 0x00080000, :scales_with_creature_level)
       |> add_if(attrs, 0x00020000, :only_stealthed)
       |> add_if(attrs, @aura_is_debuff, :negative)
       |> add_if(attrs, @cant_cancel, :cant_cancel)

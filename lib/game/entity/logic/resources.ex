@@ -6,11 +6,14 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
   units.
   """
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CostScaling
   alias ThistleTea.Game.Spell.Modifiers
 
   @mana_power_type 0
@@ -57,6 +60,20 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
 
   def can_pay_cost?(_entity, _power_type, amount), do: amount == 0
 
+  def validate_cast_cost(entity, power_type, amount) do
+    if creature_ignores_cost?(entity, power_type) or can_pay_cost?(entity, power_type, amount),
+      do: :ok,
+      else: {:error, if(power_type == @health_power_type, do: :caster_aurastate, else: :no_power)}
+  end
+
+  defp creature_ignores_cost?(%Mob{internal: %Internal{pet: pet}, unit: %Unit{} = unit}, power_type) do
+    ordinary? = is_nil(pet) or match?(%Pet{kind: :charmed}, pet)
+    no_mana? = (unit.base_mana || unit.max_power1 || 0) == 0
+    ordinary? and (power_type in 1..4 or (power_type == @mana_power_type and no_mana?))
+  end
+
+  defp creature_ignores_cost?(_entity, _power_type), do: false
+
   def can_pay_channel_cost?(%{internal: %Internal{godmode: true}}, %Spell{}, _tick_ms), do: true
 
   def can_pay_channel_cost?(
@@ -89,18 +106,27 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
 
   def channel_cost(_entity, _spell, _tick_ms), do: 0
 
-  def power_cost(entity, %Spell{mana_cost: cost, mana_cost_percent: percent, power_type: power_type} = spell) do
+  def power_cost(entity, spell, opts \\ [])
+
+  def power_cost(entity, %Spell{} = spell, opts) do
+    if Keyword.get(opts, :cast_item_guid) || Keyword.get(opts, :triggered?, false),
+      do: 0,
+      else: spell_power_cost(entity, spell)
+  end
+
+  def power_cost(_entity, _spell, _opts), do: 0
+
+  defp spell_power_cost(entity, %Spell{mana_cost_percent: percent, power_type: power_type} = spell) do
     if Spell.attribute?(spell, :use_all_mana) do
       all_current_power(entity, power_type)
     else
       flat = Aura.flat_modifier(entity, :mod_power_cost_school, Spell.school_mask(spell))
-      base = (cost || 0) + percent_cost(entity, power_type, percent) + flat
-      cost = Modifiers.integer_value(entity, spell, :cost, base)
+      base = CostScaling.base_cost(entity, spell) + percent_cost(entity, power_type, percent) + flat
+      cost = trunc(Modifiers.value(entity, spell, :cost, base))
+      cost = CostScaling.apply_level_multiplier(entity, spell, cost)
       school_cost(entity, spell, cost)
     end
   end
-
-  def power_cost(_entity, _spell), do: 0
 
   defp school_cost(entity, %Spell{} = spell, cost) when is_number(cost) do
     modifier = Aura.flat_modifier(entity, :mod_power_cost_school_pct, Spell.school_mask(spell))

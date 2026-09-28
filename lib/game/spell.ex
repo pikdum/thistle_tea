@@ -25,6 +25,8 @@ defmodule ThistleTea.Game.Spell do
     :max_duration_ms,
     :range_yards,
     :mana_cost,
+    :mana_cost_per_level,
+    :cost_skill_id,
     :mana_cost_per_second,
     :mana_cost_per_second_per_level,
     :power_type,

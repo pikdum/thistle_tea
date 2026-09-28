@@ -196,7 +196,7 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   defp modifier_used_by_spell?(_aura, _spell), do: false
 
   defp operation_used_by_spell?(:cost, %Spell{} = spell) do
-    (spell.mana_cost || 0) > 0 or (spell.mana_cost_percent || 0) > 0
+    (spell.mana_cost || 0) > 0 or (spell.mana_cost_per_level || 0) > 0 or (spell.mana_cost_percent || 0) > 0
   end
 
   defp operation_used_by_spell?(:casting_time, %Spell{cast_time_ms: cast_time_ms}),

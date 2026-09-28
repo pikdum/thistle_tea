@@ -307,15 +307,17 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     casting = casting |> Cast.transition(:launch) |> Cast.put_resolution(resolve(entity, casting))
     cost = casting.resolution.costs.power
 
-    if Resources.can_pay_cost?(entity, cost.power_type, cost.amount) do
-      entity |> put_cast(casting) |> advance_phase(casting, now)
-    else
-      entity =
-        entity
-        |> Effects.enqueue(Effects.spell_cast_failed(Cast.result_spell(casting), :no_power))
-        |> cancel()
+    case Resources.validate_cast_cost(entity, cost.power_type, cost.amount) do
+      :ok ->
+        entity |> put_cast(casting) |> advance_phase(casting, now)
 
-      {:finished, entity}
+      {:error, reason} ->
+        entity =
+          entity
+          |> Effects.enqueue(Effects.spell_cast_failed(Cast.result_spell(casting), reason))
+          |> cancel(now)
+
+        {:finished, entity}
     end
   end
 
@@ -456,7 +458,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp casting_costs(entity, %Cast{spell: spell} = casting) do
     %Costs{
-      power: power_cost(entity, spell),
+      power: power_cost(entity, casting),
       channel_power: channel_power_cost(entity, casting),
       reagents: if(deferred_item_costs?(casting), do: [], else: spell.reagents || []),
       cast_item_guid: if(!deferred_item_costs?(casting), do: cast_item_cost(casting)),
@@ -531,8 +533,8 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     ItemUse.deferred_costs?(spell, item_guid)
   end
 
-  defp power_cost(entity, %Spell{} = spell) do
-    %PowerCost{power_type: spell.power_type, amount: Resources.power_cost(entity, spell)}
+  defp power_cost(entity, %Cast{spell: spell} = casting) do
+    %PowerCost{power_type: spell.power_type, amount: Resources.power_cost(entity, spell, cast_options(casting))}
   end
 
   defp channel_power_cost(entity, %Cast{spell: %Spell{} = spell, channel_tick_ms: tick_ms}) do

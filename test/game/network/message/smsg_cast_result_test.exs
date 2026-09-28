@@ -6,6 +6,12 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResultTest do
   alias ThistleTea.Game.Spell.Area
 
   describe "to_binary/1" do
+    test "distinguishes insufficient health and other power failures" do
+      for {reason, code} <- [caster_aurastate: 0x12, no_power: 0x4D] do
+        assert SmsgCastResult.to_binary(SmsgCastResult.failure(123, reason)) == <<123::little-size(32), 2, code>>
+      end
+    end
+
     test "distinguishes caster-facing and target-facing failures" do
       for {reason, code} <- [unit_not_infront: 0x7C, not_infront: 0x36, not_behind: 0x33] do
         assert SmsgCastResult.to_binary(SmsgCastResult.failure(1776, reason)) == <<1776::little-size(32), 2, code>>

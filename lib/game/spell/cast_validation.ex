@@ -10,8 +10,6 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   import Bitwise, only: [&&&: 2, <<<: 2]
 
   alias ThistleTea.Game.Duel
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Ammunition
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
@@ -56,9 +54,6 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Spell.UnitTargets
 
-  @power_fields %{0 => :power1, 1 => :power2, 2 => :power3, 3 => :power4, 4 => :power5}
-  @health_power_type -2
-
   def validate(caster, %Spell{} = spell, %Target{} = targets, target_info, now, opts \\ []) do
     with :ok <- check_caster_alive(caster),
          :ok <- check_spirit_of_redemption(caster, spell),
@@ -96,7 +91,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_special_aura_requirements(caster, spell),
          :ok <- check_warlock_resources(caster, spell),
          :ok <- check_cooldown(caster, spell, now),
-         :ok <- check_power(caster, spell),
+         :ok <- check_power(caster, spell, opts),
          :ok <- Disarm.validate(caster, spell),
          :ok <- check_equipped_item(caster, spell, Keyword.get(opts, :equipped_items, [])),
          :ok <- check_ammo(caster, spell, opts),
@@ -418,30 +413,9 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     end
   end
 
-  defp check_power(%{unit: unit} = caster, %Spell{power_type: @health_power_type} = spell) do
-    cost = Resources.power_cost(caster, spell)
-    if godmode?(caster) or (unit.health || 0) > cost, do: :ok, else: {:error, :no_power}
+  defp check_power(caster, spell, opts) do
+    Resources.validate_cast_cost(caster, spell.power_type, Resources.power_cost(caster, spell, opts))
   end
-
-  defp check_power(%{unit: unit} = caster, %Spell{power_type: power_type} = spell) do
-    cost = Resources.power_cost(caster, spell)
-    field = Map.get(@power_fields, power_type)
-    power = if field, do: Map.get(unit, field)
-    power = if is_integer(power), do: power, else: 0
-
-    if creature_ignores_power?(caster, power_type) or godmode?(caster) or power >= cost,
-      do: :ok,
-      else: {:error, :no_power}
-  end
-
-  defp check_power(_caster, _spell), do: :ok
-
-  defp creature_ignores_power?(%Mob{internal: %Internal{pet: nil}}, power_type) when power_type in 1..4, do: true
-
-  defp creature_ignores_power?(%Mob{internal: %Internal{pet: nil}, unit: %Unit{} = unit}, 0),
-    do: (unit.base_mana || unit.max_power1 || 0) == 0
-
-  defp creature_ignores_power?(_caster, _power_type), do: false
 
   defp check_equipped_item(%Mob{}, _spell, _equipped_items), do: :ok
 

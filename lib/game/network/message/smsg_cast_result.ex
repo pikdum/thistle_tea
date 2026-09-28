@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     bad_implicit_targets: 0x09,
     bad_targets: 0x0A,
     cant_do_that_yet: 0x12,
+    caster_aurastate: 0x12,
     caster_dead: 0x13,
     charmed: 0x14,
     chest_in_use: 0x15,

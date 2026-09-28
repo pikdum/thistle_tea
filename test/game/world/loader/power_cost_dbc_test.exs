@@ -7,13 +7,36 @@ defmodule ThistleTea.Game.World.Loader.PowerCostDbcTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Resources
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db
 
   describe "load/1" do
+    test "loads per-level creature costs and the separate level-scaling attribute" do
+      armor = SpellLoader.load(12_544)
+      fireball = SpellLoader.load(9053)
+      lightning = SpellLoader.load(9654)
+      mob = %Mob{unit: %Unit{level: 50, auras: []}, internal: %Internal{}}
+
+      assert armor.mana_cost_per_level == 5
+      assert armor.cost_skill_id == nil
+      refute Spell.attribute?(armor, :scales_with_creature_level)
+      assert Resources.power_cost(mob, armor) == 55
+
+      assert Spell.attribute?(fireball, :scales_with_creature_level)
+      assert fireball.mana_cost_per_level == 0
+      assert Resources.power_cost(mob, fireball) == 286
+
+      assert lightning.mana_cost_per_level == 4
+      assert Spell.attribute?(lightning, :scales_with_creature_level)
+      assert Resources.power_cost(mob, lightning) == 159
+      assert Resources.power_cost(%{mob | unit: %{mob.unit | level: 30}}, lightning) == 55
+    end
+
     test "Burst of Knowledge reduces real spell costs until cancellation or expiry" do
       burst = SpellLoader.load(15_646)
       heal = SpellLoader.load(10_396)
