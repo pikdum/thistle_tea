@@ -80,7 +80,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
           hit_context: context
         )
 
-      {state, [event]}
+      {state, trigger_events(spell, effect, event)}
     end
   end
 
@@ -109,6 +109,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
   end
 
   def apply(state, _context, _spell, _effect, _now), do: {state, []}
+
+  defp trigger_events(spell, effect, event) do
+    case Scripts.trigger_chance(spell, effect) do
+      {chance, total} -> [%Effects.RandomChoice{choices: [{chance, [event]}, {total - chance, []}]}]
+      nil -> [event]
+    end
+  end
 
   defp database_script_events(state, %CastContext{caster_guid: guid}, [_ | _] = steps)
        when is_integer(guid) and guid > 0 do

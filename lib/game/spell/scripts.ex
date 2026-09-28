@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cone
   alias ThistleTea.Game.Spell.Consumable
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Slow
 
   @battle_stance_form 17
@@ -207,6 +208,11 @@ defmodule ThistleTea.Game.Spell.Scripts do
   end
 
   def dummy_effect(_spell), do: nil
+
+  def trigger_chance(%Spell{script_name: "spell_linkens_boomerang"}, %Effect{index: 1}), do: {1, 31}
+  def trigger_chance(%Spell{script_name: "spell_linkens_boomerang"}, %Effect{index: 2}), do: {1, 11}
+  def trigger_chance(%Spell{script_name: "spell_scorpid_surprise"}, %Effect{index: 1}), do: {1, 11}
+  def trigger_chance(_spell, _effect), do: nil
 
   def tame_beast_ownership_spell_id, do: @tame_beast_ownership
 
