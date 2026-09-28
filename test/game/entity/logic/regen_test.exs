@@ -18,7 +18,9 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
 
   @warrior 1
   @paladin 2
+  @hunter 3
   @rogue 4
+  @shaman 7
   @mage 8
   @druid 11
 
@@ -246,6 +248,19 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
         |> with_aura(:mod_regen, 20, amplitude_ms: 5_000)
 
       assert Regen.tick(in_combat, 10_000).unit.health == 10
+    end
+
+    test "low spirit cannot subtract from food or flat health regeneration" do
+      for class <- [@warrior, @hunter, @rogue, @shaman] do
+        entity = character(class: class, spirit: 0, health: 10, stand_state: 1)
+        assert Regen.tick(entity, 10_000).internal.health_regen_carry == 0.0
+
+        eating = with_aura(entity, :mod_regen, 70, amplitude_ms: 5_000)
+        assert Regen.tick(eating, 10_000).unit.health == 38
+
+        fortified = with_aura(entity, :mod_health_regen_in_combat, 20)
+        assert Regen.tick(fortified, 10_000).unit.health == 18
+      end
     end
 
     test "mod_power_regen adds mp5 that works during the five second rule" do

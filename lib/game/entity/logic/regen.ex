@@ -240,7 +240,7 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
   defp ordinary_health_per_tick(_entity), do: 0.0
 
   defp spirit_health_portion(entity, class, spirit) do
-    base = health_per_tick(class, spirit)
+    base = max(health_per_tick(class, spirit), 0.0)
 
     portion =
       cond do
