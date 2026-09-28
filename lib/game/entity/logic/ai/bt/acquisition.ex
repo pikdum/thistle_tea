@@ -19,7 +19,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Acquisition do
     source = Perception.actor(perception, entity.object.guid)
     radius = Aggro.search_radius(entity)
 
-    if radius > 0 and Hostility.can_initiate_attack?(source) and not CombatControl.auto_attack_blocked?(entity) do
+    if radius > 0 and Mob.proximity_aggro?(entity) and Hostility.can_initiate_attack?(source) and
+         not CombatControl.auto_attack_blocked?(entity) do
       (Perception.nearby(perception, :players, radius) ++ Perception.nearby(perception, :mobs, radius))
       |> Enum.sort_by(fn {guid, distance} -> {distance, guid} end)
       |> Enum.find_value(fn {guid, distance} ->

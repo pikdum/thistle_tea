@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Data.Reputation.Definition
   alias ThistleTea.Game.Entity.Data.Reputation.State, as: ReputationState
+  alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.CombatRatings
@@ -161,6 +162,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".debug durability <percent> [carried] - apply durability wear for testing",
       ".debug item duration <entry> <seconds> - set an owned timed item's remaining lifetime",
       ".debug pet [loyalty|happiness <delta>] - inspect or adjust your hunter pet",
+      ".debug reaction <passive|defensive|aggressive> - set the selected creature's scripted reaction",
       ".debug spells - learn class trainer spells up to your level",
       ".debug events [start|stop <id>] - inspect or temporarily change world events",
       ".debug variable <index> - inspect a runtime server variable",
@@ -279,6 +281,21 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
         state
         |> system_message("Invalid command. Use: .modify <type> <n>")
+    end
+    |> handled()
+  end
+
+  def run(state, ".debug reaction " <> mode) do
+    reaction = Enum.find_index(["passive", "defensive", "aggressive"], &(&1 == String.trim(mode)))
+    target = state.target
+
+    if reaction && is_integer(target) && Guid.entity_type(target) in [:mob, :pet] &&
+         match?({world, _, _, _} when world == state.character.internal.world, World.position(target)) do
+      step = %ScriptStep{command: :set_react_state, datalong: reaction}
+      Entity.start_script(target, [step], state.character.object.guid, state.character.internal.world)
+      system_message(state, "Creature reaction: #{String.trim(mode)}.")
+    else
+      system_message(state, "Select a creature and use: .debug reaction <passive|defensive|aggressive>")
     end
     |> handled()
   end

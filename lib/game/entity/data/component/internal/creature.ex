@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.Entity.Data.Component.Internal.Creature do
   @moduledoc """
-  Static creature-template config carried by mobs: the spawn's db guid (for
+  Creature-template config and scripted overrides carried by mobs: the spawn's db guid (for
   guid-scoped script conditions), the XP reward inputs (multiplier, extra
   flags, elite rank), static combat defaults, the type flags driving visibility rules, the
   regeneration flags, the spell list driving combat casts, the addon auras
@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Creature do
     :script_faction_original,
     :script_faction_value,
     :script_faction_flags,
+    :reaction_state,
     stationary?: false,
     critter?: false,
     civilian?: false,

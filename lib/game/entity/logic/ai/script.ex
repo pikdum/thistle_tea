@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.CreatureEntry
   alias ThistleTea.Game.Entity.Logic.CreatureGroup.Member
+  alias ThistleTea.Game.Entity.Logic.CreatureReaction
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.GameObjectActions
@@ -296,6 +297,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp execute_command(state, blackboard, %ScriptStep{command: :creature_spells} = step, _target, _now, _context) do
+    failed(state, blackboard, step)
+  end
+
+  defp execute_command(
+         %Mob{} = state,
+         blackboard,
+         %ScriptStep{command: :set_react_state, datalong: reaction},
+         _target,
+         _now,
+         _context
+       )
+       when reaction in 0..2 do
+    mode = elem({:passive, :defensive, :aggressive}, reaction)
+    {CreatureReaction.set(state, mode), blackboard, :continue}
+  end
+
+  defp execute_command(state, blackboard, %ScriptStep{command: :set_react_state} = step, _target, _now, _context) do
     failed(state, blackboard, step)
   end
 

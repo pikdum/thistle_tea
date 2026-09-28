@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEntryTest do
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CreatureEntry
+  alias ThistleTea.Game.Entity.Logic.CreatureReaction
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
@@ -28,6 +29,13 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEntryTest do
   setup [:creatures]
 
   describe "apply/3" do
+    test "initializes reaction defaults on entry replacement and restoration", %{mob: mob, template: template} do
+      passive = CreatureReaction.set(mob, :passive)
+      assert CreatureReaction.mode(CreatureEntry.apply(passive, template, 100)) == :aggressive
+      restored = passive |> CreatureEntry.apply(template, 100) |> CreatureReaction.set(:defensive) |> Mob.respawn()
+      assert CreatureReaction.mode(restored) == :aggressive
+    end
+
     test "replaces archetype fields without replacing the actor", %{mob: mob, template: template} do
       cast = Cast.new(%Spell{id: 81, cast_time_ms: 5_000}, Target.unit(1), 0)
       loot = %{mob.internal.loot | tapped_by: %Tap{player: 1}, pockets: %{1 => :taken}}

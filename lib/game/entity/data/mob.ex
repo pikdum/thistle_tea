@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   alias ThistleTea.Game.Entity.Logic.CreatureEntry
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Entity.Logic.CreatureMovement
+  alias ThistleTea.Game.Entity.Logic.CreatureReaction
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -33,7 +34,6 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   @update_flag_living 0x20
   @update_flag_has_position 0x40
   @default_respawn_delay_ms 120_000
-  @extra_flag_no_aggro 0x00000002
   @static_flag_no_automatic_regen 0x00000400
   @static_flag_tameable 0x00000010
   @static_flag_visible_to_ghosts 0x00200000
@@ -293,12 +293,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
 
   def proximity_aggro?(%__MODULE__{internal: %Internal{creature: %Creature{critter?: true}}}), do: false
 
-  def proximity_aggro?(%__MODULE__{internal: %Internal{creature: %Creature{extra_flags: flags}}})
-      when is_integer(flags) do
-    (flags &&& @extra_flag_no_aggro) == 0
-  end
-
-  def proximity_aggro?(%__MODULE__{}), do: true
+  def proximity_aggro?(%__MODULE__{} = mob), do: CreatureReaction.mode(mob) == :aggressive
 
   def visibility_metadata(%__MODULE__{
         object: object,

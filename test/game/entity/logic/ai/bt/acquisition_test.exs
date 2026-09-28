@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.AcquisitionTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
+  alias ThistleTea.Game.Entity.Logic.CreatureReaction
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.WorldRef
 
@@ -117,6 +118,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.AcquisitionTest do
       first = target(1, 5.0)
       second = target(2, 5.0)
       assert Acquisition.nearest(entity, context(entity, [second, first])) == first.guid
+    end
+
+    test "only aggressive creatures acquire nearby enemies", %{entity: entity} do
+      enemy = target(1, 5.0)
+
+      for pet <- [entity.internal.pet, nil], mode <- [:passive, :defensive, :aggressive] do
+        creature = %{entity | internal: %{entity.internal | pet: pet}} |> CreatureReaction.set(mode)
+        expected = if mode == :aggressive, do: enemy.guid
+        assert Acquisition.nearest(creature, context(creature, [enemy])) == expected
+      end
     end
   end
 

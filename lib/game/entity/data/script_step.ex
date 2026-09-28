@@ -263,6 +263,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(54), do: :set_server_variable
   defp command(55), do: :creature_spells
   defp command(56), do: :remove_guardians
+  defp command(59), do: :set_react_state
   defp command(60), do: :start_waypoints
   defp command(61), do: :start_map_event
   defp command(62), do: :end_map_event

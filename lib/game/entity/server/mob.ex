@@ -1442,15 +1442,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   def handle_info({:pet_reaction, reaction}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
-    state = state |> PetBT.reaction(reaction) |> wake_ai_tick()
-
-    effect = %Effects.PetReactionChanged{
-      source_guid: state.object.guid,
-      target_guid: state.internal.pet.owner_guid,
-      reaction_state: state.internal.pet.reaction_state
-    }
-
-    {:noreply, EventSink.emit(state, effect)}
+    state = state |> PetBT.reaction(reaction) |> wake_ai_tick() |> EventSink.emit_pending()
+    {:noreply, state}
   end
 
   def handle_info({:attach_pet, owner_pid, spell_id, pet_spells}, %Mob{internal: %Internal{pet: %Pet{}}} = state)

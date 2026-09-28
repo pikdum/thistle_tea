@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Server.ScriptRoutingTest do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Emote, as: EmoteLoader
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
@@ -36,6 +37,20 @@ defmodule ThistleTea.Game.Entity.Server.ScriptRoutingTest do
   setup [:world]
 
   describe "script delivery" do
+    test "reaction changes publish acquisition and assistance eligibility", %{world: world} do
+      creature = mob(world, 0.0, 0.0)
+      {:ok, pid} = World.start_entity(creature)
+      on_exit(fn -> World.stop_entity(creature.object.guid) end)
+
+      for {reaction, proximity?, assistance?} <- [{0, false, false}, {1, false, true}, {2, true, true}] do
+        Entity.start_script(pid, [%ScriptStep{command: :set_react_state, datalong: reaction}], 0, world)
+        :sys.get_state(pid)
+        metadata = Metadata.get(creature.object.guid)
+        assert metadata.proximity_aggro? == proximity?
+        assert metadata.assistance_available? == assistance?
+      end
+    end
+
     test "zero emotes restore a creature after a persistent scripted animation", %{world: world} do
       previous = Enum.flat_map([0, 69], &:ets.lookup(EmoteLoader, {:animation, &1}))
       EmoteLoader.load([%{id: 0, spec_proc: 0}, %{id: 69, spec_proc: 2}], [])

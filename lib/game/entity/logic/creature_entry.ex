@@ -126,7 +126,8 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEntry do
   defp restore_faction_tracking(%CreatureArchetype{} = template, %Creature{} = current) do
     %{
       template.creature
-      | script_faction_original: if(current.script_faction_original, do: template.unit.faction_template),
+      | reaction_state: nil,
+        script_faction_original: if(current.script_faction_original, do: template.unit.faction_template),
         script_faction_value: current.script_faction_value,
         script_faction_flags: current.script_faction_flags
     }
@@ -150,6 +151,7 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureEntry do
     template = %{
       template
       | db_guid: current.db_guid,
+        reaction_state: nil,
         ai_events: current.ai_events,
         stationary?: current.stationary?,
         addon_source: current.addon_source

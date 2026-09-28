@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.CreatureReaction
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
@@ -103,9 +104,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
   def command(%Mob{} = state, _command, _target_guid, _now), do: state
 
-  def reaction(%Mob{internal: %Internal{pet: %Pet{} = pet} = internal} = state, reaction)
+  def reaction(%Mob{internal: %Internal{pet: %Pet{}}} = state, reaction)
       when reaction in [:passive, :defensive, :aggressive] do
-    state = %{state | internal: %{internal | pet: %{pet | reaction_state: reaction}}}
+    state = CreatureReaction.set(state, reaction)
 
     if reaction == :passive do
       state

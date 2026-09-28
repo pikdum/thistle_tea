@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   alias ThistleTea.Game.Entity.Logic.CombatTimer
   alias ThistleTea.Game.Entity.Logic.ControlledCombat
   alias ThistleTea.Game.Entity.Logic.ControlMovement
+  alias ThistleTea.Game.Entity.Logic.CreatureReaction
   alias ThistleTea.Game.Entity.Logic.DamageOrigin
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -64,14 +65,6 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   def enter(entity, target_guid, now, opts \\ [])
 
-  def enter(%Mob{internal: %Internal{pet: %Pet{reaction_state: :passive}}} = entity, target_guid, now, opts) do
-    if Keyword.get(opts, :allow_passive?, false) do
-      enter_active(entity, target_guid, now, opts)
-    else
-      result(entity, entity, :passive)
-    end
-  end
-
   def enter(%Mob{unit: %Unit{health: health}} = entity, _target_guid, _now, _opts)
       when is_number(health) and health <= 0 do
     result(entity, entity, :dead)
@@ -79,7 +72,9 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   def enter(%Mob{internal: %Internal{}} = entity, target_guid, now, opts)
       when is_integer(target_guid) and target_guid > 0 and is_integer(now) do
-    enter_active(entity, target_guid, now, opts)
+    if CreatureReaction.mode(entity) != :passive or Keyword.get(opts, :allow_passive?, false),
+      do: enter_active(entity, target_guid, now, opts),
+      else: result(entity, entity, :passive)
   end
 
   def enter(%Mob{} = entity, _target_guid, _now, _opts), do: result(entity, entity, :invalid_target)

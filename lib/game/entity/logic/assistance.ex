@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Assistance do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Distancing
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CreatureMovement
+  alias ThistleTea.Game.Entity.Logic.CreatureReaction
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Math
 
@@ -27,7 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.Assistance do
     blackboard = Blackboard.ensure(internal.blackboard)
     flags = if internal.creature, do: internal.creature.extra_flags || 0, else: 0
 
-    available_target?(entity) and not Mob.critter?(entity) and
+    available_target?(entity) and not Mob.critter?(entity) and CreatureReaction.mode(entity) != :passive and
       ((unit.flags || 0) &&& 0x00020000) == 0 and (flags &&& @no_assist) == 0 and
       not blackboard.navigation.returning_home?
   end
