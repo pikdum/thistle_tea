@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetSelectionTest do
   alias ThistleTea.Game.Network.Message.CmsgSetSelection
 
   describe "handle/2" do
-    test "keeps target-bound combo points when temporarily deselecting" do
+    test "publishes selection changes while preserving target-bound combo points" do
       character = %Character{
         object: %Object{guid: 5},
         unit: %Unit{target: 77},
@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetSelectionTest do
       assert state.character.unit.target == 0
       assert state.character.player.field_combo_target == 77
       assert state.character.player.combo_points == 5
-      refute state.character.internal.broadcast_update?
+      assert state.character.internal.broadcast_update?
     end
   end
 end
