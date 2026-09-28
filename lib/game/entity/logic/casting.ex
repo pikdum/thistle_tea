@@ -1180,7 +1180,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
            resolution: %CastResolution{followups: %Followups{selected_unit_guid: selected_unit_guid}}
          } = casting
        ) do
-    target_guid = selected_unit_guid || character.unit.target
+    target_guid = character.unit.target || selected_unit_guid
 
     events =
       for %Spell.Effect{type: :trans_door, misc_value: entry, implicit_target_a: target} <- spell.effects,

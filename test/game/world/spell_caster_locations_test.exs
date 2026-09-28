@@ -130,6 +130,17 @@ defmodule ThistleTea.Game.World.SpellCasterLocationsTest do
       assert summon.spell_id == spell.id
       assert summon.duration_ms == 60_000
     end
+
+    test "summoning rituals retain the selected player when the client cast targets the caster", data do
+      %{caster: caster, spell: spell} = data
+      caster = %{caster | unit: %{caster.unit | target: 2}}
+      effect = %{hd(spell.effects) | type: :trans_door, misc_value: 36_727, implicit_target_a: :caster_front}
+      spell = %{spell | effects: [effect], duration_ms: 60_000}
+      completed = launch(caster, spell, Target.unit(caster.object.guid))
+      summon = Enum.find(completed.internal.events, &is_struct(&1, Effects.SummonGameObject))
+      assert summon.target_guid == 2
+      assert summon.entry == 36_727
+    end
   end
 
   describe "receive/4" do
