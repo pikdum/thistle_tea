@@ -857,6 +857,50 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
                )
     end
 
+    test "bank space cannot hold the displaced offhand", %{unit: unit, greatsword: greatsword, shield: shield, bag: bag} do
+      filler = build_item(10, %ItemTemplate{entry: 1000})
+      player = Enum.reduce(23..38, %Player{offhand: shield.object.guid}, &store(&2, &1, filler))
+      bag = %{bag | container: %{bag.container | slot_1: greatsword.object.guid}}
+      lookup = get_item_fn([filler, greatsword, shield, bag])
+
+      for {player, source} <- [
+            {%{player | bank1: greatsword.object.guid}, {255, 39}},
+            {%{player | bank_bag1: bag.object.guid, bank_bag_slots: 1}, {63, 0}}
+          ] do
+        assert {:error, :cant_equip_with_twohanded, _, 0} =
+                 Inventory.swap(player, unit, @prof, @owner, source, {255, 15}, lookup)
+
+        assert {:ok, result} =
+                 Inventory.swap(%{player | inv16: 0}, unit, @prof, @owner, source, {255, 15}, lookup)
+
+        assert result.player.mainhand == greatsword.object.guid
+        assert result.player.offhand == 0
+        assert result.player.inv16 == shield.object.guid
+      end
+    end
+
+    test "a vacated carried slot can hold the displaced offhand", %{
+      unit: unit,
+      greatsword: greatsword,
+      shield: shield,
+      bag: bag
+    } do
+      filler = build_item(10, %ItemTemplate{entry: 1000})
+      player = Enum.reduce(23..38, %Player{offhand: shield.object.guid}, &store(&2, &1, filler))
+
+      for {player, source} <- [
+            {%{player | inv1: greatsword.object.guid}, {255, 23}},
+            {%{player | bag1: bag.object.guid}, {19, 0}}
+          ] do
+        bag = %{bag | container: %{bag.container | num_slots: 1, slot_1: greatsword.object.guid}}
+        lookup = get_item_fn([filler, greatsword, shield, bag])
+        assert {:ok, result} = Inventory.swap(player, unit, @prof, @owner, source, {255, 15}, lookup)
+        assert result.player.mainhand == greatsword.object.guid
+        assert result.player.offhand == 0
+        assert Inventory.item_guid_at(result.player, source, get_item_after(result, lookup)) == shield.object.guid
+      end
+    end
+
     test "stores the offhand when equipping a two-hander", %{
       unit: unit,
       greatsword: greatsword,

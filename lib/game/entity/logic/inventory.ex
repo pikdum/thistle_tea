@@ -1205,7 +1205,8 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
 
   defp offhand_storable?(ctx, src_pos, dst_item) do
     offhand_item = item_at(ctx, {@bag_0, @offhand_slot})
-    free_position(ctx, :carried, offhand_item) != nil or (dst_item == nil and storage_pos?(src_pos))
+    after_swap = put_pos(ctx, src_pos, dst_item)
+    free_position(after_swap, :carried, offhand_item) != nil
   end
 
   defp storage_pos?({@bag_0, slot}), do: backpack_slot?(slot) or base_bank_slot?(slot)
