@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Player.CompanionVisibility do
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.PacketSink
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
@@ -28,19 +29,12 @@ defmodule ThistleTea.Game.Player.CompanionVisibility do
     state
   end
 
-  def finish_attachment(%State{} = state, %Attachment{entity_ref: ref, pid: pid} = attachment) do
-    companion = Companion.relationship(state.character)
-    request = {:restore, companion.action_bar, companion.autocast}
-
-    case Entity.call(pid, {:pet_controls, state.guid, request}) do
-      {:ok, spells, control} ->
-        character = Companion.remember_controls(state.character, ref.guid, control)
-        Network.send_packet(Message.SmsgPetSpells.for_pet(ref.guid, spells, control))
-        send_name_response(attachment.name_response)
-        %{state | character: character}
-
-      _ ->
-        state
+  def finish_attachment(%State{} = state, %Attachment{entity_ref: ref, spells: spells} = attachment) do
+    if Guid.entity_type(ref.guid) == :player do
+      Network.send_packet(Message.SmsgPetSpells.for_pet(ref.guid, spells))
+      state
+    else
+      restore_pet_controls(state, attachment)
     end
   end
 
@@ -64,6 +58,22 @@ defmodule ThistleTea.Game.Player.CompanionVisibility do
   def defer_restoration(%State{} = state) do
     send(self(), :restore_companion)
     state
+  end
+
+  defp restore_pet_controls(%State{} = state, %Attachment{entity_ref: ref, pid: pid} = attachment) do
+    companion = Companion.relationship(state.character)
+    request = {:restore, companion.action_bar, companion.autocast}
+
+    case Entity.call(pid, {:pet_controls, state.guid, request}) do
+      {:ok, spells, control} ->
+        character = Companion.remember_controls(state.character, ref.guid, control)
+        Network.send_packet(Message.SmsgPetSpells.for_pet(ref.guid, spells, control))
+        send_name_response(attachment.name_response)
+        %{state | character: character}
+
+      _ ->
+        state
+    end
   end
 
   defp send_name_response(%Message.SmsgPetNameQueryResponse{pet_number: number} = packet)
