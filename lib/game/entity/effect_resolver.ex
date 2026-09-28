@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
     Effects.TeleportToSpellTarget
   ]
   @spell_requests [
+    Effects.SummonMount,
     Effects.CheckCastRequirements,
     Effects.SpellGameObjectAction,
     Effects.DeliverSpell,

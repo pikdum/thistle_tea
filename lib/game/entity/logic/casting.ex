@@ -218,7 +218,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
             do: [Effects.clear_cooldown(entity.object.guid, cast.spell.id) | events],
             else: events
 
-        entity |> cancel(now) |> Effects.enqueue(events)
+        entity |> cancel(now) |> Mount.cast_failed(cast.spell, reason, now) |> Effects.enqueue(events)
     end
   end
 

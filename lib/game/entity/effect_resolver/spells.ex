@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Spell.UnitTargets
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpellAreas
@@ -41,6 +42,20 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.World.SpellRequirements
 
   @heal_threat_radius 100.0
+
+  def resolve(entity, %Effects.SummonMount{} = effect) do
+    spell_id =
+      if MapTemplate.mount_allowed?(entity.internal.world.map_id),
+        do: effect.allowed_spell_id,
+        else: effect.restricted_spell_id
+
+    trigger =
+      Effects.trigger_spell(entity.object.guid, entity.unit.level, entity.object.guid, spell_id,
+        cast_item_guid: effect.cast_item_guid
+      )
+
+    resolve(entity, trigger)
+  end
 
   def resolve(entity, %Effects.SpellGameObjectAction{target_guid: guid} = effect) do
     world = entity.internal.world

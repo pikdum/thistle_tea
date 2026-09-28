@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.Loader.ModelGeometry do
   Boot-loaded display scales and model geometry, with dimensions normalized to
   object scale one. Gameplay boundaries read ETS without querying source tables.
   """
+  import Bitwise, only: [&&&: 2]
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
@@ -20,11 +21,18 @@ defmodule ThistleTea.Game.World.Loader.ModelGeometry do
     from(display in CreatureDisplayInfo,
       join: model in CreatureModelData,
       on: model.id == display.model,
+      left_join: extra in CreatureDisplayInfoExtra,
+      on: extra.id == display.extended_display_info,
+      left_join: race in ChrRaces,
+      on: race.id == extra.display_race,
       select: %{
         id: display.id,
         display_scale: display.creature_model_scale,
         model_scale: model.model_scale,
-        collision_height: model.collision_height
+        collision_height: model.collision_height,
+        extended_display_id: extra.id,
+        model_flags: model.flags,
+        race_flags: race.flags
       }
     )
     |> DBC.all()
@@ -33,10 +41,21 @@ defmodule ThistleTea.Game.World.Loader.ModelGeometry do
 
   def load(rows, table \\ __MODULE__) do
     Enum.each(rows, fn row ->
-      model = %Model{display_id: row.id, height: normalized_height(row), scale: native_scale(row)}
+      model = %Model{
+        display_id: row.id,
+        height: normalized_height(row),
+        scale: native_scale(row),
+        can_mount?: can_mount?(row)
+      }
+
       :ets.insert(table, {row.id, model})
     end)
   end
+
+  defp can_mount?(%{extended_display_id: id, model_flags: model, race_flags: race}) when is_integer(id) and id > 0,
+    do: ((model || 0) &&& 0x80) != 0 or is_nil(race) or (race &&& 0x04) != 0
+
+  defp can_mount?(_row), do: false
 
   def height(display_id, table \\ __MODULE__) do
     get(display_id, table).height

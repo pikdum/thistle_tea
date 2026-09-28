@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.SpellRequirements do
   alias ThistleTea.Game.World.SpellEnvironment
   alias ThistleTea.Game.World.SpellFocus
   alias ThistleTea.Game.World.SpellLocations
+  alias ThistleTea.Game.World.SpellMounts
   alias ThistleTea.Game.World.SpellObjects
   alias ThistleTea.Game.World.SpellTargetInfo
   alias ThistleTea.Game.World.SpellUnits
@@ -35,7 +36,8 @@ defmodule ThistleTea.Game.World.SpellRequirements do
           destination_los?: World.line_of_sight?(caster, targets.destination_location)
         },
         spell_area: SpellAreas.context(caster, spell),
-        outdoors?: SpellEnvironment.context(caster, spell)
+        outdoors?: SpellEnvironment.context(caster, spell),
+        mount_context: SpellMounts.context(caster, spell)
     }
   end
 

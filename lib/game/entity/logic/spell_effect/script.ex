@@ -95,6 +95,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
     end
   end
 
+  def apply(state, %CastContext{} = context, %Spell{id: 26_656}, %Effect{type: :script_effect, index: 0}, now) do
+    Mount.summon_qiraji(state, context, now)
+  end
+
   def apply(state, %CastContext{} = context, spell, %Effect{type: :script_effect}, now) do
     cond do
       aura_id = StackingProc.removal_spell(spell) -> Aura.remove_stack(state, aura_id, now)

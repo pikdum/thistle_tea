@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Player.SpellcastingTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Possession
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.PlayerCharm
@@ -110,6 +111,39 @@ defmodule ThistleTea.Game.Player.SpellcastingTest do
 
   describe "cast_result/3" do
     setup [:script_caster]
+
+    test "Black Qiraji use dismisses an existing mount without starting or paying for a cast", %{state: state} do
+      character = state.character
+      movement = struct!(character.movement_block, MovementBlock.player_speeds())
+      character = %{character | movement_block: movement}
+
+      mount = %Spell{
+        id: 458,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :mounted, misc_value: 2404},
+          %Effect{index: 1, type: :apply_aura, aura: :mod_increase_mounted_speed, base_points: 60}
+        ]
+      }
+
+      {mounted, _} = Aura.apply_spell(character, state.guid, 60, mount, Time.now())
+      state = %{state | character: mounted}
+
+      crystal = %Spell{
+        id: 26_656,
+        attributes: MapSet.new([:allow_while_mounted]),
+        effects: [%Effect{index: 0, type: :script_effect, implicit_target_a: :caster}]
+      }
+
+      assert {:error, dismissed} = Spellcasting.cast_result(state, crystal, <<0::16>>)
+      assert dismissed.character.unit.mount_display_id == 0
+      assert dismissed.character.movement_block.run_speed == 7.0
+      assert dismissed.character.unit.power1 == character.unit.power1
+      assert dismissed.character.internal.casting == nil
+      assert dismissed.character.internal.cooldowns == %{}
+      refute Aura.has_aura?(dismissed.character, :mounted)
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{spell: 26_656, reason: 0x17}}}
+      refute_received {:"$gen_cast", {:send_packet, %Message.SmsgSpellStart{}}}
+    end
 
     test "reports seated admission failure without starting a cast", %{state: state, spell: spell} do
       character = state.character

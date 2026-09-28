@@ -16,10 +16,14 @@ defmodule ThistleTea.Game.Entity.Logic.MountTest do
   alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Area
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Requirements
   alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.WorldRef
 
   setup [:character]
 
@@ -198,6 +202,68 @@ defmodule ThistleTea.Game.Entity.Logic.MountTest do
   end
 
   describe "validate/3" do
+    test "area-bound mounts bypass the map ban after their area requirement passes", %{character: c} do
+      spell = %{mount(25_953, 15_903, 100) | area_rules: [%Area{area_id: 3428}]}
+      opts = [mount_context: %Mount.Context{mount_allowed?: false}, spell_area: %Area.Context{area_id: 3428}]
+      assert CastValidation.validate(c, spell, Target.self(1), nil, 2_000, opts) == :ok
+
+      assert CastValidation.validate(
+               c,
+               spell,
+               Target.self(1),
+               nil,
+               2_000,
+               Keyword.put(opts, :spell_area, %Area.Context{area_id: 1519})
+             ) == {:error, :requires_area}
+
+      quest_only = %{spell | area_rules: [%Area{quest_start: 1}]}
+      assert Mount.validate(c, quest_only, opts) == {:error, :no_mounts_allowed}
+    end
+
+    test "Black Qiraji is allowed in its temple and ordinary mount maps", %{character: c} do
+      assert Mount.validate(c, qiraji(), []) == :ok
+      blocked = [mount_context: %Mount.Context{mount_allowed?: false}]
+      assert Mount.validate(c, qiraji(), blocked) == {:error, :no_mounts_allowed}
+      temple = %{c | internal: %{c.internal | world: WorldRef.instance(531, 1)}}
+      assert Mount.validate(temple, qiraji(), blocked) == :ok
+      assert Mount.validate(temple, mount(1, 2404, 100), blocked) == {:error, :no_mounts_allowed}
+      assert Mount.validate(c, qiraji(), Keyword.put(blocked, :triggered?, true)) == :ok
+      swimming = %{c | movement_block: %{c.movement_block | movement_flags: 0x00200000}}
+      assert Mount.validate(swimming, qiraji(), []) == {:error, :only_abovewater}
+    end
+
+    test "transports distinguish exposed decks and the Black Qiraji restriction", %{character: c} do
+      passenger = %{c | movement_block: %{c.movement_block | transport_guid: 123}}
+
+      for outdoors <- [nil, false] do
+        assert Mount.validate(passenger, mount(1, 2404, 100), mount_context: %Mount.Context{outdoors?: outdoors}) ==
+                 {:error, :no_mounts_allowed}
+      end
+
+      deck = [mount_context: %Mount.Context{outdoors?: true}]
+      assert Mount.validate(passenger, mount(1, 2404, 100), deck) == :ok
+      assert Mount.validate(passenger, qiraji(), deck) == {:error, :no_mounts_allowed}
+
+      assert Mount.validate(c, mount(1, 2404, 100), mount_context: %Mount.Context{area_id: 35}) ==
+               {:error, :no_mounts_allowed}
+    end
+
+    test "mounts reject animal forms and models that cannot ride", %{character: c} do
+      for form <- [1, 3, 4, 5, 8, 16, 31, 32] do
+        shifted = %{c | unit: %{c.unit | shapeshift_form: form}}
+        assert Mount.validate(shifted, qiraji(), []) == {:error, :not_shapeshift}
+      end
+
+      for form <- [0, 17, 18, 19, 28, 30] do
+        shifted = %{c | unit: %{c.unit | shapeshift_form: form}}
+        assert Mount.validate(shifted, qiraji(), []) == :ok
+      end
+
+      transformed = %{c | unit: %{c.unit | display_id: 7550}}
+      assert Mount.validate(transformed, qiraji(), []) == {:error, :not_shapeshift}
+      assert Mount.validate(transformed, qiraji(), mount_context: %Mount.Context{display_mountable?: true}) == :ok
+    end
+
     test "Holly requires an aura-owned mount before casting or spending its item", %{character: c} do
       spell = holly()
       assert CastValidation.validate(c, spell, Target.self(1), nil, 2_000) == {:error, :only_mounted}
@@ -212,7 +278,10 @@ defmodule ThistleTea.Game.Entity.Logic.MountTest do
     test "rejects mounting where prohibited and while swimming", %{character: character} do
       spell = %{mount(1, 2404, 60) | aura_interrupt_flags: 0x80}
       assert Mount.validate(character, spell, []) == :ok
-      assert Mount.validate(character, spell, mount_allowed?: false) == {:error, :no_mounts_allowed}
+
+      assert Mount.validate(character, spell, mount_context: %Mount.Context{mount_allowed?: false}) ==
+               {:error, :no_mounts_allowed}
+
       swimming = %{character | movement_block: %{character.movement_block | movement_flags: 0x00200000}}
       assert Mount.validate(swimming, spell, []) == {:error, :only_abovewater}
     end
@@ -234,12 +303,36 @@ defmodule ThistleTea.Game.Entity.Logic.MountTest do
     end
   end
 
+  describe "resolve_requirements/4" do
+    test "mount admission is rechecked at launch before power or cooldowns are spent", %{character: c} do
+      spell = qiraji()
+      casting = Cast.new(spell, Target.self(1), 1_000)
+      c = %{c | internal: %{c.internal | casting: casting}}
+      requirements = %Requirements{mount_context: %Mount.Context{mount_allowed?: false}}
+      failed = Casting.resolve_requirements(c, casting, requirements, 2_000)
+      assert failed.internal.casting == nil
+      assert failed.internal.cooldowns == %{}
+      assert Enum.any?(failed.internal.events, &match?(%Effects.SpellCastFailed{reason: :no_mounts_allowed}, &1))
+    end
+
+    test "a mount acquired during the cast turns Black Qiraji completion into a dismount", %{character: c} do
+      {mounted, _} = apply_spell(c, mount(1, 2404, 100))
+      casting = Cast.new(qiraji(), Target.self(1), 1_000)
+      mounted = %{mounted | internal: %{mounted.internal | casting: casting}}
+      failed = Casting.resolve_requirements(mounted, casting, %Requirements{mount_context: %Mount.Context{}}, 2_000)
+      assert failed.unit.mount_display_id == 0
+      assert failed.movement_block.run_speed == 7.0
+      assert failed.internal.casting == nil
+      assert failed.internal.cooldowns == %{}
+    end
+  end
+
   defp character(_context) do
     character = %Character{
       object: %Object{guid: 1},
       unit: %Unit{health: 100, max_health: 100, level: 60, auras: [], display_id: 49, native_display_id: 49},
       player: %Player{},
-      internal: %Internal{},
+      internal: %Internal{world: WorldRef.open(0)},
       movement_block: struct!(%MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}, MovementBlock.player_speeds())
     }
 
@@ -267,6 +360,14 @@ defmodule ThistleTea.Game.Entity.Logic.MountTest do
       id: 25_860,
       attributes: MapSet.new([:allow_while_mounted]),
       effects: [%Effect{index: 0, type: :dummy, implicit_target_a: :caster}]
+    }
+  end
+
+  defp qiraji do
+    %Spell{
+      id: 26_656,
+      attributes: MapSet.new([:allow_while_mounted]),
+      effects: [%Effect{index: 0, type: :script_effect, implicit_target_a: :caster}]
     }
   end
 

@@ -8,6 +8,7 @@ defmodule CreatureModelData do
 
   @primary_key {:id, :integer, autogenerate: false}
   schema "CreatureModelData" do
+    field(:flags, :integer)
     field(:model_scale, :float)
     field(:collision_height, :float, source: :mount_height)
   end

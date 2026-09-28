@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.ItemUse
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
+  alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.PlayerCharm
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.Logic.Warlock
@@ -64,6 +65,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.World.SpellEnvironment
   alias ThistleTea.Game.World.SpellFocus
   alias ThistleTea.Game.World.SpellLocations
+  alias ThistleTea.Game.World.SpellMounts
   alias ThistleTea.Game.World.SpellObjects
   alias ThistleTea.Game.World.SpellRequirements
   alias ThistleTea.Game.World.SpellTargetInfo
@@ -205,10 +207,16 @@ defmodule ThistleTea.Game.Player.Spellcasting do
         {:error, state}
 
       {:error, reason} ->
+        state = dismiss_mount(state, spell, reason)
         fail_cast(state, requested || spell, reason)
         state = if reason == :already_open, do: state |> Looting.release() |> ItemLoot.open(), else: state
         {:error, state}
     end
+  end
+
+  defp dismiss_mount(%{character: character} = state, spell, reason) do
+    character = character |> Mount.cast_failed(spell, reason, Time.now()) |> EventSink.emit_pending()
+    %{state | character: character}
   end
 
   defp snapshot_action_position(%{character: %Character{} = character} = state) do
@@ -401,7 +409,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
         enchant_item: Disenchant.owned_item(character, enchant_guid),
         ammo_id: character.player.ammo_id,
         ammo_template: ItemLoader.get_template(character.player.ammo_id),
-        mount_allowed?: MapTemplateLoader.mount_allowed?(character.internal.world.map_id),
+        mount_context: SpellMounts.context(character, spell),
         battleground: battleground_context(character, spell),
         spell_area: SpellAreas.context(character, spell),
         outdoors?: SpellEnvironment.context(character, spell),

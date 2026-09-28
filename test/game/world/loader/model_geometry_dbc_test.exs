@@ -13,6 +13,9 @@ defmodule ThistleTea.Game.World.Loader.ModelGeometryDbcTest do
       assert_in_delta model.collision_height, 1.913, 0.001
       ModelGeometry.load_all()
       assert_in_delta ModelGeometry.height(50), 1.913, 0.001
+      assert ModelGeometry.get(4617).can_mount?
+      assert ModelGeometry.get(6921).can_mount?
+      refute ModelGeometry.get(7550).can_mount?
     end
   end
 

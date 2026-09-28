@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
   @moduledoc false
 
   effects = [
+    {:SummonMount, [:allowed_spell_id, :restricted_spell_id], [cast_item_guid: nil]},
     {:DeathItemReward, [:target_guid, :item_id, :count, :victim], []},
     {:TeachSpell, [:spell, :skill_steps], [cast_item_guid: nil]},
     {:SpellMagnetsChanged, [:magnets], []},

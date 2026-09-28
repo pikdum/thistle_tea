@@ -39,4 +39,36 @@ defmodule ThistleTea.Game.World.Loader.ModelGeometryTest do
       assert ModelGeometry.get(59, table) == model
     end
   end
+
+  describe "load/2" do
+    test "mount capability requires extended display data and a mountable model or race" do
+      table = :ets.new(:mount_models, [:set])
+
+      for {id, extra, model, race, expected} <- [
+            {1, nil, 0x80, 4, false},
+            {2, 2, 0x80, 0, true},
+            {3, 3, 0, 4, true},
+            {4, 4, 0, 0, false},
+            {5, 5, 0, nil, true}
+          ] do
+        ModelGeometry.load(
+          [
+            %{
+              id: id,
+              extended_display_id: extra,
+              model_flags: model,
+              race_flags: race,
+              model_scale: 1.0,
+              display_scale: 1.0
+            }
+          ],
+          table
+        )
+
+        assert ModelGeometry.get(id, table).can_mount? == expected
+      end
+
+      refute ModelGeometry.get(999, table).can_mount?
+    end
+  end
 end
