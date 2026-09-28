@@ -10,6 +10,17 @@ defmodule ThistleTea.Game.Spell.Immunity do
 
   defstruct schools: 0, mechanics: MapSet.new(), dispels: MapSet.new(), states: MapSet.new()
 
+  def targeted_school_protection?(%Spell{} = spell) do
+    first = Enum.find(spell.effects, &(&1.index == 0))
+
+    not Spell.attribute?(spell, :ignore_caster_and_target_restrictions) and
+      match?(
+        %Effect{implicit_target_a: target} when target in [:target_ally, :party_member, :chain_heal, :raid_and_class],
+        first
+      ) and
+      (spell.triggers_school_immunity? or Enum.any?(spell.effects, &(&1.aura == :school_immunity)))
+  end
+
   def purging(%Spell{} = spell) do
     grants = Enum.map(Spell.aura_effects(spell), fn %Effect{} = effect -> {effect.aura, effect.misc_value} end)
     build(spell, grants)

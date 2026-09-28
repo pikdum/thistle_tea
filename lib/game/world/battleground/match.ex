@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.Battleground.Match do
   alias ThistleTea.Game.Battleground.Effects.ExitPlayers
   alias ThistleTea.Game.Battleground.Result
   alias ThistleTea.Game.Battleground.Rules
+  alias ThistleTea.Game.Battleground.WarsongGulch
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -42,6 +43,8 @@ defmodule ThistleTea.Game.World.Battleground.Match do
   def player_died(server, defeat, dropped_guid) do
     GenServer.cast(server, {:player_died, defeat, dropped_guid})
   end
+
+  def flag_removed(server, guid, team, position), do: GenServer.cast(server, {:flag_removed, guid, team, position})
 
   def creature_died(server, defeat), do: GenServer.cast(server, {:creature_died, defeat})
   def quest_rewarded(server, guid, quest_id), do: GenServer.cast(server, {:quest_rewarded, guid, quest_id})
@@ -195,6 +198,17 @@ defmodule ThistleTea.Game.World.Battleground.Match do
     result = state.rules.player_died(state.match, defeat, dropped_guid)
     {:noreply, apply_result(state, result)}
   end
+
+  def handle_cast({:flag_removed, guid, team, position}, %{rules: WarsongGulch} = state) do
+    dropped_guid = dropped_flag_guid(state, guid, nil)
+    {:noreply, apply_result(state, WarsongGulch.flag_removed(state.match, guid, team, position, dropped_guid))}
+  rescue
+    error ->
+      Logger.error("Battleground flag removal failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:flag_removed, _guid, _team, _position}, state), do: {:noreply, state}
 
   def handle_cast({:creature_died, defeat}, state) do
     {:noreply, apply_result(state, state.rules.creature_died(state.match, defeat, Time.now()))}

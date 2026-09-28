@@ -7,11 +7,24 @@ defmodule ThistleTea.Game.World.Loader.ImmunityEscapeDbcTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Spell.CasterState
+  alias ThistleTea.Game.Spell.Immunity
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db
 
   describe "load/1" do
+    test "distinguishes targeted protection, triggered intervention, and self immunity" do
+      for id <- [1022, 5599, 10_278, 19_752, 19_753] do
+        assert Immunity.targeted_school_protection?(SpellLoader.load(id))
+      end
+
+      assert SpellLoader.load(19_752).triggers_school_immunity?
+
+      for id <- [642, 1020, 11_958, 1953] do
+        refute Immunity.targeted_school_protection?(SpellLoader.load(id))
+      end
+    end
+
     test "Divine Shield and Ice Block escape stuns and magic controls while Protection remains physical" do
       stun = holder(853)
       fear = holder(5782)

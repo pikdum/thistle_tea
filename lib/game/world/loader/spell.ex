@@ -277,8 +277,22 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> load_boost_auras(MapSet.put(ancestors, row.id))
     |> load_form_auras(MapSet.put(ancestors, row.id))
     |> load_passive_dependencies(MapSet.put(ancestors, row.id))
+    |> load_triggered_immunity()
     |> Semantics.compile()
   end
+
+  defp load_triggered_immunity(%SpellData{} = spell) do
+    %{spell | triggers_school_immunity?: Enum.any?(spell.effects, &triggers_school_immunity?/1)}
+  end
+
+  defp triggers_school_immunity?(%Effect{type: :trigger_spell, trigger_spell_id: id}) when is_integer(id) and id > 0 do
+    case DBC.get(Spell, id) do
+      nil -> false
+      row -> Enum.any?(build_effects(row, fn _radius -> 0.0 end), &(&1.aura == :school_immunity))
+    end
+  end
+
+  defp triggers_school_immunity?(_effect), do: false
 
   defp load_boost_auras(%SpellData{} = spell, ancestors) do
     auras =

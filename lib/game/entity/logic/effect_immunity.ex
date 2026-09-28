@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunity do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura.Invulnerability
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
@@ -32,7 +33,8 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunity do
 
   def blocked?(%{unit: %Unit{auras: holders}} = entity, %Spell{} = spell, %Effect{} = effect) when is_list(holders) do
     not Spell.attribute?(spell, :ignore_caster_and_target_restrictions) and
-      (sessile_immunity?(entity, effect) or Enum.any?(holders, &blocks?(&1, spell, effect)))
+      (Invulnerability.blocks_protection?(entity, spell) or sessile_immunity?(entity, effect) or
+         Enum.any?(holders, &blocks?(&1, spell, effect)))
   end
 
   def blocked?(_entity, _spell, _effect), do: false

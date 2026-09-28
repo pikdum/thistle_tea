@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.Ammunition
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Aura.Dispel
+  alias ThistleTea.Game.Entity.Logic.Aura.Invulnerability
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Disenchant
@@ -43,6 +44,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Spell.Environment
   alias ThistleTea.Game.Spell.Facing
   alias ThistleTea.Game.Spell.Focus
+  alias ThistleTea.Game.Spell.Immunity
   alias ThistleTea.Game.Spell.LocationTargets
   alias ThistleTea.Game.Spell.ObjectTargets
   alias ThistleTea.Game.Spell.Posture
@@ -88,6 +90,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_stronger_group(caster, spell, targets, target_info),
          :ok <- check_mechanic_immunity(caster, spell, targets, target_info),
          :ok <- check_dispel_immunity(caster, spell, targets),
+         :ok <- check_protection_immunity(caster, spell, targets, target_info),
          :ok <- check_special_aura_requirements(caster, spell),
          :ok <- check_warlock_resources(caster, spell),
          :ok <- check_cooldown(caster, spell, now),
@@ -322,6 +325,15 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     else
       :ok
     end
+  end
+
+  defp check_protection_immunity(caster, spell, targets, target_info) do
+    carrier? =
+      if self_target?(caster, Target.unit_guid(targets)),
+        do: Invulnerability.carrier?(caster),
+        else: is_map(target_info) and Map.get(target_info, :invulnerability_interruptible?, false)
+
+    if carrier? and Immunity.targeted_school_protection?(spell), do: {:error, :target_aurastate}, else: :ok
   end
 
   defp check_special_aura_requirements(caster, %Spell{} = spell) do

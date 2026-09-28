@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   """
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Battleground.Flags
   alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.AreaSources
@@ -69,10 +70,17 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   ]
 
   def apply_spell(entity, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
-    if not TriggeredLifetime.source_alive?(entity, context.required_aura_source, now) or
-         CreatureImmunity.spell?(entity, context, spell),
-       do: {entity, []},
-       else: Script.instant_application(entity, context, spell) || apply_unblocked_spell(entity, context, spell, now)
+    case Flags.admit(entity, spell) do
+      :ok ->
+        if not TriggeredLifetime.source_alive?(entity, context.required_aura_source, now) or
+             CreatureImmunity.spell?(entity, context, spell),
+           do: {entity, []},
+           else:
+             Script.instant_application(entity, context, spell) || apply_unblocked_spell(entity, context, spell, now)
+
+      {:error, effects} ->
+        {entity, effects}
+    end
   end
 
   defp apply_unblocked_spell(entity, context, spell, now) do

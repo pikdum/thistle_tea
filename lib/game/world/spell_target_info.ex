@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.World.SpellTargetInfo do
     :aura_sources,
     :dispel_options,
     :friendly_mechanic_immunities,
+    :invulnerability_interruptible?,
     :area
   ]
 
@@ -122,6 +123,7 @@ defmodule ThistleTea.Game.World.SpellTargetInfo do
           aura_sources: Map.get(metadata, :aura_sources, MapSet.new()),
           dispel_options: Map.get(metadata, :dispel_options, MapSet.new()),
           friendly_mechanic_immunities: Map.get(metadata, :friendly_mechanic_immunities, MapSet.new()),
+          invulnerability_interruptible?: Map.get(metadata, :invulnerability_interruptible?, false),
           area: Map.get(metadata, :area),
           los?: World.line_of_sight?(caster, guid)
         }

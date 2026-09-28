@@ -88,6 +88,38 @@ defmodule ThistleTea.Game.World.PresenceTest do
   end
 
   describe "sync/2" do
+    test "spell admission follows carrier publication and removal" do
+      character = character(WorldRef.open(0), {1.0, 2.0, 3.0, 0.0}, 12)
+      caster = character(WorldRef.open(0), {1.0, 2.0, 3.0, 0.0}, 12)
+
+      flag = %Spell{
+        id: 23_333,
+        aura_interrupt_flags: 0x00200000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :dummy}]
+      }
+
+      {carrying, _} = Aura.apply_spell(character, character.object.guid, 60, flag, 0)
+      on_exit(fn -> Presence.leave(character) end)
+      Presence.enter(carrying, %{})
+
+      protection = %Spell{
+        id: 1022,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :school_immunity, misc_value: 1, implicit_target_a: :target_ally}
+        ]
+      }
+
+      info = SpellTargetInfo.build(carrying, carrying.object.guid, protection)
+      assert info.invulnerability_interruptible?
+
+      assert CastValidation.validate(caster, protection, Target.unit(carrying.object.guid), info, 100) ==
+               {:error, :target_aurastate}
+
+      {released, _} = Aura.remove_spells(carrying, [23_333], 100)
+      Presence.sync(released, %{})
+      refute SpellTargetInfo.build(released, released.object.guid, protection).invulnerability_interruptible?
+    end
+
     test "spell snapshots follow current translation speed and clear it when movement stops" do
       character = character(WorldRef.open(0), {1.0, 2.0, 3.0, 0.0}, 12)
       character = %{character | movement_block: %{character.movement_block | movement_flags: 1, run_speed: 7.0}}

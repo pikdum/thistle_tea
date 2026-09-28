@@ -267,7 +267,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     do: receive_outcome(target, context, spell, outcome, now)
 
   defp immune_to_spell?(target, %CastContext{caster_guid: caster_guid} = context, %Spell{} = spell) do
-    Aura.mechanic_immune?(target, spell) or CreatureImmunity.spell?(target, context, spell) or
+    Aura.Invulnerability.blocks_protection?(target, spell) or Aura.mechanic_immune?(target, spell) or
+      CreatureImmunity.spell?(target, context, spell) or
       (target.object.guid != caster_guid and Spell.harmful?(spell) and
          DamageImmunity.immune?(target, spell.school, spell))
   end

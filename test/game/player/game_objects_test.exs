@@ -83,6 +83,49 @@ defmodule ThistleTea.Game.Player.GameObjectsTest do
   end
 
   describe "interactable?/2" do
+    test "base and dropped flags require a nearby living player in the same world" do
+      for type <- [24, 26] do
+        entry = System.unique_integer([:positive])
+        template = %GameObjectTemplate{entry: entry, type: type, size: 1.0, flags: 0}
+        GameObjectTemplateLoader.put(template)
+        world = WorldRef.instance(489, entry)
+        object = GameObject.build_summoned(template, world, {0.0, 0.0, 0.0, 0.0})
+        guid = object.object.guid
+        World.update_position(object)
+        Metadata.put(guid, %{go_spawned?: true, go_rotation: {0.0, 0.0, 0.0, 1.0}, go_scale: 1.0, go_flags: 0})
+
+        on_exit(fn ->
+          World.remove_position(object)
+          Metadata.delete(guid)
+          :ets.delete(GameObjectTemplateLoader, entry)
+        end)
+
+        character = %Character{
+          object: %Object{guid: 1},
+          unit: %Unit{health: 100, max_health: 100, auras: []},
+          internal: %Internal{world: world},
+          movement_block: %MovementBlock{position: {1.0, 0.0, 0.0, 0.0}}
+        }
+
+        assert GameObjects.interactable?(character, guid)
+        refute GameObjects.interactable?(%{character | unit: %{character.unit | health: 0}}, guid)
+        refute GameObjects.interactable?(%{character | unit: %{character.unit | mount_display_id: 1234}}, guid)
+
+        refute GameObjects.interactable?(
+                 %{character | internal: %{character.internal | world: %{world | instance_id: entry + 1}}},
+                 guid
+               )
+
+        refute GameObjects.interactable?(
+                 %{character | movement_block: %{character.movement_block | position: {100.0, 0.0, 0.0, 0.0}}},
+                 guid
+               )
+
+        Metadata.update(guid, %{go_spawned?: false})
+        refute GameObjects.interactable?(character, guid)
+      end
+    end
+
     test "spellcasting objects require a living nearby player and a nonhostile faction" do
       entry = System.unique_integer([:positive])
       template = %GameObjectTemplate{entry: entry, type: 22, size: 1.0, flags: 0, data: [30_238]}

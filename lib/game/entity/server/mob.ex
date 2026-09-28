@@ -1678,6 +1678,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           breakable_crowd_control?: Aura.breakable_crowd_control?(state),
           dispel_options: Aura.dispel_options(state),
           friendly_mechanic_immunities: Aura.friendly_mechanics(state),
+          invulnerability_interruptible?: Aura.Invulnerability.carrier?(state),
           spell_threat: SpellThreat.projection(state)
         }
         |> Map.merge(SpellResist.defense_snapshot(state))

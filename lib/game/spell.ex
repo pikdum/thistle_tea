@@ -44,6 +44,7 @@ defmodule ThistleTea.Game.Spell do
     max_targets: 0,
     custom_flags: 0,
     hidden_aura?: false,
+    triggers_school_immunity?: false,
     object_targets: [],
     unit_targets: [],
     cone: %Cone{},

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
     {:PlayerDefeated, [:source_guid, :count_death?], []},
     {:CreatureDefeated, [:source_guid], []},
     {:BattlegroundDeath, [:world, :defeat], []},
+    {:BattlegroundFlagRemoved, [:world, :guid, :team, :position], []},
     {:BattlegroundCreatureDeath, [:world, :defeat], []},
     {:HonorDamage, [:source_guid, :damage, :now, :lethal?, :honorless?], []},
     {:HonorContribution, [:player_guid, :damage, :now, :lethal?, :honorless?], []},

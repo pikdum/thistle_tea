@@ -155,6 +155,36 @@ defmodule ThistleTea.Game.Battleground.WarsongGulchTest do
     end
   end
 
+  describe "flag_removed/5" do
+    test "drops once without kill credit and ignores stale removals after return or capture", %{match: match} do
+      carried = match |> active_with_players() |> take_horde_flag()
+      position = {4.0, 5.0, 6.0, 0.0}
+
+      for {guid, team} <- [{@horde, :horde}, {@alliance, :alliance}] do
+        assert %Result{match: ^carried, effects: []} = WarsongGulch.flag_removed(carried, guid, team, position, 999)
+      end
+
+      dropped = WarsongGulch.flag_removed(carried, @alliance, :horde, position, 999)
+      assert dropped.match.flags.horde.state == :ground
+      assert dropped.match.players == carried.players
+      assert %Effects.SpawnDroppedFlag{guid: 999, team: :horde, position: position} in dropped.effects
+      assert [{{:flag_return, :horde, generation}, 10_000}] = dropped.timers
+
+      assert %Result{effects: [], timers: []} =
+               WarsongGulch.flag_removed(dropped.match, @alliance, :horde, position, 1000)
+
+      returned = WarsongGulch.handle_timer(dropped.match, {:flag_return, :horde, generation}, 11_000).match
+      assert returned.flags.horde.state == :base
+
+      assert %Result{match: ^returned, effects: []} =
+               WarsongGulch.flag_removed(returned, @alliance, :horde, position, 1000)
+
+      {:handled, captured} = WarsongGulch.area_trigger(carried, @alliance, @alliance_capture_trigger, 2_000)
+      assert captured.match.flags.horde.state == :waiting
+      assert %Result{effects: []} = WarsongGulch.flag_removed(captured.match, @alliance, :horde, position, 1000)
+    end
+  end
+
   describe "area_trigger/4" do
     test "captures only while the scoring team's own flag is home", %{match: match} do
       match = match |> active_with_players() |> take_horde_flag()

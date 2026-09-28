@@ -58,17 +58,22 @@ defmodule ThistleTea.Game.Player.GameObjects do
     metadata = Metadata.get(guid) || %{}
     enabled? = ((Map.get(metadata, :go_flags) || 0) &&& 0x10) == 0
 
-    case GameObjectTemplateLoader.cached(Guid.entry(guid)) do
-      %GameObjectTemplate{type: 22} = template ->
-        enabled? and object_in_range?(character, guid, template, metadata) and not Hostility.hostile?(guid, character)
-
-      %GameObjectTemplate{type: type} = template when type in [0, 1, 9, 10, 23] ->
-        enabled? and object_in_range?(character, guid, template, metadata)
-
-      _ ->
-        enabled?
-    end
+    enabled? and interactable_template?(character, guid, GameObjectTemplateLoader.cached(Guid.entry(guid)), metadata)
   end
+
+  defp interactable_template?(character, guid, %GameObjectTemplate{type: type} = template, metadata)
+       when type in [24, 26],
+       do:
+         GameObjectInteraction.battleground_allowed?(character) and
+           object_in_range?(character, guid, template, metadata)
+
+  defp interactable_template?(character, guid, %GameObjectTemplate{type: 22} = template, metadata),
+    do: object_in_range?(character, guid, template, metadata) and not Hostility.hostile?(guid, character)
+
+  defp interactable_template?(character, guid, %GameObjectTemplate{type: type} = template, metadata)
+       when type in [0, 1, 9, 10, 23], do: object_in_range?(character, guid, template, metadata)
+
+  defp interactable_template?(_character, _guid, _template, _metadata), do: true
 
   defp object_in_range?(character, guid, template, metadata) do
     world = character.internal.world
@@ -191,6 +196,9 @@ defmodule ThistleTea.Game.Player.GameObjects do
       chair?(guid) ->
         sit_on_chair(state, guid)
 
+      battleground_flag?(guid) ->
+        use_battleground_flag(state, guid)
+
       true ->
         case BattlegroundSystem.use_game_object(
                character.internal.world,
@@ -208,6 +216,20 @@ defmodule ThistleTea.Game.Player.GameObjects do
         end
 
         state
+    end
+  end
+
+  defp battleground_flag?(guid),
+    do: match?(%GameObjectTemplate{type: type} when type in [24, 26], GameObjectTemplateLoader.cached(Guid.entry(guid)))
+
+  defp use_battleground_flag(state, guid) do
+    with true <- interactable?(state.character, guid),
+         {:ok, character} <- GameObjectInteraction.prepare_battleground_use(state.character, Time.now()) do
+      state = put_user(state, character)
+      battleground_use(state, guid)
+      state
+    else
+      _ineligible -> state
     end
   end
 

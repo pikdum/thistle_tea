@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.ControlSync
   alias ThistleTea.Game.Entity.Logic.Aura.HealthSync
+  alias ThistleTea.Game.Entity.Logic.Aura.Invulnerability
   alias ThistleTea.Game.Entity.Logic.Aura.Linked
   alias ThistleTea.Game.Entity.Logic.Aura.ModifierSync
   alias ThistleTea.Game.Entity.Logic.Aura.MountSync
@@ -71,11 +72,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     desired = MountSync.interrupt_holders(previous, desired)
     desired = StealthSync.interrupt_holders(previous, desired)
     desired = FeignDeath.interrupt_holders(previous, desired)
-    desired = Silithyst.reconcile(desired)
     desired = StackingProc.reconcile(previous, desired)
     desired = Linked.reconcile(entity, previous, desired, now)
     desired = Capacity.retain(desired, entity_guid(entity))
     desired = EffectImmunity.purge_new(previous, desired)
+    desired = Invulnerability.interrupt_holders(entity, previous, desired)
+    desired = Silithyst.reconcile(desired)
     desired = retain_active_sources(previous, desired, now)
 
     if desired == previous do

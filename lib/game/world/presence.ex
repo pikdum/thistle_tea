@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.Presence do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Appearance
+  alias ThistleTea.Game.Entity.Logic.Aura.Invulnerability
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.FeignDeath
   alias ThistleTea.Game.Entity.Logic.ItemEligibility
@@ -59,6 +60,7 @@ defmodule ThistleTea.Game.World.Presence do
     character
     |> location_metadata()
     |> Map.put(:item_eligibility, ItemEligibility.from_character(character))
+    |> Map.put(:invulnerability_interruptible?, Invulnerability.carrier?(character))
     |> Map.merge(PlayerCombat.projection(character))
   end
 

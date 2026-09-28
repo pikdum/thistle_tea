@@ -247,6 +247,11 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  defp emit_resolved(entity, %Effects.BattlegroundFlagRemoved{} = effect, _context) do
+    Battleground.flag_removed(effect.world, effect.guid, effect.team, effect.position)
+    entity
+  end
+
   defp emit_resolved(entity, %Effects.BattlegroundCreatureDeath{world: world, defeat: defeat}, _context) do
     Battleground.creature_died(world, defeat)
     entity

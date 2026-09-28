@@ -10,9 +10,28 @@ defmodule ThistleTea.Game.Entity.Logic.GameObjectInteraction do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Aura.Invulnerability
+  alias ThistleTea.Game.Entity.Logic.ControlMovement
+  alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.Silithyst
+
+  def battleground_allowed?(%Character{} = character) do
+    Death.alive?(character) and not Aura.has_spell?(character, 27_827) and
+      (character.unit.mount_display_id || 0) == 0 and not Invulnerability.total?(character) and
+      not ControlMovement.active?(character) and
+      not Enum.any?([:mod_stun, :feign_death, :mod_possess], &Aura.has_aura?(character, &1))
+  end
+
+  def prepare_battleground_use(%Character{} = character, now) do
+    if battleground_allowed?(character) do
+      {character, effects} = Aura.remove_aura_types(character, [:mod_stealth, :mod_invisibility], now)
+      {:ok, Effects.enqueue(character, effects)}
+    else
+      {:error, :not_interactable}
+    end
+  end
 
   def prepare_questgiver_use(%Character{} = character, %GameObjectTemplate{type: 2, data: data}, flags, now) do
     prepare_use(character, flags, Enum.at(data, 5, 0), Enum.at(data, 8, 0), now)

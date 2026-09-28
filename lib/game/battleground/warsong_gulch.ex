@@ -410,6 +410,14 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
     }
   end
 
+  def flag_removed(%__MODULE__{phase: :active} = match, guid, team, position, dropped_guid) do
+    if team in [:alliance, :horde] and carried_flag(match, guid) == team,
+      do: drop_carried_flag(match, guid, position, dropped_guid),
+      else: %Result{match: match}
+  end
+
+  def flag_removed(%__MODULE__{} = match, _guid, _team, _position, _dropped_guid), do: %Result{match: match}
+
   defp drop_carried_flag(match, guid, position, dropped_guid) do
     case carried_flag(match, guid) do
       team when team in [:alliance, :horde] and is_integer(dropped_guid) and is_tuple(position) ->

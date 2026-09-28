@@ -71,6 +71,9 @@ defmodule ThistleTea.Game.World.System.Battleground do
     GenServer.cast(server, {:player_died, world, defeat})
   end
 
+  def flag_removed(%WorldRef{} = world, guid, team, position, server \\ __MODULE__),
+    do: GenServer.cast(server, {:flag_removed, world, guid, team, position})
+
   def creature_died(%WorldRef{} = world, %CreatureDefeat{} = defeat, server \\ __MODULE__) do
     GenServer.cast(server, {:creature_died, world, defeat})
   end
@@ -430,6 +433,15 @@ defmodule ThistleTea.Game.World.System.Battleground do
     end
 
     {:noreply, state}
+  end
+
+  def handle_cast({:flag_removed, world, guid, team, position}, state) do
+    if pid = Map.get(state.worlds, world), do: Match.flag_removed(pid, guid, team, position)
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("Battleground flag removal routing failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:creature_died, world, defeat}, state) do

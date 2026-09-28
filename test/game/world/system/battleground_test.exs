@@ -270,6 +270,38 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
     end
   end
 
+  describe "flag_removed/5" do
+    test "routes owner removal into the correct match and returns one dropped flag", %{server: server} do
+      assert :ok = BattlegroundSystem.join(alliance(1), 489, server)
+      assert :ok = BattlegroundSystem.join(horde(2), 489, server)
+      destination = {WorldRef.open(0), {0.0, 0.0, 0.0, 0.0}}
+      assert {:ok, world, _} = BattlegroundSystem.port(1, 1, destination, server)
+      assert {:ok, ^world, _} = BattlegroundSystem.port(2, 1, destination, server)
+      assert :ok = BattlegroundSystem.debug_start_now(world, server)
+      position = {1.0, 2.0, 3.0, 0.0}
+      assert :handled = BattlegroundSystem.use_game_object(world, 1, 102, 179_831, position, server)
+      pid = BattlegroundSystem.match_for_world(world, server)
+      assert Match.snapshot(pid).flags.horde.carrier == 1
+
+      BattlegroundSystem.flag_removed(%{world | instance_id: world.instance_id + 1}, 1, :horde, position, server)
+      BattlegroundSystem.world_states(world, server)
+      assert Match.snapshot(pid).flags.horde.carrier == 1
+
+      BattlegroundSystem.flag_removed(world, 1, :horde, position, server)
+      BattlegroundSystem.world_states(world, server)
+      dropped = Match.snapshot(pid).flags.horde
+      assert dropped.state == :ground
+      assert dropped.carrier == nil
+      assert Guid.entry(dropped.dropped_guid) == 179_786
+
+      BattlegroundSystem.flag_removed(world, 1, :horde, position, server)
+      BattlegroundSystem.world_states(world, server)
+      assert Match.snapshot(pid).flags.horde == dropped
+      send(pid, {:battleground_timer, {:flag_return, :horde, dropped.generation}})
+      assert Match.snapshot(pid).flags.horde.state == :base
+    end
+  end
+
   describe "corpse_recovery_allowed?/3" do
     test "permits only admitted players after preparation ends", %{server: server} do
       :ok = BattlegroundSystem.join(alliance(1), 489, server)
