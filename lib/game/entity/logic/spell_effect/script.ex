@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
   alias ThistleTea.Game.Entity.Logic.Engineering
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Mage
+  alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.Racial
   alias ThistleTea.Game.Entity.Logic.Rogue
@@ -126,6 +127,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
 
   defp apply_class_dummy(state, context, _spell, %Effect{index: 0}, :goblin_bomb, _now) do
     Engineering.goblin_bomb(state, context)
+  end
+
+  defp apply_class_dummy(state, context, _spell, %Effect{index: 0}, :reindeer_transformation, now) do
+    Mount.reindeer(state, context, now)
   end
 
   defp apply_class_dummy(%Mob{unit: %{health: 0}} = state, _context, _spell, _effect, :capture_corpse, _now) do

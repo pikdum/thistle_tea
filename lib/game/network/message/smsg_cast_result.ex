@@ -49,6 +49,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     no_mounts_allowed: 0x4B,
     only_abovewater: 0x50,
     only_indoors: 0x52,
+    only_mounted: 0x53,
     only_outdoors: 0x55,
     only_battlegrounds: 0x87,
     not_behind: 0x33,

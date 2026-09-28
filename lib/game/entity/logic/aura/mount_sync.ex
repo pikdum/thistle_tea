@@ -7,8 +7,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MountSync do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.ExtraAttacks
+  alias ThistleTea.Game.Spell
 
   def interrupt_holders(previous, desired) do
+    desired = dismount_on_transform(previous, desired)
+
     case {mounted?(previous), mounted?(desired)} do
       {false, true} -> Enum.reject(desired, &Holder.interruptible?(&1, 0x00020000))
       {true, false} -> Enum.reject(desired, &Holder.interruptible?(&1, 0x00000040))
@@ -34,4 +37,20 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MountSync do
   defp mount_display(_aura), do: nil
 
   defp mounted?(holders), do: Enum.any?(holders, &Holder.has_aura_type?(&1, :mounted))
+
+  defp dismount_on_transform(previous, desired) do
+    applications = previous |> Enum.filter(&dismounts?/1) |> MapSet.new(&application/1)
+
+    if Enum.any?(desired, &(dismounts?(&1) and not MapSet.member?(applications, application(&1)))),
+      do: Enum.reject(desired, &Holder.has_aura_type?(&1, :mounted)),
+      else: desired
+  end
+
+  defp application(%Holder{} = holder), do: {Holder.key(holder), holder.applied_at}
+
+  defp dismounts?(%Holder{spell: %Spell{id: 4060}, auras: auras}) do
+    Enum.any?(auras, &match?(%Aura{index: 0, type: :transform}, &1))
+  end
+
+  defp dismounts?(_holder), do: false
 end

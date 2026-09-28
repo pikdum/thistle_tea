@@ -58,6 +58,11 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResultTest do
       assert SmsgCastResult.to_binary(message) == <<20_577::little-size(32), 2, 0x86>>
     end
 
+    test "encodes the mounted-only requirement" do
+      message = SmsgCastResult.failure(25_860, :only_mounted)
+      assert SmsgCastResult.to_binary(message) == <<25_860::little-size(32), 2, 0x53>>
+    end
+
     test "includes the required spell focus identifier" do
       message = SmsgCastResult.failure(%Spell{id: 2657, required_focus_id: 3}, :requires_spell_focus)
       assert SmsgCastResult.to_binary(message) == <<2657::little-size(32), 2, 0x5E, 3::little-size(32)>>

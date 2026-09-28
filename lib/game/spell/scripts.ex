@@ -164,6 +164,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def dummy_effect(%Spell{id: 9033, spell_family: 7}), do: :shapeshift_cleanse
   def dummy_effect(%Spell{id: 13_120}), do: :net_o_matic
   def dummy_effect(%Spell{id: 23_134}), do: :goblin_bomb
+  def dummy_effect(%Spell{id: 25_860}), do: :reindeer_transformation
   def dummy_effect(%Spell{id: 28_006}), do: {:trigger_spell, 29_296}
   def dummy_effect(%Spell{id: id}) when id in [11_885, 11_886, 11_887, 11_888, 11_889, 12_699], do: :capture_corpse
 
