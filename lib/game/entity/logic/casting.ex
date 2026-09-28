@@ -1181,7 +1181,8 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     target_guid = selected_unit_guid || character.unit.target
 
     events =
-      for %Spell.Effect{type: :trans_door, misc_value: entry} <- spell.effects,
+      for %Spell.Effect{type: :trans_door, misc_value: entry, implicit_target_a: target} <- spell.effects,
+          target != :caster_fishing_spot,
           is_integer(entry) and entry > 0 do
         Effects.summon_game_object(entry, area_duration(casting, spell),
           ritual_target_guid: target_guid,

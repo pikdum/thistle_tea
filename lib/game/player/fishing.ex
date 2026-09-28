@@ -47,7 +47,16 @@ defmodule ThistleTea.Game.Player.Fishing do
 
   def start_cast(%{character: character} = state, %Spell{} = spell) do
     if fishing_spell?(spell) do
-      spawn_bobber(state, character, state.fishing_position)
+      character = EventSink.emit_pending(character)
+      state = %{state | character: character}
+
+      case character.internal.casting do
+        %Cast{phase: :channel_tick, spell: %{id: id}} when id == spell.id ->
+          spawn_bobber(state, character, state.fishing_position)
+
+        _ ->
+          Map.delete(state, :fishing_position)
+      end
     else
       state
     end
