@@ -48,10 +48,11 @@ jobs:
           otp-version: ${{ matrix.otp }}
       - run: mix deps.get
       - run: mix tailwind.install
-      - name: fetch namigator (C++ NIF source)
+      - name: fetch namigator (C++ NIF source, pinned by flake.lock)
         run: |
+          rev=$(jq -r '.nodes["namigator-src"].locked.rev' flake.lock)
           git clone https://github.com/pikdum/namigator "$RUNNER_TEMP/namigator"
-          git -C "$RUNNER_TEMP/namigator" checkout 0d34ff2c41365198e4647dcd9eee36f447231b35
+          git -C "$RUNNER_TEMP/namigator" checkout "$rev"
           git -C "$RUNNER_TEMP/namigator" submodule update --init recastnavigation
           echo "NAMIGATOR_SRC=$RUNNER_TEMP/namigator" >> "$GITHUB_ENV"
       - run: mix compile
