@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Player.QuestRewardsTest do
   setup [:character]
 
   describe "credit_event/2" do
+    @tag :vmangos_db
     test "rewards a hidden flag once without consuming a log slot or announcing it", %{state: state, quest: quest} do
       full = Map.new(0..19, &{&1, %QuestLog.Entry{quest_id: &1 + 1}})
       state = %{state | character: %{state.character | player: %{state.character.player | quest_log: full}}}
@@ -36,6 +37,7 @@ defmodule ThistleTea.Game.Player.QuestRewardsTest do
       refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgQuestgiverQuestComplete{}}}
     end
 
+    @tag :vmangos_db
     test "removes an accepted flag while ordinary unaccepted quests remain untouched", %{state: state, quest: quest} do
       {:ok, log} = QuestLog.add(%{}, quest.id)
       state = %{state | character: %{state.character | player: %{state.character.player | quest_log: log}}}

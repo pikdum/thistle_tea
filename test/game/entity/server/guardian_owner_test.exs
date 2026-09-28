@@ -28,10 +28,11 @@ defmodule ThistleTea.Game.Entity.Server.GuardianOwnerTest do
   alias ThistleTea.Game.World.Loader.Summon
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Test.FactionFixtures
 
   @entries [990_201, 990_202]
 
-  setup [:templates, :owner]
+  setup [{FactionFixtures, :seed}, :templates, :owner]
 
   describe "summon/3" do
     test "scripts remove selected child owners and their world projections", %{owner: owner} do

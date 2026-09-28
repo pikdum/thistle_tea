@@ -25,10 +25,11 @@ defmodule ThistleTea.Game.Entity.Server.Player.MiniPetOwnerTest do
   alias ThistleTea.Game.World.Loader.Summon
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Test.FactionFixtures
 
   @entries [990_101, 990_102]
 
-  setup [:templates, :owner]
+  setup [{FactionFixtures, :seed}, :templates, :owner]
 
   describe "summon/2" do
     @tag :dbc_db

@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.World.SpellRequirementsTest do
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpellRequirements
@@ -104,6 +105,8 @@ defmodule ThistleTea.Game.World.SpellRequirementsTest do
 
   describe "cast_result/3" do
     test "uses the nearby body instead of validating the caster as an edible target", %{caster: caster, spell: spell} do
+      :ets.insert(SpellLoader, {{:spell, 20_578}, nil})
+      on_exit(fn -> :ets.delete(SpellLoader, {:spell, 20_578}) end)
       body(:mob, caster.internal.world, {1.0, 0.0, 0.0})
       state = %State{guid: caster.object.guid, character: caster}
       assert {:ok, _state} = Spellcasting.cast_result(state, spell, <<0::little-size(16)>>)

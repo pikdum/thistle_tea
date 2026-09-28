@@ -29,10 +29,11 @@ defmodule ThistleTea.Game.Entity.Server.WildSummonTest do
   alias ThistleTea.Game.World.Loader.WildSummon
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Test.FactionFixtures
 
   @entries [990_211, 990_212, 2673, 2674, 12_426]
 
-  setup [:templates, :caster]
+  setup [{FactionFixtures, :seed}, :templates, :caster]
 
   describe "build/4" do
     test "ordinary summons keep their template faction level and independent lifetime", %{caster: caster} do

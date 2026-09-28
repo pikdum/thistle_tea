@@ -15,8 +15,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CreatureEventTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Test.FactionFixtures
 
-  setup [:creatures]
+  setup [{FactionFixtures, :seed}, :creatures]
 
   describe "world event lifecycle" do
     test "updates every live copy and restores the original client fields", %{mob: mob, template: template} do

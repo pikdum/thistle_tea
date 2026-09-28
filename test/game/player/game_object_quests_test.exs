@@ -270,6 +270,7 @@ defmodule ThistleTea.Game.Player.GameObjectQuestsTest do
   end
 
   describe "choose_reward/4" do
+    @tag :vmangos_db
     test "consumes objectives, grants rewards, runs the end script, and offers the object chain", context do
       next = put_quest(%Quest{id: context.quest.id + 1, title: "Next", prev_quest_id: context.quest.id})
       quest = put_quest(%{context.quest | next_quest_in_chain: next.id})

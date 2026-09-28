@@ -21,8 +21,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CreatureEntryTest do
   alias ThistleTea.Game.World.Loader.CreatureArchetype, as: ArchetypeLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Test.FactionFixtures
 
-  setup [:creatures]
+  setup [{FactionFixtures, :seed}, :creatures]
 
   describe "handle_cast/2" do
     test "publishes avoidance on spawn, aura replacement, and respawn", %{mob: mob} do

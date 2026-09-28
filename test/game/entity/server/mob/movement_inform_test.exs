@@ -19,6 +19,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob.MovementInformTest do
   alias ThistleTea.Game.Network.Message.SmsgMonsterMove
   alias ThistleTea.Game.World
   alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Test.FactionFixtures
+
+  setup {FactionFixtures, :seed}
 
   describe "movement completion" do
     test "an observer arriving during the move retains its final facing" do

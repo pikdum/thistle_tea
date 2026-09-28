@@ -27,8 +27,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob.SummonLifecycleTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Test.FactionFixtures
 
-  setup [:summoner]
+  setup [{FactionFixtures, :seed}, :summoner]
 
   describe "summon lifecycle" do
     test "NPC pets grant one reward and leave an unlootable corpse until removal", %{summoner: summoner} do

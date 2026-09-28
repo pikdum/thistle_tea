@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Player.TalentResetTest do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Gossip
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
@@ -279,6 +280,7 @@ defmodule ThistleTea.Game.Player.TalentResetTest do
     Entity.register(trainer)
     cache(Gossip, [{{:trainer, @trainer}, %{type: 0, class: 3}}])
     cache(ItemLoader, [{@reagent, %ItemTemplate{entry: @reagent, stackable: 1}}])
+    cache(SpellChainLoader, for(id <- [@trained, @dependent, @ordinary, @foreign, @summon], do: {{:chain, id}, nil}))
 
     cache(TalentLoader, [
       {{:tabs, 3}, [777]},

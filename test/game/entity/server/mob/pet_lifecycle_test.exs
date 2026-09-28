@@ -45,8 +45,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetLifecycleTest do
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpellRequirements
   alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Test.FactionFixtures
 
-  setup [:build_pet]
+  setup [{FactionFixtures, :seed}, :build_pet]
 
   describe "pet visibility" do
     test "sends the current name with a corpse reveal after an earlier query was lost", %{pet: pet} do

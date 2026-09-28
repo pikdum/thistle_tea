@@ -195,6 +195,7 @@ defmodule ThistleTea.Game.Player.ItemsTest do
              ]
     end
 
+    @tag :vmangos_db
     test "does not grant an early entry when a later entry fails", %{state: state} do
       size = :ets.info(ItemStore, :size)
       assert {:error, :item_not_found, ^state} = Items.store_many(state, [{@entry, 1}, {@entry + 1, 1}])

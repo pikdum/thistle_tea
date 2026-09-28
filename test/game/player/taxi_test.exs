@@ -111,6 +111,7 @@ defmodule ThistleTea.Game.Player.TaxiTest do
   end
 
   describe "activate/4" do
+    @tag :dbc_db
     test "starts and completes a paid flight", context do
       character = put_known(context.character, [2, 4])
 
@@ -216,6 +217,7 @@ defmodule ThistleTea.Game.Player.TaxiTest do
       assert Taxi.spline_done(foreign, spline_id) == foreign
     end
 
+    @tag :dbc_db
     test "finishes the matching elapsed flight once at the server destination", %{flight_state: state} do
       state = expire_flight(state)
       spline_id = state.character.internal.spline_id
@@ -370,6 +372,7 @@ defmodule ThistleTea.Game.Player.TaxiTest do
   describe "resume/1" do
     setup [:start_flight]
 
+    @tag :dbc_db
     test "starts once after the client's active mover and finishes under a fresh token", %{flight_state: flying} do
       old_token = flying.character.internal.taxi_flight.token
       old_spline_id = flying.character.internal.spline_id

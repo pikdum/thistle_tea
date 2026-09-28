@@ -29,8 +29,9 @@ defmodule ThistleTea.Game.World.SpellUnitLocationsTest do
   alias ThistleTea.Game.World.SpellLocations
   alias ThistleTea.Game.World.SpellRequirements
   alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Test.FactionFixtures
 
-  setup [:caster]
+  setup [{FactionFixtures, :seed}, :caster]
 
   describe "resolve/4" do
     test "replaces supplied coordinates with the selected unit's live position", %{caster: caster, spell: spell} do

@@ -111,6 +111,7 @@ defmodule ThistleTea.Game.Player.ResurrectionTest do
   end
 
   describe "respond/3" do
+    @tag :dbc_db
     test "matching arrival revives once and removes all corpse projections", %{
       state: state,
       corpse: corpse,
@@ -139,6 +140,7 @@ defmodule ThistleTea.Game.Player.ResurrectionTest do
       assert Travel.teleport_ack(restored, state.guid, packet.counter) == restored
     end
 
+    @tag :dbc_db
     test "cross-map recovery waits for its worldport and competing travel cancels it", %{state: state, offer: offer} do
       accepted = Resurrection.respond(state, offer.caster_guid, 1)
       assert_receive {:"$gen_cast", {:accept_resurrection, accepted_offer}}

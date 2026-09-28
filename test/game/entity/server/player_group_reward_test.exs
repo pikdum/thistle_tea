@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerGroupRewardTest do
   setup [:reward_context]
 
   describe "handle_cast/2" do
+    @tag :vmangos_db
     test "NPC pets award reduced XP alongside quest and reputation credit", context do
       victim = %{
         context.victim

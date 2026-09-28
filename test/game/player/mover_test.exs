@@ -78,6 +78,7 @@ defmodule ThistleTea.Game.Player.MoverTest do
   end
 
   describe "release/3" do
+    @tag :dbc_db
     test "applies a final body snapshot without cancelling possession's channel", %{state: state, other: other} do
       state = control(state, other)
       cast = %Cast{spell: %Spell{id: 605}, phase: :channel_tick, ends_at: Time.now() + 60_000}
@@ -111,6 +112,7 @@ defmodule ThistleTea.Game.Player.MoverTest do
       assert Mover.release(state, other, <<>>) == state
     end
 
+    @tag :dbc_db
     test "the recipient accepts a final snapshot only before new movement", %{state: state, other: other} do
       state = %{state | character: MovementHandoff.offer(state.character, other, Time.now())}
 

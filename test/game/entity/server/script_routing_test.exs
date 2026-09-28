@@ -33,8 +33,9 @@ defmodule ThistleTea.Game.Entity.Server.ScriptRoutingTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
   alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Test.FactionFixtures
 
-  setup [:world]
+  setup [{FactionFixtures, :seed}, :world]
 
   describe "script delivery" do
     test "reaction changes publish acquisition and assistance eligibility", %{world: world} do

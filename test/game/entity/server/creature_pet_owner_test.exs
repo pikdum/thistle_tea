@@ -29,11 +29,12 @@ defmodule ThistleTea.Game.Entity.Server.CreaturePetOwnerTest do
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Test.FactionFixtures
 
   @entries [990_301, 990_302]
   @levels [1, 18, 20]
 
-  setup [:templates, :owner]
+  setup [{FactionFixtures, :seed}, :templates, :owner]
 
   describe "summon/2" do
     test "publishes one aggressive pet and rejects recasts while it lives", %{owner: owner, pid: pid} do
