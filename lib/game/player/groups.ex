@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Player.Groups do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgPartyCommandResult, as: Result
@@ -17,6 +18,25 @@ defmodule ThistleTea.Game.Player.Groups do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+
+  def random_roll(%{ready: true, guid: guid} = state, minimum, maximum)
+      when minimum in 0..1_000_000 and maximum in 0..1_000_000 and minimum <= maximum do
+    packet = %Message.MsgRandomRollResponse{
+      minimum: minimum,
+      maximum: maximum,
+      result: Math.random_int(minimum, maximum),
+      guid: guid
+    }
+
+    case PartySystem.group_of(guid) do
+      %Group{} = group -> Notifier.broadcast(group, packet)
+      nil -> Network.send_packet(packet, guid)
+    end
+
+    state
+  end
+
+  def random_roll(state, _minimum, _maximum), do: state
 
   def invite(%{ready: true, guid: guid, character: %Character{} = character} = state, name) do
     name = String.capitalize(name)

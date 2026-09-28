@@ -276,7 +276,8 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_ITEM_TEXT_QUERY: Message.CmsgItemTextQuery,
               CMSG_MAIL_CREATE_TEXT_ITEM: Message.CmsgMailCreateTextItem,
               MSG_QUERY_NEXT_MAIL_TIME: Message.MsgQueryNextMailTimeClient,
-              MSG_MINIMAP_PING: Message.MsgMinimapPing
+              MSG_MINIMAP_PING: Message.MsgMinimapPing,
+              MSG_RANDOM_ROLL: Message.MsgRandomRoll
             }
             |> Map.merge(@movement_opcodes)
             |> Map.new(fn {opcode, module} -> {Opcodes.get(opcode), module} end)

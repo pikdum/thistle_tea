@@ -13,6 +13,65 @@ defmodule ThistleTea.Game.Player.GroupsTest do
 
   setup [:party]
 
+  describe "random_roll/3" do
+    test "shares one server result from any member across the whole raid", %{leader: leader, member: member} do
+      outsider = unique_guid()
+      Registry.register(outsider)
+      offline = unique_guid()
+      :ok = PartySystem.invite(leader.guid, "First", offline)
+      {:ok, _} = PartySystem.accept(offline, "Offline")
+      on_exit(fn -> PartySystem.leave(offline) end)
+      {:ok, _} = PartySystem.convert_raid(leader.guid)
+      {:ok, group} = PartySystem.change_subgroup(leader.guid, member.guid, 7)
+
+      member = %{
+        member
+        | character: %{member.character | internal: %{member.character.internal | world: WorldRef.open(1)}}
+      }
+
+      assert Groups.random_roll(member, 37, 91) == member
+      guid = member.guid
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.MsgRandomRollResponse{guid: ^guid, minimum: 37, maximum: 91} = roll}}
+
+      assert roll.result in 37..91
+      assert_receive {:"$gen_cast", {:send_packet, ^roll}}
+      refute_received {:"$gen_cast", {:send_packet, %Message.MsgRandomRollResponse{}}}
+      assert PartySystem.group_of(guid) == group
+    end
+
+    test "uses current membership after leaving and returns solo rolls only once", %{leader: leader, member: member} do
+      PartySystem.leave(member.guid)
+
+      for state <- [leader, member], bound <- [0, 1_000_000] do
+        assert Groups.random_roll(state, bound, bound) == state
+        guid = state.guid
+
+        assert_receive {:"$gen_cast",
+                        {:send_packet,
+                         %Message.MsgRandomRollResponse{guid: ^guid, result: ^bound, minimum: ^bound, maximum: ^bound}}}
+
+        refute_received {:"$gen_cast", {:send_packet, %Message.MsgRandomRollResponse{}}}
+      end
+    end
+
+    test "accepts the complete range and shares the same result with the party", %{leader: leader} do
+      assert Groups.random_roll(leader, 0, 1_000_000) == leader
+      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgRandomRollResponse{} = roll}}
+      assert roll.result in 0..1_000_000
+      assert_receive {:"$gen_cast", {:send_packet, ^roll}}
+      refute_received {:"$gen_cast", {:send_packet, %Message.MsgRandomRollResponse{}}}
+    end
+
+    test "rejects reversed, negative, oversized and noninteger bounds", %{leader: leader} do
+      for {minimum, maximum} <- [{100, 1}, {-1, 100}, {0, 1_000_001}, {1, 0xFFFFFFFF}, {0.5, 100}, {0, nil}] do
+        assert Groups.random_roll(leader, minimum, maximum) == leader
+        refute_received {:"$gen_cast", {:send_packet, %Message.MsgRandomRollResponse{}}}
+      end
+    end
+  end
+
   describe "convert_raid/1" do
     test "projects conversion, assistant flags, and subgroup changes to both members", %{leader: leader, member: member} do
       assert Groups.convert_raid(member) == member
