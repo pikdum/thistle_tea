@@ -77,7 +77,7 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
 
       character = debug_character()
       character = %{character | object: %Object{guid: 1}, internal: %{character.internal | cooldowns: cooldowns}}
-      assert {:handled, updated} = DevCommands.run(%{character: character}, ".debug cooldowns")
+      assert {:handled, updated} = DevCommands.run(%{guid: 1, character: character}, ".debug cooldowns")
       assert updated.character.internal.cooldowns == %{}
       assert_received {:"$gen_cast", {:send_packet, %Message.SmsgClearCooldown{spell_id: 23_453}}}
       assert_received {:"$gen_cast", {:send_packet, %Message.SmsgClearCooldown{spell_id: 133}}}

@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Entity.Data.Reputation.Definition
   alias ThistleTea.Game.Entity.Data.Reputation.State, as: ReputationState
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
@@ -349,7 +350,8 @@ defmodule ThistleTea.Game.Player.DevCommands do
     keys = Map.keys(character.internal.cooldowns)
     events = for id <- keys, is_integer(id), do: Effects.clear_cooldown(character.object.guid, id)
 
-    character = character |> Cooldowns.reset(keys) |> Effects.enqueue(events) |> EventSink.emit_pending()
+    character =
+      character |> Cooldowns.reset(keys) |> Effects.enqueue(events) |> EventSink.emit_pending(Context.new(self()))
 
     %{state | character: character}
     |> system_message("Spell and item cooldowns reset.")
