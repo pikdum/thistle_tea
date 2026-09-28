@@ -51,6 +51,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.Invisibility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
+  alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Logic.UnreachableTarget
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
@@ -290,7 +291,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp in_combat?(%Mob{} = state, %Blackboard{} = blackboard) do
-    CombatBT.in_combat?(state, blackboard)
+    CombatBT.in_combat?(state, blackboard) or (state.internal.in_combat == true and Threat.targets(state) != [])
   end
 
   defp not_in_combat?(%Mob{} = state, %Blackboard{} = blackboard) do
@@ -343,6 +344,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     |> Core.mark_broadcast_update()
     |> maybe_enqueue_call_assistance(target_guid)
   end
+
+  def maybe_enqueue_call_assistance(%Mob{unit: %Unit{target: target}} = state, _target_guid) when target in [nil, 0],
+    do: state
 
   def maybe_enqueue_call_assistance(
         %Mob{internal: %Internal{creature: %Creature{critter?: true}}} = state,
@@ -403,6 +407,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       } ->
         {state, blackboard} = maybe_on_kill(state, blackboard, previous_victim, context)
         {:success, state, Blackboard.clear_attack_started(blackboard)}
+
+      %Engagement.Result{entity: %Mob{unit: %{target: target}} = state, decision: :keep}
+      when target in [nil, 0] ->
+        {BT.running(1_000, :passive_combat), state, blackboard}
 
       %Engagement.Result{entity: state, decision: :keep} ->
         {:success, state, blackboard}

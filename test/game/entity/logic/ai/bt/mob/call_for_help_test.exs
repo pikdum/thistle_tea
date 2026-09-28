@@ -14,17 +14,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.CallForHelpTest do
   alias ThistleTea.Game.Entity.Logic.Effects
 
   describe "maybe_enqueue_call_assistance/2" do
-    test "queues a call-assistance event for a regular mob" do
-      mob = MobBT.maybe_enqueue_call_assistance(mob(), 42)
+    test "queues a call-assistance event only after acquiring a victim" do
+      assert MobBT.maybe_enqueue_call_assistance(mob(), 42).internal.events == []
+      mob = MobBT.maybe_enqueue_call_assistance(mob(target: 42), 42)
 
       assert [%Effects.CallAssistance{target_guid: 42}] = mob.internal.events
     end
 
     test "does not queue for pets or mobs with the range disabled" do
-      pet = mob(pet: %Pet{owner_guid: 7})
+      pet = mob(pet: %Pet{owner_guid: 7}, target: 42)
       assert MobBT.maybe_enqueue_call_assistance(pet, 42).internal.events in [nil, []]
 
-      disabled = mob(range: 0.0)
+      disabled = mob(range: 0.0, target: 42)
       assert MobBT.maybe_enqueue_call_assistance(disabled, 42).internal.events in [nil, []]
     end
   end

@@ -2049,7 +2049,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp engage_combat(%Mob{} = state, _caster, _opts), do: state
 
   defp receive_combat_contact(state, caster, now, role \\ :attacked, timed? \\ nil) do
-    state |> Engagement.contact(caster, now, role, timed?) |> engage_combat(caster)
+    state |> Engagement.contact(caster, now, role, timed?) |> engage_combat(caster, contact?: true)
   end
 
   defp enter_combat(%Mob{} = state, caster, opts, now) do

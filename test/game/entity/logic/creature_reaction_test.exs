@@ -6,19 +6,26 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureReactionTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Assistance
   alias ThistleTea.Game.Entity.Logic.CreatureReaction
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
+  alias ThistleTea.Game.Entity.Logic.Regen
+  alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
 
@@ -51,7 +58,11 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureReactionTest do
     test "passive creatures refuse combat entry, damage retaliation, and assistance", %{mob: mob} do
       passive = CreatureReaction.set(mob, :passive)
       assert %Engagement.Result{entity: ^passive, reason: :passive} = Engagement.enter(passive, 1, 100)
-      assert Engagement.on_damage(passive, 1, 100) == passive
+      attacked = Engagement.on_damage(passive, 1, 100)
+      assert attacked.internal.in_combat
+      assert attacked.internal.threat == %{1 => 0.0}
+      assert attacked.unit.target in [nil, 0]
+      assert MobBT.maybe_enqueue_call_assistance(attacked, 1) == attacked
       refute Assistance.available?(passive)
 
       for mode <- [:defensive, :aggressive] do
@@ -85,6 +96,49 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureReactionTest do
       stopped = PetBT.reaction(commanded, :passive)
       assert stopped.unit.target in [nil, 0]
       refute stopped.internal.pet.attack_command?
+    end
+
+    test "preserves the current victim but refuses replacements while passive", %{mob: mob} do
+      %{entity: fighting} = Engagement.enter(mob, 1, 100, selection: :target)
+      passive = fighting |> CreatureReaction.set(:passive) |> Threat.add(2, 100)
+      %{entity: unchanged, decision: :keep} = Engagement.select(passive, valid?: fn _ -> true end)
+      assert unchanged.unit.target == 1
+
+      %{entity: waiting, decision: :keep} = Engagement.select(passive, valid?: &(&1 == 2))
+      assert waiting.unit.target == 0
+      assert waiting.internal.threat == %{2 => 100.0}
+      assert waiting.internal.in_combat
+      assert Enum.any?(waiting.internal.events, &match?(%Effects.AttackStop{target_guid: 1}, &1))
+      refute Enum.any?(waiting.internal.events, &match?(%Effects.AttackerGained{target_guid: 2}, &1))
+    end
+  end
+
+  describe "BehaviorRunner.tick/3" do
+    test "passive damage retains combat without attacking or regenerating", %{mob: mob} do
+      mob = %{mob | unit: %{mob.unit | health: 50}}
+      attacked = mob |> CreatureReaction.set(:passive) |> Engagement.on_damage(1, 100)
+      assert Regen.tick(attacked, 1_000).unit.health == 50
+      context = combat_context(attacked)
+
+      assert {{:running, 1_000, :passive_combat}, waiting} =
+               BehaviorRunner.tick(MobBT.tree(), attacked, context)
+
+      assert waiting.unit.target in [nil, 0]
+      assert waiting.unit.health == 50
+      assert waiting.internal.in_combat
+      assert waiting.internal.threat == %{1 => 0.0}
+      refute Enum.any?(waiting.internal.events, &is_struct(&1, Effects.AttackStart))
+
+      %{entity: defensive, decision: {:switch, 1}} =
+        waiting |> CreatureReaction.set(:defensive) |> Engagement.select(valid?: fn _ -> true end)
+
+      assert defensive.unit.target == 1
+
+      {_status, reset} = BehaviorRunner.tick(MobBT.tree(), waiting, Context.new(2_000))
+      refute reset.internal.in_combat
+      assert reset.internal.threat == %{}
+      assert Enum.any?(reset.internal.events, &match?(%Effects.ThreatRefLost{target_guid: 1}, &1))
+      assert CreatureReaction.mode(reset) == :passive
     end
   end
 
@@ -128,9 +182,32 @@ defmodule ThistleTea.Game.Entity.Logic.CreatureReactionTest do
       object: %Object{guid: Guid.from_low_guid(:mob, 1, 1)},
       unit: %Unit{health: 100, max_health: 100, flags: 0},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-      internal: %Internal{creature: %Creature{}, blackboard: Blackboard.new(), in_combat: false}
+      internal: %Internal{
+        creature: %Creature{regenerate_stats: 3, call_for_help_range: 10.0},
+        spawn: %Spawn{position: {0.0, 0.0, 0.0}},
+        blackboard: Blackboard.new(),
+        in_combat: false
+      }
     }
 
     %{mob: mob}
+  end
+
+  defp combat_context(mob) do
+    source = %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+    enemy = %FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
+
+    observations = %{
+      mob.object.guid => %Observation{guid: mob.object.guid, metadata: %{faction_template: source}},
+      1 => %Observation{
+        guid: 1,
+        metadata: %{alive?: true, faction_template: enemy},
+        position: {mob.internal.world, 2.0, 0.0, 0.0},
+        distance: 2.0
+      }
+    }
+
+    perception = Perception.new(1_000, {mob.internal.world, 0.0, 0.0, 0.0}, observations, %{})
+    Context.new(1_000, perception: perception)
   end
 end

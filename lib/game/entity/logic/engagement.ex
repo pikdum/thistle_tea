@@ -72,9 +72,16 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   def enter(%Mob{internal: %Internal{}} = entity, target_guid, now, opts)
       when is_integer(target_guid) and target_guid > 0 and is_integer(now) do
-    if CreatureReaction.mode(entity) != :passive or Keyword.get(opts, :allow_passive?, false),
-      do: enter_active(entity, target_guid, now, opts),
-      else: result(entity, entity, :passive)
+    cond do
+      CreatureReaction.mode(entity) != :passive or Keyword.get(opts, :allow_passive?, false) ->
+        enter_active(entity, target_guid, now, opts)
+
+      Keyword.get(opts, :contact?, false) ->
+        enter_active(entity, target_guid, now, Keyword.put(opts, :selection, :preserve))
+
+      true ->
+        result(entity, entity, :passive)
+    end
   end
 
   def enter(%Mob{} = entity, _target_guid, _now, _opts), do: result(entity, entity, :invalid_target)
@@ -94,7 +101,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   defp react_to_damage(%Mob{internal: %Internal{in_combat: combat?}} = entity, source, now) when combat? != true do
     selection = if default_selection(entity) == :preserve, do: :preserve, else: :target
-    %Result{entity: entity} = enter(entity, source, now, selection: selection)
+    %Result{entity: entity} = enter(entity, source, now, selection: selection, contact?: true)
     entity
   end
 
@@ -157,12 +164,19 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
     case Threat.reselect(entity, opts) do
       {entity, {:switch, target_guid} = decision} ->
-        entity = set_victim(entity, target_guid)
-        result(previous, entity, :select, decision)
+        if is_nil(entity.internal.pet) and CreatureReaction.mode(entity) == :passive do
+          result(previous, preserve_passive_victim(entity), :select, :keep)
+        else
+          result(previous, set_victim(entity, target_guid), :select, decision)
+        end
 
       {entity, decision} when decision in [:keep, :none] ->
         result(previous, entity, :select, decision)
     end
+  end
+
+  defp preserve_passive_victim(%Mob{} = entity) do
+    if Threat.tracking?(entity, victim(entity)), do: entity, else: stop_attack(entity).entity
   end
 
   def drop(%Mob{} = entity, source_guid, opts \\ []) when is_integer(source_guid) do
