@@ -8,6 +8,18 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Leaf.World do
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
 
   def evaluate(
+        %Context{world: %{saved_variables: variables}},
+        %Condition{type: :saved_variable, value1: index, value2: expected, value3: comparison} = condition
+      )
+      when is_map(variables) do
+    {:handled, Result.compare_result(Map.get(variables, index, 0), expected, comparison, condition)}
+  end
+
+  def evaluate(%Context{}, %Condition{type: :saved_variable} = condition) do
+    {:handled, Result.unknown(condition, {:missing_fact, :world, :saved_variables})}
+  end
+
+  def evaluate(
         %Context{world: %{instance_data: %Snapshot{status: :available, fields: fields}}},
         %Condition{type: :instance_data, value1: field, value2: expected, value3: comparison} = condition
       ) do

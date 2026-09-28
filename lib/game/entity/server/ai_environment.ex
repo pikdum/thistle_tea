@@ -54,6 +54,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Pathfinding.Aquatic
+  alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.SpellAreas
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.System.ScriptedEvent
@@ -100,6 +101,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       liquid_spell: LiquidSpells.context(entity, liquid),
       body_height: PlayerMovement.body_height(entity),
       instance_data: instance_data(entity, requirements, options),
+      saved_variables: saved_variables(requirements, options),
       formation: FormationEnvironment.snapshot(entity, now),
       shared_leash_time: CombatLeashes.last_extended_at(entity),
       pet_allies: pet_allies,
@@ -468,6 +470,13 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
         {world, x, y, z} -> Pathfinding.get_zone_and_area(world.map_id, {x, y, z})
         _missing -> nil
       end
+    end
+  end
+
+  defp saved_variables(requirements, options) do
+    if Enum.any?(requirements, &match?({:saved_variable, _index}, &1)) do
+      lookup = Keyword.get(options, :saved_variables, &ServerVariables.snapshot/0)
+      lookup.()
     end
   end
 

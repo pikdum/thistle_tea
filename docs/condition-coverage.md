@@ -14,7 +14,7 @@ every consumer has migrated.
 - Distinct direct condition roots: 977.
 - Reachable condition IDs: 1776.
 - Reachable definitions with known VMangos numeric mappings: 1776.
-- Reachable definitions handled end to end by the shared evaluator: 1656.
+- Reachable definitions handled end to end by the shared evaluator: 1661.
 - Missing child IDs: none.
 - Cycles: none.
 
@@ -81,7 +81,7 @@ every consumer has migrated.
 | 19 | `quest_available` | 7 | evaluable | - |
 | 21 | `nearby_game_object` | 7 | partial | scripted-event boundary only |
 | 50 | `object_fit_condition` | 7 | partial | spawned game objects; child capabilities still apply |
-| 11 | `saved_variable` | 5 | blocked | global saved-variable owner |
+| 11 | `saved_variable` | 5 | evaluable | - |
 | 18 | `instance_script` | 5 | blocked | instance-script callbacks |
 | 33 | `map_id` | 5 | evaluable | - |
 | 57 | `creature_group_member` | 5 | partial | registered creature-group owner |
@@ -130,7 +130,7 @@ every consumer has migrated.
 1. Consumer migrations: remaining discovered consumers.
 2. Partial world facts currently collected only by the scripted-event
    boundary or for spawned game objects.
-3. Explicitly blocked owners: saved variables, instance-specific callbacks,
+3. Explicitly blocked owners: instance-specific callbacks,
    unregistered instance fields, raw flags, and game-object loot state.
 
 The inventory includes every schema column whose normalized name is
@@ -142,5 +142,5 @@ Conditioned reference expansion is denied when no authoritative fact owner
 can evaluate it. Registered instance fields are available from player and AI
 boundary snapshots; unregistered instance-conditioned references remain
 denied rather than approximated.
-`npc_vendor_template` composition remains outside the vendor
-loader because the current creature cache does not model VMangos `vendor_id`.
+Vendor inventories include direct rows and shared `npc_vendor_template`
+rows selected by the creature's `vendor_id`.

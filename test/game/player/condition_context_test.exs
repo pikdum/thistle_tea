@@ -22,6 +22,27 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
   alias ThistleTea.Game.WorldRef
 
   describe "build/3" do
+    test "collects requested server variables and preserves snapshot semantics" do
+      condition = %Condition{type: :saved_variable, value1: 30_050, value2: 2}
+
+      lookup = fn ->
+        send(self(), :variables_read)
+        %{30_050 => 2}
+      end
+
+      context = ConditionContext.build(character(), [condition], saved_variables: lookup)
+      assert_receive :variables_read
+      assert Evaluator.evaluate(context, condition) == :met
+      fresh = ConditionContext.build(character(), [condition], saved_variables: fn -> %{30_050 => 3} end)
+      assert Evaluator.evaluate(fresh, condition) == :unmet
+      assert Evaluator.evaluate(context, condition) == :met
+      ConditionContext.build(character(), [], saved_variables: lookup)
+      refute_received :variables_read
+      snapshot = ConditionContext.snapshot(character(), saved_variables: lookup)
+      assert_receive :variables_read
+      assert Evaluator.evaluate(snapshot, condition) == :met
+    end
+
     test "quest availability alone requests the active event snapshot" do
       condition = %Condition{type: :quest_available, value1: 300}
 

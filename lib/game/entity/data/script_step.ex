@@ -243,6 +243,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(50), do: :call_for_help
   defp command(51), do: :set_sheath
   defp command(52), do: :invincibility
+  defp command(54), do: :set_server_variable
   defp command(56), do: :remove_guardians
   defp command(60), do: :start_waypoints
   defp command(61), do: :start_map_event

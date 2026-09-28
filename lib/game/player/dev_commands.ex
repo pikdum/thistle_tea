@@ -66,6 +66,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
+  alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.System.Auction, as: AuctionSystem
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.GameEvent
@@ -162,6 +163,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".debug pet [loyalty|happiness <delta>] - inspect or adjust your hunter pet",
       ".debug spells - learn class trainer spells up to your level",
       ".debug events [start|stop <id>] - inspect or temporarily change world events",
+      ".debug variable <index> - inspect a runtime server variable",
       ".debug explore - unlock every world-map area",
       ".debug taxi - unlock every flight path",
       ".debug transport - show the attached or nearest transport",
@@ -330,6 +332,17 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
   def run(state, ".debug events" <> params) do
     state |> world_events_command(String.split(params)) |> handled()
+  end
+
+  def run(state, ".debug variable" <> params) do
+    case Integer.parse(String.trim(params)) do
+      {index, ""} when index >= 0 and index <= 0xFFFFFFFF ->
+        system_message(state, "Server variable #{index}: #{ServerVariables.get(index)}")
+
+      _invalid ->
+        system_message(state, "Usage: .debug variable <index>")
+    end
+    |> handled()
   end
 
   def run(state, ".debug explore" <> _) do

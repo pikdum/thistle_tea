@@ -4,10 +4,13 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.AI.Script.Request
   alias ThistleTea.Game.Entity.Logic.Condition.Reason
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
   alias ThistleTea.Game.WorldRef
@@ -419,6 +422,33 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
   end
 
   describe "command_result/1" do
+    test "global writes need no map event and expired requests cannot overwrite them", context do
+      index = System.unique_integer([:positive, :monotonic])
+      on_exit(fn -> :ets.delete(ServerVariables, index) end)
+      step = %ScriptStep{command: :set_server_variable, datalong: index, datalong2: 6}
+      effect = Effects.scripted_event_command(context.world, context.source_guid, 0, step)
+      assert ScriptedEventSystem.command_result(effect) == :ok
+      assert ServerVariables.get(index) == 6
+      condition = %Condition{entry: index, type: :saved_variable, value1: index, value2: 6}
+      other_world = WorldRef.instance(1, index)
+      assert ScriptedEventSystem.condition_results(other_world, nil, nil, [condition]) == %{index => :met}
+      reversed = %{condition | reverse?: true}
+      assert ScriptedEventSystem.condition_results(other_world, nil, nil, [reversed]) == %{index => :unmet}
+
+      request = %Request{
+        id: make_ref(),
+        world: context.world,
+        step: step,
+        target_guid: 0,
+        reply_to: self(),
+        deadline: Time.now() - 1
+      }
+
+      stale = %{effect | step: %{step | datalong2: 9}, reply: request}
+      assert ScriptedEventSystem.command_result(stale) == {:error, :event_state}
+      assert ServerVariables.get(index) == 6
+    end
+
     test "reports duplicate starts and missing event mutations within one world", context do
       start = %ScriptStep{command: :start_map_event, datalong: 648, datalong2: 60}
       effect = Effects.scripted_event_command(context.world, context.source_guid, context.target_guid, start)

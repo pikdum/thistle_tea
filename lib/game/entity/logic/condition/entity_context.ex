@@ -29,7 +29,11 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.EntityContext do
     Context.new(
       source: source,
       target: target,
-      world: %{map_id: map_id(entity), instance_data: ai_context.instance_data},
+      world: %{
+        map_id: map_id(entity),
+        instance_data: ai_context.instance_data,
+        saved_variables: ai_context.saved_variables
+      },
       now: ai_context.condition_now,
       content_patch: @content_patch,
       environment: %{condition_results: condition_results(ai_context, target_guid)}

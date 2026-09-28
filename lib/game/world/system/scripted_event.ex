@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   alias ThistleTea.Game.World.CreatureGroups
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.WorldRef
 
   require Logger
@@ -149,6 +150,10 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
     do: true
 
   defp command_allowed?(_events, %Effects.ScriptedEventCommand{
+         step: %ScriptStep{command: :set_server_variable, datalong: index, datalong2: value}
+       }), do: ServerVariables.valid?(index, value)
+
+  defp command_allowed?(_events, %Effects.ScriptedEventCommand{
          step: %ScriptStep{command: :remove_map_event_target, datalong3: mode, target_condition: nil}
        })
        when mode in [1, 2], do: false
@@ -161,6 +166,13 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   defp current_request?(%Request{} = request), do: Time.now() <= request.deadline and Process.alive?(request.reply_to)
 
   defp current_request?(_receipt), do: true
+
+  defp apply_command(events, %Effects.ScriptedEventCommand{
+         step: %ScriptStep{command: :set_server_variable, datalong: index, datalong2: value}
+       }) do
+    ServerVariables.put(index, value)
+    events
+  end
 
   defp apply_command(events, %Effects.ScriptedEventCommand{step: %ScriptStep{command: :start_map_event}} = effect) do
     key = event_key(effect.world, effect.step.datalong)
@@ -405,6 +417,12 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   end
 
   defp evaluate_condition(%Condition{type: :none}, _events, _world, _source_guid, _target_guid), do: :met
+
+  defp evaluate_condition(%Condition{type: :saved_variable} = condition, _events, _world, _source, _target) do
+    context = Context.new(world: %{saved_variables: ServerVariables.snapshot()})
+    {:handled, result} = Leaf.evaluate(context, condition)
+    result
+  end
 
   defp evaluate_condition(%Condition{type: :not, children: [child]}, events, world, source_guid, target_guid),
     do: child |> condition_result(events, world, source_guid, target_guid) |> Result.negate()

@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
   alias ThistleTea.Game.World.Loader.Graveyard
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.System.Battleground
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -107,7 +108,7 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
     Context.new(
       source: loot_subject(target_guid),
       target: target,
-      world: %{active_game_events: MapSet.new(GameEvent.get_events())},
+      world: %{active_game_events: MapSet.new(GameEvent.get_events()), saved_variables: ServerVariables.snapshot()},
       content_patch: 10
     )
   end

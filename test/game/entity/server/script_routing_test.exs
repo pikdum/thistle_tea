@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Server.ScriptRoutingTest do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Emote, as: EmoteLoader
+  alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
   alias ThistleTea.Game.WorldRef
@@ -146,6 +147,38 @@ defmodule ThistleTea.Game.Entity.Server.ScriptRoutingTest do
   end
 
   describe "acknowledged scripts" do
+    test "server variables are visible to the immediate tail and other worlds", %{world: world} do
+      {source, source_pid} = start_mob(world)
+      {_other, other_pid} = start_mob(WorldRef.instance(world.map_id, world.instance_id + 1_000_000))
+      index = System.unique_integer([:positive, :monotonic])
+      on_exit(fn -> :ets.delete(ServerVariables, index) end)
+      condition = %Condition{type: :saved_variable, value1: index, value2: 6}
+      assign = %ScriptStep{command: :set_server_variable, datalong: index, datalong2: 6}
+      steps = [assign, %{stand(1) | condition: condition, abort_on_failure?: true}, stand(2)]
+      Entity.start_script(source_pid, steps, 0, world)
+      assert finished_script(source_pid).unit.stand_state == 2
+      assert ServerVariables.get(index) == 6
+      World.stop_entity(source.object.guid)
+      other_world = :sys.get_state(other_pid).internal.world
+      Entity.start_script(other_pid, [%{stand(1) | condition: condition}], 0, other_world)
+      assert finished_script(other_pid).unit.stand_state == 1
+      assert ServerVariables.get(index) == 6
+    end
+
+    test "invalid variable assignments honor abort and preserve the previous value", %{world: world} do
+      {_source, pid} = start_mob(world)
+      index = System.unique_integer([:positive, :monotonic])
+      on_exit(fn -> :ets.delete(ServerVariables, index) end)
+      ServerVariables.put(index, 7)
+
+      for abort? <- [true, false] do
+        assign = %ScriptStep{command: :set_server_variable, datalong: index, datalong2: -1, abort_on_failure?: abort?}
+        Entity.start_script(pid, [stand(0), assign, stand(1)], 0, world)
+        assert finished_script(pid).unit.stand_state == if(abort?, do: 0, else: 1)
+        assert ServerVariables.get(index) == 7
+      end
+    end
+
     test "a remote termination or failed condition cancels the caller's immediate and delayed tail", %{world: world} do
       {source, source_pid} = start_mob(world)
       {target, target_pid} = start_mob(world)

@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Player.ConditionContext do
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Party
   alias ThistleTea.Game.World.System.ScriptedEvent
@@ -73,6 +74,7 @@ defmodule ThistleTea.Game.Player.ConditionContext do
       |> MapSet.put({:active_game_event, 0})
       |> MapSet.put(:content_patch)
       |> MapSet.put(:current_time)
+      |> MapSet.put({:saved_variable, 0})
 
     movement_now = Keyword.get(options, :movement_now, Time.now())
     target = subject(character, requirements, item_lookup, movement_now, options)
@@ -167,8 +169,16 @@ defmodule ThistleTea.Game.Player.ConditionContext do
     %{
       map_id: character.internal.world.map_id,
       active_game_events: active_game_events(requirements, options),
+      saved_variables: saved_variables(requirements, options),
       instance_data: instance_data(character.internal.world, requirements, options)
     }
+  end
+
+  defp saved_variables(requirements, options) do
+    if Enum.any?(requirements, &match?({:saved_variable, _index}, &1)) do
+      lookup = Keyword.get(options, :saved_variables, &ServerVariables.snapshot/0)
+      lookup.()
+    end
   end
 
   defp instance_data(world, requirements, options) do

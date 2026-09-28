@@ -95,6 +95,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.OutdoorPvp.CaptureEnvironment
   alias ThistleTea.Game.World.PostOffice
+  alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.SingleTargetAuras
   alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.World.SpawnPool
@@ -206,6 +207,7 @@ defmodule ThistleTea.Application do
     :ets.new(:session, [:named_table, :public, read_concurrency: true, write_concurrency: :auto])
     Metadata.init()
     InstanceData.init()
+    ServerVariables.init()
     ItemLoader.init()
     ItemEnchantmentLoader.init()
     ItemPropertyLoader.init()

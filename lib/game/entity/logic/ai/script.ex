@@ -64,6 +64,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   @max_phase 31
   @unit_flag_player_controlled 0x00000008
   @scripted_event_commands [
+    :set_server_variable,
     :start_map_event,
     :end_map_event,
     :add_map_event_target,

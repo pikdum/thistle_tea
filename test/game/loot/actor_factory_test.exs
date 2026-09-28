@@ -19,9 +19,34 @@ defmodule ThistleTea.Game.Loot.ActorFactoryTest do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.WorldRef
 
   describe "for_character/2 and for_guid/2" do
+    test "refresh global conditions for both local and remote loot actors" do
+      guid = Guid.from_low_guid(:player, unique_guid())
+      index = unique_guid()
+      on_exit(fn -> :ets.delete(ServerVariables, index) end)
+
+      character = %Character{
+        object: %Object{guid: guid},
+        player: %Player{},
+        unit: %Unit{class: 1, race: 1, level: 20, health: 100, max_health: 100},
+        internal: %Internal{world: WorldRef.open(0)},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      condition = %Condition{type: :saved_variable, value1: index, value2: 0}
+      local = ActorFactory.for_character(character, 0).condition_context
+      remote = ActorFactory.for_guid(guid, 0).condition_context
+      assert Evaluator.evaluate(local, condition) == :met
+      assert Evaluator.evaluate(remote, condition) == :met
+      ServerVariables.put(index, 1)
+      assert Evaluator.evaluate(ActorFactory.for_character(character, 0).condition_context, condition) == :unmet
+      assert Evaluator.evaluate(ActorFactory.for_guid(guid, 0).condition_context, condition) == :unmet
+      assert Evaluator.evaluate(local, condition) == :met
+    end
+
     test "refresh item eligibility through owner updates and reconnect" do
       player_guid = Guid.from_low_guid(:player, unique_guid())
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())

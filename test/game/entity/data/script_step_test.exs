@@ -4,6 +4,14 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
 
   describe "build/1" do
+    test "decodes server variable assignment without a target" do
+      step = row(54) |> Map.merge(%{datalong: 30_011, datalong2: 6}) |> ScriptStep.build()
+      assert step.command == :set_server_variable
+      assert step.datalong == 30_011
+      assert step.datalong2 == 6
+      assert step.target_type == :provided
+    end
+
     test "decodes guardian removal" do
       assert row(56) |> ScriptStep.build() |> Map.fetch!(:command) == :remove_guardians
     end

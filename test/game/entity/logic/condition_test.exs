@@ -10,6 +10,33 @@ defmodule ThistleTea.Game.Entity.Logic.ConditionTest do
   alias ThistleTea.Game.WorldRef
 
   describe "evaluate/2" do
+    test "compares server variables independently of source, target, and map" do
+      context = Context.new(world: %{saved_variables: %{30_050 => 2}})
+      condition = %Condition{type: :saved_variable, value1: 30_050, value2: 2}
+
+      for comparison <- 0..2 do
+        assert Evaluator.evaluate(context, %{condition | value3: comparison}) == :met
+      end
+
+      assert Evaluator.evaluate(context, %{condition | value2: 3, value3: 1}) == :unmet
+      assert Evaluator.evaluate(context, %{condition | value2: 1, value3: 2}) == :unmet
+      assert Evaluator.evaluate(context, %{condition | swap_targets?: true}) == :met
+      assert Evaluator.evaluate(context, %{condition | reverse?: true}) == :unmet
+      assert Evaluator.evaluate(context, %{condition | value1: 30_056, value2: 0}) == :met
+
+      assert {:unknown, [%Reason{capability: :invalid_comparison}]} =
+               Evaluator.evaluate(context, %{condition | value3: 3})
+    end
+
+    test "an absent server-variable snapshot stays unknown under negation" do
+      condition = %Condition{type: :saved_variable, value1: 30_050, value2: 0}
+
+      for reverse? <- [true, false] do
+        assert {:unknown, [%Reason{capability: {:missing_fact, :world, :saved_variables}}]} =
+                 Evaluator.evaluate(Context.new(), %{condition | reverse?: reverse?})
+      end
+    end
+
     test "compares visible PvP rank with inclusive bounds and target swapping" do
       context =
         Context.new(

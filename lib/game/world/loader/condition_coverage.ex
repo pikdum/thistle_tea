@@ -91,6 +91,7 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
                  8,
                  9,
                  10,
+                 11,
                  12,
                  14,
                  15,
@@ -140,7 +141,6 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
   }
 
   @blocked_dependencies %{
-    11 => "global saved-variable owner",
     13 => "authoritative path-failure state",
     18 => "instance-script callbacks",
     26 => "holiday projection",
@@ -238,7 +238,7 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
     1. Consumer migrations: remaining discovered consumers.
     2. Partial world facts currently collected only by the scripted-event
        boundary or for spawned game objects.
-    3. Explicitly blocked owners: saved variables, instance-specific callbacks,
+    3. Explicitly blocked owners: instance-specific callbacks,
        unregistered instance fields, raw flags, and game-object loot state.
 
     The inventory includes every schema column whose normalized name is
@@ -250,8 +250,8 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
     can evaluate it. Registered instance fields are available from player and AI
     boundary snapshots; unregistered instance-conditioned references remain
     denied rather than approximated.
-    `npc_vendor_template` composition remains outside the vendor
-    loader because the current creature cache does not model VMangos `vendor_id`.
+    Vendor inventories include direct rows and shared `npc_vendor_template`
+    rows selected by the creature's `vendor_id`.
     """
   end
 
