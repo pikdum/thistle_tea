@@ -61,6 +61,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :last_hostile_time,
     :combat_timer_target,
     :combat_leash,
+    :combat_zone,
     :companion_monitor,
     :last_trade_id,
     :item_logout_at,

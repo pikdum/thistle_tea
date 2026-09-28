@@ -244,13 +244,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           AIEnvironment.context(
             &1,
             now,
-            ObservationRequest.new([target_guid], Script.observation_radius(steps),
-              game_object_radius: Script.game_object_observation_radius(steps),
-              script_conditions: Script.conditions(steps),
-              script_targets: Script.target_requests(steps),
-              creature_entries: Script.creature_entries(steps),
-              random_points: Script.random_point_requests(steps)
-            )
+            ObservationRequest.for_script(steps, [target_guid])
           )
         )
       )
@@ -1339,13 +1333,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
             AIEnvironment.context(
               &1,
               now,
-              ObservationRequest.new([target_guid], Script.observation_radius(steps),
-                game_object_radius: Script.game_object_observation_radius(steps),
-                script_conditions: Script.conditions(steps),
-                script_targets: Script.target_requests(steps),
-                creature_entries: Script.creature_entries(steps),
-                random_points: Script.random_point_requests(steps)
-              )
+              ObservationRequest.for_script(steps, [target_guid])
             )
           )
         )

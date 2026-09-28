@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.TemporarySummon
   alias ThistleTea.Game.Entity.Logic.UnreachableTarget
+  alias ThistleTea.Game.Entity.Logic.ZoneCombat
 
   def tick(tree, %{internal: %Internal{}} = entity, %Context{now: now} = context) do
     entity = TemporarySummon.tick(entity, now)
@@ -68,5 +69,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
     |> Distancing.maintain(context)
     |> CombatLeash.maintain(now)
     |> UnreachableTarget.maintain(context)
+    |> ZoneCombat.maintain(context)
   end
 end

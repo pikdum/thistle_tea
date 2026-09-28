@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Navigation, as: NavigationMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Confusion
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.CombatZone
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
@@ -37,6 +38,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Logic.CreatureMovement
   alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Logic.TargetRef
+  alias ThistleTea.Game.Entity.Logic.ZoneCombat
+  alias ThistleTea.Game.Entity.Server.CombatZone, as: CombatZoneEnvironment
   alias ThistleTea.Game.Entity.Server.FormationEnvironment
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.SpellReception
@@ -76,7 +79,9 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     requirements = Requirements.plan(conditions)
     script_targets = script_target_results(entity, request.script_targets)
     pet_allies = pet_allies(entity)
-    observed_actors = actors ++ pet_allies ++ Map.values(script_targets)
+    combat_zone = combat_zone(entity, request, now)
+    zone_actors = CombatZone.actors(combat_zone)
+    observed_actors = actors ++ pet_allies ++ zone_actors ++ Map.values(script_targets)
     perception = perception(entity, now, observed_actors, requested_radius, requested_game_object_radius)
     groups = condition_groups(entity, request, perception, conditions)
     condition_results = script_condition_results(entity, groups)
@@ -104,10 +109,21 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       saved_variables: saved_variables(requirements, options),
       formation: FormationEnvironment.snapshot(entity, now),
       shared_leash_time: CombatLeashes.last_extended_at(entity),
+      combat_zone: combat_zone,
       pet_allies: pet_allies,
       aura_contexts: SpellReception.aura_contexts(entity, now),
       creature_archetypes: creature_archetypes(entity, request.creature_entries)
     }
+  end
+
+  defp combat_zone(entity, request, now) do
+    event_steps = entity |> EventAI.events() |> Enum.flat_map(&List.flatten(&1.actions))
+
+    requested? =
+      request.combat_zone? or ZoneCombat.observe?(entity, now) or
+        Script.zone_combat?(event_steps ++ waypoint_steps(entity))
+
+    CombatZoneEnvironment.snapshot(entity, requested?)
   end
 
   defp liquid_surface(%Character{} = character), do: PlayerMovement.liquid_surface(character)

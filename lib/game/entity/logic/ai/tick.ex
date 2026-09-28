@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   alias ThistleTea.Game.Entity.Logic.Rest
   alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.Logic.TemporarySummon
+  alias ThistleTea.Game.Entity.Logic.ZoneCombat
   alias ThistleTea.Game.Spell.Cast
 
   @default_tick_ms 100
@@ -79,6 +80,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
     |> schedule_summon_death(entity)
     |> schedule_totem_expiry(entity)
     |> schedule_movement(entity)
+    |> schedule_zone_combat(entity)
+  end
+
+  defp schedule_zone_combat(plan, entity) do
+    case ZoneCombat.next_at(entity, plan.now) do
+      at when is_integer(at) -> TickPlan.schedule_at(plan, :zone_combat, at)
+      _ -> plan
+    end
   end
 
   defp schedule_movement(plan, entity) do

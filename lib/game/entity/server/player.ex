@@ -1914,14 +1914,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   defp run_script(%State{character: %Character{} = character} = state, steps, target_guid) do
     now = Time.now()
 
-    request =
-      ObservationRequest.new([target_guid], Script.observation_radius(steps),
-        game_object_radius: Script.game_object_observation_radius(steps),
-        script_conditions: Script.conditions(steps),
-        script_targets: Script.target_requests(steps),
-        creature_entries: Script.creature_entries(steps),
-        random_points: Script.random_point_requests(steps)
-      )
+    request = ObservationRequest.for_script(steps, [target_guid])
 
     context = AIEnvironment.context(character, now, request)
     {character, _blackboard} = Script.run(character, Blackboard.new(), steps, target_guid, context)

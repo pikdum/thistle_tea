@@ -285,6 +285,20 @@ defmodule ThistleTea.Game.Player.DevCommands do
     |> handled()
   end
 
+  def run(state, ".debug combatpulse" <> _) do
+    target = state.target
+
+    if is_integer(target) && Guid.entity_type(target) in [:mob, :pet] &&
+         match?({world, _, _, _} when world == state.character.internal.world, World.position(target)) do
+      step = %ScriptStep{command: :zone_combat_pulse, datalong: 1}
+      Entity.start_script(target, [step], state.character.object.guid, state.character.internal.world)
+      system_message(state, "Requested dungeon combat pulse from selected creature.")
+    else
+      system_message(state, "Select a creature and use: .debug combatpulse")
+    end
+    |> handled()
+  end
+
   def run(state, ".debug reaction " <> mode) do
     reaction = Enum.find_index(["passive", "defensive", "aggressive"], &(&1 == String.trim(mode)))
     target = state.target

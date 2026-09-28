@@ -94,14 +94,7 @@ defmodule ThistleTea.Game.Entity.Server.ScriptExecution do
     entity = prepare(entity, steps)
     now = Time.now()
 
-    request =
-      ObservationRequest.new([target_guid], Script.observation_radius(steps),
-        game_object_radius: Script.game_object_observation_radius(steps),
-        script_conditions: Script.conditions(steps),
-        script_targets: Script.target_requests(steps),
-        creature_entries: Script.creature_entries(steps),
-        random_points: Script.random_point_requests(steps)
-      )
+    request = ObservationRequest.for_script(steps, [target_guid])
 
     context = AIEnvironment.context(entity, now, request)
     {entity, blackboard} = apply.(entity, Blackboard.ensure(entity.internal.blackboard), context)

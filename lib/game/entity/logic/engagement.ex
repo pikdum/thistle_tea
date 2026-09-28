@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Entity.Logic.Threat
+  alias ThistleTea.Game.Entity.Logic.ZoneCombat
   alias ThistleTea.Game.Guid
 
   @dynamic_flag_tapped 0x0004
@@ -156,6 +157,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
             Effects.creature_group_event({:attack, victim(entity), CombatLeash.reference(entity)})
           )
 
+    entity = if previous.internal.in_combat == true, do: entity, else: ZoneCombat.on_enter(entity, target_guid)
     result(previous, entity, :enter, decision)
   end
 
@@ -198,7 +200,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   def leave(%Mob{} = entity, reason, opts \\ []) when is_atom(reason) do
     previous = entity
-    entity = CombatLeash.stop(entity)
+    entity = entity |> CombatLeash.stop() |> ZoneCombat.clear()
     clear_tap? = Keyword.get(opts, :clear_tap?, true)
     blackboard = opts |> Keyword.get(:blackboard, entity.internal.blackboard) |> Blackboard.ensure()
     target = victim(entity)

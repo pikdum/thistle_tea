@@ -58,6 +58,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.ScriptEquipment
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Entity.Logic.Threat
+  alias ThistleTea.Game.Entity.Logic.ZoneCombat
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.WorldRef
@@ -340,6 +341,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
       {:ok, state} -> {state, blackboard, :continue}
       :error -> failed(state, blackboard, step)
     end
+  end
+
+  defp execute_command(
+         %Mob{} = state,
+         blackboard,
+         %ScriptStep{command: :zone_combat_pulse} = step,
+         _target,
+         _now,
+         context
+       ) do
+    if Core.dead?(state) do
+      failed(state, blackboard, step)
+    else
+      state = %{state | internal: %{state.internal | blackboard: blackboard}}
+      state = ZoneCombat.pulse(state, step.datalong != 0, context)
+      {state, state.internal.blackboard, :continue}
+    end
+  end
+
+  defp execute_command(state, blackboard, %ScriptStep{command: :zone_combat_pulse} = step, _target, _now, _context) do
+    failed(state, blackboard, step)
   end
 
   defp execute_command(state, blackboard, step, target_guid, now, context) do
@@ -1680,6 +1702,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   def termination_conditions(_steps), do: []
+
+  def zone_combat?(steps) when is_list(steps) do
+    Enum.any?(steps, fn %ScriptStep{} = step ->
+      step.command == :zone_combat_pulse or zone_combat?(step.sub_scripts |> Map.values() |> List.flatten())
+    end)
+  end
 
   def conditions(steps) when is_list(steps) do
     steps
