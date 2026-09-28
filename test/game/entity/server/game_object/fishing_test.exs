@@ -41,6 +41,12 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.FishingTest do
 
       assert {{:ok, _loot, 0}, state} = Fishing.hole_loot(state)
       assert state.internal.fishing.uses_left == 0
+      assert {{:error, :depleted}, ^state} = Fishing.hole_loot(state)
+    end
+
+    test "does not grant pool loot from a bobber" do
+      state = bobber(%FishingState{owner_guid: 42, ready?: true})
+      assert {{:error, :not_fishing_hole}, ^state} = Fishing.hole_loot(state)
     end
   end
 

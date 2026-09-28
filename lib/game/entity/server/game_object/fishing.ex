@@ -49,13 +49,20 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Fishing do
 
   def use(state, _owner_guid, _skill), do: {{:error, :not_fishing}, state}
 
-  def hole_loot(%GameObject{internal: %Internal{fishing: %FishingState{loot_id: loot_id} = fishing}} = state) do
+  def hole_loot(
+        %GameObject{internal: %Internal{fishing: %FishingState{loot_id: loot_id, uses_left: uses_left} = fishing}} =
+          state
+      )
+      when is_integer(loot_id) and is_integer(uses_left) and uses_left > 0 do
     loot = LootLoader.generate_gameobject(loot_id, 0, 0)
-    uses_left = max((fishing.uses_left || 1) - 1, 0)
+    uses_left = uses_left - 1
     fishing = %{fishing | uses_left: uses_left}
     state = %{state | internal: %{state.internal | fishing: fishing}}
     {{:ok, loot, uses_left}, state}
   end
+
+  def hole_loot(%GameObject{internal: %Internal{fishing: %FishingState{uses_left: 0}}} = state),
+    do: {{:error, :depleted}, state}
 
   def hole_loot(state), do: {{:error, :not_fishing_hole}, state}
 
