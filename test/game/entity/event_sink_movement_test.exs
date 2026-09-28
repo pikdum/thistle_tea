@@ -18,6 +18,8 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
   alias ThistleTea.Game.Network.Message.MsgMoveKnockBack
   alias ThistleTea.Game.Network.Message.MsgMoveTeleport
   alias ThistleTea.Game.Network.Message.SmsgClientControlUpdate
+  alias ThistleTea.Game.Network.Message.SmsgForceMoveRoot
+  alias ThistleTea.Game.Network.Message.SmsgForceMoveUnroot
   alias ThistleTea.Game.Network.Message.SmsgForceRunSpeedChange
   alias ThistleTea.Game.Network.Message.SmsgMonsterMove
   alias ThistleTea.Game.Network.Message.SmsgMoveKnockBack
@@ -30,6 +32,43 @@ defmodule ThistleTea.Game.Entity.EventSinkMovementTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.WorldRef
+
+  describe "emit/3 MovementRootChanged" do
+    test "root changes reach only the possessed creature's controller" do
+      world = WorldRef.instance(0, unique_low())
+      observers = start_observers(controller: {world, {0.0, 0.0, 0.0}}, nearby: {world, {1.0, 0.0, 0.0}})
+      [{:controller, controller, _} | _] = observers
+      entity = mob(Guid.from_low_guid(:mob, 36, unique_low()), world, {0.0, 0.0, 0.0, 0.0})
+      entity = put_in(entity.internal.pet, %Pet{possessed?: true, owner_guid: controller})
+      guid = entity.object.guid
+      on_exit(fn -> stop_observers(observers) end)
+
+      EventSink.emit(entity, Effects.movement_root_changed(true), Context.new(self()))
+
+      assert_receive {:observer, :controller, {:"$gen_cast", {:send_packet, %SmsgForceMoveRoot{guid: ^guid}, _}}}
+
+      EventSink.emit(entity, Effects.movement_root_changed(false), Context.new(self()))
+
+      assert_receive {:observer, :controller, {:"$gen_cast", {:send_packet, %SmsgForceMoveUnroot{guid: ^guid}, _}}}
+      refute_received {:observer, :nearby, {:"$gen_cast", {:send_packet, _, _}}}
+      refute_received {:"$gen_cast", {:send_packet, _}}
+    end
+
+    test "ordinary and charmed creatures do not send forced movement packets" do
+      owner = Guid.from_low_guid(:player, unique_low())
+      {:ok, _} = Entity.register(owner)
+      entity = mob(Guid.from_low_guid(:mob, 36, unique_low()), WorldRef.open(0), {0.0, 0.0, 0.0, 0.0})
+      changes = [Effects.movement_root_changed(true), Effects.movement_root_changed(false)]
+
+      for pet <- [nil, %Pet{possessed?: false, owner_guid: owner}] do
+        entity = put_in(entity.internal.pet, pet)
+        assert EventSink.emit(entity, changes, Context.new(self())) == entity
+      end
+
+      refute_received {:"$gen_cast", {:send_packet, _}}
+      refute_received {:"$gen_cast", {:send_packet, _, _}}
+    end
+  end
 
   describe "emit/3 MovementSpeedChanged" do
     test "publishes the retimed spline to observers and spatial consumers" do
