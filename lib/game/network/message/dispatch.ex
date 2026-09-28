@@ -191,6 +191,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_CANCEL_GROWTH_AURA: Message.CmsgCancelGrowthAura,
               CMSG_SUMMON_RESPONSE: Message.CmsgSummonResponse,
               CMSG_AUTOEQUIP_ITEM: Message.CmsgAutoequipItem,
+              CMSG_AUTOEQUIP_ITEM_SLOT: Message.CmsgAutoequipItemSlot,
               CMSG_SWAP_INV_ITEM: Message.CmsgSwapInvItem,
               CMSG_SWAP_ITEM: Message.CmsgSwapItem,
               CMSG_SPLIT_ITEM: Message.CmsgSplitItem,

@@ -55,6 +55,19 @@ defmodule ThistleTea.Game.Player.Inventory do
     end
   end
 
+  def equip_item(%State{guid: owner_guid} = state, item_guid, destination_slot) do
+    destination_position = {255, destination_slot}
+
+    with true <- Inventory.equipment_slot?(destination_slot) or Inventory.bag_slot?(destination_slot),
+         %Item{item: %{owner: ^owner_guid}} <- ItemStore.get(item_guid),
+         {_, _} = source_position when source_position != destination_position <-
+           Inventory.find_position(state.character.player, item_guid, :all_owned, &ItemStore.get/1) do
+      swap(state, source_position, destination_position)
+    else
+      _ignored -> state
+    end
+  end
+
   def swap(%State{} = state, source_position, destination_position) do
     case Bank.authorize_positions(state, [source_position, destination_position]) do
       {:ok, state} ->

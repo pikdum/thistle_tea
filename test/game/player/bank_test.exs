@@ -138,6 +138,28 @@ defmodule ThistleTea.Game.Player.BankTest do
   end
 
   describe "generic inventory authorization" do
+    test "GUID equipment requires live banker access for bank items", %{state: state, banker_guid: banker_guid} do
+      item = ItemStore.create(%ItemTemplate{entry: 20_001, class: 4, inventory_type: 12}, owner: state.guid)
+      on_exit(fn -> ItemStore.delete(item.object.guid) end)
+      state = put_in(state.character.player.bank1, item.object.guid)
+      assert PlayerInventory.equip_item(state, item.object.guid, 13) == state
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgInventoryChangeFailure{code: 35}}}
+
+      active = Bank.activate(state, banker_guid)
+      SpatialHash.update(:mobs, banker_guid, WorldRef.open(0), 6.0, 0.0, 0.0)
+      rejected = PlayerInventory.equip_item(active, item.object.guid, 13)
+      assert rejected.active_banker_guid == nil
+      assert rejected.character == state.character
+      assert ItemStore.get(item.object.guid) == item
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgInventoryChangeFailure{code: 35}}}
+
+      SpatialHash.update(:mobs, banker_guid, WorldRef.open(0), 2.0, 0.0, 0.0)
+      equipped = PlayerInventory.equip_item(Bank.activate(rejected, banker_guid), item.object.guid, 13)
+      assert equipped.character.player.bank1 == 0
+      assert equipped.character.player.trinket2 == item.object.guid
+      assert CharacterStore.get(state.character.id) == equipped.character
+    end
+
     test "decodes bag auto-storage and rejects remote bank access", %{state: state, banker_guid: banker_guid} do
       message = Dispatch.to_message(Packet.build(<<255, 39, 255>>, 0x10B))
       assert message == %Message.CmsgAutostoreBagItem{source_bag: 255, source_slot: 39, destination_bag: 255}

@@ -69,6 +69,82 @@ defmodule ThistleTea.Game.Player.EquipmentTransitionsTest do
     end
   end
 
+  describe "equip_item/3" do
+    test "resolves the current bag position and swaps into the requested trinket slot", %{state: state, item: item} do
+      bag =
+        ItemStore.create(%ItemTemplate{entry: 900_001, class: 1, inventory_type: 18, container_slots: 4},
+          owner: state.guid
+        )
+
+      previous = ItemStore.create(Item.template(item), owner: state.guid)
+      on_exit(fn -> Enum.each([bag, previous], &ItemStore.delete(&1.object.guid)) end)
+      ItemStore.put(%{bag | container: %{bag.container | slot_3: item.object.guid}})
+      player = %{state.character.player | inv1: 0, bag1: bag.object.guid, trinket2: previous.object.guid}
+      state = %{state | character: %{state.character | player: player}}
+
+      equipped = Inventory.equip_item(state, item.object.guid, 13)
+
+      assert equipped.character.player.trinket2 == item.object.guid
+      assert equipped.character.player.trinket1 in [nil, 0]
+      assert ItemStore.get(bag.object.guid).container.slot_3 == previous.object.guid
+      assert CharacterStore.get(state.guid) == equipped.character
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgItemCooldown{}}}
+    end
+
+    test "same-slot requests leave the equip cooldown and packets untouched", %{state: state, item: item, spell: spell} do
+      message = %Message.CmsgAutoequipItemSlot{item_guid: item.object.guid, destination_slot: 13}
+      equipped = Message.CmsgAutoequipItemSlot.handle(message, state)
+      deadline = Cooldowns.ready_at(equipped.character, spell)
+      assert is_integer(deadline)
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgItemCooldown{}}}
+
+      assert Message.CmsgAutoequipItemSlot.handle(message, equipped) == equipped
+      assert Cooldowns.ready_at(CharacterStore.get(state.guid), spell) == deadline
+      refute_received {:"$gen_cast", {:send_packet, %Message.SmsgItemCooldown{}}}
+    end
+
+    test "ignores unowned items, missing items, and storage destinations", %{state: state, item: item} do
+      for slot <- [-1, 23, 39, 63, 255] do
+        assert Inventory.equip_item(state, item.object.guid, slot) == state
+      end
+
+      assert Inventory.equip_item(state, 0, 13) == state
+      detached = put_in(state.character.player.inv1, 0)
+      assert Inventory.equip_item(detached, item.object.guid, 13) == detached
+      ItemStore.put(%{item | item: %{item.item | owner: state.guid + 1}})
+      assert Inventory.equip_item(state, item.object.guid, 13) == state
+      assert CharacterStore.get(state.guid) == state.character
+      refute_received {:"$gen_cast", {:send_packet, _packet}}
+    end
+
+    test "rejects combat and incompatible destinations before committing", %{state: state, item: item} do
+      combat = put_in(state.character.internal.in_combat, true)
+      assert Inventory.equip_item(combat, item.object.guid, 13) == combat
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgInventoryChangeFailure{code: 60}}}
+      assert Inventory.equip_item(state, item.object.guid, 0) == state
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgInventoryChangeFailure{code: 3}}}
+      assert ItemStore.get(item.object.guid) == item
+      assert CharacterStore.get(state.guid) == state.character
+    end
+
+    test "equips bags into an explicit bag-bar slot", %{state: state} do
+      bag =
+        ItemStore.create(%ItemTemplate{entry: 900_002, class: 1, inventory_type: 18, container_slots: 4},
+          owner: state.guid
+        )
+
+      on_exit(fn -> ItemStore.delete(bag.object.guid) end)
+      state = put_in(state.character.player.inv2, bag.object.guid)
+
+      equipped = Inventory.equip_item(state, bag.object.guid, 22)
+
+      assert equipped.character.player.bag4 == bag.object.guid
+      assert equipped.character.player.bag1 in [nil, 0]
+      assert equipped.character.player.inv2 == 0
+      assert CharacterStore.get(state.guid) == equipped.character
+    end
+  end
+
   describe "swap/3" do
     test "rejects both direct unequip and auto-store of combat trinkets", %{state: state} do
       equipped = Inventory.auto_equip(state, {255, 23})
