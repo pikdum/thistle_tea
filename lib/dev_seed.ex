@@ -42,7 +42,7 @@ defmodule ThistleTea.DevSeed do
   support defensive pet target transitions between multiple attackers.
   A ranged Blackrock Warlock at {16653.2, 16198.1} casts Fireball to test
   ranged damage against pets commanded to Stay.
-  The Windreaver at {16753.2, 16468.1} retains its invasion death script to
+  The Windreaver at {16383.2, 16398.1} retains its invasion death script to
   exercise server-wide variable assignment through combat.
   """
   import Ecto.Query
@@ -397,7 +397,7 @@ defmodule ThistleTea.DevSeed do
       ]
     )
 
-    spawn_mob(14_454, @base_low_guid + 3400, {x + 450.0, y + 150.0, z}, nil, 180)
+    spawn_mob(14_454, @base_low_guid + 3400, {x + 80.0, y + 80.0, z}, nil, 180)
 
     spawn_mob(2006, @base_low_guid + 2600, {x - 220.0, y + 80.0, z}, nil, 30)
     spawn_mob(2007, @base_low_guid + 2601, {x - 224.0, y + 84.0, z}, nil, 30)
