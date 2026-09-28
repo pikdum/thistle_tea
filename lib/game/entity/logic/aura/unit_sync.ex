@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Immunity
 
   @max_slots 48
   @max_positive_slots 32
@@ -29,6 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   @unit_flag_disarmed 0x00200000
   @unit_flag_non_attackable 0x00010000
   @unit_flag_auras_visible 0x08000000
+  @unit_flag_immune 0x80000000
   @judgement_aura_state_bit 1 <<< 4
 
   def sync_unit(%Unit{} = unit) do
@@ -41,6 +43,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
     |> sync_disarm()
     |> CombatControl.sync()
     |> sync_unattackable()
+    |> sync_immunity()
     |> sync_auras_visible()
     |> sync_aura_state()
     |> sync_aura_fields()
@@ -133,6 +136,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   end
 
   defp sync_unattackable(unit), do: unit
+
+  defp sync_immunity(%Unit{auras: holders} = unit) do
+    immune? = Enum.any?(holders || [], &(not &1.negative? and Immunity.purging(&1).schools != 0))
+    flags = (unit.flags || 0) &&& bnot(@unit_flag_immune)
+    %{unit | flags: if(immune?, do: flags ||| @unit_flag_immune, else: flags)}
+  end
 
   defp sync_auras_visible(%Unit{auras: holders} = unit) do
     visible? = Enum.any?(holders || [], &Holder.has_aura_type?(&1, :auras_visible))

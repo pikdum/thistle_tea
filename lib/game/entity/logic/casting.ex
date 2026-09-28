@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.CasterState
   alias ThistleTea.Game.Spell.CastMovement
   alias ThistleTea.Game.Spell.CastResolution
   alias ThistleTea.Game.Spell.CastResolution.Costs
@@ -280,6 +281,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp launch(entity, %Cast{} = casting, now) do
     with :ok <- Posture.validate(entity, casting.spell, cast_options(casting)),
+         :ok <- CasterState.validate(entity, casting.spell, now, cast_options(casting)),
          :ok <- Disarm.validate(entity, casting.spell),
          :ok <- validate_cast_target(entity, casting) do
       prepare_launch(entity, casting, now)

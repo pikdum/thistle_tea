@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunity do
   alias ThistleTea.Game.Entity.Logic.CreatureFlags
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Immunity
 
   @harmful_auras [
     :mod_stun,
@@ -84,43 +85,29 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunity do
       (type in [:distract, :pull, :knockback] or aura in [:mod_confuse, :mod_fear, :mod_root])
   end
 
-  def purges_state?(%Spell{} = spell, type) do
-    Spell.attribute?(spell, :immunity_purges_effect) and
-      Enum.any?(Spell.aura_effects(spell), &match?(%Effect{aura: :state_immunity, misc_value: ^type}, &1))
+  def purge(holders, %Holder{} = incoming) do
+    immunity = Immunity.purging(incoming)
+
+    Enum.reject(holders, fn holder ->
+      holder.spell.id != incoming.spell.id and
+        (Enum.any?(holder.auras, &Immunity.state?(immunity, &1.type)) or
+           Immunity.dispel?(immunity, holder.spell) or purge_mechanic?(holder, immunity) or
+           purge_school?(holder, incoming, immunity))
+    end)
   end
 
-  def purge(holders, %Holder{spell: spell, auras: auras}) do
-    if Spell.attribute?(spell, :immunity_purges_effect) do
-      types = for %Aura{type: :state_immunity, misc_value: type} <- auras, not is_nil(type), do: type
-
-      dispel_types =
-        for %Aura{type: :dispel_immunity, misc_value: type} <- auras, is_integer(type) and type > 0, do: type
-
-      mechanics = mechanic_immunities(auras)
-
-      Enum.reject(holders, fn holder ->
-        holder.spell.id != spell.id and
-          (Holder.has_any_type?(holder, types) or holder.spell.dispel_type in dispel_types or
-             purge_mechanic?(holder, mechanics))
-      end)
-    else
-      holders
-    end
-  end
-
-  defp mechanic_immunities(auras) do
-    for %Aura{type: :mechanic_immunity, misc_value: mechanic} <- auras,
-        is_integer(mechanic) and mechanic > 0,
-        do: mechanic
-  end
-
-  defp purge_mechanic?(%Holder{spell: spell, auras: auras}, mechanics) do
+  defp purge_mechanic?(%Holder{spell: spell, auras: auras}, immunity) do
     active = MapSet.new(auras, & &1.index)
 
     not Spell.attribute?(spell, :no_immunities) and
-      (spell.mechanic in mechanics or
-         Enum.any?(spell.effects, &(&1.mechanic in mechanics and MapSet.member?(active, &1.index))))
+      (Immunity.mechanic?(immunity, spell.mechanic) or
+         Enum.any?(spell.effects, &(Immunity.mechanic?(immunity, &1.mechanic) and MapSet.member?(active, &1.index))))
   end
+
+  defp purge_school?(%Holder{spell: spell, negative?: true}, %Holder{negative?: false}, immunity),
+    do: not Spell.attribute?(spell, :no_immunities) and Immunity.school?(immunity, spell)
+
+  defp purge_school?(_holder, _incoming, _immunity), do: false
 
   defp blocks?(%Holder{} = holder, spell, effect) do
     applies_to_polarity?(holder, harmful_effect?(spell, effect)) and Enum.any?(holder.auras, &matches?(&1, effect))

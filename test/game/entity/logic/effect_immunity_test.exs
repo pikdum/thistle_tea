@@ -165,6 +165,67 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunityTest do
   end
 
   describe "apply_spell/5" do
+    test "school purges remove matching debuffs and release movement through the aura transition", %{entity: entity} do
+      magic = %{
+        stun()
+        | id: 3,
+          school: :frost,
+          effects: [%{hd(stun().effects) | aura: :periodic_damage, amplitude_ms: 1000, base_points: 10}]
+      }
+
+      buff = %{protection(:mod_stat, 0) | id: 4}
+      {controlled, _} = Aura.apply_spell(entity, 2, 10, stun(), 0)
+      {controlled, _} = Aura.apply_spell(controlled, 2, 10, magic, 0)
+      {controlled, _} = Aura.apply_spell(controlled, 1, 10, buff, 0)
+      assert controlled.internal.rooted?
+      immunity = protection(:school_immunity, 1, [:immunity_purges_effect])
+      {protected, events} = Aura.apply_spell(controlled, 1, 10, immunity, 100)
+      refute Aura.has_spell?(protected, 2)
+      assert Aura.has_spell?(protected, 3)
+      assert Aura.has_spell?(protected, 4)
+      refute protected.internal.rooted?
+      assert Enum.any?(events, &match?(%Effects.MovementRootChanged{rooted?: false}, &1))
+      assert Bitwise.band(protected.unit.flags, 0x80000000) != 0
+    end
+
+    test "school purge polarity and immunity bypasses preserve protected holders", %{entity: entity} do
+      bypass = %{stun() | attributes: MapSet.new([:no_immunities])}
+      {controlled, _} = Aura.apply_spell(entity, 2, 10, bypass, 0)
+      immunity = protection(:school_immunity, 127, [:immunity_purges_effect])
+      {protected, _} = Aura.apply_spell(controlled, 1, 10, immunity, 100)
+      assert Aura.has_spell?(protected, bypass.id)
+
+      for attributes <- [[], [:immunity_purges_effect, :negative]] do
+        {controlled, _} = Aura.apply_spell(entity, 2, 10, stun(), 0)
+        {protected, _} = Aura.apply_spell(controlled, 1, 10, protection(:school_immunity, 127, attributes), 100)
+        assert Aura.has_spell?(protected, 2)
+        assert Bitwise.band(protected.unit.flags, 0x80000000) == 0
+      end
+    end
+
+    test "school purges clear periodic ticks and immunity flags follow the last holder", %{entity: entity} do
+      dot = %{
+        stun()
+        | school: :shadow,
+          effects: [%{hd(stun().effects) | aura: :periodic_damage, amplitude_ms: 1000, base_points: 10}]
+      }
+
+      {afflicted, _} = Aura.apply_spell(entity, 2, 10, dot, 0)
+      immunity = protection(:school_immunity, 127, [:immunity_purges_effect])
+      {protected, _} = Aura.apply_spell(afflicted, 1, 10, immunity, 100)
+      refute Aura.has_spell?(protected, dot.id)
+      {protected, _} = Aura.apply_spell(protected, 1, 10, %{immunity | id: 3, duration_ms: 2000}, 200)
+      {later, events} = Aura.tick(protected, 1500)
+      assert later.unit.health == 100
+      refute Enum.any?(events, &is_struct(&1, Effects.PeriodicAuraLog))
+      refute Aura.has_spell?(later, 1)
+      assert Bitwise.band(later.unit.flags, 0x80000000) != 0
+      {expired, _} = Aura.expire_due(later, 2200)
+      assert Bitwise.band(expired.unit.flags, 0x80000000) == 0
+      dead = Core.kill(protected, 300)
+      assert Bitwise.band(dead.unit.flags, 0x80000000) == 0
+    end
+
     test "mechanic purges follow spell and active effect mechanics", %{entity: entity} do
       spell = %{stun() | mechanic: 12}
       effect_spell = %{stun() | effects: Enum.map(stun().effects, &%{&1 | mechanic: 12})}

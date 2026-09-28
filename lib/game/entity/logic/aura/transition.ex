@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Silithyst
   alias ThistleTea.Game.Entity.Logic.SpellMagnet
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.Cooldowns
 
   @causes Change.causes()
@@ -380,6 +381,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   defp cat_form?(%Holder{auras: auras}) do
     Enum.any?(auras, &match?(%Aura{type: :mod_shapeshift, misc_value: 1}, &1))
   end
+
+  defp maybe_interrupt_casting(
+         %{object: %{guid: guid}, internal: %{casting: %Cast{phase: :impact, spell: %Spell{id: id}}}} = entity,
+         %Holder{caster_guid: guid, spell: %Spell{id: id}}
+       ), do: entity
 
   defp maybe_interrupt_casting(%{internal: %{casting: casting}} = entity, %Holder{} = holder)
        when not is_nil(casting) do

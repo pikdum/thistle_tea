@@ -14,13 +14,11 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.Ammunition
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Aura.Dispel
-  alias ThistleTea.Game.Entity.Logic.CombatControl
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Disenchant
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Enchantments
-  alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Insignia
@@ -38,10 +36,10 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Spell.Area
   alias ThistleTea.Game.Spell.AuraRank
   alias ThistleTea.Game.Spell.Battleground
+  alias ThistleTea.Game.Spell.CasterState
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.CorpseTarget
   alias ThistleTea.Game.Spell.Destination
-  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Environment
   alias ThistleTea.Game.Spell.Facing
   alias ThistleTea.Game.Spell.Focus
@@ -59,7 +57,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     with :ok <- check_caster_alive(caster),
          :ok <- Posture.validate(caster, spell, opts),
          :ok <- check_spirit_of_redemption(caster, spell),
-         :ok <- check_caster_state(caster, spell, now),
+         :ok <- CasterState.validate(caster, spell, now, opts),
          :ok <- check_combat_state(caster, spell),
          :ok <- Stealth.validate(caster, spell, opts),
          :ok <- check_peaceful_target(spell, target_info, opts),
@@ -353,66 +351,6 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp cooldown_error(%Spell{} = spell) do
     {:error, if(Spell.attribute?(spell, :cooldown_on_event), do: :dont_report, else: :not_ready)}
-  end
-
-  @mechanic_fear 5
-  @mechanic_stun 12
-  @confuse_mechanics [17, 30]
-
-  defp check_caster_state(caster, %Spell{} = spell, now) do
-    stunned? = AuraLogic.has_aura?(caster, :mod_stun)
-
-    case control_state_error(caster, spell, stunned?) do
-      :ok -> prevention_error(caster, spell, stunned?, now)
-      error -> error
-    end
-  end
-
-  defp control_state_error(caster, spell, stunned?) do
-    immune = immunity_purge_mechanics(spell)
-
-    cond do
-      stunned? and not control_purged?(spell, immune, :mod_stun, [@mechanic_stun]) ->
-        {:error, :stunned}
-
-      AuraLogic.has_aura?(caster, :mod_confuse) and
-          not control_purged?(spell, immune, :mod_confuse, @confuse_mechanics) ->
-        {:error, :confused}
-
-      Fear.active?(caster) and not control_purged?(spell, immune, :mod_fear, [@mechanic_fear]) ->
-        {:error, :fleeing}
-
-      true ->
-        :ok
-    end
-  end
-
-  defp control_purged?(spell, immune, type, mechanics) do
-    Enum.any?(mechanics, &(&1 in immune)) or EffectImmunity.purges_state?(spell, type)
-  end
-
-  defp prevention_error(caster, spell, stunned?, now) do
-    if spell.prevention_type == 1 and not stunned? and silenced_for?(caster, spell, now) do
-      {:error, :silenced}
-    else
-      CombatControl.prevention(caster, spell)
-    end
-  end
-
-  defp silenced_for?(caster, %Spell{} = spell, now) do
-    CombatControl.silenced?(caster) or
-      Cooldowns.school_locked?(caster, Spell.school_mask(spell), now)
-  end
-
-  defp immunity_purge_mechanics(%Spell{effects: effects} = spell) do
-    if Spell.attribute?(spell, :immunity_purges_effect) do
-      for %Effect{type: type, aura: :mechanic_immunity, misc_value: misc} <- effects,
-          type in [:apply_aura, :apply_area_aura],
-          is_integer(misc),
-          do: misc
-    else
-      []
-    end
   end
 
   defp check_power(caster, spell, opts) do
