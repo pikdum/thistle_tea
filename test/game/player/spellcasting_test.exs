@@ -112,6 +112,27 @@ defmodule ThistleTea.Game.Player.SpellcastingTest do
   describe "cast_result/3" do
     setup [:script_caster]
 
+    test "rejects Swiftmend without a HoT before spending mana or starting cooldowns", %{state: state} do
+      spell = %Spell{
+        id: 18_562,
+        name: "Swiftmend",
+        script_name: "spell_druid_swiftmend",
+        mana_cost: 20,
+        power_type: 0,
+        gcd_ms: 1_500,
+        recovery_time_ms: 15_000,
+        effects: [%Effect{index: 0, type: :heal, implicit_target_a: :target_ally}]
+      }
+
+      assert {:error, rejected} = Spellcasting.cast_result(state, spell, <<0::16>>)
+      assert rejected.character.internal.casting == nil
+      assert rejected.character.internal.cooldowns == %{}
+      assert rejected.character.unit.power1 == state.character.unit.power1
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{spell: 18_562, reason: 0x67}}}
+      refute_received {:"$gen_cast", {:send_packet, %Message.SmsgSpellStart{}}}
+      refute_received {:"$gen_cast", {:send_packet, %Message.SmsgSpellGo{}}}
+    end
+
     test "Black Qiraji use dismisses an existing mount without starting or paying for a cast", %{state: state} do
       character = state.character
       movement = struct!(character.movement_block, MovementBlock.player_speeds())

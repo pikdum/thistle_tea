@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Disenchant
+  alias ThistleTea.Game.Entity.Logic.Druid
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Hostility
@@ -147,6 +148,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- Facing.validate(caster, spell, target_info, opts),
          :ok <- check_target_aura_state(spell, target_info),
          :ok <- check_warlock_target(caster, spell, target_info),
+         :ok <- Druid.validate_target(caster, spell, target_info),
          :ok <- PlayerPossession.validate(caster, spell, target_info),
          :ok <- Hunter.validate_tame(caster, spell, target_info),
          :ok <- Range.validate(caster, spell, target_info, opts) do

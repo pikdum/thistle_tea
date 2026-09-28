@@ -67,8 +67,25 @@ defmodule ThistleTea.Game.Entity.Logic.Druid do
 
   def enrage_event(_entity, _spell), do: nil
 
+  def validate_target(caster, %Spell{} = spell, target_info) do
+    if swiftmend?(spell) and not Enum.any?(target_sources(caster, target_info), &swiftmend_source?/1),
+      do: {:error, :target_aurastate},
+      else: :ok
+  end
+
+  defp target_sources(caster, target) when target in [nil, :self], do: AuraLogic.source_spells(caster)
+  defp target_sources(_caster, %{aura_sources: sources}), do: sources
+  defp target_sources(_caster, _target), do: []
+
+  defp swiftmend?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_druid_swiftmend")
+
+  defp swiftmend_source?({_id, @druid_family, flags, _flags_1, _caster}) when is_integer(flags),
+    do: (flags &&& (@rejuvenation_mask ||| @regrowth_mask)) != 0
+
+  defp swiftmend_source?(_source), do: false
+
   def consume_swiftmend_hot(entity, %Spell{} = spell, now) do
-    if Spell.vmangos_script?(spell, "spell_druid_swiftmend") do
+    if swiftmend?(spell) do
       do_consume_swiftmend_hot(entity, now)
     else
       {entity, 0, []}
@@ -78,7 +95,7 @@ defmodule ThistleTea.Game.Entity.Logic.Druid do
   def consume_swiftmend_hot(entity, _spell, _now), do: {entity, 0, []}
 
   defp do_consume_swiftmend_hot(entity, now) do
-    case swiftmend_holder(entity) do
+    case swiftmend_holder(entity, now) do
       %Holder{spell: hot, auras: auras} ->
         tick_heal =
           Enum.find_value(auras, 0, fn
@@ -91,17 +108,20 @@ defmodule ThistleTea.Game.Entity.Logic.Druid do
         {entity, tick_heal * multiplier, events}
 
       nil ->
-        {entity, 0, []}
+        {:error, :target_aurastate}
     end
   end
 
-  defp swiftmend_holder(%{unit: %{auras: holders}}) when is_list(holders) do
+  defp swiftmend_holder(%{unit: %{auras: holders}}, now) when is_list(holders) do
     holders
-    |> Enum.filter(&swiftmend_hot?/1)
+    |> Enum.filter(&(swiftmend_hot?(&1) and active?(&1, now)))
     |> Enum.min_by(&remaining_duration/1, fn -> nil end)
   end
 
-  defp swiftmend_holder(_entity), do: nil
+  defp swiftmend_holder(_entity, _now), do: nil
+
+  defp active?(%Holder{expires_at: at}, now) when is_integer(at) and at != -1, do: at > now
+  defp active?(_holder, _now), do: true
 
   defp swiftmend_hot?(%Holder{spell: %Spell{spell_family: @druid_family, family_flags_0: flags}, auras: auras})
        when is_integer(flags) do
@@ -111,6 +131,8 @@ defmodule ThistleTea.Game.Entity.Logic.Druid do
 
   defp swiftmend_hot?(_holder), do: false
 
-  defp remaining_duration(%Holder{expires_at: expires_at}) when is_integer(expires_at), do: expires_at
+  defp remaining_duration(%Holder{expires_at: expires_at}) when is_integer(expires_at) and expires_at != -1,
+    do: expires_at
+
   defp remaining_duration(_holder), do: 9_223_372_036_854_775_807
 end

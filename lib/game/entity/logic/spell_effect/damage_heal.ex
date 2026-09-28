@@ -114,20 +114,24 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   end
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :heal} = effect, now) do
-    {state, swiftmend_healing, swiftmend_events} = Druid.consume_swiftmend_hot(state, spell, now)
+    case Druid.consume_swiftmend_hot(state, spell, now) do
+      {state, swiftmend_healing, swiftmend_events} ->
+        base = base_amount(spell, effect, context) + swiftmend_healing
+        healing = healing_amount(state, base, context, spell, effect)
+        crit? = heal_crit?(context, spell)
+        healing = if crit?, do: healing + div(healing, 2), else: healing
+        events = SpellThreat.heal_events(state, context, spell, healing)
 
-    base = base_amount(spell, effect, context) + swiftmend_healing
-    healing = healing_amount(state, base, context, spell, effect)
-    crit? = heal_crit?(context, spell)
-    healing = if crit?, do: healing + div(healing, 2), else: healing
-    events = SpellThreat.heal_events(state, context, spell, healing)
+        heal_event =
+          Effects.spell_heal(context.caster_guid, state.object.guid, spell, healing, crit?,
+            proc_origin: ProcOrigin.classify(spell, context)
+          )
 
-    heal_event =
-      Effects.spell_heal(context.caster_guid, state.object.guid, spell, healing, crit?,
-        proc_origin: ProcOrigin.classify(spell, context)
-      )
+        {Core.heal(state, healing), swiftmend_events ++ events ++ [heal_event]}
 
-    {Core.heal(state, healing), swiftmend_events ++ events ++ [heal_event]}
+      {:error, :target_aurastate} ->
+        {state, []}
+    end
   end
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :heal_mechanical} = effect, _now) do
