@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Spell.Focus
   alias ThistleTea.Game.Spell.LocationTargets
   alias ThistleTea.Game.Spell.ObjectTargets
+  alias ThistleTea.Game.Spell.Posture
   alias ThistleTea.Game.Spell.Range
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.StackRules
@@ -56,6 +57,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   def validate(caster, %Spell{} = spell, %Target{} = targets, target_info, now, opts \\ []) do
     with :ok <- check_caster_alive(caster),
+         :ok <- Posture.validate(caster, spell, opts),
          :ok <- check_spirit_of_redemption(caster, spell),
          :ok <- check_caster_state(caster, spell, now),
          :ok <- check_combat_state(caster, spell),

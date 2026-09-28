@@ -111,6 +111,17 @@ defmodule ThistleTea.Game.Player.SpellcastingTest do
   describe "cast_result/3" do
     setup [:script_caster]
 
+    test "reports seated admission failure without starting a cast", %{state: state, spell: spell} do
+      character = state.character
+      state = %{state | character: %{character | unit: %{character.unit | stand_state: 1}}}
+      assert {:error, rejected} = Spellcasting.cast_result(state, spell, <<0::16>>)
+      assert rejected.character.internal.casting == nil
+      assert rejected.character.internal.cooldowns == %{}
+      assert rejected.character.unit.power1 == state.character.unit.power1
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{spell: id, reason: 0x3E}}}
+      assert id == spell.id
+    end
+
     test "rejects a visible stealth opener with its protocol error and no resource loss", %{state: state, spell: spell} do
       spell = %{spell | attributes: MapSet.new([:only_stealthed])}
       assert {:error, rejected} = Spellcasting.cast_result(state, spell, <<0::16>>)

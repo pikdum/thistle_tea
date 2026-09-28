@@ -52,6 +52,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Spell.LocationTargets
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.ObjectTargets
+  alias ThistleTea.Game.Spell.Posture
   alias ThistleTea.Game.Spell.Proc
   alias ThistleTea.Game.Spell.ProcOrigin
   alias ThistleTea.Game.Spell.Radius
@@ -270,7 +271,8 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp launch(entity, %Cast{} = casting, now) do
-    with :ok <- Disarm.validate(entity, casting.spell),
+    with :ok <- Posture.validate(entity, casting.spell, cast_options(casting)),
+         :ok <- Disarm.validate(entity, casting.spell),
          :ok <- validate_cast_target(entity, casting) do
       prepare_launch(entity, casting, now)
     else
@@ -278,7 +280,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         entity =
           entity
           |> Effects.enqueue(Effects.spell_cast_failed(Cast.result_spell(casting), reason))
-          |> cancel()
+          |> cancel(now)
 
         {:finished, entity}
     end
