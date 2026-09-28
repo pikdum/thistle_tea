@@ -335,6 +335,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     failed(state, blackboard, step)
   end
 
+  defp execute_command(state, blackboard, %ScriptStep{command: :move_to} = step, target, _now, context) do
+    case __MODULE__.MoveTo.apply(state, step, target, context) do
+      {:ok, state} -> {state, blackboard, :continue}
+      :error -> failed(state, blackboard, step)
+    end
+  end
+
   defp execute_command(state, blackboard, step, target_guid, now, context) do
     {state, blackboard} = execute(state, blackboard, step, target_guid, now, context)
     {state, blackboard, :continue}
@@ -439,18 +446,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
       %{alive?: alive?} -> alive?
       _metadata -> true
     end
-  end
-
-  defp execute(
-         state,
-         blackboard,
-         %ScriptStep{command: :move_to, datalong: mode} = step,
-         _target,
-         _now,
-         %Context{} = context
-       )
-       when mode in [0, 3] do
-    {__MODULE__.MoveTo.apply(state, step, context), blackboard}
   end
 
   defp execute(
@@ -1290,11 +1285,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :set_phase_range}, _target_guid, _now) do
-    {state, blackboard}
-  end
-
-  defp execute(state, blackboard, %ScriptStep{command: :move_to} = step, _target_guid, _now) do
-    Logger.debug("Script #{step.script_id}: move_to coordinate type #{step.datalong} unsupported, skipping")
     {state, blackboard}
   end
 
