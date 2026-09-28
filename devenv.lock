@@ -57,11 +57,11 @@
     "namigator": {
       "flake": false,
       "locked": {
-        "lastModified": 1789726948,
-        "narHash": "sha256-VCIxJKWihSmOkz7lJ9Ub30tD+Ycvd7AeGPAaQ2fvgNU=",
+        "lastModified": 1790628466,
+        "narHash": "sha256-AXp12ED/6j0+HZIt+FlgybYM4jy8TztgDUhDfsVqaV0=",
         "ref": "refs/heads/master",
-        "rev": "185394d45265b88c76634e00dda6dfd7690d8730",
-        "revCount": 540,
+        "rev": "10b31b6d15e86ff240dde38280986ebe3b1cb338",
+        "revCount": 542,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/pikdum/namigator.git"

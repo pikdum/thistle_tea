@@ -12,8 +12,9 @@ zone names or ceiling visibility.
 
 ## Generating metadata
 
-The pinned Namigator source is patched by `nix/namigator-source.nix` for both
-the runtime NIF and the map builder. New `nix run .#maps` bakes include metadata.
+The pinned [Namigator fork](https://github.com/pikdum/namigator) provides this
+metadata for both the runtime NIF and the map builder. New `nix run .#maps`
+bakes include it.
 An existing bake can be upgraded without rebuilding navigation:
 
 ```bash
@@ -39,9 +40,9 @@ queries transform liquid triangles with the WMO instance and reject surfaces
 below the player's collision floor. Missing sidecars return no WMO liquid;
 terrain liquid sampling remains available.
 
-Outside the devenv shell, obtain the matching source with
-`nix build .#namigator-source --no-link --print-out-paths` and set `NAMIGATOR_SRC`
-to the resulting path before compiling the NIF.
+Outside the devenv shell, check out the fork at the `namigator-src` revision in
+`flake.lock`, initialize its `recastnavigation` submodule, and set
+`NAMIGATOR_SRC` to the checkout before compiling the NIF.
 
 ## Verification
 

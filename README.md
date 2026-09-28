@@ -14,7 +14,7 @@ hop in the [discord](https://discord.gg/dSYsRXHDhb) if you're interested in help
 
 ```bash
 # the devenv shell provides elixir, a C++ toolchain, and namigator (NAMIGATOR_SRC);
-# outside devenv, use the patched source from nix build .#namigator-source
+# outside devenv, point NAMIGATOR_SRC at a pikdum/namigator checkout (rev in flake.lock)
 git clone https://github.com/pikdum/thistle_tea.git
 cd thistle_tea
 mix deps.get
