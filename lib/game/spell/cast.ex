@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Spell.Cast do
     :requested_spell,
     :targets,
     :resolution,
+    :movement_origin,
     :cast_time_ms,
     :channel_ms,
     :channel_tick_ms,

@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Breathing
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.ControlMovement
   alias ThistleTea.Game.Entity.Logic.Core
@@ -35,9 +36,6 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.LiquidSpells
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
-  alias ThistleTea.Game.Player.Spellcasting
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Terrain.Liquid
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -50,8 +48,6 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility
 
-  @spell_failed_moving 0x2E
-  @stuck_spell 7355
   @client_projection_ms 750
 
   def handle(%Message.MsgMove{} = message, %{character: %Character{} = character} = state) do
@@ -244,6 +240,7 @@ defmodule ThistleTea.Game.Player.Movement do
     character = interrupt_attacks(character, moved? or MovementBlock.airborne?(movement_block), now)
     character = interrupt_auras(character, moved?)
     character = interrupt_water_auras(character, movement_block, state.character.movement_block)
+    character = if Keyword.get(opts, :final?, false), do: character, else: Casting.interrupt_movement(character, now)
 
     Presence.relocate_client(
       character,
@@ -259,7 +256,6 @@ defmodule ThistleTea.Game.Player.Movement do
         ChaseWatch.notify_moved(state.guid, {x1, y1, z1})
 
         %{state | character: character}
-        |> cancel_moving_cast(movement_block, Keyword.get(opts, :final?, false))
         |> PlayerRest.check_tavern_exit()
         |> PlayerExploration.check_movement(now)
       else
@@ -281,18 +277,6 @@ defmodule ThistleTea.Game.Player.Movement do
       character
     end
   end
-
-  defp cancel_moving_cast(state, _movement, true), do: state
-
-  defp cancel_moving_cast(
-         %{character: %Character{internal: %Internal{casting: %Cast{spell: %Spell{id: @stuck_spell}}}}} = state,
-         movement,
-         false
-       ) do
-    if MovementBlock.falling_far?(movement), do: state, else: Spellcasting.cancel(state, @spell_failed_moving)
-  end
-
-  defp cancel_moving_cast(state, _movement, false), do: Spellcasting.cancel(state, @spell_failed_moving)
 
   defp broadcast(state, message, controller) do
     recipients =

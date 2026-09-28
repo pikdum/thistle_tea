@@ -3,14 +3,15 @@ defmodule ThistleTea.Game.Player.Fishing do
   Player boundary for fishing casts, bobber placement, catches, and skill gains.
   """
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Commands
   alias ThistleTea.Game.Entity.Data.Component.Internal.Fishing, as: FishingState
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.BoundaryResult
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Skills
-  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Enchantments
@@ -59,7 +60,7 @@ defmodule ThistleTea.Game.Player.Fishing do
     case Entity.call(bobber_guid, {:fishing_use, state.guid, skill}) do
       {:ok, _loot, _catch} ->
         character = advance_skill(character)
-        character = character |> Casting.cancel() |> EventSink.emit_pending()
+        character = character |> Casting.finish_game_object_channel(bobber_guid) |> EventSink.emit_pending()
         Looting.open(%{state | character: character}, bobber_guid, loot_type: @loot_type_fishing)
 
       {:error, :not_hooked} ->
@@ -76,17 +77,6 @@ defmodule ThistleTea.Game.Player.Fishing do
         state
     end
   end
-
-  def cancel_bobber(%{unit: %{channel_object: guid}} = character) when is_integer(guid) and guid > 0 do
-    case GameObjectTemplateLoader.get(Guid.entry(guid)) do
-      %{type: 17} -> World.stop_entity(guid)
-      _ -> :ok
-    end
-
-    character
-  end
-
-  def cancel_bobber(character), do: character
 
   def cast_position(%{internal: %{world: world}, movement_block: %{position: {x, y, z, o}}} = character, random)
       when is_function(random, 0) do
@@ -143,7 +133,8 @@ defmodule ThistleTea.Game.Player.Fishing do
 
       character =
         character
-        |> adjust_channel(bobber.object.guid, duration_ms)
+        |> BoundaryResult.apply(%Commands.ChannelGameObjectStarted{guid: bobber.object.guid})
+        |> adjust_channel(duration_ms)
         |> Core.mark_broadcast_update()
         |> Effects.enqueue(Effects.channel_update(character.object.guid, duration_ms))
 
@@ -153,7 +144,7 @@ defmodule ThistleTea.Game.Player.Fishing do
     end
   end
 
-  defp adjust_channel(%{internal: internal, unit: unit} = character, bobber_guid, duration_ms) do
+  defp adjust_channel(%{internal: internal} = character, duration_ms) do
     casting = internal.casting
 
     casting =
@@ -163,7 +154,7 @@ defmodule ThistleTea.Game.Player.Fishing do
         casting
       end
 
-    %{character | internal: %{internal | casting: casting}, unit: %{unit | channel_object: bobber_guid}}
+    %{character | internal: %{internal | casting: casting}}
   end
 
   defp advance_skill(character) do

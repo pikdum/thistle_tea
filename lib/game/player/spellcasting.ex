@@ -285,7 +285,6 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
         character =
           character
-          |> Fishing.cancel_bobber()
           |> Casting.cancel()
           |> EventSink.emit_pending()
 

@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.CastMovement
   alias ThistleTea.Game.Spell.CastResolution
   alias ThistleTea.Game.Spell.CastResolution.Costs
   alias ThistleTea.Game.Spell.CastResolution.Followups
@@ -101,6 +102,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         cast_item_guid: cast_item_guid
     }
 
+    casting = CastMovement.anchor(casting, entity)
     entity |> cancel(now) |> put_cast(casting) |> complete(now)
   end
 
@@ -144,6 +146,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       spell
       |> Cast.new(targets, now, Modifiers.snapshot(character, spell))
       |> Cast.apply_speed_multiplier(CastSpeed.multiplier(character.unit, spell))
+      |> CastMovement.anchor(character)
       |> then(
         &%{
           &1
@@ -168,8 +171,13 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     end
   end
 
-  def advance(%{internal: %Internal{casting: %Cast{} = casting}} = entity, now) when is_integer(now) do
-    advance_phase(entity, casting, now)
+  def advance(%{internal: %Internal{casting: %Cast{}}} = entity, now) when is_integer(now) do
+    entity = interrupt_movement(entity, now)
+
+    case entity.internal.casting do
+      nil -> {:finished, entity}
+      casting -> advance_phase(entity, casting, now)
+    end
   end
 
   def advance(entity, _now), do: {:idle, entity}
@@ -183,7 +191,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   def complete(%{internal: %Internal{} = internal} = entity, %Cast{} = casting, now) when is_integer(now) do
     entity = %{entity | internal: %{internal | casting: casting}}
 
-    case advance_phase(entity, casting, max(now, Cast.launch_at(casting))) do
+    case advance(entity, max(now, Cast.launch_at(casting))) do
       {:waiting, entity, _delay_ms} -> entity
       {:finished, entity} -> entity
     end
@@ -363,7 +371,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> CastingCombat.launch(casting, now)
 
     if Cast.channeled?(casting) do
-      casting = Cast.transition(casting, :channel_tick)
+      casting = casting |> Cast.transition(:channel_tick) |> CastMovement.anchor(entity)
       entity = entity |> put_cast(casting) |> start_channel(casting)
 
       if valid_channel_target?(entity, casting) do
@@ -863,6 +871,18 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   def interrupt(entity, _now), do: entity
 
+  def interrupt_movement(%{internal: %Internal{casting: %Cast{} = cast}} = entity, now) do
+    if CastMovement.interrupts?(entity, cast) do
+      entity
+      |> cancel(now)
+      |> Effects.enqueue(Effects.spell_cast_failed(Cast.result_spell(cast), :moving))
+    else
+      entity
+    end
+  end
+
+  def interrupt_movement(entity, _now), do: entity
+
   def reconcile_channel_auras(
         %{
           object: %{guid: guid},
@@ -903,6 +923,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> Cast.put_resolution(empty_resolution(game_object_guid))
       |> Cast.transition(:impact)
       |> Cast.transition(:channel_tick)
+      |> CastMovement.anchor(character)
 
     %{
       character
