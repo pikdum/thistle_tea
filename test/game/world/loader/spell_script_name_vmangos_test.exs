@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Loader.SpellScriptNameVmangosTest do
       assert SpellScriptName.get(15_712) == "spell_linkens_boomerang"
       assert SpellScriptName.get(6410) == "spell_scorpid_surprise"
       assert SpellScriptName.get(18_562) == "spell_druid_swiftmend"
+      assert SpellScriptName.get(23_442) == "spell_everlook_transporter"
       assert SpellScriptName.get(19_503) == nil
     end
   end

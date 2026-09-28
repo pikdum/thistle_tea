@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Engineering
   alias ThistleTea.Game.Entity.Logic.Knockback
   alias ThistleTea.Game.Entity.Logic.SafePosition
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Amount
@@ -32,7 +33,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
     {state, [Effects.leap(destination)]}
   end
 
-  def apply(state, %CastContext{} = context, %Spell{id: spell_id}, %Effect{type: :teleport_units} = effect, _now) do
+  def apply(
+        state,
+        %CastContext{} = context,
+        %Spell{id: spell_id} = spell,
+        %Effect{type: :teleport_units} = effect,
+        _now
+      ) do
     selectors = [effect.implicit_target_a, effect.implicit_target_b]
 
     events =
@@ -43,7 +50,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
         true -> [Effects.teleport_to_spell_target(spell_id)]
       end
 
-    {state, events}
+    {state, events ++ Engineering.transporter_mishap(spell, context)}
   end
 
   def apply(

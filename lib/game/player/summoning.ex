@@ -5,7 +5,33 @@ defmodule ThistleTea.Game.Player.Summoning do
   """
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Time
+
+  def request(%{character: %Character{} = character} = state, summoner_guid, zone_id, world, position) do
+    if Aura.has_spell?(character, 23_445) do
+      state
+    else
+      auto_decline_ms = 120_000
+
+      pending = %{
+        summoner_guid: summoner_guid,
+        world: world,
+        position: position,
+        expires_at: Time.now() + auto_decline_ms
+      }
+
+      Network.send_packet(%Message.SmsgSummonRequest{
+        summoner_guid: summoner_guid,
+        zone_id: zone_id || 0,
+        auto_decline_ms: auto_decline_ms
+      })
+
+      %{state | character: %{character | internal: %{character.internal | pending_summon: pending}}}
+    end
+  end
 
   def accept(%{character: %Character{} = character} = state, summoner_guid) do
     case accept(character, summoner_guid, Time.now()) do

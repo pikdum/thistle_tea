@@ -153,6 +153,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
     Engineering.goblin_bomb(state, context)
   end
 
+  defp apply_class_dummy(state, context, _spell, %Effect{index: 0}, :gnomish_transporter, _now) do
+    Engineering.gnomish_transporter(state, context)
+  end
+
+  defp apply_class_dummy(state, context, _spell, %Effect{index: 0}, :transporter_arrival, _now) do
+    Engineering.transporter_arrival(state, context)
+  end
+
   defp apply_class_dummy(state, context, _spell, %Effect{index: 0}, :reindeer_transformation, now) do
     Mount.reindeer(state, context, now)
   end

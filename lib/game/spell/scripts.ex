@@ -168,6 +168,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def dummy_effect(%Spell{id: 8344}), do: :universal_remote
   def dummy_effect(%Spell{id: 13_180}), do: :mind_control_cap
   def dummy_effect(%Spell{id: 23_134}), do: :goblin_bomb
+  def dummy_effect(%Spell{id: 23_453}), do: :gnomish_transporter
+  def dummy_effect(%Spell{id: 23_448}), do: :transporter_arrival
   def dummy_effect(%Spell{id: 25_860}), do: :reindeer_transformation
   def dummy_effect(%Spell{id: 28_006}), do: {:trigger_spell, 29_296}
   def dummy_effect(%Spell{id: id}) when id in [11_885, 11_886, 11_887, 11_888, 11_889, 12_699], do: :capture_corpse

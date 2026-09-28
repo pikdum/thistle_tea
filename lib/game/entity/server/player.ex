@@ -142,6 +142,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.SpellEnvironment
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
+  alias ThistleTea.Game.Player.Summoning
   alias ThistleTea.Game.Player.Taxi, as: PlayerTaxi
   alias ThistleTea.Game.Player.Trade
   alias ThistleTea.Game.Player.WeaponProcs
@@ -423,27 +424,12 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
-  def handle_cast(
-        {:summon_request, summoner_guid, zone_id, world, {x, y, z}},
-        %{character: %Character{internal: internal} = character} = state
-      ) do
-    auto_decline_ms = 120_000
-
-    pending = %{
-      summoner_guid: summoner_guid,
-      world: world,
-      position: {x, y, z},
-      expires_at: Time.now() + auto_decline_ms
-    }
-
-    Network.send_packet(%Message.SmsgSummonRequest{
-      summoner_guid: summoner_guid,
-      zone_id: zone_id || 0,
-      auto_decline_ms: auto_decline_ms
-    })
-
-    character = %{character | internal: %{internal | pending_summon: pending}}
-    {:noreply, %{state | character: character}}
+  def handle_cast({:summon_request, summoner_guid, zone_id, world, {x, y, z}}, state) do
+    {:noreply, Summoning.request(state, summoner_guid, zone_id, world, {x, y, z})}
+  rescue
+    error ->
+      Logger.error("Summon request failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast(

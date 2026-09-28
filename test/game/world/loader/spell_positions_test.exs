@@ -23,6 +23,18 @@ defmodule ThistleTea.Game.World.Loader.SpellPositionsTest do
       assert %{map: 0, orientation: orientation} = Spell.target_position(3561)
       assert_in_delta orientation, 5.28, 0.001
       assert %{map: 0, x: -6076.0, y: -215.0, z: 424.0} = Spell.target_position(18_634)
+      assert %{map: 1, x: x, y: y, z: z} = Spell.target_position(23_442)
+      assert_in_delta x, 6755.33, 0.01
+      assert_in_delta y, -4658.09, 0.01
+      assert_in_delta z, 724.8, 0.01
+
+      for id <- [23_441, 23_446] do
+        assert %{map: 1, x: x, y: y, z: z} = Spell.target_position(id)
+        assert_in_delta x, -7109.1, 0.01
+        assert_in_delta y, -3825.21, 0.01
+        assert_in_delta z, 10.151, 0.01
+      end
+
       assert Spell.target_position(987_654) == nil
     end
   end
