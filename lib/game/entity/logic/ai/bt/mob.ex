@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
   alias ThistleTea.Game.Entity.Logic.AI.BT.Critter, as: CritterBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Distancing
+  alias ThistleTea.Game.Entity.Logic.AI.BT.EventAI, as: EventAIBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Fear, as: FearBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Flee
   alias ThistleTea.Game.Entity.Logic.AI.BT.Formation
@@ -111,7 +112,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         BT.condition(&not_in_combat?/2),
         SpellBT.casting_sequence()
       ]),
-      BT.action(&eventai_step/3),
+      BT.action(&EventAIBT.tick/3),
       BT.action(&SeekAssistance.tick/3),
       BT.action(&Flee.tick/3),
       BT.action(&Distancing.tick/3),
@@ -258,15 +259,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     state = set_running(state, false)
     blackboard = Blackboard.clear_move_target(blackboard)
     {BT.running(@dead_idle_delay, :stunned), state, blackboard}
-  end
-
-  defp eventai_step(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
-    {state, blackboard} = EventAI.tick(state, blackboard, now, context)
-    {:failure, state, blackboard}
-  end
-
-  defp eventai_step(state, %Blackboard{} = blackboard, %Context{}) do
-    {:failure, state, blackboard}
   end
 
   defp eventai_target_dead(

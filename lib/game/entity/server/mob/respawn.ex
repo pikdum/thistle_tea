@@ -216,6 +216,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       proximity_aggro?: Mob.proximity_aggro?(state),
       no_spell_defense?: CreatureFlags.has?(state, :no_spell_defense),
       unit_flags: state.unit.flags,
+      transport_guid: state.movement_block.transport_guid,
       shapeshift_form: state.unit.shapeshift_form || 0,
       incarnation_id: Incarnation.id(state),
       alive?: state.unit.health > 0,

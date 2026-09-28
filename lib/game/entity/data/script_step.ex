@@ -287,6 +287,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(83), do: :quest_credit
   defp command(85), do: :send_script_event
   defp command(87), do: :reset_door_or_button
+  defp command(88), do: :set_command_state
   defp command(89), do: :play_custom_animation
   defp command(90), do: :start_script_on_group
   defp command(other), do: {:unsupported, other}

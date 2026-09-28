@@ -94,6 +94,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         level: mob.unit.level,
         tameable?: Bitwise.band(mob.internal.creature.type_flags || 0, 0x1) != 0,
         unit_flags: mob.unit.flags,
+        transport_guid: mob.movement_block.transport_guid,
         proximity_aggro?: Mob.proximity_aggro?(mob),
         detection_range: mob.internal.creature.detection_range,
         display_id: mob.unit.display_id,

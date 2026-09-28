@@ -1432,12 +1432,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       {:noreply, state}
   end
 
-  def handle_info({:pet_command, :dismiss, _target_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
-    {:noreply, Respawn.despawn(state, nil)}
-  end
-
   def handle_info({:pet_command, command, target_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
-    state = state |> PetBT.command(command, target_guid) |> wake_ai_tick()
+    state = state |> PetBT.command(command, target_guid) |> wake_ai_tick() |> EventSink.emit_pending()
     {:noreply, state, {:continue, :maybe_broadcast}}
   end
 
@@ -1674,6 +1670,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           power_type: state.unit.power_type,
           shapeshift_form: state.unit.shapeshift_form || 0,
           unit_flags: state.unit.flags,
+          transport_guid: state.movement_block.transport_guid,
           aura_sources: Aura.source_spells(state),
           aura_stacks: Aura.spell_stacks(state),
           aura_effects: Aura.effect_keys(state),

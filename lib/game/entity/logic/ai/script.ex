@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Distancing
   alias ThistleTea.Game.Entity.Logic.AI.BT.Flee
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
+  alias ThistleTea.Game.Entity.Logic.AI.Script.PetCommand
   alias ThistleTea.Game.Entity.Logic.AI.Script.Run
   alias ThistleTea.Game.Entity.Logic.Assistance
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
@@ -314,6 +315,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp execute_command(state, blackboard, %ScriptStep{command: :set_react_state} = step, _target, _now, _context) do
+    failed(state, blackboard, step)
+  end
+
+  defp execute_command(
+         %Mob{} = state,
+         blackboard,
+         %ScriptStep{command: :set_command_state, datalong: command},
+         target,
+         _now,
+         context
+       ) do
+    state = %{state | internal: %{state.internal | blackboard: blackboard}}
+    state = PetCommand.apply(state, command, target, context)
+    {state, state.internal.blackboard, :continue}
+  end
+
+  defp execute_command(state, blackboard, %ScriptStep{command: :set_command_state} = step, _target, _now, _context) do
     failed(state, blackboard, step)
   end
 

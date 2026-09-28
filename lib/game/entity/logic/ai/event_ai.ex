@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
@@ -64,8 +65,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
 
   def tick_ms, do: @tick_ms
 
-  def events(%{internal: %Internal{creature: %Creature{ai_events: events}}}) when is_list(events), do: events
+  def events(%{internal: %Internal{pet: %Pet{possessed?: true}}}), do: []
+  def events(%{internal: %Internal{pet: %Pet{kind: kind}}}) when kind in [:charmed, :possessed], do: []
+
+  def events(%{internal: %Internal{creature: %Creature{ai_events: events}, pet: pet}}) when is_list(events) do
+    if player_controlled_pet?(pet), do: [], else: events
+  end
+
   def events(_state), do: []
+
+  defp player_controlled_pet?(%Pet{kind: kind, owner_guid: owner}) when kind in [:hunter, :summon] do
+    is_integer(owner) and Guid.entity_type(owner) == :player
+  end
+
+  defp player_controlled_pet?(_pet), do: false
 
   def with_blackboard(%{internal: %Internal{}} = state, fun) when is_function(fun, 2) do
     blackboard = Blackboard.ensure(state.internal.blackboard)

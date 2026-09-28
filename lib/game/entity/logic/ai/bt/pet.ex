@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Confusion
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.EventAI
   alias ThistleTea.Game.Entity.Logic.AI.BT.Fear, as: FearBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
@@ -46,6 +47,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
       BT.action(&Confusion.tick/3),
       BT.action(&FearBT.tick/3),
       CombatBT.extra_attacks_step(),
+      BT.action(&EventAI.tick/3),
       SpellBT.casting_sequence(),
       BT.action(&return_to_command/3),
       BT.sequence([
@@ -75,6 +77,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
   def command(state, command, target_guid, now \\ Time.now())
 
+  def command(%Mob{internal: %Internal{pet: %Pet{possessed?: true} = pet}} = state, command, _target, _now)
+      when command in [:stay, :follow] do
+    position = if command == :stay, do: xyz(state.movement_block.position)
+    pet = %{pet | command_state: command, stay_position: position, attack_command?: false}
+    %{state | internal: %{state.internal | pet: pet}} |> returning(nil)
+  end
+
   def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :stay, _target_guid, now) do
     state = Movement.sync_position(state, now)
     position = xyz(state.movement_block.position)
@@ -100,6 +109,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
       Engagement.enter(state, target_guid, now, allow_passive?: true, selection: :target)
 
     state
+  end
+
+  def command(%Mob{internal: %{pet: %Pet{kind: :hunter}}} = state, :dismiss, _target, _now), do: state
+
+  def command(%Mob{internal: %{pet: %Pet{kind: kind} = pet}} = state, :dismiss, _target, _now)
+      when kind in [:charmed, :possessed] do
+    Effects.enqueue(state, Effects.release_controlled(pet.owner_guid, state.object.guid, pet.control_spell_id))
+  end
+
+  def command(%Mob{internal: %{pet: %Pet{}}} = state, :dismiss, _target, _now) do
+    Effects.enqueue(state, Effects.despawn_self(0, 0))
   end
 
   def command(%Mob{} = state, _command, _target_guid, _now), do: state
