@@ -81,14 +81,22 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
       assert is_binary(text) and text != ""
     end
 
-    test "resolves the Defias Thug guid-scoped emote condition tree" do
-      mob = mob(38)
+    test "resolves the Defias Thug guid-scoped emote condition tree and settles it per spawn" do
+      thug = creature(38)
 
-      emote_event = Enum.find(mob.internal.creature.ai_events, &(&1.condition_id == 3_804))
+      emote_event = Enum.find(thug.ai_events, &(&1.condition_id == 3_804))
 
       assert %Condition{type: :or, children: [left, right]} = emote_event.condition
       assert %Condition{type: :db_guid, value1: 80_152} = left
       assert %Condition{type: :db_guid, value1: 80_151} = right
+
+      refute Enum.any?(MobBuilder.build(thug).internal.creature.ai_events, &(&1.condition_id == 3_804))
+
+      assert %{condition: nil} =
+               Enum.find(
+                 MobBuilder.build(%{thug | guid: 80_152}).internal.creature.ai_events,
+                 &(&1.condition_id == 3_804)
+               )
     end
 
     test "resolves start_script generic sub-scripts with texts" do
@@ -200,7 +208,9 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
     end
   end
 
-  defp mob(entry) do
+  defp mob(entry), do: entry |> creature() |> MobBuilder.build()
+
+  defp creature(entry) do
     %Mangos.Creature{
       guid: entry,
       id: entry,
@@ -211,6 +221,5 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
       orientation: 0.0
     }
     |> MobLoader.load_creature()
-    |> MobBuilder.build()
   end
 end

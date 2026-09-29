@@ -454,6 +454,39 @@ defmodule ThistleTea.Game.Core.AI.EventAITest do
     end
   end
 
+  describe "specialize/1" do
+    test "drops events the spawn's gates rule out and strips gates it always passes" do
+      emoters = %Condition{
+        type: :or,
+        children: [%Condition{type: :db_guid, value1: 80_152}, %Condition{type: :db_guid, value1: 80_151}]
+      }
+
+      level = %Condition{entry: 7, type: :level, value1: 20, value2: 0}
+      guarded = %Condition{type: :and, children: [%Condition{type: :db_guid, value1: 99}, level]}
+      events = [event(:aggro), event(:timer_ooc, condition: emoters), event(:spawned, condition: guarded)]
+
+      assert [%AIEvent{event_type: :aggro}, %AIEvent{event_type: :spawned, condition: condition}] =
+               EventAI.specialize(mob(events: events, db_guid: 99)).internal.creature.ai_events
+
+      assert %Condition{type: :and, children: [^level]} = condition
+
+      assert [%AIEvent{event_type: :aggro}, %AIEvent{event_type: :timer_ooc, condition: nil}] =
+               EventAI.specialize(mob(events: events, db_guid: 80_151)).internal.creature.ai_events
+    end
+
+    test "an idle creature ruled out of its only out-of-combat timer schedules no check" do
+      emote = event(:timer_ooc, condition: %Condition{type: :db_guid, value1: 80_152}, repeatable?: true)
+      mob = mob(events: [event(:aggro), emote], db_guid: 99)
+
+      specialized = EventAI.specialize(mob)
+      {_mob, blackboard} = EventAI.on_spawned(mob, Blackboard.new(), 0)
+      {_specialized, specialized_blackboard} = EventAI.on_spawned(specialized, Blackboard.new(), 0)
+
+      assert EventAI.ooc_timer_delay(mob, blackboard, 100_000) == 1
+      assert EventAI.ooc_timer_delay(specialized, specialized_blackboard, 100_000) == nil
+    end
+  end
+
   describe "enter_combat/4" do
     test "fires aggro events and re-enables fired events" do
       enemy = Guid.from_low_guid(:player, 3)

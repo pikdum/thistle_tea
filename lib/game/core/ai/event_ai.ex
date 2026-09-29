@@ -8,7 +8,11 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
   reached home, scripted map event) fire from the owning process at those
   moments. Events carrying a resolved condition tree are gated through the
   condition evaluator before their repeat timers are consumed, per vmangos
-  ordering. Per-event enable/cooldown
+  ordering. Because a failing gate leaves its timer due, `specialize/1` folds
+  each condition against the spawn's fixed facts when the creature is built:
+  an event whose gate can never pass for this spawn is dropped instead of
+  being re-checked every second, and a gate that always passes is removed.
+  Per-event enable/cooldown
   state and the script-controlled phase live on the blackboard: non-repeatable
   events disable until the next combat entry, event timers re-roll from their
   repeat params, and out-of-combat timers re-initialize on evade, matching
@@ -77,6 +81,26 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
   end
 
   def events(_state), do: []
+
+  def specialize(
+        %Mob{internal: %Internal{creature: %Creature{ai_events: [_ | _] = events} = creature} = internal} = mob
+      ) do
+    context = EntityContext.static(mob)
+    events = Enum.flat_map(events, &specialize_event(&1, context))
+    %{mob | internal: %{internal | creature: %{creature | ai_events: events}}}
+  end
+
+  def specialize(mob), do: mob
+
+  defp specialize_event(%AIEvent{condition: nil} = event, _context), do: [event]
+
+  defp specialize_event(%AIEvent{condition: condition} = event, context) do
+    case ConditionEvaluator.specialize(context, condition) do
+      :met -> [%{event | condition: nil}]
+      :unmet -> []
+      residual -> [%{event | condition: residual}]
+    end
+  end
 
   defp player_controlled_pet?(%Pet{kind: kind, owner_guid: owner}) when kind in [:hunter, :summon] do
     is_integer(owner) and Guid.entity_type(owner) == :player

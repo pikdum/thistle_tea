@@ -177,6 +177,70 @@ defmodule ThistleTea.Game.Core.ConditionTest do
     end
   end
 
+  describe "specialize/2" do
+    test "decides database guid and content patch leaves from a spawn's fixed facts" do
+      context = spawn_context(80_152)
+
+      assert Condition.specialize(context, db_guid([80_184, 80_152])) == :met
+      assert Condition.specialize(context, db_guid([80_184])) == :unmet
+      assert Condition.specialize(context, %{db_guid([80_184]) | reverse?: true}) == :met
+      assert Condition.specialize(context, %Condition{type: :content_patch, value1: 10, value2: 0}) == :met
+      assert Condition.specialize(spawn_context(nil), db_guid([80_152])) == db_guid([80_152])
+    end
+
+    test "folds combinators around decided leaves and keeps what the spawn cannot decide" do
+      context = spawn_context(80_152)
+      level = %Condition{entry: 7, type: :level, value1: 20, value2: 0}
+
+      assert Condition.specialize(context, %Condition{type: :or, children: [db_guid([1]), db_guid([80_152])]}) == :met
+      assert Condition.specialize(context, %Condition{type: :or, children: [db_guid([1]), db_guid([2])]}) == :unmet
+      assert Condition.specialize(context, %Condition{type: :and, children: [db_guid([1]), level]}) == :unmet
+      assert Condition.specialize(context, %Condition{type: :not, children: [db_guid([80_152])]}) == :unmet
+
+      assert Condition.specialize(context, %Condition{type: :or, reverse?: true, children: [db_guid([80_152])]}) ==
+               :unmet
+
+      assert %Condition{type: :and, children: [^level]} =
+               Condition.specialize(context, %Condition{type: :and, children: [db_guid([80_152]), level]})
+
+      assert %Condition{type: :or, children: [^level]} =
+               Condition.specialize(context, %Condition{type: :or, children: [db_guid([1]), level]})
+    end
+
+    test "leaves read through swapped targets stay undecided" do
+      swapped = %{db_guid([80_152]) | swap_targets?: true}
+      tree = %Condition{type: :or, swap_targets?: true, children: [db_guid([80_152])]}
+
+      assert Condition.specialize(spawn_context(80_152), swapped) == swapped
+      assert Condition.specialize(spawn_context(80_152), tree) == tree
+    end
+
+    test "a specialized tree evaluates exactly like the original" do
+      level = %Condition{entry: 7, type: :level, value1: 20, value2: 0}
+
+      trees = [
+        %Condition{type: :and, children: [db_guid([80_152]), level]},
+        %Condition{type: :or, children: [db_guid([1]), %{level | reverse?: true}]},
+        %Condition{type: :not, children: [%Condition{type: :and, children: [level, db_guid([80_152])]}]},
+        %Condition{type: :or, children: [db_guid([1]), %Condition{entry: 8, type: :level}]}
+      ]
+
+      for tree <- trees, target_level <- [20, 21, nil] do
+        runtime =
+          Context.new(
+            source: Subject.new(db_guid: 80_152),
+            target: Subject.new(level: target_level),
+            content_patch: 10
+          )
+
+        specialized = Condition.specialize(spawn_context(80_152), tree)
+        expected = Condition.evaluate(runtime, tree)
+        actual = if is_struct(specialized, Condition), do: Condition.evaluate(runtime, specialized), else: specialized
+        assert actual == expected
+      end
+    end
+  end
+
   describe "compare/3" do
     test "implements VMangos comparison modes" do
       assert Condition.compare(5, 5, 0)
@@ -271,6 +335,14 @@ defmodule ThistleTea.Game.Core.ConditionTest do
   defp leaf(:unknown), do: %Condition{entry: 5, type: :level}
 
   defp context, do: Context.new(source: Subject.new(entry: 38))
+
+  defp spawn_context(db_guid),
+    do: Context.new(source: Subject.new(kind: :creature, db_guid: db_guid), content_patch: 10)
+
+  defp db_guid(guids) do
+    [value1, value2, value3, value4] = Enum.take(guids ++ [0, 0, 0, 0], 4)
+    %Condition{type: :db_guid, value1: value1, value2: value2, value3: value3, value4: value4}
+  end
 
   defp instance_condition(expected, comparison) do
     %Condition{entry: 3_755, type: :instance_data, value1: 7, value2: expected, value3: comparison}

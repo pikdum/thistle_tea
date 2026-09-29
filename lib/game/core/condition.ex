@@ -4,6 +4,11 @@ defmodule ThistleTea.Game.Core.Condition do
   the pure three-valued evaluator over those trees. Raw values and flags are
   retained so evaluation can preserve exact upstream semantics while
   capability support is migrated.
+
+  `specialize/2` partially evaluates a tree against the facts a spawn can
+  never change (its database guid and the content patch): the leaves those
+  facts decide become results, the combinators fold around them, and whatever
+  is left is returned as a smaller tree with the same semantics.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -25,6 +30,7 @@ defmodule ThistleTea.Game.Core.Condition do
 
   @flag_reverse_result 0x1
   @flag_swap_targets 0x2
+  @static_types [:none, :db_guid, :content_patch]
 
   @types %{
     -3 => :not,
@@ -192,7 +198,46 @@ defmodule ThistleTea.Game.Core.Condition do
     end
   end
 
+  def specialize(%Context{} = context, %Condition{type: type} = condition) when type in @static_types do
+    case evaluate(context, condition) do
+      result when result in [:met, :unmet] -> result
+      {:unknown, _reasons} -> condition
+    end
+  end
+
+  def specialize(%Context{} = context, %Condition{type: type, children: [_ | _] = children} = condition)
+      when type in [:not, :or, :and] do
+    inner = if condition.swap_targets?, do: Context.swap(context), else: context
+
+    children
+    |> Enum.map(&specialize(inner, &1))
+    |> fold(condition)
+    |> fold_reverse(condition)
+  end
+
+  def specialize(%Context{}, %Condition{} = condition), do: condition
+
   def compare(actual, expected, mode), do: Result.compare(actual, expected, mode)
+
+  defp fold([result], %Condition{type: :not}) when result in [:met, :unmet], do: Result.negate(result)
+  defp fold([%Condition{} = child], %Condition{type: :not} = condition), do: %{condition | children: [child]}
+  defp fold(_children, %Condition{type: :not} = condition), do: condition
+  defp fold(children, %Condition{type: :or} = condition), do: fold_around(children, condition, :met, :unmet)
+  defp fold(children, %Condition{type: :and} = condition), do: fold_around(children, condition, :unmet, :met)
+
+  defp fold_around(children, condition, dominant, neutral) do
+    if dominant in children do
+      dominant
+    else
+      case Enum.reject(children, &(&1 == neutral)) do
+        [] -> neutral
+        remaining -> %{condition | children: remaining}
+      end
+    end
+  end
+
+  defp fold_reverse(result, %Condition{reverse?: true}) when result in [:met, :unmet], do: Result.negate(result)
+  defp fold_reverse(result, _condition), do: result
 
   defp precomputed(%Context{environment: %{condition_results: results}}, %Condition{} = condition)
        when is_map(results) do

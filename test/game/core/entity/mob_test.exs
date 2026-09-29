@@ -2,8 +2,10 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Core.AI.AIEvent
   alias ThistleTea.Game.Core.Combat
   alias ThistleTea.Game.Core.Combat.Engagement.Tap
+  alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
   alias ThistleTea.Game.Core.Entity.Component.Internal.Loot
@@ -116,6 +118,27 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
         explicit = %{creature | creature_template: %{creature.creature_template | ai_name: ai}}
         refute Mob.critter?(MobBuilder.build(explicit))
       end
+    end
+
+    test "specializes EventAI gates to the spawn's database guid" do
+      emote = %AIEvent{event_type: :timer_ooc, condition: %Condition{type: :db_guid, value1: 80_152}, actions: []}
+      aggro = %AIEvent{event_type: :aggro, actions: []}
+
+      creature = %Mangos.Creature{
+        guid: 7,
+        id: 38,
+        modelid: 3,
+        curhealth: 10,
+        creature_movement: [],
+        equip_items: [nil, nil, nil],
+        ai_events: [aggro, emote],
+        creature_template: %Mangos.CreatureTemplate{entry: 38, name: "Defias Thug", ai_name: "EventAI", scale: 1.0}
+      }
+
+      assert [^aggro] = MobBuilder.build(creature).internal.creature.ai_events
+
+      assert [^aggro, %AIEvent{condition: nil}] =
+               MobBuilder.build(%{creature | guid: 80_152}).internal.creature.ai_events
     end
 
     test "derives proximity aggro from VMangos creature extra flags" do

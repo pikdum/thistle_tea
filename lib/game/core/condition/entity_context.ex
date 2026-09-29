@@ -1,7 +1,8 @@
 defmodule ThistleTea.Game.Core.Condition.EntityContext do
   @moduledoc """
   Pure projection of an entity and its behavior-tree environment into a
-  condition context.
+  condition context. `static/1` projects only the facts a creature spawn can
+  never change, for specializing its conditions when it is built.
   """
 
   alias ThistleTea.Game.Core.AI.BT.Context, as: AIContext
@@ -37,6 +38,13 @@ defmodule ThistleTea.Game.Core.Condition.EntityContext do
       now: ai_context.condition_now,
       content_patch: @content_patch,
       environment: %{condition_results: condition_results(ai_context, target_guid)}
+    )
+  end
+
+  def static(%Mob{object: object, internal: %Internal{creature: %Creature{db_guid: db_guid}}}) do
+    Context.new(
+      source: %Subject{guid: object.guid, kind: :creature, db_guid: db_guid},
+      content_patch: @content_patch
     )
   end
 

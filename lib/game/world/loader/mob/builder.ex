@@ -2,11 +2,13 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
   @moduledoc """
   Builds mob entities from VMangos `creature` rows and their templates: level,
   class-level stats with template multipliers, model and scale, flags, ranges,
-  virtual items, and waypoint routes.
+  virtual items, and waypoint routes. EventAI conditions are specialized to
+  the spawn as it is built.
   """
   import Bitwise, only: [|||: 2, <<<: 2, &&&: 2]
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Core.AI.EventAI
   alias ThistleTea.Game.Core.Combat.Reactive
   alias ThistleTea.Game.Core.Creature.CreatureFlags
   alias ThistleTea.Game.Core.Creature.CreatureMovement
@@ -220,6 +222,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
     |> Reactive.sync_health()
     |> MovementStats.recompute()
     |> CreatureMovement.sync()
+    |> EventAI.specialize()
     |> then(fn mob ->
       if Keyword.get(opts, :apply_addon_auras?, true), do: Mob.apply_addon_auras(mob, Time.now()), else: mob
     end)
