@@ -8,16 +8,12 @@ defmodule ThistleTea.Game.Core.Combat.Threat do
   `internal.threat` and is wiped when the mob leaves combat.
   """
   alias ThistleTea.Game.Core.Aura.Holder
-  alias ThistleTea.Game.Core.Combat
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
-  alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Metadata
 
   @melee_overtake_ratio 1.1
   @ranged_overtake_ratio 1.3
@@ -223,12 +219,10 @@ defmodule ThistleTea.Game.Core.Combat.Threat do
 
   def entries(_entity), do: []
 
-  def reselect(entity, opts \\ [])
-
   def reselect(%Mob{unit: %Unit{target: current}, internal: %Internal{threat: table}} = entity, opts)
       when is_map(table) do
-    valid? = Keyword.get_lazy(opts, :valid?, fn -> &valid_target?(entity, &1) end)
-    in_melee? = Keyword.get_lazy(opts, :in_melee?, fn -> &in_melee_range?(entity, &1) end)
+    valid? = Keyword.fetch!(opts, :valid?)
+    in_melee? = Keyword.fetch!(opts, :in_melee?)
 
     {kept, dropped} = Enum.split_with(table, fn {guid, _threat} -> valid?.(guid) end)
     pruned = Map.new(kept)
@@ -292,13 +286,6 @@ defmodule ThistleTea.Game.Core.Combat.Threat do
     end
   end
 
-  defp valid_target?(%Mob{internal: %Internal{world: world}} = entity, guid) do
-    case World.position(guid) do
-      {^world, _x, _y, _z} -> Hostility.valid_attack_target?(entity, guid)
-      _ -> false
-    end
-  end
-
   defp taunt_caster(%Mob{unit: %Unit{auras: holders}}, valid?) when is_list(holders) do
     holders
     |> Enum.filter(&Holder.has_aura_type?(&1, :mod_taunt))
@@ -312,24 +299,4 @@ defmodule ThistleTea.Game.Core.Combat.Threat do
   end
 
   defp taunt_caster(_entity, _valid?), do: nil
-
-  defp in_melee_range?(%Mob{} = entity, guid) do
-    case World.distance_between(entity, guid) do
-      distance when is_number(distance) ->
-        distance <= Combat.melee_reach(own_combat_reach(entity), target_combat_reach(guid))
-
-      _ ->
-        false
-    end
-  end
-
-  defp own_combat_reach(%Mob{unit: %Unit{combat_reach: reach}}) when is_number(reach) and reach > 0, do: reach
-  defp own_combat_reach(%Mob{}), do: Unit.default_combat_reach()
-
-  defp target_combat_reach(guid) do
-    case Metadata.query(guid, [:combat_reach]) do
-      %{combat_reach: reach} when is_number(reach) -> reach
-      _ -> Unit.default_combat_reach()
-    end
-  end
 end

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.World.Combat.CallForHelpTest do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Combat.CallForHelp
+  alias ThistleTea.Game.World.Combat.ThreatSelection
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -21,7 +22,7 @@ defmodule ThistleTea.Game.World.Combat.CallForHelpTest do
     test "captures the caller's current fight reference for initial assistance" do
       {caller, enemy_guid} = combat_scene()
       put_helper({5.0, 0.0, 0.0})
-      %{entity: caller} = Engagement.enter(caller, enemy_guid, 1_000)
+      %{entity: caller} = Engagement.enter(caller, enemy_guid, 1_000, ThreatSelection.opts(caller))
       source = CombatLeash.reference(caller)
       CallForHelp.assist(caller, enemy_guid)
       assert_receive {:"$gen_cast", {:assist_attack, ^enemy_guid, ^source}}
@@ -148,7 +149,7 @@ defmodule ThistleTea.Game.World.Combat.CallForHelpTest do
       {caller, enemy_guid} = combat_scene()
       put_helper({5.0, 0.0, 0.0})
       put_helper({25.0, 0.0, 0.0})
-      %{entity: caller} = Engagement.enter(caller, enemy_guid, 1_000)
+      %{entity: caller} = Engagement.enter(caller, enemy_guid, 1_000, ThreatSelection.opts(caller))
       source = CombatLeash.reference(caller)
       helpers = CallForHelp.capture(caller, enemy_guid)
       assert length(helpers) == 1
@@ -163,7 +164,7 @@ defmodule ThistleTea.Game.World.Combat.CallForHelpTest do
     test "rechecks captured helpers without replacing an unavailable one" do
       {caller, enemy_guid} = combat_scene()
       helper = put_helper({5.0, 0.0, 0.0})
-      %{entity: caller} = Engagement.enter(caller, enemy_guid, 1_000)
+      %{entity: caller} = Engagement.enter(caller, enemy_guid, 1_000, ThreatSelection.opts(caller))
       source = CombatLeash.reference(caller)
       helpers = CallForHelp.capture(caller, enemy_guid)
       Metadata.update(helper, %{assistance_available?: false})
@@ -177,12 +178,12 @@ defmodule ThistleTea.Game.World.Combat.CallForHelpTest do
     test "ignores callbacks from a previous fight, even against the same victim" do
       {caller, enemy_guid} = combat_scene()
       put_helper({5.0, 0.0, 0.0})
-      %{entity: caller} = Engagement.enter(caller, enemy_guid, 1_000)
+      %{entity: caller} = Engagement.enter(caller, enemy_guid, 1_000, ThreatSelection.opts(caller))
       source = CombatLeash.reference(caller)
       helpers = CallForHelp.capture(caller, enemy_guid)
       %{entity: idle} = Engagement.leave(caller, :evade)
       CallForHelp.deliver(idle, enemy_guid, helpers, source)
-      %{entity: fighting} = Engagement.enter(idle, enemy_guid, 2_000)
+      %{entity: fighting} = Engagement.enter(idle, enemy_guid, 2_000, ThreatSelection.opts(idle))
       refute CombatLeash.reference(fighting) == source
       CallForHelp.deliver(fighting, enemy_guid, helpers, source)
 
@@ -192,7 +193,7 @@ defmodule ThistleTea.Game.World.Combat.CallForHelpTest do
     test "does not deliver across world copies" do
       {caller, enemy_guid} = combat_scene()
       helper = put_helper({5.0, 0.0, 0.0})
-      %{entity: caller} = Engagement.enter(caller, enemy_guid, 1_000)
+      %{entity: caller} = Engagement.enter(caller, enemy_guid, 1_000, ThreatSelection.opts(caller))
       source = CombatLeash.reference(caller)
       helpers = CallForHelp.capture(caller, enemy_guid)
       SpatialHash.update(:mobs, helper, WorldRef.instance(0, 33), 5.0, 0.0, 0.0)

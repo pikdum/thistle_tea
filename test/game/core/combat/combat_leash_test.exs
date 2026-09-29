@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Core.Combat.CombatLeashTest do
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Combat.ThreatSelection
 
   describe "should_evade?/3" do
     test "anchors a patrol fight at its current location and waits more than twelve seconds" do
@@ -52,14 +53,14 @@ defmodule ThistleTea.Game.Core.Combat.CombatLeashTest do
     test "hostile contact extends the timer without moving the origin and a new fight changes its reference" do
       mob = engage()
       original = CombatLeash.reference(mob)
-      %{entity: mob} = Engagement.enter(at(mob, {1_060.0, 0.0, 0.0}), 20, 10_000)
+      %{entity: mob} = Engagement.enter(at(mob, {1_060.0, 0.0, 0.0}), 20, 10_000, ThreatSelection.opts(mob))
       assert mob.internal.combat_leash.origin == {1_000.0, 0.0, 0.0}
       refute CombatLeash.should_evade?(mob, 20_000)
       assert CombatLeash.reference(mob) == original
       %{entity: mob} = Engagement.leave(mob, :evade)
       assert CombatLeash.reference(mob) == nil
       assert %Effects.CombatLeashEvent{ref: original, event: :stop} in mob.internal.events
-      %{entity: mob} = Engagement.enter(mob, 20, 21_000)
+      %{entity: mob} = Engagement.enter(mob, 20, 21_000, ThreatSelection.opts(mob))
       assert CombatLeash.reference(mob).generation == original.generation + 1
       assert mob.internal.combat_leash.origin == {1_060.0, 0.0, 0.0}
     end
@@ -103,7 +104,7 @@ defmodule ThistleTea.Game.Core.Combat.CombatLeashTest do
       internal: %Internal{world: WorldRef.open(0), spawn: %Spawn{position: {0.0, 0.0, 0.0}, incarnation_id: 1}}
     }
 
-    %{entity: mob} = Engagement.enter(mob, 20, 1_000)
+    %{entity: mob} = Engagement.enter(mob, 20, 1_000, ThreatSelection.opts(mob))
     mob
   end
 

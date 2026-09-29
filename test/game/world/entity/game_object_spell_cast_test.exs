@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSpellCastTest do
   alias ThistleTea.Game.Core.Spell.UnitTargets.Selector
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Combat.ThreatSelection
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.GameObject.Goober
   alias ThistleTea.Game.World.Entity.GameObject.SpellCast
@@ -163,7 +164,10 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSpellCastTest do
       refute Enum.any?(damaged.internal.events, &is_struct(&1, Effects.AttackerGained))
 
       owner = player(object, 5.0)
-      %Engagement.Result{entity: engaged} = Engagement.enter(target, owner.object.guid, 1_000)
+
+      %Engagement.Result{entity: engaged} =
+        Engagement.enter(target, owner.object.guid, 1_000, ThreatSelection.opts(target))
+
       {damaged, _events} = SpellEffect.receive(engaged, delivery.cast_context, spell, 2_000)
       assert damaged.unit.health == 11
       assert damaged.internal.in_combat

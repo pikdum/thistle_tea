@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Core.Creature.CreatureReactionTest do
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Power.Regen
+  alias ThistleTea.Game.World.Combat.ThreatSelection
   alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
 
   setup [:mob]
@@ -58,7 +59,10 @@ defmodule ThistleTea.Game.Core.Creature.CreatureReactionTest do
   describe "set/2" do
     test "passive creatures refuse combat entry, damage retaliation, and assistance", %{mob: mob} do
       passive = CreatureReaction.set(mob, :passive)
-      assert %Engagement.Result{entity: ^passive, reason: :passive} = Engagement.enter(passive, 1, 100)
+
+      assert %Engagement.Result{entity: ^passive, reason: :passive} =
+               Engagement.enter(passive, 1, 100, ThreatSelection.opts(passive))
+
       attacked = Engagement.on_damage(passive, 1, 100)
       assert attacked.internal.in_combat
       assert attacked.internal.threat == %{1 => 0.0}
@@ -102,10 +106,13 @@ defmodule ThistleTea.Game.Core.Creature.CreatureReactionTest do
     test "preserves the current victim but refuses replacements while passive", %{mob: mob} do
       %{entity: fighting} = Engagement.enter(mob, 1, 100, selection: :target)
       passive = fighting |> CreatureReaction.set(:passive) |> Threat.add(2, 100)
-      %{entity: unchanged, decision: :keep} = Engagement.select(passive, valid?: fn _ -> true end)
+
+      %{entity: unchanged, decision: :keep} =
+        Engagement.select(passive, valid?: fn _ -> true end, in_melee?: fn _ -> false end)
+
       assert unchanged.unit.target == 1
 
-      %{entity: waiting, decision: :keep} = Engagement.select(passive, valid?: &(&1 == 2))
+      %{entity: waiting, decision: :keep} = Engagement.select(passive, valid?: &(&1 == 2), in_melee?: fn _ -> false end)
       assert waiting.unit.target == 0
       assert waiting.internal.threat == %{2 => 100.0}
       assert waiting.internal.in_combat
@@ -131,7 +138,9 @@ defmodule ThistleTea.Game.Core.Creature.CreatureReactionTest do
       refute Enum.any?(waiting.internal.events, &is_struct(&1, Effects.AttackStart))
 
       %{entity: defensive, decision: {:switch, 1}} =
-        waiting |> CreatureReaction.set(:defensive) |> Engagement.select(valid?: fn _ -> true end)
+        waiting
+        |> CreatureReaction.set(:defensive)
+        |> Engagement.select(valid?: fn _ -> true end, in_melee?: fn _ -> false end)
 
       assert defensive.unit.target == 1
 

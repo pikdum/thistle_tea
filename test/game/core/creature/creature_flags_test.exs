@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Core.Creature.CreatureFlagsTest do
   alias ThistleTea.Game.Core.Spell.SpellEffect
   alias ThistleTea.Game.Core.Spell.SpellResist
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Combat.ThreatSelection
   alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
 
   setup [:creature]
@@ -202,7 +203,7 @@ defmodule ThistleTea.Game.Core.Creature.CreatureFlagsTest do
     test "sessile evasion cleans combat without moving home", %{creature: creature} do
       mob = creature |> build(0x100108) |> engage() |> Entity.take_damage(99, 500)
       mob = %{mob | movement_block: %{mob.movement_block | position: {10.0, 0.0, 0.0, 0.0}}}
-      reset = MobBT.drop_threat(mob, 1, context(20.0))
+      reset = MobBT.drop_threat(mob, 1, context(20.0), ThreatSelection.opts(mob))
       assert reset.unit.health == 100
       refute reset.internal.in_combat
       assert reset.internal.threat == %{}

@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Core.Movement.DistractionTest do
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.Spell.SpellEffect
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Combat.ThreatSelection
 
   setup [:build_mob]
 
@@ -85,7 +86,7 @@ defmodule ThistleTea.Game.Core.Movement.DistractionTest do
 
     test "combat permanently cancels the pause", %{mob: mob} do
       {mob, _} = Distraction.apply(mob, {0.0, 5.0, 0.0}, 10_000, 1_000)
-      assert %Engagement.Result{entity: mob} = Engagement.enter(mob, 99, 2_000)
+      assert %Engagement.Result{entity: mob} = Engagement.enter(mob, 99, 2_000, ThreatSelection.opts(mob))
       assert mob.internal.in_combat
       assert mob.internal.blackboard.navigation.distracted_until == nil
     end

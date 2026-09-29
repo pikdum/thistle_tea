@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Core.Combat.CombatStateTest do
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Spell.Casting
   alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Game.World.Combat.ThreatSelection
 
   setup [:actors]
 
@@ -111,7 +112,7 @@ defmodule ThistleTea.Game.Core.Combat.CombatStateTest do
     test "creature engagement and pet references share interruption", ctx do
       for entity <- [ctx.mob, ctx.pet] do
         casting = prepare(entity, ctx.spell, 1_000)
-        %Engagement.Result{entity: entered} = Engagement.enter(casting, 2, 1_500)
+        %Engagement.Result{entity: entered} = Engagement.enter(casting, 2, 1_500, ThreatSelection.opts(casting))
         assert entered.internal.casting == nil
         assert entered.internal.in_combat
         assert Enum.any?(entered.internal.events, &match?(%Effects.SpellCastFailed{reason: :interrupted}, &1))

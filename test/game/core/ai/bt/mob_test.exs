@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Combat.ThreatSelection
   alias ThistleTea.Game.World.Entity.AIEnvironment
   alias ThistleTea.Game.World.Entity.NavigationResolver
   alias ThistleTea.Game.World.Metadata
@@ -200,7 +201,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
             blackboard: %Blackboard{combat: %Blackboard.Combat{auto_attacking: true}}
         }
 
-        pet = MobBT.drop_threat(%{mob | unit: unit, internal: internal}, target, Context.new(1_000))
+        pet = drop_threat(%{mob | unit: unit, internal: internal}, target, Context.new(1_000))
 
         refute pet.internal.in_combat
         assert Threat.entries(pet) == []
@@ -232,7 +233,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
         }
       }
 
-      mob = MobBT.drop_threat(mob, target)
+      mob = drop_threat(mob, target)
 
       refute mob.internal.in_combat
       assert Threat.entries(mob) == []
@@ -261,7 +262,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
           blackboard: %Blackboard{combat: %Blackboard.Combat{auto_attacking: true}}
       }
 
-      mob = MobBT.drop_threat(%{mob | unit: unit, internal: internal}, target)
+      mob = drop_threat(%{mob | unit: unit, internal: internal}, target)
       {_status, mob} = BehaviorRunner.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, Time.now()))
 
       assert mob.movement_block.position == {0.0, 0.0, 0.0, 2.5}
@@ -286,7 +287,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
 
       mob =
         %{mob | unit: unit, internal: internal}
-        |> MobBT.drop_threat(target)
+        |> drop_threat(target)
         |> NavigationResolver.resolve(Time.now())
 
       refute mob.internal.in_combat
@@ -305,7 +306,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
 
       put_spatial_target(:players, replacement, {1.0, 0.0, 0.0}, alliance(), 5)
 
-      mob = MobBT.drop_threat(mob, vanished)
+      mob = drop_threat(mob, vanished)
 
       assert mob.internal.in_combat
       assert mob.unit.target == replacement
@@ -319,7 +320,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       internal = %{mob.internal | threat: %{}, spawn: %Spawn{position: {0.0, 0.0, 0.0}}}
       mob = %{mob | unit: unit, internal: internal}
 
-      assert MobBT.drop_threat(mob, target) == mob
+      assert drop_threat(mob, target) == mob
     end
 
     test "does not evade, heal, or clear loot from a corpse" do
@@ -347,7 +348,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
 
       corpse = %{mob | unit: unit, internal: internal}
 
-      assert MobBT.drop_threat(corpse, target) == corpse
+      assert drop_threat(corpse, target) == corpse
     end
 
     test "only releases a stale threat reference from a corpse" do
@@ -366,7 +367,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       }
 
       corpse = %{mob | unit: unit, internal: internal}
-      result = MobBT.drop_threat(corpse, target)
+      result = drop_threat(corpse, target)
 
       assert result.unit == corpse.unit
       assert result.internal.loot == corpse.internal.loot
@@ -1238,6 +1239,9 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
   end
 
   defp finish_current_move(%Mob{} = mob), do: mob
+
+  defp drop_threat(mob, target, context \\ Context.new(Time.now())),
+    do: MobBT.drop_threat(mob, target, context, ThreatSelection.opts(mob))
 
   defp fixture_mob(opts \\ []) do
     %Mob{

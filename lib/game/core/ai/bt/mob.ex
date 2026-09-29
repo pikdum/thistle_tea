@@ -56,7 +56,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.Core.Movement
   alias ThistleTea.Game.Core.Movement.Distraction
-  alias ThistleTea.Game.Core.Time
 
   @chase_tick_delay 1_000
 
@@ -577,21 +576,15 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
     {:success, state, state.internal.blackboard}
   end
 
-  def drop_threat(%Mob{} = state, source_guid) when is_integer(source_guid) do
-    drop_threat(state, source_guid, Context.new(Time.now()))
-  end
-
-  def drop_threat(state, _source_guid), do: state
-
-  def drop_threat(%Mob{} = state, source_guid, %Context{} = context) when is_integer(source_guid) do
-    case Engagement.drop(state, source_guid) do
+  def drop_threat(%Mob{} = state, source_guid, %Context{} = context, selection) when is_integer(source_guid) do
+    case Engagement.drop(state, source_guid, selection) do
       %Engagement.Result{entity: state, reason: :untracked} -> state
       %Engagement.Result{entity: state, decision: :none} -> reset_after_combat(state, context)
       %Engagement.Result{entity: state} -> state
     end
   end
 
-  def drop_threat(state, _source_guid, %Context{}), do: state
+  def drop_threat(state, _source_guid, %Context{}, _selection), do: state
 
   def reset_after_combat(%Mob{} = state, %Context{} = context) do
     reset_after_combat(state, Blackboard.ensure(state.internal.blackboard), context)

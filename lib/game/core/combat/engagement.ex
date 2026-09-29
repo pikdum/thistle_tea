@@ -100,7 +100,7 @@ defmodule ThistleTea.Game.Core.Combat.Engagement do
   end
 
   defp react_to_damage(%Mob{internal: %Internal{in_combat: combat?}} = entity, source, now) when combat? != true do
-    selection = if default_selection(entity) == :preserve, do: :preserve, else: :target
+    selection = if default_selection(entity, []) == :preserve, do: :preserve, else: :target
     %Result{entity: entity} = enter(entity, source, now, selection: selection, contact?: true)
     entity
   end
@@ -140,7 +140,7 @@ defmodule ThistleTea.Game.Core.Combat.Engagement do
       |> CombatState.enter(now)
 
     entity = Threat.add(entity, target_guid, 0)
-    selection = Keyword.get(opts, :selection, default_selection(entity))
+    selection = Keyword.get_lazy(opts, :selection, fn -> default_selection(entity, opts) end)
 
     %Result{entity: entity, decision: decision} =
       select_on_enter(entity, target_guid, selection)
@@ -351,10 +351,14 @@ defmodule ThistleTea.Game.Core.Combat.Engagement do
 
   defp select_on_enter(entity, _target_guid, opts) when is_list(opts), do: select(entity, opts)
 
-  defp default_selection(%Mob{internal: %Internal{pet: %Pet{attack_command?: true}}, unit: %Unit{target: target_guid}})
+  defp default_selection(
+         %Mob{internal: %Internal{pet: %Pet{attack_command?: true}}, unit: %Unit{target: target_guid}},
+         _opts
+       )
        when is_integer(target_guid) and target_guid > 0, do: :preserve
 
-  defp default_selection(%Mob{} = mob), do: if(Mob.critter?(mob), do: :preserve, else: [])
+  defp default_selection(%Mob{} = mob, opts),
+    do: if(Mob.critter?(mob), do: :preserve, else: Keyword.take(opts, [:valid?, :in_melee?]))
 
   defp victim_change_effects(previous, target_guid) when is_integer(previous) do
     [Effects.attacker_lost(previous), Effects.attacker_gained(target_guid)]

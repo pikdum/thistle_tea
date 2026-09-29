@@ -92,6 +92,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   alias ThistleTea.Game.World.Combat.ChaseWatch
   alias ThistleTea.Game.World.Combat.DamageSharing
   alias ThistleTea.Game.World.Combat.KillReward
+  alias ThistleTea.Game.World.Combat.ThreatSelection
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.AIEnvironment
   alias ThistleTea.Game.World.Entity.EventSink
@@ -686,7 +687,11 @@ defmodule ThistleTea.Game.World.Entity.Mob do
 
     state =
       state
-      |> MobBT.drop_threat(source_guid, AIEnvironment.context(state, now, ObservationRequest.actor(source_guid)))
+      |> MobBT.drop_threat(
+        source_guid,
+        AIEnvironment.context(state, now, ObservationRequest.actor(source_guid)),
+        ThreatSelection.opts(state)
+      )
       |> NavigationResolver.resolve(now)
       |> EventSink.emit_pending()
       |> wake_ai_tick()
@@ -2041,7 +2046,9 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   end
 
   defp enter_combat(%Mob{} = state, caster, opts, now) do
-    %Engagement.Result{entity: state, from: from, to: to} = Engagement.enter(state, caster, now, opts)
+    %Engagement.Result{entity: state, from: from, to: to} =
+      Engagement.enter(state, caster, now, ThreatSelection.opts(state) ++ opts)
+
     was_in_combat = from == :engaged
 
     if to == :engaged do

@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet.ReturnTest do
   alias ThistleTea.Game.Core.Spell.Casting
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Combat.ThreatSelection
   alias ThistleTea.Game.World.Entity.NavigationResolver
 
   setup [:pet]
@@ -151,7 +152,10 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet.ReturnTest do
 
       returning = PetBT.clear_combat_state(pet, 1_000)
       assert Targeting.retaliation?(returning, target, context(returning, target))
-      assert %Engagement.Result{entity: defended, to: :engaged} = Engagement.enter(returning, target, 1_001)
+
+      assert %Engagement.Result{entity: defended, to: :engaged} =
+               Engagement.enter(returning, target, 1_001, ThreatSelection.opts(returning))
+
       assert defended.internal.blackboard.pet.returning == nil
     end
 

@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetLifecycleTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Combat.ThreatSelection
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.EventSink.Context
@@ -193,7 +194,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetLifecycleTest do
   describe "taming lifecycle" do
     test "stops the wild creature without leaving threat or world projections", %{pet: pet, guid: guid, owner: owner} do
       wild = %{pet | internal: %{pet.internal | pet: nil}}
-      wild = Engagement.enter(wild, owner, ThistleTea.Game.Core.Time.now()).entity
+      wild = Engagement.enter(wild, owner, ThistleTea.Game.Core.Time.now(), ThreatSelection.opts(wild)).entity
       {:ok, pid} = World.start_entity(wild)
       ref = Process.monitor(pid)
       spell = %Spell{id: 13_481, effects: [%Effect{index: 0, type: :tame_creature}]}

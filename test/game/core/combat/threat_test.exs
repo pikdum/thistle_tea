@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Core.Combat.ThreatTest do
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.World.Combat.ThreatSelection
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
 
@@ -265,7 +266,7 @@ defmodule ThistleTea.Game.Core.Combat.ThreatTest do
       entity = mob(guid: mob_guid, threat: %{player_guid => 10.0})
 
       assert {_entity, {:switch, ^player_guid}} =
-               Threat.reselect(entity, in_melee?: fn _guid -> false end)
+               Threat.reselect(entity, Keyword.put(ThreatSelection.opts(entity), :in_melee?, fn _guid -> false end))
     end
 
     test "switches away from an invalid victim" do
