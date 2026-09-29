@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironmentTest do
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Core.Effects
@@ -343,6 +344,47 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironmentTest do
 
       assert length(Perception.nearby(perception, :mobs, 2.0)) == 20
       assert line_of_sight_call_count(tracer) == 1
+    end
+
+    test "an idle aggro check sights only nearby units it could attack" do
+      world = %WorldRef{map_id: 999}
+      creature = %FactionTemplate{id: 98_014, faction_group: 8, enemy_group: 1}
+      mob = mob(world)
+      mob = %{mob | internal: %{mob.internal | in_combat: false}}
+      player_guid = Guid.from_low_guid(:player, 98_040)
+      kin_guids = Enum.map(1..5, &Guid.from_low_guid(:mob, 1, 98_040 + &1))
+
+      Metadata.put(mob.object.guid, %{alive?: true, level: 10, faction_template: creature})
+      put_actor(:players, player_guid, world, 10.0)
+      Metadata.put(player_guid, %{alive?: true, level: 10, faction_template: %FactionTemplate{id: 1, faction_group: 3}})
+
+      for {guid, offset} <- Enum.with_index(kin_guids, 1) do
+        put_actor(:mobs, guid, world, offset * 1.0)
+        Metadata.put(guid, %{alive?: true, level: 10, faction_template: creature})
+      end
+
+      on_exit(fn ->
+        Metadata.delete(mob.object.guid)
+        remove_actor(:players, player_guid)
+        Enum.each(kin_guids, &remove_actor(:mobs, &1))
+      end)
+
+      tracer = start_line_of_sight_trace()
+      perception = AIEnvironment.context(mob, 1_000).perception
+
+      assert length(Perception.nearby(perception, :mobs, 10.0)) == 5
+      assert Perception.nearby(perception, :players, 10.0) == [{player_guid, 10.0}]
+      assert line_of_sight_call_count(tracer) == 1
+    end
+
+    test "reads the local clock only for local-time conditions" do
+      world = WorldRef.open(0)
+      local_time = %Condition{entry: 1, type: :local_time, value1: 0, value2: 0, value3: 23, value4: 59}
+
+      assert AIEnvironment.context(mob(world), 1_000).condition_now == nil
+
+      assert %NaiveDateTime{} =
+               AIEnvironment.context(mob(world), 1_000, Request.new([], 0.0, script_conditions: [local_time])).condition_now
     end
 
     test "bounds a regular combat snapshot to nearby movement coordination" do

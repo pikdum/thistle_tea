@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.Combat.Aggro
   alias ThistleTea.Game.Core.Combat.CombatReferences
+  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Combat.ZoneCombat
   alias ThistleTea.Game.Core.Condition.Requirements
   alias ThistleTea.Game.Core.Creature.CreatureMovement
@@ -37,6 +38,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Entity.TargetRef
   alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.Core.Movement.Fear
   alias ThistleTea.Game.Core.Party
   alias ThistleTea.Game.Core.Pet.Companion
@@ -101,7 +103,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
       script_conditions: Map.get(condition_results, condition_target, %{}),
       script_conditions_by_target: condition_results,
       script_targets: script_targets,
-      condition_now: local_time(),
+      condition_now: condition_now(requirements),
       condition_area: condition_area(entity, requirements),
       spell_area: spell_area(entity),
       liquid_surface: liquid_surface(entity),
@@ -184,11 +186,16 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
       |> Enum.filter(&(is_integer(&1) and &1 > 0))
       |> Enum.uniq()
 
-    line_of_sight_guids = line_of_sight_guids(entity, now, observed_guids, nearby)
-    observations = Map.new(guids, &{&1, observe(entity, &1, now, line_of_sight_guids)})
+    observations = Map.new(guids, &{&1, observe(entity, &1, now)})
+    line_of_sight_guids = line_of_sight_guids(entity, now, observed_guids, nearby, observations)
+    observations = Map.new(observations, &put_line_of_sight(entity, &1, line_of_sight_guids))
     nearby = Map.new(nearby, fn {kind, entries} -> {kind, observed_distances(entries, observations)} end)
 
     Perception.new(now, origin(entity), observations, nearby)
+  end
+
+  defp put_line_of_sight(entity, {guid, %Observation{} = observation}, line_of_sight_guids) do
+    {guid, %{observation | line_of_sight?: line_of_sight?(entity, guid, line_of_sight_guids)}}
   end
 
   defp observation_radius(%Character{}), do: 0.0
@@ -484,6 +491,10 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
   defp threat_guids(threat) when is_map(threat), do: Map.keys(threat)
   defp threat_guids(_threat), do: []
 
+  defp condition_now(requirements) do
+    if MapSet.member?(requirements, :current_time), do: local_time()
+  end
+
   defp local_time do
     {{year, month, day}, {hour, minute, second}} = :calendar.local_time()
     NaiveDateTime.new!(year, month, day, hour, minute, second)
@@ -522,7 +533,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
 
   defp instance_data(_entity, _requirements, _options), do: nil
 
-  defp observe(entity, guid, now, line_of_sight_guids) do
+  defp observe(entity, guid, now) do
     position = World.position(guid, now)
     metadata = Metadata.get(guid)
     owner = Reaction.owner_projection(guid, metadata)
@@ -536,8 +547,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
       controller_level: controller_level(metadata, owner),
       owner: owner,
       swimmable?: swimmable_target?(entity, position),
-      moving?: World.moving?(guid, now),
-      line_of_sight?: line_of_sight?(entity, guid, line_of_sight_guids)
+      moving?: World.moving?(guid, now)
     }
   end
 
@@ -569,43 +579,54 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
       World.line_of_sight?(entity, guid)
   end
 
-  defp line_of_sight_guids(entity, now, observed_guids, nearby) do
+  defp line_of_sight_guids(entity, now, observed_guids, nearby, observations) do
     observed_guids
     |> Enum.concat(direct_guids(entity))
-    |> Enum.concat(nearby_line_of_sight_guids(entity, now, nearby))
+    |> Enum.concat(nearby_line_of_sight_guids(entity, now, nearby, observations))
     |> Enum.filter(&(is_integer(&1) and &1 > 0))
     |> MapSet.new()
   end
 
-  defp nearby_line_of_sight_guids(entity, now, nearby) do
-    if nearby_line_of_sight_needed?(entity, now) do
-      Enum.flat_map(nearby, fn {_kind, entries} -> Enum.map(entries, &elem(&1, 0)) end)
-    else
-      []
+  defp nearby_line_of_sight_guids(entity, now, nearby, observations) do
+    guids = Enum.flat_map(nearby, fn {_kind, entries} -> Enum.map(entries, &elem(&1, 0)) end)
+
+    case nearby_line_of_sight_scope(entity, now) do
+      :all -> guids
+      :aggro_targets -> aggro_target_candidates(entity, now, guids, observations)
+      :none -> []
     end
   end
 
-  defp nearby_line_of_sight_needed?(%Mob{internal: %Internal{totem: %Totem{}}}, _now), do: true
+  defp nearby_line_of_sight_scope(%Mob{internal: %Internal{totem: %Totem{}}}, _now), do: :all
 
-  defp nearby_line_of_sight_needed?(
+  defp nearby_line_of_sight_scope(
          %Mob{internal: %Internal{pet: %Pet{reaction_state: :aggressive}, in_combat: in_combat}},
          _now
        )
-       when in_combat != true, do: true
+       when in_combat != true, do: :all
 
-  defp nearby_line_of_sight_needed?(
+  defp nearby_line_of_sight_scope(
          %Mob{internal: %Internal{pet: nil, in_combat: false, blackboard: blackboard}} = entity,
          now
        ) do
-    nearby_targeting_needed?(entity) or
-      MobBT.aggro_check_ready?(entity, Blackboard.ensure(blackboard), now)
+    cond do
+      nearby_targeting_needed?(entity) -> :all
+      MobBT.aggro_check_ready?(entity, Blackboard.ensure(blackboard), now) -> :aggro_targets
+      true -> :none
+    end
   end
 
-  defp nearby_line_of_sight_needed?(%Mob{} = entity, _now) do
-    nearby_targeting_needed?(entity)
+  defp nearby_line_of_sight_scope(%Mob{} = entity, _now) do
+    if nearby_targeting_needed?(entity), do: :all, else: :none
   end
 
-  defp nearby_line_of_sight_needed?(_entity, _now), do: false
+  defp nearby_line_of_sight_scope(_entity, _now), do: :none
+
+  defp aggro_target_candidates(%Mob{object: %{guid: own_guid}} = entity, now, guids, observations) do
+    perception = Perception.new(now, origin(entity), observations, %{})
+    source = Perception.actor(perception, own_guid)
+    Enum.filter(guids, &Hostility.valid_hostile_target?(source, Perception.actor(perception, &1)))
+  end
 
   defp nearby_targeting_needed?(%Mob{} = entity) do
     MobSpells.observation_radius(entity) > 0 or
@@ -628,9 +649,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
 
   defp origin(_entity), do: nil
 
-  defp distance({world, x, y, z}, {world, tx, ty, tz}) do
-    :math.sqrt(:math.pow(tx - x, 2) + :math.pow(ty - y, 2) + :math.pow(tz - z, 2))
-  end
+  defp distance({world, x, y, z}, {world, tx, ty, tz}), do: Math.distance({x, y, z}, {tx, ty, tz})
 
   defp distance(_origin, _position), do: nil
 
