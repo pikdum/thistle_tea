@@ -34,13 +34,20 @@
 
 ### Network Messages
 - Server messages: `use ServerMessage, :SMSG_FOO`, implement `to_binary/1`
-- Client messages: `use ClientMessage, :CMSG_FOO`, implement `from_binary/1` and `handle/2`
+- Client messages: `use ClientMessage, :CMSG_FOO`, implement `from_binary/1`; register the opcode in `Message.Dispatch` and handle the struct in a `World.Inbound.*` module
 - Use `<<value::little-size(32)>>` binary patterns for packet parsing
+
+### Layout and Layers
+- `lib/game/core/` (`ThistleTea.Game.Core`): pure data and rules, grouped by domain (`combat/`, `spell/`, `aura/`, `item/`, `quest/`, `pet/`, `class/`, ...). Things that use SMSG_UPDATE_OBJECT (character, mob, game object, item, corpse, dynamic object) and their components live in `core/entity/`; generic entity operations are `Core.Entity`
+- `lib/game/world/` (`ThistleTea.Game.World`): everything effectful. `world/entity/` holds the entity owner processes (player, mob, game object, ...) with their event sinks and effect resolvers; `world/system/` holds shared-owner GenServers (party, guild, battleground, instance, ...); `world/loader/` translates seed rows into core structs and caches them; `world/inbound/` handles decoded client messages; root modules are shared infrastructure (Metadata, SpatialHash, stores, Pathfinding, Visibility)
+- `lib/game/network/` (`ThistleTea.Game.Network`): the connection handler, header crypto, opcodes, and message codecs. It reaches the world only through the `Network.Session` behaviour, whose implementation (`World.Session`) the application passes in at startup
+- Module names follow their paths: `lib/game/core/combat/threat.ex` is `ThistleTea.Game.Core.Combat.Threat`
+- The `boundary` compiler enforces the layering: Core depends on nothing, Network on Core, and World on Core, Network, DB, Auth, and Native. `ThistleTea.DB` (VMangos and DBC schemas) depends on nothing. A forbidden reference is a compiler warning, so `--warnings-as-errors` rejects it. Core's `dirty_xrefs` in `lib/game/core.ex` is the remaining debt into World and DB: never add to it (pass the data in instead), and remove entries as the compiler reports them unneeded
 
 ### Architecture Patterns
 - Functional core / boundary layer split (à la "Designing Elixir Systems with OTP"): the core handles data + logic and stays pure; the boundary handles process orchestration (GenServers, Registries, ETS tables)
 - Keep the core pure: functions like `take_damage` operate on entity/component data and return new data — no DB calls, no process sends, no side effects. This makes logic generic across players, mobs, and game objects, and trivially testable
-- Database queries live at the boundary, not in the core. Loaders (e.g. `lib/game/world/loader/mob.ex`) query Mangos and translate rows into internal entity structs (e.g. `lib/game/core/entity/mob.ex`); domain code never touches `Mangos.*` schemas directly
+- Database queries live at the boundary, not in the core. Loaders (e.g. `lib/game/world/loader/mob.ex` and `World.Loader.Mob.Builder`) query Mangos and translate rows into core structs (e.g. `lib/game/core/entity/mob.ex`); core code never touches `Mangos.*` or `DBC.*` schemas
 - Runtime state is decoupled from the Mangos DB — Mangos is a read-only seed at boundaries, not the system's source of truth at runtime
 - No Mangos queries in gameplay paths: loaders cache in ETS (boot preload or lazy + cache); CMSG handlers and game systems answer from those caches, never `Mangos.Repo` per request
 - Effects as data: pure logic enqueues typed `Core.Effects.*` structs with `Effects.enqueue/2`; the entity owner drains them with `EventSink.emit_pending/1`. `EffectResolver` turns semantic requests into concrete effects, and `EventSink` projects them. Owner-local delivery uses `EventSink.Context`, never ambient `self()` or direct packet sends in interpreters
@@ -55,7 +62,7 @@
 - Mob engagement lifecycle transitions go through `Core.Combat.Engagement`; `Core.Combat.Threat` owns threat values, not victim, tap, combat, death, or reset cleanup
 - Multi-item inventory changes use `Inventory.Batch` → `Inventory.plan` → `Inventory.ChangeSet`; commit once with `InventoryUpdate.apply/2` only after the full plan succeeds
 - Behavior trees are the primary abstraction for AI/action logic. `World.Entity.Mob` and `World.Entity.Player` tick them through `BehaviorRunner`/`TickPlan`; nodes consume immutable `BT.Context`, keep state in typed `Blackboard` subtrees, and enqueue `NavigationIntent` for `NavigationResolver`. Do not add direct world, metadata, pathfinding, clock, or random dependencies to new nodes
-- `test/game/architecture/dependency_test.exs` is a ratchet: do not expand its allowlist to admit new boundary dependencies; remove entries as existing debt is eliminated
+- `test/game/architecture/dependency_test.exs` is a file-level ratchet on the same debt (which core files still reference World or DB) plus event-sink and spatial-index rules: do not expand its allowlists; remove entries as debt is eliminated
 
 ### Formatting
 - No comments in code (keep functions self-documenting via naming); the only exceptions are TODO comments and `# credo:disable-for-next-line` markers where a refactor would hurt clarity
