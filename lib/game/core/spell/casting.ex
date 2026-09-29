@@ -66,8 +66,6 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
   alias ThistleTea.Game.Core.Spell.UnitTargets
   alias ThistleTea.Game.Core.Stats.CastSpeed
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Spell.SpellTargetResolver
 
   def start(entity, spell, targets, now, cast_item_guid \\ nil, cast_item_id \\ 0, opts \\ [])
@@ -1361,7 +1359,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
     unit_guid = Target.unit_guid(targets)
 
     if is_integer(unit_guid) and unit_guid > 0 and unit_guid != self_guid do
-      Spell.attribute?(spell, :ignore_line_of_sight) or World.line_of_sight?(character, unit_guid)
+      Spell.attribute?(spell, :ignore_line_of_sight) or SpellTargetResolver.line_of_sight?(character, unit_guid)
     else
       true
     end
@@ -1412,9 +1410,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
     if Spell.harmful?(spell) do
       {hits, missed} =
         Enum.split_with(targets, fn target_guid ->
-          target_guid == caster_guid or
-            not Hostility.valid_attack_target?(caster, target_guid, area?: true) or
-            spell_hits_target?(caster, target_guid, spell)
+          target_guid == caster_guid or spell_hits_target?(caster, target_guid, spell)
         end)
 
       {hits, Enum.map(missed, &%{guid: &1, reason: spell_miss_reason(spell)})}
@@ -1426,20 +1422,10 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
   defp roll_spell_hits(_caster, _spell, targets), do: {targets, []}
 
   defp spell_hits_target?(caster, target_guid, %Spell{} = spell) do
-    target_player? = Guid.type_id(target_guid) == :player
-
-    metadata =
-      Metadata.query(target_guid, [
-        :alive?,
-        :level,
-        :attacker_spell_hit_chance,
-        :aoe_avoidance,
-        :mechanic_resistance,
-        :school_resistances,
-        :no_spell_defense?
-      ])
-
-    SpellResist.spell_hit?(caster, spell, metadata || %{}, target_player?)
+    case SpellTargetResolver.hit_defense(caster, target_guid) do
+      :unattackable -> true
+      defense -> SpellResist.spell_hit?(caster, spell, defense, Guid.type_id(target_guid) == :player)
+    end
   end
 
   defp spell_miss_reason(%Spell{dmg_class: 1}), do: @spell_miss_reason_resist

@@ -93,6 +93,24 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolver do
          :caster in [effect.implicit_target_a, effect.implicit_target_b])
   end
 
+  @hit_defense_keys [
+    :alive?,
+    :level,
+    :attacker_spell_hit_chance,
+    :aoe_avoidance,
+    :mechanic_resistance,
+    :school_resistances,
+    :no_spell_defense?
+  ]
+
+  def hit_defense(caster, target_guid) when is_integer(target_guid) do
+    if Hostility.valid_attack_target?(caster, target_guid, area?: true),
+      do: Metadata.query(target_guid, @hit_defense_keys) || %{},
+      else: :unattackable
+  end
+
+  def line_of_sight?(caster, target_guid), do: World.line_of_sight?(caster, target_guid)
+
   def insignia_target(caster, spell, targets) do
     info = InsigniaTarget.info(caster, targets)
     with :ok <- CastValidation.validate_target(caster, spell, targets, info), do: {:ok, info.body_guid}

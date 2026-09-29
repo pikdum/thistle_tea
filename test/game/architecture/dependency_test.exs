@@ -9,8 +9,6 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
                              {"lib/game/core/combat/hostility.ex", "ThistleTea.Game.World.System.Duel"},
                              {"lib/game/core/entity/game_object.ex", "ThistleTea.DB.Mangos"},
                              {"lib/game/core/entity/game_object_template.ex", "ThistleTea.DB.Mangos"},
-                             {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World"},
-                             {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World.Metadata"},
                              {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World.Spell.SpellTargetResolver"}
                            ])
 
