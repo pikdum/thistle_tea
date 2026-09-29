@@ -46,3 +46,29 @@ MIX_ENV=bench mix run --no-start bench/spatial_grid.exs
 ```
 
 Cell size should be selected from the complete profile, not query throughput alone. Smaller cells generally reduce candidates but increase membership churn and may shorten the bounded high-speed projection horizon.
+
+# Hot path benchmarks
+
+This harness times the per-tick and per-recipient work that scales with population, using synthetic fixtures so it needs no generated database:
+
+- `update_object`: SMSG_UPDATE_OBJECT encoding for mob and player values/create blocks, for the owner and for another player, plus zlib compression of the resulting payloads;
+- `movement`: `Math.distance/2`, `Math.movement_duration/2`, and `Movement.position_at/4` on active and finished splines;
+- `spatial`: `World.position/2` across every mob and exact 30-yard `World.nearby_units_exact/5` queries over a populated `SpatialHash`.
+
+```console
+MIX_ENV=bench mix run --no-start bench/hot_paths.exs
+```
+
+Update fixtures fill every update field a component declares, so they measure the largest block each object type can produce; real entities leave many fields nil and encode faster.
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `HOT_PATHS_GROUPS` | `update_object,movement,spatial` | Groups to run |
+| `HOT_PATHS_ENTITIES` | `600` | Mobs inserted for the spatial group |
+| `HOT_PATHS_SPACING` | `4.0` | Grid spacing between spatial mobs in yards |
+| `HOT_PATHS_MOVING_PERCENT` | `30` | Percentage of spatial mobs on active splines |
+| `HOT_PATHS_TIME` | `2` | Benchee measurement time per scenario |
+| `HOT_PATHS_WARMUP` | `0.5` | Benchee warmup time per scenario |
+| `HOT_PATHS_MEMORY_TIME` | `0.5` | Benchee memory measurement time per scenario |
+
+Compare runs on the same machine and commit range; the dev environment does not consolidate protocols, so profile a running dev server only for relative weight, not absolute Enumerable cost.
