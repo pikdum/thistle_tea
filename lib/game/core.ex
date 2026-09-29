@@ -19,8 +19,6 @@ defmodule ThistleTea.Game.Core do
       ThistleTea.DB.Mangos.GameObjectTemplate,
       ThistleTea.Game.World,
       ThistleTea.Game.World.Loader.Spell,
-      ThistleTea.Game.World.Loader.SpellPetAura,
-      ThistleTea.Game.World.Loader.SpellThreat,
       ThistleTea.Game.World.Loader.Talent,
       ThistleTea.Game.World.Metadata,
       ThistleTea.Game.World.Spell.SpellTargetResolver,

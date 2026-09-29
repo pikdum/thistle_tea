@@ -29,7 +29,6 @@ defmodule ThistleTea.Game.World.Spell.SpellReception do
   alias ThistleTea.Game.World.Combat.FeignDeath
   alias ThistleTea.Game.World.Entity.EffectResolver.Pvp
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
-  alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
   alias ThistleTea.Game.World.Metadata
 
   defmodule Prepared do
@@ -242,7 +241,7 @@ defmodule ThistleTea.Game.World.Spell.SpellReception do
   end
 
   defp threat_context(target, %CastContext{} = context, spell) do
-    context = %{context | spell_threat: SpellThreatLoader.get(spell.id) || context.spell_threat}
+    context = %{context | spell_threat: spell.threat || context.spell_threat}
 
     case metadata(target, context.caster_guid) do
       %{spell_threat: %SpellThreat{} = projection} -> SpellThreat.put_context(context, spell, projection)

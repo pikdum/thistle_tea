@@ -374,7 +374,6 @@ defmodule ThistleTea.Application do
         )
 
         SummonLoader.preload(InstanceScript.summon_entries() ++ PlaguelandsRewards.creature_entries())
-        Enum.each(Plaguelands.buffs() ++ PlaguelandsRewards.aura_ids(), &SpellLoader.cached/1)
         Logger.info("Loading templates...")
         CreatureTemplateLoader.load_all()
         ExplorationLoader.load_all()
@@ -413,6 +412,7 @@ defmodule ThistleTea.Application do
         TaxiLoader.load_all()
         CreatureArchetypeLoader.load_all()
         CreatureEventLoader.load_all()
+        Enum.each(Plaguelands.buffs() ++ PlaguelandsRewards.aura_ids(), &SpellLoader.cached/1)
 
         OutdoorPvpSystem.configure_towers(
           Towers.new(CaptureEnvironment.templates()),

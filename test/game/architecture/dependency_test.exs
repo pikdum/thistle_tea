@@ -15,11 +15,9 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
                              {"lib/game/core/entity/game_object.ex", "ThistleTea.DB.Mangos"},
                              {"lib/game/core/entity/game_object_template.ex", "ThistleTea.DB.Mangos"},
                              {"lib/game/core/player/talents.ex", "ThistleTea.Game.World.Loader.Talent"},
-                             {"lib/game/core/spell/cast_context.ex", "ThistleTea.Game.World.Loader.SpellThreat"},
                              {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World"},
                              {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World.Metadata"},
-                             {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World.Spell.SpellTargetResolver"},
-                             {"lib/game/core/spell/spell_effect/script.ex", "ThistleTea.Game.World.Loader.SpellPetAura"}
+                             {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World.Spell.SpellTargetResolver"}
                            ])
 
   @spatial_index_boundaries MapSet.new([

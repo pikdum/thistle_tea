@@ -32,7 +32,6 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
   alias ThistleTea.Game.Core.Spell.SpellEffect.Amount
   alias ThistleTea.Game.Core.Spell.SpellEffect.DamageHeal
   alias ThistleTea.Game.Core.Spell.SpellTeaching
-  alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
 
   def apply(%Character{} = state, %CastContext{} = context, spell, %Effect{type: type} = effect, _now)
       when type in [:learn_spell, :learn_pet_spell, :skill_step] do
@@ -295,9 +294,9 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
 
   defp apply_class_dummy(state, _context, _spell, _effect, _unscripted, _now), do: {state, []}
 
-  defp pet_aura_events(%Character{} = state, %CastContext{} = context, %Spell{id: spell_id}) do
+  defp pet_aura_events(%Character{} = state, %CastContext{} = context, %Spell{id: spell_id} = spell) do
     with pet_guid when is_integer(pet_guid) <- Character.controlled_guid(state),
-         [_link | _rest] = aura_ids <- SpellPetAuraLoader.pet_aura_ids(spell_id, Guid.entry(pet_guid)) do
+         [_link | _rest] = aura_ids <- Spell.pet_aura_ids(spell, Guid.entry(pet_guid)) do
       Enum.map(aura_ids, fn aura_id ->
         Effects.trigger_spell(pet_guid, context.caster_level, pet_guid, aura_id, triggered_by_spell_id: spell_id)
       end)
@@ -309,10 +308,10 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
   defp pet_aura_events(
          %{object: %{guid: pet_guid}, internal: %{pet: %{owner_guid: owner_guid}}} = state,
          %CastContext{},
-         %Spell{id: spell_id}
+         %Spell{id: spell_id} = spell
        )
        when is_integer(owner_guid) do
-    case SpellPetAuraLoader.pet_aura_ids(spell_id, Guid.entry(pet_guid)) do
+    case Spell.pet_aura_ids(spell, Guid.entry(pet_guid)) do
       [_link | _rest] = aura_ids ->
         Enum.map(aura_ids, fn aura_id ->
           Effects.trigger_spell(pet_guid, state.unit.level || 1, pet_guid, aura_id, triggered_by_spell_id: spell_id)

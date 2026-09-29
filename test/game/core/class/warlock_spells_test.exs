@@ -28,7 +28,6 @@ defmodule ThistleTea.Game.Core.Class.WarlockSpellsTest do
   alias ThistleTea.Game.Core.Spell.SpellEffect
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.World.Loader.SpellPetAura
 
   describe "Life Tap" do
     test "converts health into mana without killing the caster" do
@@ -169,14 +168,17 @@ defmodule ThistleTea.Game.Core.Class.WarlockSpellsTest do
     end
 
     test "the dummy cast places the linked aura on the active pet" do
-      SpellPetAura.init()
-      :ets.insert(SpellPetAura, {19_028, [{0, 25_228}]})
-
       pet_guid = 999
       caster = character()
       caster = Companion.activate(caster, :guardian, %EntityRef{guid: pet_guid, entry: 416, spell_id: 688})
 
-      soul_link = %Spell{id: 19_028, name: "Soul Link", effects: [%Effect{type: :dummy, base_points: 0}]}
+      soul_link = %Spell{
+        id: 19_028,
+        name: "Soul Link",
+        pet_auras: [{0, 25_228}],
+        effects: [%Effect{type: :dummy, base_points: 0}]
+      }
+
       context = %CastContext{caster_guid: 1, caster_level: 40}
 
       {_result, events} = SpellEffect.receive(caster, context, soul_link, 1_000)
@@ -189,13 +191,16 @@ defmodule ThistleTea.Game.Core.Class.WarlockSpellsTest do
     end
 
     test "the dummy effect delivered to the pet self-casts the linked aura" do
-      SpellPetAura.init()
-      :ets.insert(SpellPetAura, {19_028, [{0, 25_228}]})
-
       pet = mob()
       pet = %{pet | internal: %{pet.internal | pet: %Pet{owner_guid: 1, profile: :combat, kind: :summon}}}
 
-      soul_link = %Spell{id: 19_028, name: "Soul Link", effects: [%Effect{type: :dummy, base_points: 0}]}
+      soul_link = %Spell{
+        id: 19_028,
+        name: "Soul Link",
+        pet_auras: [{0, 25_228}],
+        effects: [%Effect{type: :dummy, base_points: 0}]
+      }
+
       context = %CastContext{caster_guid: 1, caster_level: 40, target_role: :pet}
 
       {_result, events} = SpellEffect.receive(pet, context, soul_link, 1_000)
@@ -692,12 +697,10 @@ defmodule ThistleTea.Game.Core.Class.WarlockSpellsTest do
 
   describe "Soul Link" do
     test "prefers the pet-aura link over the legacy hidden script aura" do
-      SpellPetAura.init()
-      :ets.insert(SpellPetAura, {19_028, [{0, 25_228}]})
-
       spell = %Spell{
         id: 19_028,
         name: "Soul Link",
+        pet_auras: [{0, 25_228}],
         effects: [%Effect{type: :dummy}],
         script_steps: [
           %ScriptStep{

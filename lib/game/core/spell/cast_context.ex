@@ -33,7 +33,6 @@ defmodule ThistleTea.Game.Core.Spell.CastContext do
   alias ThistleTea.Game.Core.Stats.SpellPower
   alias ThistleTea.Game.Core.Stats.TargetAttackPower
   alias ThistleTea.Game.Core.Stats.TargetSpellPower
-  alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
 
   @two_hand_inventory_type 17
   @dagger_subclass 15
@@ -148,7 +147,7 @@ defmodule ThistleTea.Game.Core.Spell.CastContext do
       spell: spell,
       healing_bonus: healing_bonus(caster, spell),
       resistance_penetration: ResistancePenetration.snapshot(caster),
-      spell_threat: SpellThreatLoader.get(spell_id(spell)),
+      spell_threat: spell_threat(spell),
       spell_hit_snapshot: hit_snapshot,
       spell_hit_bonus: SpellResist.hit_bonus(hit_snapshot, spell),
       conditional_crit_modifiers: Critical.snapshot(caster, spell),
@@ -212,8 +211,8 @@ defmodule ThistleTea.Game.Core.Spell.CastContext do
   defp caster_faction_template(%{unit: %{faction_template: faction_template}}), do: faction_template
   defp caster_faction_template(_caster), do: nil
 
-  defp spell_id(%Spell{id: id}), do: id
-  defp spell_id(_spell), do: nil
+  defp spell_threat(%Spell{threat: threat}), do: threat
+  defp spell_threat(_spell), do: nil
 
   defp caster_position(%{internal: %{world: world}, movement_block: %{position: {x, y, z, _o}}}) do
     {world, x, y, z}

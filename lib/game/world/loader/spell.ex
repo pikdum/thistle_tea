@@ -24,9 +24,11 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.Game.World.Loader.SpellElixir, as: SpellElixirLoader
   alias ThistleTea.Game.World.Loader.SpellGroup, as: SpellGroupLoader
   alias ThistleTea.Game.World.Loader.SpellObjectTarget, as: SpellObjectTargetLoader
+  alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
   alias ThistleTea.Game.World.Loader.SpellProcEvent, as: SpellProcEventLoader
   alias ThistleTea.Game.World.Loader.SpellScript, as: SpellScriptLoader
   alias ThistleTea.Game.World.Loader.SpellScriptName, as: SpellScriptNameLoader
+  alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
   alias ThistleTea.Game.World.Loader.SpellUnitTarget, as: SpellUnitTargetLoader
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
 
@@ -222,6 +224,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       hidden_aura?: row.attributes == 0x80 and row.duration == 21,
       script_name: SpellScriptNameLoader.get(row.id),
       proc_rule: SpellProcEventLoader.get(row.id),
+      threat: SpellThreatLoader.get(row.id),
+      pet_auras: SpellPetAuraLoader.links(row.id),
       school: school(row.school),
       cast_time_ms: cast_time_ms(row.spell_cast_time),
       duration_ms: duration_ms(row.spell_duration),

@@ -26,17 +26,18 @@ defmodule ThistleTea.Game.World.Loader.SpellPetAura do
     :ok
   end
 
-  def pet_aura_ids(spell_id, pet_entry) when is_integer(spell_id) and spell_id > 0 do
-    case :ets.lookup(__MODULE__, spell_id) do
-      [{^spell_id, links}] ->
-        for {pet, aura} <- links, pet == 0 or pet == pet_entry, do: aura
+  def pet_aura_ids(spell_id, pet_entry) do
+    for {pet, aura} <- links(spell_id), pet == 0 or pet == pet_entry, do: aura
+  end
 
-      _missing ->
-        []
+  def links(spell_id) when is_integer(spell_id) and spell_id > 0 do
+    case :ets.lookup(__MODULE__, spell_id) do
+      [{^spell_id, links}] -> links
+      _missing -> []
     end
   rescue
     ArgumentError -> []
   end
 
-  def pet_aura_ids(_spell_id, _pet_entry), do: []
+  def links(_spell_id), do: []
 end

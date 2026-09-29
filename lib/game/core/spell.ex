@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Core.Spell do
     :script_name,
     :semantics,
     :proc_rule,
+    :threat,
     :school,
     :cast_time_ms,
     :duration_ms,
@@ -47,6 +48,7 @@ defmodule ThistleTea.Game.Core.Spell do
     triggers_school_immunity?: false,
     object_targets: [],
     unit_targets: [],
+    pet_auras: [],
     cone: %Cone{},
     area_rules: [],
     family_flags_0: 0,
@@ -435,6 +437,11 @@ defmodule ThistleTea.Game.Core.Spell do
 
   def vmangos_script?(%__MODULE__{script_name: script_name}, script_name) when is_binary(script_name), do: true
   def vmangos_script?(_spell, _script_name), do: false
+
+  def pet_aura_ids(%__MODULE__{pet_auras: links}, pet_entry) when is_list(links),
+    do: for({pet, aura} <- links, pet == 0 or pet == pet_entry, do: aura)
+
+  def pet_aura_ids(_spell, _pet_entry), do: []
 
   def creature_type_allowed?(%__MODULE__{target_creature_type_mask: mask}, creature_type)
       when is_integer(mask) and mask > 0 and is_integer(creature_type) and creature_type > 0 do
