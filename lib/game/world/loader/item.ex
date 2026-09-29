@@ -17,6 +17,8 @@ defmodule ThistleTea.Game.World.Loader.Item do
     end
   end
 
+  def build_template(%Mangos.ItemTemplate{} = row), do: struct(ItemTemplate, Map.from_struct(row))
+
   def display_ids(item_ids) when is_list(item_ids) do
     Map.new(item_ids, fn item_id ->
       case get_template(item_id) do
@@ -47,7 +49,7 @@ defmodule ThistleTea.Game.World.Loader.Item do
   def random_usable_template(inventory_type, race, class, level, prof \\ Proficiency.all()) do
     inventory_type
     |> Mangos.ItemTemplate.random_usable_by_type(race, class, level, @random_candidates)
-    |> Enum.map(&ItemTemplate.build/1)
+    |> Enum.map(&build_template/1)
     |> Enum.find(&(Proficiency.can_equip?(prof, &1) == :ok))
     |> case do
       %ItemTemplate{} = template -> cache(template)
@@ -85,7 +87,7 @@ defmodule ThistleTea.Game.World.Loader.Item do
 
   defp load_template(entry) do
     case Mangos.Repo.get(Mangos.ItemTemplate, entry) do
-      %Mangos.ItemTemplate{} = row -> cache(ItemTemplate.build(row))
+      %Mangos.ItemTemplate{} = row -> cache(build_template(row))
       _ -> nil
     end
   end

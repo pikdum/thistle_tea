@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Mob, as: MobServer
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
 
@@ -48,7 +49,7 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
         creature_template: %Mangos.CreatureTemplate{entry: 2, name: "Guard", extra_flags: 0x40}
       }
 
-      mob = Mob.build(creature)
+      mob = MobBuilder.build(creature)
       assert Unit.bytes_2(mob.unit) == <<1, 0x10, 0, 0>>
       assert mob.internal.creature.extra_flags == 0x40
       assert mob.unit.virtual_item_slot_display == 0
@@ -67,7 +68,7 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
         creature_template: %Mangos.CreatureTemplate{entry: 2, name: "Protected", scale: 1.0, mechanic_immune_mask: 2304}
       }
 
-      mob = Mob.build(creature)
+      mob = MobBuilder.build(creature)
       assert mob.internal.creature.mechanic_immune_mask == 2304
       assert Mob.respawn(mob).internal.creature.mechanic_immune_mask == 2304
     end
@@ -88,7 +89,7 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
         }
       }
 
-      mob = Mob.build(creature)
+      mob = MobBuilder.build(creature)
       assert mob.internal.creature.damage_school == 2
       assert mob.internal.creature.school_immune_mask == 4
       respawned = Mob.respawn(mob)
@@ -107,13 +108,13 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
         creature_template: %Mangos.CreatureTemplate{entry: 721, name: "Rabbit", creature_type: 8, scale: 1.0}
       }
 
-      critter = Mob.build(creature)
+      critter = MobBuilder.build(creature)
       assert Mob.critter?(critter)
       refute Mob.proximity_aggro?(critter)
 
       for ai <- ["EventAI", "BasicAI", "NullAI"] do
         explicit = %{creature | creature_template: %{creature.creature_template | ai_name: ai}}
-        refute Mob.critter?(Mob.build(explicit))
+        refute Mob.critter?(MobBuilder.build(explicit))
       end
     end
 
@@ -145,7 +146,7 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
         }
         |> Map.put(:equip_items, [nil, nil, nil])
 
-      mob = Mob.build(creature)
+      mob = MobBuilder.build(creature)
 
       assert mob.movement_block.update_flag == 0x70
       assert mob.movement_block.walk_speed == 3.0
@@ -176,7 +177,7 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
         }
         |> Map.put(:equip_items, [nil, nil, nil])
 
-      assert Mob.build(creature).unit.gender == 1
+      assert MobBuilder.build(creature).unit.gender == 1
     end
 
     test "stores XP reward metadata from creature templates" do
@@ -205,7 +206,7 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
         }
         |> Map.put(:equip_items, [nil, nil, nil])
 
-      mob = Mob.build(creature)
+      mob = MobBuilder.build(creature)
 
       assert mob.internal.creature.experience_multiplier == 1.5
       assert mob.internal.creature.health_multiplier == 1.0
@@ -241,7 +242,7 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
         }
         |> Map.put(:equip_items, [nil, nil, nil])
 
-      mob = Mob.build(creature)
+      mob = MobBuilder.build(creature)
 
       assert mob.internal.creature.family == 3
       assert mob.internal.creature.type_flags == 0x03
@@ -280,7 +281,7 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
           stamina: 256
         })
 
-      mob = Mob.build(creature)
+      mob = MobBuilder.build(creature)
 
       assert mob.unit.max_health == 3052
       assert mob.unit.health == 3052
@@ -337,7 +338,7 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
       }
 
       for seed <- [creature, Map.put(creature, :creature_class_level_stats, stats)] do
-        mob = Mob.build(seed)
+        mob = MobBuilder.build(seed)
         assert mob.unit.base_attack_power == 200
         assert mob.unit.base_ranged_attack_power == 100
         assert Stats.recompute(mob.unit) == mob.unit
@@ -368,7 +369,7 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
         }
         |> Map.put(:equip_items, [nil, nil, nil])
 
-      mob = Mob.build(creature)
+      mob = MobBuilder.build(creature)
 
       assert mob.internal.spawn.respawn_delay_ms == 7_000
     end
@@ -396,7 +397,7 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
         |> Map.put(:equip_items, [nil, nil, nil])
         |> Map.put(:addon_auras, [frost_armor()])
 
-      mob = Mob.build(creature)
+      mob = MobBuilder.build(creature)
 
       assert [%{spell: %{id: 12_544}}] = mob.unit.auras
       assert mob.internal.creature.addon_auras == [frost_armor()]

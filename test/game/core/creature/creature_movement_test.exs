@@ -15,13 +15,14 @@ defmodule ThistleTea.Game.Core.Creature.CreatureMovementTest do
   alias ThistleTea.Game.Core.Creature.CreatureEntry
   alias ThistleTea.Game.Core.Creature.CreatureMovement
   alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
-  alias ThistleTea.Game.Core.Entity.Component.Internal.WaypointRoute
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Movement
   alias ThistleTea.Game.Core.Movement.Falling
   alias ThistleTea.Game.Network.Message.SmsgMonsterMove
   alias ThistleTea.Game.World.Entity.Mob.Flight
   alias ThistleTea.Game.World.Entity.NavigationResolver
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
+  alias ThistleTea.Game.World.Loader.Waypoint, as: WaypointLoader
 
   setup [:build_flyer]
 
@@ -272,11 +273,11 @@ defmodule ThistleTea.Game.Core.Creature.CreatureMovementTest do
         }
       end)
 
-    WaypointRoute.build(%Mangos.Creature{movement_type: 3, creature_movement: rows})
+    WaypointLoader.build(%Mangos.Creature{movement_type: 3, creature_movement: rows})
   end
 
   defp build_mob(inhabit_type) do
-    Mob.build(%Mangos.Creature{
+    MobBuilder.build(%Mangos.Creature{
       guid: 1,
       id: 6139,
       position_z: 30.0,

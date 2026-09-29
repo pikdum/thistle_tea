@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Game.World.Loader.PetSpells
   alias ThistleTea.Game.World.Loader.PetTraining, as: PetTrainingLoader
@@ -60,7 +61,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
     world = WorldRef.coerce(world)
 
     %{creature | guid: next_low_guid(), map: world.map_id, position_x: x, position_y: y, position_z: z, orientation: o}
-    |> Mob.build(opts)
+    |> MobBuilder.build(opts)
     |> then(&%{&1 | internal: %{&1.internal | world: world}})
     |> Mob.prepare_summon(opts)
   end

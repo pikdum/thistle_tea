@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Core.Creature.CreatureEntryTest do
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
 
   setup [:creatures]
 
@@ -306,7 +307,7 @@ defmodule ThistleTea.Game.Core.Creature.CreatureEntryTest do
         max_melee_dmg: 20.0
       }
     }
-    |> Mob.build()
+    |> MobBuilder.build()
   end
 
   defp aura(id, type, amount) do

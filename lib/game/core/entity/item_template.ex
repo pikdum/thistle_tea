@@ -1,10 +1,8 @@
 defmodule ThistleTea.Game.Core.Entity.ItemTemplate do
   @moduledoc """
-  Internal item template struct translated from Mangos `item_template` rows,
-  so domain code never touches the DB schema directly.
+  Internal item template struct that `World.Loader.Item` builds from Mangos
+  `item_template` rows, so domain code never touches the DB schema directly.
   """
-  alias ThistleTea.DB.Mangos
-
   defstruct [
     :entry,
     class: 0,
@@ -135,8 +133,4 @@ defmodule ThistleTea.Game.Core.Entity.ItemTemplate do
     extra_flags: 0,
     wrapped_gift: 0
   ]
-
-  def build(%Mangos.ItemTemplate{} = row) do
-    struct(__MODULE__, Map.from_struct(row))
-  end
 end

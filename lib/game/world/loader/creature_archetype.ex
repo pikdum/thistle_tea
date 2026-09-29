@@ -5,8 +5,8 @@ defmodule ThistleTea.Game.World.Loader.CreatureArchetype do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.Creature.CreatureArchetype
-  alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.World.Loader.Mob.Batch
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
 
   @tables ~w(creature_ai_scripts creature_movement_scripts generic_scripts quest_start_scripts quest_end_scripts
     gossip_scripts spell_scripts event_scripts gameobject_scripts areatrigger_scripts creature_spells_scripts)
@@ -50,7 +50,7 @@ defmodule ThistleTea.Game.World.Loader.CreatureArchetype do
     |> Enum.map(&elem(&1, 1))
     |> Batch.load_definitions()
     |> Enum.group_by(& &1.id, fn creature ->
-      template = creature |> Mob.build(apply_addon_auras?: false) |> CreatureArchetype.from_mob()
+      template = creature |> MobBuilder.build(apply_addon_auras?: false) |> CreatureArchetype.from_mob()
       {Map.fetch!(weights, creature.guid), template}
     end)
   end

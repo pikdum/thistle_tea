@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Core.Creature.CreatureFlagsTest do
   alias ThistleTea.Game.Core.Spell.SpellEffect
   alias ThistleTea.Game.Core.Spell.SpellResist
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
 
   setup [:creature]
 
@@ -282,7 +283,7 @@ defmodule ThistleTea.Game.Core.Creature.CreatureFlagsTest do
   end
 
   defp build(creature, flags) do
-    Mob.build(%{creature | creature_template: %{creature.creature_template | creature_type_flags: flags}})
+    MobBuilder.build(%{creature | creature_template: %{creature.creature_template | creature_type_flags: flags}})
   end
 
   defp creature(_context) do

@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.CreatureTeleportVmangosTest do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.AIEnvironment
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
   alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -148,6 +149,6 @@ defmodule ThistleTea.Game.CreatureTeleportVmangosTest do
         %{event | condition: Map.get(conditions, event.condition_id)}
       end)
 
-    Mob.build(%{creature | ai_events: ai_events})
+    MobBuilder.build(%{creature | ai_events: ai_events})
   end
 end

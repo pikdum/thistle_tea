@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Core.Creature.CreatureEventTest do
   alias ThistleTea.Game.Core.GameEvent.CreatureData
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
 
   setup [:creatures]
 
@@ -190,7 +191,7 @@ defmodule ThistleTea.Game.Core.Creature.CreatureEventTest do
         melee_base_attack_time: 2_000
       }
     }
-    |> Mob.build()
+    |> MobBuilder.build()
   end
 
   defp aura(id, type, amount),

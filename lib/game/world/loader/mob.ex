@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   alias ThistleTea.Game.World.Loader.CreatureGroup, as: CreatureGroupLoader
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Mob.Batch
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.SpawnPool
@@ -48,7 +49,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     |> Batch.load()
     |> Enum.each(fn creature ->
       group = Catalog.group_for(:creature, creature.guid)
-      :ok = SpawnPool.activate(group, cell, Mob.build(creature))
+      :ok = SpawnPool.activate(group, cell, MobBuilder.build(creature))
     end)
   end
 
@@ -69,7 +70,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     Mangos.Creature.query_guids(guids, events)
     |> Mangos.Repo.all()
     |> Batch.load()
-    |> Map.new(fn creature -> {{:creature, creature.guid}, Mob.build(creature)} end)
+    |> Map.new(fn creature -> {{:creature, creature.guid}, MobBuilder.build(creature)} end)
   end
 
   def load_creature(%Mangos.Creature{} = creature), do: Batch.load_one(creature)

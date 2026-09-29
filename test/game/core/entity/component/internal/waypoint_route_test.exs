@@ -4,16 +4,17 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.WaypointRouteTest do
   alias ThistleTea.DB.Mangos.Creature
   alias ThistleTea.Game.Core.Entity.Component.Internal.Waypoint
   alias ThistleTea.Game.Core.Entity.Component.Internal.WaypointRoute
+  alias ThistleTea.Game.World.Loader.Waypoint, as: WaypointLoader
 
   describe "build/1" do
     test "returns nil for empty creature movement" do
       creature = %Creature{creature_movement: []}
-      assert WaypointRoute.build(creature) == nil
+      assert WaypointLoader.build(creature) == nil
     end
 
     test "returns nil for nil creature movement" do
       creature = %Creature{creature_movement: nil}
-      assert WaypointRoute.build(creature) == nil
+      assert WaypointLoader.build(creature) == nil
     end
   end
 

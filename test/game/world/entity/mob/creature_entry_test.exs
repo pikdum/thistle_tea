@@ -7,7 +7,6 @@ defmodule ThistleTea.Game.World.Entity.Mob.CreatureEntryTest do
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Creature.CreatureArchetype
   alias ThistleTea.Game.Core.Entity.DynamicObject
-  alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.CastContext
@@ -20,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CreatureEntryTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.World.Loader.CreatureArchetype, as: ArchetypeLoader
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Test.FactionFixtures
 
@@ -210,7 +210,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CreatureEntryTest do
           extra_flags: 2
         }
       }
-      |> Mob.build()
+      |> MobBuilder.build()
 
     %{mob | internal: %{mob.internal | world: WorldRef.instance(998, 51)}}
   end

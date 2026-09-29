@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.World.Loader.ElementalCreatureVmangosTest do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.Combat.AttackTable
   alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
 
   @moduletag :vmangos_db
 
@@ -22,7 +23,7 @@ defmodule ThistleTea.Game.World.Loader.ElementalCreatureVmangosTest do
           creature_template: template
         }
 
-        mob = Mob.build(creature)
+        mob = MobBuilder.build(creature)
         assert AttackTable.attacker_context(mob).spell_school_mask == attack_mask
         assert mob.internal.creature.school_immune_mask == immune_mask
         assert Mob.respawn(mob).internal.creature.school_immune_mask == immune_mask

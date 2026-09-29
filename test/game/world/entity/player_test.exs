@@ -34,7 +34,6 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.Travel.Transport
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.ConnectionState
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet

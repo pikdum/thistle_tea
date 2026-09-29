@@ -4,9 +4,9 @@ defmodule ThistleTea.Game.Core.Creature.CreatureFlagsVmangosTest do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.Creature.CreatureFlags
-  alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Skills
   alias ThistleTea.Game.Core.Stats.MovementStats
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
 
   @moduletag :vmangos_db
 
@@ -50,7 +50,7 @@ defmodule ThistleTea.Game.Core.Creature.CreatureFlagsVmangosTest do
   defp build(entry) do
     template = Mangos.Repo.get!(Mangos.CreatureTemplate, entry)
 
-    Mob.build(%Mangos.Creature{
+    MobBuilder.build(%Mangos.Creature{
       guid: 1,
       id: entry,
       modelid: template.model_id1,

@@ -11,11 +11,11 @@ defmodule ThistleTea.Game.World.Loader.Script do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.AI.ScriptStep
-  alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.CreatureSpellList, as: CreatureSpellListLoader
   alias ThistleTea.Game.World.Loader.GameObject, as: GameObjectLoader
+  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
   def load_by_ids(schema, script_ids), do: load_by_ids(schema, script_ids, MapSet.new())
 
@@ -155,7 +155,7 @@ defmodule ThistleTea.Game.World.Loader.Script do
   defp load_equipment_templates(ids) do
     from(item in Mangos.ItemTemplate, where: item.entry in ^ids)
     |> Mangos.Repo.all()
-    |> Map.new(&{&1.entry, ItemTemplate.build(&1)})
+    |> Map.new(&{&1.entry, ItemLoader.build_template(&1)})
   end
 
   defp resolve_nested_scripts(steps, visited) do

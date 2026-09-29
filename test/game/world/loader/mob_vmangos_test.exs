@@ -5,12 +5,12 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Condition
-  alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.SpatialGrid
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Mob.Batch
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
 
   @moduletag :dbc_db
 
@@ -72,7 +72,7 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
           orientation: 0.0
         }
         |> MobLoader.load_creature()
-        |> Mob.build()
+        |> MobBuilder.build()
 
       point = mob.internal.spawn.waypoint_route.points[7]
 
@@ -117,7 +117,7 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
           orientation: 0.0
         }
         |> MobLoader.load_creature()
-        |> Mob.build()
+        |> MobBuilder.build()
 
       supervisor_guid = Guid.from_low_guid(:mob, 10_616, 81_251)
 
@@ -211,6 +211,6 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
       orientation: 0.0
     }
     |> MobLoader.load_creature()
-    |> Mob.build()
+    |> MobBuilder.build()
   end
 end

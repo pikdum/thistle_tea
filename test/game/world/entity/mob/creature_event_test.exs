@@ -3,7 +3,6 @@ defmodule ThistleTea.Game.World.Entity.Mob.CreatureEventTest do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.Creature.CreatureArchetype
-  alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.GameEvent.CreatureData
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Spell
@@ -13,6 +12,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CreatureEventTest do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Loader.CreatureEvent, as: CreatureEventLoader
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Test.FactionFixtures
@@ -120,7 +120,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CreatureEventTest do
         melee_base_attack_time: 2_000
       }
     }
-    |> Mob.build()
+    |> MobBuilder.build()
     |> then(&%{&1 | internal: %{&1.internal | world: WorldRef.instance(998, 81)}})
   end
 

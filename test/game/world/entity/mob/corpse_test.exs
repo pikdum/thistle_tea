@@ -4,7 +4,6 @@ defmodule ThistleTea.Game.World.Entity.Mob.CorpseTest do
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Core.Combat.DamageOrigin
-  alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Loot, as: InternalLoot
   alias ThistleTea.Game.Core.Entity.Component.Internal.Spawn

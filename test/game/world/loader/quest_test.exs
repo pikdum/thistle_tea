@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.QuestTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Quest
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
@@ -24,6 +25,170 @@ defmodule ThistleTea.Game.World.Loader.QuestTest do
       quest = %Quest{id: 1}
 
       assert %Quest{required_condition: nil} = QuestLoader.attach_required_condition(quest, %{})
+    end
+  end
+
+  describe "build/1" do
+    test "translates core fields from a quest_template row" do
+      row = %Mangos.QuestTemplate{
+        entry: 33,
+        start_script: 33,
+        complete_script: 34,
+        method: 2,
+        min_level: 3,
+        quest_level: 8,
+        required_races: 1,
+        required_classes: 0,
+        required_condition: 42,
+        required_skill: 185,
+        required_skill_value: 50,
+        breadcrumb_for_quest_id: 90,
+        prev_quest_id: 0,
+        src_item_id: 0,
+        title: "Wolves Across the Border",
+        details: "Kill some wolves.",
+        objectives: "Bring 8 pelts."
+      }
+
+      quest = QuestLoader.build(row)
+
+      assert quest.id == 33
+      assert quest.start_script_id == 33
+      assert quest.complete_script_id == 34
+      assert quest.min_level == 3
+      assert quest.level == 8
+      assert quest.required_races == 1
+      assert quest.required_condition_id == 42
+      assert quest.required_skill == 185
+      assert quest.required_skill_value == 50
+      assert quest.breadcrumb_for_quest_id == 90
+      assert quest.required_condition == nil
+      assert quest.title == "Wolves Across the Border"
+      assert quest.objective_texts == ["", "", "", ""]
+    end
+
+    test "translates delayed mail rewards" do
+      row = %Mangos.QuestTemplate{
+        entry: 1141,
+        rew_mail_template_id: 87,
+        rew_mail_delay_secs: 86_400,
+        rew_mail_money: 50
+      }
+
+      quest = QuestLoader.build(row)
+
+      assert quest.reward_mail_template_id == 87
+      assert quest.reward_mail_delay_secs == 86_400
+      assert quest.reward_mail_money == 50
+    end
+
+    test "normalizes kill objectives with slot indexes, skipping empty and gameobject slots" do
+      row = %Mangos.QuestTemplate{
+        entry: 1,
+        req_creature_or_go_id1: 299,
+        req_creature_or_go_count1: 8,
+        req_creature_or_go_id2: -55,
+        req_creature_or_go_count2: 3,
+        req_creature_or_go_id3: 300,
+        req_creature_or_go_count3: 0
+      }
+
+      assert QuestLoader.build(row).required_kills == [{0, 299, 8}, {2, 300, 1}]
+    end
+
+    test "skips kill slots that are spell-cast objectives" do
+      row = %Mangos.QuestTemplate{
+        entry: 1,
+        req_creature_or_go_id1: 299,
+        req_creature_or_go_count1: 8,
+        req_spell_cast1: 12_345
+      }
+
+      assert QuestLoader.build(row).required_kills == []
+    end
+
+    test "normalizes creature, gameobject, and spell objectives" do
+      row = %Mangos.QuestTemplate{
+        entry: 1,
+        req_creature_or_go_id1: 299,
+        req_creature_or_go_count1: 8,
+        req_creature_or_go_id2: -55,
+        req_creature_or_go_count2: 3,
+        req_spell_cast2: 12_345
+      }
+
+      assert QuestLoader.build(row).required_entity_objectives == [
+               {0, :creature, 299, 0, 8},
+               {1, :game_object, 55, 12_345, 3}
+             ]
+    end
+
+    test "normalizes item objectives and rewards" do
+      row = %Mangos.QuestTemplate{
+        entry: 2,
+        req_item_id2: 750,
+        req_item_count2: 4,
+        rew_item_id1: 80,
+        rew_item_count1: 1,
+        rew_choice_item_id1: 90,
+        rew_choice_item_count1: 2,
+        rew_choice_item_id2: 91,
+        rew_choice_item_count2: 1,
+        rew_or_req_money: 150
+      }
+
+      quest = QuestLoader.build(row)
+
+      assert quest.required_items == [{1, 750, 4}]
+      assert quest.reward_items == [{80, 1}]
+      assert quest.reward_choice_items == [{90, 2}, {91, 1}]
+      assert quest.reward_money == 150
+      assert Quest.deliver?(quest)
+    end
+
+    test "translates reputation gates, objectives, and reward spillover flags" do
+      row = %Mangos.QuestTemplate{
+        entry: 3,
+        rep_objective_faction: 529,
+        rep_objective_value: 3_000,
+        required_min_rep_faction: 529,
+        required_min_rep_value: 0,
+        required_max_rep_faction: 87,
+        required_max_rep_value: 0,
+        rew_rep_faction1: 529,
+        rew_rep_value1: 250,
+        rew_rep_faction2: 87,
+        rew_rep_value2: -25,
+        rew_rep_spillover_mask: 0x02
+      }
+
+      quest = QuestLoader.build(row)
+
+      assert quest.reputation_objective_faction == 529
+      assert quest.reputation_objective_value == 3_000
+      assert quest.required_min_reputation_faction == 529
+      assert quest.required_max_reputation_faction == 87
+
+      assert quest.reward_reputation == [
+               %{faction_id: 529, value: 250, no_spillover?: false},
+               %{faction_id: 87, value: -25, no_spillover?: true}
+             ]
+    end
+
+    test "nil text columns become empty strings" do
+      row = %Mangos.QuestTemplate{entry: 3, title: nil, details: nil, objectives: nil}
+      quest = QuestLoader.build(row)
+
+      assert quest.title == ""
+      assert quest.details == ""
+      assert quest.objectives_text == ""
+    end
+
+    test "defaults to no required condition" do
+      quest = QuestLoader.build(%Mangos.QuestTemplate{entry: 4})
+
+      assert quest.required_condition_id == 0
+      assert quest.required_condition == nil
     end
   end
 end

@@ -7,12 +7,12 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceAuriusVmangosTest do
   alias ThistleTea.Game.Core.AI.AIEvent
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.EventAI
-  alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.World.Entity.AIEnvironment
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.EventSink.Context, as: SinkContext
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
   alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Instance.InstanceData
@@ -201,6 +201,6 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceAuriusVmangosTest do
         %{event | condition: Map.get(conditions, event.condition_id)}
       end)
 
-    Mob.build(%{creature | ai_events: ai_events})
+    MobBuilder.build(%{creature | ai_events: ai_events})
   end
 end

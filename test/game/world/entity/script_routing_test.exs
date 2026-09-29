@@ -14,7 +14,6 @@ defmodule ThistleTea.Game.World.Entity.ScriptRoutingTest do
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.GameObject
-  alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
@@ -29,6 +28,7 @@ defmodule ThistleTea.Game.World.Entity.ScriptRoutingTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.ScriptExecution
   alias ThistleTea.Game.World.Loader.Emote, as: EmoteLoader
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.SpatialHash
@@ -331,7 +331,7 @@ defmodule ThistleTea.Game.World.Entity.ScriptRoutingTest do
         melee_base_attack_time: 2_000
       }
     }
-    |> Mob.build()
+    |> MobBuilder.build()
     |> then(&%{&1 | internal: %{&1.internal | world: world}})
   end
 end

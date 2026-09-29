@@ -3,7 +3,6 @@ defmodule ThistleTea.Game.Core.Entity.CorpseTest do
 
   import Bitwise, only: [&&&: 2, <<<: 2, >>>: 2]
 
-  alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock

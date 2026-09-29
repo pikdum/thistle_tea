@@ -73,6 +73,7 @@ defmodule ThistleTea.DevSeed do
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -474,7 +475,7 @@ defmodule ThistleTea.DevSeed do
         mob =
           creature
           |> MobLoader.load_creature()
-          |> Mob.build()
+          |> MobBuilder.build()
           |> select_ai_events(Keyword.get(opts, :ai_events))
           |> select_spells(Keyword.get(opts, :spells))
 
