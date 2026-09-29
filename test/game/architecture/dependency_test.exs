@@ -21,7 +21,6 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
                              {"lib/game/core/entity/character.ex", "ThistleTea.Game.World.Loader.Spell"},
                              {"lib/game/core/entity/game_object.ex", "ThistleTea.DB.Mangos"},
                              {"lib/game/core/entity/game_object_template.ex", "ThistleTea.DB.Mangos"},
-                             {"lib/game/core/party.ex", "ThistleTea.Game.World.System.Party"},
                              {"lib/game/core/player/talents.ex", "ThistleTea.Game.World.Loader.Talent"},
                              {"lib/game/core/spell/cast_context.ex", "ThistleTea.Game.World.Loader.SpellThreat"},
                              {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World"},
@@ -105,9 +104,18 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
   end
 
   defp outer_modules(source) do
-    ~r/ThistleTea\.(?:Game\.(?:Network|World)|DB)(?:\.[A-Z][A-Za-z0-9_]*)*/
-    |> Regex.scan(source, capture: :first)
-    |> List.flatten()
+    {_ast, modules} =
+      source
+      |> Code.string_to_quoted!()
+      |> Macro.prewalk([], fn
+        {:__aliases__, _meta, [:ThistleTea | _rest] = parts} = node, acc ->
+          {node, [inspect(Module.concat(parts)) | acc]}
+
+        node, acc ->
+          {node, acc}
+      end)
+
+    Enum.filter(modules, &Regex.match?(~r/^ThistleTea\.(?:Game\.(?:Network|World)|DB)(?:\.|$)/, &1))
   end
 
   defp event_sink_files do
@@ -129,9 +137,8 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
       "lib/game/world/entity/player/gossip_condition.ex",
       "lib/game/world/entity/player/looting.ex",
       "lib/game/world/entity/player/vendor.ex",
-      "lib/game/network/message/cmsg_buy_item.ex",
-      "lib/game/network/message/cmsg_gossip_hello.ex",
-      "lib/game/network/message/cmsg_list_inventory.ex"
+      "lib/game/world/inbound/interaction.ex",
+      "lib/game/world/inbound/vendor.ex"
     ]
 
     Enum.map(relative, &Path.join(@root, &1)) ++
