@@ -1,7 +1,9 @@
 defmodule ThistleTea.Game.Core.Class.Shaman do
   @moduledoc """
   Weapon enchantment proc decisions, including Shaman imbue effects.
-  Enchantment and VMangos PPM data are supplied by the player boundary.
+  Enchantment and VMangos PPM data are supplied by the player boundary, and
+  the Flametongue damage spell arrives preloaded in the proc spell's
+  `script_spells`.
   """
   alias ThistleTea.Game.Core.Combat.ExtraAttacks
   alias ThistleTea.Game.Core.Effects
@@ -10,7 +12,6 @@ defmodule ThistleTea.Game.Core.Class.Shaman do
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.Spell.Modifiers
   alias ThistleTea.Game.Core.Spell.ProcOrigin
-  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @flametongue_damage_spell 10_444
 
@@ -73,10 +74,12 @@ defmodule ThistleTea.Game.Core.Class.Shaman do
     )
   end
 
+  def script_spell_ids(%Spell{} = spell), do: if(flametongue_proc?(spell), do: [@flametongue_damage_spell], else: [])
+
   defp flametongue_proc?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_shaman_flametongue_proc_dummy")
 
   defp trigger_flametongue(entity, victim_guid, proc_spell, proc) do
-    with %Spell{} = damage_spell <- SpellLoader.load(@flametongue_damage_spell),
+    with %Spell{} = damage_spell <- Enum.find(proc_spell.script_spells, &(&1.id == @flametongue_damage_spell)),
          %Effect{} = effect <- List.first(proc_spell.effects),
          %Effect{} = damage_effect <- List.first(damage_spell.effects) do
       context = CastContext.from_caster(entity, proc_spell, victim_guid)

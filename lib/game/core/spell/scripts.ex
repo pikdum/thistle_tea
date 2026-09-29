@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
   alias ThistleTea.Game.Core.Class.Druid
   alias ThistleTea.Game.Core.Class.Paladin
   alias ThistleTea.Game.Core.Class.Priest
+  alias ThistleTea.Game.Core.Class.Shaman
   alias ThistleTea.Game.Core.Class.Warlock
   alias ThistleTea.Game.Core.Profession.Engineering.DeathRay
   alias ThistleTea.Game.Core.Spell
@@ -99,6 +100,7 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
   def boost_aura_ids(_spell), do: []
 
   defdelegate form_aura_ids(spell), to: Druid
+  defdelegate script_spell_ids(spell), to: Shaman
   defdelegate form_aura_spell(parent, spell), to: Druid
 
   @overpower_family_mask 0x00000004

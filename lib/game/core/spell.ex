@@ -86,6 +86,7 @@ defmodule ThistleTea.Game.Core.Spell do
     linked_auras: [],
     boost_auras: [],
     form_auras: [],
+    script_spells: [],
     passive_dependencies: [],
     script_steps: [],
     reagents: []

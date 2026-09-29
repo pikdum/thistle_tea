@@ -279,6 +279,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> append_shapeshift_passives(radius_lookup)
     |> load_linked_auras(MapSet.put(ancestors, row.id))
     |> load_boost_auras(MapSet.put(ancestors, row.id))
+    |> load_script_spells(MapSet.put(ancestors, row.id))
     |> load_form_auras(MapSet.put(ancestors, row.id))
     |> load_passive_dependencies(MapSet.put(ancestors, row.id))
     |> load_triggered_immunity()
@@ -307,6 +308,17 @@ defmodule ThistleTea.Game.World.Loader.Spell do
           do: build(row, ancestors)
 
     %{spell | boost_auras: auras}
+  end
+
+  defp load_script_spells(%SpellData{} = spell, ancestors) do
+    spells =
+      for id <- Scripts.script_spell_ids(spell),
+          not MapSet.member?(ancestors, id),
+          row = DBC.get(DBC.Spell, id),
+          not is_nil(row),
+          do: build(row, ancestors)
+
+    %{spell | script_spells: spells}
   end
 
   defp load_form_auras(%SpellData{} = spell, ancestors) do

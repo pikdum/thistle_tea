@@ -56,6 +56,27 @@ defmodule ThistleTea.Game.Core.Class.ShamanTest do
       assert [%Effects.TriggerSpell{}] =
                Shaman.trigger_weapon_enchant(shaman(), payload, proc, 1.0, fn -> 0.04 end).internal.events
     end
+
+    test "flametongue delivers its preloaded damage spell" do
+      damage = %Spell{id: 10_444, school: :fire, effects: [%Effect{type: :school_damage, base_points: 1, die_sides: 1}]}
+
+      proc_spell = %Spell{
+        id: 8026,
+        script_name: "spell_shaman_flametongue_proc_dummy",
+        effects: [%Effect{type: :dummy, base_points: 324, die_sides: 1}],
+        script_spells: [damage]
+      }
+
+      assert Shaman.script_spell_ids(proc_spell) == [10_444]
+
+      proc = %{effect: %{amount: 0, spell_id: 8026}, proc_spell: proc_spell, attack_time_ms: 2000}
+      triggered = Shaman.trigger_weapon_enchant(shaman(), %{outcome: :normal, victim_guid: 2}, proc, 1.0, fn -> 0.0 end)
+
+      assert [
+               %Effects.DeliverSpell{target_guid: 2, spell: %Spell{id: 10_444, effects: [%Effect{die_sides: 0}]}},
+               %Effects.SpellCastCompleted{target_guid: 2}
+             ] = triggered.internal.events
+    end
   end
 
   describe "flametongue_damage/3" do
