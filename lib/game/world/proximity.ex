@@ -8,11 +8,14 @@ defmodule ThistleTea.Game.World.Proximity do
   unit that hears the announcement decides for itself in both directions: an
   idle creature that aggroes on sight notices a hostile announcer inside its
   radius, and a unit inside an announcing creature's radius asks that
-  creature to notice it. A walking announcer's path becomes one scheduled
-  check at the moment of contact, rechecked against the authoritative
-  position when it fires.
+  creature to notice it. A creature with an out-of-combat line-of-sight
+  EventAI event also wakes for any announcer within that event's range. A
+  walking announcer's path becomes one scheduled check at the moment of
+  contact, rechecked against the authoritative position when it fires.
   """
 
+  alias ThistleTea.Game.Core.AI.BT.Blackboard
+  alias ThistleTea.Game.Core.AI.EventAI
   alias ThistleTea.Game.Core.Aura.StealthDetection
   alias ThistleTea.Game.Core.Combat.Aggro
   alias ThistleTea.Game.Core.Combat.FactionTemplate
@@ -112,11 +115,16 @@ defmodule ThistleTea.Game.World.Proximity do
         now
       ) do
     aggressor = ProximityCore.aggressor(listener)
+    sight_range = sight_range(listener, now)
 
-    with true <- not is_nil(announcer) or not is_nil(aggressor),
+    with true <- not is_nil(announcer) or not is_nil(aggressor) or sight_range > 0,
          {^world, x, y, z} <- World.position(listener, now) do
       alert(listener, announcement, {x, y, z}, now)
-      notice(listener, aggressor, announcement, {x, y, z}, now)
+
+      case notice(listener, aggressor, announcement, {x, y, z}, now) do
+        :notice -> :notice
+        :ignore -> sight(sight_range, announcement, {x, y, z}, now)
+      end
     else
       _ -> :ignore
     end
@@ -126,7 +134,7 @@ defmodule ThistleTea.Game.World.Proximity do
 
   def due(%{internal: %Internal{world: world}} = listener, guid, role, now) when is_integer(guid) do
     with {^world, x, y, z} <- World.position(listener, now),
-         %Announcement{} = observed <- observe(guid, world, now) do
+         %Announcement{} = observed <- observed(guid, world, now) do
       case role do
         :alert ->
           alert(listener, observed, {x, y, z}, now)
@@ -134,6 +142,9 @@ defmodule ThistleTea.Game.World.Proximity do
 
         :notice ->
           notice(listener, ProximityCore.aggressor(listener), observed, {x, y, z}, now)
+
+        :sight ->
+          sight(sight_range(listener, now), observed, {x, y, z}, now)
       end
     else
       _ -> :ignore
@@ -162,6 +173,16 @@ defmodule ThistleTea.Game.World.Proximity do
   end
 
   defp notice(_listener, _aggressor, _announcement, _center, _now), do: :ignore
+
+  defp sight(range, %Announcement{} = announcement, center, now) when range > 0,
+    do: react(announcement, center, range, :sight, now, fn _distance -> :sight end)
+
+  defp sight(_range, _announcement, _center, _now), do: :ignore
+
+  defp sight_range(%Mob{internal: %Internal{blackboard: blackboard}} = mob, now),
+    do: EventAI.ooc_los_radius(mob, Blackboard.ensure(blackboard), now)
+
+  defp sight_range(_listener, _now), do: 0.0
 
   defp react(%Announcement{guid: guid} = announcement, center, radius, role, now, act) do
     case ProximityCore.contact(announcement, center, radius, now) do
@@ -193,7 +214,7 @@ defmodule ThistleTea.Game.World.Proximity do
     end
   end
 
-  defp observe(guid, world, now) do
+  defp observed(guid, world, now) do
     with {^world, x, y, z} <- World.position(guid, now),
          %{} = row <- Metadata.get(guid) do
       %Announcement{

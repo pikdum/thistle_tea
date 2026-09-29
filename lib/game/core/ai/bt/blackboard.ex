@@ -42,6 +42,14 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard do
     %{blackboard | pet: %{pet | returning: reason}}
   end
 
+  def request_aggro_check(%__MODULE__{combat: combat} = blackboard),
+    do: %{blackboard | combat: %{combat | aggro_check?: true}}
+
+  def complete_aggro_check(%__MODULE__{combat: combat} = blackboard),
+    do: %{blackboard | combat: %{combat | aggro_check?: false}}
+
+  def aggro_check?(%__MODULE__{combat: %Combat{aggro_check?: requested?}}), do: requested?
+
   def pet_returning?(%__MODULE__{pet: %Pet{returning: reason}}), do: reason != nil
   def pet_returning?(_blackboard), do: false
 
@@ -288,8 +296,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard do
   defp deadline(%__MODULE__{navigation: %Navigation{next_waypoint_at: at}}, :next_waypoint_at), do: at
   defp deadline(%__MODULE__{combat: %Combat{next_attack_at: at}}, :next_attack_at), do: at
   defp deadline(%__MODULE__{combat: %Combat{next_offhand_attack_at: at}}, :next_offhand_attack_at), do: at
-  defp deadline(%__MODULE__{combat: %Combat{next_aggro_at: at}}, :next_aggro_at), do: at
-
   defp deadline(%__MODULE__{combat: %Combat{next_call_for_help_at: at}}, :next_call_for_help_at), do: at
 
   defp deadline(%__MODULE__{combat: %Combat{next_spread_at: at}}, :next_spread_at), do: at
@@ -317,10 +323,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard do
 
   defp put_deadline(%__MODULE__{combat: combat} = blackboard, :next_offhand_attack_at, at) do
     %{blackboard | combat: %{combat | next_offhand_attack_at: at}}
-  end
-
-  defp put_deadline(%__MODULE__{combat: combat} = blackboard, :next_aggro_at, at) do
-    %{blackboard | combat: %{combat | next_aggro_at: at}}
   end
 
   defp put_deadline(%__MODULE__{combat: combat} = blackboard, :next_call_for_help_at, at) do

@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.ProximityTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Core.AI.AIEvent
   alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Combat.Proximity.Aggressor
   alias ThistleTea.Game.Core.Combat.Proximity.Announcement
@@ -140,6 +141,20 @@ defmodule ThistleTea.Game.World.ProximityTest do
       fighting = %{mob | internal: %{mob.internal | in_combat: true}}
       assert Proximity.hear(fighting, player_announcement(player_guid, {10.0, 0.0, 0.0}), Time.now()) == :ignore
       assert Proximity.hear(mob, creature_announcement(mob.object.guid, {0.0, 0.0, 0.0}), Time.now()) == :ignore
+    end
+
+    test "a creature with an out-of-combat sight event wakes for announcers in range" do
+      player_guid = put_player(player_guid())
+      greeter = mob(put_mob(mob_guid(), {0.0, 0.0, 0.0}, faction_template: wolf()))
+      sight = %AIEvent{event_type: :ooc_los, param2: 20}
+      creature = %{greeter.internal.creature | ai_events: [sight]}
+      greeter = %{greeter | internal: %{greeter.internal | creature: creature}}
+
+      assert Proximity.hear(greeter, player_announcement(player_guid, {10.0, 0.0, 0.0}), Time.now()) == :sight
+      assert Proximity.hear(greeter, player_announcement(player_guid, {30.0, 0.0, 0.0}), Time.now()) == :ignore
+
+      fighting = %{greeter | internal: %{greeter.internal | in_combat: true}}
+      assert Proximity.hear(fighting, player_announcement(player_guid, {10.0, 0.0, 0.0}), Time.now()) == :ignore
     end
 
     test "a walking announcer schedules one check for the moment of contact" do

@@ -5,11 +5,12 @@ defmodule ThistleTea.Game.Core.Combat.Proximity do
   A unit announces itself when it moves, appears, or changes how others react
   to it: where it stands, the path it is walking, the level aggro radii are
   judged against, and, for an idle creature that aggroes on sight, the
-  detection it notices targets with. Every unit that hears an announcement
-  decides for itself in both directions, whether it notices the announcer and
-  whether the announcer should notice it. `contact/4` turns a walking
-  announcer's path into the moment it first comes within a radius, so a
-  listener schedules one check instead of polling.
+  detection it notices targets with. An announcement reaches every unit that
+  could care: the widest aggro radius or out-of-combat line-of-sight event
+  range. Every unit that hears one decides for itself in both directions,
+  whether it notices the announcer and whether the announcer should notice it.
+  `contact/4` turns a walking announcer's path into the moment it first comes
+  within a radius, so a listener schedules one check instead of polling.
   """
 
   alias ThistleTea.Game.Core.AI.BT.Blackboard
@@ -24,6 +25,7 @@ defmodule ThistleTea.Game.Core.Combat.Proximity do
 
   @contact_margin_ms 50
   @max_path_extent 250.0
+  @max_sight_range 80.0
 
   defmodule Path do
     @moduledoc false
@@ -94,9 +96,9 @@ defmodule ThistleTea.Game.Core.Combat.Proximity do
     do: Aggro.radius_for(range, level, target_level || 1, modifier)
 
   def reach(%Announcement{aggressor: %Aggressor{detection_range: range, modifier: modifier}}),
-    do: max(Aggro.max_radius(), Aggro.reach(range, modifier))
+    do: Enum.max([Aggro.max_radius(), @max_sight_range, Aggro.reach(range, modifier)])
 
-  def reach(%Announcement{}), do: Aggro.max_radius()
+  def reach(%Announcement{}), do: max(Aggro.max_radius(), @max_sight_range)
 
   def extent(%Announcement{} = announcement) do
     reach = reach(announcement)

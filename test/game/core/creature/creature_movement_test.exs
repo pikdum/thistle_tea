@@ -113,7 +113,7 @@ defmodule ThistleTea.Game.Core.Creature.CreatureMovementTest do
   describe "circle/3" do
     test "flies repeated level circles without ground navigation or idle pauses", %{mob: mob} do
       mob = %{mob | movement_block: %{mob.movement_block | position: {10.0, 0.0, 30.0, 0.0}}}
-      blackboard = Blackboard.put_next_at(Blackboard.new(), :next_aggro_at, 100_000, 0)
+      blackboard = Blackboard.complete_aggro_check(Blackboard.new())
       mob = BT.init(mob, MobBT.tree(), blackboard)
       assert {{:running, 0, :navigation}, requested} = BehaviorRunner.tick(MobBT.tree(), mob, Context.new(0))
       assert [%NavigationIntent{path: path}] = requested.internal.navigation_intents
@@ -175,7 +175,7 @@ defmodule ThistleTea.Game.Core.Creature.CreatureMovementTest do
       route = cyclic_route()
       assert route.cyclic?
       mob = %{mob | internal: %{mob.internal | spawn: %{mob.internal.spawn | waypoint_route: route, movement_type: 3}}}
-      blackboard = Blackboard.put_next_at(Blackboard.new(), :next_aggro_at, 100_000, 0)
+      blackboard = Blackboard.complete_aggro_check(Blackboard.new())
       mob = BT.init(mob, MobBT.tree(), blackboard)
       assert {{:running, 0, :navigation}, requested} = BehaviorRunner.tick(MobBT.tree(), mob, Context.new(0))
       assert [%NavigationIntent{path: path}] = requested.internal.navigation_intents

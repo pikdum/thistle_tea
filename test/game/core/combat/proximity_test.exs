@@ -118,7 +118,7 @@ defmodule ThistleTea.Game.Core.Combat.ProximityTest do
     test "covers the announcer's reach around its whole path" do
       path = %Path{origin: {0.0, 0.0, 0.0}, nodes: [{40.0, -20.0, 0.0}], started_at: 0, duration_ms: 1_000}
 
-      assert Proximity.extent(announcement(position: {10.0, 0.0, 0.0}, path: path)) == {-75.0, -95.0, 115.0, 75.0}
+      assert Proximity.extent(announcement(position: {10.0, 0.0, 0.0}, path: path)) == {-80.0, -100.0, 120.0, 80.0}
 
       aggressor = %Aggressor{detection_range: 60.0, level: 1, modifier: 10}
       assert Proximity.extent(announcement(aggressor: aggressor)) == {-95.0, -95.0, 95.0, 95.0}

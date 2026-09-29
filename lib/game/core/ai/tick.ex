@@ -4,9 +4,10 @@ defmodule ThistleTea.Game.Core.AI.Tick do
 
   Behavior status, aura upkeep, and regeneration each contribute a semantic
   deadline. Entity owners schedule the earliest deadline and use a default
-  cadence only when no subsystem needs a specific wake. Players in combat also
-  wake for the next combat check, so an unrelated long deadline such as a
-  30-minute buff can never postpone leaving combat.
+  cadence only when no subsystem needs a specific wake; a behavior waiting on
+  messages alone leaves no wake at all. Players in combat also wake for the
+  next combat check, so an unrelated long deadline such as a 30-minute buff
+  can never postpone leaving combat.
   """
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Blackboard.Combat
@@ -193,6 +194,8 @@ defmodule ThistleTea.Game.Core.AI.Tick do
       _ -> plan
     end
   end
+
+  defp schedule_status(plan, {:running, :infinity, _reason}), do: TickPlan.dormant(plan)
 
   defp schedule_status(plan, {:running, delay_ms, reason}) when is_integer(delay_ms) and delay_ms >= 0 do
     TickPlan.schedule_in(plan, reason, delay_ms)

@@ -4,7 +4,8 @@ defmodule ThistleTea.Game.Core.AI.BT do
   used for all entity AI/action logic. Nodes return
   `:success | :failure | :running | {:running, delay_ms} | {:running, delay_ms, reason}`;
   trees are ticked from the entity's owning process, which honors the returned
-  delay when scheduling the next tick.
+  delay when scheduling the next tick. A delay of `:infinity` means the node is
+  waiting for a message rather than a deadline.
   """
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Context
@@ -36,7 +37,8 @@ defmodule ThistleTea.Game.Core.AI.BT do
     %__MODULE__{type: :action, fun: fun}
   end
 
-  def running(delay_ms, reason) when is_integer(delay_ms) and delay_ms >= 0 and is_atom(reason) do
+  def running(delay_ms, reason)
+      when ((is_integer(delay_ms) and delay_ms >= 0) or delay_ms == :infinity) and is_atom(reason) do
     {:running, delay_ms, reason}
   end
 

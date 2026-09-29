@@ -23,6 +23,14 @@ defmodule ThistleTea.Game.Core.AI.TickPlanTest do
       assert TickPlan.delay(plan, 250) == 250
     end
 
+    test "a dormant plan with no deadlines has no next wake" do
+      plan = TickPlan.new(1_000) |> TickPlan.dormant()
+
+      assert TickPlan.next(plan) == nil
+      assert TickPlan.delay(plan) == nil
+      assert %Wake{at: 1_300, source: :aura} = plan |> TickPlan.schedule_at(:aura, 1_300) |> TickPlan.next()
+    end
+
     test "clamps overdue deadlines to an immediate wake" do
       plan = TickPlan.new(1_000) |> TickPlan.schedule_at(:aura, 900)
 

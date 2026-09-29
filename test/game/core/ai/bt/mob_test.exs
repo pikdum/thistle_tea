@@ -442,6 +442,19 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       assert blackboard.navigation.move_target == nil
       assert Enum.any?(state.internal.events, &match?(%Effects.MovementStopped{}, &1))
     end
+
+    test "an idle creature with nothing scheduled sleeps until a message arrives" do
+      mob = fixture_mob()
+      mob = %{mob | unit: %{mob.unit | health: 100, max_health: 100, auras: []}} |> BT.init(MobBT.tree())
+
+      assert {{:running, :infinity, :idle}, mob} =
+               BehaviorRunner.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, 1_000))
+
+      refute Blackboard.aggro_check?(mob.internal.blackboard)
+
+      assert {{:running, :infinity, :idle}, _mob} =
+               BehaviorRunner.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, 60_000))
+    end
   end
 
   describe "wait_until_wander_ready/3" do
@@ -461,15 +474,11 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
                MobBT.wait_until_wander_ready(state, blackboard, 1_000)
     end
 
-    test "wakes for aggro before a long wander wait" do
+    test "waits out a long wander without polling for aggro" do
       state = fixture_mob()
+      blackboard = %Blackboard{navigation: %Blackboard.Navigation{next_wander_at: 5_000}}
 
-      blackboard = %Blackboard{
-        navigation: %Blackboard.Navigation{next_wander_at: 5_000},
-        combat: %Blackboard.Combat{next_aggro_at: 1_250}
-      }
-
-      assert {{:running, 250, :aggro}, ^state, ^blackboard} =
+      assert {{:running, 4_000, :wander}, ^state, ^blackboard} =
                MobBT.wait_until_wander_ready(state, blackboard, 1_000)
     end
   end
@@ -483,15 +492,11 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
                MobBT.wait_until_waypoint_ready(state, blackboard, 1_000)
     end
 
-    test "wakes for aggro before a long waypoint wait" do
+    test "waits out a long waypoint pause without polling for aggro" do
       state = fixture_mob()
+      blackboard = %Blackboard{navigation: %Blackboard.Navigation{next_waypoint_at: 5_000}}
 
-      blackboard = %Blackboard{
-        navigation: %Blackboard.Navigation{next_waypoint_at: 5_000},
-        combat: %Blackboard.Combat{next_aggro_at: 1_250}
-      }
-
-      assert {{:running, 250, :aggro}, ^state, ^blackboard} =
+      assert {{:running, 4_000, :waypoint}, ^state, ^blackboard} =
                MobBT.wait_until_waypoint_ready(state, blackboard, 1_000)
     end
   end
@@ -918,18 +923,6 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
                MobBT.wait_for_arrival(state, blackboard, 1_000)
     end
 
-    test "wakes for aggro before the next spatial cell boundary" do
-      state = fixture_mob(start_time: 0, duration: 10_000, spline_nodes: [{250.0, 0.0, 0.0}])
-
-      blackboard = %Blackboard{
-        navigation: %Blackboard.Navigation{move_target: {250.0, 0.0, 0.0}},
-        combat: %Blackboard.Combat{next_aggro_at: 1_250}
-      }
-
-      assert {{:running, 250, :aggro}, ^state, ^blackboard} =
-               MobBT.wait_for_arrival(state, blackboard, 1_000)
-    end
-
     test "clears move target after arrival" do
       state = fixture_mob(start_time: 0, duration: 500)
 
@@ -1010,7 +1003,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       put_spatial_target(:players, target_guid, {10.0, 0.0, 0.0}, alliance(), 5)
       put_spatial_target(:players, other_guid, {12.0, 0.0, 0.0}, alliance(), 5)
 
-      assert {:failure, state, %Blackboard{combat: %Blackboard.Combat{next_aggro_at: 6_000}}} =
+      assert {:failure, state, %Blackboard{combat: %Blackboard.Combat{aggro_check?: false}}} =
                MobBT.try_aggro(state, blackboard, AIEnvironment.context(state, 1_000))
 
       assert state.unit.target == target_guid
@@ -1039,7 +1032,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       put_spatial_target(:mobs, friendly_guid, {10.0, 0.0, 0.0}, defias(), 5)
       put_spatial_target(:mobs, neutral_guid, {8.0, 0.0, 0.0}, wolf(), 5)
 
-      assert {:failure, ^state, %Blackboard{combat: %Blackboard.Combat{next_aggro_at: 6_000}}} =
+      assert {:failure, ^state, %Blackboard{combat: %Blackboard.Combat{aggro_check?: false}}} =
                MobBT.try_aggro(state, blackboard, 1_000)
     end
 
@@ -1054,7 +1047,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       Metadata.update(source_guid, %{proximity_aggro?: false})
       put_spatial_target(:players, target_guid, {10.0, 0.0, 0.0}, alliance(), 5)
 
-      assert {:failure, ^state, %Blackboard{combat: %Blackboard.Combat{next_aggro_at: 6_000}}} =
+      assert {:failure, ^state, %Blackboard{combat: %Blackboard.Combat{aggro_check?: false}}} =
                MobBT.try_aggro(state, blackboard, AIEnvironment.context(state, 1_000))
     end
 
@@ -1068,7 +1061,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       put_metadata(source_guid, defias(), 5)
       put_spatial_target(:players, target_guid, {6.0, 0.0, 0.0}, alliance(), 30)
 
-      assert {:failure, ^state, %Blackboard{combat: %Blackboard.Combat{next_aggro_at: 6_000}}} =
+      assert {:failure, ^state, %Blackboard{combat: %Blackboard.Combat{aggro_check?: false}}} =
                MobBT.try_aggro(state, blackboard, 1_000)
     end
 
@@ -1082,7 +1075,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       put_metadata(source_guid, defias(), 5)
       put_spatial_target(:players, target_guid, {12.0, 0.0, 0.0}, alliance(), 5)
 
-      assert {:failure, ^state, %Blackboard{combat: %Blackboard.Combat{next_aggro_at: 6_000}}} =
+      assert {:failure, ^state, %Blackboard{combat: %Blackboard.Combat{aggro_check?: false}}} =
                MobBT.try_aggro(state, blackboard, 1_000)
 
       assert state.unit.target == 0
@@ -1097,7 +1090,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       put_spatial_target(:players, target_guid, {5.0, 0.0, 0.0}, alliance(), 5)
       Metadata.update(target_guid, %{stealthed?: true, stealth_skill: 25})
 
-      assert {:failure, state, %Blackboard{combat: %Blackboard.Combat{next_aggro_at: 6_000}}} =
+      assert {:failure, state, %Blackboard{combat: %Blackboard.Combat{aggro_check?: false}}} =
                MobBT.try_aggro(state, %Blackboard{}, AIEnvironment.context(state, 1_000))
 
       assert state.unit.target == 0

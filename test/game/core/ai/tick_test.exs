@@ -47,6 +47,13 @@ defmodule ThistleTea.Game.Core.AI.TickTest do
       assert Tick.mob_delay(fixture(), :running, 1_000) == 100
       assert Tick.mob_delay(fixture(), :success, 1_000) == 100
     end
+
+    test "a behavior waiting on messages leaves no wake unless upkeep needs one" do
+      assert Tick.mob_delay(fixture(), {:running, :infinity, :idle}, 1_000) == nil
+
+      entity = %{fixture() | internal: %{fixture().internal | totem: %Totem{expires_at: 1_050}}}
+      assert Tick.mob_delay(entity, {:running, :infinity, :idle}, 1_000) == 50
+    end
   end
 
   describe "needs_tick?/1" do

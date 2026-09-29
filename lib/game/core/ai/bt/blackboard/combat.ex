@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard.Combat do
   defstruct extra_attacks: 0,
             next_attack_at: 0,
             next_offhand_attack_at: 0,
-            next_aggro_at: 0,
+            aggro_check?: true,
             next_call_for_help_at: 0,
             next_spread_at: 0,
             attack_started: false,

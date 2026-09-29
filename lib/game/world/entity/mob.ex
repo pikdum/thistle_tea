@@ -1556,6 +1556,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   def handle_info({:proximity, %Announcement{} = announcement}, %Mob{} = state) do
     case Proximity.hear(state, announcement, Time.now()) do
       :notice -> notice_nearby(state)
+      :sight -> {:noreply, look_around(state)}
       :ignore -> {:noreply, state}
     end
   rescue
@@ -1567,6 +1568,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   def handle_info({:proximity_due, guid, role}, %Mob{} = state) do
     case Proximity.due(state, guid, role, Time.now()) do
       :notice -> notice_nearby(state)
+      :sight -> {:noreply, look_around(state)}
       :ignore -> {:noreply, state}
     end
   rescue
@@ -1656,6 +1658,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       |> broadcast_if_pending()
       |> sync_perception_metadata()
       |> schedule_movement_completion()
+      |> ensure_ai_tick()
       |> Proximity.sync()
 
     {:noreply, state}
@@ -1879,6 +1882,18 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       else: schedule_ai_tick(state, TickPlan.delay(plan))
   end
 
+  defp ensure_ai_tick(%Mob{internal: %Internal{ai_tick_ref: nil}} = state) do
+    if EntityCore.dead?(state) do
+      state
+    else
+      now = Time.now()
+      plan = Tick.plan(state, BT.running(:infinity, :idle), now)
+      schedule_ai_tick(state, TickPlan.delay(plan))
+    end
+  end
+
+  defp ensure_ai_tick(%Mob{} = state), do: state
+
   defp schedule_movement_completion(%Mob{} = state) do
     case Movement.completion_at(state) do
       at when is_integer(at) ->
@@ -1896,14 +1911,15 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   end
 
   defp emit_ai_tick_telemetry(%Mob{object: %{guid: guid}}, status, duration, %TickPlan{} = plan) do
-    wake = TickPlan.next(plan)
-
     :telemetry.execute(
       [:thistle_tea, :mob, :ai_tick],
       %{duration: duration, next_delay_ms: TickPlan.delay(plan)},
-      %{guid: guid, status: tick_status(status), wake_reason: wake.source}
+      %{guid: guid, status: tick_status(status), wake_reason: wake_reason(TickPlan.next(plan))}
     )
   end
+
+  defp wake_reason(%TickPlan.Wake{source: source}), do: source
+  defp wake_reason(nil), do: :dormant
 
   defp tick_status({:running, _delay}), do: :running
   defp tick_status({:running, _delay, _reason}), do: :running
@@ -1927,6 +1943,8 @@ defmodule ThistleTea.Game.World.Entity.Mob do
     |> cancel_ai_tick()
     |> unwatch_chase()
   end
+
+  defp schedule_ai_tick(%Mob{} = state, nil), do: cancel_ai_tick(state)
 
   defp schedule_ai_tick(%Mob{} = state, delay) when is_integer(delay) and delay >= 0 do
     state = cancel_ai_tick(state)
@@ -2008,8 +2026,14 @@ defmodule ThistleTea.Game.World.Entity.Mob do
 
   defp notice_nearby(state), do: {:noreply, state}
 
+  defp look_around(%Mob{internal: %Internal{blackboard: blackboard, ai_tick_ref: ref}} = state) do
+    delay = blackboard |> Blackboard.ensure() |> Blackboard.delay_until(:next_eventai_at, Time.now())
+    remaining = if is_reference(ref), do: Process.read_timer(ref)
+    if is_integer(remaining) and remaining <= delay, do: state, else: schedule_ai_tick(state, delay)
+  end
+
   defp mark_aggro_ready(%Mob{internal: %Internal{blackboard: blackboard} = internal} = state) do
-    blackboard = blackboard |> Blackboard.ensure() |> Blackboard.reset_deadline(:next_aggro_at)
+    blackboard = blackboard |> Blackboard.ensure() |> Blackboard.request_aggro_check()
     %{state | internal: %{internal | blackboard: blackboard}}
   end
 

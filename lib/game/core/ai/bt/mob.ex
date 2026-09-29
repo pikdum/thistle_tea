@@ -74,7 +74,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   @deep_bounds_factor 0.5
   @distance_sqr_size_factor 1.0
 
-  @aggro_check_delay 5_000
   @dead_idle_delay 1_000
   @blocked_retry_delay 1_000
   @call_for_help_delay 1_000
@@ -283,13 +282,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
     not in_combat?(state, blackboard)
   end
 
-  def aggro_check_ready?(state, %Blackboard{} = blackboard, %Context{now: now}) do
-    aggro_check_ready?(state, blackboard, now)
-  end
-
-  def aggro_check_ready?(_state, %Blackboard{} = blackboard, now) when is_integer(now) do
-    Blackboard.ready_for?(blackboard, :next_aggro_at, now)
-  end
+  def aggro_check_ready?(_state, %Blackboard{} = blackboard, _now), do: Blackboard.aggro_check?(blackboard)
 
   defp try_aggro_with_context(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
     try_aggro(state, blackboard, context)
@@ -300,7 +293,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   end
 
   def try_aggro(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
-    blackboard = Blackboard.put_next_at(blackboard, :next_aggro_at, @aggro_check_delay, now)
+    blackboard = Blackboard.complete_aggro_check(blackboard)
 
     case Acquisition.nearest(state, context) do
       nil ->
@@ -1415,16 +1408,15 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   end
 
   defp idle_wake(%Mob{} = state, %Blackboard{} = blackboard, now) do
-    idle_wake(state, blackboard, :next_aggro_at, now, :aggro)
+    soonest_wake([{:eventai, EventAI.ooc_timer_delay(state, blackboard, now)}], :idle, :infinity)
   end
 
   defp idle_wake(%Mob{} = state, %Blackboard{} = blackboard, key, now, key_reason) do
     [
       {key_reason, Blackboard.delay_until(blackboard, key, now)},
-      {:aggro, Blackboard.delay_until(blackboard, :next_aggro_at, now)},
       {:eventai, EventAI.ooc_timer_delay(state, blackboard, now)}
     ]
-    |> soonest_wake(:aggro, @aggro_check_delay)
+    |> soonest_wake(:idle, :infinity)
   end
 
   defp eventai_combat_delay(%Mob{} = state, %Blackboard{} = blackboard, now) do

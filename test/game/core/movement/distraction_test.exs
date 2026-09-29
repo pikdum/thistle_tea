@@ -112,7 +112,7 @@ defmodule ThistleTea.Game.Core.Movement.DistractionTest do
   end
 
   defp build_mob(_) do
-    blackboard = %Blackboard{combat: %Blackboard.Combat{next_aggro_at: 20_000}}
+    blackboard = %Blackboard{combat: %Blackboard.Combat{aggro_check?: false}}
 
     mob = %Mob{
       object: %Object{guid: 1},

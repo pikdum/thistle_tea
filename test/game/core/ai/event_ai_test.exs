@@ -423,6 +423,37 @@ defmodule ThistleTea.Game.Core.AI.EventAITest do
     end
   end
 
+  describe "ooc_los_radius/3" do
+    test "is the widest ready out-of-combat line-of-sight range" do
+      mob = mob(events: [event(:ooc_los, param2: 20), event(:ooc_los, param2: 35), event(:timer_ooc)])
+
+      assert EventAI.ooc_los_radius(mob, Blackboard.new(), 1_000) == 35.0
+      assert EventAI.ooc_los_radius(mob(events: []), Blackboard.new(), 1_000) == 0.0
+    end
+
+    test "is zero in combat or while the event is on cooldown" do
+      player = Guid.from_low_guid(:player, 3)
+      mob = mob(events: [event(:ooc_los, param2: 20, param3: 5_000, param4: 5_000, repeatable?: true)])
+      fighting = %{mob | internal: %{mob.internal | in_combat: true}}
+      assert EventAI.ooc_los_radius(fighting, Blackboard.new(), 1_000) == 0.0
+
+      nearby = %{mobs: [], players: [{player, 5.0}], game_objects: []}
+      {_mob, blackboard} = EventAI.tick(mob, Blackboard.new(), 1_000, target_context(mob, player, %{}, nearby: nearby))
+
+      assert EventAI.ooc_los_radius(mob, blackboard, 2_000) == 0.0
+      assert EventAI.ooc_los_radius(mob, blackboard, 7_000) == 20.0
+    end
+  end
+
+  describe "ooc_timer_delay/3" do
+    test "polls ready friendly missing-buff events at the EventAI cadence" do
+      mob = mob(events: [event(:friendly_missing_buff, param1: 27_995, param2: 30)])
+
+      assert EventAI.ooc_timer_delay(mob, Blackboard.new(), 1_000) == EventAI.tick_ms()
+      assert EventAI.ooc_timer_delay(mob(events: [event(:ooc_los, param2: 20)]), Blackboard.new(), 1_000) == nil
+    end
+  end
+
   describe "enter_combat/4" do
     test "fires aggro events and re-enables fired events" do
       enemy = Guid.from_low_guid(:player, 3)

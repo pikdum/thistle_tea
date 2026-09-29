@@ -15,6 +15,10 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
   vmangos `CreatureEventAI` reset semantics. Result-checked events re-enable
   immediately when an action terminates, retrying on the next eligible tick
   or edge. Each action group still runs independently of earlier failures.
+  An idle creature ticks only for its out-of-combat timers and friendly
+  missing-buff polls; out-of-combat line-of-sight events wait for a unit to
+  announce itself within `ooc_los_radius/3`, as vmangos evaluates them from
+  MoveInLineOfSight.
   """
   alias ThistleTea.Game.Core.AI.AIEvent
   alias ThistleTea.Game.Core.AI.BT.Blackboard
@@ -364,25 +368,42 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
       else: fire_edges(state, blackboard, matcher, nil, now, context)
   end
 
+  def ooc_los_radius(state, %Blackboard{} = blackboard, now) when is_integer(now) do
+    if in_combat?(state) or Entity.dead?(state) do
+      0.0
+    else
+      state
+      |> events()
+      |> Enum.with_index()
+      |> Enum.filter(fn {event, index} ->
+        event.event_type == :ooc_los and enabled?(blackboard, index) and due?(blackboard, index, now) and
+          AIEvent.phase_allows?(event, blackboard.event_ai.phase)
+      end)
+      |> Enum.map(fn {event, _index} -> event_observation_radius(event) end)
+      |> Enum.max(fn -> 0.0 end)
+    end
+  end
+
   def ooc_timer_delay(state, %Blackboard{} = blackboard, now) when is_integer(now) do
     events = events(state)
 
     delays =
       events
       |> Enum.with_index()
-      |> Enum.filter(fn {event, index} -> event.event_type == :timer_ooc and enabled?(blackboard, index) end)
-      |> Enum.flat_map(fn {_event, index} ->
-        case timer_at(blackboard, index) do
-          ready_at when is_integer(ready_at) -> [max(ready_at - now, 0)]
-          _ -> []
-        end
+      |> Enum.filter(fn {event, index} ->
+        event.event_type in [:timer_ooc, :friendly_missing_buff] and enabled?(blackboard, index)
       end)
+      |> Enum.flat_map(fn {event, index} -> ooc_delay(event, timer_at(blackboard, index), now) end)
 
     case delays do
       [] -> nil
       delays -> delays |> Enum.min() |> max(Blackboard.delay_until(blackboard, :next_eventai_at, now)) |> max(1)
     end
   end
+
+  defp ooc_delay(_event, ready_at, now) when is_integer(ready_at), do: [max(ready_at - now, 0)]
+  defp ooc_delay(%AIEvent{event_type: :friendly_missing_buff}, nil, _now), do: [@tick_ms]
+  defp ooc_delay(_event, _ready_at, _now), do: []
 
   defp fire_edges(state, %Blackboard{} = blackboard, matcher, invoker_guid, now, %Context{} = context) do
     events = events(state)
