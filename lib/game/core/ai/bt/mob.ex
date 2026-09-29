@@ -57,8 +57,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   alias ThistleTea.Game.Core.Movement
   alias ThistleTea.Game.Core.Movement.Distraction
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Metadata
 
   @chase_tick_delay 1_000
 
@@ -706,32 +704,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
 
   def halt_at_contact(%Mob{} = state, %Blackboard{} = blackboard, %Context{}), do: {:success, state, blackboard}
 
-  def halt_at_contact(%Mob{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, now)
-      when is_integer(target) and target > 0 and is_integer(now) do
-    if not Blackboard.combat_movement?(blackboard, state) or
-         (Blackboard.spreading?(blackboard) and Movement.moving?(state, now)) do
-      {:success, state, blackboard}
-    else
-      maybe_halt_at_contact(state, Blackboard.clear_spreading(blackboard), target, now)
-    end
-  end
-
-  def halt_at_contact(%Mob{} = state, %Blackboard{} = blackboard, _now), do: {:success, state, blackboard}
-
-  defp maybe_halt_at_contact(%Mob{} = state, %Blackboard{} = blackboard, target, now) do
-    with {world, tx, ty, _tz} when world == state.internal.world <- World.target_position(target),
-         true <- within_contact?(state, target, {tx, ty}) do
-      state =
-        state
-        |> maybe_halt(now)
-        |> face_target(target, {tx, ty})
-
-      {:success, state, blackboard}
-    else
-      _ -> {:success, state, blackboard}
-    end
-  end
-
   defp maybe_halt_at_contact(%Mob{} = state, %Blackboard{} = blackboard, target, now, perception) do
     with {world, tx, ty, _tz} when world == state.internal.world <- Perception.position(perception, target),
          true <- within_contact?(state, target, {tx, ty}, perception) do
@@ -746,10 +718,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
     end
   end
 
-  defp within_contact?(%Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state, target_guid, {tx, ty}) do
-    planar_distance({mx, my, 0.0}, {tx, ty, 0.0}) <= contact_distance(state, target_guid)
-  end
-
   defp within_contact?(
          %Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state,
          target_guid,
@@ -757,10 +725,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
          perception
        ) do
     planar_distance({mx, my, 0.0}, {tx, ty, 0.0}) <= contact_distance(state, target_guid, perception)
-  end
-
-  defp contact_distance(%Mob{} = state, target_guid) do
-    own_combat_reach(state) + target_combat_reach(target_guid)
   end
 
   defp contact_distance(%Mob{} = state, target_guid, perception) do
@@ -1117,8 +1081,8 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
     :math.sqrt(dx * dx + dy * dy)
   end
 
-  def chase_repath_distance(%Mob{} = state, target_guid) do
-    CombatLogic.chase_rechase_distance(melee_reach_to(state, target_guid), target_bounding_radius(target_guid))
+  def chase_repath_distance(%Mob{} = state, target) when is_map(target) do
+    CombatLogic.chase_rechase_distance(melee_reach_to(state, target), target_bounding_radius(target))
   end
 
   defp chase_repath_distance(%Mob{} = state, target_guid, perception) do
@@ -1130,12 +1094,12 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
 
   @melee_escape_min_threshold 0.5
 
-  def melee_escape_distance(%Mob{} = state, target_guid, distance) when is_number(distance) do
-    max(melee_reach_to(state, target_guid) - distance, @melee_escape_min_threshold)
+  def melee_escape_distance(%Mob{} = state, target, distance) when is_map(target) and is_number(distance) do
+    max(melee_reach_to(state, target) - distance, @melee_escape_min_threshold)
   end
 
-  defp melee_reach_to(%Mob{} = state, target_guid) do
-    CombatLogic.melee_reach(own_combat_reach(state), target_combat_reach(target_guid))
+  defp melee_reach_to(%Mob{} = state, target) when is_map(target) do
+    CombatLogic.melee_reach(own_combat_reach(state), target_combat_reach(target))
   end
 
   defp melee_reach_to(%Mob{} = state, target_guid, perception) do
@@ -1145,39 +1109,19 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   defp own_combat_reach(%Mob{unit: %Unit{combat_reach: reach}}) when is_number(reach) and reach > 0, do: reach
   defp own_combat_reach(%Mob{}), do: Unit.default_combat_reach()
 
-  defp target_combat_reach(target_guid) when is_integer(target_guid) do
-    case Metadata.query(target_guid, [:combat_reach]) do
-      %{combat_reach: combat_reach} when is_number(combat_reach) -> combat_reach
-      _ -> Unit.default_combat_reach()
-    end
-  end
+  defp target_combat_reach(%{combat_reach: combat_reach}) when is_number(combat_reach), do: combat_reach
+  defp target_combat_reach(_target), do: Unit.default_combat_reach()
 
-  defp target_combat_reach(_target_guid), do: Unit.default_combat_reach()
-
-  defp target_combat_reach(target_guid, perception) when is_integer(target_guid) do
-    case Perception.metadata(perception, target_guid) do
-      %{combat_reach: combat_reach} when is_number(combat_reach) -> combat_reach
-      _ -> Unit.default_combat_reach()
-    end
-  end
+  defp target_combat_reach(target_guid, perception) when is_integer(target_guid),
+    do: perception |> Perception.metadata(target_guid) |> target_combat_reach()
 
   defp target_combat_reach(_target_guid, _perception), do: Unit.default_combat_reach()
 
-  defp target_bounding_radius(target_guid) when is_integer(target_guid) do
-    case Metadata.query(target_guid, [:bounding_radius]) do
-      %{bounding_radius: bounding_radius} when is_number(bounding_radius) -> bounding_radius
-      _ -> Unit.default_bounding_radius()
-    end
-  end
+  defp target_bounding_radius(%{bounding_radius: bounding_radius}) when is_number(bounding_radius), do: bounding_radius
+  defp target_bounding_radius(_target), do: Unit.default_bounding_radius()
 
-  defp target_bounding_radius(_target_guid), do: Unit.default_bounding_radius()
-
-  defp target_bounding_radius(target_guid, perception) when is_integer(target_guid) do
-    case Perception.metadata(perception, target_guid) do
-      %{bounding_radius: bounding_radius} when is_number(bounding_radius) -> bounding_radius
-      _ -> Unit.default_bounding_radius()
-    end
-  end
+  defp target_bounding_radius(target_guid, perception) when is_integer(target_guid),
+    do: perception |> Perception.metadata(target_guid) |> target_bounding_radius()
 
   defp target_bounding_radius(_target_guid, _perception), do: Unit.default_bounding_radius()
 

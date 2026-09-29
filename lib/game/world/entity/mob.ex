@@ -1947,7 +1947,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
        when is_integer(target) and target > 0 do
     case Blackboard.ensure(blackboard) do
       %Blackboard{navigation: %Blackboard.Navigation{last_target_pos: {x, y, z}}} ->
-        {target, {x, y, z}, MobBT.chase_repath_distance(state, target)}
+        {target, {x, y, z}, MobBT.chase_repath_distance(state, target_dimensions(target))}
 
       %Blackboard{} ->
         melee_hold_watch(state, target)
@@ -1959,11 +1959,13 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   defp melee_hold_watch(%Mob{internal: %Internal{world: world}} = state, target) do
     with {^world, x, y, z} <- World.target_position(target),
          distance when is_number(distance) <- World.distance_between(state, target) do
-      {target, {x, y, z}, MobBT.melee_escape_distance(state, target, distance)}
+      {target, {x, y, z}, MobBT.melee_escape_distance(state, target_dimensions(target), distance)}
     else
       _ -> nil
     end
   end
+
+  defp target_dimensions(target), do: Metadata.query(target, [:combat_reach, :bounding_radius]) || %{}
 
   defp mark_chase_ready(%Mob{internal: %Internal{blackboard: blackboard} = internal} = state) do
     blackboard = blackboard |> Blackboard.ensure() |> Blackboard.reset_deadline(:next_chase_at)

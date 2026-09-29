@@ -5,8 +5,6 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
 
   @allowed_core_references MapSet.new([
                              {"lib/game/core/ai/bt/combat.ex", "ThistleTea.Game.World.Spell.SpellTargetResolver"},
-                             {"lib/game/core/ai/bt/mob.ex", "ThistleTea.Game.World"},
-                             {"lib/game/core/ai/bt/mob.ex", "ThistleTea.Game.World.Metadata"},
                              {"lib/game/core/combat/hostility.ex", "ThistleTea.Game.World.Metadata"},
                              {"lib/game/core/combat/hostility.ex", "ThistleTea.Game.World.System.Duel"},
                              {"lib/game/core/combat/threat.ex", "ThistleTea.Game.World"},

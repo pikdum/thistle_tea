@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Context
   alias ThistleTea.Game.Core.AI.BT.Context.Navigation, as: NavigationContext
+  alias ThistleTea.Game.Core.AI.BT.Context.Perception
+  alias ThistleTea.Game.Core.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Core.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Aura
@@ -689,25 +691,29 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
     end
   end
 
+  defp contact_context(%Mob{internal: %Internal{world: world}}, target_guid, position) do
+    observations =
+      case position do
+        {x, y, z} -> %{target_guid => %Observation{guid: target_guid, position: {world, x, y, z}}}
+        nil -> %{}
+      end
+
+    Context.new(2_000, perception: Perception.new(2_000, nil, observations, %{mobs: [], players: [], game_objects: []}))
+  end
+
   describe "chase_repath_distance/2" do
     test "uses combined melee reach and the target's bounding radius" do
-      target_guid = player_guid()
-      Metadata.put(target_guid, %{combat_reach: 4.0, bounding_radius: 1.0})
-
-      on_exit(fn -> Metadata.delete(target_guid) end)
-
       state = fixture_mob()
       expected = (Unit.default_combat_reach() + 4.0 + 1.333) * 0.75 - 1.0
 
-      assert_in_delta MobBT.chase_repath_distance(state, target_guid), expected, 0.0001
+      assert_in_delta MobBT.chase_repath_distance(state, %{combat_reach: 4.0, bounding_radius: 1.0}), expected, 0.0001
     end
   end
 
   describe "halt_at_contact/3" do
     test "halts, faces the target, and emits a stop when riding a spline into contact" do
       target_guid = player_guid()
-      SpatialHash.update(:players, target_guid, 0, 4.0, 0.0, 0.0)
-      on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
+      target_position = {4.0, 0.0, 0.0}
 
       state =
         fixture_mob(
@@ -720,7 +726,9 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
 
       state = put_in(state.unit.target, target_guid)
 
-      assert {:success, state, %Blackboard{}} = MobBT.halt_at_contact(state, %Blackboard{}, 2_000)
+      assert {:success, state, %Blackboard{}} =
+               MobBT.halt_at_contact(state, %Blackboard{}, contact_context(state, target_guid, target_position))
+
       assert state.movement_block.spline_nodes == []
       assert state.movement_block.position == {2.0, 0.0, 0.0, 0.0}
       assert is_nil(state.internal.movement_start_time)
@@ -733,8 +741,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
 
     test "re-faces a stationary target that crosses through melee range" do
       target_guid = player_guid()
-      SpatialHash.update(:players, target_guid, 0, -2.0, 0.0, 0.0)
-      on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
+      target_position = {-2.0, 0.0, 0.0}
 
       state =
         fixture_mob(
@@ -746,7 +753,9 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
 
       state = put_in(state.unit.target, target_guid)
 
-      assert {:success, state, %Blackboard{}} = MobBT.halt_at_contact(state, %Blackboard{}, 2_000)
+      assert {:success, state, %Blackboard{}} =
+               MobBT.halt_at_contact(state, %Blackboard{}, contact_context(state, target_guid, target_position))
+
       {_x, _y, _z, orientation} = state.movement_block.position
       assert_in_delta abs(orientation), :math.pi(), 0.0001
       assert [%Effects.SetFacing{facing: {:target, ^target_guid}}] = state.internal.events
@@ -754,8 +763,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
 
     test "keeps moving outside the contact ring" do
       target_guid = player_guid()
-      SpatialHash.update(:players, target_guid, 0, 9.0, 0.0, 0.0)
-      on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
+      target_position = {9.0, 0.0, 0.0}
 
       state =
         fixture_mob(
@@ -768,15 +776,16 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
 
       state = put_in(state.unit.target, target_guid)
 
-      assert {:success, ^state, %Blackboard{}} = MobBT.halt_at_contact(state, %Blackboard{}, 2_000)
+      assert {:success, ^state, %Blackboard{}} =
+               MobBT.halt_at_contact(state, %Blackboard{}, contact_context(state, target_guid, target_position))
+
       assert state.movement_block.spline_nodes == [{2.0, 0.0, 0.0}]
       assert state.internal.events == []
     end
 
     test "does not interrupt a spread move" do
       target_guid = player_guid()
-      SpatialHash.update(:players, target_guid, 0, 4.0, 0.0, 0.0)
-      on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
+      target_position = {4.0, 0.0, 0.0}
 
       state =
         fixture_mob(
@@ -790,7 +799,9 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       state = put_in(state.unit.target, target_guid)
       blackboard = %Blackboard{combat: %Blackboard.Combat{spreading: true}}
 
-      assert {:success, ^state, ^blackboard} = MobBT.halt_at_contact(state, blackboard, 2_000)
+      assert {:success, ^state, ^blackboard} =
+               MobBT.halt_at_contact(state, blackboard, contact_context(state, target_guid, target_position))
+
       assert state.movement_block.spline_nodes == [{2.0, 0.0, 0.0}]
     end
 
@@ -802,26 +813,22 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
                MobBT.halt_at_contact(
                  state,
                  %Blackboard{combat: %Blackboard.Combat{spreading: true}},
-                 2_000
+                 contact_context(state, target_guid, nil)
                )
     end
   end
 
   describe "melee_escape_distance/3" do
     test "is the remaining distance to the melee reach edge" do
-      target_guid = player_guid()
-      Metadata.put(target_guid, %{combat_reach: 1.5})
-      on_exit(fn -> Metadata.delete(target_guid) end)
-
       state = fixture_mob()
 
-      assert_in_delta MobBT.melee_escape_distance(state, target_guid, 4.0), 1.0, 0.0001
+      assert_in_delta MobBT.melee_escape_distance(state, %{combat_reach: 1.5}, 4.0), 1.0, 0.0001
     end
 
     test "floors at a minimum threshold near the reach edge" do
       state = fixture_mob()
 
-      assert MobBT.melee_escape_distance(state, player_guid(), 4.9) == 0.5
+      assert MobBT.melee_escape_distance(state, %{}, 4.9) == 0.5
     end
   end
 
