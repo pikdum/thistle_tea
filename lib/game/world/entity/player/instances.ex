@@ -1,5 +1,8 @@
 defmodule ThistleTea.Game.World.Entity.Player.Instances do
-  @moduledoc "Instance admission, membership grace periods, and safe recovery to the player's home bind."
+  @moduledoc """
+  Instance admission, lockout reports and resets, membership grace periods,
+  and safe recovery to the player's home bind.
+  """
 
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Instance.Eviction
@@ -25,6 +28,17 @@ defmodule ThistleTea.Game.World.Entity.Player.Instances do
     raids = InstanceSystem.saved_raids(guid)
     Outbound.send_packet(%Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: raids != []})
     Enum.each(raids, &Outbound.send_packet(%Message.SmsgUpdateLastInstance{map: &1.map_id}))
+  end
+
+  def reset(guid) do
+    case InstanceSystem.reset(guid) do
+      {:ok, %{reset: reset, failed: failed}} ->
+        Enum.each(reset, &Outbound.send_packet(%Message.SmsgInstanceReset{map: &1.map_id}))
+        Enum.each(failed, &Outbound.send_packet(%Message.SmsgInstanceResetFailed{reason: 0, map: &1.map_id}))
+
+      {:error, :not_leader} ->
+        :ok
+    end
   end
 
   def lockout_changed(guid, reason) do

@@ -1,7 +1,9 @@
 defmodule ThistleTea.Game.World.Entity.Player.MovementControl do
   @moduledoc """
   State-owned sequencing for movement changes that the client acknowledges,
-  including deferring spirit-release teleports until earlier changes settle.
+  including deferring spirit-release teleports until earlier changes settle,
+  and the client's movement clock skips (advancing the stored timestamp and
+  refreshing a newly boarded transport).
   """
 
   alias ThistleTea.Game.Core.Death.Resurrection
@@ -9,12 +11,17 @@ defmodule ThistleTea.Game.World.Entity.Player.MovementControl do
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.Movement, as: PlayerMovement
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Transports
 
   @ack_timeout_ms 4_000
   @max_counter 0xFFFFFFFF
+  @timestamp_modulus 0x1_0000_0000
 
   def prepare(%Message.SmsgNewWorld{} = packet, %State{} = state) do
     character = Resurrection.expect_arrival(state.character, :worldport)
@@ -84,6 +91,20 @@ defmodule ThistleTea.Game.World.Entity.Player.MovementControl do
   end
 
   def prepare(packet, state), do: {packet, state}
+
+  def acknowledge_controlled(state, guid, counter, change, movement_payload) do
+    case acknowledge(state, guid, counter, change) do
+      {:ok, state} -> state |> reconcile_movement(movement_payload, guid) |> maybe_finish_repop()
+      {:error, state} -> state
+    end
+  end
+
+  def acknowledge_toggle(state, guid, counter, change) do
+    case acknowledge(state, guid, counter, change) do
+      {:ok, state} -> maybe_finish_repop(state)
+      {:error, state} -> state
+    end
+  end
 
   def acknowledge(%State{guid: guid} = state, guid, counter, expected) when is_integer(counter) do
     case Map.fetch(state.pending_movement_acks, counter) do
@@ -186,6 +207,33 @@ defmodule ThistleTea.Game.World.Entity.Player.MovementControl do
     end
   end
 
+  def time_skipped(
+        %State{
+          transport_refresh_pending: transport_guid,
+          character: %Character{movement_block: %MovementBlock{transport_guid: transport_guid} = movement_block}
+        } = state,
+        lag
+      )
+      when is_integer(transport_guid) and is_integer(lag) do
+    Outbound.send_packet(UpdateObject.out_of_range([transport_guid]))
+    send_transport_refresh(transport_guid)
+    character = %{state.character | movement_block: advance_timestamp(movement_block, lag)}
+    %{state | character: character, transport_refresh_pending: nil}
+  end
+
+  def time_skipped(%State{character: %Character{} = character} = state, lag) when is_integer(lag) do
+    character = %{character | movement_block: advance_timestamp(character.movement_block, lag)}
+
+    World.broadcast_packet(%Message.MsgMoveTimeSkipped{guid: state.guid, lag: lag}, character,
+      include_self?: false,
+      recipients: state.player_guids
+    )
+
+    %{state | character: character}
+  end
+
+  def time_skipped(state, _lag), do: state
+
   def track_transport_boarding(%State{} = state, %MovementBlock{transport_guid: previous_guid}, %MovementBlock{
         transport_guid: current_guid
       }) do
@@ -273,4 +321,18 @@ defmodule ThistleTea.Game.World.Entity.Player.MovementControl do
 
   defp next_counter(@max_counter), do: 0
   defp next_counter(counter), do: counter + 1
+
+  defp advance_timestamp(%MovementBlock{timestamp: timestamp} = movement_block, lag)
+       when is_integer(timestamp) and timestamp > 0 do
+    %{movement_block | timestamp: Integer.mod(timestamp + lag, @timestamp_modulus)}
+  end
+
+  defp advance_timestamp(%MovementBlock{} = movement_block, _lag), do: movement_block
+
+  defp send_transport_refresh(transport_guid) do
+    case Entity.transport_update(transport_guid) do
+      {:ok, %UpdateObject{} = update} -> Outbound.send_packet(%{update | has_transport: false})
+      _error -> :ok
+    end
+  end
 end

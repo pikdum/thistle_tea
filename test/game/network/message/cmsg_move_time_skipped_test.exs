@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTimeSkippedTest do
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message.CmsgMoveTimeSkipped
   alias ThistleTea.Game.Network.Message.Dispatch
+  alias ThistleTea.Game.Network.Message.MsgMoveTimeSkipped
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
@@ -108,11 +109,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTimeSkippedTest do
 
       assert state.character.movement_block.timestamp == 125
 
-      opcode = Opcodes.get(:MSG_MOVE_TIME_SKIPPED)
-      payload = BinaryUtils.pack_guid(player_guid) <> <<25::little-size(32)>>
-
       assert_receive {:"$gen_cast",
-                      {:send_packet, %Packet{opcode: ^opcode, payload: ^payload}, [source_guid: ^player_guid]}}
+                      {:send_packet, %MsgMoveTimeSkipped{guid: ^player_guid, lag: 25} = message,
+                       [source_guid: ^player_guid]}}
+
+      assert MsgMoveTimeSkipped.to_binary(message) == BinaryUtils.pack_guid(player_guid) <> <<25::little-size(32)>>
     end
   end
 

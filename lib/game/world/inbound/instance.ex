@@ -3,8 +3,6 @@ defmodule ThistleTea.Game.World.Inbound.Instance do
 
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.Instances
-  alias ThistleTea.Game.World.Outbound
-  alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
   def messages do
     [
@@ -21,20 +19,7 @@ defmodule ThistleTea.Game.World.Inbound.Instance do
   def handle(%Message.CmsgRequestRaidInfo{}, state), do: state
 
   def handle(%Message.CmsgResetInstances{}, %{ready: true, guid: guid} = state) do
-    case InstanceSystem.reset(guid) do
-      {:ok, %{reset: reset, failed: failed}} ->
-        Enum.each(reset, fn world ->
-          Outbound.send_packet(%Message.SmsgInstanceReset{map: world.map_id})
-        end)
-
-        Enum.each(failed, fn world ->
-          Outbound.send_packet(%Message.SmsgInstanceResetFailed{reason: 0, map: world.map_id})
-        end)
-
-      {:error, :not_leader} ->
-        :ok
-    end
-
+    Instances.reset(guid)
     state
   end
 
