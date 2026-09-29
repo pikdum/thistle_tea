@@ -11,7 +11,8 @@ defmodule ThistleTea.MixProject do
       compilers: [:boundary, :elixir_make] ++ Mix.compilers(),
       aliases: aliases(),
       deps: deps(),
-      listeners: [Phoenix.CodeReloader]
+      listeners: [Phoenix.CodeReloader],
+      test_ignore_filters: [&String.starts_with?(&1, "test/support/")]
     ]
   end
 
