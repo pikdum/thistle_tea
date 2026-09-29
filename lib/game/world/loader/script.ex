@@ -10,9 +10,9 @@ defmodule ThistleTea.Game.World.Loader.Script do
   import Ecto.Query, only: [from: 2]
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Data.ScriptStep
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.CreatureSpellList, as: CreatureSpellListLoader
   alias ThistleTea.Game.World.Loader.GameObject, as: GameObjectLoader

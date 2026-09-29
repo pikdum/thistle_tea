@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetUnlearn do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PET_UNLEARN
 
-  alias ThistleTea.Game.Player.PetUntraining
+  alias ThistleTea.Game.World.Entity.Player.PetUntraining
 
   defstruct [:pet_guid]
 

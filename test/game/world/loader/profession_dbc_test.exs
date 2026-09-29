@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.World.Loader.ProfessionDBCTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Logic.Skills
-  alias ThistleTea.Game.Entity.Logic.SpellSkills
+  alias ThistleTea.Game.Core.Skills
+  alias ThistleTea.Game.Core.Skills.SpellSkills
   alias ThistleTea.Game.World.Loader.Skill
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 

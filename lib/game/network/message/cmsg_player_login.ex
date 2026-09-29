@@ -2,9 +2,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PLAYER_LOGIN
 
-  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Network.ConnectionState
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
 
   require Logger
 

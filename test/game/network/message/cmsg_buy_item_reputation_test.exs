@@ -1,29 +1,29 @@
 defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Data.Reputation.Catalog
-  alias ThistleTea.Game.Entity.Data.Reputation.Definition
-  alias ThistleTea.Game.Entity.Data.Reputation.Variant
-  alias ThistleTea.Game.Entity.Data.VendorItem
-  alias ThistleTea.Game.Entity.Logic.Reputation
-  alias ThistleTea.Game.Entity.Registry
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Reputation
+  alias ThistleTea.Game.Core.Reputation.Catalog
+  alias ThistleTea.Game.Core.Reputation.Definition
+  alias ThistleTea.Game.Core.Reputation.Variant
+  alias ThistleTea.Game.Core.Vendor.VendorItem
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.CmsgBuyItem
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Entity.Registry
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
-  alias ThistleTea.Game.WorldRef
 
   describe "handle/2" do
     test "rejects purchases below the item's required reputation rank" do

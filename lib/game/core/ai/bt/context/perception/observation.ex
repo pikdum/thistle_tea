@@ -1,0 +1,16 @@
+defmodule ThistleTea.Game.Core.AI.BT.Context.Perception.Observation do
+  @moduledoc false
+
+  @enforce_keys [:guid]
+  defstruct [
+    :guid,
+    :position,
+    :grounded_position,
+    :distance,
+    :metadata,
+    :controller_level,
+    :swimmable?,
+    moving?: false,
+    line_of_sight?: true
+  ]
+end

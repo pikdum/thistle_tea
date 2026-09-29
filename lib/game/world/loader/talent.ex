@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.World.Loader.Talent do
   import Ecto.Query
 
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.Talent, as: TalentData
+  alias ThistleTea.Game.Core.Player.Talent, as: TalentData
   alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
 
   @classes 1..11

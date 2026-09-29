@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharCreate do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CHAR_CREATE
 
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Player.Characters
+  alias ThistleTea.Game.World.Entity.Player.Characters
   alias ThistleTea.Game.World.Loader.Character, as: CharacterLoader
 
   require Logger

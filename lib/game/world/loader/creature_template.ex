@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.World.Loader.CreatureTemplate do
   gameplay queries answer from running state instead of the Mangos seed.
   """
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.CreatureTemplate
+  alias ThistleTea.Game.Core.Entity.CreatureTemplate
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 

@@ -1,30 +1,30 @@
 defmodule ThistleTea.Game.World.PresenceTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Model
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.PlayerCombat
-  alias ThistleTea.Game.Entity.Logic.TargetRef
-  alias ThistleTea.Game.Entity.SpellTargetResolver
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.CastValidation
-  alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Core.AI.BT.Blackboard
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Combat.PlayerCombat
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Model
+  alias ThistleTea.Game.Core.Entity.TargetRef
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.CastValidation
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.Position.ClientMotion
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
-  alias ThistleTea.Game.World.SpellTargetInfo
-  alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Game.World.Spell.SpellTargetInfo
+  alias ThistleTea.Game.World.Spell.SpellTargetResolver
 
   describe "enter/2" do
     test "publishes health deficits through entry and subsequent owner updates" do

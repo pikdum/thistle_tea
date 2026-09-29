@@ -1,30 +1,30 @@
 defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Condition
-  alias ThistleTea.Game.Entity.Data.Reputation
-  alias ThistleTea.Game.Entity.Data.ScriptStep
-  alias ThistleTea.Game.Entity.Data.Taxi.Network
-  alias ThistleTea.Game.Entity.Data.Taxi.Node
-  alias ThistleTea.Game.Entity.Logic.Effects.SendTaxiPath
-  alias ThistleTea.Game.Entity.Server.Player.State
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Condition
+  alias ThistleTea.Game.Core.Effects.SendTaxiPath
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Reputation
+  alias ThistleTea.Game.Core.Travel.Taxi.Network
+  alias ThistleTea.Game.Core.Travel.Taxi.Node
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message.CmsgGossipSelectOption
   alias ThistleTea.Game.Network.Message.SmsgGossipComplete
   alias ThistleTea.Game.Network.Message.SmsgShowBank
   alias ThistleTea.Game.Network.Message.SmsgShowtaxinodes
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.Gossip.Option
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
-  alias ThistleTea.Game.WorldRef
 
   describe "handle/2" do
     test "dispatches a taxi gossip script to the player owner" do

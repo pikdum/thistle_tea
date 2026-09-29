@@ -1,0 +1,43 @@
+defmodule ThistleTea.Game.Core.Spell.SupportMatrix do
+  @moduledoc """
+  Explicit manifest of the spell-data surface: every effect, aura, and
+  implicit-target value a player-reachable spell can carry is either mapped
+  by the loader (and handled or knowingly inert) or listed here as deferred
+  with a label. The `:dbc_db` coverage test walks every trainable class
+  spell and fails when a value falls outside this matrix, so new content
+  can never silently no-op.
+  """
+
+  @deferred_effects %{
+    19 => :block_passive,
+    20 => :defense_passive,
+    26 => :dodge_passive,
+    37 => :spell_defense_dnd,
+    47 => :tradeskill,
+    49 => :detect,
+    78 => :attack,
+    86 => :holiday_gift
+  }
+
+  @deferred_auras %{}
+
+  @deferred_targets %{
+    26 => :locked_object,
+    55 => :caster_front_leap
+  }
+
+  def known_effect?(value) when is_atom(value), do: true
+  def known_effect?(value), do: is_map_key(@deferred_effects, value)
+
+  def known_aura?(nil), do: true
+  def known_aura?(value) when is_atom(value), do: true
+  def known_aura?(value), do: is_map_key(@deferred_auras, value)
+
+  def known_target?(nil), do: true
+  def known_target?(value) when is_atom(value), do: true
+  def known_target?(value), do: is_map_key(@deferred_targets, value)
+
+  def deferred_effects, do: @deferred_effects
+  def deferred_auras, do: @deferred_auras
+  def deferred_targets, do: @deferred_targets
+end

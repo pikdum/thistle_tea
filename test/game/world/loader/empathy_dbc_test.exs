@@ -1,11 +1,11 @@
 defmodule ThistleTea.Game.World.Loader.EmpathyDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Empathy
-  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Pet.Empathy
+  alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db

@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.MsgPetitionRenameClient do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_PETITION_RENAME
 
-  alias ThistleTea.Game.Player.Petitions
+  alias ThistleTea.Game.World.Entity.Player.Petitions
 
   defstruct [:item_guid, :name]
 

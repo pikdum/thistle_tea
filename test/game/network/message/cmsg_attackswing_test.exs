@@ -1,17 +1,17 @@
 defmodule ThistleTea.Game.Network.Message.CmsgAttackswingTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.TargetRef
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.TargetRef
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message.CmsgAttackswing
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
-  alias ThistleTea.Game.WorldRef
 
   describe "handle/2" do
     test "sets attack intent but does not enter combat until a swing lands" do

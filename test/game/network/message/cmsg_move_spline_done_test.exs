@@ -1,11 +1,11 @@
 defmodule ThistleTea.Game.Network.Message.CmsgMoveSplineDoneTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Network.Message.CmsgMoveSplineDone
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
+  alias ThistleTea.Game.World.Entity.Player.State
 
   describe "from_binary/1" do
     test "decodes movement, the spline identifier, and the vanilla trailing float" do

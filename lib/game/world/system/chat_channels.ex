@@ -5,10 +5,10 @@ defmodule ThistleTea.Game.World.System.ChatChannels do
   """
   use GenServer
 
-  alias ThistleTea.Game.Chat.Channel
-  alias ThistleTea.Game.Chat.Channel.Member
-  alias ThistleTea.Game.Chat.Channels
-  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Core.Chat.Channel
+  alias ThistleTea.Game.Core.Chat.Channel.Member
+  alias ThistleTea.Game.Core.Chat.Channels
+  alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.CharacterStore

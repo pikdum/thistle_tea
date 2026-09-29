@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGroupRaidConvert do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GROUP_RAID_CONVERT
 
-  alias ThistleTea.Game.Player.Groups
+  alias ThistleTea.Game.World.Entity.Player.Groups
 
   defstruct []
 

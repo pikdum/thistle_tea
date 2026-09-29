@@ -3,9 +3,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTimeSkipped do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MOVE_TIME_SKIPPED
   use ThistleTea.Game.Network.Opcodes, [:MSG_MOVE_TIME_SKIPPED]
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Player.State
 
   @timestamp_modulus 0x1_0000_0000
 

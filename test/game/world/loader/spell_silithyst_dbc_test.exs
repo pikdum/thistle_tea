@@ -1,12 +1,12 @@
 defmodule ThistleTea.Game.World.Loader.SpellSilithystDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.SpellEffect.Reputation
-  alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.Semantics
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Semantics
+  alias ThistleTea.Game.Core.Spell.SpellEffect.Reputation
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db

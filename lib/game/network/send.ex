@@ -7,8 +7,8 @@ defmodule ThistleTea.Game.Network.Send do
 
   alias ThistleTea.Game.Network.Connection.Crypto
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.World.Entity.Player.MovementControl
   alias ThousandIsland.Socket
 
   def send_packet(%Packet{opcode: @smsg_update_object, payload: payload}, {socket, state}) do

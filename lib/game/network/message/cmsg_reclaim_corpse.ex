@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgReclaimCorpse do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_RECLAIM_CORPSE
 
-  alias ThistleTea.Game.Player.Corpses
+  alias ThistleTea.Game.World.Entity.Player.Corpses
 
   defstruct [:guid]
 

@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.VendorVmangosTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.VendorItem
+  alias ThistleTea.Game.Core.Vendor.VendorItem
   alias ThistleTea.Game.World.Loader.Vendor
 
   @moduletag :vmangos_db

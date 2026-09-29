@@ -2,11 +2,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgReadItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_READ_ITEM
 
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Logic.Inventory
-  alias ThistleTea.Game.Entity.Logic.Proficiency
-  alias ThistleTea.Game.Network.InventoryUpdate
-  alias ThistleTea.Game.Player.Bank
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Inventory
+  alias ThistleTea.Game.Core.Item.Proficiency
+  alias ThistleTea.Game.World.Entity.Player.Bank
+  alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.ItemStore
 
   defstruct [:bag, :slot]

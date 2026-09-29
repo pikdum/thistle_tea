@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Network.Message.SmsgQuestQueryResponseTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Core.Quest
   alias ThistleTea.Game.Network.Message.SmsgQuestQueryResponse
 
   test "serializes a kill quest with rewards" do

@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelTrade do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CANCEL_TRADE
 
-  alias ThistleTea.Game.Player.Trade
+  alias ThistleTea.Game.World.Entity.Player.Trade
 
   defstruct []
 

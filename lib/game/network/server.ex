@@ -9,7 +9,6 @@ defmodule ThistleTea.Game.Network.Server do
   use ThousandIsland.Handler
   use ThistleTea.Game.Network.Opcodes, [:SMSG_AUTH_CHALLENGE]
 
-  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Network.Connection
   alias ThistleTea.Game.Network.ConnectionState
   alias ThistleTea.Game.Network.Message
@@ -17,6 +16,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.Send
+  alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThousandIsland.Socket
 
   require Logger

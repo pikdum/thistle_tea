@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.WrappedGiftVmangosTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.World.Loader.Item
 
   @moduletag :vmangos_db

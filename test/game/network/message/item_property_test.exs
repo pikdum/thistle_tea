@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.Network.Message.ItemPropertyTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.ItemProperty
-  alias ThistleTea.Game.Entity.Logic.Loot
+  alias ThistleTea.Game.Core.Item.ItemProperty
+  alias ThistleTea.Game.Core.Loot
   alias ThistleTea.Game.Network.Message
 
   describe "to_binary/1" do

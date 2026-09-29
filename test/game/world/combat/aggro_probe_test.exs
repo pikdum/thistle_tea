@@ -1,0 +1,257 @@
+defmodule ThistleTea.Game.World.Combat.AggroProbeTest do
+  use ExUnit.Case, async: false
+
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.World.Combat.AggroProbe
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
+
+  describe "notify_player_moved/4" do
+    test "uses the creature's published detect range modifier" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+      put_hostile_pair(player_guid, mob_guid, {15.0, 0.0, 0.0})
+      Metadata.update(mob_guid, %{detect_range_modifier: -10})
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+      refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+
+      Metadata.update(mob_guid, %{detect_range_modifier: 0})
+      AggroProbe.notify_player_moved(player_guid, 0, {3.0, 0.0, 0.0}, table)
+      assert_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
+    test "taxi passengers do not attract mobs until they land" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+      put_hostile_pair(player_guid, mob_guid, {10.0, 0.0, 0.0})
+      Metadata.update(player_guid, %{unit_flags: 0x00100000})
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+      refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+      Metadata.update(player_guid, %{unit_flags: 0})
+      AggroProbe.notify_player_moved(player_guid, 0, {3.0, 0.0, 0.0}, table)
+      assert_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
+    test "invisibility blocks aggro until the creature has matching detection" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+      put_player(player_guid)
+      Metadata.update(player_guid, %{invisibility: %{0 => 200}})
+      put_mob(mob_guid, {1.0, 0.0, 0.0})
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+      refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+
+      Metadata.update(mob_guid, %{invisibility_detection: %{0 => 200}})
+      AggroProbe.notify_player_moved(player_guid, 0, {3.0, 0.0, 0.0}, table)
+      assert_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
+    test "probes nearby hostile mobs when a player moves" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+
+      put_hostile_pair(player_guid, mob_guid, {10.0, 0.0, 0.0})
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+
+      assert_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
+    test "does not reprobe for tiny movement from the last probed position" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+
+      put_hostile_pair(player_guid, mob_guid, {10.0, 0.0, 0.0})
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+      assert_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+
+      AggroProbe.notify_player_moved(player_guid, 0, {1.0, 0.0, 0.0}, table)
+      refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
+    test "probes after map changes even at the same coordinates" do
+      table = table()
+      player_guid = player_guid()
+      old_map_mob_guid = mob_guid()
+      new_map_mob_guid = mob_guid()
+
+      put_hostile_pair(player_guid, old_map_mob_guid, {10.0, 0.0, 0.0})
+      put_mob(new_map_mob_guid, {10.0, 0.0, 0.0}, map: 1)
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+      assert_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+
+      AggroProbe.notify_player_moved(player_guid, 1, {0.0, 0.0, 0.0}, table)
+      assert_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
+    test "does not probe friendly or neutral mobs" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+
+      put_player(player_guid)
+      put_mob(mob_guid, {10.0, 0.0, 0.0}, faction_template: wolf())
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+
+      refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
+    test "does not probe mobs with proximity aggro disabled" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+
+      put_player(player_guid)
+      put_mob(mob_guid, {10.0, 0.0, 0.0}, proximity_aggro?: false)
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+
+      refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
+    test "does not probe mobs beyond their level-scaled aggro radius" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+
+      put_player(player_guid)
+      put_mob(mob_guid, {30.0, 0.0, 0.0})
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+
+      refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
+    test "uses stealth detection instead of the normal aggro radius" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+
+      put_player(player_guid, stealthed?: true, stealth_skill: 25)
+      put_mob(mob_guid, {5.0, 0.0, 0.0})
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+
+      refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
+    test "does not probe a vanished player during detection immunity" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+
+      put_player(player_guid, undetectable_until: System.monotonic_time(:millisecond) + 1_000)
+      put_mob(mob_guid, {0.5, 0.0, 0.0})
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+
+      refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
+    test "uses the creature's published stealth detection bonus" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+      put_player(player_guid, stealthed?: true, stealth_skill: 25)
+      put_mob(mob_guid, {5.0, 0.0, 0.0})
+      Metadata.update(mob_guid, %{stealth_detection_bonus: 30})
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+
+      assert_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
+    test "does not probe dead mobs or on behalf of dead players" do
+      table = table()
+      player_guid = player_guid()
+      dead_mob_guid = mob_guid()
+
+      put_player(player_guid)
+      put_mob(dead_mob_guid, {10.0, 0.0, 0.0}, alive?: false)
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+      refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+
+      ghost_guid = player_guid()
+      live_mob_guid = mob_guid()
+      put_player(ghost_guid, alive?: false)
+      put_mob(live_mob_guid, {10.0, 0.0, 0.0})
+
+      AggroProbe.notify_player_moved(ghost_guid, 0, {0.0, 0.0, 0.0}, table)
+      refute_receive {:"$gen_cast", {:aggro_probe, ^ghost_guid}}
+    end
+  end
+
+  defp put_hostile_pair(player_guid, mob_guid, mob_position) do
+    put_player(player_guid)
+    put_mob(mob_guid, mob_position)
+  end
+
+  defp put_player(player_guid, opts \\ []) do
+    Metadata.put(player_guid, %{
+      alive?: Keyword.get(opts, :alive?, true),
+      faction_template: alliance(),
+      unit_flags: 0,
+      level: 5,
+      stealthed?: Keyword.get(opts, :stealthed?, false),
+      stealth_skill: Keyword.get(opts, :stealth_skill, 0),
+      undetectable_until: Keyword.get(opts, :undetectable_until)
+    })
+
+    on_exit(fn -> Metadata.delete(player_guid) end)
+  end
+
+  defp put_mob(mob_guid, {x, y, z}, opts \\ []) do
+    Entity.register(mob_guid)
+    SpatialHash.update(:mobs, mob_guid, Keyword.get(opts, :map, 0), x, y, z)
+
+    Metadata.put(mob_guid, %{
+      alive?: Keyword.get(opts, :alive?, true),
+      faction_template: Keyword.get(opts, :faction_template, defias()),
+      unit_flags: 0,
+      level: 5,
+      proximity_aggro?: Keyword.get(opts, :proximity_aggro?, true)
+    })
+
+    on_exit(fn ->
+      Entity.unregister(mob_guid)
+      SpatialHash.remove(:mobs, mob_guid)
+      Metadata.delete(mob_guid)
+    end)
+  end
+
+  defp table do
+    :"aggro_probe_test_#{System.unique_integer([:positive])}"
+  end
+
+  defp player_guid do
+    Guid.from_low_guid(:player, System.unique_integer([:positive]))
+  end
+
+  defp mob_guid do
+    Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+  end
+
+  defp alliance do
+    %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+  end
+
+  defp defias do
+    %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, friend_group: 0, enemy_group: 1, friends_0: 15}
+  end
+
+  defp wolf do
+    %FactionTemplate{id: 32, faction: 29, flags: 16, faction_group: 0, friend_group: 0, enemy_group: 0, enemies_0: 28}
+  end
+end

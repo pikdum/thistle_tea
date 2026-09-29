@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.LockDbcTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Lock.Requirement
+  alias ThistleTea.Game.Core.Profession.Lock.Requirement
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
 
   @moduletag :dbc_db

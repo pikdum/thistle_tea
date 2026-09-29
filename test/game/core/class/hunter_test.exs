@@ -1,0 +1,308 @@
+defmodule ThistleTea.Game.Core.Class.HunterTest do
+  use ExUnit.Case, async: true
+
+  alias ThistleTea.Game.Core.AI.BT.Blackboard
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Aura.ProcChance
+  alias ThistleTea.Game.Core.Class.Hunter
+  alias ThistleTea.Game.Core.Combat.Reactive
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.TargetRef
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.Companion.EntityRef
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.SpellFeedback
+
+  describe "validate_tame/3" do
+    test "validates the initial Tame Beast channel before its ownership trigger" do
+      hunter = %Character{unit: %Unit{level: 10}, internal: %Internal{}}
+      spell = %Spell{id: 1515, effects: [%Effect{type: :apply_aura, aura: :periodic_trigger_spell}]}
+
+      assert Hunter.validate_tame(hunter, spell, %{tameable?: true, level: 6}) == :ok
+      assert Hunter.validate_tame(hunter, spell, %{tameable?: true, level: 11}) == {:error, :bad_targets}
+      assert Hunter.validate_tame(hunter, spell, %{tameable?: false, level: 6}) == {:error, :bad_targets}
+
+      hunter = Companion.activate(hunter, :hunter_pet, %EntityRef{guid: 99, entry: 1, spell_id: 1515})
+      assert Hunter.validate_tame(hunter, spell, %{tameable?: true, level: 6}) == {:error, :already_have_summon}
+    end
+
+    test "requires a tameable beast at or below the hunter level and no active pet" do
+      hunter = %Character{unit: %Unit{level: 20}, internal: %Internal{}}
+      spell = %Spell{effects: [%Effect{type: :tame_creature}]}
+
+      assert Hunter.validate_tame(hunter, spell, %{tameable?: true, level: 20}) == :ok
+      assert Hunter.validate_tame(hunter, spell, %{tameable?: false, level: 20}) == {:error, :bad_targets}
+      assert Hunter.validate_tame(hunter, spell, %{tameable?: true, level: 21}) == {:error, :bad_targets}
+
+      hunter_with_pet =
+        Companion.activate(hunter, :hunter_pet, %EntityRef{guid: 99, entry: 1, spell_id: 1515})
+
+      assert Hunter.validate_tame(hunter_with_pet, spell, %{tameable?: true, level: 10}) ==
+               {:error, :already_have_summon}
+    end
+  end
+
+  describe "validate_feed/2" do
+    test "uses the pet family diet mask and VMangos food level tiers" do
+      spell = %Spell{effects: [%Effect{type: :feed_pet, trigger_spell_id: 1539}]}
+      pet = %{alive?: true, in_combat: false, food_mask: 0b1, level: 30}
+
+      assert Hunter.validate_feed(spell, %{pet: pet, item: %{food_type: 1, item_level: 25}}) == :ok
+
+      assert Hunter.feed_benefit(%{pet: pet, item: %{food_type: 1, item_level: 25}}) ==
+               {:ok, 35_000}
+
+      assert Hunter.food_benefit(30, 20) == 17_000
+      assert Hunter.food_benefit(30, 16) == 8_000
+      assert Hunter.food_benefit(30, 15) == 0
+
+      assert Hunter.validate_feed(spell, %{pet: pet, item: %{food_type: 2, item_level: 30}}) ==
+               {:error, :wrong_pet_food}
+
+      assert Hunter.validate_feed(spell, %{pet: pet, item: %{food_type: 1, item_level: 15}}) ==
+               {:error, :food_lowlevel}
+    end
+
+    test "rejects missing, dead, and fighting pets" do
+      spell = %Spell{effects: [%Effect{type: :feed_pet, trigger_spell_id: 1539}]}
+      item = %{food_type: 1, item_level: 20}
+
+      assert Hunter.validate_feed(spell, %{item: item, pet: nil}) == {:error, :no_pet}
+
+      assert Hunter.validate_feed(spell, %{
+               item: item,
+               pet: %{alive?: false, in_combat: false, food_mask: 1, level: 20}
+             }) == {:error, :targets_dead}
+
+      assert Hunter.validate_feed(spell, %{
+               item: item,
+               pet: %{alive?: true, in_combat: true, food_mask: 1, level: 20}
+             }) == {:error, :affecting_combat}
+    end
+
+    test "overrides the DBC trigger aura amount without changing unrelated effects" do
+      energize = %Effect{
+        index: 0,
+        type: :apply_aura,
+        aura: :periodic_energize,
+        base_points: 9_999,
+        die_sides: 1,
+        base_dice: 1
+      }
+
+      other = %Effect{index: 1, type: :dummy, base_points: 10}
+
+      spell = Hunter.apply_food_benefit(%Spell{effects: [energize, other]}, 35_000)
+
+      assert [%Effect{base_points: 35_000, die_sides: 0} = effect, ^other] = spell.effects
+      assert Effect.roll(effect, 0) == 35_000
+    end
+  end
+
+  describe "validate_companion/2" do
+    test "requires revival after pet death and rejects revival of living pets" do
+      hunter = %Character{unit: %Unit{}, internal: %Internal{}}
+      call = %Spell{effects: [%Effect{type: :summon_pet, misc_value: 0}]}
+      revive = %Spell{effects: [%Effect{type: :revive_pet, misc_value: 0}]}
+      assert Hunter.validate_companion(hunter, call) == {:error, :no_pet}
+      assert Hunter.validate_companion(hunter, revive) == {:error, :no_pet}
+      hunter = Companion.activate(hunter, :hunter_pet, %EntityRef{guid: 99, entry: 1, spell_id: 1515})
+      assert Hunter.validate_companion(hunter, call) == {:error, :already_have_summon}
+      assert Hunter.validate_companion(hunter, revive) == {:error, :target_not_dead}
+      assert Hunter.validate_companion(Companion.suspend(hunter), call) == :ok
+      assert Hunter.validate_companion(Companion.suspend(hunter), revive) == {:error, :target_not_dead}
+      dead = hunter |> Companion.remember_death(99) |> Companion.suspend()
+      assert Hunter.validate_companion(dead, call) == {:error, :targets_dead}
+      assert Hunter.validate_companion(dead, revive) == :ok
+      assert Hunter.validate_companion(dead, %Spell{effects: [%Effect{type: :summon_pet, misc_value: 416}]}) == :ok
+    end
+  end
+
+  describe "reconcile_feign_death/4" do
+    test "feign death clears combat and drops every threat reference" do
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{target: 2, flags: 0, stand_state: 0},
+        internal: %Internal{
+          in_combat: true,
+          blackboard: Blackboard.enable_auto_attack(Blackboard.new(), %TargetRef{guid: 2}),
+          threat_refs: MapSet.new([{2, 1}, {3, 1}]),
+          auto_shot: %{target_guid: 2}
+        }
+      }
+
+      spell = %Spell{id: 5384, effects: [%Effect{type: :apply_aura, aura: :feign_death}]}
+      {character, events} = Aura.apply_spell(character, 1, 50, spell, 1_000)
+
+      refute character.internal.in_combat
+      assert character.internal.threat_refs == MapSet.new()
+      assert character.internal.auto_shot == nil
+      assert character.unit.stand_state == 0
+      assert character.unit.dynamic_flags == 0x20
+      assert Enum.count(events, &is_struct(&1, Effects.DropThreat)) == 2
+      assert Enum.any?(events, &is_struct(&1, Effects.DropNearbyThreat))
+      assert Enum.any?(events, &(is_struct(&1, Effects.AttackStop) and &1.target_guid == 2))
+      assert Enum.any?(events, &is_struct(&1, Effects.CancelAutoRepeat))
+      refute Enum.any?(events, &is_struct(&1, Effects.StandState))
+    end
+  end
+
+  describe "auto_shot?/1" do
+    test "identifies auto shot from its DBC family and weapon effect" do
+      auto_shot = %Spell{
+        spell_family: 9,
+        family_flags_0: 0x1,
+        effects: [%Effect{type: :weapon_damage}]
+      }
+
+      assert Hunter.auto_shot?(auto_shot)
+      refute Hunter.auto_shot?(%{auto_shot | family_flags_0: 0x800})
+      refute Hunter.auto_shot?(%{auto_shot | effects: [%Effect{type: :school_damage}]})
+    end
+  end
+
+  describe "Improved Aspect of the Hawk" do
+    test "keeps the aspect's base chance and applies the current aura-107 rank at proc time" do
+      talent = %Spell{
+        id: 19_556,
+        spell_family: 9,
+        duration_ms: -1,
+        effects: [
+          %Effect{
+            type: :apply_aura,
+            aura: :add_flat_modifier,
+            base_points: 4,
+            die_sides: 1,
+            base_dice: 1,
+            misc_value: 18,
+            class_mask: 0x100000
+          }
+        ]
+      }
+
+      aspect = %Spell{
+        id: 13_165,
+        spell_family: 9,
+        family_flags_0: 0x100000,
+        proc_type_mask: 0x10140,
+        proc_chance: 0,
+        duration_ms: -1,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :mod_ranged_attack_power, base_points: 20},
+          %Effect{index: 1, type: :apply_aura, aura: :proc_trigger_spell, trigger_spell_id: 6150}
+        ]
+      }
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{level: 60, auras: []},
+        player: %Player{},
+        internal: %Internal{}
+      }
+
+      {character, _events} = Aura.apply_spell(character, 1, 60, talent, 1_000)
+      context = CastContext.from_caster(character, aspect, 1)
+      {character, _events} = Aura.apply_spell(character, context, aspect, 1_000)
+
+      aspect_holder = Enum.find(character.unit.auras, &match?(%Holder{spell: %Spell{id: 13_165}}, &1))
+      assert aspect_holder.spell.proc_chance == 0
+      assert ProcChance.chance(character, aspect, :outgoing, %{}) == 5
+
+      aspect_holder = %{aspect_holder | spell: %{aspect_holder.spell | proc_chance: 100}}
+
+      holders =
+        Enum.map(character.unit.auras, fn
+          %Holder{spell: %Spell{id: 13_165}} -> aspect_holder
+          holder -> holder
+        end)
+
+      character = %{character | unit: %{character.unit | auras: holders}}
+      auto_shot = %Spell{id: 75, spell_family: 9, family_flags_0: 0x1}
+
+      character =
+        SpellFeedback.receive(
+          character,
+          %{outcome: :normal, victim_guid: 2, proc_type: :deal_ranged_attack},
+          auto_shot,
+          2_000
+        )
+
+      assert [%Effects.TriggerSpell{spell_id: 6150}] = character.internal.events
+    end
+  end
+
+  describe "reset_cooldowns/2" do
+    test "readiness clears active hunter cooldowns and queues client updates" do
+      readiness = %Spell{id: 23_989, script_name: "spell_hunter_readiness"}
+      arcane = %Spell{id: 3044, spell_family: 9, category: 76, category_recovery_time_ms: 6_000}
+      immolation_trap = %Spell{id: 13_795, spell_family: 9, recovery_time_ms: 15_000}
+      fireball = %Spell{id: 133, spell_family: 3, recovery_time_ms: 8_000}
+
+      character = %Character{
+        object: %Object{guid: 1},
+        internal: %Internal{
+          cooldowns: %{{:category, 76} => 7_000, 13_795 => 16_000, 133 => 9_000},
+          spellbook: %{3044 => arcane, 13_795 => immolation_trap, 133 => fireball}
+        }
+      }
+
+      character = Hunter.reset_cooldowns(character, readiness)
+
+      assert character.internal.cooldowns == %{133 => 9_000}
+
+      assert [
+               %Effects.ClearCooldown{spell_id: 3044},
+               %Effects.ClearCooldown{spell_id: 13_795}
+             ] = character.internal.events
+    end
+
+    test "refocus uses hunter family masks instead of spell IDs" do
+      refocus = %Spell{id: 24_531, script_name: "spell_hunter_refocus"}
+      aimed = %Spell{id: 19_434, spell_family: 9, family_flags_0: 0x00020000, recovery_time_ms: 6_000}
+      trap = %Spell{id: 13_795, spell_family: 9, family_flags_0: 0x4, recovery_time_ms: 15_000}
+
+      character = %Character{
+        object: %Object{guid: 1},
+        internal: %Internal{
+          cooldowns: %{19_434 => 7_000, 13_795 => 16_000},
+          spellbook: %{19_434 => aimed, 13_795 => trap}
+        }
+      }
+
+      character = Hunter.reset_cooldowns(character, refocus)
+
+      assert character.internal.cooldowns == %{13_795 => 16_000}
+      assert [%Effects.ClearCooldown{spell_id: 19_434}] = character.internal.events
+    end
+  end
+
+  describe "validate_reactive/4" do
+    test "mongoose bite requires a dodge against the selected target" do
+      mongoose = %Spell{script_name: "spell_hunter_mongoose_bite"}
+      hunter = %Character{unit: %Unit{class: 3, health: 100}, player: %Player{}, internal: %Internal{}}
+      hunter = Reactive.mark_defense(hunter, 7, :dodge, 1_000)
+
+      assert Hunter.validate_reactive(hunter, mongoose, 7, 2_000) == :ok
+      assert Hunter.validate_reactive(hunter, mongoose, 8, 2_000) == {:error, :bad_targets}
+      assert Hunter.validate_reactive(hunter, mongoose, 7, 5_000) == {:error, :bad_targets}
+    end
+
+    test "counterattack requires a parry rather than any defense event" do
+      counterattack = %Spell{script_name: "spell_hunter_counterattack"}
+      hunter = %Character{unit: %Unit{class: 3, health: 100}, player: %Player{}, internal: %Internal{}}
+      dodged = Reactive.mark_defense(hunter, 7, :dodge, 1_000)
+      parried = Reactive.mark_defense(hunter, 7, :parry, 1_000)
+
+      assert Hunter.validate_reactive(dodged, counterattack, 7, 2_000) == {:error, :bad_targets}
+      assert Hunter.validate_reactive(parried, counterattack, 7, 2_000) == :ok
+    end
+  end
+end

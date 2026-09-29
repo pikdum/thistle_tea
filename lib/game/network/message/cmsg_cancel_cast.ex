@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelCast do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CANCEL_CAST
 
-  alias ThistleTea.Game.Player.Spellcasting
+  alias ThistleTea.Game.World.Entity.Player.Spellcasting
 
   require Logger
 

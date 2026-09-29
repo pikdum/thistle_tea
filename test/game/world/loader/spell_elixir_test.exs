@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.SpellElixirTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Spell.Consumable
+  alias ThistleTea.Game.Core.Spell.Consumable
   alias ThistleTea.Game.World.Loader.SpellElixir
 
   @moduletag :vmangos_db

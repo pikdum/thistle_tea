@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.SelfResurrectionDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellChain
   alias ThistleTea.Game.World.Loader.SpellEffectOverride

@@ -8,8 +8,8 @@ defmodule ThistleTea.Game.World.Loader.PetTraining do
 
   alias ThistleTea.DBC
   alias ThistleTea.DBC.CreatureFamily
-  alias ThistleTea.Game.Entity.Data.PetAbility
-  alias ThistleTea.Game.Spell, as: SpellData
+  alias ThistleTea.Game.Core.Pet.PetAbility
+  alias ThistleTea.Game.Core.Spell, as: SpellData
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   def init(table \\ __MODULE__) do

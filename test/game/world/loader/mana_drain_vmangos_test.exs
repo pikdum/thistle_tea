@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.ManaDrainVmangosTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Logic.EquipmentSpells
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Item.EquipmentSpells
   alias ThistleTea.Game.World.Loader.Item
   alias ThistleTea.Game.World.Loader.SpellEffectOverride
 

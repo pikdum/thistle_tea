@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Loader.CreatureGroupTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Logic.CreatureGroup
+  alias ThistleTea.Game.Core.Creature.CreatureGroup
   alias ThistleTea.Game.World.Loader.CreatureGroup, as: Loader
 
   describe "build/1" do

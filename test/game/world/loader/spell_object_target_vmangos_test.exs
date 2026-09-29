@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.World.Loader.SpellObjectTargetVmangosTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Condition
-  alias ThistleTea.Game.Entity.Data.ScriptStep
-  alias ThistleTea.Game.Spell.ObjectTargets.Selector
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Condition
+  alias ThistleTea.Game.Core.Spell.ObjectTargets.Selector
   alias ThistleTea.Game.World.Loader.GameObjectScript
   alias ThistleTea.Game.World.Loader.SpellObjectTarget
 

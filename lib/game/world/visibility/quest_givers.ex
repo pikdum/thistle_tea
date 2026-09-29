@@ -6,18 +6,18 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
 
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.GameObject
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.GameObjectTemplate
-  alias ThistleTea.Game.Entity.Data.Quest
-  alias ThistleTea.Game.Entity.Logic.QuestLog
-  alias ThistleTea.Game.Entity.Server.Player.State
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.GameObject
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.GameObjectTemplate
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Quest
+  alias ThistleTea.Game.Core.Quest.QuestLog
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgQuestgiverStatus
   alias ThistleTea.Game.Network.UpdateObject
-  alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.World.Entity.Player.Quests
+  alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata

@@ -8,14 +8,14 @@ defmodule ThistleTea.Game.World.System.CellActivator do
   """
   use GenServer
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.SpatialGrid
+  alias ThistleTea.Game.Core.SpatialGrid
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Loader
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.SpawnPool
-  alias ThistleTea.Game.World.SpawnPool.CellIndex
-  alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Game.World.System.SpawnPool
+  alias ThistleTea.Game.World.System.SpawnPool.CellIndex
 
   require Logger
 

@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.World.SocialStore do
   atomically; readers can inspect relationships while that character is offline.
   """
 
-  alias ThistleTea.Game.Social
+  alias ThistleTea.Game.Core.Social
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 

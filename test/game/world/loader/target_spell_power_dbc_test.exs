@@ -1,16 +1,16 @@
 defmodule ThistleTea.Game.World.Loader.TargetSpellPowerDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.EquipmentStats
-  alias ThistleTea.Game.Entity.Logic.TargetSpellPower
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Stats.EquipmentStats
+  alias ThistleTea.Game.Core.Stats.TargetSpellPower
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db

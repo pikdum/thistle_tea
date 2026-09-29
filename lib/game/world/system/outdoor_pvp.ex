@@ -2,15 +2,15 @@ defmodule ThistleTea.Game.World.System.OutdoorPvp do
   @moduledoc "Owns outdoor resource races, capture-point progress, and monitored regional subscriptions."
   use GenServer
 
-  alias ThistleTea.Game.Entity.Logic.Silithyst
-  alias ThistleTea.Game.OutdoorPvp.Plaguelands
-  alias ThistleTea.Game.OutdoorPvp.ResourceRace
-  alias ThistleTea.Game.OutdoorPvp.Towers
-  alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World.OutdoorPvp.CaptureAnnouncements
-  alias ThistleTea.Game.World.OutdoorPvp.CaptureEnvironment
-  alias ThistleTea.Game.World.OutdoorPvp.CaptureRewards
-  alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Game.Core.OutdoorPvp.Plaguelands
+  alias ThistleTea.Game.Core.OutdoorPvp.ResourceRace
+  alias ThistleTea.Game.Core.OutdoorPvp.Silithyst
+  alias ThistleTea.Game.Core.OutdoorPvp.Towers
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.System.OutdoorPvp.CaptureAnnouncements
+  alias ThistleTea.Game.World.System.OutdoorPvp.CaptureEnvironment
+  alias ThistleTea.Game.World.System.OutdoorPvp.CaptureRewards
 
   require Logger
 

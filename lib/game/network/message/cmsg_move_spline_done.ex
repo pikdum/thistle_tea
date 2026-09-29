@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveSplineDone do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MOVE_SPLINE_DONE
 
-  alias ThistleTea.Game.Player.Taxi
+  alias ThistleTea.Game.World.Entity.Player.Taxi
 
   defstruct [:movement_block, :spline_id, :unknown]
 

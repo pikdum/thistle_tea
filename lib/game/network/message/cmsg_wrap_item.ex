@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgWrapItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_WRAP_ITEM
 
-  alias ThistleTea.Game.Player.Gifts
+  alias ThistleTea.Game.World.Entity.Player.Gifts
 
   defstruct [:gift_bag, :gift_slot, :item_bag, :item_slot]
 

@@ -2,15 +2,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetSelection do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SET_SELECTION
 
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Player.Reputation
+  alias ThistleTea.Game.Core.Entity
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.World.Entity.Player.Reputation
 
   defstruct [:guid]
 
   @impl ClientMessage
   def handle(%__MODULE__{guid: guid}, %{character: %{unit: %Unit{} = unit} = character} = state) do
-    character = %{character | unit: %{unit | target: guid}} |> Core.mark_broadcast_update()
+    character = %{character | unit: %{unit | target: guid}} |> Entity.mark_broadcast_update()
 
     state
     |> then(&%{&1 | character: character, target: guid})

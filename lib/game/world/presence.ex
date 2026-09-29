@@ -3,25 +3,25 @@ defmodule ThistleTea.Game.World.Presence do
   Owns publication of a player's metadata and spatial world presence.
   """
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Appearance
-  alias ThistleTea.Game.Entity.Logic.Aura.Invulnerability
-  alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.FeignDeath
-  alias ThistleTea.Game.Entity.Logic.ItemEligibility
-  alias ThistleTea.Game.Entity.Logic.PlayerCombat
-  alias ThistleTea.Game.Entity.Logic.PlayerPossession
-  alias ThistleTea.Game.Entity.Logic.Pvp
-  alias ThistleTea.Game.OutdoorPvp.Participation
-  alias ThistleTea.Game.Social.Notifier, as: SocialNotifier
+  alias ThistleTea.Game.Core.Aura.Invulnerability
+  alias ThistleTea.Game.Core.Combat.FeignDeath
+  alias ThistleTea.Game.Core.Combat.PlayerCombat
+  alias ThistleTea.Game.Core.Entity
+  alias ThistleTea.Game.Core.Entity.Appearance
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Item.ItemEligibility
+  alias ThistleTea.Game.Core.OutdoorPvp.Participation
+  alias ThistleTea.Game.Core.Pet.PlayerPossession
+  alias ThistleTea.Game.Core.Pvp
+  alias ThistleTea.Game.Core.Realm
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
+  alias ThistleTea.Game.World.Social.Notifier, as: SocialNotifier
   alias ThistleTea.Game.World.System.Party
-  alias ThistleTea.Realm
 
   def enter(%Character{} = character, metadata) when is_map(metadata) do
     Metadata.put(character.object.guid, Map.merge(metadata, state_metadata(character)))
@@ -75,7 +75,7 @@ defmodule ThistleTea.Game.World.Presence do
          } = character
        ) do
     %{
-      health_deficit: Core.health_deficit(character),
+      health_deficit: Entity.health_deficit(character),
       feigning_death?: FeignDeath.successful?(character),
       shapeshift_form: shapeshift_form(character),
       area: area,

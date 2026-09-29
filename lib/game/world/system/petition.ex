@@ -4,8 +4,8 @@ defmodule ThistleTea.Game.World.System.Petition do
   """
   use GenServer
 
-  alias ThistleTea.Game.Guild.Member
-  alias ThistleTea.Game.Guild.Petitions
+  alias ThistleTea.Game.Core.Guild.Member
+  alias ThistleTea.Game.Core.Guild.Petitions
 
   require Logger
 

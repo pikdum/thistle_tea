@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelAutoRepeatSpell do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CANCEL_AUTO_REPEAT_SPELL
 
-  alias ThistleTea.Game.Player.Spellcasting
+  alias ThistleTea.Game.World.Entity.Player.Spellcasting
 
   defstruct []
 

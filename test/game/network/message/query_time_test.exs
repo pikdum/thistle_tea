@@ -1,11 +1,11 @@
 defmodule ThistleTea.Game.Network.Message.QueryTimeTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Registry
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.World.Entity.Registry
 
   describe "handle/2" do
     test "answers an empty time query with current Unix seconds for the ready player" do

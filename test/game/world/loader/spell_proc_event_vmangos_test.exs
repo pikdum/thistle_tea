@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Spell.ProcRule
+  alias ThistleTea.Game.Core.Spell.ProcRule
   alias ThistleTea.Game.World.Loader.SpellProcEvent
   alias ThistleTea.Game.World.Loader.SpellScriptName
   alias ThistleTea.Game.World.Loader.SpellThreat

@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveKnockBack do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :MSG_MOVE_KNOCK_BACK
 
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
 
   defstruct [:guid, :movement_block]
 

@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgQueryTime do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_QUERY_TIME
 
-  alias ThistleTea.Game.Player.Login
+  alias ThistleTea.Game.World.Entity.Player.Login
 
   defstruct []
 

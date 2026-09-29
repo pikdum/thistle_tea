@@ -4,9 +4,9 @@ defmodule ThistleTea.Game.World.Loader.ItemProperty do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.ItemProperty
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Logic.ItemProperties
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Item.ItemProperties
+  alias ThistleTea.Game.Core.Item.ItemProperty
 
   @supported_patch 10
   @table_options [:named_table, :public, read_concurrency: true]

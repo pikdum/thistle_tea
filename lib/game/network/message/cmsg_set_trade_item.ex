@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetTradeItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SET_TRADE_ITEM
 
-  alias ThistleTea.Game.Player.Trade
+  alias ThistleTea.Game.World.Entity.Player.Trade
 
   defstruct [:trade_slot, :bag, :slot]
 

@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMeetingstoneLeave do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MEETINGSTONE_LEAVE
 
-  alias ThistleTea.Game.Player.MeetingStones
+  alias ThistleTea.Game.World.Entity.Player.MeetingStones
 
   defstruct []
 

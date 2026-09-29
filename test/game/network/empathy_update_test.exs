@@ -3,15 +3,15 @@ defmodule ThistleTea.Game.Network.EmpathyUpdateTest do
 
   import Bitwise, only: [&&&: 2, <<<: 2]
 
-  alias ThistleTea.Game.Aura
-  alias ThistleTea.Game.Aura.Holder
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.UpdateObject
-  alias ThistleTea.Game.Spell
 
   setup [:update]
 

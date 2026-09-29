@@ -2,10 +2,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgGroupUninviteGuid do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GROUP_UNINVITE_GUID
 
+  alias ThistleTea.Game.Core.Party
   alias ThistleTea.Game.Network.Message.SmsgPartyCommandResult, as: Result
-  alias ThistleTea.Game.Party
-  alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.System.Party.Notifier
 
   defstruct [:guid]
 

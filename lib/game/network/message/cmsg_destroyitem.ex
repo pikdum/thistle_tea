@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgDestroyitem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_DESTROYITEM
 
-  alias ThistleTea.Game.Player.Inventory
+  alias ThistleTea.Game.World.Entity.Player.Inventory
 
   defstruct [:bag, :slot, :count]
 

@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgChannelUnmoderator do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CHANNEL_UNMODERATOR
 
-  alias ThistleTea.Game.Chat
   alias ThistleTea.Game.Network.Message.ChannelCommand
+  alias ThistleTea.Game.World.Chat
   alias ThistleTea.Game.World.System.ChatChannels
 
   defstruct [:channel_name, :player_name]

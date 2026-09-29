@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.Network.Message.PetitionTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Guild.Member
-  alias ThistleTea.Game.Guild.Petitions.Petition
-  alias ThistleTea.Game.Guild.Petitions.Signature
+  alias ThistleTea.Game.Core.Guild.Member
+  alias ThistleTea.Game.Core.Guild.Petitions.Petition
+  alias ThistleTea.Game.Core.Guild.Petitions.Signature
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes

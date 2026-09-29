@@ -1,16 +1,16 @@
 defmodule ThistleTea.Game.World.System.InstanceTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
-  alias ThistleTea.Game.Instance.Admission.Policy
-  alias ThistleTea.Game.InstanceScript.Effects.CastPlayerSpell
-  alias ThistleTea.Game.InstanceScript.Effects.MonsterTalk
-  alias ThistleTea.Game.InstanceScript.Effects.OperateGameObject
-  alias ThistleTea.Game.InstanceScript.Effects.SummonCreature
+  alias ThistleTea.Game.Core.Condition.InstanceDataSnapshot, as: Snapshot
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Instance.Admission.Policy
+  alias ThistleTea.Game.Core.InstanceScript.Effects.CastPlayerSpell
+  alias ThistleTea.Game.Core.InstanceScript.Effects.MonsterTalk
+  alias ThistleTea.Game.Core.InstanceScript.Effects.OperateGameObject
+  alias ThistleTea.Game.Core.InstanceScript.Effects.SummonCreature
   alias ThistleTea.Game.World.CharacterStore
-  alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
+  alias ThistleTea.Game.World.System.Instance.InstanceData
 
   describe "admission" do
     test "serializes concurrent entrants without exceeding the copy capacity" do

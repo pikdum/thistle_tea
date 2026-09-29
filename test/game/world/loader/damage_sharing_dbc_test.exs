@@ -1,14 +1,14 @@
 defmodule ThistleTea.Game.World.Loader.DamageSharingDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.DamageSharing
-  alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Combat.DamageSharing
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.World.Loader.Spell
 
   @moduletag :dbc_db

@@ -5,8 +5,8 @@ defmodule ThistleTea.Game.World.Loader.GameEvent do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.World.System.GameEvent.Schedule
-  alias ThistleTea.Game.World.System.GameEvent.Schedule.Entry
+  alias ThistleTea.Game.Core.GameEvent.Schedule
+  alias ThistleTea.Game.Core.GameEvent.Schedule.Entry
 
   @supported_patch 10
 

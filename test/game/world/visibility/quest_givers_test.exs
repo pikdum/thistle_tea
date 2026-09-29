@@ -1,28 +1,28 @@
 defmodule ThistleTea.Game.World.Visibility.QuestGiversTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Quest
-  alias ThistleTea.Game.Entity.Logic.QuestGraph
-  alias ThistleTea.Game.Entity.Server.Player.PacketSink
-  alias ThistleTea.Game.Entity.Server.Player.State
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Quest
+  alias ThistleTea.Game.Core.Quest.QuestGraph
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message.SmsgQuestgiverStatus
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Player.PacketSink
+  alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.World.Visibility.QuestGivers
-  alias ThistleTea.Game.WorldRef
 
   setup [:questgiver]
 

@@ -2,16 +2,16 @@ defmodule ThistleTea.Game.World.Loader.TotemTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Stats
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Stats
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.Summon
   alias ThistleTea.Game.World.Loader.Totem
-  alias ThistleTea.Game.WorldRef
 
   @moduletag :namigator_maps
 

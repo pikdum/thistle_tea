@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSelfRes do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SELF_RES
 
-  alias ThistleTea.Game.Player.SelfResurrection
+  alias ThistleTea.Game.World.Entity.Player.SelfResurrection
 
   defstruct []
 

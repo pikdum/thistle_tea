@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.MsgRandomRoll do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_RANDOM_ROLL
 
-  alias ThistleTea.Game.Player.Groups
+  alias ThistleTea.Game.World.Entity.Player.Groups
 
   defstruct [:minimum, :maximum]
 

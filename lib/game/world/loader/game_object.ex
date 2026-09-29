@@ -3,11 +3,11 @@ defmodule ThistleTea.Game.World.Loader.GameObject do
   Loads the game-object spawns for a cell from Mangos into entity structs.
   """
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.GameObject
+  alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.SpawnPool
-  alias ThistleTea.Game.World.SpawnPool.Catalog
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.World.System.SpawnPool
+  alias ThistleTea.Game.World.System.SpawnPool.Catalog
   alias ThistleTea.Game.World.Transports
 
   def load(cell) do

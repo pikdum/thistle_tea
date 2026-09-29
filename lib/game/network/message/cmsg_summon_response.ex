@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSummonResponse do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SUMMON_RESPONSE
 
-  alias ThistleTea.Game.Player.Summoning
+  alias ThistleTea.Game.World.Entity.Player.Summoning
 
   defstruct [:summoner_guid]
 

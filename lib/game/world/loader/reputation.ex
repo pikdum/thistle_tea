@@ -6,11 +6,11 @@ defmodule ThistleTea.Game.World.Loader.Reputation do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.Reputation.Catalog
-  alias ThistleTea.Game.Entity.Data.Reputation.Definition
-  alias ThistleTea.Game.Entity.Data.Reputation.KillReward
-  alias ThistleTea.Game.Entity.Data.Reputation.Spillover
-  alias ThistleTea.Game.Entity.Data.Reputation.Variant
+  alias ThistleTea.Game.Core.Reputation.Catalog
+  alias ThistleTea.Game.Core.Reputation.Definition
+  alias ThistleTea.Game.Core.Reputation.KillReward
+  alias ThistleTea.Game.Core.Reputation.Spillover
+  alias ThistleTea.Game.Core.Reputation.Variant
 
   @table_options [:named_table, :public, read_concurrency: true]
   @no_reputation_index 4_294_967_295

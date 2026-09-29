@@ -1,12 +1,12 @@
 defmodule ThistleTea.Game.Network.Message.MirrorTimerMessagesTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.EventSink.ClientProjection
-  alias ThistleTea.Game.Entity.EventSink.Context
-  alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Network.Message.SmsgStartMirrorTimer
   alias ThistleTea.Game.Network.Message.SmsgStopMirrorTimer
+  alias ThistleTea.Game.World.Entity.EventSink.ClientProjection
+  alias ThistleTea.Game.World.Entity.EventSink.Context
 
   describe "to_binary/1" do
     test "encodes a signed countdown scale in the vanilla layout" do

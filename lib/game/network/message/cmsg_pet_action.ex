@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetAction do
 
   import Bitwise, only: [&&&: 2, >>>: 2]
 
-  alias ThistleTea.Game.Player.PetActions
+  alias ThistleTea.Game.World.Entity.Player.PetActions
 
   defstruct [:pet_guid, :action, :action_type, :target_guid]
 

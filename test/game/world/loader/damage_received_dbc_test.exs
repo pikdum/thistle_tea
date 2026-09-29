@@ -1,19 +1,18 @@
 defmodule ThistleTea.Game.World.Loader.DamageReceivedDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Aura, as: AuraData
-  alias ThistleTea.Game.Aura.Holder
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.SpellEffect
-  alias ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Spell.Coefficient
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.Coefficient
+  alias ThistleTea.Game.Core.Spell.SpellEffect
+  alias ThistleTea.Game.Core.Spell.SpellEffect.DamageHeal
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db
@@ -56,15 +55,15 @@ defmodule ThistleTea.Game.World.Loader.DamageReceivedDbcTest do
             | auras: [
                 %Holder{
                   spell: %Spell{id: 90_001},
-                  auras: [%AuraData{type: :mod_damage_taken, amount: 100, misc_value: 127}]
+                  auras: [%Aura{type: :mod_damage_taken, amount: 100, misc_value: 127}]
                 },
                 %Holder{
                   spell: %Spell{id: 90_002},
-                  auras: [%AuraData{type: :mod_damage_percent_taken, amount: 100, misc_value: 127}]
+                  auras: [%Aura{type: :mod_damage_percent_taken, amount: 100, misc_value: 127}]
                 },
                 %Holder{
                   spell: %Spell{id: 90_003},
-                  auras: [%AuraData{type: :school_absorb, amount: 20, misc_value: 127}]
+                  auras: [%Aura{type: :school_absorb, amount: 20, misc_value: 127}]
                 }
               ]
           }

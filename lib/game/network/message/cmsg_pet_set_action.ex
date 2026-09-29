@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetSetAction do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PET_SET_ACTION
 
-  alias ThistleTea.Game.Player.PetActions
+  alias ThistleTea.Game.World.Entity.Player.PetActions
 
   defstruct [:pet_guid, actions: []]
 

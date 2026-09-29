@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgSwapInvItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SWAP_INV_ITEM
 
-  alias ThistleTea.Game.Entity.Logic.Inventory, as: InventoryLogic
-  alias ThistleTea.Game.Player.Inventory
+  alias ThistleTea.Game.Core.Inventory, as: InventoryLogic
+  alias ThistleTea.Game.World.Entity.Player.Inventory
 
   defstruct [:src_slot, :dst_slot]
 

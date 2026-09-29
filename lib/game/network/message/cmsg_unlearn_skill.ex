@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUnlearnSkill do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_UNLEARN_SKILL
 
-  alias ThistleTea.Game.Player.Professions
+  alias ThistleTea.Game.World.Entity.Player.Professions
 
   defstruct [:skill_id]
 

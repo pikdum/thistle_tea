@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgQuestQueryResponse do
 
   import Bitwise
 
-  alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Core.Quest
 
   @hidden_rewards_flag 0x200
 

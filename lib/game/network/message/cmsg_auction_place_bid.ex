@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAuctionPlaceBid do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_AUCTION_PLACE_BID
 
-  alias ThistleTea.Game.Player.Auction
+  alias ThistleTea.Game.World.Entity.Player.Auction
 
   defstruct [:auctioneer, :auction_id, :price]
   @impl ClientMessage

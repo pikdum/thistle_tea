@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBinderActivate do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_BINDER_ACTIVATE
 
-  alias ThistleTea.Game.Player.HomeBind
+  alias ThistleTea.Game.World.Entity.Player.HomeBind
 
   defstruct [:guid]
 

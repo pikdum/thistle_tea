@@ -1,0 +1,335 @@
+defmodule ThistleTea.Game.Core.Combat.Threat do
+  @moduledoc """
+  Per-mob threat table and victim selection, following vmangos'
+  `ThreatManager`: damage accrues threat toward the attacker, heals accrue
+  threat toward the healer on every mob fighting the healed unit, and the
+  current victim is only overtaken when a candidate exceeds 110% of its
+  threat in melee range or 130% at range. The table lives on
+  `internal.threat` and is wiped when the mob leaves combat.
+  """
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Combat
+  alias ThistleTea.Game.Core.Combat.Hostility
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Metadata
+
+  @melee_overtake_ratio 1.1
+  @ranged_overtake_ratio 1.3
+  @heal_threat_ratio 0.5
+
+  def heal_threat_ratio, do: @heal_threat_ratio
+
+  def targets(%Mob{internal: %{threat: table}}) when is_map(table), do: table |> Map.keys() |> Enum.sort()
+  def targets(_entity), do: []
+
+  def heal_threat_events(entity, healer_guid, healing, multiplier) when is_number(multiplier) and multiplier > 0 do
+    entity
+    |> heal_threat_events(healer_guid, healing)
+    |> Enum.map(fn %Effects.HealThreat{} = event -> %{event | amount: event.amount * multiplier} end)
+  end
+
+  def heal_threat_events(_entity, _healer_guid, _healing, _multiplier), do: []
+
+  def heal_threat_events(entity, healer_guid, healing)
+
+  def heal_threat_events(
+        %{object: %{guid: healed_guid}, unit: %Unit{health: health, max_health: max_health}},
+        healer_guid,
+        healing
+      )
+      when is_integer(healer_guid) and healer_guid > 0 and is_number(healing) and healing > 0 and is_number(health) and
+             is_number(max_health) do
+    case min(healing, max(max_health - health, 0)) do
+      gain when gain > 0 -> [Effects.heal_threat(healer_guid, healed_guid, gain * @heal_threat_ratio)]
+      _no_gain -> []
+    end
+  end
+
+  def heal_threat_events(_entity, _healer_guid, _healing), do: []
+
+  def add(entity, source_guid, amount)
+
+  def add(%Mob{object: %{guid: self_guid}} = entity, source_guid, amount)
+      when is_integer(source_guid) and source_guid > 0 and source_guid != self_guid and is_number(amount) and
+             amount >= 0 do
+    if Guid.entity_type(source_guid) in [:player, :mob, :pet], do: add_unit(entity, source_guid, amount), else: entity
+  end
+
+  def add(entity, _source_guid, _amount), do: entity
+
+  defp add_unit(%Mob{internal: %Internal{} = internal} = entity, source_guid, amount) do
+    existing = internal.threat || %{}
+    table = Map.update(existing, source_guid, amount / 1, &(&1 + amount))
+    entity = %{entity | internal: %{internal | threat: table}}
+
+    if Map.has_key?(existing, source_guid) do
+      entity
+    else
+      entity |> Effects.enqueue(Effects.threat_ref_gained(source_guid)) |> Entity.mark_broadcast_update()
+    end
+  end
+
+  def change(entity, source_guid, amount) when is_number(amount) and amount >= 0 do
+    add(entity, source_guid, amount)
+  end
+
+  def change(entity, source_guid, amount) when is_number(amount) do
+    modify(entity, source_guid, amount)
+  end
+
+  def change(entity, _source_guid, _amount), do: entity
+
+  def add_damage(%Mob{internal: %Internal{in_combat: true}} = entity, source_guid, damage) do
+    add(entity, source_guid, damage)
+  end
+
+  def add_damage(entity, _source_guid, _damage), do: entity
+
+  def taunt(%Mob{unit: %Unit{target: victim}, internal: %Internal{threat: table}} = entity, taunter_guid)
+      when is_map(table) and is_integer(taunter_guid) and victim != taunter_guid do
+    case table do
+      %{^victim => threat} ->
+        entity |> add(taunter_guid, 0) |> change(taunter_guid, threat - Map.get(table, taunter_guid, 0))
+
+      _no_victim ->
+        entity
+    end
+  end
+
+  def taunt(entity, _taunter_guid), do: entity
+
+  def apply_taunt(
+        %Mob{unit: %Unit{target: victim, health: health}, internal: %Internal{threat: table} = internal} = entity,
+        taunter_guid
+      )
+      when is_map(table) and is_number(health) and health > 0 and victim != taunter_guid do
+    with %{^victim => victim_threat, ^taunter_guid => taunter_threat} <- table,
+         true <- taunter_threat < victim_threat,
+         0 <- Map.get(internal.temporary_threat, taunter_guid, 0) do
+      set_temporary(entity, taunter_guid, victim_threat - taunter_threat)
+    else
+      _unchanged -> entity
+    end
+  end
+
+  def apply_taunt(entity, _taunter_guid), do: entity
+
+  def wipe(%Mob{internal: %Internal{threat: table} = internal} = entity) when is_map(table) do
+    entity = %{entity | internal: %{internal | threat: %{}, temporary_threat: %{}}}
+
+    table
+    |> Map.keys()
+    |> Enum.reduce(entity, &Effects.enqueue(&2, Effects.threat_ref_lost(&1)))
+    |> Entity.mark_broadcast_update()
+  end
+
+  def wipe(%Mob{internal: %Internal{} = internal} = entity) do
+    %{entity | internal: %{internal | threat: %{}, temporary_threat: %{}}}
+  end
+
+  def wipe(entity), do: entity
+
+  def tracking?(%Mob{internal: %Internal{threat: table}}, guid) when is_map(table) do
+    Map.has_key?(table, guid)
+  end
+
+  def tracking?(_entity, _guid), do: false
+
+  def remove(%Mob{internal: %Internal{threat: table} = internal} = entity, guid)
+      when is_map(table) and is_integer(guid) do
+    if Map.has_key?(table, guid) do
+      %{
+        entity
+        | internal: %{
+            internal
+            | threat: Map.delete(table, guid),
+              temporary_threat: Map.delete(internal.temporary_threat, guid)
+          }
+      }
+      |> Effects.enqueue(Effects.threat_ref_lost(guid))
+      |> Entity.mark_broadcast_update()
+    else
+      entity
+    end
+  end
+
+  def remove(entity, _guid), do: entity
+
+  def modify(%Mob{internal: %Internal{threat: table} = internal} = entity, guid, amount)
+      when is_map(table) and is_integer(guid) and is_number(amount) do
+    case table do
+      %{^guid => current} ->
+        %{entity | internal: %{internal | threat: Map.put(table, guid, max(current + amount, 0.0))}}
+
+      _ ->
+        entity
+    end
+  end
+
+  def modify(entity, _guid, _amount), do: entity
+
+  def set_temporary(%Mob{internal: %Internal{} = internal} = entity, guid, amount)
+      when is_integer(guid) and is_number(amount) do
+    previous = Map.get(internal.temporary_threat, guid, 0)
+
+    if tracking?(entity, guid) and previous != amount do
+      entity = entity |> modify(guid, -previous) |> modify(guid, amount)
+
+      temporary =
+        if amount == 0,
+          do: Map.delete(internal.temporary_threat, guid),
+          else: Map.put(internal.temporary_threat, guid, amount)
+
+      %{entity | internal: %{entity.internal | temporary_threat: temporary}}
+    else
+      entity
+    end
+  end
+
+  def set_temporary(entity, _guid, _amount), do: entity
+
+  def modify_percent(%Mob{internal: %Internal{threat: table} = internal} = entity, guid, percent)
+      when is_map(table) and is_integer(guid) and is_number(percent) do
+    case table do
+      %{^guid => current} ->
+        multiplier = max(100 + percent, 0) / 100
+        %{entity | internal: %{internal | threat: Map.put(table, guid, current * multiplier)}}
+
+      _ ->
+        entity
+    end
+  end
+
+  def modify_percent(entity, _guid, _percent), do: entity
+
+  def modify_all_percent(%Mob{internal: %Internal{threat: table} = internal} = entity, percent)
+      when is_map(table) and is_number(percent) do
+    multiplier = max(100 + percent, 0) / 100
+    table = Map.new(table, fn {guid, threat} -> {guid, threat * multiplier} end)
+    %{entity | internal: %{internal | threat: table}}
+  end
+
+  def modify_all_percent(entity, _percent), do: entity
+
+  def entries(%Mob{internal: %Internal{threat: table}}) when is_map(table) do
+    Enum.sort_by(table, fn {_guid, threat} -> threat end, :desc)
+  end
+
+  def entries(_entity), do: []
+
+  def reselect(entity, opts \\ [])
+
+  def reselect(%Mob{unit: %Unit{target: current}, internal: %Internal{threat: table}} = entity, opts)
+      when is_map(table) do
+    valid? = Keyword.get_lazy(opts, :valid?, fn -> &valid_target?(entity, &1) end)
+    in_melee? = Keyword.get_lazy(opts, :in_melee?, fn -> &in_melee_range?(entity, &1) end)
+
+    {kept, dropped} = Enum.split_with(table, fn {guid, _threat} -> valid?.(guid) end)
+    pruned = Map.new(kept)
+
+    entity =
+      dropped
+      |> Enum.reduce(
+        %{
+          entity
+          | internal: %{
+              entity.internal
+              | threat: pruned,
+                temporary_threat: Map.take(entity.internal.temporary_threat, Map.keys(pruned))
+            }
+        },
+        fn {guid, _threat}, acc ->
+          Effects.enqueue(acc, Effects.threat_ref_lost(guid))
+        end
+      )
+
+    sorted = Enum.sort_by(pruned, fn {_guid, threat} -> threat end, :desc)
+
+    current_threat =
+      if is_integer(current) and current > 0 and Map.has_key?(pruned, current) do
+        Map.fetch!(pruned, current)
+      end
+
+    decision =
+      case taunt_caster(entity, valid?) do
+        taunter when is_integer(taunter) and taunter != current ->
+          {:switch, taunter}
+
+        taunter when is_integer(taunter) ->
+          :keep
+
+        _no_taunt ->
+          decide(sorted, current, current_threat, in_melee?)
+      end
+
+    {entity, decision}
+  end
+
+  def reselect(entity, _opts), do: {entity, :none}
+
+  defp decide([], _current, _current_threat, _in_melee?), do: :none
+
+  defp decide([{top_guid, _threat} | _rest], current, nil, _in_melee?) do
+    if top_guid == current, do: :keep, else: {:switch, top_guid}
+  end
+
+  defp decide([{guid, _threat} | _rest], current, _current_threat, _in_melee?) when guid == current, do: :keep
+
+  defp decide([{_guid, threat} | _rest], _current, current_threat, _in_melee?)
+       when threat <= current_threat * @melee_overtake_ratio, do: :keep
+
+  defp decide([{guid, threat} | rest], current, current_threat, in_melee?) do
+    if threat > current_threat * @ranged_overtake_ratio or in_melee?.(guid) do
+      {:switch, guid}
+    else
+      decide(rest, current, current_threat, in_melee?)
+    end
+  end
+
+  defp valid_target?(%Mob{internal: %Internal{world: world}} = entity, guid) do
+    case World.position(guid) do
+      {^world, _x, _y, _z} -> Hostility.valid_attack_target?(entity, guid)
+      _ -> false
+    end
+  end
+
+  defp taunt_caster(%Mob{unit: %Unit{auras: holders}}, valid?) when is_list(holders) do
+    holders
+    |> Enum.filter(&Holder.has_aura_type?(&1, :mod_taunt))
+    |> Enum.reverse()
+    |> Enum.sort_by(& &1.applied_at, :desc)
+    |> Enum.find(&valid?.(&1.caster_guid))
+    |> case do
+      %Holder{caster_guid: caster_guid} -> caster_guid
+      _no_taunt -> nil
+    end
+  end
+
+  defp taunt_caster(_entity, _valid?), do: nil
+
+  defp in_melee_range?(%Mob{} = entity, guid) do
+    case World.distance_between(entity, guid) do
+      distance when is_number(distance) ->
+        distance <= Combat.melee_reach(own_combat_reach(entity), target_combat_reach(guid))
+
+      _ ->
+        false
+    end
+  end
+
+  defp own_combat_reach(%Mob{unit: %Unit{combat_reach: reach}}) when is_number(reach) and reach > 0, do: reach
+  defp own_combat_reach(%Mob{}), do: Unit.default_combat_reach()
+
+  defp target_combat_reach(guid) do
+    case Metadata.query(guid, [:combat_reach]) do
+      %{combat_reach: reach} when is_number(reach) -> reach
+      _ -> Unit.default_combat_reach()
+    end
+  end
+end

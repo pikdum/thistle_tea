@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgItemTextQuery do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ITEM_TEXT_QUERY
 
-  alias ThistleTea.Game.Player.Mail
+  alias ThistleTea.Game.World.Entity.Player.Mail
 
   defstruct [:item_text_id, :mail_id]
 

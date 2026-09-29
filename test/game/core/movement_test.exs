@@ -1,0 +1,552 @@
+defmodule ThistleTea.Game.Core.MovementTest do
+  use ExUnit.Case, async: true
+
+  import Bitwise, only: [&&&: 2]
+
+  alias ThistleTea.Game.Core.AI.NavigationIntent
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Movement
+  alias ThistleTea.Game.Core.WorldRef
+
+  describe "movement completion" do
+    test "reports arrival once at the deadline and retains final facing" do
+      event = %Effects.MovementInform{motion_type: 9, point_id: 7}
+
+      moving =
+        Movement.move_along_path(
+          build_entity([]),
+          [{10.0, 0.0, 0.0}],
+          [velocity: 10.0, movement_inform: event, face_angle: 1.5],
+          100
+        )
+
+      assert Movement.completion_at(moving) == 1_100
+      refute event in Movement.sync_position(moving, 1_099).internal.events
+      arrived = Movement.sync_position(moving, 1_100)
+      assert arrived.movement_block.position == {10.0, 0.0, 0.0, 1.5}
+      assert event in arrived.internal.events
+      assert Movement.completion_at(arrived) == nil
+      assert Movement.sync_position(arrived, 2_000) == arrived
+      assert Movement.stop(moving, 1_100).internal.events |> Enum.count(&(&1 == event)) == 1
+    end
+
+    test "stops, teleports, and replacement paths discard unfinished callbacks" do
+      event = %Effects.MovementInform{motion_type: 9, point_id: 7}
+
+      moving =
+        Movement.move_along_path(build_entity([]), [{10.0, 0.0, 0.0}], [velocity: 10.0, movement_inform: event], 0)
+
+      stopped = Movement.stop(moving, 500)
+      {teleported, _} = Movement.teleport(moving, {20.0, 0.0, 0.0, 0.0}, 500)
+      replaced = Movement.move_along_path(moving, [{0.0, 10.0, 0.0}], [velocity: 10.0], 500)
+
+      for entity <- [stopped, teleported, replaced] do
+        refute event in Movement.sync_position(entity, 10_000).internal.events
+        assert Movement.completion_at(entity) == nil
+      end
+    end
+
+    test "retiming retains identity and moves the completion deadline" do
+      event = %Effects.MovementInform{motion_type: 9, point_id: 7}
+      entity = build_entity([])
+      entity = %{entity | movement_block: %{entity.movement_block | run_speed: 10.0}}
+      moving = Movement.move_along_path(entity, [{20.0, 0.0, 0.0}], [run?: true, movement_inform: event], 0)
+      slower = %{moving | movement_block: %{moving.movement_block | run_speed: 5.0}}
+      {retimed, _} = Movement.retime(slower, :run_speed, 1_000)
+      assert Movement.completion_at(retimed) == 3_000
+      refute event in Movement.sync_position(retimed, 2_999).internal.events
+      assert event in Movement.sync_position(retimed, 3_000).internal.events
+    end
+
+    test "an already reached point completes on the next update" do
+      event = %Effects.MovementInform{motion_type: 9, point_id: 0}
+
+      moving =
+        Movement.move_along_path(build_entity([]), [{0.0, 0.0, 0.0}], [velocity: 10.0, movement_inform: event], 0)
+
+      refute event in moving.internal.events
+      assert event in Movement.sync_position(moving, 1).internal.events
+    end
+  end
+
+  defp build_entity(opts) do
+    internal = %Internal{
+      world: Keyword.get(opts, :world, %WorldRef{map_id: 0}),
+      movement_start_time: Keyword.get(opts, :start_time),
+      movement_start_position: Keyword.get(opts, :start_position),
+      events: Keyword.get(opts, :events, []),
+      navigation_intents: Keyword.get(opts, :navigation_intents, [])
+    }
+
+    movement_block = %MovementBlock{
+      position: Keyword.get(opts, :position, {0.0, 0.0, 0.0, 0.0}),
+      duration: Keyword.get(opts, :duration, 1_000),
+      spline_nodes: Keyword.get(opts, :spline_nodes, []),
+      time_passed: Keyword.get(opts, :time_passed, 0),
+      movement_flags: Keyword.get(opts, :movement_flags, 1),
+      spline_flags: Keyword.get(opts, :spline_flags, 0x100),
+      spline_id: Keyword.get(opts, :spline_id),
+      spline_start_position: Keyword.get(opts, :spline_start_position)
+    }
+
+    %{internal: internal, movement_block: movement_block}
+  end
+
+  test "moving? reflects movement window" do
+    now = 5_000
+
+    moving =
+      build_entity(
+        start_time: now - 50,
+        duration: 1_000
+      )
+
+    not_moving =
+      build_entity(
+        start_time: now - 2_000,
+        duration: 1_000
+      )
+
+    assert Movement.moving?(moving, now)
+    refute Movement.moving?(not_moving, now)
+  end
+
+  test "remaining_move_duration/2 reflects explicit time" do
+    now = 5_000
+
+    entity =
+      build_entity(
+        start_time: now - 250,
+        duration: 1_000
+      )
+
+    assert Movement.remaining_move_duration(entity, now) == 750
+  end
+
+  describe "resume_spline/2" do
+    test "returns the remaining path from the current position" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 10_000,
+          spline_nodes: [{10.0, 0.0, 0.0}, {20.0, 0.0, 0.0}]
+        )
+
+      resumed = Movement.resume_spline(entity, 2_500)
+
+      assert resumed.movement_block.position == {5.0, 0.0, 0.0, 0.0}
+      assert resumed.movement_block.spline_nodes == [{10.0, 0.0, 0.0}, {20.0, 0.0, 0.0}]
+      assert resumed.movement_block.duration == 7_500
+    end
+
+    test "drops nodes already passed" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 10_000,
+          spline_nodes: [{10.0, 0.0, 0.0}, {20.0, 0.0, 0.0}]
+        )
+
+      resumed = Movement.resume_spline(entity, 7_500)
+
+      assert resumed.movement_block.position == {15.0, 0.0, 0.0, 0.0}
+      assert resumed.movement_block.spline_nodes == [{20.0, 0.0, 0.0}]
+      assert resumed.movement_block.duration == 2_500
+    end
+
+    test "returns nil once the movement window has ended" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 1_000,
+          spline_nodes: [{10.0, 0.0, 0.0}]
+        )
+
+      assert Movement.resume_spline(entity, 2_000) == nil
+    end
+
+    test "returns nil without an active spline" do
+      entity = build_entity(start_time: nil, start_position: nil, spline_nodes: [])
+
+      assert Movement.resume_spline(entity, 1_000) == nil
+    end
+  end
+
+  describe "retime/3" do
+    test "keeps the interpolated position and remaining corners when speed changes" do
+      entity = build_entity([])
+      entity = %{entity | movement_block: %{entity.movement_block | run_speed: 10.0}}
+      path = [{10.0, 0.0, 0.0}, {10.0, 20.0, 0.0}]
+      moving = Movement.move_along_path(entity, path, [run?: true, face_angle: 1.5], 0)
+      slower = %{moving | movement_block: %{moving.movement_block | run_speed: 5.0}}
+      {retimed, events} = Movement.retime(slower, :run_speed, 1_500)
+      assert retimed.movement_block.position == {10.0, 5.0, 0.0, :math.pi() / 2}
+      assert retimed.movement_block.spline_nodes == [{10.0, 20.0, 0.0}]
+      assert retimed.movement_block.duration == 3_000
+      assert retimed.internal.movement_start_time == 1_500
+      assert retimed.internal.movement_start_position == {10.0, 5.0, 0.0}
+      assert retimed.internal.movement_speed == {:run_speed, 5.0}
+      assert retimed.movement_block.spline_id == moving.movement_block.spline_id + 1
+      assert [%Effects.MonsterMove{move_opts: opts}] = events
+      assert opts[:face_angle] == 1.5
+      assert Movement.retime(retimed, :run_speed, 1_600) == {retimed, []}
+
+      faster = %{retimed | movement_block: %{retimed.movement_block | run_speed: 10.0}}
+      {restored, [_]} = Movement.retime(faster, :run_speed, 2_500)
+      assert restored.movement_block.position == {10.0, 10.0, 0.0, :math.pi() / 2}
+      assert restored.movement_block.duration == 1_000
+    end
+
+    test "does not retime walking, explicit velocity, timed, completed or stopped paths" do
+      entity = build_entity([])
+      entity = %{entity | movement_block: %{entity.movement_block | run_speed: 10.0, walk_speed: 2.5}}
+      path = [{30.0, 0.0, 0.0}]
+      walking = Movement.move_along_path(entity, path, [run?: false], 0)
+      explicit = Movement.move_along_path(entity, path, [run?: true, velocity: 15.0], 0)
+      timed = Movement.start_timed_path(entity, path, 2_000, 0, run?: true)
+      running = Movement.move_along_path(entity, path, [run?: true], 0)
+      stopped = Movement.stop(running, 500)
+
+      for original <- [walking, explicit, timed, stopped] do
+        changed = %{original | movement_block: %{original.movement_block | run_speed: 5.0}}
+        assert Movement.retime(changed, :run_speed, 1_000) == {changed, []}
+      end
+
+      finished = %{running | movement_block: %{running.movement_block | run_speed: 5.0}}
+      assert Movement.retime(finished, :run_speed, 4_000) == {finished, []}
+    end
+  end
+
+  describe "next_spatial_update_delay/2" do
+    test "returns the delay to the next spatial cell boundary" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 10_000,
+          spline_nodes: [{250.0, 0.0, 0.0}]
+        )
+
+      assert Movement.next_spatial_update_delay(entity, 0) == 4_980
+    end
+
+    test "returns the remaining duration when movement stays in the current cell" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 10_000,
+          spline_nodes: [{10.0, 0.0, 0.0}]
+        )
+
+      assert Movement.next_spatial_update_delay(entity, 0) == 10_000
+    end
+
+    test "returns zero without active movement" do
+      entity = build_entity(start_time: nil, start_position: nil, spline_nodes: [])
+
+      assert Movement.next_spatial_update_delay(entity, 0) == 0
+    end
+  end
+
+  describe "time_to_within/4" do
+    test "returns the delay until the path enters the radius" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 10_000,
+          spline_nodes: [{100.0, 0.0, 0.0}]
+        )
+
+      assert Movement.time_to_within(entity, {50.0, 0.0}, 3.0, 0) == 4_700
+    end
+
+    test "measures from the current position mid-move" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 10_000,
+          spline_nodes: [{100.0, 0.0, 0.0}]
+        )
+
+      assert Movement.time_to_within(entity, {80.0, 0.0}, 3.0, 5_000) == 2_700
+    end
+
+    test "returns the minimum delay when already within the radius" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 10_000,
+          spline_nodes: [{100.0, 0.0, 0.0}]
+        )
+
+      assert Movement.time_to_within(entity, {1.0, 0.0}, 3.0, 0) == 1
+    end
+
+    test "returns nil when the path never enters the radius" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 10_000,
+          spline_nodes: [{100.0, 0.0, 0.0}]
+        )
+
+      assert Movement.time_to_within(entity, {50.0, 10.0}, 3.0, 0) == nil
+    end
+
+    test "walks across segments to find the contact point" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 2_000,
+          spline_nodes: [{10.0, 0.0, 0.0}, {10.0, 10.0, 0.0}]
+        )
+
+      assert Movement.time_to_within(entity, {10.0, 8.0}, 3.0, 0) == 1_500
+    end
+
+    test "returns nil without active movement" do
+      entity = build_entity(start_time: nil, start_position: nil, spline_nodes: [])
+
+      assert Movement.time_to_within(entity, {5.0, 0.0}, 3.0, 0) == nil
+    end
+  end
+
+  test "sync_position updates time_passed while moving" do
+    now = 5_000
+
+    entity =
+      build_entity(
+        start_time: now - 10,
+        start_position: {0.0, 0.0, 0.0},
+        duration: 10_000,
+        spline_nodes: [{0.0, 0.0, 0.0}]
+      )
+
+    updated = Movement.sync_position(entity, now)
+
+    assert updated.movement_block.time_passed > 0
+    assert updated.movement_block.time_passed < updated.movement_block.duration
+    assert updated.movement_block.spline_nodes == [{0.0, 0.0, 0.0}]
+    assert updated.internal.movement_start_time == entity.internal.movement_start_time
+  end
+
+  test "sync_position faces the active spline segment" do
+    entity =
+      build_entity(
+        start_time: 0,
+        start_position: {0.0, 0.0, 0.0},
+        duration: 2_000,
+        spline_nodes: [{10.0, 0.0, 0.0}, {10.0, 10.0, 0.0}]
+      )
+
+    updated = Movement.sync_position(entity, 1_500)
+
+    assert updated.movement_block.position == {10.0, 5.0, 0.0, :math.pi() / 2}
+  end
+
+  test "sync_position finalizes movement when complete" do
+    now = 5_000
+
+    entity =
+      build_entity(
+        start_time: now - 2_000,
+        start_position: {0.0, 0.0, 0.0},
+        duration: 1_000,
+        spline_nodes: [{0.0, 0.0, 0.0}],
+        spline_id: 7,
+        spline_start_position: {0.0, 0.0, 0.0},
+        movement_flags: 123,
+        spline_flags: 0x100
+      )
+
+    updated = Movement.sync_position(entity, now)
+
+    assert updated.movement_block.position == {0.0, 0.0, 0.0, 0.0}
+    assert updated.movement_block.spline_nodes == []
+    assert updated.movement_block.movement_flags == 0
+    assert updated.movement_block.spline_flags == 0
+    assert updated.movement_block.time_passed == updated.movement_block.duration
+    assert is_nil(updated.movement_block.spline_id)
+    assert is_nil(updated.movement_block.spline_start_position)
+    assert is_nil(updated.internal.movement_start_time)
+    assert is_nil(updated.internal.movement_start_position)
+  end
+
+  describe "stop/2" do
+    test "halts active projected movement and enqueues its semantic stop" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 1_000,
+          spline_nodes: [{10.0, 0.0, 0.0}]
+        )
+
+      stopped = Movement.stop(entity, 500)
+
+      assert stopped.movement_block.position == {5.0, 0.0, 0.0, 0.0}
+      assert stopped.movement_block.spline_nodes == []
+      assert [%Effects.MovementStopped{}] = stopped.internal.events
+    end
+
+    test "does not enqueue repeated stops for stationary movement" do
+      entity = build_entity(start_time: nil, start_position: nil, duration: 0, spline_nodes: [], movement_flags: 0)
+
+      stopped = Movement.stop(entity, 500)
+
+      assert stopped.internal.events == []
+    end
+
+    test "enqueues a stop for translating client movement" do
+      entity = build_entity(start_time: nil, start_position: nil, duration: 0, spline_nodes: [], movement_flags: 0xE)
+
+      stopped = Movement.stop(entity, 500)
+
+      assert stopped.movement_block.movement_flags == 0
+      assert [%Effects.MovementStopped{}] = stopped.internal.events
+    end
+
+    test "finishes natural movement without emitting an interruption" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 1_000,
+          spline_nodes: [{10.0, 0.0, 0.0}]
+        )
+
+      finished = Movement.finish(entity, 1_000)
+
+      assert finished.movement_block.position == {10.0, 0.0, 0.0, 0.0}
+      assert finished.internal.events == []
+    end
+  end
+
+  describe "position_at/4" do
+    test "interpolates linearly along the path" do
+      assert Movement.position_at({0.0, 0.0, 0.0}, [{10.0, 0.0, 0.0}], 1_000, 500) == {5.0, 0.0, 0.0}
+    end
+
+    test "clamps before the start and after the end" do
+      assert Movement.position_at({0.0, 0.0, 0.0}, [{10.0, 0.0, 0.0}], 1_000, -50) == {0.0, 0.0, 0.0}
+      assert Movement.position_at({0.0, 0.0, 0.0}, [{10.0, 0.0, 0.0}], 1_000, 5_000) == {10.0, 0.0, 0.0}
+    end
+
+    test "walks across multiple segments" do
+      nodes = [{10.0, 0.0, 0.0}, {10.0, 10.0, 0.0}]
+
+      assert Movement.position_at({0.0, 0.0, 0.0}, nodes, 2_000, 1_500) == {10.0, 5.0, 0.0}
+    end
+
+    test "returns the start position without spline nodes" do
+      assert Movement.position_at({1.0, 2.0, 3.0}, [], 1_000, 500) == {1.0, 2.0, 3.0}
+    end
+  end
+
+  describe "teleport/3" do
+    test "interrupts an active spline at its interpolated pose and installs the exact destination" do
+      world = WorldRef.instance(329, 77)
+      destination = {4032.73, -3366.51, 115.063, 5.42797}
+
+      entity =
+        build_entity(
+          world: world,
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 1_000,
+          spline_nodes: [{10.0, 0.0, 0.0}],
+          movement_flags: 0x01400101,
+          spline_flags: 0x100,
+          spline_id: 8,
+          spline_start_position: {0.0, 0.0, 0.0},
+          events: [Effects.monster_move(), Effects.movement_stopped(), Effects.movement_root_changed(true)],
+          navigation_intents: [%NavigationIntent{destination: {20.0, 0.0, 0.0}}]
+        )
+
+      {teleported, transition} = Movement.teleport(entity, destination, 500)
+
+      assert transition.from_position == {5.0, 0.0, 0.0, 0.0}
+      assert transition.position == destination
+      assert transition.movement_block == teleported.movement_block
+      assert teleported.internal.world == world
+      assert teleported.movement_block.position == destination
+      assert teleported.movement_block.spline_nodes == []
+      assert teleported.movement_block.duration == 0
+      assert teleported.movement_block.spline_flags == 0
+      assert is_nil(teleported.movement_block.spline_id)
+      assert is_nil(teleported.movement_block.spline_start_position)
+      assert is_nil(teleported.internal.movement_start_time)
+      assert is_nil(teleported.internal.movement_start_position)
+      assert teleported.internal.navigation_intents == []
+      assert [%Effects.MovementRootChanged{rooted?: true}] = teleported.internal.events
+      assert (teleported.movement_block.movement_flags &&& 0x01400001) == 0
+    end
+
+    test "still records an exact same-position orientation change while stationary" do
+      entity = build_entity(position: {1.0, 2.0, 3.0, 0.5}, duration: 0, spline_nodes: [], movement_flags: 0)
+
+      {teleported, transition} = Movement.teleport(entity, {1.0, 2.0, 3.0, 0.0}, 900)
+
+      assert transition.from_position == {1.0, 2.0, 3.0, 0.5}
+      assert teleported.movement_block.position == {1.0, 2.0, 3.0, 0.0}
+      assert teleported.movement_block.timestamp == 900
+    end
+  end
+
+  describe "move_along_path/4" do
+    test "does not emit a monster-move when already at the destination" do
+      entity = build_entity(position: {5.0, 5.0, 5.0, 0.0}, spline_nodes: nil)
+
+      result = Movement.move_along_path(entity, [{5.0, 5.0, 5.0}], [], 5_000)
+
+      assert result.internal.events == []
+      assert is_nil(result.movement_block.spline_nodes)
+    end
+
+    test "starts movement along supplied path geometry" do
+      entity =
+        build_entity(position: {0.0, 0.0, 0.0, 0.0}, spline_nodes: nil)
+        |> then(&%{&1 | movement_block: %{&1.movement_block | walk_speed: 2.5, run_speed: 7.0}})
+
+      result = Movement.move_along_path(entity, [{2.0, 0.0, 0.0}, {5.0, 1.0, 0.0}], [], 5_000)
+
+      assert result.movement_block.spline_nodes == [{2.0, 0.0, 0.0}, {5.0, 1.0, 0.0}]
+      assert result.movement_block.position == {0.0, 0.0, 0.0, 0.0}
+      assert result.internal.movement_start_time == 5_000
+      assert [_event] = result.internal.events
+    end
+
+    test "faces the first supplied path segment immediately" do
+      entity =
+        build_entity(position: {0.0, 0.0, 0.0, 0.0}, spline_nodes: nil)
+        |> then(&%{&1 | movement_block: %{&1.movement_block | walk_speed: 2.5, run_speed: 7.0}})
+
+      result = Movement.move_along_path(entity, [{0.0, 5.0, 0.0}], [], 5_000)
+
+      assert result.movement_block.position == {0.0, 0.0, 0.0, :math.pi() / 2}
+    end
+
+    test "starts a flying spline at the requested velocity" do
+      entity =
+        build_entity(position: {0.0, 0.0, 0.0, 0.0}, spline_nodes: nil)
+        |> then(&%{&1 | movement_block: %{&1.movement_block | walk_speed: 2.5, run_speed: 7.0}})
+
+      result = Movement.move_along_path(entity, [{32.0, 0.0, 0.0}], [velocity: 32.0, flying?: true], 5_000)
+
+      assert result.movement_block.duration == 1_000
+      assert (result.movement_block.movement_flags &&& 0x01000000) != 0
+      assert (result.movement_block.spline_flags &&& 0x00000200) != 0
+    end
+  end
+end

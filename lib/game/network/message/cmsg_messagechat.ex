@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MESSAGECHAT
 
-  alias ThistleTea.Game.Chat
+  alias ThistleTea.Game.World.Chat
 
   defstruct [:chat_type, :language, :message, :target_name]
 

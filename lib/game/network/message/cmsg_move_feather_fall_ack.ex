@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveFeatherFallAck do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MOVE_FEATHER_FALL_ACK
 
-  alias ThistleTea.Game.Entity.Server.Player.State
-  alias ThistleTea.Game.Network.MovementControl
+  alias ThistleTea.Game.World.Entity.Player.MovementControl
+  alias ThistleTea.Game.World.Entity.Player.State
 
   defstruct [:guid, :counter, :movement_payload, :apply]
 

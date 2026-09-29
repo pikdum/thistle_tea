@@ -1,0 +1,798 @@
+defmodule ThistleTea.Game.Core.Movement do
+  @moduledoc """
+  Pure spline-movement state for server-driven entities: starting and halting
+  moves, interpolating the current position along the active path, remaining
+  move duration, and root/blocked checks.
+  """
+  import Bitwise, only: [&&&: 2, bnot: 1, bor: 2]
+
+  alias ThistleTea.Game.Core.Creature.CreatureMovement
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Math
+  alias ThistleTea.Game.Core.Movement.Falling
+  alias ThistleTea.Game.Core.SpatialGrid
+
+  @max_u32 0xFFFFFFFF
+  @movement_flag_forward 0x00000001
+  @movement_flag_walk_mode 0x00000100
+  @movement_flag_spline_enabled 0x00400000
+  @movement_flag_flying 0x01000000
+  @movement_flag_root 0x08000000
+  @spline_flag_runmode 0x00000100
+  @move_epsilon 0.1
+
+  def increment_spline_id(%{internal: %Internal{spline_id: spline_id} = internal} = entity) do
+    new_spline_id = increment_spline_id(spline_id)
+    %{entity | internal: %{internal | spline_id: new_spline_id}}
+  end
+
+  def increment_spline_id(id) when is_integer(id) do
+    rem(id, @max_u32) + 1
+  end
+
+  def moving?(%{internal: %Internal{movement_start_time: nil}}, _now), do: false
+
+  def moving?(
+        %{movement_block: %MovementBlock{duration: duration}, internal: %Internal{movement_start_time: start_time}},
+        now
+      )
+      when is_integer(duration) and is_integer(start_time) and is_integer(now) and duration > 0 do
+    now <= start_time + duration
+  end
+
+  def moving?(_entity, _now), do: false
+
+  def remaining_move_duration(
+        %{internal: %Internal{movement_start_time: start_time}, movement_block: %MovementBlock{duration: duration}},
+        now
+      )
+      when is_integer(start_time) and is_integer(duration) and is_integer(now) and duration > 0 do
+    max(start_time + duration - now, 0)
+  end
+
+  def remaining_move_duration(_entity, _now), do: 0
+
+  def completion_at(%{internal: %Internal{charge: %{arrives_at: at}}}) when is_integer(at), do: at
+
+  def completion_at(%{internal: %Internal{movement_start_time: started, movement_options: opts}, movement_block: mb})
+      when is_integer(started) and is_list(opts) do
+    if Keyword.has_key?(opts, :movement_inform) or Keyword.get(opts, :falling?, false), do: started + mb.duration
+  end
+
+  def completion_at(_entity), do: nil
+
+  def falling?(%{internal: %Internal{movement_options: opts}}) when is_list(opts),
+    do: Keyword.get(opts, :falling?, false)
+
+  def falling?(_entity), do: false
+
+  def fall_to(%{movement_block: %MovementBlock{position: {x, y, z, _}}} = entity, floor, now)
+      when is_number(floor) and floor < z - 0.1 do
+    opts = [falling?: true, flying?: false, run?: true]
+
+    entity
+    |> start_timed_path([{x, y, floor}], Falling.duration(z - floor), now, opts)
+    |> CreatureMovement.sync()
+    |> Effects.enqueue(Effects.monster_move(opts))
+  end
+
+  def fall_to(entity, _floor, _now), do: CreatureMovement.sync(entity)
+
+  def next_spatial_update_delay(
+        %{
+          internal: %Internal{world: world, movement_start_time: start_time, movement_start_position: start_position},
+          movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration}
+        } = entity,
+        now
+      )
+      when is_integer(start_time) and is_tuple(start_position) and is_list(spline_nodes) and spline_nodes != [] and
+             is_integer(duration) and duration > 0 and is_integer(now) do
+    if moving?(entity, now) do
+      remaining_delay = max(remaining_move_duration(entity, now), 1)
+      next_spatial_update_delay(world, start_position, spline_nodes, start_time, duration, now, remaining_delay)
+    else
+      0
+    end
+  end
+
+  def next_spatial_update_delay(_entity, _now), do: 0
+
+  defp next_spatial_update_delay(map, start_position, spline_nodes, start_time, duration, now, remaining_delay) do
+    path = [start_position | spline_nodes]
+    total_distance = path_length(path)
+
+    if total_distance <= 0 do
+      remaining_delay
+    else
+      elapsed = min(max(now - start_time, 0), duration)
+      current_cell = cell_at(map, start_position, spline_nodes, duration, elapsed)
+      travelled = total_distance * elapsed / duration
+      boundary_delay(path, travelled, map, current_cell, duration, total_distance, remaining_delay)
+    end
+  end
+
+  defp cell_at(map, start_position, spline_nodes, duration, elapsed) do
+    {x, y, z} = position_at(start_position, spline_nodes, duration, elapsed)
+    SpatialGrid.cell(map, x, y, z)
+  end
+
+  defp boundary_delay(path, travelled, map, current_cell, duration, total_distance, remaining_delay) do
+    case distance_to_leave_cell(path, travelled, map, current_cell) do
+      nil -> remaining_delay
+      distance -> min(max(ceil(distance * duration / total_distance), 1), remaining_delay)
+    end
+  end
+
+  def time_to_within(
+        %{
+          internal: %Internal{movement_start_time: start_time, movement_start_position: start_position},
+          movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration}
+        } = entity,
+        {tx, ty},
+        radius,
+        now
+      )
+      when is_integer(start_time) and is_tuple(start_position) and is_list(spline_nodes) and spline_nodes != [] and
+             is_integer(duration) and duration > 0 and is_number(radius) and is_integer(now) do
+    if moving?(entity, now) do
+      contact_delay(entity, {tx, ty}, radius, now)
+    end
+  end
+
+  def time_to_within(_entity, _point, _radius, _now), do: nil
+
+  defp contact_delay(
+         %{
+           internal: %Internal{movement_start_time: start_time, movement_start_position: start_position},
+           movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration}
+         } = entity,
+         center,
+         radius,
+         now
+       ) do
+    path = [start_position | spline_nodes]
+    total_distance = path_length(path)
+
+    if total_distance > 0 do
+      elapsed = min(max(now - start_time, 0), duration)
+      travelled = total_distance * elapsed / duration
+      contact_delay_at(entity, path, travelled, center, radius, total_distance, now)
+    end
+  end
+
+  defp contact_delay_at(
+         %{movement_block: %MovementBlock{duration: duration}} = entity,
+         path,
+         travelled,
+         center,
+         radius,
+         total_distance,
+         now
+       ) do
+    case distance_to_within(path, travelled, center, radius) do
+      nil -> nil
+      distance -> min(max(ceil(distance * duration / total_distance), 1), remaining_move_duration(entity, now))
+    end
+  end
+
+  def sync_position(%{movement_block: %MovementBlock{spline_nodes: spline_nodes}} = entity, _now)
+      when spline_nodes in [nil, []] do
+    entity
+  end
+
+  def sync_position(%{movement_block: %MovementBlock{}, internal: %Internal{}} = entity, now) when is_integer(now) do
+    if moving?(entity, now) do
+      update_position_from_spline(entity, now)
+    else
+      finalize_movement(entity)
+    end
+  end
+
+  def move_along_path(%{movement_block: %MovementBlock{movement_flags: flags}} = state, _path, _opts, _now)
+      when is_integer(flags) and (flags &&& @movement_flag_root) > 0 do
+    state
+  end
+
+  def move_along_path(state, path, opts, now) when is_list(path) and is_list(opts) and is_integer(now) do
+    moved = start_path(state, path, now, opts)
+
+    case moved.movement_block.spline_nodes do
+      [_ | _] -> Effects.enqueue(moved, Effects.monster_move(opts))
+      _ -> moved
+    end
+  end
+
+  def start_timed_path(entity, path, duration, now, opts \\ [])
+      when is_list(path) and is_integer(duration) and duration > 0 and is_integer(now) and is_list(opts) do
+    entity = sync_position(entity, now)
+    %{movement_block: %MovementBlock{position: {x0, y0, z0, _orientation}}} = entity
+
+    if Enum.all?(path, &at_destination?({x0, y0, z0}, &1)) do
+      entity
+    else
+      entity
+      |> increment_spline_id()
+      |> begin_path(path, duration, now, opts)
+    end
+  end
+
+  defp start_path(entity, path, now, opts) when is_integer(now) do
+    entity = sync_position(entity, now)
+    %{movement_block: %MovementBlock{position: {x0, y0, z0, _o}}} = entity
+
+    if path == [] or
+         (Enum.all?(path, &at_destination?({x0, y0, z0}, &1)) and not Keyword.has_key?(opts, :movement_inform)) do
+      entity
+    else
+      start_resolved_path(entity, path, now, opts)
+    end
+  end
+
+  defp start_resolved_path(entity, path, now, opts) do
+    %{
+      movement_block: %MovementBlock{walk_speed: walk_speed, run_speed: run_speed},
+      internal: %Internal{running: running}
+    } = entity
+
+    running = Keyword.get(opts, :run?, running)
+    velocity = Keyword.get(opts, :velocity)
+    speed_type = Keyword.get(opts, :speed_type, if(running, do: :run_speed, else: :walk_speed))
+    speed = movement_speed(velocity, speed_type == :run_speed, run_speed, walk_speed)
+    opts = Keyword.put(opts, :run?, running)
+
+    duration =
+      [position(entity) | path]
+      |> Math.movement_duration(speed)
+      |> Kernel.*(1_000)
+      |> trunc()
+      |> max(1)
+
+    entity = entity |> increment_spline_id() |> begin_path(path, duration, now, opts)
+
+    source =
+      if !(is_number(velocity) and velocity > 0),
+        do: {speed_type, speed}
+
+    %{entity | internal: %{entity.internal | movement_speed: source}}
+  end
+
+  defp begin_path(entity, path, duration, now, opts) do
+    %{
+      movement_block: %MovementBlock{position: {x0, y0, z0, orientation}} = mb,
+      internal: %Internal{running: default_running, spline_id: spline_id} = internal
+    } = entity
+
+    running = Keyword.get(opts, :run?, default_running)
+    flying? = Keyword.get(opts, :flying?, CreatureMovement.flying?(entity))
+
+    internal = %{
+      internal
+      | movement_start_time: now,
+        movement_handoff: nil,
+        movement_start_position: {x0, y0, z0},
+        movement_speed: nil,
+        movement_options: opts,
+        fall: nil
+    }
+
+    {_position, orientation} = pose_along_path([{x0, y0, z0} | path], 0.0, orientation)
+
+    movement_block = %{
+      mb
+      | position: {x0, y0, z0, orientation},
+        spline_nodes: path,
+        duration: duration,
+        time_passed: 0,
+        movement_flags: movement_flags(mb.movement_flags, running, flying?),
+        spline_flags: if(Keyword.get(opts, :falling?, false), do: 0x00000002, else: spline_flags(running, flying?)),
+        spline_id: spline_id,
+        spline_start_position: {x0, y0, z0}
+    }
+
+    %{entity | movement_block: movement_block, internal: internal}
+  end
+
+  defp position(%{movement_block: %MovementBlock{position: {x, y, z, _orientation}}}), do: {x, y, z}
+
+  def retime(
+        %{internal: %Internal{movement_speed: {source, previous}, movement_options: opts}, movement_block: mb} = entity,
+        type,
+        now
+      )
+      when source == type and is_integer(now) do
+    speed =
+      case type do
+        :run_speed -> mb.run_speed
+        :walk_speed -> mb.walk_speed
+      end
+
+    if speed != previous and is_number(speed) do
+      retime_remaining(entity, speed, now, opts)
+    else
+      {entity, []}
+    end
+  end
+
+  def retime(entity, _type, _now), do: {entity, []}
+
+  defp retime_remaining(entity, speed, now, _opts) when speed <= 0, do: stop_with_effects(entity, now)
+
+  defp retime_remaining(entity, _speed, now, opts) do
+    case resume_spline(entity, now) do
+      nil ->
+        {entity, []}
+
+      remaining ->
+        updated = start_resolved_path(remaining, remaining.movement_block.spline_nodes, now, opts)
+        {updated, [Effects.monster_move(opts)]}
+    end
+  end
+
+  defp at_destination?({x0, y0, z0}, {x, y, z}) do
+    abs(x0 - x) <= @move_epsilon and abs(y0 - y) <= @move_epsilon and abs(z0 - z) <= @move_epsilon
+  end
+
+  def resume_spline(
+        %{
+          internal: %Internal{movement_start_time: start_time, movement_start_position: start_position},
+          movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration}
+        } = entity,
+        now
+      )
+      when is_integer(start_time) and is_tuple(start_position) and is_list(spline_nodes) and spline_nodes != [] and
+             is_integer(duration) and duration > 0 and is_integer(now) do
+    if moving?(entity, now) do
+      remaining_spline_entity(entity, now)
+    end
+  end
+
+  def resume_spline(_entity, _now), do: nil
+
+  defp remaining_spline_entity(
+         %{
+           internal: %Internal{movement_start_time: start_time, movement_start_position: start_position},
+           movement_block:
+             %MovementBlock{spline_nodes: spline_nodes, duration: duration, position: {_, _, _, orientation}} = mb
+         } = entity,
+         now
+       ) do
+    elapsed = min(max(now - start_time, 0), duration)
+    path = [start_position | spline_nodes]
+    travelled = path_length(path) * elapsed / duration
+    {{x, y, z}, orientation} = pose_along_path(path, travelled, orientation)
+
+    case nodes_after(path, travelled) do
+      [] ->
+        nil
+
+      remaining_nodes ->
+        movement_block = %{
+          mb
+          | position: {x, y, z, orientation},
+            spline_nodes: remaining_nodes,
+            duration: max(remaining_move_duration(entity, now), 1)
+        }
+
+        %{entity | movement_block: movement_block}
+    end
+  end
+
+  defp nodes_after([start | rest], travelled) do
+    rest
+    |> Enum.reduce({start, 0.0, []}, fn node, {prev, distance_acc, kept} ->
+      segment_end = distance_acc + segment_distance(prev, node)
+      kept = if segment_end > travelled, do: [node | kept], else: kept
+      {node, segment_end, kept}
+    end)
+    |> elem(2)
+    |> Enum.reverse()
+  end
+
+  defp movement_speed(velocity, _running, _run_speed, _walk_speed) when is_number(velocity) and velocity > 0,
+    do: velocity
+
+  defp movement_speed(_velocity, true, run_speed, _walk_speed), do: run_speed
+  defp movement_speed(_velocity, _running, _run_speed, walk_speed), do: walk_speed
+
+  def stop(entity, now) when is_integer(now) do
+    {entity, events} = stop_with_effects(entity, now)
+    Effects.enqueue(entity, events)
+  end
+
+  def stop_with_effects(entity, now) when is_integer(now) do
+    stopped? = projected?(entity)
+    entity = halt(entity, now)
+    events = if stopped?, do: [Effects.movement_stopped()], else: []
+    {entity, events}
+  end
+
+  def finish(entity, now) when is_integer(now), do: halt(entity, now)
+
+  def teleport(
+        %{movement_block: %MovementBlock{}, internal: %Internal{}} = entity,
+        {x, y, z, orientation} = position,
+        now
+      )
+      when is_number(x) and is_number(y) and is_number(z) and is_number(orientation) and is_integer(now) do
+    entity = sync_position(entity, now)
+    from_position = entity.movement_block.position
+    entity = halt(entity, now)
+
+    internal = %{
+      entity.internal
+      | events: Enum.reject(entity.internal.events, &stale_movement_projection?/1),
+        movement_handoff: nil,
+        navigation_intents: [],
+        fall: nil
+    }
+
+    movement_block = %{entity.movement_block | position: position, timestamp: now}
+    entity = %{entity | movement_block: movement_block, internal: internal}
+
+    {entity,
+     %{
+       from_position: from_position,
+       position: position,
+       movement_block: movement_block
+     }}
+  end
+
+  defp halt(%{movement_block: %MovementBlock{} = mb, internal: %Internal{}} = entity, now) when is_integer(now) do
+    entity = sync_position(entity, now)
+
+    movement_block = %{
+      entity.movement_block
+      | spline_nodes: [],
+        spline_flags: 0,
+        spline_id: nil,
+        spline_start_position: nil,
+        duration: 0,
+        time_passed: 0,
+        movement_flags: MovementBlock.clear_motion_flags(mb.movement_flags)
+    }
+
+    internal = %{
+      entity.internal
+      | movement_start_time: nil,
+        movement_start_position: nil,
+        movement_speed: nil,
+        movement_options: nil
+    }
+
+    %{entity | movement_block: movement_block, internal: internal}
+    |> CreatureMovement.sync()
+  end
+
+  defp projected?(%{
+         movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration} = movement_block,
+         internal: %Internal{movement_start_time: start_time, movement_start_position: start_position}
+       }) do
+    (is_list(spline_nodes) and spline_nodes != [] and is_integer(duration) and duration > 0 and
+       is_integer(start_time) and is_tuple(start_position)) or MovementBlock.translating?(movement_block)
+  end
+
+  defp projected?(_entity), do: false
+
+  defp stale_movement_projection?(%Effects.MonsterMove{}), do: true
+  defp stale_movement_projection?(%Effects.MovementStopped{}), do: true
+  defp stale_movement_projection?(_effect), do: false
+
+  def face_towards(
+        %{movement_block: %MovementBlock{position: {x, y, z, _orientation}} = movement_block} = entity,
+        {target_x, target_y}
+      )
+      when is_number(target_x) and is_number(target_y) do
+    if target_x == x and target_y == y do
+      entity
+    else
+      orientation = :math.atan2(target_y - y, target_x - x)
+      %{entity | movement_block: %{movement_block | position: {x, y, z, orientation}}}
+    end
+  end
+
+  def face_towards(entity, _target), do: entity
+
+  def blocked?(%{movement_block: %MovementBlock{movement_flags: flags}})
+      when is_integer(flags) and (flags &&& @movement_flag_root) > 0 do
+    true
+  end
+
+  def blocked?(_entity), do: false
+
+  defp update_position_from_spline(
+         %{
+           movement_block:
+             %MovementBlock{duration: duration, spline_nodes: spline_nodes, position: {_, _, _, orientation}} = mb,
+           internal: %Internal{movement_start_time: start_time, movement_start_position: start_position}
+         } = entity,
+         now
+       )
+       when is_integer(duration) and duration > 0 and not is_nil(start_time) and not is_nil(start_position) do
+    elapsed = max(now - start_time, 0)
+    elapsed = min(elapsed, duration)
+
+    path = [start_position | spline_nodes]
+    total_distance = path_length(path)
+
+    {{x, y, z}, orientation} =
+      cond do
+        falling?(entity) ->
+          {Falling.position(start_position, List.last(path), elapsed), orientation}
+
+        total_distance <= 0 ->
+          {List.last(path), orientation}
+
+        true ->
+          distance_travelled = total_distance * elapsed / duration
+          pose_along_path(path, distance_travelled, orientation)
+      end
+
+    movement_block = %{mb | position: {x, y, z, orientation}, time_passed: elapsed}
+    entity = %{entity | movement_block: movement_block}
+
+    if elapsed >= duration do
+      finalize_movement(entity)
+    else
+      entity
+    end
+  end
+
+  defp update_position_from_spline(entity, _now), do: finalize_movement(entity)
+
+  defp movement_flags(flags, running, flying?) do
+    flags = flags || 0
+    flags = bor(flags, bor(@movement_flag_forward, @movement_flag_spline_enabled))
+    flags = if flying?, do: bor(flags, @movement_flag_flying), else: flags &&& bnot(@movement_flag_flying)
+
+    if running do
+      flags &&& bnot(@movement_flag_walk_mode)
+    else
+      bor(flags, @movement_flag_walk_mode)
+    end
+  end
+
+  defp spline_flags(running, flying?) do
+    flags = if running, do: @spline_flag_runmode, else: 0
+    if flying?, do: bor(flags, 0x00000200), else: flags
+  end
+
+  defp finalize_movement(
+         %{
+           movement_block: %MovementBlock{spline_nodes: spline_nodes, position: {_, _, _, orientation}} = mb,
+           internal: %Internal{movement_start_position: start_position} = internal
+         } = entity
+       ) do
+    case spline_nodes do
+      nil ->
+        entity
+
+      [] ->
+        entity
+
+      _ ->
+        {x, y, z} = List.last(spline_nodes)
+        path = if is_tuple(start_position), do: [start_position | spline_nodes], else: spline_nodes
+        {_position, orientation} = pose_along_path(path, path_length(path), orientation)
+        opts = internal.movement_options || []
+        orientation = Keyword.get(opts, :face_angle, orientation)
+
+        movement_block = %{
+          mb
+          | position: {x, y, z, orientation},
+            spline_nodes: [],
+            movement_flags: MovementBlock.clear_motion_flags(mb.movement_flags),
+            time_passed: mb.duration,
+            spline_flags: 0,
+            spline_id: nil,
+            spline_start_position: nil
+        }
+
+        internal = %{
+          internal
+          | movement_start_time: nil,
+            movement_start_position: nil,
+            movement_speed: nil,
+            movement_options: nil
+        }
+
+        entity = CreatureMovement.sync(%{entity | movement_block: movement_block, internal: internal})
+
+        case Keyword.get(opts, :movement_inform) do
+          %Effects.MovementInform{} = event -> Effects.enqueue(entity, event)
+          nil -> entity
+        end
+    end
+  end
+
+  def position_at(start_position, spline_nodes, duration, elapsed)
+      when is_tuple(start_position) and is_list(spline_nodes) and spline_nodes != [] and is_integer(duration) and
+             duration > 0 do
+    path = [start_position | spline_nodes]
+    total_distance = path_length(path)
+
+    if total_distance <= 0 do
+      List.last(path)
+    else
+      elapsed = min(max(elapsed, 0), duration)
+      {position, _orientation} = pose_along_path(path, total_distance * elapsed / duration, 0.0)
+      position
+    end
+  end
+
+  def position_at(start_position, _spline_nodes, _duration, _elapsed), do: start_position
+
+  defp lerp_point({x1, y1, z1}, {x2, y2, z2}, segment_distance, remaining) when segment_distance > 0 do
+    t = remaining / segment_distance
+    {x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, z1 + (z2 - z1) * t}
+  end
+
+  defp lerp_point(_start, finish, _segment_distance, _remaining), do: finish
+
+  defp distance_to_within([start | rest], travelled, center, radius) do
+    rest
+    |> Enum.reduce_while({start, 0.0}, &reduce_contact_segment(&1, &2, travelled, center, radius))
+    |> case do
+      {_finish, _distance_acc} -> nil
+      distance -> distance
+    end
+  end
+
+  defp reduce_contact_segment(finish, {prev, distance_acc}, travelled, center, radius) do
+    segment_distance = segment_distance(prev, finish)
+    segment_end = distance_acc + segment_distance
+
+    cond do
+      segment_distance <= 0 ->
+        {:cont, {finish, distance_acc}}
+
+      travelled >= segment_end ->
+        {:cont, {finish, segment_end}}
+
+      true ->
+        offset = max(travelled - distance_acc, 0.0)
+        segment_start = lerp_point(prev, finish, segment_distance, offset)
+        remaining_segment_distance = segment_distance - offset
+        contact_reduce_result(segment_start, finish, remaining_segment_distance, segment_end, travelled, center, radius)
+    end
+  end
+
+  defp contact_reduce_result(segment_start, finish, remaining_segment_distance, segment_end, travelled, center, radius) do
+    case contact_distance_on_segment(segment_start, finish, remaining_segment_distance, center, radius) do
+      nil -> {:cont, {finish, segment_end}}
+      distance -> {:halt, max(segment_end - remaining_segment_distance - travelled, 0.0) + distance}
+    end
+  end
+
+  defp contact_distance_on_segment({x1, y1, _z1}, {x2, y2, _z2}, segment_length, {cx, cy}, radius) do
+    fx = x1 - cx
+    fy = y1 - cy
+
+    if fx * fx + fy * fy <= radius * radius do
+      0.0
+    else
+      contact_entry_distance(x2 - x1, y2 - y1, fx, fy, segment_length, radius)
+    end
+  end
+
+  defp contact_entry_distance(dx, dy, fx, fy, segment_length, radius) do
+    a = dx * dx + dy * dy
+    b = 2.0 * (fx * dx + fy * dy)
+    c = fx * fx + fy * fy - radius * radius
+    discriminant = b * b - 4.0 * a * c
+
+    if a > 0 and discriminant >= 0 do
+      t = (-b - :math.sqrt(discriminant)) / (2.0 * a)
+      if t >= 0.0 and t <= 1.0, do: t * segment_length
+    end
+  end
+
+  defp distance_to_leave_cell([start | rest], travelled, map, cell) do
+    rest
+    |> Enum.reduce_while({start, 0.0}, &reduce_cell_boundary_segment(&1, &2, travelled, map, cell))
+    |> case do
+      {_finish, _distance_acc} -> nil
+      distance -> distance
+    end
+  end
+
+  defp reduce_cell_boundary_segment(finish, {prev, distance_acc}, travelled, map, cell) do
+    segment_distance = segment_distance(prev, finish)
+    segment_end = distance_acc + segment_distance
+
+    cond do
+      segment_distance <= 0 ->
+        {:cont, {finish, distance_acc}}
+
+      travelled >= segment_end ->
+        {:cont, {finish, segment_end}}
+
+      true ->
+        offset = max(travelled - distance_acc, 0.0)
+        segment_start = lerp_point(prev, finish, segment_distance, offset)
+        remaining_segment_distance = segment_distance - offset
+        cell_boundary_reduce_result(map, cell, segment_start, finish, remaining_segment_distance, segment_end)
+    end
+  end
+
+  defp cell_boundary_reduce_result(map, cell, segment_start, finish, remaining_segment_distance, segment_end) do
+    case distance_to_leave_cell_segment(map, cell, segment_start, finish, remaining_segment_distance) do
+      nil -> {:cont, {finish, segment_end}}
+      distance -> {:halt, distance}
+    end
+  end
+
+  defp distance_to_leave_cell_segment(map, cell, {x1, y1, _z1}, {x2, y2, _z2}, distance) do
+    cond do
+      SpatialGrid.cell(map, x1, y1, 0.0) != cell ->
+        0.0
+
+      SpatialGrid.cell(map, x2, y2, 0.0) == cell ->
+        nil
+
+      true ->
+        cell_boundary_distance(cell, x1, y1, x2 - x1, y2 - y1, distance)
+    end
+  end
+
+  defp cell_boundary_distance(cell, x, y, dx, dy, distance) do
+    {{x_min, x_max}, {y_min, y_max}} = SpatialGrid.cell_bounds(cell)
+
+    [boundary_fraction(x, dx, x_min, x_max), boundary_fraction(y, dy, y_min, y_max)]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.filter(fn fraction -> fraction >= 0.0 and fraction <= 1.0 end)
+    |> case do
+      [] -> distance
+      fractions -> Enum.min(fractions) * distance
+    end
+  end
+
+  defp boundary_fraction(position, delta, _min_boundary, max_boundary) when delta > 0 do
+    (max_boundary - position) / delta
+  end
+
+  defp boundary_fraction(position, delta, min_boundary, _max_boundary) when delta < 0 do
+    (min_boundary - position) / delta
+  end
+
+  defp boundary_fraction(_position, _delta, _min_boundary, _max_boundary), do: nil
+
+  defp path_length(points) when is_list(points) do
+    points
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.reduce(0.0, fn [start, finish], acc -> acc + segment_distance(start, finish) end)
+  end
+
+  defp segment_distance(start, finish) do
+    Math.movement_duration(start, finish, 1.0)
+  end
+
+  defp pose_along_path([start | rest], distance, orientation) do
+    rest
+    |> Enum.reduce_while({start, distance, orientation}, fn node, {previous, remaining, previous_orientation} ->
+      segment_distance = segment_distance(previous, node)
+      orientation = segment_orientation(previous, node, previous_orientation)
+
+      cond do
+        segment_distance <= 0 ->
+          {:cont, {node, remaining, orientation}}
+
+        remaining <= segment_distance ->
+          position = lerp_point(previous, node, segment_distance, max(remaining, 0.0))
+          {:halt, {:pose, position, orientation}}
+
+        true ->
+          {:cont, {node, remaining - segment_distance, orientation}}
+      end
+    end)
+    |> case do
+      {:pose, position, orientation} -> {position, orientation}
+      {last, _remaining, orientation} -> {last, orientation}
+    end
+  end
+
+  defp segment_orientation({x1, y1, _z1}, {x2, y2, _z2}, fallback) do
+    if x1 == x2 and y1 == y2, do: fallback, else: :math.atan2(y2 - y1, x2 - x1)
+  end
+end

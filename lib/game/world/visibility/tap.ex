@@ -7,10 +7,10 @@ defmodule ThistleTea.Game.World.Visibility.Tap do
   """
   import Bitwise
 
-  alias ThistleTea.Game.Entity.Logic.LootSession
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Loot.ActorFactory
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Loot.LootSession
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World.Loot.ActorFactory
   alias ThistleTea.Game.World.Metadata
 
   @dynamic_flag_lootable 0x0001

@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.World.Visibility.GameObjects do
   @moduledoc "Observer-specific visibility for spawned objects and hostile stealthed traps."
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Logic.Hostility
-  alias ThistleTea.Game.Entity.Logic.Invisibility
+  alias ThistleTea.Game.Core.Aura.Invisibility
+  alias ThistleTea.Game.Core.Combat.Hostility
+  alias ThistleTea.Game.Core.Entity.Character
 
   def can_see?(_character, _guid, %{go_spawned?: false}), do: false
 

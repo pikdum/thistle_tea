@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetitionSign do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PETITION_SIGN
 
-  alias ThistleTea.Game.Player.Petitions
+  alias ThistleTea.Game.World.Entity.Player.Petitions
 
   defstruct [:item_guid]
 

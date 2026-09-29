@@ -2,9 +2,9 @@ defmodule ThistleTea.Game.World.Loader.SpellUnitTargetDbcTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.DB.Mangos.SpellEffectMod
-  alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.LocationTargets
-  alias ThistleTea.Game.Spell.UnitTargets
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.LocationTargets
+  alias ThistleTea.Game.Core.Spell.UnitTargets
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride
 

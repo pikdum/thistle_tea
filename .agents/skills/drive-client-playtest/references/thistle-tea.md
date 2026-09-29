@@ -97,7 +97,7 @@ Use Tidewave only after the client and logs establish the live symptom. Keep exp
 
 ```bash
 nix run github:albert-io/flakes.nix#tidewave-cli -- eval --timeout 30000 \
-  'alias ThistleTea.Game.World; alias ThistleTea.Game.WorldRef; world = WorldRef.instance(329, 1); %{aurius: World.spawn_guid(world, :mob, 53297), baron: World.spawn_guid(world, :mob, 54241)}'
+  'alias ThistleTea.Game.World; alias ThistleTea.Game.Core.WorldRef; world = WorldRef.instance(329, 1); %{aurius: World.spawn_guid(world, :mob, 53297), baron: World.spawn_guid(world, :mob, 54241)}'
 ```
 
 Use `Entity.pid/1` plus `:sys.get_state/1` as an interactive diagnostic only when public projections cannot explain owner-local state. Never put `:sys.get_state/1` into gameplay code or a player command.

@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgOfferPetition do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_OFFER_PETITION
 
-  alias ThistleTea.Game.Player.Petitions
+  alias ThistleTea.Game.World.Entity.Player.Petitions
 
   defstruct [:item_guid, :target_guid]
 

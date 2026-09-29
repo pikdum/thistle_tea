@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGameobjUse do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GAMEOBJ_USE
 
-  alias ThistleTea.Game.Player.GameObjects
+  alias ThistleTea.Game.World.Entity.Player.GameObjects
 
   defstruct [:guid]
 

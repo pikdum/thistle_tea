@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSendMail do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SEND_MAIL
 
-  alias ThistleTea.Game.Player.Mail
+  alias ThistleTea.Game.World.Entity.Player.Mail
 
   defstruct [:mailbox, :receiver, :subject, :body, :stationery, :item_guid, money: 0, cod: 0]
 

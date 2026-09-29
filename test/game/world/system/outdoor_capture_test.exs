@@ -1,13 +1,13 @@
 defmodule ThistleTea.Game.World.System.OutdoorCaptureTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.OutdoorPvp.CapturePoint
-  alias ThistleTea.Game.OutdoorPvp.CapturePoint.Template
-  alias ThistleTea.Game.OutdoorPvp.Plaguelands
-  alias ThistleTea.Game.OutdoorPvp.Towers
-  alias ThistleTea.Game.OutdoorPvp.Towers.Participant
+  alias ThistleTea.Game.Core.OutdoorPvp.CapturePoint
+  alias ThistleTea.Game.Core.OutdoorPvp.CapturePoint.Template
+  alias ThistleTea.Game.Core.OutdoorPvp.Plaguelands
+  alias ThistleTea.Game.Core.OutdoorPvp.Towers
+  alias ThistleTea.Game.Core.OutdoorPvp.Towers.Participant
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.System.OutdoorPvp
-  alias ThistleTea.Game.WorldRef
 
   setup [:server]
 

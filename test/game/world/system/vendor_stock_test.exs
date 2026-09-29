@@ -1,16 +1,16 @@
 defmodule ThistleTea.Game.World.System.VendorStockTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Data.VendorItem
-  alias ThistleTea.Game.Entity.Data.VendorStock.Receipt
-  alias ThistleTea.Game.Entity.Logic.Inventory
-  alias ThistleTea.Game.Entity.Logic.Inventory.Batch
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Inventory
+  alias ThistleTea.Game.Core.Inventory.Batch
+  alias ThistleTea.Game.Core.Vendor.VendorItem
+  alias ThistleTea.Game.Core.Vendor.VendorStock.Receipt
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.System.VendorStock
   alias ThistleTea.Game.World.VendorStockStore
-  alias ThistleTea.Game.WorldRef
 
   setup [:merchant]
 

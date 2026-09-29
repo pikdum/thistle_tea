@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.System.HonorTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Honor.Award
-  alias ThistleTea.Game.Entity.Data.Honor.Snapshot
+  alias ThistleTea.Game.Core.Honor.Award
+  alias ThistleTea.Game.Core.Honor.Snapshot
   alias ThistleTea.Game.World.HonorStore
   alias ThistleTea.Game.World.System.Honor
 

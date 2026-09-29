@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceRunSpeedChangeAck do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_FORCE_RUN_SPEED_CHANGE_ACK
 
-  alias ThistleTea.Game.Network.MovementControl
+  alias ThistleTea.Game.World.Entity.Player.MovementControl
 
   defstruct [:guid, :counter, :new_speed]
 

@@ -1,0 +1,597 @@
+defmodule ThistleTea.Game.Core.Aura.Periodic do
+  @moduledoc """
+  Ticks periodic auras (damage, heal, mana recovery, leech, trigger-spell) when their
+  next-tick time comes due, expires elapsed holders afterwards, and reports
+  the earliest upcoming tick or expiry for tick scheduling.
+  """
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.AreaSources
+  alias ThistleTea.Game.Core.Aura.Change
+  alias ThistleTea.Game.Core.Aura.Heartbeat
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Aura.Lifecycle
+  alias ThistleTea.Game.Core.Aura.Linked
+  alias ThistleTea.Game.Core.Aura.PeriodicDamage
+  alias ThistleTea.Game.Core.Aura.Reactions
+  alias ThistleTea.Game.Core.Aura.Script
+  alias ThistleTea.Game.Core.Aura.Transition
+  alias ThistleTea.Game.Core.Class.Warlock
+  alias ThistleTea.Game.Core.Combat.DamageImmunity
+  alias ThistleTea.Game.Core.Combat.HealingReceived
+  alias ThistleTea.Game.Core.Creature.CreatureFlags
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Item.Consumable
+  alias ThistleTea.Game.Core.Power.PowerBurn
+  alias ThistleTea.Game.Core.Power.PowerLeech
+  alias ThistleTea.Game.Core.Power.Resources
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.PersistentArea
+  alias ThistleTea.Game.Core.Spell.PersistentArea.Check
+  alias ThistleTea.Game.Core.Spell.Scripts
+  alias ThistleTea.Game.Core.Spell.SpellResist
+  alias ThistleTea.Game.Core.Spell.SpellThreat
+  alias ThistleTea.Game.Core.Stats.ResistancePenetration
+
+  @aura_interrupt_damage 0x02
+
+  @harmful_periodics [
+    :periodic_damage,
+    :periodic_damage_percent,
+    :periodic_leech,
+    :periodic_health_funnel,
+    :periodic_mana_leech,
+    :periodic_power_burn
+  ]
+  @resource_periodics @harmful_periodics ++ [:periodic_heal, :obs_mod_health, :obs_mod_mana, :periodic_energize]
+
+  def tick(entity, now, contexts \\ %{})
+
+  def tick(%{unit: %Unit{auras: holders}} = entity, now, contexts) when is_list(holders) and holders != [] do
+    {entity, area_events} = remove_unavailable_areas(entity, now, contexts)
+    {entity, heartbeat_events} = Heartbeat.tick(entity, now, contexts)
+
+    entity
+    |> tick_periodics(now, contexts)
+    |> then(fn {entity, events} ->
+      {entity, expire_events} = Lifecycle.expire_due(entity, now)
+      {entity, area_events ++ heartbeat_events ++ events ++ expire_events}
+    end)
+  end
+
+  def tick(entity, _now, _contexts), do: {entity, []}
+
+  def next_event_at(%{unit: %Unit{auras: holders}}) when is_list(holders) do
+    holders
+    |> Enum.flat_map(&holder_event_times/1)
+    |> Enum.min(fn -> nil end)
+  end
+
+  def next_event_at(_entity), do: nil
+
+  defp tick_periodics(%{unit: %Unit{auras: holders}} = entity, now, contexts) do
+    result =
+      Enum.reduce_while(holders, {entity, [], []}, fn holder, {ent, acc, events} ->
+        context = Map.get(contexts, {holder.spell.id, holder.caster_guid, holder.item_source}, holder.cast_context)
+        holder = %{holder | cast_context: context}
+        was_dead? = Entity.dead?(ent)
+        {ent, new_holder, holder_events} = tick_active_holder(ent, holder, now)
+        events = events ++ holder_events
+
+        if Entity.dead?(ent) and not was_dead? do
+          {:halt, {ent, :died, events}}
+        else
+          {:cont, {ent, [new_holder | acc], events}}
+        end
+      end)
+
+    case result do
+      {entity, :died, events} ->
+        {entity, events}
+
+      {entity, acc, events} ->
+        new_holders = Enum.map(entity.unit.auras, &merge_tick_state(&1, acc))
+
+        {entity, transition_events} =
+          Transition.run(entity, %Change{holders: new_holders, cause: :ticked, now: now})
+
+        {entity, reaction_events} = periodic_taken_reactions(entity, events, now)
+        {entity, events ++ transition_events ++ reaction_events}
+    end
+  end
+
+  defp remove_unavailable_areas(entity, now, contexts) do
+    holders =
+      Enum.flat_map(entity.unit.auras, fn holder ->
+        context = Map.get(contexts, {holder.spell.id, holder.caster_guid, holder.item_source}, holder.cast_context)
+        AreaSources.retain_available(holder, context)
+      end)
+
+    Transition.run(entity, %Change{holders: holders, cause: :removed, now: now})
+  end
+
+  defp tick_active_holder(entity, holder, now) do
+    if Linked.active?(holder, entity.unit.auras, now), do: tick_holder(entity, holder, now), else: {entity, holder, []}
+  end
+
+  defp periodic_taken_reactions(entity, events, now) do
+    Enum.reduce(events, {entity, []}, fn
+      %Effects.SpellDamage{
+        periodic?: true,
+        damage: damage,
+        absorbed: absorbed,
+        crit?: crit?,
+        source_guid: caster,
+        spell: %Spell{} = spell
+      },
+      {current, acc}
+      when is_integer(damage) and damage > 0 and is_integer(caster) ->
+        {current, reaction_events} =
+          Reactions.reactions(current, :spell_hit_taken, %{
+            attacker_guid: caster,
+            spell: spell,
+            proc_type: :take_harmful_periodic,
+            outcome: if(crit?, do: :crit, else: :normal),
+            damage: max(damage - (absorbed || 0), 0),
+            now: now
+          })
+
+        {current, acc ++ reaction_events}
+
+      _event, acc_pair ->
+        acc_pair
+    end)
+  end
+
+  defp merge_tick_state(%Holder{} = current, ticked) do
+    case Enum.find(ticked, &(Holder.key(&1) == Holder.key(current))) do
+      nil ->
+        current
+
+      %Holder{} = updated ->
+        auras = Enum.map(current.auras, &merge_aura_tick(&1, updated.auras))
+
+        %{
+          current
+          | auras: auras,
+            next_area_refresh_at: updated.next_area_refresh_at,
+            next_area_check_at: updated.next_area_check_at
+        }
+    end
+  end
+
+  defp merge_aura_tick(%Aura{index: index} = current, ticked) do
+    case Enum.find(ticked, &(&1.index == index)) do
+      nil ->
+        current
+
+      %Aura{next_tick_at: at, tick_count: count, accumulated_damage: damage} ->
+        %{current | next_tick_at: at, tick_count: count, accumulated_damage: damage}
+    end
+  end
+
+  defp tick_holder(entity, %Holder{auras: auras} = holder, now) do
+    holder = if is_integer(holder.next_area_check_at), do: %{holder | next_area_check_at: now + 250}, else: holder
+
+    {entity, new_auras, events} =
+      Enum.reduce(auras, {entity, [], []}, fn aura, {ent, acc, events} ->
+        aura = count_due_tick(aura, now)
+        {ent, new_aura, aura_events} = tick_checked_aura(ent, holder, aura, now)
+        {ent, [new_aura | acc], events ++ aura_events}
+      end)
+
+    {holder, area_events} = tick_area_refresh(entity, %{holder | auras: Enum.reverse(new_auras)}, now)
+    {entity, holder, events ++ area_events}
+  end
+
+  defp count_due_tick(%Aura{next_tick_at: at, tick_count: count} = aura, now) when is_integer(at) and now >= at,
+    do: %{aura | tick_count: count + 1}
+
+  defp count_due_tick(aura, _now), do: aura
+
+  defp tick_area_refresh(entity, %Holder{next_area_refresh_at: at, area_radius: radius, spell: spell} = holder, now)
+       when is_integer(at) and now >= at and is_number(radius) do
+    holder = %{holder | next_area_refresh_at: advance_tick(at, 1_000, now)}
+    {holder, party_aura_effects(entity, spell, radius)}
+  end
+
+  defp tick_area_refresh(_entity, holder, _now), do: {holder, []}
+
+  defp tick_checked_aura(
+         entity,
+         _holder,
+         %Aura{persistent_area: %PersistentArea{expires_at: expires_at}, next_tick_at: at} = aura,
+         _now
+       )
+       when is_integer(at) and at > expires_at do
+    {entity, aura, []}
+  end
+
+  defp tick_checked_aura(
+         %{unit: %Unit{health: health}} = entity,
+         _holder,
+         %Aura{type: type, next_tick_at: at} = aura,
+         now
+       )
+       when type in @resource_periodics and is_number(health) and health <= 0 and is_integer(at) and now >= at do
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, []}
+  end
+
+  defp tick_checked_aura(entity, %Holder{} = holder, %Aura{type: type, next_tick_at: at} = aura, now)
+       when type in @harmful_periodics and is_integer(at) and now >= at do
+    cond do
+      unavailable_drain_caster?(holder, aura) ->
+        {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, []}
+
+      persistent_area_missed?(entity, holder, aura) ->
+        event = %Effects.SpellLogMiss{
+          source_guid: holder.caster_guid,
+          target_guid: entity.object.guid,
+          spell_id: holder.spell.id,
+          reason: :resist
+        }
+
+        {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event]}
+
+      DamageImmunity.immune?(entity, holder.spell.school, holder.spell) ->
+        event = %Effects.SpellDamageImmune{
+          source_guid: holder.caster_guid,
+          target_guid: entity.object.guid,
+          spell_id: holder.spell.id
+        }
+
+        {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event]}
+
+      true ->
+        tick_aura(entity, holder, aura, now)
+    end
+  end
+
+  defp tick_checked_aura(entity, holder, aura, now), do: tick_aura(entity, holder, aura, now)
+
+  defp unavailable_drain_caster?(%Holder{cast_context: %CastContext{caster_available?: false}}, %Aura{type: type}),
+    do: type in [:periodic_leech, :periodic_health_funnel, :periodic_mana_leech]
+
+  defp unavailable_drain_caster?(_holder, _aura), do: false
+
+  defp persistent_area_missed?(
+         entity,
+         %Holder{spell: %Spell{dmg_class: 1} = spell, cast_context: %CastContext{} = context},
+         %Aura{type: type, persistent_area: %PersistentArea{guid: guid}}
+       )
+       when type in [
+              :periodic_damage,
+              :periodic_damage_percent,
+              :periodic_leech,
+              :periodic_health_funnel,
+              :periodic_mana_leech
+            ] do
+    target =
+      Map.merge(SpellResist.defense_snapshot(entity), %{
+        level: entity.unit.level,
+        no_spell_defense?: CreatureFlags.has?(entity, :no_spell_defense)
+      })
+
+    check = Map.get(context.area_checks, guid, %Check{})
+    opts = if is_integer(check.hit_roll), do: [roll: check.hit_roll], else: []
+    not SpellResist.context_hit?(context, spell, target, match?(%Character{}, entity), opts)
+  end
+
+  defp persistent_area_missed?(_entity, _holder, _aura), do: false
+
+  defp party_aura_effects(%Character{object: %{guid: guid}, unit: %Unit{level: level}}, spell, radius) do
+    [
+      Effects.deliver_spell_to_query(guid, level || 1, spell, {:party_aoe, radius}, exclude_guids: [guid])
+    ]
+  end
+
+  defp party_aura_effects(
+         %Mob{object: %{guid: guid}, unit: %Unit{level: level}, internal: %{pet: %{owner_guid: owner_guid}}},
+         spell,
+         _radius
+       ) do
+    context = %CastContext{
+      caster_guid: guid,
+      caster_level: level || 1,
+      target_guid: owner_guid,
+      target_hostile?: false,
+      spell: spell
+    }
+
+    [Effects.deliver_spell(owner_guid, context, spell)]
+  end
+
+  defp party_aura_effects(%Mob{object: %{guid: guid}, unit: %Unit{level: level, created_by: owner_guid}}, spell, radius)
+       when is_integer(owner_guid) and owner_guid > 0 do
+    [Effects.deliver_spell_to_query(guid, level || 1, spell, {:party_aoe, radius})]
+  end
+
+  defp party_aura_effects(_entity, _spell, _radius), do: []
+
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: type, next_tick_at: at} = aura, now)
+       when type in [:periodic_damage, :periodic_damage_percent] and is_integer(at) and now >= at do
+    {aura, amount} = PeriodicDamage.tick_amount(entity, holder, aura)
+    {entity, damage, log_opts} = apply_periodic_damage(entity, holder, amount, now)
+
+    event =
+      Effects.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, log_opts)
+
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event]}
+  end
+
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_heal, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    amount = healing_amount(entity, holder, aura, aura.amount)
+
+    threat_events = SpellThreat.heal_events(entity, cast_context(holder), holder.spell, amount, periodic?: true)
+    entity = Entity.heal(entity, amount)
+    event = Effects.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_heal, amount)
+
+    proc_event =
+      Effects.spell_heal(holder.caster_guid, entity.object.guid, holder.spell, amount, false, periodic?: true)
+
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event, proc_event | threat_events]}
+  end
+
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :obs_mod_health, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    amount = healing_amount(entity, holder, aura, (entity.unit.max_health || 0) * (aura.amount || 0) / 100)
+    threat_events = SpellThreat.heal_events(entity, cast_context(holder), holder.spell, amount, periodic?: true)
+    entity = Entity.heal(entity, amount)
+    event = Effects.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_heal, amount)
+
+    proc_event =
+      Effects.spell_heal(holder.caster_guid, entity.object.guid, holder.spell, amount, false, periodic?: true)
+
+    events = [event, proc_event | threat_events] ++ Script.periodic_events(entity, holder)
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
+  end
+
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :obs_mod_mana, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    {entity, events} = restore_percent_mana(entity, holder, aura)
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
+  end
+
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_energize, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    {entity, events} = apply_energize(entity, holder, power_type(aura.misc_value), aura.amount)
+
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
+  end
+
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: type, next_tick_at: at} = aura, now)
+       when type in [:periodic_leech, :periodic_health_funnel] and is_integer(at) and now >= at do
+    health_before = max(entity.unit.health || 0, 0)
+    amount = PeriodicDamage.amount(entity, holder, aura)
+    {entity, damage, log_opts} = apply_periodic_damage(entity, holder, amount, now)
+    health_drained = max(health_before - (entity.unit.health || 0), 0)
+
+    events = [
+      Effects.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, log_opts)
+      | leech_heal_events(holder, health_drained, aura)
+    ]
+
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
+  end
+
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_mana_leech, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    {entity, events} = PowerLeech.periodic(entity, cast_context(holder), holder.spell, aura)
+
+    {entity, interrupted} =
+      if events == [],
+        do: {entity, []},
+        else: Lifecycle.remove_with_interrupt_flags(entity, @aura_interrupt_damage, now)
+
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events ++ interrupted}
+  end
+
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_trigger_spell, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    trigger_id = Scripts.periodic_trigger_spell_id(holder.spell, aura.trigger_spell_id, aura.tick_count)
+
+    events =
+      case {Warlock.allow_periodic_trigger?(entity, holder), trigger_id} do
+        {false, _spell_id} ->
+          []
+
+        {true, spell_id} when is_integer(spell_id) and spell_id > 0 ->
+          [
+            Effects.trigger_spell(holder.caster_guid, holder.caster_level, entity.object.guid, spell_id,
+              hit_context: holder.cast_context
+            )
+          ]
+
+        _ ->
+          []
+      end
+
+    events = Script.periodic_trigger_events(entity, holder) ++ events
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
+  end
+
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_power_burn, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    context = cast_context(holder)
+
+    {entity, events} =
+      PowerBurn.apply(
+        entity,
+        context,
+        holder.spell,
+        aura.amount,
+        aura,
+        now,
+        periodic?: true,
+        periodic_can_crit?: true,
+        proc_type: :deal_harmful_periodic
+      )
+
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
+  end
+
+  defp tick_aura(entity, _holder, %Aura{type: :periodic_emote, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, Consumable.party_emotes(entity)}
+  end
+
+  defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}
+
+  @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
+
+  defp apply_periodic_damage(entity, %Holder{} = holder, amount, now) do
+    school = school_atom(holder.spell)
+    caster_level = if is_integer(holder.caster_level) and holder.caster_level > 0, do: holder.caster_level, else: 1
+    resisted = periodic_resisted_amount(entity, amount, school, caster_level, holder)
+    damage = amount - resisted
+
+    {entity, damage, absorbed} =
+      Entity.take_damage_with_mitigation(entity, damage, now,
+        school: school,
+        spell: holder.spell,
+        source: holder.caster_guid,
+        source_owner: holder.caster_owner_guid,
+        reflected_by: holder.reflected_by_guid,
+        periodic: true,
+        damage_taken_applied?: true,
+        source_level: caster_level,
+        resistance_penetration: holder.resistance_penetration,
+        damage_sharing_targets: cast_context(holder).damage_sharing_targets,
+        threat_multiplier: SpellThreat.multiplier(cast_context(holder))
+      )
+
+    {entity, damage, [periodic?: true, resisted: resisted, absorbed: absorbed]}
+  end
+
+  defp periodic_resisted_amount(_entity, damage, _school, _caster_level, _penetration) when damage <= 0, do: 0
+  defp periodic_resisted_amount(_entity, _damage, :physical, _caster_level, _penetration), do: 0
+
+  defp periodic_resisted_amount(%{unit: %Unit{} = unit} = entity, damage, school, caster_level, %Holder{} = holder) do
+    resistance =
+      ResistancePenetration.resistance(Map.get(unit, :"#{school}_resistance"), holder.resistance_penetration, school)
+
+    target_creature? = not is_map(Map.get(entity, :player))
+    level_diff = (unit.level || 1) - caster_level
+
+    SpellResist.resisted_amount(damage, resistance, caster_level,
+      target_creature?: target_creature?,
+      level_diff: level_diff,
+      spell: holder.spell,
+      dot?: true
+    )
+  end
+
+  defp school_atom(%Spell{school: school}) when is_atom(school) and not is_nil(school), do: school
+  defp school_atom(%Spell{} = spell), do: Enum.at(@schools, Spell.school_index(spell), :physical)
+  defp school_atom(_spell), do: :physical
+
+  defp leech_heal_events(%Holder{caster_guid: caster_guid, spell: spell}, damage, %Aura{} = aura)
+       when is_integer(caster_guid) and damage > 0 do
+    multiplier = if is_number(aura.multiple_value), do: max(aura.multiple_value, 0), else: 1.0
+    [Effects.heal_entity(caster_guid, trunc(damage * multiplier), source_guid: caster_guid, spell: spell)]
+  end
+
+  defp leech_heal_events(_holder, _damage, _aura), do: []
+
+  defp restore_percent_mana(
+         %{unit: %Unit{health: health, power1: mana, max_power1: max_mana}} = entity,
+         %Holder{} = holder,
+         %Aura{} = aura
+       )
+       when is_number(health) and health > 0 and is_integer(mana) and is_integer(max_mana) and max_mana > 0 do
+    amount = div(max_mana * max(aura.amount || 0, 0) * max(holder.stacks || 1, 1), 100)
+    restored = Entity.restore_mana(entity, amount)
+    gained = restored.unit.power1 - mana
+
+    event = Effects.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :obs_mod_mana, amount)
+
+    {restored, [event | SpellThreat.assist_events(entity, cast_context(holder), holder.spell, gained)]}
+  end
+
+  defp restore_percent_mana(entity, _holder, _aura), do: {entity, []}
+
+  defp apply_energize(entity, %Holder{} = holder, 0, amount) do
+    entity = Entity.restore_mana(entity, amount)
+
+    event =
+      Effects.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_energize, amount,
+        misc_value: 0
+      )
+
+    {entity, [event]}
+  end
+
+  defp apply_energize(entity, %Holder{} = holder, power_type, amount) when is_integer(power_type) and power_type > 0 do
+    previous = Resources.current_power(entity, power_type)
+    entity = Resources.gain_power(entity, power_type, amount)
+    gained = Resources.current_power(entity, power_type) - previous
+
+    event =
+      Effects.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_energize, amount,
+        misc_value: power_type
+      )
+
+    threat_events =
+      if power_type == 4,
+        do: [],
+        else: SpellThreat.assist_events(entity, cast_context(holder), holder.spell, gained)
+
+    {entity, [event | threat_events]}
+  end
+
+  defp apply_energize(entity, _holder, _power_type, _amount), do: {entity, []}
+
+  defp healing_amount(entity, holder, aura, base) do
+    effect = Enum.find(holder.spell.effects, &(&1.index == aura.index))
+    stacks = max(holder.stacks || 1, 1)
+    HealingReceived.spell_amount(entity, base * stacks, holder.spell, effect, damage_type: :dot, stacks: stacks)
+  end
+
+  defp cast_context(%Holder{cast_context: %CastContext{} = context}), do: context
+
+  defp cast_context(%Holder{} = holder) do
+    %CastContext{
+      caster_guid: holder.caster_guid,
+      caster_owner_guid: holder.caster_owner_guid,
+      reflected_by_guid: holder.reflected_by_guid,
+      caster_level: holder.caster_level,
+      spell: holder.spell
+    }
+  end
+
+  defp power_type(value) when is_integer(value) and value >= 0, do: value
+  defp power_type(_value), do: 0
+
+  defp advance_tick(last_tick, amplitude_ms, now) when is_integer(amplitude_ms) and amplitude_ms > 0 do
+    next = last_tick + amplitude_ms
+    if next > now, do: next, else: advance_tick(next, amplitude_ms, now)
+  end
+
+  defp advance_tick(_last_tick, _amplitude_ms, now), do: now + 1_000
+
+  defp holder_event_times(%Holder{} = holder) do
+    tick_times = Heartbeat.event_times(holder) ++ Enum.flat_map(holder.auras, &aura_event_times/1)
+
+    tick_times =
+      if is_integer(holder.next_area_refresh_at), do: [holder.next_area_refresh_at | tick_times], else: tick_times
+
+    tick_times =
+      if is_integer(holder.next_area_check_at), do: [holder.next_area_check_at | tick_times], else: tick_times
+
+    if is_integer(holder.expires_at) and holder.expires_at != -1 do
+      [holder.expires_at | tick_times]
+    else
+      tick_times
+    end
+  end
+
+  defp aura_event_times(%Aura{next_tick_at: at, persistent_area: area}) do
+    times = if is_integer(at), do: [at], else: []
+    if area, do: [area.expires_at | times], else: times
+  end
+end

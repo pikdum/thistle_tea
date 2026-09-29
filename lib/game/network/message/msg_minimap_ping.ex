@@ -2,9 +2,9 @@ defmodule ThistleTea.Game.Network.Message.MsgMinimapPing do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_MINIMAP_PING
 
-  alias ThistleTea.Game.Party.Group
-  alias ThistleTea.Game.Party.Notifier
+  alias ThistleTea.Game.Core.Party.Group
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.System.Party.Notifier
 
   defstruct [:x, :y]
 

@@ -7,23 +7,23 @@ defmodule ThistleTea.Game.World.System.Duel do
 
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.Game.Duel
-  alias ThistleTea.Game.Duel.Admission
-  alias ThistleTea.Game.Duel.Match
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.GameObject
-  alias ThistleTea.Game.Entity.Data.GameObjectTemplate
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Math
+  alias ThistleTea.Game.Core.Duel
+  alias ThistleTea.Game.Core.Duel.Admission
+  alias ThistleTea.Game.Core.Duel.Match
+  alias ThistleTea.Game.Core.Entity.GameObject
+  alias ThistleTea.Game.Core.Entity.GameObjectTemplate
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Math
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SocialStore
-  alias ThistleTea.Game.WorldRef
 
   @countdown_ms 3_000
   @bounds_tick_ms 1_000

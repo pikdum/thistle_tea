@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEvent do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.SpellProcEvent
-  alias ThistleTea.Game.Spell.ProcRule
+  alias ThistleTea.Game.Core.Spell.ProcRule
 
   @client_build 5875
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]

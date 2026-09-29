@@ -1,15 +1,15 @@
 defmodule ThistleTea.Game.Network.Message.CmsgAreatriggerTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message.CmsgAreatrigger
   alias ThistleTea.Game.Network.Message.SmsgAreaTriggerMessage
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
-  alias ThistleTea.Game.WorldRef
 
   @moduletag :vmangos_db
 

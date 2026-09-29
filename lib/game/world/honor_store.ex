@@ -4,8 +4,8 @@ defmodule ThistleTea.Game.World.HonorStore do
   owns the table; the honor coordinator is its only writer.
   """
 
-  alias ThistleTea.Game.Entity.Data.Honor.Entry
-  alias ThistleTea.Game.Entity.Logic.Honor.Ledger
+  alias ThistleTea.Game.Core.Honor.Entry
+  alias ThistleTea.Game.Core.Honor.Ledger
 
   def init do
     :ets.new(__MODULE__, [:named_table, :public, read_concurrency: true])

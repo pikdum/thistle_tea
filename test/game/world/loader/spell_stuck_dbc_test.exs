@@ -1,24 +1,24 @@
 defmodule ThistleTea.Game.World.Loader.SpellStuckDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.SafePosition
-  alias ThistleTea.Game.Entity.Logic.SpellEffect
-  alias ThistleTea.Game.Entity.Server.Player.State
-  alias ThistleTea.Game.Entity.SpellTargetResolver
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Movement.SafePosition
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.SpellEffect
+  alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.BinaryUtils
-  alias ThistleTea.Game.Player.DevCommands
-  alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.World.Entity.Player.DevCommands
+  alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
-  alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Game.World.Spell.SpellTargetResolver
 
   @moduletag :dbc_db
 

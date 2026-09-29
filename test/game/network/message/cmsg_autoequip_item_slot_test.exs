@@ -1,10 +1,10 @@
 defmodule ThistleTea.Game.Network.Message.CmsgAutoequipItemSlotTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message.CmsgAutoequipItemSlot
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.World.Entity.Player.State
 
   describe "from_binary/1" do
     test "dispatches the vanilla item GUID and destination slot" do

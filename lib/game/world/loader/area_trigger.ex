@@ -8,9 +8,9 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.AreaTriggerTeleport
+  alias ThistleTea.Game.Core.Travel.AreaTriggerTeleport
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
-  alias ThistleTea.Game.WorldRef
 
   @supported_build 5875
   @supported_patch 10

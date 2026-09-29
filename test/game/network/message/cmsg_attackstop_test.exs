@@ -1,17 +1,17 @@
 defmodule ThistleTea.Game.Network.Message.CmsgAttackstopTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.AI.BT.Blackboard
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message.CmsgAttackstop
   alias ThistleTea.Game.Network.Message.SmsgCastResult
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.WorldRef
 
   describe "handle/2" do
     test "stops auto attack without resetting the swing timer" do

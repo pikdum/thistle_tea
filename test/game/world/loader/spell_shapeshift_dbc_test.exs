@@ -1,11 +1,11 @@
 defmodule ThistleTea.Game.World.Loader.SpellShapeshiftDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Aura
-  alias ThistleTea.Game.Aura.Holder
-  alias ThistleTea.Game.Entity.Logic.Shapeshift
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Semantics
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Aura.Shapeshift
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Semantics
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellChain
 

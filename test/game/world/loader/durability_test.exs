@@ -1,10 +1,10 @@
 defmodule ThistleTea.Game.World.Loader.DurabilityTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Logic.Buyback
-  alias ThistleTea.Game.Entity.Logic.Durability, as: DurabilityLogic
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Item.Durability, as: DurabilityLogic
+  alias ThistleTea.Game.Core.Vendor.Buyback
   alias ThistleTea.Game.World.Loader.Durability
 
   @moduletag :dbc_db

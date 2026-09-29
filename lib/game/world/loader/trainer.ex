@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.World.Loader.Trainer do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.TrainerSpell
+  alias ThistleTea.Game.Core.Player.TrainerSpell
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]

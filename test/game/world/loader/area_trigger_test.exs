@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.AreaTriggerTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.AreaTrigger
-  alias ThistleTea.Game.WorldRef
 
   describe "inside?/4" do
     test "checks distance against radius triggers" do

@@ -4,8 +4,8 @@ defmodule ThistleTea.Game.World.Loader.GameObjectTemplate do
   gameplay queries answer from running state instead of the Mangos seed.
   """
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.GameObjectTemplate
-  alias ThistleTea.Game.Spell.Focus
+  alias ThistleTea.Game.Core.Entity.GameObjectTemplate
+  alias ThistleTea.Game.Core.Spell.Focus
   alias ThistleTea.Game.World.Loader.Faction
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]

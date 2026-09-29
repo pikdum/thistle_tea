@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemInSlot do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_BUY_ITEM_IN_SLOT
 
-  alias ThistleTea.Game.Player.Vendor
+  alias ThistleTea.Game.World.Entity.Player.Vendor
 
   defstruct [:vendor_guid, :item_id, :bag_guid, :slot, :count]
 

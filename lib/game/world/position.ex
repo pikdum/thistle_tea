@@ -3,15 +3,15 @@ defmodule ThistleTea.Game.World.Position do
   Owns the stationary and projected position records for world entities.
   """
 
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Logic.Falling
-  alias ThistleTea.Game.Entity.Logic.Movement
-  alias ThistleTea.Game.SpatialGrid
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Movement
+  alias ThistleTea.Game.Core.Movement.Falling
+  alias ThistleTea.Game.Core.SpatialGrid
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Position.ClientMotion
   alias ThistleTea.Game.World.Position.Spline
   alias ThistleTea.Game.World.SpatialHash
-  alias ThistleTea.Game.WorldRef
 
   def put(
         %{

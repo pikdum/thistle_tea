@@ -4,16 +4,16 @@ defmodule ThistleTea.Game.World.Loader.SpellWildDbcTest do
   import Ecto.Query
 
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.SpellTargetResolver
-  alias ThistleTea.Game.Spell.Semantics
-  alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Spell.Semantics
+  alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride
-  alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Game.World.Spell.SpellTargetResolver
 
   @moduletag :dbc_db
 

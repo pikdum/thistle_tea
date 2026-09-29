@@ -5,9 +5,9 @@ defmodule ThistleTea.Game.World.Loader.SpellAppearance do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.CreatureTemplate
-  alias ThistleTea.Game.Entity.Data.Model
-  alias ThistleTea.Game.Entity.Logic.Appearance
+  alias ThistleTea.Game.Core.Entity.Appearance
+  alias ThistleTea.Game.Core.Entity.CreatureTemplate
+  alias ThistleTea.Game.Core.Entity.Model
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.ModelGeometry

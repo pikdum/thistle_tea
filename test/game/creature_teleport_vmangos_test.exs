@@ -4,20 +4,20 @@ defmodule ThistleTea.Game.CreatureTeleportVmangosTest do
   alias Ecto.Adapters.SQL
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.Repo
-  alias ThistleTea.Game.Entity.Data.AIEvent
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
-  alias ThistleTea.Game.Entity.Logic.AI.EventAI
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Server.AIEnvironment
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.AI.AIEvent
+  alias ThistleTea.Game.Core.AI.BT.Blackboard
+  alias ThistleTea.Game.Core.AI.EventAI
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.InstanceSpawn
+  alias ThistleTea.Game.World.Entity.AIEnvironment
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
-  alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Game.World.System.Instance.InstanceSpawn
 
   @moduletag :vmangos_db
 

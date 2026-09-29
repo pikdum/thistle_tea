@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgInspect do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_INSPECT
 
-  alias ThistleTea.Game.Player.Inspection
+  alias ThistleTea.Game.World.Entity.Player.Inspection
 
   defstruct [:guid]
 

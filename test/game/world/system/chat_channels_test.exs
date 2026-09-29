@@ -1,10 +1,10 @@
 defmodule ThistleTea.Game.World.System.ChatChannelsTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Chat.Channel.Member
-  alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.Core.Chat.Channel.Member
+  alias ThistleTea.Game.Core.Social
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Social
+  alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.World.System.ChatChannels

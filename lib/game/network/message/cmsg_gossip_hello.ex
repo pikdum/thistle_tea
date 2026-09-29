@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GOSSIP_HELLO
 
-  alias ThistleTea.Game.Player.Gossip
+  alias ThistleTea.Game.World.Entity.Player.Gossip
 
   defstruct [:guid]
 

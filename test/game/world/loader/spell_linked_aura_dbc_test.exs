@@ -2,19 +2,19 @@ defmodule ThistleTea.Game.World.Loader.SpellLinkedAuraDbcTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.DB.Mangos.SpellEffectMod
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Combat
-  alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Spell.Cast
-  alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.Modifiers
-  alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Combat
+  alias ThistleTea.Game.Core.Entity
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Spell.Cast
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Modifiers
+  alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride
 
@@ -66,14 +66,14 @@ defmodule ThistleTea.Game.World.Loader.SpellLinkedAuraDbcTest do
       assert Modifiers.integer_value(protected, wrath, :casting_time, wrath.cast_time_ms) == wrath.cast_time_ms + 1_000
       cast = Cast.new(wrath, Target.unit(2), 2_000)
       protected = %{protected | internal: %{protected.internal | casting: cast}}
-      {damaged, 80, 0} = Core.take_damage_with_mitigation(protected, 100, 2_100, source: 2)
+      {damaged, 80, 0} = Entity.take_damage_with_mitigation(protected, 100, 2_100, source: 2)
       assert damaged.internal.casting.ends_at == cast.ends_at
       {expired, _} = Aura.expire_due(damaged, 1_000 + barkskin.duration_ms)
       assert expired.unit.auras == []
       assert Combat.attack_speed_ms(expired) == 2_000
       assert Modifiers.integer_value(expired, wrath, :casting_time, wrath.cast_time_ms) == wrath.cast_time_ms
       expired = %{expired | internal: %{expired.internal | casting: cast}}
-      {delayed, 100, 0} = Core.take_damage_with_mitigation(expired, 100, 2_100, source: 2)
+      {delayed, 100, 0} = Entity.take_damage_with_mitigation(expired, 100, 2_100, source: 2)
       assert delayed.internal.casting.ends_at > cast.ends_at
     end
 

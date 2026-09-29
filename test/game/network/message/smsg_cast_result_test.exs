@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.Network.Message.SmsgCastResultTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Area
   alias ThistleTea.Game.Network.Message.SmsgCastResult
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Area
 
   describe "to_binary/1" do
     test "encodes posture and movement failures" do

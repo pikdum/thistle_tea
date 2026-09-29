@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetRename do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PET_RENAME
 
-  alias ThistleTea.Game.Player.Pets
+  alias ThistleTea.Game.World.Entity.Player.Pets
 
   defstruct [:pet_guid, :name]
 

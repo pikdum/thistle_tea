@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgTradeStatusExtended do
 
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Core.Entity.Item
 
   defstruct other?: true, money: 0, spell_id: 0, items: %{}
 

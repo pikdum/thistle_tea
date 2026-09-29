@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.MsgTabardvendorActivateClient do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_TABARDVENDOR_ACTIVATE
 
-  alias ThistleTea.Game.Player.Guilds
+  alias ThistleTea.Game.World.Entity.Player.Guilds
 
   defstruct [:vendor_guid]
 

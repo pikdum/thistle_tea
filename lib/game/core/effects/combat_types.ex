@@ -1,0 +1,76 @@
+defmodule ThistleTea.Game.Core.Effects.CombatTypes do
+  @moduledoc false
+
+  effects = [
+    {:CombatLeashEvent, [:ref, :event], []},
+    {:CreatureGroupEvent, [:event], []},
+    {:CreatureGroupCommand, [:command], []},
+    {:EnterEvade, [:target_guid], []},
+    {:PlayerDefeated, [:source_guid, :count_death?], []},
+    {:CreatureDefeated, [:source_guid], []},
+    {:BattlegroundDeath, [:world, :defeat], []},
+    {:BattlegroundFlagRemoved, [:world, :guid, :team, :position], []},
+    {:BattlegroundCreatureDeath, [:world, :defeat], []},
+    {:HonorDamage, [:source_guid, :damage, :now, :lethal?, :honorless?], []},
+    {:HonorContribution, [:player_guid, :damage, :now, :lethal?, :honorless?], []},
+    {:HonorCreatureKill, [:source_guid], []},
+    {:HonorAward, [:target_guid, :award], []},
+    {:DurabilityDamage, [:source_guid, :lethal?, :environmental?], []},
+    {:DurabilityLoss, [:target_guid, :mode, :amount, :scope], [death?: false, caster_guid: nil, spell_id: nil]},
+    {:EnvironmentalDamage, [:type, :damage], [absorbed: 0, resisted: 0]},
+    {:DeliverAttack, [:target_guid, :attack], []},
+    {:TriggerWeaponProcs, [:source_guid, :target_guid, :hand], [extra_attack?: false]},
+    {:SharedDamage, [:target_guid, :source_guid, :world, :spell, :school, :damage, :kind],
+     [
+       source_level: 1,
+       source_owner_guid: nil,
+       reflected_by_guid: nil,
+       damage_spell: nil,
+       periodic?: false,
+       resistance_penetration: []
+     ]},
+    {:AdvanceCombatSkill, [:target_guid, :skill_id], []},
+    {:PvpContact, [:target_guid, :role, :other, :now], [combat?: true, engage?: true]},
+    {:HoldCombat, [:target_guid, :now, :duration_ms], [opponent_guid: nil]},
+    {:ControlledCombatContact, [:target_guid, :controlled_guid, :opponent_guid, :role, :now], []},
+    {:PvpFlagsChanged, [:enabled?], []},
+    {:AttackStart, [:source_guid, :target_guid], []},
+    {:StartAttack, [:target_guid], [target_ref: nil]},
+    {:PetSpellAttack, [:target_guid], []},
+    {:PetAttacked, [:attacker_guid], []},
+    {:AttackStop, [:source_guid, :target_guid], []},
+    {:DuelDefeat, [:source_guid, :target_guid], []},
+    {:DuelInterrupted, [:target_guid], []},
+    {:DuelRequest, [:source_guid, :source_level, :target_guid, :entry, :position, :facing], []},
+    {:AttackNotInRange, [], []},
+    {:AttackBadFacing, [], []},
+    {:AttackerGained, [:target_guid], []},
+    {:AttackerLost, [:target_guid], []},
+    {:ThreatRefGained, [:target_guid], []},
+    {:ThreatRefLost, [:target_guid], []},
+    {:TemporaryThreat, [:target_guid, :incarnation_id, :amount], []},
+    {:DropThreat, [:target_guid], []},
+    {:DropNearbyThreat, [], []},
+    {:FeignDeathApplied, [], []},
+    {:FeignDeathAppliedResolved, [:target_guids], []},
+    {:DropNearbyThreatResolved, [:target_guids, :metadata], []},
+    {:BladeFlurry, [:target_guid, :damage, :spell_id], []},
+    {:SecondaryMelee, [:target_guid, :damage, :spell_id, :range_yards], []},
+    {:TapClaimed, [:player_guid], [:group_id]},
+    {:TapCleared, [], []},
+    {:AttackOutcome, [:target_guid, :source_guid, :outcome, :damage, :proc_damage, :spell_id],
+     [hand: :mainhand, extra_attack?: false, proc_ex: nil, proc_origin: :cast, spell: nil, power_cost: nil]},
+    {:KillOutcome, [:target_guid, :victim], []},
+    {:AttackerStateUpdate, [:source_guid, :target_guid, :damage, :attack], []},
+    {:CallAssistance, [:target_guid], []},
+    {:CallForHelp, [:target_guid], [:radius]}
+  ]
+
+  for {name, required, optional} <- effects do
+    defmodule Module.concat(ThistleTea.Game.Core.Effects, name) do
+      @moduledoc false
+      @enforce_keys required
+      defstruct required ++ optional
+    end
+  end
+end

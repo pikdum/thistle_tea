@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.World.Loader.BattlegroundVMangosTest do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Battleground.Template
+  alias ThistleTea.Game.Core.Battleground.Template
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
 
   @moduletag :vmangos_db

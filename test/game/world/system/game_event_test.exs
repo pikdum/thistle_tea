@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.World.System.GameEventTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.GameEvent.Schedule
+  alias ThistleTea.Game.Core.GameEvent.Schedule.Entry
   alias ThistleTea.Game.World.System.GameEvent
-  alias ThistleTea.Game.World.System.GameEvent.Schedule
-  alias ThistleTea.Game.World.System.GameEvent.Schedule.Entry
 
   describe "start_link/1" do
     test "activates the current schedule and applies its next transition" do

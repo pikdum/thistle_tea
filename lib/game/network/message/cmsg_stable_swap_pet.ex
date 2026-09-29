@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgStableSwapPet do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_STABLE_SWAP_PET
 
-  alias ThistleTea.Game.Player.PetStable
+  alias ThistleTea.Game.World.Entity.Player.PetStable
 
   defstruct [:guid, :pet_number]
 

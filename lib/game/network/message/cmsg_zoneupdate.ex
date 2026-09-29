@@ -2,12 +2,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgZoneupdate do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ZONEUPDATE
 
-  alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
-  alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
-  alias ThistleTea.Game.Player.OutdoorPvp
-  alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Entity.Player.Exploration, as: PlayerExploration
+  alias ThistleTea.Game.World.Entity.Player.OutdoorPvp
+  alias ThistleTea.Game.World.Entity.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.System.Party.Notifier, as: PartyNotifier
 
   defstruct [:area]
 

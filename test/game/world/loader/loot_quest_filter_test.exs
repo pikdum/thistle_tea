@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.LootQuestFilterTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Logic.Loot
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Loot
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
 

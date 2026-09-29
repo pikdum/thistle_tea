@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTeleportTest do
 
   import Bitwise, only: [|||: 2]
 
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message.MsgMoveTeleport
 

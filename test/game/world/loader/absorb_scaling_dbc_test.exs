@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.AbsorbScalingDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Spell.AbsorbBonus
-  alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.AbsorbBonus
+  alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db

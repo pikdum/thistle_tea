@@ -6,11 +6,11 @@ defmodule ThistleTea.Game.World.System.VendorStock do
 
   use GenServer
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.VendorStock.Receipt
-  alias ThistleTea.Game.Entity.Logic.VendorStock, as: Stock
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.Vendor.VendorStock, as: Stock
+  alias ThistleTea.Game.Core.Vendor.VendorStock.Receipt
   alias ThistleTea.Game.Network.Sessions
-  alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.VendorStockStore
 

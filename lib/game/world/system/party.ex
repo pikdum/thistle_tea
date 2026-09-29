@@ -1,16 +1,17 @@
 defmodule ThistleTea.Game.World.System.Party do
   @moduledoc """
   Boundary for the party system: serializes group mutations through one
-  GenServer over the pure `ThistleTea.Game.Party` core and mirrors membership
+  GenServer over the pure `ThistleTea.Game.Core.Party` core and mirrors membership
   into a public ETS table for cheap concurrent reads.
   """
   use GenServer
 
-  alias ThistleTea.Game.MeetingStone
-  alias ThistleTea.Game.Party
-  alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World.MeetingStones
+  alias ThistleTea.Game.Core.MeetingStone
+  alias ThistleTea.Game.Core.Party
+  alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
+  alias ThistleTea.Game.World.System.Party.MeetingStones
+  alias ThistleTea.Game.World.System.Party.Notifier
 
   require Logger
 
@@ -137,7 +138,7 @@ defmodule ThistleTea.Game.World.System.Party do
 
   defp deliver_queue_event({:group, group}) do
     index_group(group)
-    Party.Notifier.send_group_list(group)
+    Notifier.send_group_list(group)
   end
 
   defp deliver_queue_event(event), do: MeetingStones.deliver(event)

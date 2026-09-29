@@ -1,21 +1,21 @@
 defmodule ThistleTea.Game.CreatureTeleportContentTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Data.ScriptStep
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
-  alias ThistleTea.Game.Entity.Logic.AI.Script
-  alias ThistleTea.Game.Entity.Logic.AI.Script.Run
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Game.Core.AI.BT.Blackboard
+  alias ThistleTea.Game.Core.AI.BT.Context
+  alias ThistleTea.Game.Core.AI.Script
+  alias ThistleTea.Game.Core.AI.Script.Run
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Spawn
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.WorldRef
 
   test "all seven imported rows execute as exact same-copy creature teleports" do
     rows = [

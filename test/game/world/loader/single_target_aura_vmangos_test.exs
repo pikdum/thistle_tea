@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.SingleTargetAuraVmangosTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.World.Loader.SpellEffectOverride
 
   @moduletag :vmangos_db

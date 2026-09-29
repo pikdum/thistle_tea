@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgRequestPetInfo do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_REQUEST_PET_INFO
 
-  alias ThistleTea.Game.Player.Login
+  alias ThistleTea.Game.World.Entity.Player.Login
 
   defstruct []
 

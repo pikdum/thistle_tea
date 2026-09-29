@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgJoinChannel do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_JOIN_CHANNEL
 
-  alias ThistleTea.Game.Chat
+  alias ThistleTea.Game.World.Chat
   alias ThistleTea.Game.World.System.ChatChannels
 
   require Logger

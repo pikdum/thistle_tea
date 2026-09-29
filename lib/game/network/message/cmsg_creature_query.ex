@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCreatureQuery do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CREATURE_QUERY
 
-  alias ThistleTea.Game.Entity.Data.CreatureTemplate
+  alias ThistleTea.Game.Core.Entity.CreatureTemplate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Metadata

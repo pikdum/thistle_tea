@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgGroupSetLeader do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GROUP_SET_LEADER
 
-  alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.System.Party.Notifier
 
   defstruct [:guid]
 

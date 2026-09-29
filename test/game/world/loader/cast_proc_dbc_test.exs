@@ -1,11 +1,11 @@
 defmodule ThistleTea.Game.World.Loader.CastProcDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Spell.Proc
-  alias ThistleTea.Game.Spell.ProcOrigin
-  alias ThistleTea.Game.Spell.ProcRule
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.Proc
+  alias ThistleTea.Game.Core.Spell.ProcOrigin
+  alias ThistleTea.Game.Core.Spell.ProcRule
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db

@@ -4,9 +4,9 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
 
   import Bitwise, only: [bnot: 1, band: 2, bor: 2]
 
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
 
   # @move_type_normal 0
   @move_type_stop 1

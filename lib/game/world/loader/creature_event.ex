@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.World.Loader.CreatureEvent do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.GameEvent.CreatureData
+  alias ThistleTea.Game.Core.GameEvent.CreatureData
   alias ThistleTea.Game.World.Loader.CreatureArchetype
   alias ThistleTea.Game.World.Loader.Item
   alias ThistleTea.Game.World.Loader.ModelGeometry

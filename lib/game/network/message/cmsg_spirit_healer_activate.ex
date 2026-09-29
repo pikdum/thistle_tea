@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSpiritHealerActivate do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SPIRIT_HEALER_ACTIVATE
 
-  alias ThistleTea.Game.Player.SpiritHealer
+  alias ThistleTea.Game.World.Entity.Player.SpiritHealer
 
   defstruct [:guid]
 

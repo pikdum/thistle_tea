@@ -2,22 +2,22 @@ defmodule ThistleTea.Game.ScriptFailureVmangosTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.AIEvent
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
-  alias ThistleTea.Game.Entity.Logic.AI.EventAI
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Core.AI.AIEvent
+  alias ThistleTea.Game.Core.AI.BT.Blackboard
+  alias ThistleTea.Game.Core.AI.BT.Context
+  alias ThistleTea.Game.Core.AI.BT.Context.Perception.Observation
+  alias ThistleTea.Game.Core.AI.EventAI
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
-  alias ThistleTea.Game.WorldRef
 
   @moduletag :vmangos_db
 

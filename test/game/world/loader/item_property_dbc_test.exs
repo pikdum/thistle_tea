@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.ItemPropertyDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.ItemProperty
+  alias ThistleTea.Game.Core.Item.ItemProperty
   alias ThistleTea.Game.World.Loader.ItemProperty, as: PropertyLoader
 
   @moduletag :dbc_db

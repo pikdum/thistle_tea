@@ -1,8 +1,8 @@
 defmodule ThistleTea.AuthTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Account
   alias ThistleTea.Auth
+  alias ThistleTea.Auth.Account
   alias ThousandIsland.Socket
   alias ThousandIsland.Telemetry
 

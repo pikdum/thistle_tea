@@ -1,25 +1,25 @@
 defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.CreatureSpell
-  alias ThistleTea.Game.Entity.Logic.Companion
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.AI.CreatureSpell
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.Companion.EntityRef
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Game.Core.Spell.TargetCodec
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Target
-  alias ThistleTea.Game.Spell.TargetCodec
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
-  alias ThistleTea.Game.WorldRef
   alias ThistleTea.Test.PetControlOwner
 
   describe "SMSG_PET_BROKEN" do

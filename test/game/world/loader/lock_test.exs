@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.LockTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Lock, as: LockData
-  alias ThistleTea.Game.Entity.Data.Lock.Requirement
+  alias ThistleTea.Game.Core.Profession.Lock, as: LockData
+  alias ThistleTea.Game.Core.Profession.Lock.Requirement
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
 
   describe "load/2" do

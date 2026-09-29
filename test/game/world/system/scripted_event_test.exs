@@ -1,19 +1,19 @@
 defmodule ThistleTea.Game.World.System.ScriptedEventTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Condition
-  alias ThistleTea.Game.Entity.Data.ScriptStep
-  alias ThistleTea.Game.Entity.Logic.AI.Script.Request
-  alias ThistleTea.Game.Entity.Logic.Condition.Reason
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Time
+  alias ThistleTea.Game.Core.AI.Script.Request
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Condition
+  alias ThistleTea.Game.Core.Condition.Reason
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
-  alias ThistleTea.Game.WorldRef
 
   setup do
     :sys.replace_state(ScriptedEventSystem, fn _events -> %{} end)

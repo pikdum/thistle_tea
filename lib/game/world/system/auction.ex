@@ -6,19 +6,19 @@ defmodule ThistleTea.Game.World.System.Auction do
   """
   use GenServer
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Auction.Actor
-  alias ThistleTea.Game.Entity.Data.Auction.Receipt
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Logic.Auction, as: AuctionLogic
-  alias ThistleTea.Game.Entity.Logic.Auction.Inventory, as: AuctionInventory
-  alias ThistleTea.Game.Entity.Logic.Auction.Query
-  alias ThistleTea.Game.Time
+  alias ThistleTea.Game.Core.Auction, as: AuctionLogic
+  alias ThistleTea.Game.Core.Auction.Actor
+  alias ThistleTea.Game.Core.Auction.Inventory, as: AuctionInventory
+  alias ThistleTea.Game.Core.Auction.Query
+  alias ThistleTea.Game.Core.Auction.Receipt
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World.AuctionStore
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemEnchantment
-  alias ThistleTea.Game.World.PostOffice
+  alias ThistleTea.Game.World.System.PostOffice
 
   require Logger
 

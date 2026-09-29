@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAcceptTrade do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ACCEPT_TRADE
 
-  alias ThistleTea.Game.Player.Trade
+  alias ThistleTea.Game.World.Entity.Player.Trade
 
   defstruct [:unknown]
 

@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetAmmo do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SET_AMMO
 
-  alias ThistleTea.Game.Player.Ammunition
+  alias ThistleTea.Game.World.Entity.Player.Ammunition
 
   defstruct [:item]
 

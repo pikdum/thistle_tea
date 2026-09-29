@@ -5,8 +5,8 @@ defmodule ThistleTea.Game.World.VendorStockStore do
   recovery marker, including across a coordinator restart.
   """
 
-  alias ThistleTea.Game.Entity.Data.VendorStock.Receipt
-  alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
+  alias ThistleTea.Game.Core.Inventory.ChangeSet
+  alias ThistleTea.Game.Core.Vendor.VendorStock.Receipt
   alias ThistleTea.Game.World.ItemStore
 
   def stock(key, table \\ ItemStore) do

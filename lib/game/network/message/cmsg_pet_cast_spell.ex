@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetCastSpell do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PET_CAST_SPELL
 
-  alias ThistleTea.Game.Player.PetActions
+  alias ThistleTea.Game.World.Entity.Player.PetActions
 
   defstruct [:pet_guid, :spell_id, :spell_cast_targets]
 

@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.Network.Message.CmsgCancelAutoRepeatSpellTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Network.Message.CmsgCancelAutoRepeatSpell
 
   test "decodes the empty Vanilla payload" do

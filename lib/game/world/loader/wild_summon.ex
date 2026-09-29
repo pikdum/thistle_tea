@@ -4,13 +4,13 @@ defmodule ThistleTea.Game.World.Loader.WildSummon do
   timed death. Target Dummies use passive stationary behavior and shared auras.
   """
 
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.KillReward
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Engagement
-  alias ThistleTea.Game.Entity.Logic.Engagement.Tap
-  alias ThistleTea.Game.Entity.Logic.Stats
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Combat.Engagement
+  alias ThistleTea.Game.Core.Combat.Engagement.Tap
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Stats
+  alias ThistleTea.Game.World.Combat.KillReward
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon
   alias ThistleTea.Game.World.Metadata

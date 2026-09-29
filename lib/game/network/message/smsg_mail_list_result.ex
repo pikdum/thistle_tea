@@ -4,9 +4,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgMailListResult do
 
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Data.Mail
-  alias ThistleTea.Game.Entity.Logic.Mail, as: MailLogic
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Mail
 
   defstruct mails: [], now: 0
 
@@ -23,7 +22,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgMailListResult do
       <<mail_type(mail.sender_type)>> <>
       sender_binary(mail) <>
       mail.subject <>
-      <<0, MailLogic.item_text_id(mail)::little-size(32), 0::little-size(32), mail.stationery::little-size(32)>> <>
+      <<0, Mail.item_text_id(mail)::little-size(32), 0::little-size(32), mail.stationery::little-size(32)>> <>
       item_binary(item) <>
       <<mail.money::little-size(32), mail.cod::little-size(32), mail.checked::little-size(32),
         expiration_days(mail, now)::little-float-size(32), mail.template_id::little-size(32)>>

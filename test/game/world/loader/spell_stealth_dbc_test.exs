@@ -1,11 +1,11 @@
 defmodule ThistleTea.Game.World.Loader.SpellStealthDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Aura.Holder
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Stealth
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Stealth
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellChain
 

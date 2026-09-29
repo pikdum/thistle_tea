@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetNameQuery do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PET_NAME_QUERY
 
-  alias ThistleTea.Game.Player.Pets
+  alias ThistleTea.Game.World.Entity.Player.Pets
 
   defstruct [:pet_number, :pet_guid]
 

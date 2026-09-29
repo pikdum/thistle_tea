@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_BUY_ITEM
 
-  alias ThistleTea.Game.Player.Vendor
+  alias ThistleTea.Game.World.Entity.Player.Vendor
 
   defstruct [:vendor_guid, :item_id, :count]
 

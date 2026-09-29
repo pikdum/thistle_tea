@@ -5,14 +5,14 @@ defmodule ThistleTea.Game.World.Loader.SummonedPet do
   """
 
   alias ThistleTea.DB.Mangos.PetLevelStats
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.PetTraining
-  alias ThistleTea.Game.Entity.Logic.Stats
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Time
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Pet.PetTraining
+  alias ThistleTea.Game.Core.Stats
+  alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World.Loader.Summon
   alias ThistleTea.Game.World.Pathfinding
 

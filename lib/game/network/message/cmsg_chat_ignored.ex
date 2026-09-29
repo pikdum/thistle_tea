@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgChatIgnored do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CHAT_IGNORED
 
-  alias ThistleTea.Game.Player.Social
+  alias ThistleTea.Game.World.Entity.Player.Social
 
   defstruct [:guid]
 

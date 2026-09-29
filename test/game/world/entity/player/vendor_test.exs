@@ -1,0 +1,189 @@
+defmodule ThistleTea.Game.World.Entity.Player.VendorTest do
+  use ExUnit.Case, async: false
+
+  alias ThistleTea.Game.Core.Condition
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Inventory
+  alias ThistleTea.Game.Core.Reputation
+  alias ThistleTea.Game.Core.Vendor.VendorItem
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Network.Message.SmsgBuyFailed
+  alias ThistleTea.Game.Network.Message.SmsgListInventory
+  alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Entity.Player.Gossip
+  alias ThistleTea.Game.World.Entity.Player.Vendor
+  alias ThistleTea.Game.World.Entity.Registry
+  alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
+
+  describe "Gossip.hello/2" do
+    test "opens an empty merchant when no gossip menu exists" do
+      entry = System.unique_integer([:positive, :monotonic]) + 900_000
+      guid = Guid.from_low_guid(:mob, entry, entry)
+      publish_vendor(guid)
+      :ets.insert(VendorLoader, {entry, []})
+      on_exit(fn -> :ets.delete(VendorLoader, entry) end)
+      state = %{ready: true, character: character(60)}
+
+      assert Gossip.hello(state, guid) == state
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgListInventory{vendor_guid: ^guid, items: []}}}
+
+      Metadata.update(guid, %{alive?: false})
+      assert Gossip.hello(state, guid) == state
+      refute_received {:"$gen_cast", {:send_packet, %SmsgListInventory{}}}
+    end
+  end
+
+  describe "buy/4" do
+    test "splits purchases into legal stacks and pays once" do
+      vendor_entry = System.unique_integer([:positive, :monotonic])
+      vendor = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
+      publish_vendor(vendor)
+      owner = System.unique_integer([:positive, :monotonic])
+      Registry.register(owner)
+      template = %ItemTemplate{entry: 999_956, buy_price: 2, buy_count: 3, stackable: 5}
+      :ets.insert(VendorLoader, {vendor_entry, [%VendorItem{index: 1, template: template, max_count: 0}]})
+      character = character(30)
+      character = %{character | id: owner, object: %{character.object | guid: owner}}
+      state = %{ready: true, guid: owner, character: character}
+      bought = Vendor.buy(state, vendor, template.entry, 4)
+      items = Inventory.owned_items(bought.character.player, &ItemStore.get/1)
+      assert Enum.map(items, & &1.item.stack_count) == [5, 5, 2]
+      assert bought.character.player.coinage == 92
+
+      on_exit(fn ->
+        for {guid, %Item{item: %{owner: ^owner}}} <- :ets.tab2list(ItemStore), do: ItemStore.delete(guid)
+        :ets.delete(VendorLoader, vendor_entry)
+        :ets.delete(CharacterStore, owner)
+        Metadata.delete(owner)
+      end)
+    end
+
+    test "rechecks current rank and level without hiding ranked merchandise" do
+      vendor_entry = System.unique_integer([:positive, :monotonic])
+      vendor_guid = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
+      publish_vendor(vendor_guid)
+      template = %ItemTemplate{entry: 15_200, required_honor_rank: 8, required_level: 30, buy_price: 1}
+      :ets.insert(VendorLoader, {vendor_entry, [%VendorItem{index: 1, template: template, max_count: 0}]})
+      on_exit(fn -> :ets.delete(VendorLoader, vendor_entry) end)
+
+      eligible = character(30)
+      eligible = %{eligible | player: %{eligible.player | honor_rank: 8, highest_honor_rank: 18}}
+      demoted = %{eligible | player: %{eligible.player | honor_rank: 7}}
+      too_young = %{eligible | unit: %{eligible.unit | level: 29}}
+
+      for character <- [demoted, too_young] do
+        assert [%VendorItem{template: ^template}] = Vendor.visible_items(character, vendor_guid)
+        state = %{ready: true, guid: 1, character: character}
+        assert Vendor.buy(state, vendor_guid, template.entry, 1) == state
+        assert_receive {:"$gen_cast", {:send_packet, %SmsgBuyFailed{error: :rank_require}}}
+      end
+
+      eligible = %{eligible | player: %{eligible.player | coinage: 0}}
+      state = %{ready: true, guid: 1, character: eligible}
+      assert Vendor.buy(state, vendor_guid, template.entry, 1) == state
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgBuyFailed{error: :not_enough_money}}}
+    end
+  end
+
+  describe "condition policy" do
+    test "hides, shows, and rejects a stale conditioned purchase" do
+      vendor_entry = System.unique_integer([:positive, :monotonic])
+      vendor_guid = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
+      publish_vendor(vendor_guid)
+      hidden_template = %ItemTemplate{entry: 1001, buy_price: 1}
+      visible_template = %ItemTemplate{entry: 1002, buy_price: 1}
+      condition = %Condition{entry: 1, type: :level, value1: 10, value2: 1}
+
+      :ets.insert(VendorLoader, {
+        vendor_entry,
+        [
+          %VendorItem{index: 1, template: hidden_template, max_count: 0, condition: condition},
+          %VendorItem{index: 2, template: visible_template, max_count: 0}
+        ]
+      })
+
+      on_exit(fn -> :ets.delete(VendorLoader, vendor_entry) end)
+
+      assert [%VendorItem{index: 1, template: ^visible_template}] =
+               Vendor.visible_items(character(9), vendor_guid)
+
+      assert [
+               %VendorItem{index: 1, template: ^hidden_template},
+               %VendorItem{index: 2, template: ^visible_template}
+             ] = Vendor.visible_items(character(10), vendor_guid)
+
+      stale_state = %{ready: true, guid: 1, character: character(9)}
+      assert Vendor.buy(stale_state, vendor_guid, hidden_template.entry, 1) == stale_state
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet,
+                       %SmsgBuyFailed{
+                         vendor_guid: ^vendor_guid,
+                         item_id: 1001,
+                         error: :cant_find_item
+                       }}}
+    end
+
+    test "denies unknown conditions" do
+      vendor_entry = System.unique_integer([:positive, :monotonic])
+      vendor_guid = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
+      template = %ItemTemplate{entry: 2001, buy_price: 1}
+      condition = %Condition{entry: 2, type: :item_with_bank, value1: 2001, value2: 1}
+
+      :ets.insert(VendorLoader, {
+        vendor_entry,
+        [%VendorItem{index: 1, template: template, max_count: 0, condition: condition}]
+      })
+
+      on_exit(fn -> :ets.delete(VendorLoader, vendor_entry) end)
+
+      assert Vendor.visible_items(character(60), vendor_guid) == []
+    end
+  end
+
+  defp character(level) do
+    %Character{
+      object: %Object{guid: 1},
+      unit: %Unit{
+        level: level,
+        race: 1,
+        class: 1,
+        health: 100,
+        max_health: 100,
+        power1: 0,
+        max_power1: 0,
+        auras: []
+      },
+      player: %Player{
+        coinage: 100,
+        skills: %{},
+        quest_log: %{},
+        rewarded_quests: MapSet.new(),
+        reputation: %Reputation{}
+      },
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+      internal: %Internal{world: WorldRef.open(1), spellbook: %{}}
+    }
+  end
+
+  defp publish_vendor(guid) do
+    Metadata.put(guid, %{alive?: true, npc_flags: 4})
+    SpatialHash.update(:mobs, guid, WorldRef.open(1), 2.0, 0.0, 0.0)
+
+    on_exit(fn ->
+      Metadata.delete(guid)
+      SpatialHash.remove(:mobs, guid)
+    end)
+  end
+end

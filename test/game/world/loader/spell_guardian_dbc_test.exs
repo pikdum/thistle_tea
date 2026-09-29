@@ -4,27 +4,27 @@ defmodule ThistleTea.Game.World.Loader.SpellGuardianDbcTest do
   import Ecto.Query
 
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.EffectResolver.Spells
-  alias ThistleTea.Game.Entity.Logic.Casting
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Engineering
-  alias ThistleTea.Game.Entity.Logic.PetSpellModifiers
-  alias ThistleTea.Game.Entity.Logic.SpellEffect
-  alias ThistleTea.Game.Entity.SpellTargetResolver
-  alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Spell.Semantics
-  alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Pet.PetSpellModifiers
+  alias ThistleTea.Game.Core.Profession.Engineering
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.Casting
+  alias ThistleTea.Game.Core.Spell.Semantics
+  alias ThistleTea.Game.Core.Spell.SpellEffect
+  alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Entity.EffectResolver.Spells
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride
-  alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Game.World.Spell.SpellTargetResolver
 
   @moduletag :dbc_db
 

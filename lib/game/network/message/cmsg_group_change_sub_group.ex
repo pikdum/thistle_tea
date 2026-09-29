@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGroupChangeSubGroup do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GROUP_CHANGE_SUB_GROUP
 
-  alias ThistleTea.Game.Player.Groups
+  alias ThistleTea.Game.World.Entity.Player.Groups
 
   defstruct [:name, :subgroup]
 

@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBattlefieldJoin do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_BATTLEFIELD_JOIN
 
-  alias ThistleTea.Game.Player.Battlegrounds
+  alias ThistleTea.Game.World.Entity.Player.Battlegrounds
 
   defstruct [:map, instance_id: 0, join_as_group: false]
 

@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetFactionInactive do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SET_FACTION_INACTIVE
 
-  alias ThistleTea.Game.Player.Reputation
+  alias ThistleTea.Game.World.Entity.Player.Reputation
 
   defstruct [:index, :inactive]
 

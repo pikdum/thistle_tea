@@ -1,20 +1,20 @@
 defmodule ThistleTea.Game.Network.Message.CmsgMoveTimeSkippedTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
-  alias ThistleTea.Game.Entity.Server.Player.PacketSink
-  alias ThistleTea.Game.Entity.Server.Player.State
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message.CmsgMoveTimeSkipped
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Player.PacketSink
+  alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.World.Visibility
 
   defmodule TransportUpdateServer do

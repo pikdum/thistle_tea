@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_CAST_RESULT
 
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Area
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Area
 
   @simple_spell_cast_result_failure 2
 

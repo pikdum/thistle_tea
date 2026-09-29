@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgTaxinodeStatusQuery do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_TAXINODE_STATUS_QUERY
 
-  alias ThistleTea.Game.Player.Taxi
+  alias ThistleTea.Game.World.Entity.Player.Taxi
 
   defstruct [:guid]
 

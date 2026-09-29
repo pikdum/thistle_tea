@@ -1,25 +1,25 @@
 defmodule ThistleTea.Game.World.StealthVisibilityTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Aura
-  alias ThistleTea.Game.Aura.Holder
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.StealthDetection
-  alias ThistleTea.Game.Entity.Server.Player.State
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Aura.StealthDetection
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
-  alias ThistleTea.Game.WorldRef
 
   @moduletag :namigator_maps
 
@@ -53,7 +53,7 @@ defmodule ThistleTea.Game.World.StealthVisibilityTest do
         effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_stealth_detect, base_points: 50, misc_value: 0}]
       }
 
-      {character, _} = ThistleTea.Game.Entity.Logic.Aura.apply_spell(state.character, state.guid, 10, spell, 0)
+      {character, _} = Aura.apply_spell(state.character, state.guid, 10, spell, 0)
       Presence.sync(character, StealthDetection.target_metadata(character))
       state = %{state | character: character, tracked_entities: MapSet.new([target])}
       assert Visibility.can_see?(state, target)
@@ -86,9 +86,9 @@ defmodule ThistleTea.Game.World.StealthVisibilityTest do
 
     test "detects again when Vanish immunity ends without movement", %{state: state, target: target} do
       state = with_detection(state)
-      Metadata.update(target, %{undetectable_until: ThistleTea.Game.Time.now() + 10_000})
+      Metadata.update(target, %{undetectable_until: ThistleTea.Game.Core.Time.now() + 10_000})
       refute Visibility.can_see?(state, target)
-      Metadata.update(target, %{undetectable_until: ThistleTea.Game.Time.now()})
+      Metadata.update(target, %{undetectable_until: ThistleTea.Game.Core.Time.now()})
       state = tick(state)
       self_guid = state.guid
       assert_receive {:"$gen_cast", {:send_update_to, ^self_guid}}

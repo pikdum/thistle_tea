@@ -3,25 +3,25 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
 
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.PetLevel
-  alias ThistleTea.Game.Entity.Data.PetName
-  alias ThistleTea.Game.Entity.Data.PetProgress
-  alias ThistleTea.Game.Entity.Logic.Combat
-  alias ThistleTea.Game.Entity.Logic.Companion
-  alias ThistleTea.Game.Entity.Logic.PetProgression
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Combat
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.Companion.EntityRef
+  alias ThistleTea.Game.Core.Pet.PetLevel
+  alias ThistleTea.Game.Core.Pet.PetName
+  alias ThistleTea.Game.Core.Pet.PetProgress
+  alias ThistleTea.Game.Core.Pet.PetProgression
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Game.World.Loader.PetSpells
   alias ThistleTea.Game.World.Loader.PetTraining
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon
-  alias ThistleTea.Game.WorldRef
 
   @moduletag :dbc_db
 

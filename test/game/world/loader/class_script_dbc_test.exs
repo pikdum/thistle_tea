@@ -1,19 +1,19 @@
 defmodule ThistleTea.Game.World.Loader.ClassScriptDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Aura.ClassScript
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.SpellEffect
-  alias ThistleTea.Game.Entity.Logic.SpellTarget
-  alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Spell.Modifiers
-  alias ThistleTea.Game.Spell.Proc
-  alias ThistleTea.Game.Spell.ProcRule
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.ClassScript
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.Modifiers
+  alias ThistleTea.Game.Core.Spell.Proc
+  alias ThistleTea.Game.Core.Spell.ProcRule
+  alias ThistleTea.Game.Core.Spell.SpellEffect
+  alias ThistleTea.Game.Core.Spell.SpellTarget
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
 

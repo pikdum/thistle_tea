@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.SingleTargetAuraDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Aura.Holder
-  alias ThistleTea.Game.Entity.Logic.Aura.SingleTarget
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Aura.SingleTarget
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride
 

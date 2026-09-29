@@ -3,8 +3,8 @@ defmodule ThistleTea.Game.World.Loader.Lock do
   Startup lock catalog. Gameplay reads immutable requirements from ETS.
   """
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.Lock, as: LockData
-  alias ThistleTea.Game.Entity.Data.Lock.Requirement
+  alias ThistleTea.Game.Core.Profession.Lock, as: LockData
+  alias ThistleTea.Game.Core.Profession.Lock.Requirement
 
   def init(table \\ __MODULE__) do
     case :ets.whereis(table) do

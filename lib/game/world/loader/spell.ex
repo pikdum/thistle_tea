@@ -9,12 +9,12 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.SpellEffectMod
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.CreatureTemplate
-  alias ThistleTea.Game.Spell, as: SpellData
-  alias ThistleTea.Game.Spell.AuraRank
-  alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.Scripts
-  alias ThistleTea.Game.Spell.Semantics
+  alias ThistleTea.Game.Core.Entity.CreatureTemplate
+  alias ThistleTea.Game.Core.Spell, as: SpellData
+  alias ThistleTea.Game.Core.Spell.AuraRank
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Scripts
+  alias ThistleTea.Game.Core.Spell.Semantics
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.PassiveSpell, as: PassiveSpellLoader
   alias ThistleTea.Game.World.Loader.SpellAppearance

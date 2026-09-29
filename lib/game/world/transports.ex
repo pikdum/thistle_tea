@@ -3,19 +3,18 @@ defmodule ThistleTea.Game.World.Transports do
   Runtime facade and read projection for moving transports.
   """
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.GameObject
-  alias ThistleTea.Game.Entity.Data.Transport
-  alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Math
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.GameObject
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Math
+  alias ThistleTea.Game.Core.Travel.Transport
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.Loader.Transport, as: TransportLoader
-  alias ThistleTea.Game.WorldRef
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
@@ -31,7 +30,7 @@ defmodule ThistleTea.Game.World.Transports do
       Enum.map(TransportLoader.ship_entries(), fn entry ->
         with %Transport{} = route <- TransportLoader.get(entry),
              template when not is_nil(template) <- GameObjectTemplateLoader.get(entry) do
-          pose = TransportLogic.pose_at(route, 0)
+          pose = Transport.pose_at(route, 0)
 
           template
           |> GameObject.build_transport(pose)
@@ -162,10 +161,10 @@ defmodule ThistleTea.Game.World.Transports do
       )
       when is_integer(transport_guid) do
     with true <- Guid.transport?(transport_guid),
-         true <- TransportLogic.valid_passenger_position?(local_position),
+         true <- Transport.valid_passenger_position?(local_position),
          {:ok, transport} <- Entity.board_transport(transport_guid, player_guid, world, local_position) do
       leave_changed(previous_guid, transport_guid, player_guid)
-      position = TransportLogic.passenger_world_position(local_position, transport.position)
+      position = Transport.passenger_world_position(local_position, transport.position)
       {:ok, %{movement_block | position: position}}
     else
       _ -> {:error, :invalid_transport}

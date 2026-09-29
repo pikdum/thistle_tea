@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Loader.Weather do
   @moduledoc "Boot-loaded seasonal weather chances from the read-only world seed."
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Weather.Season
+  alias ThistleTea.Game.Core.Weather.Season
 
   def init(table \\ __MODULE__) do
     case :ets.whereis(table) do

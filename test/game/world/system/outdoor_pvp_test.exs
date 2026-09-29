@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.World.System.OutdoorPvpTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.OutdoorPvp.ResourceRace
+  alias ThistleTea.Game.Core.OutdoorPvp.ResourceRace
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.System.OutdoorPvp
-  alias ThistleTea.Game.WorldRef
 
   setup [:server]
 

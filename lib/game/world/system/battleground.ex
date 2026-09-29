@@ -4,20 +4,20 @@ defmodule ThistleTea.Game.World.System.Battleground do
   """
   use GenServer
 
-  alias ThistleTea.Game.Battleground
-  alias ThistleTea.Game.Battleground.CreatureDefeat
-  alias ThistleTea.Game.Battleground.Defeat
-  alias ThistleTea.Game.Battleground.Effects.Scoreboard
-  alias ThistleTea.Game.Battleground.Lifecycle
-  alias ThistleTea.Game.Battleground.Rules
-  alias ThistleTea.Game.Battleground.WarsongGulch
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World.Battleground.Graveyard
-  alias ThistleTea.Game.World.Battleground.Match
-  alias ThistleTea.Game.World.Battleground.Supervisor, as: MatchSupervisor
+  alias ThistleTea.Game.Core.Battleground
+  alias ThistleTea.Game.Core.Battleground.CreatureDefeat
+  alias ThistleTea.Game.Core.Battleground.Defeat
+  alias ThistleTea.Game.Core.Battleground.Effects.Scoreboard
+  alias ThistleTea.Game.Core.Battleground.Lifecycle
+  alias ThistleTea.Game.Core.Battleground.Rules
+  alias ThistleTea.Game.Core.Battleground.WarsongGulch
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
-  alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Game.World.System.Battleground.Graveyard
+  alias ThistleTea.Game.World.System.Battleground.Match
+  alias ThistleTea.Game.World.System.Battleground.Supervisor, as: MatchSupervisor
 
   require Logger
 

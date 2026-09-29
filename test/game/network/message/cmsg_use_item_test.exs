@@ -1,32 +1,32 @@
 defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Logic.Casting
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Inventory
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Inventory
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Cast
+  alias ThistleTea.Game.Core.Spell.Casting
+  alias ThistleTea.Game.Core.Spell.Cooldowns
+  alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Game.Core.Spell.TargetCodec
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.CmsgUseItem
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Cast
-  alias ThistleTea.Game.Spell.Cooldowns
-  alias ThistleTea.Game.Spell.Target
-  alias ThistleTea.Game.Spell.TargetCodec
-  alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemTarget
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
-  alias ThistleTea.Game.WorldRef
 
   @backpack_start 23
   @not_ready 0x3C

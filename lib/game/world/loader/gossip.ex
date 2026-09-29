@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.Script
 

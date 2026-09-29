@@ -12,29 +12,29 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
   alias ThistleTea.DBC.CreatureFamily
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Data.PetProgress
-  alias ThistleTea.Game.Entity.Logic.Companion
-  alias ThistleTea.Game.Entity.Logic.CreatureMovement
-  alias ThistleTea.Game.Entity.Logic.PetNaming
-  alias ThistleTea.Game.Entity.Logic.PetProgression
-  alias ThistleTea.Game.Entity.Logic.PetSpellModifiers
-  alias ThistleTea.Game.Entity.Logic.PetTraining
-  alias ThistleTea.Game.Entity.Logic.Stats
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Spell, as: GameSpell
-  alias ThistleTea.Game.Spell.Modifiers
-  alias ThistleTea.Game.Time
+  alias ThistleTea.Game.Core.Creature.CreatureMovement
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Spawn
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.PetNaming
+  alias ThistleTea.Game.Core.Pet.PetProgress
+  alias ThistleTea.Game.Core.Pet.PetProgression
+  alias ThistleTea.Game.Core.Pet.PetSpellModifiers
+  alias ThistleTea.Game.Core.Pet.PetTraining
+  alias ThistleTea.Game.Core.Spell, as: GameSpell
+  alias ThistleTea.Game.Core.Spell.Modifiers
+  alias ThistleTea.Game.Core.Stats
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Game.World.Loader.PetSpells
   alias ThistleTea.Game.World.Loader.PetTraining, as: PetTrainingLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
-  alias ThistleTea.Game.WorldRef
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
   @low_guid_base 0x400000

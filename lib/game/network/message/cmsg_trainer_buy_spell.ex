@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgTrainerBuySpell do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_TRAINER_BUY_SPELL
 
-  alias ThistleTea.Game.Player.Training
+  alias ThistleTea.Game.World.Entity.Player.Training
 
   defstruct [:trainer_guid, :spell_id]
 

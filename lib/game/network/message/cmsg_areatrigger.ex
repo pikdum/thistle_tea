@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAreatrigger do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_AREATRIGGER
 
-  alias ThistleTea.Game.Player.AreaTriggers
+  alias ThistleTea.Game.World.Entity.Player.AreaTriggers
 
   defstruct [:trigger_id]
 

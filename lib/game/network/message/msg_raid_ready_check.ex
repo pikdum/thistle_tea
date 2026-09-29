@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.MsgRaidReadyCheck do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_RAID_READY_CHECK
 
-  alias ThistleTea.Game.Player.Groups
+  alias ThistleTea.Game.World.Entity.Player.Groups
 
   defstruct [:ready?]
 

@@ -1,0 +1,70 @@
+defmodule ThistleTea.Game.Core.AI.BehaviorRunnerTest do
+  use ExUnit.Case, async: true
+
+  alias ThistleTea.Game.Core.AI.BehaviorRunner
+  alias ThistleTea.Game.Core.AI.BT
+  alias ThistleTea.Game.Core.AI.BT.Context
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.WorldRef
+
+  describe "tick/3" do
+    test "runs aura and regeneration upkeep outside the behavior tree" do
+      now = 1_000
+      entity = fixture()
+      {entity, _events} = Aura.apply_spell(entity, 999, 1, dot_spell(), now)
+
+      entity =
+        update_in(entity.unit.auras, fn [holder] ->
+          [
+            update_in(holder.auras, fn [aura] ->
+              [%{aura | next_tick_at: now - 1}]
+            end)
+          ]
+        end)
+
+      tree = BT.action(fn entity, blackboard -> {:failure, entity, blackboard} end)
+
+      assert {:failure, entity} = BehaviorRunner.tick(tree, entity, Context.new(now))
+      assert entity.unit.health == 83
+
+      assert [
+               %Effects.DurabilityDamage{source_guid: 999, lethal?: false},
+               %Effects.SpellDamage{spell_id: 11_366, periodic?: true}
+             ] = entity.internal.events
+    end
+  end
+
+  defp fixture do
+    %Mob{
+      object: %Object{guid: 1},
+      unit: %Unit{level: 1, health: 100, max_health: 100, auras: []},
+      internal: %Internal{world: %WorldRef{map_id: 0}}
+    }
+  end
+
+  defp dot_spell do
+    %Spell{
+      id: 11_366,
+      name: "Pyroblast",
+      school: :fire,
+      duration_ms: 12_000,
+      effects: [
+        %Effect{
+          index: 1,
+          type: :apply_aura,
+          base_points: 50,
+          die_sides: 0,
+          aura: :periodic_damage,
+          amplitude_ms: 3_000
+        }
+      ]
+    }
+  end
+end

@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUnstablePet do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_UNSTABLE_PET
 
-  alias ThistleTea.Game.Player.PetStable
+  alias ThistleTea.Game.World.Entity.Player.PetStable
 
   defstruct [:guid, :pet_number]
 

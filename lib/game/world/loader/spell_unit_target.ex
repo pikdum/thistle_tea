@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.World.Loader.SpellUnitTarget do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Spell.UnitTargets.Selector
+  alias ThistleTea.Game.Core.Spell.UnitTargets.Selector
   alias ThistleTea.Game.World.Loader.Condition
 
   def init do

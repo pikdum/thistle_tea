@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.World.Loader.Emote do
   """
 
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.Emote
+  alias ThistleTea.Game.Core.Chat.Emote
 
   def init(table \\ __MODULE__) do
     case :ets.whereis(table) do

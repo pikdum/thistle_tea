@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.World.ItemStoreTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.World.ItemStore
 
   setup [:build_template]

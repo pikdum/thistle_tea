@@ -6,11 +6,11 @@ defmodule ThistleTea.Game.World.System.Honor do
   """
   use GenServer
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Honor.Award
-  alias ThistleTea.Game.Entity.Data.Honor.Entry
-  alias ThistleTea.Game.Entity.Data.Honor.Snapshot
-  alias ThistleTea.Game.Entity.Logic.Honor.Ledger
+  alias ThistleTea.Game.Core.Honor.Award
+  alias ThistleTea.Game.Core.Honor.Entry
+  alias ThistleTea.Game.Core.Honor.Ledger
+  alias ThistleTea.Game.Core.Honor.Snapshot
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.HonorStore
 
   require Logger

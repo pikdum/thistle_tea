@@ -1,16 +1,16 @@
 defmodule ThistleTea.Game.World.System.AuctionTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Auction.House
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Core.Auction.House
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.World.AuctionStore
-  alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.System.Auction
+  alias ThistleTea.Game.World.System.PostOffice
 
   setup [:market]
 

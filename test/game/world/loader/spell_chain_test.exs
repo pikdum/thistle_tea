@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.SpellChainTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Logic.SpellBook
-  alias ThistleTea.Game.Entity.Logic.Talents
+  alias ThistleTea.Game.Core.Player.Talents
+  alias ThistleTea.Game.Core.Spell.SpellBook
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.SpellChain
   alias ThistleTea.Game.World.Loader.Talent

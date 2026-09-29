@@ -1,0 +1,917 @@
+defmodule ThistleTea.Game.Core.Class.WarlockSpellsTest do
+  use ExUnit.Case, async: true
+
+  alias ThistleTea.Game.Core.AI.BT.Pet, as: PetBT
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Class.Warlock
+  alias ThistleTea.Game.Core.Combat
+  alias ThistleTea.Game.Core.Combat.DamageSharing
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.Companion.EntityRef
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.Casting
+  alias ThistleTea.Game.Core.Spell.CastValidation
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.SpellEffect
+  alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Loader.SpellPetAura
+
+  describe "Life Tap" do
+    test "converts health into mana without killing the caster" do
+      caster = character(health: 100, power1: 0, max_power1: 200)
+
+      spell = %Spell{
+        id: 1454,
+        name: "Life Tap",
+        script_name: "spell_warlock_life_tap",
+        school: :shadow,
+        spell_family: 5,
+        family_flags_0: 0x00040000,
+        effects: [%Effect{type: :dummy, base_points: 39}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 20, spell_damage_bonus: %{}}
+
+      {result, events} = SpellEffect.receive(caster, context, spell, 1_000)
+
+      assert result.unit.health == 61
+      assert result.unit.power1 == 0
+      assert [%Effects.TriggerSpell{spell_id: 31_818, amount: 39, slot: 0, source_guid: 1, target_guid: 1}] = events
+    end
+
+    test "improved life tap boosts the mana gained" do
+      talent = %Holder{
+        slot: 0,
+        caster_guid: 1,
+        spell: %Spell{id: 18_183, name: "Improved Life Tap"},
+        auras: [%Aura{type: :dummy, amount: 20}]
+      }
+
+      caster = character(health: 100, power1: 0, max_power1: 200, auras: [talent])
+
+      spell = %Spell{
+        id: 1454,
+        name: "Life Tap",
+        script_name: "spell_warlock_life_tap",
+        school: :shadow,
+        spell_family: 5,
+        family_flags_0: 0x00040000,
+        effects: [%Effect{type: :dummy, base_points: 39}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 20, spell_damage_bonus: %{}}
+
+      {result, events} = SpellEffect.receive(caster, context, spell, 1_000)
+
+      assert result.unit.health == 61
+      assert result.unit.power1 == 0
+      assert [%Effects.TriggerSpell{spell_id: 31_818, amount: 46}] = events
+    end
+
+    test "health costs bypass shields and damage interrupts while honoring spell bonuses" do
+      shield = %Holder{
+        spell: %Spell{id: 17},
+        caster_guid: 1,
+        auras: [%Aura{type: :school_absorb, amount: 500, misc_value: 32}]
+      }
+
+      interrupted = %Holder{
+        spell: %Spell{id: 18, aura_interrupt_flags: 2},
+        caster_guid: 1,
+        auras: [%Aura{type: :dummy}]
+      }
+
+      caster = character(health: 200, power1: 0, max_power1: 200, auras: [shield, interrupted])
+
+      spell = %Spell{
+        id: 1454,
+        script_name: "spell_warlock_life_tap",
+        school: :shadow,
+        effects: [%Effect{type: :dummy, base_points: 20, bonus_coefficient: 0.8}]
+      }
+
+      context = %CastContext{
+        caster_guid: 1,
+        caster_level: 20,
+        spell_damage_bonus: %{shadow: 100},
+        spell_modifiers: [%Aura{type: :add_pct_modifier, misc_value: 14, amount: -50}]
+      }
+
+      {result, [%Effects.TriggerSpell{amount: 90}]} = SpellEffect.receive(caster, context, spell, 1_000)
+      assert result.unit.health == 110
+      assert result.unit.auras == caster.unit.auras
+      assert result.internal.events == caster.internal.events
+    end
+
+    test "validation and execution reject costs that would kill the caster" do
+      caster = character(health: 100, power1: 0, max_power1: 200, equipment_bonuses: %{spell_shadow: 100})
+
+      spell = %Spell{
+        id: 1454,
+        script_name: "spell_warlock_life_tap",
+        school: :shadow,
+        effects: [%Effect{type: :dummy, base_points: 20, bonus_coefficient: 0.8}]
+      }
+
+      assert Warlock.life_tap_cost(caster, spell) == 100
+      assert {:error, :fizzle} = CastValidation.validate(caster, spell, Target.self(1), nil, 1_000)
+      context = %CastContext{caster_guid: 1, caster_level: 20, spell_damage_bonus: %{shadow: 100}}
+      {result, [%Effects.SpellCastFailed{reason: :fizzle}]} = SpellEffect.receive(caster, context, spell, 1_000)
+      assert result.unit.health == 100
+      assert result.unit.power1 == 0
+    end
+  end
+
+  describe "Soul Link pet auras" do
+    defp soul_link_buff do
+      %Spell{
+        id: 25_228,
+        name: "Soul Link",
+        duration_ms: -1,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_area_aura,
+            base_points: 2,
+            die_sides: 1,
+            base_dice: 1,
+            aura: :mod_damage_percent_done,
+            radius_yards: 100.0,
+            implicit_target_a: :caster
+          },
+          %Effect{
+            index: 1,
+            type: :apply_area_aura,
+            base_points: 29,
+            die_sides: 1,
+            base_dice: 1,
+            aura: :split_damage_percent,
+            misc_value: 127,
+            radius_yards: 100.0,
+            implicit_target_a: :caster
+          }
+        ]
+      }
+    end
+
+    test "the dummy cast places the linked aura on the active pet" do
+      SpellPetAura.init()
+      :ets.insert(SpellPetAura, {19_028, [{0, 25_228}]})
+
+      pet_guid = 999
+      caster = character()
+      caster = Companion.activate(caster, :guardian, %EntityRef{guid: pet_guid, entry: 416, spell_id: 688})
+
+      soul_link = %Spell{id: 19_028, name: "Soul Link", effects: [%Effect{type: :dummy, base_points: 0}]}
+      context = %CastContext{caster_guid: 1, caster_level: 40}
+
+      {_result, events} = SpellEffect.receive(caster, context, soul_link, 1_000)
+
+      assert Enum.any?(
+               events,
+               &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 25_228 and &1.target_guid == pet_guid and
+                   &1.source_guid == pet_guid)
+             )
+    end
+
+    test "the dummy effect delivered to the pet self-casts the linked aura" do
+      SpellPetAura.init()
+      :ets.insert(SpellPetAura, {19_028, [{0, 25_228}]})
+
+      pet = mob()
+      pet = %{pet | internal: %{pet.internal | pet: %Pet{owner_guid: 1, profile: :combat, kind: :summon}}}
+
+      soul_link = %Spell{id: 19_028, name: "Soul Link", effects: [%Effect{type: :dummy, base_points: 0}]}
+      context = %CastContext{caster_guid: 1, caster_level: 40, target_role: :pet}
+
+      {_result, events} = SpellEffect.receive(pet, context, soul_link, 1_000)
+
+      pet_guid = pet.object.guid
+
+      assert Enum.any?(
+               events,
+               &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 25_228 and &1.target_guid == pet_guid and
+                   &1.source_guid == pet_guid)
+             )
+    end
+
+    test "pets arm the area refresh on their self-cast link aura" do
+      pet = mob()
+      pet = %{pet | internal: %{pet.internal | pet: %Pet{owner_guid: 1, profile: :combat, kind: :summon}}}
+      pet_guid = pet.object.guid
+
+      context = %CastContext{caster_guid: pet_guid, caster_level: 40, spell: soul_link_buff()}
+      {pet, _events} = SpellEffect.receive(pet, context, soul_link_buff(), 1_000)
+
+      assert [%Holder{next_area_refresh_at: at, area_radius: 100.0}] = pet.unit.auras
+      assert is_integer(at)
+
+      {_pet, tick_events} = Aura.tick(pet, at)
+
+      assert [
+               %Effects.DeliverSpell{
+                 target_guid: 1,
+                 cast_context: %CastContext{caster_guid: ^pet_guid, target_guid: 1}
+               }
+             ] = tick_events
+    end
+
+    test "owners receive the propagated area aura with a visible slot and working split" do
+      warlock = character()
+      context = %CastContext{caster_guid: 2, caster_level: 40, spell: soul_link_buff()}
+
+      {warlock, _events} = SpellEffect.receive(warlock, context, soul_link_buff(), 1_000)
+
+      assert [%Holder{spell: %Spell{id: 25_228}, slot: slot, caster_guid: 2}] = warlock.unit.auras
+      assert is_integer(slot)
+
+      assert {70, [%Effects.SharedDamage{target_guid: 2, damage: 30}]} =
+               DamageSharing.split(warlock, 100, :physical, 1_000, damage_sharing_targets: MapSet.new([2]))
+    end
+  end
+
+  describe "Healthstone creation" do
+    test "turns the rank script effect into the matching item event" do
+      spell = %Spell{
+        id: 6201,
+        name: "Create Healthstone (Minor)",
+        script_name: "spell_warlock_create_healthstone",
+        effects: [%Effect{type: :script_effect}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 20}
+
+      {_result, events} = SpellEffect.receive(character(), context, spell, 1_000)
+
+      assert Enum.any?(events, &(is_struct(&1, Effects.CreateItem) and &1.item_id == 5512))
+    end
+
+    test "does not apply the VMangos item table without its script label" do
+      spell = %Spell{id: 6201, effects: [%Effect{type: :script_effect}]}
+      context = %CastContext{caster_guid: 1, caster_level: 20}
+
+      {_result, events} = SpellEffect.receive(character(), context, spell, 1_000)
+
+      refute Enum.any?(events, &is_struct(&1, Effects.CreateItem))
+    end
+  end
+
+  describe "Inferno and demon control" do
+    test "summon possessed uses the effect data and selected destination" do
+      eye = %Spell{
+        id: 126,
+        duration_ms: 60_000,
+        effects: [%Effect{type: :summon_possessed, misc_value: 4277, implicit_target_a: :minion_position}]
+      }
+
+      context = %CastContext{
+        caster_guid: 1,
+        caster_level: 22,
+        caster_position: {%WorldRef{map_id: 0}, 1.0, 2.0, 3.0},
+        caster_orientation: 0.5,
+        destination_position: {4.0, 5.0, 6.0},
+        target_role: :caster
+      }
+
+      {_result, [%Effects.SummonCreature{summon: summon}]} =
+        SpellEffect.receive(character(), context, eye, 1_000)
+
+      assert summon.entry == 4277
+      {x, y, z, orientation} = summon.position
+      assert {x, y, z} == {4.0, 5.0, 6.0}
+      assert orientation == 0.5
+      assert summon.control == :possessed
+      assert summon.control_spell_id == 126
+      assert summon.despawn_delay_ms == 60_000
+    end
+
+    test "Inferno carries only the VMangos post-summon spell script" do
+      inferno = %Spell{
+        id: 1122,
+        script_name: "spell_warlock_inferno",
+        duration_ms: 300_000,
+        effects: [%Effect{type: :summon_demon, misc_value: 89}]
+      }
+
+      context = %CastContext{
+        caster_guid: 1,
+        caster_level: 60,
+        caster_position: {%WorldRef{map_id: 0}, 1.0, 2.0, 3.0},
+        caster_orientation: 0.5
+      }
+
+      {_result, [%Effects.SummonCreature{summon: summon}]} =
+        SpellEffect.receive(character(), context, inferno, 1_000)
+
+      assert summon.post_spawn_spells == [
+               %{caster: :owner, spell_id: 20_882, resolve_targets?: false},
+               %{caster: :summon, spell_id: 22_707, resolve_targets?: false},
+               %{caster: :summon, spell_id: 22_703, resolve_targets?: true}
+             ]
+
+      ordinary = %{inferno | script_name: nil}
+      {_result, [%{summon: ordinary_summon}]} = SpellEffect.receive(character(), context, ordinary, 1_000)
+      assert ordinary_summon.post_spawn_spells == []
+    end
+
+    test "a possess aura drives mob control and restores the original state on removal" do
+      enslave = %Spell{
+        id: 20_882,
+        duration_ms: 300_000,
+        effects: [%Effect{type: :apply_aura, aura: :mod_charm, base_points: 60}]
+      }
+
+      context = %CastContext{
+        caster_guid: 1,
+        caster_level: 60,
+        caster_faction_template: 35,
+        target_guid: 2,
+        spell: enslave
+      }
+
+      original = mob()
+      original = %{original | unit: %{original.unit | faction_template: 14, npc_flags: 7}}
+      {controlled, events} = SpellEffect.receive(original, context, enslave, 1_000)
+
+      assert controlled.unit.charmed_by == 1
+      assert controlled.unit.faction_template == 35
+      assert controlled.unit.npc_flags == 0
+      assert controlled.internal.pet.owner_guid == 1
+      assert controlled.internal.pet.kind == :charmed
+      assert Enum.any?(events, &(is_struct(&1, Effects.ControlGranted) and &1.spell_id == 20_882))
+
+      {released, events} = Aura.remove_spells(controlled, [20_882], 2_000)
+
+      assert released.unit.charmed_by == 0
+      assert released.unit.faction_template == 14
+      assert released.unit.npc_flags == 7
+      assert released.internal.pet == nil
+      assert Enum.any?(events, &(is_struct(&1, Effects.ControlReleased) and &1.target_guid == 2))
+    end
+  end
+
+  describe "Death Coil" do
+    test "damages the target and heals the caster" do
+      spell = %Spell{
+        id: 6789,
+        name: "Death Coil",
+        school: :shadow,
+        effects: [%Effect{type: :health_leech, base_points: 49}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 40, spell_damage_bonus: %{}}
+
+      {target, events} = SpellEffect.receive(mob(), context, spell, 1_000)
+
+      assert target.unit.health == 151
+      assert Enum.any?(events, &(is_struct(&1, Effects.HealEntity) and &1.target_guid == 1 and &1.amount == 49))
+    end
+  end
+
+  describe "Devour Magic" do
+    test "heals the felhunter after a successful dispel" do
+      buff = %Holder{
+        spell: %Spell{id: 100, dispel_type: 1},
+        caster_guid: 2,
+        slot: 0,
+        auras: [%Aura{type: :mod_stat, amount: 10}]
+      }
+
+      devour = %Spell{
+        id: 19_505,
+        script_name: "spell_warlock_devour_magic",
+        effects: [%Effect{index: 0, type: :dispel, misc_value: 1}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 40, target_hostile?: true}
+      {target, events} = SpellEffect.receive(mob([buff]), context, devour, 1_000)
+
+      assert target.unit.auras == []
+
+      assert Enum.any?(events, fn event ->
+               is_struct(event, Effects.TriggerSpell) and event.source_guid == 1 and event.target_guid == 1 and
+                 event.spell_id == 19_658
+             end)
+    end
+
+    test "does not heal when nothing was dispelled" do
+      devour = %Spell{
+        id: 19_505,
+        script_name: "spell_warlock_devour_magic",
+        effects: [%Effect{index: 0, type: :dispel, misc_value: 1}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 40, target_hostile?: true}
+      {_target, events} = SpellEffect.receive(mob(), context, devour, 1_000)
+
+      refute Enum.any?(events, &is_struct(&1, Effects.TriggerSpell))
+    end
+  end
+
+  describe "Ritual of Summoning" do
+    test "requires a grouped player target outside combat" do
+      ritual = %Spell{id: 698, script_name: "spell_warlock_ritual_of_summoning"}
+
+      valid = %{
+        target_player?: true,
+        target_online?: true,
+        self?: false,
+        same_group?: true,
+        target_in_combat?: false,
+        caster_dungeon?: false,
+        caster_battleground?: false,
+        same_world?: false
+      }
+
+      assert :ok = CastValidation.validate(character(), ritual, Target.none(), nil, 1_000, ritual_context: valid)
+
+      assert {:error, :target_in_combat} =
+               CastValidation.validate(character(), ritual, Target.none(), nil, 1_000,
+                 ritual_context: %{valid | target_in_combat?: true}
+               )
+
+      assert {:error, :target_not_in_instance} =
+               CastValidation.validate(character(), ritual, Target.none(), nil, 1_000,
+                 ritual_context: %{valid | caster_dungeon?: true}
+               )
+
+      assert {:error, :not_here} =
+               CastValidation.validate(character(), ritual, Target.none(), nil, 1_000,
+                 ritual_context: %{valid | caster_battleground?: true}
+               )
+
+      assert {:error, :bad_targets} =
+               CastValidation.validate(character(), ritual, Target.none(), nil, 1_000,
+                 ritual_context: %{valid | same_group?: false}
+               )
+    end
+
+    test "spawns a data-driven ritual object when channeling begins" do
+      ritual = %Spell{
+        id: 698,
+        script_name: "spell_warlock_ritual_of_summoning",
+        duration_ms: 120_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{index: 0, type: :trans_door, misc_value: 36_727}]
+      }
+
+      caster = character()
+      caster = %{caster | unit: %{caster.unit | target: 9}}
+      caster = Casting.start(caster, ritual, Target.none(), 1_000)
+
+      assert Enum.any?(caster.internal.events, fn event ->
+               is_struct(event, Effects.SummonGameObject) and event.entry == 36_727 and event.target_guid == 9 and
+                 event.duration_ms == 120_000
+             end)
+    end
+
+    test "cancelling a channel despawns its tracked game object" do
+      ritual = %Spell{
+        id: 698,
+        duration_ms: 120_000,
+        attributes: MapSet.new([:channeled]),
+        effects: []
+      }
+
+      caster = Casting.start(character(), ritual, Target.none(), 1_000)
+
+      caster = %{
+        caster
+        | internal: %{
+            caster.internal
+            | channel_game_object_guid: 77,
+              channel_game_object_owned?: true
+          }
+      }
+
+      caster = Casting.cancel(caster)
+
+      assert caster.internal.channel_game_object_guid == nil
+      assert Enum.any?(caster.internal.events, &(is_struct(&1, Effects.DespawnEntity) and &1.target_guid == 77))
+    end
+
+    test "helper channel cancellation releases the participant without despawning the portal" do
+      visual = %Spell{id: 698, duration_ms: 120_000, attributes: MapSet.new([:channeled])}
+
+      helper = Casting.start_game_object_channel(character(), 77, visual, 120_000, 1_000)
+      helper = Casting.cancel(helper)
+
+      assert Enum.any?(helper.internal.events, fn event ->
+               is_struct(event, Effects.LeaveRitual) and event.target_guid == 77 and event.source_guid == 1
+             end)
+
+      refute Enum.any?(helper.internal.events, &is_struct(&1, Effects.DespawnEntity))
+    end
+
+    test "portal completion clears a helper channel without releasing it again" do
+      visual = %Spell{id: 698, duration_ms: 120_000, attributes: MapSet.new([:channeled])}
+
+      helper = Casting.start_game_object_channel(character(), 77, visual, 120_000, 1_000)
+      helper = Casting.finish_game_object_channel(helper, 77)
+
+      assert helper.internal.casting == nil
+      assert helper.unit.channel_object == 0
+
+      refute Enum.any?(
+               helper.internal.events,
+               &(is_struct(&1, Effects.LeaveRitual) or is_struct(&1, Effects.DespawnEntity))
+             )
+    end
+  end
+
+  describe "Conflagrate" do
+    test "validation requires the caster's Immolate metadata" do
+      caster = character()
+
+      spell = %Spell{
+        id: 17_962,
+        name: "Conflagrate",
+        script_name: "spell_warlock_conflagrate",
+        school: :fire,
+        spell_family: 5,
+        family_flags_0: 0x00000200
+      }
+
+      target_info = %{alive?: true, hostile?: true, attackable?: true, aura_sources: MapSet.new()}
+
+      assert CastValidation.validate(caster, spell, Target.unit(2), target_info, 1_000) ==
+               {:error, :target_aurastate}
+
+      target_info = %{target_info | aura_sources: MapSet.new([{348, 5, 0x00000004, 0, 1}])}
+      assert CastValidation.validate(caster, spell, Target.unit(2), target_info, 1_000) == :ok
+    end
+
+    test "requires and consumes the caster's Immolate" do
+      immolate = %Spell{id: 348, name: "Immolate", school: :fire, spell_family: 5, family_flags_0: 0x00000004}
+
+      target =
+        mob([
+          %Holder{
+            spell: immolate,
+            caster_guid: 1,
+            auras: [%Aura{type: :periodic_damage, amount: 10}]
+          }
+        ])
+
+      spell = %Spell{
+        id: 17_962,
+        name: "Conflagrate",
+        script_name: "spell_warlock_conflagrate",
+        school: :fire,
+        spell_family: 5,
+        family_flags_0: 0x00000200,
+        effects: [%Effect{type: :school_damage, base_points: 99}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 40, spell_damage_bonus: %{}}
+
+      {result, _events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert result.unit.health == 101
+      assert result.unit.auras == []
+    end
+
+    test "does no damage without the caster's Immolate" do
+      spell = %Spell{
+        id: 17_962,
+        name: "Conflagrate",
+        script_name: "spell_warlock_conflagrate",
+        school: :fire,
+        spell_family: 5,
+        family_flags_0: 0x00000200,
+        effects: [%Effect{type: :school_damage, base_points: 99}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 40, spell_damage_bonus: %{}}
+
+      {result, events} = SpellEffect.receive(mob(), context, spell, 1_000)
+
+      assert result.unit.health == 200
+      assert events == []
+    end
+  end
+
+  describe "Curse of Agony" do
+    test "ramps from half damage to normal and then one-and-a-half damage" do
+      spell = %Spell{
+        id: 980,
+        name: "Curse of Agony",
+        school: :shadow,
+        spell_family: 5,
+        family_flags_0: 0x00000400,
+        effects: [%Effect{index: 0, base_points: 9, base_dice: 1}]
+      }
+
+      early = agony_target(spell, 3_000)
+      {early, _events} = Aura.tick(early, 3_000)
+      assert early.unit.health == 195
+
+      late = agony_target(spell, 19_000)
+      {late, _events} = Aura.tick(late, 19_000)
+      assert late.unit.health == 185
+    end
+  end
+
+  describe "Curse of Idiocy" do
+    test "periodic stacking stops after both encoded stat losses reach the VMangos cap" do
+      below_cap = idiocy_target(12, 1)
+      {_target, events} = Aura.tick(below_cap, 2_000)
+      assert Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 1010))
+
+      capped = idiocy_target(13, 1)
+      {_target, events} = Aura.tick(capped, 2_000)
+      refute Enum.any?(events, &is_struct(&1, Effects.TriggerSpell))
+    end
+
+    test "does not recursively trigger when self-cast" do
+      target = idiocy_target(1, 2)
+      {_target, events} = Aura.tick(target, 2_000)
+      refute Enum.any?(events, &is_struct(&1, Effects.TriggerSpell))
+    end
+  end
+
+  describe "Curse of Weakness" do
+    test "reduces the target's physical weapon damage" do
+      curse = %Holder{
+        spell: %Spell{id: 702},
+        caster_guid: 1,
+        auras: [%Aura{type: :mod_damage_done, amount: -5, misc_value: 1}]
+      }
+
+      target = mob([curse])
+      target = %{target | unit: %{target.unit | min_damage: 20.0, max_damage: 30.0}}
+
+      assert Combat.damage_range(target) == {15.0, 25.0}
+    end
+  end
+
+  describe "Curse of Tongues" do
+    test "negative casting speed increases cast duration" do
+      spell = %Spell{id: 686, cast_time_ms: 2_000}
+      curse = %Holder{spell: %Spell{id: 1714}, auras: [%Aura{type: :mod_casting_speed, amount: -50}]}
+      target = Casting.start(mob([curse]), spell, Target.none(), 1_000)
+
+      assert target.internal.casting.cast_time_ms == 3_000
+      assert target.internal.casting.ends_at == 4_000
+    end
+  end
+
+  describe "Demonic Sacrifice" do
+    test "kills the pet and triggers the demon-specific owner buff" do
+      spell = %Spell{
+        id: 18_788,
+        name: "Demonic Sacrifice",
+        script_name: "spell_warlock_demonic_sacrifice",
+        effects: [%Effect{type: :instakill}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 40}
+      pet = mob()
+      pet = %{pet | object: %Object{guid: 2, entry: 416}}
+
+      {result, events} = SpellEffect.receive(pet, context, spell, 1_000)
+
+      assert result.unit.health == 0
+      assert Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.target_guid == 1 and &1.spell_id == 18_789))
+    end
+  end
+
+  describe "Soul Link" do
+    test "prefers the pet-aura link over the legacy hidden script aura" do
+      SpellPetAura.init()
+      :ets.insert(SpellPetAura, {19_028, [{0, 25_228}]})
+
+      spell = %Spell{
+        id: 19_028,
+        name: "Soul Link",
+        effects: [%Effect{type: :dummy}],
+        script_steps: [
+          %ScriptStep{
+            script_id: 19_028,
+            command: :cast_spell,
+            datalong: 18_814,
+            target_type: :provided,
+            swap_initial?: true
+          }
+        ]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 40, target_guid: 2}
+
+      {_pet, events} = SpellEffect.receive(pet(), context, spell, 1_000)
+
+      refute Enum.any?(events, &(&1.spell_id == 18_814))
+
+      assert Enum.any?(events, fn event ->
+               is_struct(event, Effects.TriggerSpell) and event.source_guid == 2 and event.target_guid == 2 and
+                 event.spell_id == 25_228
+             end)
+    end
+
+    test "redirects thirty percent of linked owner damage to the pet" do
+      linked =
+        character()
+        |> then(fn character ->
+          holder = %Holder{
+            spell: %Spell{id: 25_228},
+            caster_guid: 2,
+            auras: [%Aura{type: :split_damage_percent, amount: 30, misc_value: 127}]
+          }
+
+          %{character | unit: %{character.unit | auras: [holder]}}
+        end)
+
+      assert {70, [%Effects.SharedDamage{target_guid: 2, damage: 30}]} =
+               DamageSharing.split(linked, 100, :shadow, 1_000, damage_sharing_targets: MapSet.new([2]))
+    end
+
+    test "applies the pet-cast link aura to its owner" do
+      spell = %Spell{
+        id: 25_228,
+        effects: [
+          %Effect{
+            type: :apply_area_aura,
+            aura: :split_damage_percent,
+            base_points: 30,
+            misc_value: 127,
+            implicit_target_a: :caster
+          }
+        ]
+      }
+
+      context = %CastContext{caster_guid: 2, caster_level: 40, target_role: :caster}
+      {owner, _events} = SpellEffect.receive(character(), context, spell, 1_000)
+
+      assert {70, [%Effects.SharedDamage{target_guid: 2, damage: 30}]} =
+               DamageSharing.split(owner, 100, :shadow, 1_000, damage_sharing_targets: MapSet.new([2]))
+    end
+  end
+
+  describe "Health Funnel" do
+    test "routes the heal aura only to the pet and the caster aura only to the warlock" do
+      spell = %Spell{
+        id: 755,
+        name: "Health Funnel",
+        effects: [
+          %Effect{type: :apply_aura, aura: :periodic_heal, base_points: 11, implicit_target_a: :pet},
+          %Effect{type: :apply_aura, aura: :mod_health_regen_percent, base_points: -101, implicit_target_a: :caster}
+        ]
+      }
+
+      caster_context = %CastContext{caster_guid: 1, caster_level: 40, target_role: :caster}
+      pet_context = %CastContext{caster_guid: 1, caster_level: 40, target_role: :pet}
+
+      {caster, _events} = SpellEffect.receive(character(), caster_context, spell, 1_000)
+      {pet, _events} = SpellEffect.receive(pet(), pet_context, spell, 1_000)
+
+      assert Aura.has_aura?(caster, :mod_health_regen_percent)
+      refute Aura.has_aura?(caster, :periodic_heal)
+      assert Aura.has_aura?(pet, :periodic_heal)
+      refute Aura.has_aura?(pet, :mod_health_regen_percent)
+    end
+
+    test "cancelling the channel removes its aura from the remote pet" do
+      spell = %Spell{
+        id: 755,
+        name: "Health Funnel",
+        duration_ms: 10_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{type: :apply_aura, aura: :periodic_heal, implicit_target_a: :pet}]
+      }
+
+      caster = character(summon: 2)
+      caster = Casting.start(caster, spell, Target.none(), 1_000)
+      caster = Casting.cancel(caster)
+
+      assert Enum.any?(caster.internal.events, fn event ->
+               is_struct(event, Effects.RemoveAura) and event.source_guid == 1 and event.target_guid == 2 and
+                 event.spell_id == 755
+             end)
+    end
+  end
+
+  describe "pet commands" do
+    test "attack assigns the commanded target and enters combat" do
+      pet = pet()
+      result = PetBT.command(pet, :attack, 99)
+
+      assert result.unit.target == 99
+      assert result.internal.in_combat
+      assert result.internal.pet.command_state == :follow
+      assert result.internal.pet.attack_command?
+    end
+
+    test "follow stops attacking while retaining recent combat contact" do
+      pet = PetBT.command(pet(), :attack, 99)
+      result = PetBT.command(pet, :follow, 0)
+
+      assert result.unit.target == 0
+      assert result.internal.in_combat
+      assert result.internal.pet.command_state == :follow
+    end
+
+    test "passive immediately stops attacking while retaining recent combat contact" do
+      pet = PetBT.command(pet(), :attack, 99)
+      result = PetBT.reaction(pet, :passive)
+
+      assert result.unit.target == 0
+      assert result.internal.in_combat
+      assert result.internal.pet.reaction_state == :passive
+    end
+  end
+
+  defp character(overrides \\ []) do
+    {summon, overrides} = Keyword.pop(overrides, :summon)
+    unit = struct(%Unit{health: 100, max_health: 100, power1: 100, max_power1: 100, level: 40, auras: []}, overrides)
+
+    character = %Character{
+      object: %Object{guid: 1},
+      unit: unit,
+      player: %Player{},
+      internal: %Internal{world: %WorldRef{map_id: 0}, events: []},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+    }
+
+    if is_integer(summon) and summon > 0 do
+      Companion.activate(character, :guardian, %EntityRef{guid: summon, entry: 416, spell_id: 688})
+    else
+      character
+    end
+  end
+
+  defp mob(auras \\ []) do
+    %Mob{
+      object: %Object{guid: 2, entry: 100},
+      unit: %Unit{health: 200, max_health: 200, power1: 100, max_power1: 100, level: 20, auras: auras},
+      internal: %Internal{world: %WorldRef{map_id: 0}, creature: %Creature{}, events: []},
+      movement_block: %MovementBlock{position: {1.0, 0.0, 0.0, 0.0}}
+    }
+  end
+
+  defp pet do
+    mob()
+    |> then(fn mob ->
+      %{mob | internal: %{mob.internal | pet: %Pet{owner_guid: 1, profile: :combat}, in_combat: false}}
+    end)
+  end
+
+  defp agony_target(spell, next_tick_at) do
+    holder = %Holder{
+      spell: spell,
+      caster_guid: 1,
+      caster_level: 40,
+      applied_at: 1_000,
+      expires_at: 30_000,
+      auras: [
+        %Aura{
+          type: :periodic_damage,
+          tick_count: div(next_tick_at - 3_000, 2_000),
+          amount: 10,
+          amplitude_ms: 2_000,
+          next_tick_at: next_tick_at
+        }
+      ]
+    }
+
+    mob([holder])
+  end
+
+  defp idiocy_target(stacks, caster_guid) do
+    spell = %Spell{id: 1010, script_name: "spell_warlock_curse_of_idiocy", stack_amount: 15}
+
+    holder = %Holder{
+      spell: spell,
+      caster_guid: caster_guid,
+      caster_level: 40,
+      stacks: stacks,
+      applied_at: 1_000,
+      expires_at: 60_000,
+      auras: [
+        %Aura{type: :mod_stat, amount: -7, misc_value: 3},
+        %Aura{type: :mod_stat, amount: -7, misc_value: 4},
+        %Aura{
+          type: :periodic_trigger_spell,
+          trigger_spell_id: 1010,
+          amplitude_ms: 1_000,
+          next_tick_at: 2_000
+        }
+      ]
+    }
+
+    mob([holder])
+  end
+end

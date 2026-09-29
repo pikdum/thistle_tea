@@ -7,9 +7,8 @@ defmodule ThistleTea.Game.World.Loader.Transport do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.GameObject
-  alias ThistleTea.Game.Entity.Data.Transport
-  alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
+  alias ThistleTea.Game.Core.Entity.GameObject
+  alias ThistleTea.Game.Core.Travel.Transport
 
   @client_build 5875
   @client_patch 10
@@ -67,7 +66,7 @@ defmodule ThistleTea.Game.World.Loader.Transport do
     nodes_by_path = specs |> Enum.map(& &1.path_id) |> load_taxi_path_nodes()
 
     Enum.map(specs, fn spec ->
-      TransportLogic.build_ship(
+      Transport.build_ship(
         spec.entry,
         spec.name,
         spec.path_id,
@@ -160,7 +159,7 @@ defmodule ThistleTea.Game.World.Loader.Transport do
           }
         end)
 
-      TransportLogic.build_animation(entry, "Transport #{entry}", frames)
+      Transport.build_animation(entry, "Transport #{entry}", frames)
     end)
     |> Enum.sort_by(& &1.entry)
   end

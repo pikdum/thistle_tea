@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGetMailList do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GET_MAIL_LIST
 
-  alias ThistleTea.Game.Player.Mail
+  alias ThistleTea.Game.World.Entity.Player.Mail
 
   defstruct [:mailbox]
 

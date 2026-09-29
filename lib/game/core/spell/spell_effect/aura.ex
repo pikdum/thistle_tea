@@ -1,0 +1,89 @@
+defmodule ThistleTea.Game.Core.Spell.SpellEffect.Aura do
+  @moduledoc false
+
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Dispel
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Class.Warlock
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Semantics
+  alias ThistleTea.Game.Core.Spell.SpellEffect.Amount
+
+  def apply_group(target, %CastContext{} = context, now) do
+    {target, events} = Aura.apply_spell(target, context, context.spell, now)
+    {target, events ++ script_trigger_events(target, context)}
+  end
+
+  def apply(state, %CastContext{}, _spell, %Effect{type: :persistent_area_aura}, _now), do: {state, []}
+
+  def apply(state, %CastContext{}, _spell, %Effect{type: :dispel_mechanic, misc_value: mechanic}, now)
+      when is_integer(mechanic) and mechanic > 0 do
+    spell_ids =
+      for %Holder{spell: %Spell{id: id, mechanic: ^mechanic}} <- state.unit.auras || [], do: id
+
+    case spell_ids do
+      [] -> {state, []}
+      ids -> Aura.remove_spells(state, ids, now)
+    end
+  end
+
+  def apply(state, %CastContext{} = context, spell, %Effect{type: :dispel, misc_value: dispel_type} = effect, now) do
+    count = max(Amount.roll(spell, effect, context), 1)
+
+    {state, events, spell_ids, failed_ids} =
+      Dispel.attempt(state, dispel_type, now, dispel_polarity(context), count, resistance: context.dispel_resistance)
+
+    events = events ++ dispel_events(state, context, spell_ids) ++ failed_dispel_events(state, context, failed_ids)
+
+    case {spell_ids != [], Warlock.devour_magic_heal(spell)} do
+      {true, heal_spell_id} when is_integer(heal_spell_id) ->
+        {state,
+         events ++
+           [Effects.trigger_spell(context.caster_guid, context.caster_level, context.caster_guid, heal_spell_id)]}
+
+      _other ->
+        {state, events}
+    end
+  end
+
+  def apply(state, _context, _spell, _effect, _now), do: {state, []}
+
+  defp dispel_events(_state, _context, []), do: []
+
+  defp dispel_events(state, context, spell_ids) do
+    [
+      %Effects.SpellDispel{
+        source_guid: context.caster_guid,
+        target_guid: state.object.guid,
+        spell_ids: spell_ids
+      }
+    ]
+  end
+
+  defp failed_dispel_events(_state, _context, []), do: []
+
+  defp failed_dispel_events(state, context, spell_ids) do
+    [%Effects.DispelFailed{source_guid: context.caster_guid, target_guid: state.object.guid, spell_ids: spell_ids}]
+  end
+
+  defp script_trigger_events(target, %CastContext{spell: spell} = context) do
+    with trigger_id when is_integer(trigger_id) <- Semantics.rules(spell).apply_trigger_spell_id,
+         true <- Aura.has_spell?(target, spell.id) do
+      [
+        Effects.trigger_spell(context.caster_guid, context.caster_level, target.object.guid, trigger_id,
+          cast_item_guid: context.cast_item_guid,
+          hit_context: context
+        )
+      ]
+    else
+      _ -> []
+    end
+  end
+
+  defp dispel_polarity(%CastContext{target_hostile?: true}), do: :positive
+  defp dispel_polarity(%CastContext{target_hostile?: false}), do: :negative
+  defp dispel_polarity(_context), do: nil
+end

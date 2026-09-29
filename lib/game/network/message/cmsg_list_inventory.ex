@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgListInventory do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LIST_INVENTORY
 
-  alias ThistleTea.Game.Player.Vendor
+  alias ThistleTea.Game.World.Entity.Player.Vendor
 
   defstruct [:guid]
 

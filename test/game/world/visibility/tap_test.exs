@@ -3,9 +3,9 @@ defmodule ThistleTea.Game.World.Visibility.TapTest do
 
   import Bitwise
 
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Visibility.Tap

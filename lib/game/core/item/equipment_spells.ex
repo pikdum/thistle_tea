@@ -1,0 +1,60 @@
+defmodule ThistleTea.Game.Core.Item.EquipmentSpells do
+  @moduledoc """
+  Identifies on-equip spell sources and assigns each effect to either the
+  canonical equipment-stat aggregate or a source-owned passive aura holder.
+  """
+
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Environment
+
+  @stat_auras [
+    :mod_damage_done,
+    :mod_healing_done,
+    :mod_flat_spell_damage_versus,
+    :mod_damage_done_creature,
+    :mod_attack_power,
+    :mod_ranged_attack_power,
+    :mod_target_resistance,
+    :mod_ranged_haste,
+    :mod_ranged_ammo_haste,
+    :mod_shield_block_value,
+    :mod_block_percent
+  ]
+
+  def sources(items) do
+    for %Item{} = item <- items,
+        spell_id <- spell_ids(Item.template(item)),
+        do: {:item_equip, item.object.guid, spell_id}
+  end
+
+  def spell_ids(%ItemTemplate{} = template) do
+    [
+      {template.spellid_1, template.spelltrigger_1},
+      {template.spellid_2, template.spelltrigger_2},
+      {template.spellid_3, template.spelltrigger_3},
+      {template.spellid_4, template.spelltrigger_4},
+      {template.spellid_5, template.spelltrigger_5}
+    ]
+    |> Enum.flat_map(fn
+      {id, 1} when is_integer(id) and id > 0 -> [id]
+      _ -> []
+    end)
+    |> Enum.uniq()
+  end
+
+  def eligible?(spell, form, outdoors \\ nil)
+
+  def eligible?(%Spell{} = spell, form, outdoors),
+    do: Spell.shapeshift_cast_error(spell, form || 0) == :ok and Environment.validate(spell, outdoors) == :ok
+
+  def eligible?(_spell, _form, _outdoors), do: false
+
+  def aura_spell(%Spell{} = spell), do: %{spell | effects: Enum.reject(spell.effects, &stat_effect?/1)}
+  def aura_spell(_spell), do: nil
+
+  defp stat_effect?(%Effect{type: :apply_aura, aura: aura}), do: aura in @stat_auras
+  defp stat_effect?(_effect), do: false
+end

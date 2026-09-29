@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.TaxiVmangosTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Taxi.Node
+  alias ThistleTea.Game.Core.Travel.Taxi.Node
   alias ThistleTea.Game.World.Loader.Taxi
 
   @moduletag :vmangos_db

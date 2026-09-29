@@ -1,10 +1,10 @@
 defmodule ThistleTea.Game.World.PathfindingTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Player.Fishing
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Entity.Player.Fishing
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Pathfinding.Aquatic
-  alias ThistleTea.Game.WorldRef
 
   @moduletag :namigator_maps
 

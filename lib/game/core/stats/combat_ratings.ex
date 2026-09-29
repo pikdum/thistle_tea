@@ -1,0 +1,244 @@
+defmodule ThistleTea.Game.Core.Stats.CombatRatings do
+  @moduledoc """
+  Player melee avoidance and crit chances from canonical stats, defense skill,
+  learned combat capabilities, equipment, and auras. The same defensive chances
+  feed attack resolution and the player fields shown on the character sheet.
+  """
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Combat.CombatWeapon
+  alias ThistleTea.Game.Core.Combat.Disarm
+  alias ThistleTea.Game.Core.Combat.WeaponDamage
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Item.Proficiency
+  alias ThistleTea.Game.Core.Skills
+  alias ThistleTea.Game.Core.Spell
+
+  @warrior 1
+  @paladin 2
+  @hunter 3
+  @rogue 4
+  @priest 5
+  @shaman 7
+  @mage 8
+  @warlock 9
+  @druid 11
+
+  @crit_agility_rates %{
+    @warrior => {3.9, 20.0},
+    @paladin => {4.6, 20.0},
+    @hunter => {3.5, 53.0},
+    @rogue => {2.2, 29.0},
+    @priest => {11.0, 20.0},
+    @shaman => {4.6, 20.0},
+    @mage => {12.9, 20.0},
+    @warlock => {8.4, 20.0},
+    @druid => {4.6, 20.0}
+  }
+
+  @dodge_agility_rates %{
+    @warrior => {3.9, 20.0},
+    @paladin => {4.6, 20.0},
+    @hunter => {1.8, 26.5},
+    @rogue => {1.1, 14.5},
+    @priest => {11.0, 20.0},
+    @shaman => {4.6, 20.0},
+    @mage => {12.9, 20.0},
+    @warlock => {8.4, 20.0},
+    @druid => {4.6, 20.0}
+  }
+
+  @class_base_bonus %{
+    @paladin => 0.7,
+    @priest => 3.0,
+    @shaman => 1.7,
+    @mage => 3.2,
+    @warlock => 2.0,
+    @druid => 0.9
+  }
+
+  @spell_crit_rates %{
+    @paladin => {3.70, 14.77, 0.65},
+    @priest => {2.97, 10.03, 0.82},
+    @shaman => {3.54, 11.51, 0.80},
+    @mage => {3.70, 14.77, 0.65},
+    @warlock => {3.18, 11.30, 0.82},
+    @druid => {3.33, 12.41, 0.79}
+  }
+
+  @base_avoidance_chance 5.0
+
+  def melee_crit_chance(class, level, agility) do
+    class_base_bonus(class) + agility_chance(@crit_agility_rates, class, level, agility)
+  end
+
+  def crit_chance(entity, :offhand), do: crit_chance(entity, :mainhand)
+
+  def crit_chance(%{unit: %Unit{} = unit, player: %Player{}} = character, hand) do
+    level = unit.level || 1
+    skill = CombatWeapon.skill_snapshot(character, hand).caster_attack_skill
+    base = melee_crit_chance(unit.class, level, unit.agility || 0)
+    bonus = weapon_bonus(character, :mod_crit_percent, hand)
+    max(base + bonus + (skill - Skills.max_for_level(level)) * 0.04, 0.0)
+  end
+
+  def crit_chance(entity, _hand), do: max(5.0 + Aura.flat_amount(entity, :mod_crit_percent), 0.0)
+
+  def hit_chance(%{player: %Player{}} = character, hand), do: weapon_bonus(character, :mod_hit_chance, hand)
+  def hit_chance(entity, _hand), do: Aura.flat_amount(entity, :mod_hit_chance)
+
+  defp weapon_bonus(%{unit: %Unit{auras: holders}} = character, type, hand) when is_list(holders) do
+    for %Holder{} = holder <- holders,
+        applies?(holder, character, type, hand),
+        %Aura{type: ^type, amount: amount} <- holder.auras,
+        is_integer(amount),
+        reduce: 0 do
+      bonus -> bonus + amount * max(holder.stacks || 1, 1)
+    end
+  end
+
+  defp weapon_bonus(_character, _type, _hand), do: 0
+
+  defp applies?(%Holder{spell: %Spell{equipped_item_class: class}}, _character, _type, _hand) when class in [-1, nil],
+    do: true
+
+  defp applies?(%Holder{spell: %Spell{} = spell} = holder, character, :mod_crit_percent, hand) do
+    case source_item(holder.item_source) do
+      nil -> WeaponDamage.fits?(CombatWeapon.usable(character, hand), spell)
+      guid -> Enum.any?(crit_hands(hand), &source_matches?(character, &1, guid, spell))
+    end
+  end
+
+  defp applies?(%Holder{spell: %Spell{} = spell}, character, _type, hand),
+    do: WeaponDamage.fits?(CombatWeapon.equipped(character, hand), spell)
+
+  defp applies?(_holder, _character, _type, _hand), do: true
+
+  defp source_item({guid, _slot, _spell_id}) when is_integer(guid), do: guid
+  defp source_item({:item_equip, guid, _spell_id}), do: guid
+  defp source_item(_source), do: nil
+
+  defp crit_hands(:mainhand), do: [:mainhand, :offhand]
+  defp crit_hands(:ranged), do: [:ranged]
+
+  defp source_matches?(character, hand, guid, spell) do
+    equipped_guid(character.player, hand) == guid and WeaponDamage.fits?(CombatWeapon.usable(character, hand), spell)
+  end
+
+  defp equipped_guid(%Player{mainhand: guid}, :mainhand), do: guid
+  defp equipped_guid(%Player{offhand: guid}, :offhand), do: guid
+  defp equipped_guid(%Player{ranged: guid}, :ranged), do: guid
+
+  def dodge_chance(class, level, agility) do
+    class_base_bonus(class) + agility_chance(@dodge_agility_rates, class, level, agility)
+  end
+
+  def spell_crit_chance(class, level, intellect) do
+    case Map.get(@spell_crit_rates, class) do
+      {base, rate0, rate1} -> max(base + intellect / (rate0 + rate1 * max(level, 1)), 0.0)
+      nil -> 0.0
+    end
+  end
+
+  def parry_chance(%{unit: %Unit{}} = entity), do: defensive_chances(entity).parry
+
+  def block_chance(%{unit: %Unit{}, player: %Player{}} = character), do: defensive_chances(character).block
+
+  def block_chance(%{} = equipment_bonuses) do
+    if Map.get(equipment_bonuses, :shields, 0) > 0, do: @base_avoidance_chance, else: 0.0
+  end
+
+  def block_chance(_equipment_bonuses), do: 0.0
+
+  def defensive_chances(%{unit: %Unit{} = unit, player: %Player{}} = character) do
+    proficiency = proficiency(character)
+    level = unit.level || 1
+    equipment = unit.equipment_bonuses || %{}
+    defense_bonus = (Skills.defense_value(character) - Skills.max_for_level(level)) * 0.04
+    dodge = dodge_chance(unit.class, level, unit.agility || 0) + Aura.flat_amount(character, :mod_dodge)
+    parry = @base_avoidance_chance + Aura.flat_amount(character, :mod_parry_percent)
+
+    block =
+      @base_avoidance_chance + Map.get(equipment, :block_chance, 0) +
+        Aura.flat_amount(character, :mod_block_percent)
+
+    can_parry? = proficiency.parry? and not Disarm.parry_disabled?(character)
+    can_block? = proficiency.block? and block_chance(equipment) > 0
+
+    %{
+      dodge: max(dodge + defense_bonus, 0.0),
+      parry: if(can_parry?, do: max(parry + defense_bonus, 0.0), else: 0.0),
+      block: if(can_block?, do: max(block + defense_bonus, 0.0), else: 0.0)
+    }
+  end
+
+  def defensive_chances(entity) do
+    %{
+      dodge: max(@base_avoidance_chance + Aura.flat_amount(entity, :mod_dodge), 0.0),
+      parry: max(@base_avoidance_chance + Aura.flat_amount(entity, :mod_parry_percent), 0.0),
+      block: max(@base_avoidance_chance + Aura.flat_amount(entity, :mod_block_percent), 0.0)
+    }
+  end
+
+  defp proficiency(%{internal: %{spellbook: spellbook}}), do: Proficiency.from_spellbook(spellbook)
+  defp proficiency(_character), do: %Proficiency{}
+
+  def block_value(%{unit: %Unit{} = unit, player: %Player{}} = character) do
+    flat =
+      Map.get(unit.equipment_bonuses || %{}, :shield_block, 0) + Aura.flat_amount(character, :mod_shield_block_value)
+
+    max(trunc((flat + (unit.strength || 0) / 20 - 1) * block_value_multiplier(unit.auras)), 0)
+  end
+
+  def block_value(%{unit: %Unit{} = unit}) do
+    div(unit.level || 1, 2) + div(unit.strength || 0, 20)
+  end
+
+  def block_value(_entity), do: 0
+
+  def block_value(%{} = equipment_bonuses, strength) do
+    shield_block = Map.get(equipment_bonuses, :shield_block, 0)
+    max(shield_block + div(strength || 0, 20) - 1, 0)
+  end
+
+  def block_value(_equipment_bonuses, _strength), do: 0
+
+  defp block_value_multiplier(holders) when is_list(holders) do
+    for %Holder{auras: auras, stacks: stacks} <- holders,
+        %Aura{type: :mod_shield_block_value_pct, amount: amount} <- auras,
+        is_integer(amount),
+        reduce: 1.0 do
+      multiplier -> multiplier * max(100 + amount * max(stacks || 1, 1), 0) / 100
+    end
+  end
+
+  defp block_value_multiplier(_holders), do: 1.0
+
+  def sync(%{unit: %Unit{}, player: %Player{} = player} = character) do
+    defenses = defensive_chances(character)
+
+    player = %{
+      player
+      | crit_percentage: crit_chance(character, :mainhand),
+        ranged_crit_percentage: crit_chance(character, :ranged),
+        dodge_percentage: defenses.dodge,
+        parry_percentage: defenses.parry,
+        block_percentage: defenses.block
+    }
+
+    %{character | player: player}
+  end
+
+  def sync(entity), do: entity
+
+  defp class_base_bonus(class), do: Map.get(@class_base_bonus, class, 0.0)
+
+  defp agility_chance(rates, class, level, agility) do
+    {level1, level60} = Map.get(rates, class, {20.0, 20.0})
+    level = level |> max(1) |> min(60)
+    rate = level1 * (60 - level) / 59 + level60 * (level - 1) / 59
+
+    agility / rate
+  end
+end

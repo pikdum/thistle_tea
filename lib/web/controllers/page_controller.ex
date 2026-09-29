@@ -1,6 +1,8 @@
 defmodule ThistleTeaWeb.PageController do
   use ThistleTeaWeb, :controller
 
+  alias ThistleTea.Auth.Account
+
   @username_regex ~r/^[A-Za-z0-9_]{2,16}$/
 
   def home(conn, _params) do
@@ -26,7 +28,7 @@ defmodule ThistleTeaWeb.PageController do
         |> redirect(to: ~p"/")
 
       true ->
-        case ThistleTea.Account.register(username, password) do
+        case Account.register(username, password) do
           {:ok, _account} ->
             conn
             |> put_flash(:info, "account created — log in with the credentials you just entered")

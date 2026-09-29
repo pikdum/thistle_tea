@@ -1,18 +1,18 @@
 defmodule ThistleTea.Game.World.Loader.SpellBinaryDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.EffectResolver.Spells
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Entity.EffectResolver.Spells
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.WorldRef
 
   @moduletag :dbc_db
 

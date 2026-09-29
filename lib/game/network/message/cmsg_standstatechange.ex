@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgStandstatechange do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_STANDSTATECHANGE
 
-  alias ThistleTea.Game.Player.Emotes
+  alias ThistleTea.Game.World.Entity.Player.Emotes
 
   defstruct [:animation_state]
 

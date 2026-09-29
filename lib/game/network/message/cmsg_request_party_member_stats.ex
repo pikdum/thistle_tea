@@ -2,9 +2,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgRequestPartyMemberStats do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_REQUEST_PARTY_MEMBER_STATS
 
-  alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
-  alias ThistleTea.Game.Party
-  alias ThistleTea.Game.Party.MemberStats
+  alias ThistleTea.Game.Core.Party
+  alias ThistleTea.Game.Core.Party.MemberStats
+  alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   defstruct [:guid]

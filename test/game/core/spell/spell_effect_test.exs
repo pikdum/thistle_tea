@@ -1,0 +1,1524 @@
+defmodule ThistleTea.Game.Core.Spell.SpellEffectTest do
+  use ExUnit.Case, async: true
+
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Death.ResurrectionOffer
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.Companion.EntityRef
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Cast
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.Cooldowns
+  alias ThistleTea.Game.Core.Spell.Critical.Modifier
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.ProcRule
+  alias ThistleTea.Game.Core.Spell.SpellEffect
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+
+  defp target_fixture do
+    %Mob{
+      object: %Object{guid: 1},
+      unit: %Unit{health: 20, max_health: 20, level: 1, auras: []},
+      internal: %Internal{world: %WorldRef{map_id: 0}},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+    }
+  end
+
+  defp dead_character_fixture do
+    %Character{
+      object: %Object{guid: 1},
+      unit: %Unit{health: 0, max_health: 100, max_power1: 50, level: 10, auras: []},
+      player: %Player{flags: 0},
+      internal: %Internal{world: %WorldRef{map_id: 0}},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+    }
+  end
+
+  defp character_fixture do
+    character = dead_character_fixture()
+    %{character | unit: %{character.unit | health: 100}}
+  end
+
+  defp avoided_melee_ability_target(outcome) do
+    {class, equipment_bonuses, avoidance_auras} =
+      case outcome do
+        :dodge ->
+          {1, %{}, [%Aura{type: :mod_dodge, amount: 100}]}
+
+        :parry ->
+          {1, %{},
+           [
+             %Aura{type: :mod_dodge, amount: -100},
+             %Aura{type: :mod_parry_percent, amount: 100}
+           ]}
+
+        :block ->
+          {8, %{shields: 1},
+           [
+             %Aura{type: :mod_dodge, amount: -100},
+             %Aura{type: :mod_parry_percent, amount: -100},
+             %Aura{type: :mod_block_percent, amount: 100}
+           ]}
+      end
+
+    avoidance_holder = %Holder{
+      spell: %Spell{id: 90_000},
+      caster_guid: 1,
+      auras: avoidance_auras
+    }
+
+    proc_holder = %Holder{
+      spell: %Spell{
+        id: 90_001,
+        proc_type_mask: 0x20,
+        proc_chance: 100,
+        proc_rule: %ProcRule{proc_ex: avoidance_proc_ex(outcome)}
+      },
+      caster_guid: 1,
+      auras: [%Aura{type: :proc_trigger_spell, trigger_spell_id: 90_002}]
+    }
+
+    %Character{
+      object: %Object{guid: 1},
+      unit: %Unit{
+        health: 100,
+        max_health: 100,
+        level: 1,
+        class: class,
+        agility: 0,
+        sheath_state: 1,
+        equipment_bonuses: equipment_bonuses,
+        auras: [avoidance_holder, proc_holder]
+      },
+      player: %Player{visible_item_16_0: 1},
+      internal: %Internal{
+        world: %WorldRef{map_id: 0},
+        spellbook: %{
+          107 => %Spell{id: 107, effects: [%Effect{type: :block}]},
+          3127 => %Spell{id: 3127, effects: [%Effect{type: :parry}]}
+        }
+      },
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+    }
+  end
+
+  defp avoidance_proc_ex(:dodge), do: 0x10
+  defp avoidance_proc_ex(:parry), do: 0x20
+  defp avoidance_proc_ex(:block), do: 0x40
+
+  defp assert_avoided_melee_ability_reaction(outcome, class \\ 1) do
+    spell = %Spell{
+      id: 72,
+      school: :physical,
+      dmg_class: 2,
+      attributes: MapSet.new([:completely_blocked]),
+      effects: [%Effect{type: :weapon_damage, base_points: 0}]
+    }
+
+    context = %CastContext{
+      caster_guid: 999,
+      caster_level: 1,
+      caster_type: :player,
+      attack_skill: 5,
+      hit_chance_bonus: 100,
+      melee_crit_chance: 0.0,
+      attack_time_ms: 2_000,
+      weapon_base_min: 10,
+      weapon_base_max: 10
+    }
+
+    target = avoided_melee_ability_target(outcome)
+    target = %{target | unit: %{target.unit | class: class}}
+    {target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+    assert target.unit.health == 100
+    assert %Effects.SpellLogMiss{reason: ^outcome} = Enum.find(events, &is_struct(&1, Effects.SpellLogMiss))
+    assert %Effects.AttackOutcome{outcome: ^outcome} = Enum.find(events, &is_struct(&1, Effects.AttackOutcome))
+    assert %Effects.TriggerSpell{spell_id: 90_002} = Enum.find(events, &is_struct(&1, Effects.TriggerSpell))
+    target
+  end
+
+  describe "receive/4" do
+    test "parried special attacks open the class-specific reactive window" do
+      rogue = assert_avoided_melee_ability_reaction(:parry, 4)
+      assert rogue.unit.aura_state == 1
+      assert rogue.internal.defense_window.target_guid == 999
+      assert rogue.internal.defense_window.expires_at == 5_000
+
+      hunter = assert_avoided_melee_ability_reaction(:parry, 3)
+      assert hunter.unit.aura_state == 0x40
+      assert hunter.internal.defense_window == nil
+      assert hunter.internal.hunter_parry_window.target_guid == 999
+    end
+
+    test "master-targeted auras stay on the owner while caster effects stay on the pet" do
+      spell = %Spell{
+        id: 99_027,
+        duration_ms: 10_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :mod_stat,
+            base_points: 10,
+            misc_value: 3,
+            implicit_target_a: :caster_master
+          },
+          %Effect{
+            index: 1,
+            type: :apply_aura,
+            aura: :mod_damage_done,
+            base_points: 5,
+            misc_value: 1,
+            implicit_target_a: :caster
+          }
+        ]
+      }
+
+      owner_context = %CastContext{caster_guid: 2, caster_level: 50, target_role: :other}
+      pet_context = %CastContext{caster_guid: 2, caster_level: 50, target_role: :caster}
+      {owner, _events} = SpellEffect.receive(character_fixture(), owner_context, spell, 1_000)
+      pet = %{target_fixture() | object: %Object{guid: 2}}
+      {pet, _events} = SpellEffect.receive(pet, pet_context, spell, 1_000)
+
+      assert Aura.flat_amount(owner, :mod_stat) == 10
+      assert Aura.flat_amount(owner, :mod_damage_done) == 0
+      assert Aura.flat_amount(pet, :mod_stat) == 0
+      assert Aura.flat_amount(pet, :mod_damage_done) == 5
+    end
+
+    test "mixed enemy and master effects do not damage the owner" do
+      spell = %Spell{
+        id: 99_028,
+        school: :fire,
+        duration_ms: 10_000,
+        effects: [
+          %Effect{index: 0, type: :school_damage, base_points: 50, implicit_target_a: :target_enemy},
+          %Effect{
+            index: 1,
+            type: :apply_aura,
+            aura: :mod_stat,
+            base_points: 10,
+            misc_value: 3,
+            implicit_target_a: :target_enemy,
+            implicit_target_b: :caster_master
+          }
+        ]
+      }
+
+      owner_context = %CastContext{caster_guid: 2, caster_level: 50, target_role: :other, target_hostile?: false}
+      enemy_context = %CastContext{caster_guid: 2, caster_level: 50, target_role: :other, target_hostile?: true}
+      {owner, _events} = SpellEffect.receive(character_fixture(), owner_context, spell, 1_000)
+      enemy = %{target_fixture() | unit: %Unit{health: 100, max_health: 100, level: 50, auras: []}}
+      {enemy, _events} = SpellEffect.receive(enemy, enemy_context, spell, 1_000)
+
+      assert owner.unit.health == 100
+      assert Aura.flat_amount(owner, :mod_stat) == 10
+      assert enemy.unit.health < 100
+      assert Aura.flat_amount(enemy, :mod_stat) == 10
+    end
+
+    test "positive melee-class buffs cannot be dodged by their recipient" do
+      spell = %Spell{
+        id: 24_604,
+        school: :physical,
+        dmg_class: 2,
+        duration_ms: 10_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :mod_damage_done,
+            base_points: 8,
+            misc_value: 1,
+            implicit_target_a: :party_around_caster
+          }
+        ]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 1, attack_skill: 5, hit_chance_bonus: -100}
+      target = avoided_melee_ability_target(:dodge)
+      {result, events} = SpellEffect.receive(target, context, spell, 1_000)
+      assert Aura.has_spell?(result, 24_604)
+      assert Aura.flat_amount(result, :mod_damage_done) == 8
+      refute Enum.any?(events, &is_struct(&1, Effects.SpellLogMiss))
+      refute Enum.any?(events, &is_struct(&1, Effects.AttackOutcome))
+    end
+
+    test "resists a melee stun without applying it or reporting a successful attack" do
+      target = mechanic_resistance_target(12)
+      spell = mechanic_stun_spell(12, 12)
+      spell = %{spell | dmg_class: 2}
+      context = %CastContext{caster_guid: 999, caster_level: 1, hit_chance_bonus: 100}
+
+      {result, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      refute Aura.has_spell?(result, spell.id)
+      assert %Effects.SpellLogMiss{reason: :resist} = Enum.find(events, &is_struct(&1, Effects.SpellLogMiss))
+      assert %Effects.AttackOutcome{outcome: :resist} = Enum.find(events, &is_struct(&1, Effects.AttackOutcome))
+      refute SpellEffect.successful_hit?(events)
+    end
+
+    test "resisting an effect preserves unrelated damage and aura effects" do
+      target = mechanic_resistance_target(12)
+      spell = mechanic_stun_spell(0, 12)
+
+      spell = %{
+        spell
+        | effects:
+            spell.effects ++
+              [
+                %Effect{index: 1, type: :school_damage, base_points: 5, implicit_target_a: :target_enemy},
+                %Effect{
+                  index: 2,
+                  type: :apply_aura,
+                  aura: :mod_decrease_speed,
+                  base_points: -20,
+                  implicit_target_a: :target_enemy
+                }
+              ]
+      }
+
+      {result, events} = SpellEffect.receive(target, %CastContext{caster_guid: 999, caster_level: 1}, spell, 1_000)
+
+      assert result.unit.health == 15
+      refute Aura.has_aura?(result, :mod_stun)
+      assert Aura.has_aura?(result, :mod_decrease_speed)
+      assert SpellEffect.successful_hit?(events)
+    end
+
+    test "reports resistance when every applicable effect is resisted" do
+      target = mechanic_resistance_target(12)
+      spell = mechanic_stun_spell(0, 12)
+      context = %CastContext{caster_guid: 999, spell_threat: %{threat: 100}}
+      {result, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert result == target
+      assert [%Effects.SpellLogMiss{reason: :resist}] = events
+    end
+
+    test "does not roll the whole spell mechanic again at impact" do
+      spell = mechanic_stun_spell(12, 12)
+
+      {result, events} =
+        SpellEffect.receive(mechanic_resistance_target(12), %CastContext{caster_guid: 999}, spell, 1_000)
+
+      assert Aura.has_aura?(result, :mod_stun)
+      assert SpellEffect.successful_hit?(events)
+    end
+
+    test "reports successful dummy hits without requiring damage or healing" do
+      spell = %Spell{id: 14_291, effects: [%Effect{index: 0, type: :dummy}]}
+      context = %CastContext{caster_guid: 99, caster_level: 10}
+
+      {_target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert events == []
+      assert SpellEffect.successful_hit?(events)
+      refute SpellEffect.successful_hit?([Effects.spell_log_miss(99, 1, spell.id, :immune)])
+    end
+
+    test "corpse capture schedules removal without reviving or damaging the corpse" do
+      target = target_fixture()
+      target = %{target | unit: %{target.unit | health: 0}}
+
+      spell = %Spell{
+        id: 11_885,
+        attributes: MapSet.new([:allow_dead_target]),
+        effects: [
+          %Effect{index: 0, type: :dummy},
+          %Effect{index: 1, type: :heal, base_points: 100},
+          %Effect{index: 2, type: :school_damage, base_points: 100}
+        ]
+      }
+
+      context = %CastContext{caster_guid: 99, caster_level: 10}
+      {result, events} = SpellEffect.receive(target, context, spell, 1_000)
+      assert result.unit.health == 0
+      assert [%Effects.DespawnSelf{duration_ms: 1_000, respawn_delay_ms: 0}] = events
+      assert {^target, []} = SpellEffect.receive(target, context, %{spell | attributes: MapSet.new()}, 1_000)
+    end
+
+    test "credits the recipient of quest-complete effects" do
+      spell = %Spell{
+        id: 10_617,
+        effects: [%Effect{index: 0, type: :quest_complete, misc_value: 2561}]
+      }
+
+      context = %CastContext{caster_guid: 99, caster_level: 10}
+      target = dead_character_fixture()
+      target = %{target | unit: %{target.unit | health: 100}}
+      {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert [%Effects.QuestEventCredit{player_guid: guid, quest_id: 2561}] = events
+      assert guid == target.object.guid
+      assert {_target, []} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+    end
+
+    test "school reflection returns a harmful spell to its caster" do
+      reflect = %Holder{
+        spell: %Spell{id: 543},
+        caster_guid: 1,
+        auras: [
+          %Aura{
+            type: :reflect_spells_school,
+            amount: 100,
+            misc_value: Spell.school_mask(:fire)
+          }
+        ]
+      }
+
+      target = target_fixture()
+      target = %{target | unit: %{target.unit | health: 100, max_health: 100, auras: [reflect]}}
+
+      fireball = %Spell{
+        id: 133,
+        dmg_class: 1,
+        school: :fire,
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 20, implicit_target_a: :target_enemy}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10, target_role: :other}
+      {target, events} = SpellEffect.receive(target, context, fireball, 1_000)
+
+      assert target.unit.health == 100
+
+      assert [
+               %Effects.SpellLogMiss{source_guid: 999, target_guid: 1, spell_id: 133, reason: :reflect},
+               %Effects.DeliverSpell{target_guid: 999, cast_context: reflected_context, spell: ^fireball}
+             ] = events
+
+      assert reflected_context.caster_guid == 999
+      assert reflected_context.target_guid == 999
+      assert reflected_context.target_role == :other
+
+      caster = %{target_fixture() | object: %Object{guid: 999}, unit: %{target.unit | auras: [reflect]}}
+
+      {caster, [%Effects.SpellDamage{damage: 20}]} =
+        SpellEffect.receive(caster, reflected_context, fireball, 1_000)
+
+      assert caster.unit.health == 80
+    end
+
+    test "school reflection ignores spells from other schools" do
+      reflect = %Holder{
+        spell: %Spell{id: 543},
+        caster_guid: 1,
+        auras: [
+          %Aura{
+            type: :reflect_spells_school,
+            amount: 100,
+            misc_value: Spell.school_mask(:fire)
+          }
+        ]
+      }
+
+      frostbolt = %Spell{
+        id: 116,
+        school: :frost,
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 20}]
+      }
+
+      target = target_fixture()
+      target = %{target | unit: %{target.unit | health: 100, max_health: 100, auras: [reflect]}}
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+
+      {target, [%Effects.SpellDamage{damage: 20}]} =
+        SpellEffect.receive(target, context, frostbolt, 1_000)
+
+      assert target.unit.health == 80
+    end
+
+    test "ranged weapon damage uses target attacker-power auras" do
+      spell = %Spell{
+        id: 75,
+        school: :physical,
+        dmg_class: 3,
+        spell_family: 9,
+        family_flags_0: 0x1,
+        effects: [%Effect{type: :weapon_damage, base_points: 0}]
+      }
+
+      context = %CastContext{
+        caster_guid: 999,
+        caster_level: 1,
+        attack_power: 0,
+        attack_time_ms: 1_400,
+        attack_skill: 5,
+        weapon_base_min: 10,
+        weapon_base_max: 10,
+        melee_crit_chance: 0.0,
+        spell_crit_chance: 0.0,
+        hit_chance_bonus: 100
+      }
+
+      mark = %Holder{
+        spell: %Spell{id: 14_325},
+        caster_guid: 999,
+        auras: [%Aura{type: :ranged_attack_power_attacker_bonus, amount: 110}]
+      }
+
+      unmarked = %{target_fixture() | unit: %Unit{health: 500, max_health: 500, level: 1, auras: []}}
+      marked = %{unmarked | unit: %{unmarked.unit | auras: [mark]}}
+
+      {_unmarked, [unmarked_event]} = SpellEffect.receive(unmarked, context, spell, 1_000)
+      {_marked, [marked_event]} = SpellEffect.receive(marked, context, spell, 1_000)
+
+      assert marked_event.damage - unmarked_event.damage == 11
+      assert unmarked_event.proc_type == :deal_ranged_attack
+      assert marked_event.proc_type == :deal_ranged_attack
+
+      take_proc = %Holder{
+        spell: %Spell{proc_type_mask: 0x80, proc_chance: 100},
+        caster_guid: 1,
+        auras: [%Aura{type: :proc_trigger_spell, trigger_spell_id: 54_321}]
+      }
+
+      victim = %{unmarked | unit: %{unmarked.unit | auras: [take_proc]}}
+      {_victim, events} = SpellEffect.receive(victim, context, spell, 1_000)
+      assert %Effects.TriggerSpell{spell_id: 54_321} = Enum.find(events, &is_struct(&1, Effects.TriggerSpell))
+    end
+
+    test "ranged abilities report deal and take ranged ability proc types" do
+      victim_proc = %Holder{
+        spell: %Spell{proc_type_mask: 0x200, proc_chance: 100},
+        caster_guid: 1,
+        auras: [
+          %Aura{
+            type: :proc_trigger_spell,
+            trigger_spell_id: 12_345
+          }
+        ]
+      }
+
+      aimed_shot = %Spell{
+        id: 19_434,
+        school: :physical,
+        dmg_class: 3,
+        spell_family: 9,
+        family_flags_0: 0x20000,
+        effects: [%Effect{type: :weapon_damage, base_points: 0}]
+      }
+
+      context = %CastContext{
+        caster_guid: 999,
+        caster_level: 60,
+        attack_power: 0,
+        attack_time_ms: 2_800,
+        attack_skill: 300,
+        weapon_base_min: 100,
+        weapon_base_max: 100,
+        melee_crit_chance: 0.0,
+        spell_crit_chance: 0.0,
+        hit_chance_bonus: 100
+      }
+
+      target = %{target_fixture() | unit: %Unit{health: 500, max_health: 500, level: 60, auras: [victim_proc]}}
+      {_target, events} = SpellEffect.receive(target, context, aimed_shot, 1_000)
+
+      assert %{proc_type: :deal_ranged_ability} = Enum.find(events, &is_struct(&1, Effects.SpellDamage))
+      assert %Effects.TriggerSpell{spell_id: 12_345} = Enum.find(events, &is_struct(&1, Effects.TriggerSpell))
+    end
+
+    test "dodged melee abilities reach victim proc reactions" do
+      assert_avoided_melee_ability_reaction(:dodge)
+    end
+
+    test "parried melee abilities reach victim proc reactions" do
+      assert_avoided_melee_ability_reaction(:parry)
+    end
+
+    test "blocked melee abilities reach victim proc reactions" do
+      assert_avoided_melee_ability_reaction(:block)
+    end
+
+    test "caster-targeted trigger effects fire at the caster, other caster effects stay filtered" do
+      spell = %Spell{
+        id: 23_881,
+        school: :physical,
+        effects: [
+          %Effect{index: 0, type: :school_damage, base_points: 10, implicit_target_a: :target_enemy},
+          %Effect{index: 1, type: :trigger_spell, trigger_spell_id: 23_885, implicit_target_a: :caster},
+          %Effect{index: 2, type: :heal, base_points: 50, implicit_target_a: :caster}
+        ]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 60, target_role: :other, spell: spell}
+      target = %{target_fixture() | unit: %Unit{health: 500, max_health: 500, level: 60, auras: []}}
+
+      {target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert Enum.any?(
+               events,
+               &match?(%Effects.TriggerSpell{source_guid: 999, target_guid: 999, spell_id: 23_885}, &1)
+             )
+
+      assert target.unit.health < 500
+      refute Enum.any?(events, &is_struct(&1, Effects.HealEntity))
+    end
+
+    test "multiple weapon-damage effects fold into a single strike" do
+      spell = %Spell{
+        id: 53,
+        school: :physical,
+        effects: [
+          %Effect{index: 0, type: :weapon_percent_damage, base_points: 150},
+          %Effect{index: 1, type: :normalized_weapon_damage, base_points: 15}
+        ]
+      }
+
+      context = %CastContext{
+        caster_guid: 999,
+        caster_level: 60,
+        attack_power: 0,
+        weapon_base_min: 100,
+        weapon_base_max: 100,
+        normalized_speed: 1.7
+      }
+
+      target = %{target_fixture() | unit: %Unit{health: 500, max_health: 500, level: 60, auras: []}}
+
+      {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert [%Effects.SpellDamage{damage: 172}] = Enum.filter(events, &is_struct(&1, Effects.SpellDamage))
+    end
+
+    test "heals can crit for one and a half times the amount" do
+      spell = %Spell{id: 635, school: :holy, effects: [%Effect{index: 0, type: :heal, base_points: 100}]}
+      target = %{target_fixture() | unit: %Unit{health: 100, max_health: 500, level: 10, auras: []}}
+
+      context = %CastContext{caster_guid: 999, caster_level: 10, spell_crit_chance: 100.0}
+      {crit_target, _events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      context = %CastContext{caster_guid: 999, caster_level: 10, spell_crit_chance: 0.0}
+      {plain_target, _events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert plain_target.unit.health == 200
+      assert crit_target.unit.health == 250
+    end
+
+    test "heal_max_health heals by the caster's maximum health" do
+      spell = %Spell{id: 633, school: :holy, effects: [%Effect{index: 0, type: :heal_max_health}]}
+      target = %{target_fixture() | unit: %Unit{health: 100, max_health: 4_000, level: 60, auras: []}}
+
+      context = %CastContext{caster_guid: 999, caster_level: 60, caster_max_health: 1_500}
+      {target, _events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.unit.health == 1_600
+    end
+
+    test "direct magic damage uses the snapshotted spell crit chance" do
+      spell = %Spell{id: 133, school: :fire, dmg_class: 1, effects: [%Effect{type: :school_damage, base_points: 100}]}
+      context = %CastContext{caster_guid: 999, caster_level: 10, spell_crit_chance: 100.0}
+      target = %{target_fixture() | unit: %Unit{health: 500, max_health: 500, level: 10, auras: []}}
+
+      {target, [event]} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.unit.health == 350
+      assert event.damage == 150
+      assert event.crit?
+    end
+
+    test "Shatter raises spell crit chance against a frozen target" do
+      spell = %Spell{id: 133, school: :fire, dmg_class: 1, effects: [%Effect{type: :school_damage, base_points: 100}]}
+
+      context = %CastContext{
+        caster_guid: 999,
+        caster_level: 10,
+        spell_crit_chance: 50.0,
+        conditional_crit_modifiers: [%Modifier{condition: :target_frozen, amount: 50}]
+      }
+
+      frozen = %Holder{
+        spell: %Spell{id: 122, school: :frost},
+        auras: [%Aura{type: :mod_root}]
+      }
+
+      target = %{target_fixture() | unit: %Unit{health: 500, max_health: 500, level: 10, auras: [frozen]}}
+      {target, [event]} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.unit.health == 350
+      assert event.crit?
+    end
+
+    test "the DBC cannot-crit attribute suppresses direct spell crits" do
+      spell = %Spell{
+        id: 133,
+        school: :fire,
+        dmg_class: 1,
+        attributes: MapSet.new([:cant_crit]),
+        effects: [%Effect{type: :school_damage, base_points: 100}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10, spell_crit_chance: 100.0}
+      target = %{target_fixture() | unit: %Unit{health: 500, max_health: 500, level: 10, auras: []}}
+
+      {target, [event]} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.unit.health == 400
+      refute event.crit?
+    end
+
+    test "lethal damage prevents later aura effects from being applied" do
+      spell = %Spell{
+        id: 133,
+        name: "Fireball",
+        school: :fire,
+        duration_ms: 8_000,
+        effects: [
+          %Effect{index: 0, type: :school_damage, base_points: 50, die_sides: 0},
+          %Effect{
+            index: 1,
+            type: :apply_aura,
+            base_points: 5,
+            die_sides: 0,
+            aura: :periodic_damage,
+            amplitude_ms: 2_000
+          }
+        ]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+
+      {target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert target.unit.health == 0
+      assert target.unit.auras == []
+
+      assert [%Effects.SpellDamage{damage: 50, source_guid: 999, target_guid: 1, periodic?: false}] =
+               events
+    end
+
+    test "periodic trigger spell auras fire the triggered spell instead of applying an aura" do
+      spell = %Spell{
+        id: 5143,
+        name: "Arcane Missiles",
+        school: :arcane,
+        attributes: MapSet.new([:channeled]),
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :periodic_trigger_spell,
+            trigger_spell_id: 7268,
+            amplitude_ms: 1_000
+          }
+        ]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+
+      {target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert target.unit.auras == []
+
+      assert [%Effects.TriggerSpell{source_guid: 999, target_guid: 1, spell_id: 7268}] = events
+    end
+
+    test "channeled spells apply secondary auras without the channel-ticked trigger aura" do
+      spell = %Spell{
+        id: 15_407,
+        name: "Mind Flay",
+        school: :shadow,
+        duration_ms: 3_000,
+        attributes: MapSet.new([:negative, :channeled]),
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :periodic_trigger_spell,
+            trigger_spell_id: 16_568,
+            amplitude_ms: 1_000
+          },
+          %Effect{index: 1, type: :apply_aura, aura: :mod_decrease_speed, base_points: -50, die_sides: 0}
+        ]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 20}
+
+      {target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert [%Effects.TriggerSpell{spell_id: 16_568}] = Enum.filter(events, &is_struct(&1, Effects.TriggerSpell))
+      assert [%Holder{auras: [%{type: :mod_decrease_speed}]}] = target.unit.auras
+    end
+
+    test "resurrect stores a pending resurrect with the caster's cast position" do
+      spell = %Spell{
+        id: 2006,
+        name: "Resurrection",
+        school: :holy,
+        effects: [%Effect{index: 0, type: :resurrect, base_points: 34, die_sides: 0}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 40, caster_position: {0, 1.0, 2.0, 3.0}}
+
+      {target, events} = SpellEffect.receive(dead_character_fixture(), context, spell, 1_000)
+
+      assert target.internal.pending_resurrect == %ResurrectionOffer{
+               caster_guid: 999,
+               position: {0, 1.0, 2.0, 3.0},
+               health: 34,
+               mana: 17
+             }
+
+      assert [%Effects.ResurrectRequest{source_guid: 999, spell_id: 2006, health: 34, mana: 17}] = events
+    end
+
+    test "resurrect does nothing for non-player targets" do
+      spell = %Spell{
+        id: 2006,
+        name: "Resurrection",
+        school: :holy,
+        effects: [%Effect{index: 0, type: :resurrect, base_points: 34, die_sides: 0}]
+      }
+
+      target = target_fixture()
+      dead_mob = %{target | unit: %{target.unit | health: 0}}
+
+      assert {%Mob{internal: %Internal{pending_resurrect: nil}}, []} =
+               SpellEffect.receive(dead_mob, %CastContext{caster_guid: 999, caster_level: 40}, spell, 1_000)
+    end
+
+    test "persistent area auras do not apply directly on hit (area effect process handles ticks)" do
+      spell = %Spell{
+        id: 10,
+        name: "Blizzard",
+        school: :frost,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :persistent_area_aura,
+            aura: :periodic_damage,
+            base_points: 24,
+            die_sides: 0
+          }
+        ]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+
+      {target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert target.unit.health == 20
+      assert events == []
+    end
+
+    test "add-extra-attacks effects queue a batch for the combat behavior tree" do
+      spell = %Spell{
+        id: 20_178,
+        name: "Reckoning",
+        school: :physical,
+        effects: [%Effect{index: 0, type: :add_extra_attacks, base_points: 0, die_sides: 1, base_dice: 1}]
+      }
+
+      target = %{
+        target_fixture()
+        | unit: %Unit{
+            health: 20,
+            max_health: 20,
+            level: 1,
+            auras: [],
+            target: 555,
+            min_damage: 2.0,
+            max_damage: 4.0,
+            base_attack_time: 2_000
+          }
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 10}
+
+      {target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.internal.blackboard.combat.extra_attacks == 1
+      refute Enum.any?(target.internal.events, &is_struct(&1, Effects.DeliverAttack))
+      assert [%Effects.SpellExtraAttacks{spell_id: 20_178, count: 1}] = events
+      {unchanged, events} = SpellEffect.receive(target, context, spell, 1_001)
+      assert unchanged.internal.blackboard.combat.extra_attacks == 1
+      assert events == []
+    end
+
+    test "heal effects restore health and emit heal threat for the effective gain" do
+      spell = %Spell{
+        id: 2050,
+        name: "Lesser Heal",
+        school: :holy,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :heal,
+            base_points: 15,
+            die_sides: 0
+          }
+        ]
+      }
+
+      target = %{target_fixture() | unit: %Unit{health: 10, max_health: 20, level: 1, auras: []}}
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+
+      {target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.unit.health == 20
+      assert target.internal.broadcast_update? == true
+
+      assert [
+               %Effects.HealThreat{source_guid: 999, target_guid: 1, amount: 5.0},
+               %Effects.SpellHeal{source_guid: 999, target_guid: 1, proc_type: :deal_helpful_spell}
+             ] = events
+    end
+
+    test "energize effects restore the matching power" do
+      spell = %Spell{
+        id: 2687,
+        name: "Bloodrage",
+        school: :physical,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :energize,
+            base_points: 99,
+            die_sides: 1,
+            base_dice: 1,
+            misc_value: 1
+          }
+        ]
+      }
+
+      target = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 20, max_health: 20, level: 10, power_type: 1, power2: 0, max_power2: 1_000, auras: []},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 10}
+
+      {target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.unit.power2 == 100
+      assert target.internal.broadcast_update? == true
+
+      assert [%Effects.SpellEnergize{source_guid: 1, target_guid: 1, spell_id: 2687, power_type: 1, amount: 100}] =
+               events
+    end
+
+    test "trigger spell effects return trigger events" do
+      spell = %Spell{
+        id: 168,
+        name: "Frost Armor",
+        school: :frost,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :trigger_spell,
+            trigger_spell_id: 6136
+          }
+        ]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+
+      {_target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert [
+               %Effects.TriggerSpell{
+                 source_guid: 999,
+                 source_level: 10,
+                 target_guid: 1,
+                 spell_id: 6136
+               }
+             ] = events
+    end
+  end
+
+  defp mechanic_resistance_target(mechanic) do
+    target = target_fixture()
+
+    holder = %Holder{
+      spell: %Spell{id: 90_100},
+      caster_guid: 1,
+      auras: [%Aura{type: :mechanic_resistance, misc_value: mechanic, amount: 100}]
+    }
+
+    %{target | unit: %{target.unit | auras: [holder]}}
+  end
+
+  defp mechanic_stun_spell(mechanic, effect_mechanic) do
+    %Spell{
+      id: 90_101,
+      school: :physical,
+      mechanic: mechanic,
+      duration_ms: 5_000,
+      effects: [
+        %Effect{
+          index: 0,
+          type: :apply_aura,
+          aura: :mod_stun,
+          mechanic: effect_mechanic,
+          implicit_target_a: :target_enemy
+        }
+      ]
+    }
+  end
+
+  describe "spell power bonuses" do
+    test "direct damage gains spell power scaled by cast time" do
+      spell = %Spell{
+        id: 133,
+        name: "Fireball",
+        school: :fire,
+        cast_time_ms: 3_500,
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 5, die_sides: 0}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10, spell_damage_bonus: %{fire: 100}}
+
+      {target, _events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert target.unit.health == 0
+      assert [%{damage: 105}] = elem(SpellEffect.receive(target_fixture(), context, spell, 1_000), 1)
+    end
+
+    test "instant spells use the minimum coefficient" do
+      spell = %Spell{
+        id: 133,
+        name: "Fire Blast",
+        school: :fire,
+        cast_time_ms: 0,
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 5, die_sides: 0}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10, spell_damage_bonus: %{fire: 70}}
+
+      assert [%{damage: 35}] = elem(SpellEffect.receive(target_fixture(), context, spell, 1_000), 1)
+    end
+
+    test "wrong school bonus does not apply" do
+      spell = %Spell{
+        id: 133,
+        name: "Fireball",
+        school: :fire,
+        cast_time_ms: 3_500,
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 5, die_sides: 0}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10, spell_damage_bonus: %{shadow: 100}}
+
+      assert [%{damage: 5}] = elem(SpellEffect.receive(target_fixture(), context, spell, 1_000), 1)
+    end
+
+    test "healing gains the healing bonus" do
+      spell = %Spell{
+        id: 2050,
+        name: "Lesser Heal",
+        school: :holy,
+        cast_time_ms: 3_500,
+        effects: [%Effect{index: 0, type: :heal, base_points: 5, die_sides: 0}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10, healing_bonus: 10}
+
+      target = target_fixture()
+      target = %{target | unit: %{target.unit | health: 1}}
+      {target, _events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.unit.health == 16
+    end
+
+    test "leap effect emits a teleport event ahead of the caster" do
+      spell = %Spell{
+        id: 1953,
+        name: "Blink",
+        school: :arcane,
+        effects: [%Effect{index: 0, type: :leap, radius_yards: 20.0}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 10}
+      caster = target_fixture()
+
+      {_caster, events} = SpellEffect.receive(caster, context, spell, 1_000)
+
+      assert [%Effects.Leap{position: {x, y, z, o}}] = events
+      assert_in_delta x, 20.0, 0.001
+      assert_in_delta y, 0.0, 0.001
+      assert z == 0.0
+      assert o == 0.0
+    end
+
+    test "teleport_units effect emits a spell target teleport event" do
+      spell = %Spell{
+        id: 3561,
+        name: "Teleport: Stormwind",
+        school: :arcane,
+        effects: [%Effect{index: 0, type: :teleport_units}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 10}
+
+      {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert [%Effects.TeleportToSpellTarget{spell_id: 3561}] = events
+    end
+
+    test "create_item effect emits a create_item event" do
+      spell = %Spell{
+        id: 5504,
+        name: "Conjure Water",
+        school: :arcane,
+        effects: [%Effect{index: 0, type: :create_item, base_points: 1, die_sides: 1, base_dice: 1, misc_value: 5350}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 10}
+
+      {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert [%Effects.CreateItem{item_id: 5350, count: 2, spell_id: 5504}] = events
+    end
+
+    test "reputation effect emits a typed standing change for players" do
+      spell = %Spell{
+        id: 21_187,
+        name: "Stormpike Reputation +5",
+        school: :physical,
+        effects: [
+          %Effect{index: 0, type: :reputation, base_points: 4, die_sides: 1, base_dice: 1, misc_value: 730}
+        ]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 10}
+
+      {_character, events} = SpellEffect.receive(character_fixture(), context, spell, 1_000)
+
+      assert [%Effects.ReputationChange{faction_id: 730, value: 5}] = events
+    end
+
+    test "honor rewards players without scaling by level or awarding a kill" do
+      effect = %Effect{index: 0, type: :honor, base_points: 24, base_dice: 1, die_sides: 1, real_points_per_level: 100}
+      spell = %Spell{id: 24_951, school: :physical, base_level: 1, spell_level: 1, effects: [effect]}
+      context = %CastContext{caster_guid: 1, caster_level: 60}
+
+      {_character, events} = SpellEffect.receive(character_fixture(), context, spell, 1_000)
+
+      assert [%Effects.HonorAward{target_guid: 1, award: %{type: :quest, points: 25, victim_guid: 0}}] = events
+      assert {_mob, []} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      spell = %{spell | effects: [%{effect | base_points: -1}]}
+      assert {_character, []} = SpellEffect.receive(character_fixture(), context, spell, 1_000)
+    end
+
+    test "interrupt_cast clears the target's cast and locks out the school" do
+      spell = %Spell{
+        id: 2139,
+        name: "Counterspell",
+        school: :arcane,
+        duration_ms: 10_000,
+        effects: [%Effect{index: 0, type: :interrupt_cast}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+
+      fireball = %Spell{id: 133, school: :fire, prevention_type: 1, interrupt_flags: 2}
+      target = target_fixture()
+      target = %{target | internal: %{target.internal | casting: %Cast{spell: fireball, cast_time_ms: 3_000}}}
+
+      {target, _events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.internal.casting == nil
+      assert Cooldowns.school_locked?(target, Spell.school_mask(:fire), 10_999)
+      refute Cooldowns.school_locked?(target, Spell.school_mask(:fire), 11_001)
+      refute Cooldowns.school_locked?(target, Spell.school_mask(:frost), 10_999)
+    end
+
+    test "interrupt_cast leaves uninterruptible casts alone" do
+      spell = %Spell{
+        id: 2139,
+        name: "Counterspell",
+        school: :arcane,
+        duration_ms: 10_000,
+        effects: [%Effect{index: 0, type: :interrupt_cast}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+
+      target = target_fixture()
+      target = %{target | internal: %{target.internal | casting: %Cast{spell: %Spell{id: 1, prevention_type: 0}}}}
+
+      {target, _events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert %Cast{} = target.internal.casting
+    end
+
+    test "trap effects enqueue a timed game object summon" do
+      spell = %Spell{
+        id: 1499,
+        name: "Freezing Trap",
+        duration_ms: 60_000,
+        effects: [%Effect{index: 0, type: :summon_game_object, misc_value: 2561}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 10}
+      {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert [%Effects.SummonGameObject{entry: 2561, duration_ms: 60_000}] = events
+    end
+
+    test "summon-player effects preserve the DBC-selected target and caster destination" do
+      spell = %Spell{id: 7720, effects: [%Effect{index: 0, type: :summon_player}]}
+
+      context = %CastContext{
+        caster_guid: 1,
+        caster_level: 10,
+        caster_zone: 12,
+        caster_position: {%WorldRef{map_id: 0}, 1.0, 2.0, 3.0},
+        selected_target_guid: 99
+      }
+
+      {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert [
+               %Effects.SummonRequest{
+                 source_guid: 1,
+                 target_guid: 99,
+                 amount: 12,
+                 position: {%WorldRef{map_id: 0}, 1.0, 2.0, 3.0}
+               }
+             ] = events
+    end
+
+    test "summon-demon effects create a temporary owned summon at the destination" do
+      spell = %Spell{id: 18_541, effects: [%Effect{index: 0, type: :summon_demon, misc_value: 11_859}]}
+
+      context = %CastContext{
+        caster_guid: 1,
+        caster_level: 60,
+        caster_position: {%WorldRef{map_id: 0}, 1.0, 2.0, 3.0},
+        caster_orientation: 1.5,
+        destination_position: {4.0, 5.0, 6.0}
+      }
+
+      {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert [
+               %Effects.SummonCreature{
+                 summon: %{
+                   entry: 11_859,
+                   owner_guid: 1,
+                   position: {4.0, 5.0, 6.0, 1.5},
+                   despawn_delay_ms: 3_600_000
+                 }
+               }
+             ] = events
+    end
+
+    test "tame creature emits ownership data from the target entry" do
+      spell = %Spell{id: 1515, effects: [%Effect{index: 0, type: :tame_creature}]}
+      target = target_fixture()
+      target = %{target | object: %{target.object | entry: 1234}}
+
+      {_target, events} = SpellEffect.receive(target, %CastContext{caster_guid: 99, caster_level: 10}, spell, 1_000)
+
+      assert [%Effects.TameCreature{source_guid: 99, entry: 1234}] = events
+    end
+
+    test "tame beast completion triggers VMangos' ownership spell" do
+      spell = %Spell{id: 13_535, effects: [%Effect{index: 0, type: :dummy}]}
+      target = target_fixture()
+      context = %CastContext{caster_guid: 99, caster_level: 10}
+
+      {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert [%Effects.TriggerSpell{source_guid: 99, target_guid: target_guid, spell_id: 13_481}] = events
+      assert target_guid == target.object.guid
+    end
+
+    @tag :dbc_db
+    test "the DBC Tame Beast channel delivers ownership to the wild creature" do
+      spell = SpellLoader.load(1515)
+      tick_spell = %{spell | effects: Spell.channel_ticked_effects(spell)}
+      target = target_fixture()
+      target = %{target | object: %{target.object | entry: 113}, unit: %{target.unit | level: 6}}
+      context = %CastContext{caster_guid: 99, caster_level: 10, target_role: :other}
+
+      assert {_target, [%Effects.TriggerSpell{spell_id: 13_481, target_guid: 1}]} =
+               SpellEffect.receive(target, context, tick_spell, 21_000)
+
+      ownership = SpellLoader.load(13_481)
+
+      assert {_target, [%Effects.TameCreature{source_guid: 99, entry: 113}]} =
+               SpellEffect.receive(target, context, ownership, 21_000)
+    end
+
+    test "durability repair remains applicable to dead players" do
+      target = dead_character_fixture()
+
+      spell = %Spell{
+        id: 23_438,
+        effects: [%Effect{index: 0, type: :durability_damage, base_points: -50_000, misc_value: 17}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 60}
+
+      assert {^target, [%Effects.DurabilityLoss{amount: -50_000, mode: :points, scope: {:slot, 17}}]} =
+               SpellEffect.receive(target, context, spell, 1000)
+    end
+
+    test "durability effects still execute after an earlier effect kills the player" do
+      target = character_fixture()
+
+      spell = %Spell{
+        id: 999,
+        effects: [
+          %Effect{index: 0, type: :instakill},
+          %Effect{index: 1, type: :durability_damage_percent, base_points: 5, misc_value: 4}
+        ]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 60}
+      {dead, events} = SpellEffect.receive(target, context, spell, 1000)
+      assert dead.unit.health == 0
+      assert [%Effects.DurabilityLoss{amount: 5, mode: :percent, scope: {:slot, 4}}] = events
+    end
+
+    test "durability spells ignore creatures and invalid inventory slots" do
+      context = %CastContext{caster_guid: 1, caster_level: 60}
+      spell = %Spell{id: 999, effects: [%Effect{type: :durability_damage, base_points: 5, misc_value: 15}]}
+      mob = target_fixture()
+      assert SpellEffect.receive(mob, context, spell, 1000) == {mob, []}
+      target = character_fixture()
+
+      for slot <- [23, 39, 255] do
+        spell = %{spell | effects: [%Effect{type: :durability_damage, base_points: 5, misc_value: slot}]}
+        assert SpellEffect.receive(target, context, spell, 1000) == {target, []}
+      end
+    end
+
+    test "NPC pet summons preserve their signed level adjustment" do
+      target = target_fixture()
+      context = %CastContext{caster_guid: 1, caster_level: 20}
+
+      spell = %Spell{
+        id: 8722,
+        effects: [%Effect{index: 0, type: :summon_pet, misc_value: 10_928, multiple_value: -2.0}]
+      }
+
+      assert {^target, [%Effects.SummonPet{source_guid: 1, entry: 10_928, level_offset: -2.0}]} =
+               SpellEffect.receive(target, context, spell, 1_000)
+    end
+
+    test "controlled summons execute on the caster with the requested lifetime and destination" do
+      caster = target_fixture()
+      caster = %{caster | movement_block: %{caster.movement_block | position: {1.0, 2.0, 3.0, 0.5}}}
+      context = %CastContext{caster_guid: 1, caster_level: 20}
+      spell = %Spell{id: 513, duration_ms: 60_000, effects: [%Effect{type: :summon, misc_value: 329}]}
+
+      for {destination, position} <- [{nil, {1.0, 2.0, 3.0, -0.5}}, {{4.0, 5.0, 6.0}, {4.0, 5.0, 6.0, -0.5}}] do
+        assert {^caster,
+                [
+                  %Effects.SummonControlledPet{
+                    source_guid: 1,
+                    entry: 329,
+                    spell_id: 513,
+                    duration_ms: 60_000,
+                    position: ^position
+                  }
+                ]} =
+                 SpellEffect.receive(caster, %{context | destination_position: destination}, spell, 1000)
+      end
+
+      permanent = %{spell | duration_ms: -1}
+
+      assert {^caster, [%Effects.SummonControlledPet{duration_ms: 0}]} =
+               SpellEffect.receive(caster, context, permanent, 1000)
+
+      target = %{caster | object: %{caster.object | guid: 2}}
+      assert SpellEffect.receive(target, context, spell, 1000) == {target, []}
+    end
+
+    test "minion summons use the front-left radius and resolve collision only for implicit positions" do
+      caster = target_fixture()
+      context = %CastContext{caster_guid: 1, caster_level: 20}
+      effect = %Effect{type: :summon, misc_value: 12_922, implicit_target_a: :minion_position, radius_yards: 3.0}
+      spell = %Spell{id: 11_939, duration_ms: -1, effects: [effect]}
+
+      assert {^caster, [%Effects.SummonControlledPet{position: {x, y, z, _o}, resolve_collision?: true}]} =
+               SpellEffect.receive(caster, context, spell, 1000)
+
+      assert_in_delta x, 3.0 / :math.sqrt(2), 0.0001
+      assert_in_delta y, x, 0.0001
+      assert z == 0.0
+      context = %{context | destination_position: {1.0, 2.0, 3.0}}
+
+      assert {^caster, [%Effects.SummonControlledPet{position: {1.0, 2.0, 3.0, _o}, resolve_collision?: false}]} =
+               SpellEffect.receive(caster, context, spell, 1000)
+    end
+
+    test "call, revive, and dismiss use the stable hunter pet entry" do
+      character = dead_character_fixture()
+
+      character =
+        %{character | unit: %{character.unit | health: 100}}
+        |> Companion.activate(:hunter_pet, %EntityRef{guid: 44, entry: 1234, spell_id: 1515})
+
+      context = %CastContext{caster_guid: 1, caster_level: 10}
+
+      call_pet = %Spell{id: 883, effects: [%Effect{index: 0, type: :summon_pet, misc_value: 0}]}
+      {_character, events} = SpellEffect.receive(character, context, call_pet, 1_000)
+      assert [%Effects.SummonPet{entry: 1234, spell_id: 883}] = events
+
+      revive_pet = %Spell{id: 982, effects: [%Effect{index: 0, type: :revive_pet, misc_value: 0, base_points: 15}]}
+      {_character, events} = SpellEffect.receive(character, context, revive_pet, 1_000)
+      assert [%Effects.SummonPet{entry: 1234, spell_id: 982, health_percent: 15}] = events
+
+      dismiss_pet = %Spell{id: 2641, effects: [%Effect{index: 0, type: :dismiss_pet}]}
+      {character, events} = SpellEffect.receive(character, context, dismiss_pet, 1_000)
+      assert character.unit.summon == 0
+
+      assert character.internal.companion == %Companion{
+               kind: :hunter_pet,
+               status: {:suspended, 1234, 1515},
+               pet_number: 44,
+               restore_automatically?: false
+             }
+
+      assert [%Effects.DismissPet{target_guid: 44}] = events
+    end
+
+    test "dismiss pet drains happiness without granting mana" do
+      pet =
+        target_fixture()
+        |> then(fn pet ->
+          %{
+            pet
+            | unit: %{pet.unit | power_type: 2, power2: 100, power5: 166_500, max_power5: 1_050_000},
+              internal: %{pet.internal | pet: %Pet{kind: :hunter}}
+          }
+        end)
+
+      spell = %Spell{
+        id: 2641,
+        effects: [
+          %Effect{index: 0, type: :power_drain, base_points: 49_999, misc_value: 4, implicit_target_a: :pet}
+        ]
+      }
+
+      {pet, events} =
+        SpellEffect.receive(pet, %CastContext{caster_guid: 99, caster_level: 10, target_role: :pet}, spell, 1_000)
+
+      assert pet.unit.power2 == 100
+      assert pet.unit.power5 == 116_501
+      assert [%Effects.SpellPowerDrain{power_type: 4, amount: 49_999, multiplier: +0.0}] = events
+    end
+
+    test "growl adds threat for the pet rather than its owner" do
+      owner_guid = 40
+      pet_guid = 41
+      target = %{target_fixture() | internal: %Internal{threat: %{owner_guid => 10.0}}}
+
+      growl = %Spell{
+        id: 14_920,
+        effects: [%Effect{index: 0, type: :modify_threat, base_points: 319, implicit_target_a: :target_enemy}]
+      }
+
+      {target, _events} =
+        SpellEffect.receive(target, %CastContext{caster_guid: pet_guid, caster_level: 50}, growl, 1_000)
+
+      assert target.internal.threat[owner_guid] == 10.0
+      assert target.internal.threat[pet_guid] == 319.0
+    end
+
+    test "totem effects preserve their elemental summon slot" do
+      spell = %Spell{
+        id: 3599,
+        duration_ms: 30_000,
+        effects: [%Effect{index: 0, type: :summon_totem, summon_slot: 1, misc_value: 2523}]
+      }
+
+      {_caster, events} = SpellEffect.receive(target_fixture(), %CastContext{caster_guid: 1}, spell, 1_000)
+
+      assert [%Effects.SummonTotem{entry: 2523, slot: 1, duration_ms: 30_000}] = events
+    end
+
+    test "mod_damage_taken scales with the receiving effect coefficient" do
+      dampen = %Spell{
+        id: 604,
+        name: "Dampen Magic",
+        school: :arcane,
+        duration_ms: 600_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: -11,
+            die_sides: 1,
+            base_dice: 1,
+            aura: :mod_damage_taken,
+            misc_value: 126
+          }
+        ]
+      }
+
+      target = target_fixture()
+      {target, _} = Aura.apply_spell(target, 1, 10, dampen, 1_000)
+
+      fireball = %Spell{
+        id: 133,
+        name: "Fireball",
+        school: :fire,
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 15, die_sides: 0, bonus_coefficient: 0.5}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+      {target, events} = SpellEffect.receive(target, context, fireball, 1_000)
+
+      assert [%Effects.SpellDamage{damage: 10}] = events
+      assert target.unit.health == 10
+    end
+
+    test "mod_healing scales with the receiving heal coefficient" do
+      amplify = %Spell{
+        id: 1008,
+        name: "Amplify Magic",
+        school: :arcane,
+        duration_ms: 600_000,
+        effects: [
+          %Effect{
+            index: 1,
+            type: :apply_aura,
+            base_points: 29,
+            die_sides: 1,
+            base_dice: 1,
+            aura: :mod_healing,
+            misc_value: 126
+          }
+        ]
+      }
+
+      target = target_fixture()
+      target = %{target | unit: %{target.unit | health: 1, max_health: 100}}
+      {target, _} = Aura.apply_spell(target, 1, 10, amplify, 1_000)
+
+      heal = %Spell{
+        id: 2050,
+        name: "Lesser Heal",
+        school: :holy,
+        dmg_class: 1,
+        effects: [%Effect{index: 0, type: :heal, base_points: 5, die_sides: 0, bonus_coefficient: 0.5}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+      {target, _events} = SpellEffect.receive(target, context, heal, 1_000)
+
+      assert target.unit.health == 1 + 5 + 15
+    end
+  end
+end

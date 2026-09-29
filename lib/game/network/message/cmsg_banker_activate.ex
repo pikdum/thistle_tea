@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBankerActivate do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_BANKER_ACTIVATE
 
-  alias ThistleTea.Game.Player.Bank
+  alias ThistleTea.Game.World.Entity.Player.Bank
 
   defstruct [:banker_guid]
 

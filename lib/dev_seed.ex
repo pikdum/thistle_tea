@@ -47,23 +47,25 @@ defmodule ThistleTea.DevSeed do
   """
   import Ecto.Query
 
+  alias ThistleTea.Auth.Account
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
   alias ThistleTea.DevSeed.ActionBars
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.CreatureSpell
-  alias ThistleTea.Game.Entity.Data.GameObject
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Data.PetProgress
-  alias ThistleTea.Game.Entity.Logic.Companion
-  alias ThistleTea.Game.Entity.Logic.Skills
-  alias ThistleTea.Game.Entity.Logic.SpellBook
+  alias ThistleTea.Game.Core.AI.CreatureSpell
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.GameObject
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.PetProgress
+  alias ThistleTea.Game.Core.Skills
+  alias ThistleTea.Game.Core.Spell.SpellBook
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message.CmsgCharCreate
-  alias ThistleTea.Game.Player.Characters
-  alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Entity.Player.Characters
+  alias ThistleTea.Game.World.Entity.Player.Stats
   alias ThistleTea.Game.World.Loader.Character, as: CharacterLoader
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
@@ -72,7 +74,6 @@ defmodule ThistleTea.DevSeed do
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Pathfinding
-  alias ThistleTea.Game.WorldRef
 
   require Logger
 
@@ -146,17 +147,17 @@ defmodule ThistleTea.DevSeed do
           {"debugbidder", {"Debugbidder", @human, 8}},
           {"debugrival", {"Debugrival", @orc, 1}}
         ] do
-      ThistleTea.Account.register(account, account)
-      {:ok, %ThistleTea.Account{id: account_id}} = ThistleTea.Account.get_user(account)
+      Account.register(account, account)
+      {:ok, %Account{id: account_id}} = Account.get_user(account)
       create_character(character, account_id)
     end
   end
 
   defp seed_account_and_characters do
-    ThistleTea.Account.register(@account, @account)
+    Account.register(@account, @account)
 
-    case ThistleTea.Account.get_user(@account) do
-      {:ok, %ThistleTea.Account{id: account_id}} ->
+    case Account.get_user(@account) do
+      {:ok, %Account{id: account_id}} ->
         Enum.each(@characters, &create_character(&1, account_id))
 
       _ ->

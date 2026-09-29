@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgPetitionQueryResponse do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_PETITION_QUERY_RESPONSE
 
-  alias ThistleTea.Game.Guild.Petitions.Petition
+  alias ThistleTea.Game.Core.Guild.Petitions.Petition
 
   defstruct [:petition]
 

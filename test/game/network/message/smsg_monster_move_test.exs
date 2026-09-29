@@ -3,9 +3,9 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMoveTest do
 
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message.SmsgMonsterMove
 

@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.Loader.PetFoodDbcTest do
 
   alias ThistleTea.DBC
   alias ThistleTea.DBC.CreatureFamily
-  alias ThistleTea.Game.Entity.Logic.Hunter
+  alias ThistleTea.Game.Core.Class.Hunter
 
   @moduletag :dbc_db
 

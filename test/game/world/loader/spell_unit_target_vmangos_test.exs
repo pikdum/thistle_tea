@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.SpellUnitTargetVmangosTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Condition
-  alias ThistleTea.Game.Spell.UnitTargets.Selector
+  alias ThistleTea.Game.Core.Condition
+  alias ThistleTea.Game.Core.Spell.UnitTargets.Selector
   alias ThistleTea.Game.World.Loader.SpellUnitTarget
 
   @moduletag :vmangos_db

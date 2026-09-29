@@ -1,13 +1,13 @@
 defmodule ThistleTea.Game.World.WorldPositionTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position.Spline
   alias ThistleTea.Game.World.SpatialHash
-  alias ThistleTea.Game.WorldRef
 
   describe "broadcast_packet/3" do
     test "sends a source entity's packet to itself without visibility filtering" do

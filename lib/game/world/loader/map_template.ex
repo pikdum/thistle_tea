@@ -5,8 +5,8 @@ defmodule ThistleTea.Game.World.Loader.MapTemplate do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.Dungeon
-  alias ThistleTea.Game.Instance.Admission.Policy
+  alias ThistleTea.Game.Core.Instance.Admission.Policy
+  alias ThistleTea.Game.Core.Instance.Dungeon
 
   @table_options [:named_table, :public, read_concurrency: true]
   @supported_patch 10

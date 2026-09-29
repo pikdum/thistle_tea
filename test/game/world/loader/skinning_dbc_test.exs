@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.SkinningDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Logic.Skinning
-  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Core.Profession.Skinning
+  alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db

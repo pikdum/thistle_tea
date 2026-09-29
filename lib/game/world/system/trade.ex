@@ -7,20 +7,19 @@ defmodule ThistleTea.Game.World.System.Trade do
 
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Trade
-  alias ThistleTea.Game.Entity.Data.Trade.Decision
-  alias ThistleTea.Game.Entity.Data.Trade.Prepare
-  alias ThistleTea.Game.Entity.Logic.Inventory
-  alias ThistleTea.Game.Entity.Logic.Trade, as: TradeLogic
+  alias ThistleTea.Game.Core.Inventory
+  alias ThistleTea.Game.Core.Party
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.Trade
+  alias ThistleTea.Game.Core.Trade.Decision
+  alias ThistleTea.Game.Core.Trade.Prepare
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgAreaTriggerMessage
   alias ThistleTea.Game.Network.Message.SmsgCastResult
   alias ThistleTea.Game.Network.Message.SmsgTradeStatus
   alias ThistleTea.Game.Network.Message.SmsgTradeStatusExtended
-  alias ThistleTea.Game.Party
-  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemEnchantment
   alias ThistleTea.Game.World.Metadata
@@ -121,7 +120,7 @@ defmodule ThistleTea.Game.World.System.Trade do
          true <- state.owner.(guid) == owner,
          target_owner when is_pid(target_owner) <- state.owner.(target),
          :ok <- admission(state, guid, target) do
-      trade = TradeLogic.new(make_ref(), guid, target, state.now.())
+      trade = Trade.new(make_ref(), guid, target, state.now.())
       pids = %{guid => owner, target => target_owner}
 
       session = %{
@@ -155,7 +154,7 @@ defmodule ThistleTea.Game.World.System.Trade do
   end
 
   defp update(state, session, guid, :open) do
-    case TradeLogic.open(session.trade, guid) do
+    case Trade.open(session.trade, guid) do
       {:ok, trade} ->
         status_both(state, trade, :open_window)
         publish(state, trade)
@@ -171,15 +170,15 @@ defmodule ThistleTea.Game.World.System.Trade do
   end
 
   defp update(state, %{trade: %Trade{phase: :open} = trade}, guid, :spell_target) do
-    {{:ok, trade.id, TradeLogic.target_item(trade, guid), Map.fetch!(trade.offers, guid)}, state}
+    {{:ok, trade.id, Trade.target_item(trade, guid), Map.fetch!(trade.offers, guid)}, state}
   end
 
   defp update(state, _session, _guid, :spell_target), do: {{:error, :not_trading}, state}
 
   defp update(state, session, guid, :accept) do
-    case TradeLogic.accept(session.trade, guid, state.now.()) do
+    case Trade.accept(session.trade, guid, state.now.()) do
       {:ok, trade} ->
-        state.packet.(%SmsgTradeStatus{status: :trade_accept}, TradeLogic.other(trade, guid))
+        state.packet.(%SmsgTradeStatus{status: :trade_accept}, Trade.other(trade, guid))
         session = begin_preparation(%{session | trade: trade})
 
         {:ok, put_session(state, session)}
@@ -214,11 +213,11 @@ defmodule ThistleTea.Game.World.System.Trade do
 
   defp begin_preparation(session), do: session
 
-  defp edit(trade, guid, {:money, amount}, now), do: TradeLogic.money(trade, guid, amount, now)
-  defp edit(trade, guid, {:item, slot, item}, now), do: TradeLogic.put_item(trade, guid, slot, item, now)
-  defp edit(trade, guid, {:clear, slot}, now), do: TradeLogic.clear_item(trade, guid, slot, now)
-  defp edit(trade, guid, :unaccept, _now), do: TradeLogic.unaccept(trade, guid)
-  defp edit(%Trade{id: id} = trade, guid, {:spell, id, cast}, now), do: TradeLogic.cast(trade, guid, cast, now)
+  defp edit(trade, guid, {:money, amount}, now), do: Trade.money(trade, guid, amount, now)
+  defp edit(trade, guid, {:item, slot, item}, now), do: Trade.put_item(trade, guid, slot, item, now)
+  defp edit(trade, guid, {:clear, slot}, now), do: Trade.clear_item(trade, guid, slot, now)
+  defp edit(trade, guid, :unaccept, _now), do: Trade.unaccept(trade, guid)
+  defp edit(%Trade{id: id} = trade, guid, {:spell, id, cast}, now), do: Trade.cast(trade, guid, cast, now)
   defp edit(_trade, _guid, {:spell, _stale_id, _cast}, _now), do: {:error, :not_trading}
   defp edit(_trade, _guid, _action, _now), do: {:error, :trade_canceled}
 
@@ -228,7 +227,7 @@ defmodule ThistleTea.Game.World.System.Trade do
 
     result =
       if valid_pair?(state, session.trade),
-        do: TradeLogic.plan(session.trade, characters, state.now.(), state.get_item, state.get_enchantment),
+        do: Trade.plan(session.trade, characters, state.now.(), state.get_item, state.get_enchantment),
         else: {:error, session.trade.initiator, :item_not_found}
 
     case result do
@@ -246,7 +245,7 @@ defmodule ThistleTea.Game.World.System.Trade do
         retry_after_cast_failure(state, session, guid)
 
       {:error, guid, reason} ->
-        Enum.each(TradeLogic.participants(session.trade), fn participant ->
+        Enum.each(Trade.participants(session.trade), fn participant ->
           state.packet.(
             %SmsgTradeStatus{
               status: :close_window,
@@ -265,9 +264,9 @@ defmodule ThistleTea.Game.World.System.Trade do
   defp retry_after_cast_failure(state, session, guid) do
     release(session)
     if session.timer, do: Process.cancel_timer(session.timer)
-    {:ok, trade} = session.trade |> TradeLogic.reopen() |> TradeLogic.clear_spell(guid, state.now.())
+    {:ok, trade} = session.trade |> Trade.reopen() |> Trade.clear_spell(guid, state.now.())
     trade = %{trade | id: make_ref()}
-    players = Enum.reduce(TradeLogic.participants(trade), state.players, &Map.put(&2, &1, trade.id))
+    players = Enum.reduce(Trade.participants(trade), state.players, &Map.put(&2, &1, trade.id))
     state = %{state | sessions: Map.delete(state.sessions, session.trade.id), players: players}
     status_both(state, trade, :back_to_trade)
     publish(state, trade)
@@ -314,7 +313,7 @@ defmodule ThistleTea.Game.World.System.Trade do
 
   defp publish(state, trade) do
     Enum.each(trade.offers, fn {guid, offer} ->
-      Enum.each(TradeLogic.participants(trade), fn receiver ->
+      Enum.each(Trade.participants(trade), fn receiver ->
         state.packet.(
           %SmsgTradeStatusExtended{
             other?: receiver != guid,
@@ -332,7 +331,7 @@ defmodule ThistleTea.Game.World.System.Trade do
   defp cast_spell_id(%{spell: %{spell: spell}}), do: spell.id
 
   defp status_both(state, trade, status) do
-    Enum.each(TradeLogic.participants(trade), &state.packet.(%SmsgTradeStatus{status: status}, &1))
+    Enum.each(Trade.participants(trade), &state.packet.(%SmsgTradeStatus{status: status}, &1))
   end
 
   defp put_session(state, session), do: %{state | sessions: Map.put(state.sessions, session.trade.id, session)}
@@ -364,7 +363,7 @@ defmodule ThistleTea.Game.World.System.Trade do
     %{
       state
       | sessions: Map.delete(state.sessions, session.trade.id),
-        players: Map.drop(state.players, TradeLogic.participants(session.trade))
+        players: Map.drop(state.players, Trade.participants(session.trade))
     }
   end
 end

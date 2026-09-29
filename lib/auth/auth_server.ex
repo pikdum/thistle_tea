@@ -7,7 +7,9 @@ defmodule ThistleTea.Auth do
 
   import Binary, only: [reverse: 1]
 
+  alias ThistleTea.Auth.Account
   alias ThistleTea.Auth.SRP
+  alias ThistleTea.Game.Core.Realm
 
   require Logger
 
@@ -118,7 +120,7 @@ defmodule ThistleTea.Auth do
     Logger.metadata(username: username)
     Logger.info("CMD_AUTH_LOGON_CHALLENGE")
 
-    case ThistleTea.Account.get_user(username) do
+    case Account.get_user(username) do
       {:ok, account} ->
         send_logon_challenge(socket, state, account, protocol_version)
 
@@ -188,7 +190,7 @@ defmodule ThistleTea.Auth do
     game_server = Application.fetch_env!(:thistle_tea, :game_server)
 
     realm =
-      <<ThistleTea.Realm.type()::little-size(32), 0::little-size(8)>> <>
+      <<Realm.type()::little-size(32), 0::little-size(8)>> <>
         "Thistle Tea" <>
         <<0>> <>
         "#{game_server}:8085" <>
@@ -215,7 +217,7 @@ defmodule ThistleTea.Auth do
     Logger.metadata(username: username)
     Logger.info("CMD_AUTH_RECONNECT_CHALLENGE")
 
-    with {:ok, account} <- ThistleTea.Account.get_user(username),
+    with {:ok, account} <- Account.get_user(username),
          [{_, session}] <- :ets.lookup(:session, account.username) do
       challenge_data = :crypto.strong_rand_bytes(16)
       ThousandIsland.Socket.send(socket, <<2, 0>> <> challenge_data <> :crypto.strong_rand_bytes(16))

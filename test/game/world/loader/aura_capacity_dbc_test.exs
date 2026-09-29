@@ -1,10 +1,10 @@
 defmodule ThistleTea.Game.World.Loader.AuraCapacityDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Aura, as: AuraData
-  alias ThistleTea.Game.Aura.Holder
-  alias ThistleTea.Game.Entity.Logic.Aura.Priority
-  alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
+  alias ThistleTea.Game.Core.Aura, as: AuraData
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Aura.Priority
+  alias ThistleTea.Game.Core.Aura.UnitSync
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db

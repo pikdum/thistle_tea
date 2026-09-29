@@ -1,24 +1,24 @@
 defmodule ThistleTea.Game.World.Loader.ConsumableDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.CreatureTemplate
-  alias ThistleTea.Game.Entity.EffectResolver
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Effects.RandomChoice
-  alias ThistleTea.Game.Entity.Logic.SpellEffect
-  alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Effects.RandomChoice
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.CreatureTemplate
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.SpellEffect
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Entity.EffectResolver
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellScriptName
-  alias ThistleTea.Game.WorldRef
 
   @moduletag :dbc_db
   @children [8064, 8065, 8066, 8067, 8068, 8070, 8219, 8220, 8221, 8222, 16_591, 16_593, 16_595]

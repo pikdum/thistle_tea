@@ -3,26 +3,27 @@ defmodule ThistleTea.Game.World do
   World-level spatial queries and position upkeep: nearby players/mobs/units
   by range, and updating an entity's place in the spatial hash tables.
   """
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Corpse
-  alias ThistleTea.Game.Entity.Data.DynamicObject, as: DataDynamicObject
-  alias ThistleTea.Game.Entity.Data.GameObject
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.Movement
-  alias ThistleTea.Game.Entity.Server.Corpse, as: CorpseServer
-  alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
-  alias ThistleTea.Game.Entity.Server.GameObject, as: GameObjectServer
-  alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
-  alias ThistleTea.Game.Entity.Server.Transport, as: TransportServer
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Math
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Corpse
+  alias ThistleTea.Game.Core.Entity.DynamicObject, as: DataDynamicObject
+  alias ThistleTea.Game.Core.Entity.GameObject
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Math
+  alias ThistleTea.Game.Core.Movement
+  alias ThistleTea.Game.Core.SpatialGrid
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network
-  alias ThistleTea.Game.SpatialGrid
-  alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World.EntitySupervisor
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Corpse, as: CorpseServer
+  alias ThistleTea.Game.World.Entity.DynamicObject, as: DynamicObjectServer
+  alias ThistleTea.Game.World.Entity.EntitySupervisor
+  alias ThistleTea.Game.World.Entity.GameObject, as: GameObjectServer
+  alias ThistleTea.Game.World.Entity.Mob, as: MobServer
+  alias ThistleTea.Game.World.Entity.Transport, as: TransportServer
   alias ThistleTea.Game.World.Loader.Transport, as: TransportLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
@@ -31,7 +32,6 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Weather
-  alias ThistleTea.Game.WorldRef
 
   def entry(%{object: %{entry: entry}}), do: entry
 

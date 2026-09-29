@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.AuctionHouseTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Auction.House
+  alias ThistleTea.Game.Core.Auction.House
   alias ThistleTea.Game.World.Loader.AuctionHouse, as: AuctionHouseLoader
 
   describe "for_faction/2" do

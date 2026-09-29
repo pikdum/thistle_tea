@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgRequestRaidInfo do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_REQUEST_RAID_INFO
 
-  alias ThistleTea.Game.Player.Instances
+  alias ThistleTea.Game.World.Entity.Player.Instances
 
   defstruct []
 

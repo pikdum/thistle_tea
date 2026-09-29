@@ -6,8 +6,8 @@ defmodule ThistleTea.Game.World.Loader.ItemEnchantment do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.ItemEnchantment
-  alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Core.Item.ItemEnchantment
+  alias ThistleTea.Game.Core.Spell.Effect
 
   @equip_spell_type 3
   @mod_skill_aura 30

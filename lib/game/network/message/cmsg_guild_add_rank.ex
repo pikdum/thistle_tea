@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGuildAddRank do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GUILD_ADD_RANK
 
-  alias ThistleTea.Game.Player.Guilds
+  alias ThistleTea.Game.World.Entity.Player.Guilds
 
   defstruct [:name]
 

@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Pathfinding.Aquatic do
   @moduledoc "Resolves underwater travel and checks creature habitat constraints against terrain and liquid surfaces."
 
-  alias ThistleTea.Game.Math
+  alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.World.Pathfinding
 
   @minimum_depth 1.5

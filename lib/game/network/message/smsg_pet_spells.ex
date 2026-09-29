@@ -4,9 +4,9 @@ defmodule ThistleTea.Game.Network.Message.SmsgPetSpells do
 
   import Bitwise, only: [<<<: 2, |||: 2]
 
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
-  alias ThistleTea.Game.Entity.Logic.PetControls
-  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
+  alias ThistleTea.Game.Core.Pet.PetControls
+  alias ThistleTea.Game.Core.Spell
 
   @act_command 0x07
   @act_passive 0x01

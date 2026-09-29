@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgResurrectResponse do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_RESURRECT_RESPONSE
 
-  alias ThistleTea.Game.Player.Resurrection
+  alias ThistleTea.Game.World.Entity.Player.Resurrection
 
   defstruct [:guid, :status]
 

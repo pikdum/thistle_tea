@@ -4,30 +4,25 @@ defmodule ThistleTea.Application do
   @moduledoc false
   use Application
 
+  alias ThistleTea.Auth.Account
   alias ThistleTea.DB.Mangos.Repo
-  alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
-  alias ThistleTea.Game.Entity.Server.PlayerSupervisor
-  alias ThistleTea.Game.InstanceScript
+  alias ThistleTea.Game.Core.InstanceScript
+  alias ThistleTea.Game.Core.OutdoorPvp.Plaguelands
+  alias ThistleTea.Game.Core.OutdoorPvp.PlaguelandsRewards
+  alias ThistleTea.Game.Core.OutdoorPvp.Towers
   alias ThistleTea.Game.Network.Server, as: GameServer
   alias ThistleTea.Game.Network.Sessions
-  alias ThistleTea.Game.OutdoorPvp.Plaguelands
-  alias ThistleTea.Game.OutdoorPvp.PlaguelandsRewards
-  alias ThistleTea.Game.OutdoorPvp.Towers
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.AreaEffects
-  alias ThistleTea.Game.World.Battleground.BuffRegistry
-  alias ThistleTea.Game.World.Battleground.Spawns
-  alias ThistleTea.Game.World.Battleground.Supervisor, as: BattlegroundSupervisor
   alias ThistleTea.Game.World.CharacterStore
-  alias ThistleTea.Game.World.ChaseWatch
-  alias ThistleTea.Game.World.CombatLeashes
-  alias ThistleTea.Game.World.CreatureGroups
-  alias ThistleTea.Game.World.EntitySupervisor
+  alias ThistleTea.Game.World.Combat.AggroProbe
+  alias ThistleTea.Game.World.Combat.ChaseWatch
+  alias ThistleTea.Game.World.Entity.EntitySupervisor
+  alias ThistleTea.Game.World.Entity.PlayerSupervisor
+  alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.World.Graveyards
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.HonorStore
-  alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
   alias ThistleTea.Game.World.Loader.AuctionHouse, as: AuctionHouseLoader
@@ -93,27 +88,33 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Weather, as: WeatherLoader
   alias ThistleTea.Game.World.MailStore
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.OutdoorPvp.CaptureEnvironment
-  alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.ServerVariables
-  alias ThistleTea.Game.World.SingleTargetAuras
   alias ThistleTea.Game.World.SocialStore
-  alias ThistleTea.Game.World.SpawnPool
-  alias ThistleTea.Game.World.SpawnPool.Catalog, as: SpawnPoolCatalog
-  alias ThistleTea.Game.World.SpellMagnets
   alias ThistleTea.Game.World.System.Auction, as: AuctionSystem
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
+  alias ThistleTea.Game.World.System.Battleground.BuffRegistry
+  alias ThistleTea.Game.World.System.Battleground.Spawns
+  alias ThistleTea.Game.World.System.Battleground.Supervisor, as: BattlegroundSupervisor
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.ChatChannels
+  alias ThistleTea.Game.World.System.CombatLeashes
+  alias ThistleTea.Game.World.System.CreatureGroups
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
   alias ThistleTea.Game.World.System.Guild, as: GuildSystem
   alias ThistleTea.Game.World.System.Honor, as: HonorSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
+  alias ThistleTea.Game.World.System.Instance.InstanceData
   alias ThistleTea.Game.World.System.OutdoorPvp, as: OutdoorPvpSystem
+  alias ThistleTea.Game.World.System.OutdoorPvp.CaptureEnvironment
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.System.Petition, as: PetitionSystem
+  alias ThistleTea.Game.World.System.PostOffice
   alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
+  alias ThistleTea.Game.World.System.SingleTargetAuras
+  alias ThistleTea.Game.World.System.SpawnPool
+  alias ThistleTea.Game.World.System.SpawnPool.Catalog, as: SpawnPoolCatalog
+  alias ThistleTea.Game.World.System.SpellMagnets
   alias ThistleTea.Game.World.System.Trade, as: TradeSystem
   alias ThistleTea.Game.World.System.VendorStock
   alias ThistleTea.Game.World.System.Weather, as: WeatherSystem
@@ -139,17 +140,17 @@ defmodule ThistleTea.Application do
 
   def setup_database do
     # in memory for now, so need to re-seed on startup
-    ThistleTea.Account.init()
-    ThistleTea.Account.register("pikdum", "pikdum")
-    ThistleTea.Account.register("test", "test")
+    Account.init()
+    Account.register("pikdum", "pikdum")
+    Account.register("test", "test")
 
     Enum.each(1..10, fn i ->
-      ThistleTea.Account.register("test#{i}", "test#{i}")
+      Account.register("test#{i}", "test#{i}")
     end)
 
     Enum.each(0..999, fn i ->
       name = "BOT" <> String.pad_leading(Integer.to_string(i), 4, "0")
-      ThistleTea.Account.register(name, name)
+      Account.register(name, name)
     end)
   end
 

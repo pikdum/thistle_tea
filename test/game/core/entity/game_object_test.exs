@@ -1,0 +1,304 @@
+defmodule ThistleTea.Game.Core.Entity.GameObjectTest do
+  use ExUnit.Case, async: true
+
+  alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Core.Entity.GameObject
+  alias ThistleTea.Game.Core.Entity.GameObjectTemplate
+  alias ThistleTea.Game.Core.Guid
+
+  defp lightwell_template do
+    GameObjectTemplate.build(%Mangos.GameObjectTemplate{
+      entry: 181_102,
+      type: 22,
+      display_id: 6671,
+      name: "Lightwell",
+      faction: 0,
+      flags: 0,
+      size: 1.35,
+      data0: 7001,
+      data1: 5
+    })
+  end
+
+  describe "build_summoned/4" do
+    test "ownerless chests retain loot, lock, gold and activation fields" do
+      template = %GameObjectTemplate{
+        entry: 161_513,
+        type: 3,
+        size: 1.0,
+        flags: 4,
+        min_gold: 3,
+        max_gold: 9,
+        data: [57, 10_100, 0, 1, 1, 1]
+      }
+
+      chest = GameObject.build_summoned(template, 999, {1.0, 2.0, 3.0, 0.0}, despawn_in_ms: 120_000)
+      assert chest.game_object.created_by == nil
+      assert chest.internal.summon.owner_guid == nil
+      assert chest.internal.loot.id == 10_100
+      assert chest.internal.loot.min_gold == 3
+      assert chest.internal.loot.max_gold == 9
+      assert chest.internal.gathering.lock_id == 57
+      assert chest.game_object.dyn_flags == 1
+      assert Guid.low_guid(chest.object.guid) >= 0xC00000
+    end
+
+    test "environmental traps keep their radius, repeat count and cooldown" do
+      template = %GameObjectTemplate{entry: 180_647, type: 6, size: 1.0, data: [0, 0, 15, 25_656, 0, 3, 0, 4]}
+      trap = GameObject.build_summoned(template, 999, {1.0, 2.0, 3.0, 0.0}).internal.trap
+      assert trap.owner_guid == nil
+      assert trap.radius == 15.0
+      assert trap.charges == 0
+      assert trap.start_delay_ms == 4_000
+      assert trap.cooldown_ms == 3_000
+    end
+
+    test "builds a spellcaster game object with use spell, charges, owner, and despawn" do
+      go =
+        GameObject.build_summoned(lightwell_template(), 0, {1.0, 2.0, 3.0, 0.5},
+          summoned_by: 99,
+          despawn_in_ms: 180_000
+        )
+
+      assert go.object.entry == 181_102
+      assert Guid.type_id(go.object.guid) == :game_object
+      assert go.game_object.display_id == 6671
+      assert go.game_object.type_id == 22
+      assert go.movement_block.position == {1.0, 2.0, 3.0, 0.5}
+      assert go.internal.world.map_id == 0
+      assert go.internal.summon.owner_guid == 99
+      assert go.internal.summon.spell_id == 7001
+      assert go.internal.summon.charges == 5
+      assert go.internal.summon.despawn_in_ms == 180_000
+    end
+
+    test "summoned guids are unique per call" do
+      template = lightwell_template()
+      a = GameObject.build_summoned(template, 0, {0.0, 0.0, 0.0, 0.0}, [])
+      b = GameObject.build_summoned(template, 0, {0.0, 0.0, 0.0, 0.0}, [])
+
+      assert a.object.guid != b.object.guid
+    end
+
+    test "non-spellcaster templates carry no use spell" do
+      template = %{lightwell_template() | type: 5}
+      go = GameObject.build_summoned(template, 0, {0.0, 0.0, 0.0, 0.0}, [])
+
+      assert go.internal.summon.spell_id == nil
+      assert go.internal.summon.charges == nil
+    end
+
+    test "hunter trap templates retain their trigger definition" do
+      data = [12, 0, 5, 13_797, 1, 0, 0, 0, 0, 1] ++ List.duplicate(0, 14)
+
+      template = %GameObjectTemplate{
+        entry: 164_638,
+        type: 6,
+        display_id: 3074,
+        name: "Immolation Trap",
+        size: 1.0,
+        flags: 0,
+        faction: 0,
+        data: data
+      }
+
+      trap = GameObject.build_summoned(template, 0, {0.0, 0.0, 0.0, 0.0}, summoned_by: 99)
+
+      assert trap.internal.trap.owner_guid == 99
+      assert trap.internal.trap.spell_id == 13_797
+      assert trap.internal.trap.radius == 2.5
+      assert trap.internal.trap.charges == 1
+      assert trap.internal.trap.stealthed?
+      assert trap.internal.gathering.lock_id == 12
+    end
+
+    test "summoning ritual templates retain target and participant data" do
+      template = %GameObjectTemplate{
+        entry: 36_727,
+        type: 18,
+        display_id: 1327,
+        name: "Summoning Portal",
+        size: 1.0,
+        flags: 0,
+        faction: 0,
+        data: [3, 7720, 698, 0, 0, 0, 1, 0] ++ List.duplicate(0, 16)
+      }
+
+      portal =
+        GameObject.build_summoned(template, 0, {0.0, 0.0, 0.0, 0.0},
+          summoned_by: 99,
+          ritual_target_guid: 123,
+          ritual_zone_id: 12
+        )
+
+      assert portal.internal.ritual.owner_guid == 99
+      assert portal.internal.ritual.target_guid == 123
+      assert portal.internal.ritual.required_participants == 3
+      assert portal.internal.ritual.completion_spell_id == 7720
+      assert portal.internal.ritual.animation_spell_id == 698
+      assert portal.internal.ritual.casters_grouped?
+      refute portal.internal.ritual.persistent?
+      assert portal.internal.ritual.zone_id == 12
+      assert portal.internal.ritual.users == MapSet.new([99])
+    end
+
+    test "ritual templates retain their data-driven completion behavior" do
+      template = %GameObjectTemplate{
+        entry: 177_193,
+        type: 18,
+        display_id: 1327,
+        name: "Doom Portal",
+        size: 1.0,
+        flags: 0,
+        faction: 0,
+        data: [5, 18_541, 18_540, 0, 20_625, 1, 1, 0] ++ List.duplicate(0, 16)
+      }
+
+      portal = GameObject.build_summoned(template, 0, {0.0, 0.0, 0.0, 0.0}, summoned_by: 99)
+
+      assert portal.internal.ritual.required_participants == 5
+      assert portal.internal.ritual.completion_spell_id == 18_541
+      assert portal.internal.ritual.animation_spell_id == 18_540
+      assert portal.internal.ritual.caster_target_spell_id == 20_625
+      assert portal.internal.ritual.caster_target_spell_targets == 1
+      assert portal.internal.ritual.casters_grouped?
+    end
+  end
+
+  describe "build/1" do
+    test "static traps retain their spawn's respawn delay and stealth flag" do
+      row = %Mangos.GameObject{
+        guid: 1,
+        id: 2,
+        map: 0,
+        spawntimesecsmin: 90,
+        orientation: 0.0,
+        position_x: 0.0,
+        position_y: 0.0,
+        position_z: 0.0,
+        game_object_template: %Mangos.GameObjectTemplate{entry: 2, type: 6, data0: 12, data9: 1}
+      }
+
+      object = GameObject.build(row)
+      assert object.internal.spawn.respawn_delay_ms == 90_000
+      assert object.internal.trap.stealthed?
+      assert object.internal.gathering.lock_id == 12
+    end
+  end
+
+  describe "build/1 chests" do
+    defp bucket_row do
+      %Mangos.GameObject{
+        guid: 5000,
+        id: 161_557,
+        map: 0,
+        position_x: 1.0,
+        position_y: 2.0,
+        position_z: 3.0,
+        orientation: 0.0,
+        rotation0: 0.0,
+        rotation1: 0.0,
+        rotation2: 0.0,
+        rotation3: 1.0,
+        state: 1,
+        animprogress: 100,
+        spawntimesecsmin: 180,
+        spawntimesecsmax: 180,
+        game_object_template: %Mangos.GameObjectTemplate{
+          entry: 161_557,
+          type: 3,
+          display_id: 3012,
+          name: "Milly's Harvest",
+          faction: 0,
+          flags: 4,
+          size: 1.0,
+          data0: 43,
+          data1: 10_119,
+          mingold: 0,
+          maxgold: 0
+        },
+        game_event_game_object: nil
+      }
+    end
+
+    test "carries loot config, respawn delay, and the activate dynamic flag" do
+      go = GameObject.build(bucket_row())
+
+      assert go.internal.loot.id == 10_119
+      assert go.internal.loot.min_gold == 0
+      assert go.internal.spawn.respawn_delay_ms == 180_000
+      assert go.game_object.dyn_flags == 1
+    end
+
+    test "non-chest game objects carry no loot" do
+      row = bucket_row()
+      row = %{row | game_object_template: %{row.game_object_template | type: 5}}
+      go = GameObject.build(row)
+
+      assert go.internal.loot == nil
+      assert go.internal.spawn == nil
+      assert go.game_object.dyn_flags == 0
+    end
+
+    test "chair game objects carry their slot count and height" do
+      row = bucket_row()
+
+      row = %{
+        row
+        | game_object_template: %{
+            row.game_object_template
+            | type: 7,
+              data0: 3,
+              data1: 2
+          }
+      }
+
+      go = GameObject.build(row)
+
+      assert go.internal.chair.slots == 3
+      assert go.internal.chair.height == 2
+    end
+  end
+
+  describe "build/1 transports" do
+    test "builds an animated transport with its transport guid and stationary movement data" do
+      row = %Mangos.GameObject{
+        guid: 18_802,
+        id: 176_080,
+        map: 369,
+        position_x: -45.3934,
+        position_y: 2472.93,
+        position_z: 6.90526,
+        orientation: 1.5708,
+        rotation0: 0.0,
+        rotation1: 0.0,
+        rotation2: -0.707107,
+        rotation3: 0.707107,
+        state: 1,
+        animprogress: 0,
+        game_object_template: %Mangos.GameObjectTemplate{
+          entry: 176_080,
+          type: 11,
+          display_id: 3831,
+          name: "Subway",
+          faction: 0,
+          flags: 40,
+          size: 1.0,
+          data0: 7,
+          data1: 0
+        },
+        game_event_game_object: nil
+      }
+
+      transport = GameObject.build(row)
+
+      assert Guid.transport?(transport.object.guid)
+      assert transport.game_object.flags == 0x28
+      assert transport.game_object.state == 0
+      assert transport.game_object.level == 7
+      assert transport.movement_block.update_flag == 0x52
+      assert transport.movement_block.stationary_position == {-45.3934, 2472.93, 6.90526, 1.5708}
+      assert transport.movement_block.transport_progress_in_ms == 0
+    end
+  end
+end

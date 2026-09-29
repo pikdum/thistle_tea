@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.Loader.SpellAreaTest do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.SpellArea, as: Row
-  alias ThistleTea.Game.Spell.Area
+  alias ThistleTea.Game.Core.Spell.Area
   alias ThistleTea.Game.World.Loader.SpellArea
 
   describe "load/2" do

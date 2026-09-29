@@ -1,0 +1,191 @@
+defmodule ThistleTea.Game.World.Entity.Player.StateTest do
+  use ExUnit.Case, async: false
+
+  alias ThistleTea.Game.Core.AI.BT.Blackboard
+  alias ThistleTea.Game.Core.AI.Script
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Effects.PetDied
+  alias ThistleTea.Game.Core.Effects.PetHappinessChanged
+  alias ThistleTea.Game.Core.Effects.PetProgressChanged
+  alias ThistleTea.Game.Core.Effects.PetReactionChanged
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player, as: PlayerComponent
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.Companion.EntityRef
+  alias ThistleTea.Game.Core.Pet.PetProgress
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Player
+  alias ThistleTea.Game.World.Entity.Player.CompanionOwner
+  alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.System.CellActivator
+
+  defmodule HappinessPet do
+    @moduledoc false
+    use GenServer, restart: :temporary
+
+    def start_link({guid, happiness}), do: GenServer.start_link(__MODULE__, {guid, happiness})
+
+    @impl true
+    def init({guid, happiness}) do
+      Entity.register(guid)
+      {:ok, happiness}
+    end
+
+    @impl true
+    def handle_call(:suspend_hunter_pet, _from, happiness),
+      do: {:stop, :normal, {:ok, happiness, true, %PetProgress{level: 49, xp: 1_234}, :passive, 0}, happiness}
+  end
+
+  describe "struct defaults" do
+    test "starts not ready with empty world-presence bookkeeping" do
+      state = %State{}
+
+      refute state.ready
+      assert state.tracked_entities == MapSet.new()
+      assert state.visibility_cells == nil
+      assert state.player_guids == []
+      assert state.mob_guids == []
+      assert state.cell_activator == CellActivator
+    end
+  end
+
+  describe "leave_world/1" do
+    test "resets to a bare player state keeping its boundary references" do
+      state = %State{
+        connection_pid: self(),
+        account: %{username: "test"},
+        ready: true,
+        target: 42,
+        logout_timer: make_ref()
+      }
+
+      assert State.leave_world(state) == %State{
+               connection_pid: self(),
+               account: %{username: "test"}
+             }
+    end
+  end
+
+  describe "worldport bookkeeping" do
+    test "discards script continuations while retaining the receipt sequence" do
+      origin = WorldRef.open(0)
+      destination = WorldRef.open(1)
+
+      character = %Character{
+        object: %Object{guid: 7},
+        unit: %Unit{},
+        player: %PlayerComponent{},
+        internal: %Internal{world: origin}
+      }
+
+      step = %ScriptStep{command: :stand_state, datalong: 1, delay_ms: 1_000}
+      {character, _} = Script.run(character, Blackboard.new(), [step], 0, 0)
+      assert map_size(character.internal.scripts.runs) == 1
+      state = State.prepare_worldport(%State{character: character}, origin, destination)
+      assert state.character.internal.scripts.runs == %{}
+      assert state.character.internal.scripts.sequence == 1
+    end
+
+    test "emits the previous instance after worldport completion" do
+      state =
+        State.prepare_worldport(
+          %State{},
+          WorldRef.instance(389, 12),
+          WorldRef.open(1)
+        )
+
+      assert state.pending_last_instance_map == 389
+      assert state.pending_worldport?
+      assert %State{pending_last_instance_map: nil, pending_worldport?: false} = State.complete_worldport(state)
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgUpdateLastInstance{map: 389}}}
+    end
+
+    test "does not record an instance on entry" do
+      state =
+        State.prepare_worldport(
+          %State{},
+          WorldRef.open(1),
+          WorldRef.instance(389, 12)
+        )
+
+      assert state.pending_last_instance_map == nil
+    end
+  end
+
+  describe "suspend_companion/1" do
+    test "clears the possession camera and mover before retaining the character" do
+      guid = System.unique_integer([:positive, :monotonic])
+      target = System.unique_integer([:positive, :monotonic])
+      Entity.register(target)
+
+      character =
+        %Character{
+          object: %Object{guid: guid},
+          unit: %Unit{},
+          player: %PlayerComponent{farsight: target},
+          internal: %Internal{}
+        }
+        |> Companion.activate(:possession, %EntityRef{guid: target, entry: 0, spell_id: 605})
+
+      state = CompanionOwner.suspend(%State{guid: guid, character: character, active_mover_guid: target})
+      assert state.character.player.farsight == 0
+      assert state.active_mover_guid == guid
+      assert Companion.active_guid(state.character) == nil
+      assert_receive {:release_control, ^guid, 605}
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgClientControlUpdate{guid: ^target, allow_movement?: false}}}
+    end
+
+    test "ignores pet updates queued before logout completed" do
+      state = %State{}
+
+      for event <- [
+            %PetHappinessChanged{source_guid: 1, target_guid: 7, happiness: 0},
+            %PetProgressChanged{source_guid: 1, target_guid: 7, progress: %PetProgress{level: 49}},
+            %PetReactionChanged{source_guid: 1, target_guid: 7, reaction_state: :passive},
+            %PetDied{source_guid: 1, target_guid: 7}
+          ] do
+        assert Player.handle_info(event, state) == {:noreply, state}
+      end
+    end
+
+    test "captures final happiness and death before stopping the pet process" do
+      guid = Guid.from_low_guid(:pet, 2960, :erlang.unique_integer([:positive]))
+      pid = start_supervised!({HappinessPet, {guid, 700_000}})
+      ref = Process.monitor(pid)
+
+      character =
+        %Character{unit: %Unit{}, internal: %Internal{}}
+        |> Companion.activate(:hunter_pet, %EntityRef{guid: guid, entry: 2960, spell_id: 1515})
+        |> Companion.remember_happiness(guid, 300_000)
+
+      state = CompanionOwner.suspend(%State{character: character})
+      assert Companion.relationship(state.character).happiness == 700_000
+      assert Companion.relationship(state.character).progress == %PetProgress{level: 49, xp: 1_234}
+      assert Companion.relationship(state.character).reaction_state == :passive
+      assert Companion.relationship(state.character).dead?
+      assert Companion.suspended(state.character) == {:hunter_pet, 2960, 1515}
+      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
+    end
+
+    test "replaces the active reference with stable restore state" do
+      character =
+        %Character{unit: %Unit{}, internal: %Internal{}}
+        |> Companion.activate(:guardian, %EntityRef{guid: 123, entry: 1863, spell_id: 712})
+
+      state = CompanionOwner.suspend(%State{character: character})
+
+      assert state.character.unit.summon == 0
+
+      assert state.character.internal.companion ==
+               %Companion{kind: :guardian, status: {:suspended, 1863, 712}}
+    end
+  end
+end

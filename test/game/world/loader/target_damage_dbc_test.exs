@@ -2,23 +2,23 @@ defmodule ThistleTea.Game.World.Loader.TargetDamageDbcTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Data.ItemEnchantment
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.EquipmentStats
-  alias ThistleTea.Game.Entity.Logic.Inventory
-  alias ThistleTea.Game.Entity.Logic.TargetDamage
-  alias ThistleTea.Game.Player.Enchantments
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Combat.TargetDamage
+  alias ThistleTea.Game.Core.Entity
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Inventory
+  alias ThistleTea.Game.Core.Item.ItemEnchantment
+  alias ThistleTea.Game.Core.Stats.EquipmentStats
+  alias ThistleTea.Game.World.Entity.Player.Enchantments
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
@@ -80,7 +80,7 @@ defmodule ThistleTea.Game.World.Loader.TargetDamageDbcTest do
       replaced = Character.sync_equipment_stats(equipped)
       assert Enum.sort(TargetDamage.snapshot(replaced)) == [{1, 6}, {8, 6}]
       assert Enum.sort(TargetDamage.snapshot(Enchantments.restore(replaced))) == [{1, 6}, {8, 6}]
-      dead = Core.take_damage(replaced, 1_000, 100)
+      dead = Entity.take_damage(replaced, 1_000, 100)
       assert Enum.sort(TargetDamage.snapshot(dead)) == [{1, 6}, {8, 6}]
     end
   end

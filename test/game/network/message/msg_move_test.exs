@@ -1,31 +1,31 @@
 defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Taxi.Flight
-  alias ThistleTea.Game.Entity.Logic.Companion
-  alias ThistleTea.Game.Entity.Server.Player.ServerMovement
-  alias ThistleTea.Game.Entity.Server.Player.State
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.Companion.EntityRef
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.Travel.Taxi.Flight
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message.MsgMove
   alias ThistleTea.Game.Network.Message.SmsgEnvironmentalDamageLog
   alias ThistleTea.Game.Network.Message.SmsgStandstateUpdate
   alias ThistleTea.Game.Network.Opcodes
-  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Player.ServerMovement
+  alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.Position.ClientMotion
   alias ThistleTea.Game.World.Presence
-  alias ThistleTea.Game.WorldRef
 
   describe "handle/2" do
     test "stationary heartbeats preserve sitting and movement acknowledges standing" do

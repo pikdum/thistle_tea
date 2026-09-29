@@ -4,19 +4,35 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
   @root Path.expand("../../..", __DIR__)
 
   @allowed_logic_boundaries MapSet.new([
-                              {"lib/game/entity/logic/ai/bt/mob.ex", "ThistleTea.Game.World"},
-                              {"lib/game/entity/logic/ai/bt/mob.ex", "ThistleTea.Game.World.Metadata"},
-                              {"lib/game/entity/logic/casting.ex", "ThistleTea.Game.World"},
-                              {"lib/game/entity/logic/casting.ex", "ThistleTea.Game.World.Metadata"},
-                              {"lib/game/entity/logic/core.ex", "ThistleTea.Game.Network.UpdateObject"},
-                              {"lib/game/entity/logic/hostility.ex", "ThistleTea.Game.World.Metadata"},
-                              {"lib/game/entity/logic/hostility.ex", "ThistleTea.Game.World.System.Duel"},
-                              {"lib/game/entity/logic/shaman.ex", "ThistleTea.Game.World.Loader.Spell"},
-                              {"lib/game/entity/logic/spell_effect/script.ex",
+                              {"lib/game/core/ai/bt/combat.ex", "ThistleTea.Game.World.Spell.SpellTargetResolver"},
+                              {"lib/game/core/ai/bt/mob.ex", "ThistleTea.Game.World"},
+                              {"lib/game/core/ai/bt/mob.ex", "ThistleTea.Game.World.Metadata"},
+                              {"lib/game/core/class/shaman.ex", "ThistleTea.Game.World.Loader.Spell"},
+                              {"lib/game/core/combat/hostility.ex", "ThistleTea.Game.World.Metadata"},
+                              {"lib/game/core/combat/hostility.ex", "ThistleTea.Game.World.System.Duel"},
+                              {"lib/game/core/combat/threat.ex", "ThistleTea.Game.World"},
+                              {"lib/game/core/combat/threat.ex", "ThistleTea.Game.World.Metadata"},
+                              {"lib/game/core/entity.ex", "ThistleTea.Game.Network.UpdateObject"},
+                              {"lib/game/core/entity/character.ex", "ThistleTea.Game.World.ItemStore"},
+                              {"lib/game/core/entity/character.ex", "ThistleTea.Game.World.Loader.Item"},
+                              {"lib/game/core/entity/character.ex", "ThistleTea.Game.World.Loader.ItemEnchantment"},
+                              {"lib/game/core/entity/character.ex", "ThistleTea.Game.World.Loader.ItemSet"},
+                              {"lib/game/core/entity/character.ex", "ThistleTea.Game.World.Loader.Spell"},
+                              {"lib/game/core/entity/component/movement_block.ex",
+                               "ThistleTea.Game.Network.BinaryUtils"},
+                              {"lib/game/core/entity/component/player.ex", "ThistleTea.Game.Network.UpdateObject"},
+                              {"lib/game/core/entity/component/unit.ex", "ThistleTea.Game.Network.UpdateObject"},
+                              {"lib/game/core/entity/corpse.ex", "ThistleTea.Game.Network.UpdateObject"},
+                              {"lib/game/core/party.ex", "ThistleTea.Game.World.System.Party"},
+                              {"lib/game/core/party/member_stats.ex", "ThistleTea.Game.Network.BinaryUtils"},
+                              {"lib/game/core/player/talents.ex", "ThistleTea.Game.World.Loader.Talent"},
+                              {"lib/game/core/spell/cast_context.ex", "ThistleTea.Game.World.Loader.SpellThreat"},
+                              {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World"},
+                              {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World.Metadata"},
+                              {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World.Spell.SpellTargetResolver"},
+                              {"lib/game/core/spell/spell_effect/script.ex",
                                "ThistleTea.Game.World.Loader.SpellPetAura"},
-                              {"lib/game/entity/logic/talents.ex", "ThistleTea.Game.World.Loader.Talent"},
-                              {"lib/game/entity/logic/threat.ex", "ThistleTea.Game.World"},
-                              {"lib/game/entity/logic/threat.ex", "ThistleTea.Game.World.Metadata"}
+                              {"lib/game/core/spell/target_codec.ex", "ThistleTea.Game.Network.BinaryUtils"}
                             ])
 
   @spatial_index_boundaries MapSet.new([
@@ -57,7 +73,7 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
   test "target and movement rules stay outside concrete event interpreters" do
     violations =
       ["combat.ex", "movement.ex", "spells.ex"]
-      |> Enum.map(&Path.join([@root, "lib/game/entity/event_sink", &1]))
+      |> Enum.map(&Path.join([@root, "lib/game/world/entity/event_sink", &1]))
       |> Enum.filter(fn path ->
         source = File.read!(path)
 
@@ -83,7 +99,7 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
   end
 
   defp logic_boundary_dependencies do
-    Path.wildcard(Path.join([@root, "lib/game/entity/logic/**/*.ex"]))
+    Path.wildcard(Path.join([@root, "lib/game/core/**/*.ex"]))
     |> Enum.flat_map(fn path ->
       path
       |> File.read!()
@@ -101,29 +117,29 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
 
   defp event_sink_files do
     [
-      Path.join([@root, "lib/game/entity/event_sink.ex"])
-      | Path.wildcard(Path.join([@root, "lib/game/entity/event_sink/*.ex"]))
+      Path.join([@root, "lib/game/world/entity/event_sink.ex"])
+      | Path.wildcard(Path.join([@root, "lib/game/world/entity/event_sink/*.ex"]))
     ]
   end
 
   defp condition_runtime_files do
     relative = [
-      "lib/game/entity/logic/condition.ex",
-      "lib/game/entity/logic/loot.ex",
-      "lib/game/entity/logic/loot_session.ex",
-      "lib/game/entity/logic/ai/event_ai.ex",
-      "lib/game/entity/logic/ai/script.ex",
-      "lib/game/player/area_triggers.ex",
-      "lib/game/player/gossip.ex",
-      "lib/game/player/gossip_condition.ex",
-      "lib/game/player/looting.ex",
-      "lib/game/player/vendor.ex",
+      "lib/game/core/condition.ex",
+      "lib/game/core/loot.ex",
+      "lib/game/core/loot/loot_session.ex",
+      "lib/game/core/ai/event_ai.ex",
+      "lib/game/core/ai/script.ex",
+      "lib/game/world/entity/player/area_triggers.ex",
+      "lib/game/world/entity/player/gossip.ex",
+      "lib/game/world/entity/player/gossip_condition.ex",
+      "lib/game/world/entity/player/looting.ex",
+      "lib/game/world/entity/player/vendor.ex",
       "lib/game/network/message/cmsg_buy_item.ex",
       "lib/game/network/message/cmsg_gossip_hello.ex",
       "lib/game/network/message/cmsg_list_inventory.ex"
     ]
 
     Enum.map(relative, &Path.join(@root, &1)) ++
-      Path.wildcard(Path.join([@root, "lib/game/entity/logic/condition/**/*.ex"]))
+      Path.wildcard(Path.join([@root, "lib/game/core/condition/**/*.ex"]))
   end
 end

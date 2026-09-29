@@ -4,8 +4,8 @@ defmodule ThistleTea.Game.World.Loader.FirstAidVmangosTest do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Scripts
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Scripts
 
   @moduletag :vmangos_db
 

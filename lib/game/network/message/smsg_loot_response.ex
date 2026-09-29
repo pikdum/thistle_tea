@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgLootResponse do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_LOOT_RESPONSE
 
-  alias ThistleTea.Game.Entity.Data.ItemProperty
-  alias ThistleTea.Game.Entity.Logic.Loot
+  alias ThistleTea.Game.Core.Item.ItemProperty
+  alias ThistleTea.Game.Core.Loot
 
   @loot_type_corpse 1
 

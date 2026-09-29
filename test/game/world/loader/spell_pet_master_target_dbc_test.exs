@@ -1,19 +1,19 @@
 defmodule ThistleTea.Game.World.Loader.SpellPetMasterTargetDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.SpellEffect
-  alias ThistleTea.Game.Entity.Logic.SpellTarget
-  alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Core.Entity
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.SpellEffect
+  alias ThistleTea.Game.Core.Spell.SpellTarget
+  alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
-  alias ThistleTea.Game.WorldRef
 
   @moduletag :dbc_db
 
@@ -49,7 +49,7 @@ defmodule ThistleTea.Game.World.Loader.SpellPetMasterTargetDbcTest do
                  Enum.any?(holder.auras, &(&1.type == :school_absorb and &1.amount > 100))
              end)
 
-      {protected, absorbed} = Core.take_damage_with_absorb(shielded, 100, 1_001, school: :physical)
+      {protected, absorbed} = Entity.take_damage_with_absorb(shielded, 100, 1_001, school: :physical)
       assert absorbed == 100
       assert protected.unit.health == 100
     end

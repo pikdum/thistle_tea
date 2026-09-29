@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOption do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GOSSIP_SELECT_OPTION
 
-  alias ThistleTea.Game.Player.Gossip
+  alias ThistleTea.Game.World.Entity.Player.Gossip
 
   defstruct [:guid, :gossip_list_id, :code]
 

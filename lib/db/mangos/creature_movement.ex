@@ -3,7 +3,7 @@ defmodule ThistleTea.DB.Mangos.CreatureMovement do
 
   import Ecto.Query
 
-  alias ThistleTea.Game.Math
+  alias ThistleTea.Game.Core.Math
 
   @primary_key {:id, :integer, autogenerate: false}
   schema "creature_movement" do

@@ -7,8 +7,8 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Battleground
-  alias ThistleTea.Game.Battleground.Template
+  alias ThistleTea.Game.Core.Battleground
+  alias ThistleTea.Game.Core.Battleground.Template
 
   @supported_patch 10
   @table_options [:named_table, :public, read_concurrency: true]

@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.MsgRaidTargetUpdate do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_RAID_TARGET_UPDATE
 
-  alias ThistleTea.Game.Player.Groups
+  alias ThistleTea.Game.World.Entity.Player.Groups
 
   defstruct [:icon, :target]
 

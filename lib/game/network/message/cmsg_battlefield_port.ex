@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBattlefieldPort do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_BATTLEFIELD_PORT
 
-  alias ThistleTea.Game.Player.Battlegrounds
+  alias ThistleTea.Game.World.Entity.Player.Battlegrounds
 
   defstruct [:map, :action]
 

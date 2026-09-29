@@ -3,21 +3,21 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   Loads creature spawns and their immutable blueprint data from the VMangos seed.
   """
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.FeignDeath
-  alias ThistleTea.Game.Entity.Logic.SpellResist
-  alias ThistleTea.Game.Entity.Server.Mob.Incarnation
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Combat.FeignDeath
+  alias ThistleTea.Game.Core.Entity
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Spell.SpellResist
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Entity.Mob.Incarnation
   alias ThistleTea.Game.World.Loader.CreatureGroup, as: CreatureGroupLoader
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Mob.Batch
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.SpawnPool
-  alias ThistleTea.Game.World.SpawnPool.Catalog
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.World.System.SpawnPool
+  alias ThistleTea.Game.World.System.SpawnPool.Catalog
 
   def load(cell) do
     events = GameEvent.get_events()
@@ -107,9 +107,9 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         in_combat: false,
         rooted?: mob.internal.rooted? == true,
         root_aura?: Aura.has_aura?(mob, :mod_root),
-        health_pct: Core.health_pct(mob),
-        health_deficit: Core.health_deficit(mob),
-        mana_pct: Core.mana_pct(mob),
+        health_pct: Entity.health_pct(mob),
+        health_deficit: Entity.health_deficit(mob),
+        mana_pct: Entity.mana_pct(mob),
         power_type: mob.unit.power_type,
         shapeshift_form: mob.unit.shapeshift_form || 0,
         orientation: elem(mob.movement_block.position, 3),

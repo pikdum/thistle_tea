@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMailCreateTextItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MAIL_CREATE_TEXT_ITEM
 
-  alias ThistleTea.Game.Player.Mail
+  alias ThistleTea.Game.World.Entity.Player.Mail
 
   defstruct [:mailbox, :mail_id, :mail_template_id]
 

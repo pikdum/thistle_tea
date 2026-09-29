@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSplitItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SPLIT_ITEM
 
-  alias ThistleTea.Game.Player.Inventory
+  alias ThistleTea.Game.World.Entity.Player.Inventory
 
   defstruct [:src_bag, :src_slot, :dst_bag, :dst_slot, :count]
 

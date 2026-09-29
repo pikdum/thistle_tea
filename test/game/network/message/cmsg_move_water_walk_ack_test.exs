@@ -1,12 +1,12 @@
 defmodule ThistleTea.Game.Network.Message.CmsgMoveWaterWalkAckTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.CmsgMoveWaterWalkAck
   alias ThistleTea.Game.Network.Message.Dispatch
-  alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.World.Entity.Player.MovementControl
+  alias ThistleTea.Game.World.Entity.Player.State
 
   describe "from_binary/1" do
     test "dispatches the vanilla guid, counter, movement, and apply fields" do

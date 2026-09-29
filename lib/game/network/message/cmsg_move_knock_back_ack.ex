@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveKnockBackAck do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MOVE_KNOCK_BACK_ACK
 
-  alias ThistleTea.Game.Entity.Server.Player.State
-  alias ThistleTea.Game.Player.Knockback
+  alias ThistleTea.Game.World.Entity.Player.Knockback
+  alias ThistleTea.Game.World.Entity.Player.State
 
   defstruct [:guid, :counter, :movement_payload]
 

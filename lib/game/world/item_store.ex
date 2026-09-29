@@ -3,12 +3,12 @@ defmodule ThistleTea.Game.World.ItemStore do
   ETS store of live item instances by guid — the runtime home of items, which
   deliberately never enter visibility tracking.
   """
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Data.Trade.Exchange
-  alias ThistleTea.Game.Entity.Data.Trade.Receipt
-  alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Inventory.ChangeSet
+  alias ThistleTea.Game.Core.Trade.Exchange
+  alias ThistleTea.Game.Core.Trade.Receipt
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.ItemProperty, as: ItemPropertyLoader
 

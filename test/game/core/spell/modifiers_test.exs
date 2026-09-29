@@ -1,0 +1,247 @@
+defmodule ThistleTea.Game.Core.Spell.ModifiersTest do
+  use ExUnit.Case, async: true
+
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Power.Resources
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Modifiers
+
+  describe "value/4" do
+    test "applies flat and percent modifiers selected by DBC family masks" do
+      entity =
+        entity([
+          modifier_holder(:add_flat_modifier, 25, 7, 0x4),
+          modifier_holder(:add_pct_modifier, 50, 7, 0x4)
+        ])
+
+      affected = %Spell{spell_family: 8, family_flags_0: 0x4}
+      unaffected = %Spell{spell_family: 8, family_flags_0: 0x8}
+
+      assert Modifiers.value(entity, affected, :critical_chance, 5.0) == 45.0
+      assert Modifiers.value(entity, unaffected, :critical_chance, 5.0) == 5.0
+    end
+
+    test "stacked modifier holders multiply their amounts" do
+      holder = %{modifier_holder(:add_flat_modifier, 10, 7, 1) | stacks: 10}
+      entity = entity([holder])
+      spell = %Spell{spell_family: 8, family_flags_0: 0x1}
+
+      assert Modifiers.value(entity, spell, :critical_chance, 0.0) == 100.0
+    end
+
+    test "empty masks do not affect spells in the same family" do
+      entity = entity([modifier_holder(:add_pct_modifier, -100, 14, 0)])
+      spell = %Spell{spell_family: 8, family_flags_0: 0x80000000}
+
+      assert Modifiers.integer_value(entity, spell, :cost, 450) == 450
+    end
+
+    test "matches the upper half of vanilla's 64-bit family mask" do
+      entity = entity([modifier_holder(:add_pct_modifier, -100, 14, 0x100000000)])
+      spell = %Spell{spell_family: 8, family_flags_1: 1}
+      assert Modifiers.integer_value(entity, spell, :cost, 450) == 0
+      assert Modifiers.integer_value(entity, %{spell | family_flags_1: 2}, :cost, 450) == 450
+    end
+
+    test "cost modifiers feed the shared power calculation" do
+      entity = entity([modifier_holder(:add_pct_modifier, -100, 14, 1)])
+      spell = %Spell{spell_family: 8, family_flags_0: 1, mana_cost: 450, power_type: 0}
+
+      assert Resources.power_cost(entity, spell) == 0
+    end
+
+    test "ignored caster modifiers preserve costs, intervals, amounts, and charges" do
+      holders =
+        for operation <- [14, 19, 8, 22, 1] do
+          modifier_holder(:add_pct_modifier, -50, operation, 1, charges: 1, id: operation + 100)
+        end
+
+      entity = entity(holders)
+
+      spell = %Spell{
+        id: 90_001,
+        spell_family: 8,
+        family_flags_0: 1,
+        mana_cost: 200,
+        power_type: 0,
+        duration_ms: 6_000,
+        attributes: MapSet.new([:ignore_caster_modifiers]),
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :periodic_damage, base_points: 100, amplitude_ms: 2_000}]
+      }
+
+      assert Modifiers.snapshot(entity, spell) == []
+      assert Modifiers.for_spell(Modifiers.snapshot_all(entity), spell) == []
+      assert Modifiers.consumable_holder_ids(entity, spell) == []
+      assert Resources.power_cost(entity, spell) == 200
+      context = CastContext.from_caster(entity, spell, 2)
+      target = %{object: %Object{guid: 2}, unit: %Unit{level: 60, health: 1_000, max_health: 1_000, auras: []}}
+      {target, _events} = Aura.apply_spell(target, context, spell, 0)
+
+      assert [%Holder{expires_at: 6_000, auras: [%Aura{amount: 100, amplitude_ms: 2_000, next_tick_at: 2_000}]}] =
+               target.unit.auras
+
+      ordinary = %{spell | attributes: MapSet.new()}
+      assert Resources.power_cost(entity, ordinary) == 100
+      assert Enum.sort(Modifiers.consumable_holder_ids(entity, ordinary)) == [101, 108, 114, 119, 122]
+    end
+
+    test "all-effects modifiers snapshot into periodic aura amounts" do
+      entity = entity([modifier_holder(:add_pct_modifier, 50, 8, 0x400)])
+
+      spell = %Spell{
+        id: 980,
+        spell_family: 8,
+        family_flags_0: 0x400,
+        duration_ms: 10_000,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :periodic_damage, base_points: 100, amplitude_ms: 2_000}
+        ]
+      }
+
+      context = CastContext.from_caster(entity, spell, 2)
+      target = %{object: %Object{guid: 2}, unit: %Unit{level: 60, health: 1_000, max_health: 1_000, auras: []}}
+      {target, _events} = Aura.apply_spell(target, context, spell, 1_000)
+
+      assert Modifiers.value(context.spell_modifiers, :all_effects, 100) == 150
+      assert [%Holder{auras: [%Aura{amount: 150}]}] = target.unit.auras
+    end
+
+    test "speed modifiers alter movement aura amounts from their DBC operation" do
+      entity = entity([modifier_holder(:add_flat_modifier, -20, 12, 0x400000)])
+
+      spell = %Spell{
+        id: 18_223,
+        spell_family: 8,
+        family_flags_0: 0x400000,
+        duration_ms: 12_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_decrease_speed, base_points: -10}]
+      }
+
+      context = CastContext.from_caster(entity, spell, 2)
+      target = %{object: %Object{guid: 2}, unit: %Unit{level: 60, auras: []}}
+      {target, _events} = Aura.apply_spell(target, context, spell, 1_000)
+
+      assert [%Holder{auras: [%Aura{amount: -30}]}] = target.unit.auras
+    end
+  end
+
+  describe "periodic_interval/2" do
+    test "applies flat then percent timing and keeps a positive integer interval" do
+      effect = %Effect{aura: :periodic_trigger_spell, amplitude_ms: 4_000}
+      flat = %Aura{type: :add_flat_modifier, misc_value: 19, amount: -1_001}
+      percent = %Aura{type: :add_pct_modifier, misc_value: 19, amount: -50}
+      assert Modifiers.periodic_interval([flat, percent], effect) == 1_499
+      assert Modifiers.periodic_interval([%{flat | amount: -4_001}], effect) == 1
+      assert Modifiers.periodic_interval([%{percent | amount: -100}], effect) == 1
+    end
+
+    test "preserves absent intervals and nonperiodic regeneration schedules" do
+      modifier = %Aura{type: :add_flat_modifier, misc_value: 19, amount: -500}
+
+      for {type, amplitude, expected} <- [
+            {:periodic_damage, nil, nil},
+            {:periodic_damage, 0, 0},
+            {:obs_mod_mana, 0, 500},
+            {:mod_regen, 0, 5_000},
+            {:mod_power_regen, 0, 5_000},
+            {:mod_power_regen_percent, 0, 2_000},
+            {:mod_stat, 4_000, 4_000}
+          ] do
+        assert Modifiers.periodic_interval([modifier], %Effect{aura: type, amplitude_ms: amplitude}) == expected
+      end
+    end
+  end
+
+  describe "consumable_holder_ids/2" do
+    test "amount charges distinguish direct, periodic, and resource effects" do
+      entity =
+        entity([
+          modifier_holder(:add_flat_modifier, 10, 8, 1, charges: 1, id: 1),
+          modifier_holder(:add_flat_modifier, 10, 0, 1, charges: 1, id: 2),
+          modifier_holder(:add_flat_modifier, 10, 22, 1, charges: 1, id: 3)
+        ])
+
+      for {effect, expected} <- [
+            {%Effect{type: :heal}, [1, 2]},
+            {%Effect{type: :power_drain}, [1, 2]},
+            {%Effect{type: :energize}, [1]},
+            {%Effect{type: :apply_aura, aura: :mod_stat}, [1]},
+            {%Effect{type: :apply_aura, aura: :periodic_heal}, [1, 3]},
+            {%Effect{type: :apply_aura, aura: :periodic_damage}, [1, 3]},
+            {%Effect{type: :apply_aura, aura: :periodic_mana_leech}, [1]},
+            {%Effect{type: :apply_aura, aura: :periodic_power_burn}, [1, 2]}
+          ] do
+        spell = %Spell{spell_family: 8, family_flags_0: 1, effects: [effect]}
+        assert Modifiers.consumable_holder_ids(entity, spell) == expected
+
+        assert Modifiers.consumable_holder_ids(entity, %{spell | attributes: MapSet.new([:ignore_caster_modifiers])}) ==
+                 []
+      end
+    end
+
+    test "attack power and haste charges require the matching aura operation" do
+      entity =
+        entity([
+          modifier_holder(:add_flat_modifier, 10, 3, 1, charges: 1, id: 2),
+          modifier_holder(:add_flat_modifier, 10, 23, 1, charges: 1, id: 3)
+        ])
+
+      for {type, ids} <- [
+            {:mod_attack_power, [2]},
+            {:mod_ranged_attack_power, [2]},
+            {:mod_attack_power_pct, [2]},
+            {:mod_ranged_attack_power_pct, [2]},
+            {:mod_attack_speed, [3]},
+            {:mod_melee_haste, [3]},
+            {:mod_ranged_haste, [3]},
+            {:mod_ranged_ammo_haste, [3]},
+            {:mod_casting_speed, [3]},
+            {:mod_stat, []}
+          ] do
+        spell = %Spell{spell_family: 8, family_flags_0: 1, effects: [%Effect{type: :apply_aura, aura: type}]}
+        assert Modifiers.consumable_holder_ids(entity, spell) == ids
+        assert Modifiers.consumable_holder_ids(entity, %{spell | family_flags_0: 2}) == []
+        assert Modifiers.consumable_holder_ids(entity, %{spell | spell_family: 3}) == []
+      end
+    end
+
+    test "selects charged modifiers only when the cast uses their operation" do
+      crit = modifier_holder(:add_flat_modifier, 100, 7, 0x4, charges: 1, id: 14_177)
+      cast_time = modifier_holder(:add_flat_modifier, -5_500, 10, 0x8, charges: 1, id: 18_708)
+      entity = entity([crit, cast_time])
+
+      strike = %Spell{
+        spell_family: 8,
+        family_flags_0: 0x4,
+        dmg_class: 2,
+        effects: [%Effect{type: :school_damage}]
+      }
+
+      assert Modifiers.consumable_holder_ids(entity, strike) == [14_177]
+      assert Modifiers.consumable_holder_ids(entity, %Spell{spell_family: 8, family_flags_0: 0x4}) == []
+    end
+
+    test "the aura lifecycle spends a holder charge through its single removal funnel" do
+      holder = modifier_holder(:add_flat_modifier, 100, 7, 0x4, charges: 1, id: 14_177)
+      entity = entity([%{holder | slot: 0}])
+
+      assert {entity, _events} = Aura.spend_spell_charges(entity, [14_177], 1_000)
+      assert entity.unit.auras == []
+    end
+  end
+
+  defp entity(holders), do: %{object: %Object{guid: 1}, unit: %Unit{level: 60, auras: holders}}
+
+  defp modifier_holder(type, amount, operation, class_mask, opts \\ []) do
+    %Holder{
+      spell: %Spell{id: Keyword.get(opts, :id, 1), spell_family: 8},
+      charges: Keyword.get(opts, :charges),
+      auras: [%Aura{type: type, amount: amount, misc_value: operation, class_mask: class_mask}]
+    }
+  end
+end

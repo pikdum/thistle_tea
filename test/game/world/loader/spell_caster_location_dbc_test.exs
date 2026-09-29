@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.World.Loader.SpellCasterLocationDbcTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Spell.CasterLocation
-  alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.LocationTargets
+  alias ThistleTea.Game.Core.Spell.CasterLocation
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.LocationTargets
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db

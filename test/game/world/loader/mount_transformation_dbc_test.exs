@@ -1,25 +1,25 @@
 defmodule ThistleTea.Game.World.Loader.MountTransformationDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Aura.Holder
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.CreatureTemplate
-  alias ThistleTea.Game.Entity.EffectResolver
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Mount
-  alias ThistleTea.Game.Entity.Logic.SpellEffect
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.CreatureTemplate
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.Mount
+  alias ThistleTea.Game.Core.Spell.SpellEffect
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Entity.EffectResolver
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
-  alias ThistleTea.Game.WorldRef
 
   @moduletag :dbc_db
 
@@ -55,7 +55,7 @@ defmodule ThistleTea.Game.World.Loader.MountTransformationDbcTest do
         {swimming, _} = Aura.remove_with_interrupt_flags(reindeer, Aura.interrupt_mask(:under_water), 3_000)
         assert swimming.unit.mount_display_id == 0
         assert swimming.movement_block.run_speed == 7.0
-        dead = Core.take_damage(reindeer, 100, 3_000)
+        dead = Entity.take_damage(reindeer, 100, 3_000)
         assert dead.unit.mount_display_id == 0
         assert dead.movement_block.run_speed == 7.0
       end

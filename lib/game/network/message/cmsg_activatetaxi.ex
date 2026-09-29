@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgActivatetaxi do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ACTIVATETAXI
 
-  alias ThistleTea.Game.Player.Taxi
+  alias ThistleTea.Game.World.Entity.Player.Taxi
 
   defstruct [:guid, :source_node, :destination_node]
 

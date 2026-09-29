@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Loader.WeatherTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Weather.Season
+  alias ThistleTea.Game.Core.Weather.Season
   alias ThistleTea.Game.World.Loader.Weather
 
   setup [:table]

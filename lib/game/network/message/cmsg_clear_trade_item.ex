@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgClearTradeItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CLEAR_TRADE_ITEM
 
-  alias ThistleTea.Game.Player.Trade
+  alias ThistleTea.Game.World.Entity.Player.Trade
 
   defstruct [:trade_slot]
 

@@ -1,0 +1,252 @@
+defmodule ThistleTea.Game.World.Entity.Player.Gathering do
+  @moduledoc """
+  Revalidates opening casts against live objects, owned items, and cached locks.
+  Objects grant loot access and per-spawn gains; item unlocks, costs, and skill
+  progress commit together through the player's inventory transaction.
+  """
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity, as: EntityCore
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.GameObjectTemplate
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Inventory
+  alias ThistleTea.Game.Core.Inventory.Batch
+  alias ThistleTea.Game.Core.Inventory.ChangeSet
+  alias ThistleTea.Game.Core.Item.ItemOpening
+  alias ThistleTea.Game.Core.Item.ItemUse
+  alias ThistleTea.Game.Core.Profession.Gathering, as: GatheringLogic
+  alias ThistleTea.Game.Core.Profession.Lock
+  alias ThistleTea.Game.Core.Profession.OpenLock
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.EventSink
+  alias ThistleTea.Game.World.Entity.EventSink.Context
+  alias ThistleTea.Game.World.Entity.Player.Containers
+  alias ThistleTea.Game.World.Entity.Player.Disenchant
+  alias ThistleTea.Game.World.Entity.Player.GameObjects
+  alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
+  alias ThistleTea.Game.World.Entity.Player.Looting
+  alias ThistleTea.Game.World.Entity.Player.ObjectTarget
+  alias ThistleTea.Game.World.Entity.Player.Quests
+  alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
+
+  def context(state, spell, targets, cast_item_guid) do
+    if OpenLock.lock_spell?(spell) do
+      with {:ok, id} <- target_lock(state, Target.object_guid(targets) || Target.item_guid(targets)),
+           true <- id > 0,
+           %Lock{} = lock <- LockLoader.get(id),
+           {:ok, entry} <- cast_item_entry(state.character, cast_item_guid) do
+        {:ok, lock, entry}
+      else
+        false -> {:error, :already_open}
+        {:error, _reason} = error -> error
+        _ -> {:error, :bad_targets}
+      end
+    end
+  end
+
+  def authorize_use(%{character: %Character{} = character}, guid) do
+    template = TemplateLoader.cached(Guid.entry(guid))
+    id = GameObjectTemplate.lock_id(template)
+
+    unlocked? = match?(%{go_lock_override: false}, Metadata.get(guid))
+
+    cond do
+      match?(%{go_lock_override: true}, Metadata.get(guid)) and id == 0 ->
+        {:error, :locked}
+
+      not unlocked? and match?(%GameObjectTemplate{type: type} when type in [0, 1, 3], template) and id > 0 ->
+        OpenLock.key(
+          LockLoader.get(id),
+          &Inventory.count_entry(character.player, &1, fn guid -> ItemStore.get(guid) end)
+        )
+
+      true ->
+        :ok
+    end
+  end
+
+  def complete(
+        %{character: %Character{} = character} = state,
+        guid,
+        %Spell{} = spell,
+        cast_item_guid,
+        success_events \\ []
+      ) do
+    targets = if Guid.entity_type(guid) == :item, do: Target.item(guid), else: Target.object(guid)
+
+    with {:ok, lock, entry} <- context(state, spell, targets, cast_item_guid),
+         :ok <- validate_tools(character, spell),
+         {:ok, opened} <- OpenLock.resolve(character, spell, lock, entry) do
+      state = Looting.release(state)
+
+      case cost_batch(state.character, spell, cast_item_guid) do
+        {:ok, batch} -> complete_opening(state, guid, opened, batch, spell.id, success_events)
+        {:error, reason} -> failure(state, spell.id, reason)
+      end
+    else
+      {:error, reason} -> failure(state, spell.id, reason)
+      _ -> failure(state, spell.id, :bad_targets)
+    end
+  end
+
+  defp complete_opening(state, guid, opened, batch, spell_id, success_events) do
+    if Guid.entity_type(guid) == :item do
+      unlock_item(state, guid, opened, batch, spell_id, success_events)
+    else
+      case Inventory.plan(batch, &ItemStore.get/1) do
+        {:ok, changes} -> open(state, guid, opened, changes, spell_id, success_events)
+        {:error, reason} -> failure(state, spell_id, reason)
+      end
+    end
+  end
+
+  defp unlock_item(state, guid, opened, batch, spell_id, success_events) do
+    with %Item{} = item <- Disenchant.owned_item(state.character, guid),
+         :ok <- ItemOpening.validate_unlock(item),
+         true <- successful_attempt?(opened),
+         {:ok, changes} <- batch |> Batch.update(Item.unlock(item)) |> Inventory.plan(&ItemStore.get/1) do
+      skills =
+        case skill_gain(state.character, opened) do
+          {:gained, skills} -> skills
+          :unchanged -> changes.player.skills
+        end
+
+      changes = ChangeSet.put_player(changes, %{changes.player | skills: skills})
+      state |> InventoryUpdate.apply({:ok, changes}) |> emit(success_events) |> Containers.open_guid(guid, 2)
+    else
+      false -> failure(state, spell_id, :try_again)
+      {:error, reason} -> failure(state, spell_id, reason)
+      _ -> failure(state, spell_id, :item_gone)
+    end
+  end
+
+  defp successful_attempt?(%OpenLock{skill_id: id, value: value, required: required}) when id in [182, 186, 633] do
+    GatheringLogic.attempt?(id, value, required, value - 26 + :rand.uniform(63))
+  end
+
+  defp successful_attempt?(_opened), do: true
+
+  def open_key(state, guid, %OpenLock{} = opened) do
+    case target(state, guid) do
+      {:ok, _template} ->
+        state = Looting.release(state)
+        {:ok, changes} = Inventory.plan(Batch.new(state.character.player), &ItemStore.get/1)
+        open(state, guid, opened, changes, nil, [])
+
+      _ ->
+        state
+    end
+  end
+
+  defp open(state, guid, opened, changes, spell_id, success_events) do
+    gain = skill_gain(state.character, opened)
+
+    case Entity.call(guid, {:open_lock, Looting.actor(state, guid), opened, match?({:gained, _}, gain)}) do
+      {:ok, content, gained?} ->
+        skills = if gained?, do: elem(gain, 1), else: changes.player.skills
+        changes = ChangeSet.put_player(changes, %{changes.player | skills: skills})
+        state |> InventoryUpdate.apply({:ok, changes}) |> emit(success_events) |> project(guid, content)
+
+      {:error, reason} ->
+        failure(state, spell_id, reason)
+
+      _ ->
+        failure(state, spell_id, :bad_targets)
+    end
+  end
+
+  defp emit(state, events) do
+    %{state | character: EventSink.emit(state.character, events, Context.new(self()))}
+  end
+
+  defp project(state, guid, :activate), do: GameObjects.open_object(state, guid)
+  defp project(state, _guid, :disarmed), do: state
+
+  defp project(state, guid, loot) do
+    state = Quests.credit_entity_interaction(state, guid)
+    InstanceSystem.game_object_used(state.character.internal.world, Guid.entry(guid))
+    Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: loot, loot_type: 2})
+    %{state | loot_guid: guid, loot_type: :corpse}
+  end
+
+  defp skill_gain(character, %OpenLock{gain?: true, skill_id: id, required: required}) do
+    GatheringLogic.skill_up(character.player.skills, id, required, :rand.uniform() * 100)
+  end
+
+  defp skill_gain(_character, _opened), do: :unchanged
+
+  defp cost_batch(character, spell, cast_item_guid) do
+    batch =
+      Enum.reduce(spell.reagents || [], Batch.new(character.player), fn {id, count}, batch ->
+        Batch.remove(batch, id, count)
+      end)
+
+    item_cost(batch, character, spell, cast_item_guid)
+  end
+
+  defp item_cost(batch, _character, _spell, nil), do: {:ok, batch}
+
+  defp item_cost(batch, character, spell, guid) do
+    with %Item{} = item <- Disenchant.owned_item(character, guid),
+         {:ok, spell_id, index, _commit?} when spell_id == spell.id <- ItemUse.on_use_spell(item) do
+      ItemUse.plan(batch, item, index)
+    else
+      _ -> {:error, :item_gone}
+    end
+  end
+
+  defp cast_item_entry(_character, nil), do: {:ok, nil}
+
+  defp cast_item_entry(character, guid) do
+    case Disenchant.owned_item(character, guid) do
+      %Item{object: %{entry: entry}} -> {:ok, entry}
+      _ -> {:error, :item_gone}
+    end
+  end
+
+  defp validate_tools(character, spell) do
+    if Enum.all?(spell.tools, &(Inventory.count_entry(character.player, &1, fn guid -> ItemStore.get(guid) end) > 0)),
+      do: :ok,
+      else: {:error, :item_gone}
+  end
+
+  defp target_lock(state, guid) when is_integer(guid) do
+    if Guid.entity_type(guid) == :item do
+      with false <- EntityCore.dead?(state.character),
+           %Item{} = item <- Disenchant.owned_item(state.character, guid),
+           true <- item.item.owner == state.guid,
+           :ok <- ItemOpening.validate_unlock(item) do
+        {:ok, Item.template(item).lockid}
+      else
+        {:error, _reason} = error -> error
+        _ -> {:error, :item_gone}
+      end
+    else
+      with {:ok, template} <- target(state, guid), do: {:ok, GameObjectTemplate.lock_id(template)}
+    end
+  end
+
+  defp target_lock(_state, _guid), do: {:error, :bad_targets}
+
+  defp target(%{character: %Character{}} = state, guid) when is_integer(guid) do
+    ObjectTarget.resolve(state, guid, 5.0)
+  end
+
+  defp target(_state, _guid), do: {:error, :bad_targets}
+
+  defp failure(state, nil, _reason), do: state
+  defp failure(state, spell_id, :item_not_found), do: failure(state, spell_id, :reagents)
+
+  defp failure(state, spell_id, reason) do
+    emit(state, Effects.spell_cast_failed(spell_id, reason))
+  end
+end

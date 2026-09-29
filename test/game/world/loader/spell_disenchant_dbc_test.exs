@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Loader.SpellDisenchantDbcTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Spell.Semantics
+  alias ThistleTea.Game.Core.Spell.Semantics
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db

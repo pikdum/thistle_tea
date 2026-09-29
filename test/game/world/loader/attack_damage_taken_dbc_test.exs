@@ -1,11 +1,11 @@
 defmodule ThistleTea.Game.World.Loader.AttackDamageTakenDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.AttackDamageTaken
-  alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Combat.AttackDamageTaken
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db

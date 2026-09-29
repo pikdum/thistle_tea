@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.SpellAuraRankDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.AuraRank
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.AuraRank
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellChain
 

@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.SpatialHashTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.SpatialHash
-  alias ThistleTea.Game.WorldRef
 
   describe "setup_tables/0" do
     test "creates read and write concurrent lookup tables" do

@@ -1,32 +1,32 @@
 defmodule ThistleTea.Game.World.VisibilityTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Aura
-  alias ThistleTea.Game.Aura.Holder
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.GameObject
-  alias ThistleTea.Game.Entity.Data.Transport
-  alias ThistleTea.Game.Entity.Data.Transport.Pose
-  alias ThistleTea.Game.Entity.Logic.Invisibility
-  alias ThistleTea.Game.Entity.Server.Player.State
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Aura.Invisibility
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.GameObject
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Travel.Transport
+  alias ThistleTea.Game.Core.Travel.Transport.Pose
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position.Spline
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility
-  alias ThistleTea.Game.WorldRef
 
   describe "enter_player/1" do
     test "joins current cell and initializes visible entity lists" do
@@ -129,7 +129,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
             ]
           }
 
-          viewer |> ThistleTea.Game.Entity.Logic.Aura.apply_spell(guid, 60, spell, 0) |> elem(0)
+          viewer |> Aura.apply_spell(guid, 60, spell, 0) |> elem(0)
         end)
 
       Metadata.put(guid, Invisibility.metadata(viewer))

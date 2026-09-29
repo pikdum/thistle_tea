@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetitionShowlist do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PETITION_SHOWLIST
 
-  alias ThistleTea.Game.Player.Petitions
+  alias ThistleTea.Game.World.Entity.Player.Petitions
 
   defstruct [:npc_guid]
 

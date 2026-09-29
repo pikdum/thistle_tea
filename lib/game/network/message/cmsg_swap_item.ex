@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSwapItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SWAP_ITEM
 
-  alias ThistleTea.Game.Player.Inventory
+  alias ThistleTea.Game.World.Entity.Player.Inventory
 
   defstruct [:dst_bag, :dst_slot, :src_bag, :src_slot]
 

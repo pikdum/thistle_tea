@@ -1,0 +1,298 @@
+defmodule ThistleTea.Game.Core.Aura.ControlSync do
+  @moduledoc """
+  Derives mob charm ownership from active control auras and emits ownership
+  transition events for the controlling player's boundary.
+  """
+
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Combat
+  alias ThistleTea.Game.Core.Combat.Engagement
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Movement
+  alias ThistleTea.Game.Core.Movement.MovementHandoff
+  alias ThistleTea.Game.Core.Pet.PlayerPossession
+  alias ThistleTea.Game.Core.Pvp
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Casting
+
+  @unit_flag_possessed 0x01000000
+  @unit_flag_player_controlled 0x00000008
+
+  def sync(entity), do: sync(entity, 0)
+
+  def sync(%Mob{object: %{guid: guid}, unit: %Unit{} = unit, internal: %Internal{} = internal} = mob, now)
+      when is_integer(now) do
+    possession = possession_holder(unit.auras)
+    charm = charm_holder(unit.auras)
+
+    cond do
+      match?(%Holder{}, possession) -> sync_possession(mob, possession, internal.pet, guid, now)
+      match?(%Pet{possessed?: true}, internal.pet) -> release_possession(mob, internal.pet, now)
+      match?(%Holder{}, charm) -> sync_charm(mob, charm, internal.pet, guid, now)
+      match?(%Pet{kind: :charmed}, internal.pet) -> release_charm(mob, internal.pet, now)
+      true -> {mob, []}
+    end
+  end
+
+  def sync(%Character{} = character, now), do: PlayerPossession.sync(character, now)
+  def sync(entity, _now), do: {entity, []}
+
+  defp sync_charm(
+         %Mob{} = mob,
+         %Holder{caster_guid: owner_guid},
+         %Pet{kind: :charmed, owner_guid: owner_guid},
+         _guid,
+         _now
+       ), do: {mob, []}
+
+  defp sync_charm(%Mob{} = mob, %Holder{} = holder, %Pet{kind: :charmed} = previous, guid, now) do
+    grant_charm(mob, holder, previous, [Effects.control_released(previous.owner_guid, guid)], now)
+  end
+
+  defp sync_charm(%Mob{} = mob, %Holder{} = holder, nil, _guid, now), do: grant_charm(mob, holder, nil, [], now)
+  defp sync_charm(%Mob{} = mob, _holder, _pet, _guid, _now), do: {mob, []}
+
+  defp grant_charm(%Mob{} = mob, %Holder{} = holder, previous, events, now) do
+    original_faction = original_value(previous, :original_faction_template, mob.unit.faction_template)
+    original_npc_flags = original_value(previous, :original_npc_flags, mob.unit.npc_flags)
+    original_pvp? = original_value(previous, :original_pvp?, Pvp.active?(mob))
+    %Engagement.Result{entity: mob} = Engagement.leave(mob, :controlled, clear_tap?: false)
+
+    pet = %Pet{
+      owner_guid: holder.caster_guid,
+      profile: :combat,
+      kind: :charmed,
+      food_mask: 0,
+      control_spell_id: holder.spell.id,
+      original_faction_template: original_faction,
+      original_npc_flags: original_npc_flags,
+      original_pvp?: original_pvp?
+    }
+
+    faction_template = holder.caster_faction_template || mob.unit.faction_template
+
+    mob = %{
+      mob
+      | unit: %{
+          mob.unit
+          | charmed_by: holder.caster_guid,
+            faction_template: faction_template,
+            npc_flags: 0,
+            flags: controlled_unit_flags(mob.unit.flags || 0, holder.caster_guid)
+        },
+        internal: %{
+          mob.internal
+          | pet: pet,
+            running: true
+        }
+    }
+
+    spells = (mob.internal.spellbook || %{}) |> Map.values() |> Enum.reject(&Spell.attribute?(&1, :passive))
+    event = Effects.control_granted(holder.caster_guid, mob.object.guid, holder.spell.id, spells)
+    {mob, events} = halt_for_control(mob, now, events)
+    {Entity.mark_broadcast_update(mob), events ++ [event]}
+  end
+
+  defp release_charm(%Mob{} = mob, %Pet{} = pet, now) do
+    mob = Casting.interrupt(mob, now)
+
+    mob = %{
+      mob
+      | unit: %{
+          mob.unit
+          | charmed_by: 0,
+            faction_template: pet.original_faction_template,
+            npc_flags: pet.original_npc_flags,
+            flags:
+              mob.unit.flags
+              |> Kernel.||(0)
+              |> Bitwise.band(Bitwise.bnot(@unit_flag_player_controlled))
+              |> Pvp.unit_flags(pet.original_pvp? == true)
+        },
+        internal: %{mob.internal | pet: nil}
+    }
+
+    {mob |> Combat.sync_combat_flag() |> Entity.mark_broadcast_update(),
+     [Effects.control_released(pet.owner_guid, mob.object.guid)]}
+  end
+
+  defp sync_possession(
+         %Mob{} = mob,
+         %Holder{caster_guid: owner_guid},
+         %Pet{possessed?: true, owner_guid: owner_guid},
+         _guid,
+         _now
+       ), do: {mob, []}
+
+  defp sync_possession(%Mob{} = mob, %Holder{} = holder, previous, guid, now) do
+    events =
+      case previous do
+        %Pet{kind: :charmed, owner_guid: owner_guid} -> [Effects.control_released(owner_guid, guid)]
+        _pet -> []
+      end
+
+    grant_possession(mob, holder, previous, events, now)
+  end
+
+  defp grant_possession(%Mob{} = mob, %Holder{} = holder, previous, events, now) do
+    mob = MovementHandoff.clear(mob)
+    original_faction = original_value(previous, :original_faction_template, mob.unit.faction_template)
+    original_npc_flags = original_value(previous, :original_npc_flags, mob.unit.npc_flags)
+    %Engagement.Result{entity: mob} = Engagement.leave(mob, :controlled, clear_tap?: false)
+
+    pet = possession_pet(previous, holder, original_faction, original_npc_flags, mob.unit.flags || 0)
+    faction_template = holder.caster_faction_template || mob.unit.faction_template
+
+    mob = %{
+      mob
+      | unit: %{
+          mob.unit
+          | charmed_by: holder.caster_guid,
+            faction_template: faction_template,
+            npc_flags: 0,
+            flags: controlled_unit_flags(Bitwise.bor(mob.unit.flags || 0, @unit_flag_possessed), holder.caster_guid)
+        },
+        internal: %{
+          mob.internal
+          | pet: pet,
+            running: true
+        }
+    }
+
+    spells = controlled_spells(mob)
+    event = Effects.control_granted(holder.caster_guid, mob.object.guid, holder.spell.id, spells, kind: :possession)
+    {mob, events} = halt_for_control(mob, now, events)
+    {Entity.mark_broadcast_update(mob), events ++ [event]}
+  end
+
+  defp halt_for_control(%Mob{movement_block: %MovementBlock{} = movement} = mob, now, events) do
+    if movement.spline_nodes not in [nil, []] or is_integer(mob.internal.movement_start_time) do
+      {mob, movement_events} = Movement.stop_with_effects(mob, now)
+      {mob, events ++ movement_events}
+    else
+      {mob, events}
+    end
+  end
+
+  defp halt_for_control(mob, _now, events), do: {mob, events}
+
+  defp possession_pet(%Pet{} = pet, %Holder{} = holder, original_faction, original_npc_flags, original_unit_flags) do
+    %{
+      pet
+      | owner_guid: holder.caster_guid,
+        control_spell_id: holder.spell.id,
+        original_faction_template: original_faction,
+        original_npc_flags: original_npc_flags,
+        possession_original_kind: pet.kind,
+        possession_original_owner_guid: pet.owner_guid,
+        possession_original_control_spell_id: pet.control_spell_id,
+        possession_original_unit_flags: original_unit_flags,
+        possession_original_command_state: pet.command_state,
+        possession_original_reaction_state: pet.reaction_state,
+        possessed?: true,
+        attack_command?: false,
+        command_state: :stay,
+        reaction_state: :passive
+    }
+  end
+
+  defp possession_pet(nil, %Holder{} = holder, original_faction, original_npc_flags, original_unit_flags) do
+    %Pet{
+      owner_guid: holder.caster_guid,
+      profile: :combat,
+      kind: :possessed,
+      food_mask: 0,
+      control_spell_id: holder.spell.id,
+      original_faction_template: original_faction,
+      original_npc_flags: original_npc_flags,
+      possession_original_unit_flags: original_unit_flags,
+      possessed?: true,
+      command_state: :stay,
+      reaction_state: :passive
+    }
+  end
+
+  defp release_possession(%Mob{} = mob, %Pet{possession_original_kind: nil} = pet, now) do
+    mob =
+      mob |> Casting.interrupt(now) |> restore_controlled_unit(pet, nil) |> MovementHandoff.offer(pet.owner_guid, now)
+
+    {mob, [Effects.control_released(pet.owner_guid, mob.object.guid)]}
+  end
+
+  defp release_possession(%Mob{} = mob, %Pet{} = pet, now) do
+    restored = %{
+      pet
+      | kind: pet.possession_original_kind,
+        owner_guid: pet.possession_original_owner_guid,
+        control_spell_id: pet.possession_original_control_spell_id,
+        command_state: pet.possession_original_command_state || :follow,
+        reaction_state: pet.possession_original_reaction_state || :defensive,
+        possession_original_kind: nil,
+        possession_original_owner_guid: nil,
+        possession_original_control_spell_id: nil,
+        possession_original_unit_flags: nil,
+        possession_original_command_state: nil,
+        possession_original_reaction_state: nil,
+        possessed?: false
+    }
+
+    mob =
+      mob
+      |> Casting.interrupt(now)
+      |> restore_controlled_unit(pet, restored)
+      |> MovementHandoff.offer(pet.owner_guid, now)
+
+    {mob, [Effects.control_released(pet.owner_guid, mob.object.guid)]}
+  end
+
+  defp restore_controlled_unit(%Mob{} = mob, %Pet{} = pet, restored_pet) do
+    mob = %{
+      mob
+      | unit: %{
+          mob.unit
+          | charmed_by: 0,
+            faction_template: pet.original_faction_template,
+            npc_flags: pet.original_npc_flags,
+            flags: pet.possession_original_unit_flags || 0
+        },
+        internal: %{mob.internal | pet: restored_pet}
+    }
+
+    Entity.mark_broadcast_update(mob)
+  end
+
+  defp controlled_spells(%Mob{} = mob) do
+    (mob.internal.spellbook || %{}) |> Map.values() |> Enum.reject(&Spell.attribute?(&1, :passive))
+  end
+
+  defp possession_holder(holders) when is_list(holders) do
+    Enum.find(holders, &Holder.has_any_type?(&1, [:mod_possess, :mod_possess_pet]))
+  end
+
+  defp possession_holder(_holders), do: nil
+
+  defp charm_holder(holders) when is_list(holders) do
+    Enum.find(holders, &Holder.charm?/1)
+  end
+
+  defp charm_holder(_holders), do: nil
+
+  defp original_value(%Pet{} = pet, field, fallback), do: Map.get(pet, field) || fallback
+  defp original_value(_pet, _field, fallback), do: fallback
+
+  defp controlled_unit_flags(flags, caster_guid) do
+    if Guid.entity_type(caster_guid) == :player do
+      Bitwise.bor(flags, @unit_flag_player_controlled)
+    else
+      flags
+    end
+  end
+end

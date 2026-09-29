@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLootRelease do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LOOT_RELEASE
 
-  alias ThistleTea.Game.Player.Looting
+  alias ThistleTea.Game.World.Entity.Player.Looting
 
   defstruct [:guid]
 

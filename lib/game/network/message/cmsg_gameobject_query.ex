@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGameobjectQuery do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GAMEOBJECT_QUERY
 
-  alias ThistleTea.Game.Entity.Data.GameObjectTemplate
+  alias ThistleTea.Game.Core.Entity.GameObjectTemplate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
 

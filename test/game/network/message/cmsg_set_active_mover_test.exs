@@ -1,20 +1,20 @@
 defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMoverTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Logic.Companion
-  alias ThistleTea.Game.Entity.Logic.ItemLoot
-  alias ThistleTea.Game.Entity.Logic.Loot
-  alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Loot
+  alias ThistleTea.Game.Core.Loot.ItemLoot
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.Companion.EntityRef
   alias ThistleTea.Game.Network.Message.CmsgSetActiveMover
   alias ThistleTea.Game.Network.Message.SmsgLootResponse
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World.Entity.Player.State
 
   describe "from_binary/1" do
     test "parses mover guid" do

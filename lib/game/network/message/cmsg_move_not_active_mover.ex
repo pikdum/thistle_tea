@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveNotActiveMover do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MOVE_NOT_ACTIVE_MOVER
 
-  alias ThistleTea.Game.Player.Mover
+  alias ThistleTea.Game.World.Entity.Player.Mover
 
   defstruct [:guid, :movement_payload]
 

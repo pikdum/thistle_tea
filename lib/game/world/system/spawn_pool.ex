@@ -1,0 +1,645 @@
+defmodule ThistleTea.Game.World.System.SpawnPool do
+  @moduledoc """
+  Owns one root VMangos pool or singleton spawn and its entity incarnations.
+  """
+  use GenServer
+
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Spawn
+  alias ThistleTea.Game.Core.Entity.GameObject
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.SpatialGrid
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader
+  alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.System.Battleground.Spawns, as: BattlegroundSpawns
+  alias ThistleTea.Game.World.System.CombatLeashes
+  alias ThistleTea.Game.World.System.CreatureGroups
+  alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.World.System.Instance.InstanceSpawn
+  alias ThistleTea.Game.World.System.SpawnPool.Catalog
+  alias ThistleTea.Game.World.System.SpawnPool.CellIndex
+  alias ThistleTea.Game.World.System.SpawnPool.Selection
+  alias ThistleTea.Game.World.System.SpawnPool.Supervisor, as: SpawnPoolSupervisor
+
+  @registry ThistleTea.Game.World.System.SpawnPool.Registry
+  @activation_timeout_ms 30_000
+  @deactivation_timeout_ms 5_000
+  @drain_interval_ms 30_000
+  @observed_range 440
+  @unit_flag_player_controlled 0x00000008
+
+  def start_link(opts) do
+    key = Keyword.fetch!(opts, :key)
+    GenServer.start_link(__MODULE__, opts, name: via(key))
+  end
+
+  def child_spec(opts) do
+    key = Keyword.fetch!(opts, :key)
+    %{id: {__MODULE__, key}, start: {__MODULE__, :start_link, [opts]}, restart: :permanent}
+  end
+
+  def activate(group, {world, _x, _y} = cell, blueprint \\ nil, linked_members \\ []) do
+    world = WorldRef.coerce(world)
+    cell = put_elem(cell, 0, world)
+
+    if AreaTriggerLoader.spawnable_world?(world) do
+      key = {world, group}
+
+      with {:ok, pid} <- ensure_started(key, blueprint) do
+        GenServer.call(pid, {:activate, cell, blueprint, linked_members}, @activation_timeout_ms)
+      end
+    else
+      :ok
+    end
+  end
+
+  def load_game_object(world, %GameObject{} = blueprint) do
+    world = WorldRef.coerce(world)
+    group = game_object_group(blueprint)
+    activate(group, game_object_cell(world, blueprint), blueprint)
+  end
+
+  def respawn_game_object(world, %GameObject{} = blueprint, duration_ms)
+      when is_integer(duration_ms) and duration_ms > 0 do
+    world = WorldRef.coerce(world)
+    group = game_object_group(blueprint)
+    cell = game_object_cell(world, blueprint)
+    key = {world, group}
+
+    with true <- AreaTriggerLoader.spawnable_world?(world),
+         {:ok, pid} <- ensure_started(key, blueprint) do
+      GenServer.call(pid, {:respawn_game_object, cell, blueprint, duration_ms}, @activation_timeout_ms)
+    else
+      false -> :ok
+      error -> error
+    end
+  end
+
+  def suspend_game_object(world, game_object_or_guid, respawn_delay_ms \\ nil)
+
+  def suspend_game_object(world, %GameObject{} = blueprint, respawn_delay_ms) do
+    world = WorldRef.coerce(world)
+    group = game_object_group(blueprint)
+    key = {world, group}
+    member = member_key(blueprint)
+
+    suspend_member(key, member, respawn_delay_ms)
+  end
+
+  def suspend_game_object(%WorldRef{} = world, db_guid, respawn_delay_ms)
+      when is_integer(db_guid) and (is_integer(respawn_delay_ms) or is_nil(respawn_delay_ms)) do
+    group = Catalog.group_for(:game_object, db_guid)
+    suspend_member({world, group}, {:game_object, db_guid}, respawn_delay_ms)
+  end
+
+  defp suspend_member(key, member, respawn_delay_ms) do
+    case GenServer.whereis(via(key)) do
+      nil -> :ok
+      pid -> GenServer.cast(pid, {:suspend_member, member, respawn_delay_ms})
+    end
+  end
+
+  def resume_game_object(%WorldRef{} = world, db_guid) when is_integer(db_guid) do
+    resume(world, {:game_object, db_guid})
+  end
+
+  def suspend_spawn(%WorldRef{} = world, {kind, db_guid} = member) do
+    suspend_member({world, Catalog.group_for(kind, db_guid)}, member, nil)
+  end
+
+  def resume(%WorldRef{} = world, {kind, db_guid} = member) do
+    group = Catalog.group_for(kind, db_guid)
+
+    case GenServer.whereis(via({world, group})) do
+      nil -> :ok
+      pid -> send(pid, {:reactivate, member})
+    end
+  end
+
+  def operate_game_object(world, %GameObject{} = blueprint, action, reset_delay_ms)
+      when action in [:open, :close, :reset] and is_integer(reset_delay_ms) do
+    world = WorldRef.coerce(world)
+    key = {world, game_object_group(blueprint)}
+    member = member_key(blueprint)
+
+    case GenServer.whereis(via(key)) do
+      nil -> :ok
+      pid -> GenServer.cast(pid, {:operate_game_object, member, action, reset_delay_ms})
+    end
+  end
+
+  def recycle(%{internal: %Internal{spawn: %Spawn{pool_group: group, pool_member: member}}})
+      when not is_nil(group) and not is_nil(member) do
+    GenServer.cast(via(group), {:recycle, member, self()})
+    :pooled
+  end
+
+  def recycle(_entity), do: :unpooled
+
+  def deactivate(%{internal: %Internal{spawn: %Spawn{pool_group: group, pool_member: member}}})
+      when not is_nil(group) and not is_nil(member) do
+    GenServer.cast(via(group), {:deactivate, member, self()})
+    :pooled
+  end
+
+  def deactivate(_entity), do: :unpooled
+
+  def suspend(entity, respawn_delay_ms \\ nil)
+
+  def suspend(%{internal: %Internal{spawn: %Spawn{pool_group: group, pool_member: member}}}, respawn_delay_ms)
+      when not is_nil(group) and not is_nil(member) do
+    GenServer.cast(via(group), {:suspend, member, self(), respawn_delay_ms})
+    :pooled
+  end
+
+  def suspend(_entity, _respawn_delay_ms), do: :unpooled
+
+  def deactivate_cells(key, cells, wanted) do
+    case GenServer.whereis(via(key)) do
+      nil -> :ok
+      pid -> GenServer.call(pid, {:deactivate_cells, MapSet.new(cells), wanted}, @deactivation_timeout_ms)
+    end
+  end
+
+  def refresh_all(events) when is_list(events) do
+    @registry
+    |> Registry.select([{{:"$1", :"$2", :"$3"}, [], [:"$2"]}])
+    |> Enum.each(&GenServer.cast(&1, {:refresh, events}))
+  end
+
+  def status(group) do
+    GenServer.call(via(group), :status)
+  end
+
+  def worlds do
+    @registry
+    |> Registry.select([{{:"$1", :_, :_}, [], [:"$1"]}])
+    |> Enum.map(fn {world, _group} -> world end)
+    |> Enum.uniq()
+  end
+
+  def stop_world(%WorldRef{} = world) do
+    @registry
+    |> Registry.select([{{:"$1", :"$2", :"$3"}, [], [{{:"$1", :"$2"}}]}])
+    |> Enum.each(fn
+      {{^world, _group} = key, pid} -> SpawnPoolSupervisor.terminate_child(key, pid)
+      {_other_key, _pid} -> :ok
+    end)
+
+    CreatureGroups.stop_world(world)
+    CombatLeashes.stop_world(world)
+  end
+
+  defp ensure_started(key, blueprint) do
+    case GenServer.whereis(via(key)) do
+      pid when is_pid(pid) -> {:ok, pid}
+      nil -> start_pool(key, blueprint)
+    end
+  end
+
+  defp start_pool(key, blueprint) do
+    case SpawnPoolSupervisor.start_child(key, {__MODULE__, key: key, blueprint: blueprint}) do
+      {:ok, pid} -> {:ok, pid}
+      {:error, {:already_started, pid}} -> {:ok, pid}
+      {:error, :already_present} -> wait_for_pool(key)
+      other -> other
+    end
+  end
+
+  defp wait_for_pool(key) do
+    case GenServer.whereis(via(key)) do
+      pid when is_pid(pid) -> {:ok, pid}
+      nil -> {:error, :pool_starting}
+    end
+  end
+
+  defp via(key), do: {:via, Registry, {@registry, key}}
+
+  @impl GenServer
+  def init(opts) do
+    Process.flag(:trap_exit, true)
+    {world, group} = key = Keyword.fetch!(opts, :key)
+    blueprint = Keyword.get(opts, :blueprint)
+    {catalog, blueprints, selection} = initialize(world, group, blueprint)
+
+    {:ok,
+     %{
+       key: key,
+       world: world,
+       group: group,
+       catalog: catalog,
+       blueprints: blueprints,
+       selection: selection,
+       active_cells: MapSet.new(),
+       member_cells: %{},
+       running: %{},
+       monitors: %{},
+       drain_ref: nil
+     }}
+  end
+
+  @impl GenServer
+  def handle_call(:status, _from, state) do
+    {:reply, %{selected: state.selection.leaves, running: Map.keys(state.running)}, state}
+  end
+
+  @impl GenServer
+  def handle_call({:activate, cell, blueprint, linked_members}, _from, state) do
+    state = maybe_put_blueprint(state, blueprint)
+    state = link_member_cell(state, cell, blueprint)
+    state = Enum.reduce(linked_members, state, &put_member_cell(&2, cell, &1))
+    state = %{state | active_cells: MapSet.put(state.active_cells, cell)}
+    CellIndex.register(cell, state.key)
+    {state, errors} = start_selected_with_errors(state)
+    {:reply, activation_result(errors), state}
+  end
+
+  def handle_call({:respawn_game_object, cell, blueprint, duration_ms}, _from, state) do
+    member = member_key(blueprint)
+    already_running? = Map.has_key?(state.running, member)
+    state = maybe_put_blueprint(state, blueprint)
+    state = %{state | active_cells: MapSet.put(state.active_cells, cell)}
+    CellIndex.register(cell, state.key)
+    {state, errors} = start_selected_with_errors(state)
+
+    if not already_running? do
+      case Map.get(state.running, member) do
+        {pid, _monitor_ref} -> Process.send_after(self(), {:expire_member, member, pid}, duration_ms)
+        nil -> :ok
+      end
+    end
+
+    {:reply, activation_result(errors), state}
+  end
+
+  @impl GenServer
+  def handle_call({:deactivate_cells, cells, wanted}, _from, state) do
+    state = %{state | active_cells: MapSet.difference(state.active_cells, cells)}
+    {:reply, :ok, drain_inactive(state, wanted)}
+  end
+
+  @impl GenServer
+  def handle_cast({:recycle, member, pid}, state) do
+    case Map.get(state.running, member) do
+      {^pid, monitor_ref} ->
+        Process.demonitor(monitor_ref, [:flush])
+        stop_entity(pid)
+
+        available = state.blueprints |> Map.keys() |> MapSet.new()
+        selection = replace_selection(state, member, available)
+
+        state = %{
+          state
+          | selection: selection,
+            running: Map.delete(state.running, member),
+            monitors: Map.delete(state.monitors, monitor_ref)
+        }
+
+        {:noreply, start_selected(state)}
+
+      _ ->
+        {:noreply, state}
+    end
+  end
+
+  def handle_cast({:deactivate, member, pid}, state) do
+    {:noreply, stop_running_member(state, member, pid)}
+  end
+
+  def handle_cast({:suspend, member, pid, respawn_delay_ms}, state) do
+    state = stop_running_member(state, member, pid)
+
+    if is_integer(respawn_delay_ms) and respawn_delay_ms > 0 do
+      Process.send_after(self(), {:reactivate, member}, respawn_delay_ms)
+    end
+
+    {:noreply, state}
+  end
+
+  def handle_cast({:suspend_member, member, respawn_delay_ms}, state) do
+    state =
+      case Map.get(state.running, member) do
+        {pid, _monitor_ref} -> stop_running_member(state, member, pid)
+        nil -> state
+      end
+
+    schedule_reactivation(member, respawn_delay_ms)
+    {:noreply, state}
+  end
+
+  def handle_cast({:operate_game_object, member, action, reset_delay_ms}, state) do
+    case Map.get(state.running, member) do
+      {pid, _monitor_ref} -> send(pid, {:script_operate_game_object, action, reset_delay_ms})
+      nil -> :ok
+    end
+
+    {:noreply, state}
+  end
+
+  def handle_cast({:refresh, events}, %{group: {:pool, root_id}} = state) do
+    blueprints = load_blueprints(root_id, events) |> attach_all(state.key)
+
+    if MapSet.new(Map.keys(blueprints)) == MapSet.new(Map.keys(state.blueprints)) do
+      {:noreply, %{state | blueprints: blueprints}}
+    else
+      state = stop_all(state)
+      available = blueprints |> Map.keys() |> MapSet.new()
+      selection = Selection.initialize(root_id, state.catalog, available)
+      {:noreply, start_selected(%{state | blueprints: blueprints, selection: selection})}
+    end
+  end
+
+  def handle_cast({:refresh, events}, %{group: {:singleton, _, _}} = state) do
+    selected =
+      case Map.values(state.blueprints) do
+        [blueprint] -> eligible_singleton_selection(state.selection, blueprint, events)
+        [] -> %Selection{}
+      end
+
+    if selected.leaves == state.selection.leaves do
+      {:noreply, state}
+    else
+      state = stop_all(state)
+      {:noreply, start_selected(%{state | selection: selected})}
+    end
+  end
+
+  @impl GenServer
+  def handle_info(:drain_tick, state) do
+    {:noreply, drain_inactive(%{state | drain_ref: nil})}
+  end
+
+  def handle_info({:reactivate, member}, state) do
+    if MapSet.member?(state.selection.leaves, member) do
+      {:noreply, start_selected(state)}
+    else
+      {:noreply, state}
+    end
+  end
+
+  def handle_info({:expire_member, member, pid}, state) do
+    {:noreply, stop_running_member(state, member, pid)}
+  end
+
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
+    case Map.pop(state.monitors, ref) do
+      {nil, _monitors} ->
+        {:noreply, state}
+
+      {member, monitors} ->
+        state = %{state | running: Map.delete(state.running, member), monitors: monitors}
+        {:noreply, start_selected(state)}
+    end
+  end
+
+  defp initialize(world, {:singleton, kind, guid} = group, blueprint) do
+    member = {kind, guid}
+    catalog = %{pools: %{}, parent: %{}, member_pool: %{member => nil}}
+    blueprints = if is_nil(blueprint), do: %{}, else: %{member => attach(blueprint, {world, group}, member)}
+    selection = %Selection{leaves: MapSet.new([member])}
+    {catalog, blueprints, selection}
+  end
+
+  defp initialize(world, {:pool, root_id} = group, _blueprint) do
+    catalog = Catalog.data()
+    blueprints = load_blueprints(root_id) |> attach_all({world, group})
+    available = blueprints |> Map.keys() |> MapSet.new()
+    {catalog, blueprints, Selection.initialize(root_id, catalog, available)}
+  end
+
+  defp load_blueprints(root_id, events \\ GameEvent.get_events()) do
+    members = Catalog.root_members(root_id)
+    creature_guids = for %{kind: :creature, id: guid} <- members, do: guid
+    game_object_guids = for %{kind: :game_object, id: guid} <- members, do: guid
+    Map.merge(Loader.Mob.blueprints(creature_guids, events), Loader.GameObject.blueprints(game_object_guids, events))
+  end
+
+  defp attach_all(blueprints, group) do
+    Map.new(blueprints, fn {member, blueprint} -> {member, attach(blueprint, group, member)} end)
+  end
+
+  defp attach(%Mob{internal: internal} = mob, {world, _group} = key, member) do
+    spawn = %{internal.spawn | pool_group: key, pool_member: member}
+
+    %{mob | internal: %{internal | spawn: spawn}}
+    |> InstanceSpawn.materialize(world)
+  end
+
+  defp attach(%GameObject{internal: internal} = game_object, {world, _group} = key, member) do
+    spawn = internal.spawn || %Spawn{}
+    spawn = %{spawn | pool_group: key, pool_member: member}
+
+    %{game_object | internal: %{internal | spawn: spawn}}
+    |> InstanceSpawn.materialize(world)
+  end
+
+  defp maybe_put_blueprint(state, nil), do: state
+
+  defp maybe_put_blueprint(%{key: key} = state, blueprint) do
+    member = member_key(blueprint)
+    %{state | blueprints: Map.put(state.blueprints, member, attach(blueprint, key, member))}
+  end
+
+  defp replace_selection(%{group: {:pool, root_id}, selection: selection, catalog: catalog}, member, available) do
+    Selection.replace(selection, root_id, member, catalog, available)
+  end
+
+  defp replace_selection(%{selection: selection}, _member, _available), do: selection
+
+  defp start_selected(state) do
+    {state, _errors} = start_selected_with_errors(state)
+    state
+  end
+
+  defp start_selected_with_errors(state) do
+    Enum.reduce(state.selection.leaves, {state, []}, fn member, {acc, errors} ->
+      cond do
+        Map.has_key?(acc.running, member) -> {acc, errors}
+        not selected_cell_active?(acc, member) -> {acc, errors}
+        not BattlegroundSpawns.allowed?(acc.world, member) -> {acc, errors}
+        true -> start_member(acc, member, errors)
+      end
+    end)
+  end
+
+  defp selected_cell_active?(state, member) do
+    case Map.get(state.blueprints, member) do
+      nil ->
+        false
+
+      blueprint ->
+        cells = Map.get(state.member_cells, member, MapSet.new()) |> MapSet.put(cell(blueprint))
+        not MapSet.disjoint?(state.active_cells, cells)
+    end
+  end
+
+  defp link_member_cell(state, cell, %Mob{} = blueprint) do
+    put_member_cell(state, cell, member_key(blueprint))
+  end
+
+  defp link_member_cell(state, _cell, _blueprint), do: state
+
+  defp put_member_cell(state, cell, member) do
+    cells = state.member_cells |> Map.get(member, MapSet.new()) |> MapSet.put(cell)
+    %{state | member_cells: Map.put(state.member_cells, member, cells)}
+  end
+
+  defp start_member(state, member, errors) do
+    blueprint = Map.fetch!(state.blueprints, member)
+
+    case start_blueprint(blueprint) do
+      {:ok, pid} -> {monitor_member(state, member, pid), errors}
+      {:error, {:already_started, pid}} -> {monitor_member(state, member, pid), errors}
+      :ok -> {state, errors}
+      {:error, reason} -> {state, [{member, reason} | errors]}
+    end
+  end
+
+  defp activation_result([]), do: :ok
+  defp activation_result(errors), do: {:error, Enum.reverse(errors)}
+
+  defp start_blueprint(%Mob{} = mob), do: Loader.Mob.start_pool_mob(mob)
+  defp start_blueprint(%GameObject{} = game_object), do: Loader.GameObject.start_pool_game_object(game_object)
+
+  defp monitor_member(state, member, pid) do
+    ref = Process.monitor(pid)
+
+    %{
+      state
+      | running: Map.put(state.running, member, {pid, ref}),
+        monitors: Map.put(state.monitors, ref, member)
+    }
+  end
+
+  defp member_key(%Mob{internal: %Internal{creature: creature}}), do: {:creature, creature.db_guid}
+
+  defp member_key(%GameObject{internal: %Internal{spawn: %Spawn{pool_member: {:game_object, _id} = member}}}),
+    do: member
+
+  defp member_key(%GameObject{object: object}), do: {:game_object, Bitwise.band(object.guid, 0x00FFFFFF)}
+
+  defp game_object_group(%GameObject{} = blueprint) do
+    {:game_object, db_guid} = member_key(blueprint)
+    Catalog.group_for(:game_object, db_guid)
+  end
+
+  defp game_object_cell(world, %GameObject{movement_block: %{position: {x, y, z, _o}}}) do
+    SpatialGrid.cell(world, x, y, z)
+  end
+
+  defp schedule_reactivation(member, respawn_delay_ms) when is_integer(respawn_delay_ms) and respawn_delay_ms > 0 do
+    Process.send_after(self(), {:reactivate, member}, respawn_delay_ms)
+  end
+
+  defp schedule_reactivation(_member, _respawn_delay_ms), do: :ok
+
+  defp cell(%{internal: %Internal{world: world}, movement_block: %{position: {x, y, z, _o}}}) do
+    SpatialGrid.cell(world, x, y, z)
+  end
+
+  defp stop_running_member(state, member, pid) do
+    case Map.get(state.running, member) do
+      {^pid, monitor_ref} ->
+        Process.demonitor(monitor_ref, [:flush])
+        stop_entity(pid)
+
+        %{
+          state
+          | running: Map.delete(state.running, member),
+            monitors: Map.delete(state.monitors, monitor_ref)
+        }
+
+      _ ->
+        state
+    end
+  end
+
+  defp stop_all(state) do
+    Enum.reduce(state.running, state, fn {member, {pid, _ref}}, acc ->
+      stop_running_member(acc, member, pid)
+    end)
+  end
+
+  defp stop_entity(pid) do
+    case World.stop_entity(pid) do
+      :ok -> :ok
+      {:error, :not_found} -> :ok
+    end
+  end
+
+  defp drain_inactive(state, wanted \\ nil) do
+    stragglers =
+      Enum.filter(state.running, fn {member, {_pid, _ref}} ->
+        not selected_cell_active?(state, member)
+      end)
+
+    {state, remaining} =
+      Enum.reduce(stragglers, {state, 0}, fn {member, {pid, _ref}}, {acc, remaining} ->
+        if safe_to_stop?(Map.get(acc.blueprints, member), wanted) do
+          {stop_running_member(acc, member, pid), remaining}
+        else
+          {acc, remaining + 1}
+        end
+      end)
+
+    if remaining > 0, do: schedule_drain(state), else: state
+  end
+
+  defp safe_to_stop?(nil, _wanted), do: true
+
+  defp safe_to_stop?(blueprint, wanted) do
+    guid = blueprint.object.guid
+    metadata = Metadata.get(guid) || %{}
+
+    cond do
+      Map.get(metadata, :in_combat) == true -> false
+      Map.get(metadata, :alive?) == false -> false
+      player_controlled?(metadata) -> false
+      true -> not observed?(guid, wanted)
+    end
+  end
+
+  defp player_controlled?(metadata) do
+    Bitwise.band(Map.get(metadata, :unit_flags) || 0, @unit_flag_player_controlled) != 0
+  end
+
+  defp observed?(guid, wanted) do
+    case World.position(guid) do
+      nil -> false
+      {world, x, y, z} -> observed_at?(world, x, y, z, wanted)
+    end
+  end
+
+  defp observed_at?(world, x, y, z, %MapSet{} = wanted) do
+    MapSet.member?(wanted, SpatialGrid.cell(world, x, y, z))
+  end
+
+  defp observed_at?(world, x, y, z, nil) do
+    World.players_near?(world, {x, y, z}, @observed_range)
+  end
+
+  defp schedule_drain(%{drain_ref: nil} = state) do
+    %{state | drain_ref: Process.send_after(self(), :drain_tick, @drain_interval_ms)}
+  end
+
+  defp schedule_drain(state), do: state
+
+  defp eligible_singleton_selection(_selection, %{internal: %Internal{event: nil}} = blueprint, _events) do
+    singleton_selection(blueprint)
+  end
+
+  defp eligible_singleton_selection(_selection, %{internal: %Internal{event: event}} = blueprint, events) do
+    if event in events, do: singleton_selection(blueprint), else: %Selection{}
+  end
+
+  defp singleton_selection(blueprint), do: %Selection{leaves: MapSet.new([member_key(blueprint)])}
+
+  @impl GenServer
+  def terminate(_reason, state) do
+    stop_all(state)
+    :ok
+  end
+end

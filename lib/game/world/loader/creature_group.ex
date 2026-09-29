@@ -5,8 +5,8 @@ defmodule ThistleTea.Game.World.Loader.CreatureGroup do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Logic.CreatureGroup
-  alias ThistleTea.Game.Entity.Logic.CreatureGroup.Member
+  alias ThistleTea.Game.Core.Creature.CreatureGroup
+  alias ThistleTea.Game.Core.Creature.CreatureGroup.Member
 
   @key {__MODULE__, :catalog}
 

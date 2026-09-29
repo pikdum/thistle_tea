@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.MsgQuestPushResultClient do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_QUEST_PUSH_RESULT
 
-  alias ThistleTea.Game.Player.QuestSharing
+  alias ThistleTea.Game.World.Entity.Player.QuestSharing
 
   defstruct [:guid, :result]
 

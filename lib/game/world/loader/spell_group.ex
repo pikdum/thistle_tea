@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.Loader.SpellGroup do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Spell.StackRules
+  alias ThistleTea.Game.Core.Spell.StackRules
 
   @client_build 5875
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]

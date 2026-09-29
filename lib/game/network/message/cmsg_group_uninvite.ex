@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgGroupUninvite do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GROUP_UNINVITE
 
+  alias ThistleTea.Game.Core.Party
   alias ThistleTea.Game.Network.Message.CmsgGroupUninviteGuid
-  alias ThistleTea.Game.Party
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 

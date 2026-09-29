@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.SpellRefundsDbcTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db

@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.Network.Message.SmsgListInventoryTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Data.VendorItem
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Vendor.VendorItem
   alias ThistleTea.Game.Network.Message.SmsgListInventory
 
   describe "to_binary/1" do

@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.Loader.SpellArea do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.SpellArea
-  alias ThistleTea.Game.Spell.Area
+  alias ThistleTea.Game.Core.Spell.Area
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 

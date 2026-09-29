@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyStableSlot do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_BUY_STABLE_SLOT
 
-  alias ThistleTea.Game.Player.PetStable
+  alias ThistleTea.Game.World.Entity.Player.PetStable
 
   defstruct [:guid]
 

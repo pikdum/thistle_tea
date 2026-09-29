@@ -2,13 +2,13 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.Condition
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Data.ScriptStep
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Condition
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Mob.Batch
-  alias ThistleTea.Game.WorldRef
 
   @moduletag :dbc_db
 

@@ -3,8 +3,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgGroupDisband do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GROUP_DISBAND
 
   alias ThistleTea.Game.Network.Message.SmsgPartyCommandResult, as: Result
-  alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.System.Party.Notifier
 
   defstruct []
 

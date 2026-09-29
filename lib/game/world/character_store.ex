@@ -3,8 +3,8 @@ defmodule ThistleTea.Game.World.CharacterStore do
   ETS store of characters by id, mirroring `ItemStore` — in-memory only;
   durable persistence is deferred until the runtime model settles.
   """
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Guid
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 

@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTeleportAck do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_MOVE_TELEPORT_ACK
 
-  alias ThistleTea.Game.Player.Travel
+  alias ThistleTea.Game.World.Entity.Player.Travel
 
   defstruct [:guid, :counter, :time]
 

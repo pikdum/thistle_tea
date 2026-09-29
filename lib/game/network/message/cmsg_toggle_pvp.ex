@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgTogglePvp do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_TOGGLE_PVP
 
-  alias ThistleTea.Game.Player.Pvp
+  alias ThistleTea.Game.World.Entity.Player.Pvp
 
   defstruct [:enabled]
 

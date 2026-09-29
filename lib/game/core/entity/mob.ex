@@ -1,0 +1,597 @@
+defmodule ThistleTea.Game.Core.Entity.Mob do
+  @moduledoc """
+  Mob entity built from Mangos `creature` spawn rows and their templates,
+  including respawn reset and the metadata used for visibility queries.
+  """
+  import Bitwise, only: [|||: 2, <<<: 2, &&&: 2]
+
+  alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Core.Aura, as: AuraLogic
+  alias ThistleTea.Game.Core.Combat.Engagement
+  alias ThistleTea.Game.Core.Combat.Reactive
+  alias ThistleTea.Game.Core.Creature.CreatureEntry
+  alias ThistleTea.Game.Core.Creature.CreatureFlags
+  alias ThistleTea.Game.Core.Creature.CreatureMovement
+  alias ThistleTea.Game.Core.Creature.CreatureReaction
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Loot
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Spawn
+  alias ThistleTea.Game.Core.Entity.Component.Internal.WaypointRoute
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Profession.Skinning
+  alias ThistleTea.Game.Core.Stats.CastSpeed
+  alias ThistleTea.Game.Core.Stats.MovementStats
+  alias ThistleTea.Game.Core.Stats.Resistances
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.WorldRef
+
+  @update_flag_all 0x10
+  @update_flag_living 0x20
+  @update_flag_has_position 0x40
+  @default_respawn_delay_ms 120_000
+  @static_flag_no_automatic_regen 0x00000400
+  @static_flag_tameable 0x00000010
+  @static_flag_visible_to_ghosts 0x00200000
+  @creature_type_flag_tameable 0x01
+  @creature_type_flag_ghost_visible 0x02
+
+  defstruct object: %Object{},
+            unit: %Unit{},
+            movement_block: %MovementBlock{},
+            internal: %Internal{}
+
+  def build(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{} = ct} = c, opts \\ []) do
+    event =
+      case c.game_event_creature do
+        %Mangos.GameEventCreature{event: event} -> event
+        _ -> nil
+      end
+
+    display_info_addon = c.creature_display_info_addon
+    effective_scale = effective_scale(ct, c.display_scale)
+    {virtual_item_slot_display, virtual_item_info} = virtual_items(c.equip_items)
+    level = level(c)
+    stats = c.creature_class_level_stats
+    {health, max_health} = health_values(c, ct, stats)
+    {mana, max_mana} = mana_values(c, ct, stats)
+    {min_damage, max_damage} = melee_damage_values(ct, stats)
+
+    unit = %Unit{
+      stat_model: :creature,
+      health: health,
+      power1: mana,
+      power_type: creature_power_type(max_mana, ct.unit_class),
+      max_health: max_health,
+      max_power1: max_mana,
+      level: level,
+      class: ct.unit_class,
+      gender: display_gender(display_info_addon),
+      faction_template: ct.faction_alliance,
+      flags: unit_flags(ct),
+      npc_flags: ct.npc_flags,
+      dynamic_flags: ct.dynamic_flags || 0,
+      sheath_state: 1,
+      misc_flags: 0x10,
+      bounding_radius: mob_bounding_radius(display_info_addon, effective_scale),
+      combat_reach: mob_combat_reach(display_info_addon, effective_scale),
+      base_bounding_radius: mob_bounding_radius(display_info_addon, effective_scale),
+      base_combat_reach: mob_combat_reach(display_info_addon, effective_scale),
+      display_id: c.modelid,
+      native_display_id: c.modelid,
+      native_model_id: c.display_model_id,
+      min_damage: min_damage,
+      max_damage: max_damage,
+      base_min_damage: min_damage,
+      base_max_damage: max_damage,
+      base_attack_time: ct.melee_base_attack_time,
+      base_melee_attack_time: ct.melee_base_attack_time,
+      attack_power: stat_value(stats, :attack_power, ct.melee_attack_power),
+      base_attack_power: stat_value(stats, :attack_power, ct.melee_attack_power),
+      ranged_attack_power: stat_value(stats, :ranged_attack_power, ct.ranged_attack_power),
+      base_ranged_attack_power: stat_value(stats, :ranged_attack_power, ct.ranged_attack_power),
+      min_ranged_damage: ranged_damage_min(ct, stats),
+      max_ranged_damage: ranged_damage_max(ct, stats),
+      base_ranged_min_damage: ranged_damage_min(ct, stats),
+      base_ranged_max_damage: ranged_damage_max(ct, stats),
+      base_ranged_attack_time: ct.ranged_base_attack_time,
+      ranged_attack_time: ct.ranged_base_attack_time,
+      strength: stat_value(stats, :strength, 0),
+      agility: stat_value(stats, :agility, 0),
+      base_strength: stat_value(stats, :strength, 0),
+      base_agility: stat_value(stats, :agility, 0),
+      stamina: stat_value(stats, :stamina, 0),
+      intellect: stat_value(stats, :intellect, 0),
+      spirit: stat_value(stats, :spirit, 0),
+      normal_resistance: armor_value(ct, stats),
+      holy_resistance: ct.resistance_holy,
+      fire_resistance: ct.resistance_fire,
+      nature_resistance: ct.resistance_nature,
+      frost_resistance: ct.resistance_frost,
+      shadow_resistance: ct.resistance_shadow,
+      arcane_resistance: ct.resistance_arcane,
+      base_normal_resistance: armor_value(ct, stats),
+      base_holy_resistance: ct.resistance_holy,
+      base_fire_resistance: ct.resistance_fire,
+      base_nature_resistance: ct.resistance_nature,
+      base_frost_resistance: ct.resistance_frost,
+      base_shadow_resistance: ct.resistance_shadow,
+      base_arcane_resistance: ct.resistance_arcane,
+      virtual_item_slot_display: virtual_item_slot_display,
+      virtual_item_info: virtual_item_info,
+      auras: []
+    }
+
+    unit =
+      unit |> stat_inputs(ct, stats, Keyword.get(opts, :stat_model)) |> Resistances.recompute() |> CastSpeed.recompute()
+
+    movement_block = %MovementBlock{
+      update_flag: @update_flag_all ||| @update_flag_living ||| @update_flag_has_position,
+      position: {
+        c.position_x,
+        c.position_y,
+        c.position_z,
+        c.orientation
+      },
+      movement_flags: 0,
+      # TODO: figure out how to generate these
+      timestamp: 0,
+      fall_time: 0,
+      # from creature_template
+      walk_speed: ct.speed_walk * 2.5,
+      run_speed: ct.speed_run * 7.0,
+      run_back_speed: ct.speed_run * 4.5,
+      swim_speed: ct.speed_run * 4.722222,
+      swim_back_speed: ct.speed_run * 2.5,
+      base_walk_speed: ct.speed_walk * 2.5,
+      base_run_speed: ct.speed_run * 7.0,
+      base_run_back_speed: ct.speed_run * 4.5,
+      base_swim_speed: ct.speed_run * 4.722222,
+      base_swim_back_speed: ct.speed_run * 2.5,
+      turn_rate: 3.1415
+    }
+
+    %__MODULE__{
+      object: %Object{
+        guid: Guid.from_low_guid(:mob, c.id, c.guid),
+        entry: c.id,
+        scale_x: effective_scale,
+        base_scale_x: effective_scale
+      },
+      unit: unit,
+      movement_block: movement_block,
+      internal: %Internal{
+        world: WorldRef.open(c.map),
+        name: ct.name,
+        invincibility_health_threshold: CreatureFlags.invincibility_threshold(ct.creature_type_flags),
+        creature: %Creature{
+          db_guid: c.guid,
+          addon_source: c.addon_source,
+          spell_list_id: ct.spell_list_id,
+          template_unit_flags: unit.flags,
+          default_equipment: %{
+            virtual_item_slot_display: virtual_item_slot_display,
+            virtual_item_info: virtual_item_info
+          },
+          experience_multiplier: experience_multiplier(ct),
+          health_multiplier: ct.health_multiplier,
+          extra_flags: ct.extra_flags,
+          static_flags: ct.creature_type_flags,
+          static_flags2: ct.static_flags2,
+          mechanic_immune_mask: ct.mechanic_immune_mask,
+          school_immune_mask: ct.school_immune_mask,
+          damage_school: ct.damage_school,
+          rank: ct.rank,
+          scale_override: ct.scale,
+          civilian?: ct.civilian == 1,
+          racial_leader?: ct.racial_leader == 1,
+          family: ct.family,
+          type_flags: type_flags(ct),
+          creature_type: ct.creature_type,
+          inhabit_type: ct.inhabit_type,
+          critter?: ct.creature_type == 8 and ct.ai_name in [nil, "", "CritterAI"] and c.ai_events in [nil, []],
+          damage_multiplier: ct.damage_multiplier,
+          regenerate_stats: regenerate_stats(ct),
+          detection_range: detection_range(ct),
+          call_for_help_range: call_for_help_range(ct),
+          leash_range: leash_range(ct),
+          spells: c.spell_list,
+          addon_auras: c.addon_auras,
+          ai_events: c.ai_events
+        },
+        spawn: %Spawn{
+          unit: unit,
+          movement_block: movement_block,
+          position: {c.position_x, c.position_y, c.position_z},
+          home_orientation: c.orientation,
+          distance: spawn_distance(c),
+          movement_type: c.movement_type,
+          waypoint_route: WaypointRoute.build(c),
+          respawn_delay_ms: respawn_delay_ms(c)
+        },
+        loot: %Loot{
+          id: ct.loot_id,
+          pickpocket_id: ct.pickpocket_loot_id,
+          skinning_id: ct.skinning_loot_id,
+          min_gold: ct.min_loot_gold,
+          max_gold: ct.max_loot_gold
+        },
+        event: event,
+        in_combat: false,
+        running: false,
+        spellbook: c.spellbook
+      }
+    }
+    |> Reactive.sync_health()
+    |> MovementStats.recompute()
+    |> CreatureMovement.sync()
+    |> then(fn mob ->
+      if Keyword.get(opts, :apply_addon_auras?, true), do: apply_addon_auras(mob, Time.now()), else: mob
+    end)
+  end
+
+  defp stat_inputs(%Unit{} = unit, template, %Mangos.CreatureClassLevelStats{} = stats, :creature) do
+    %{
+      unit
+      | stat_model: :creature,
+        base_health: multiplied(stats.health, template.health_multiplier),
+        base_mana: multiplied(stats.mana, template.mana_multiplier),
+        base_stamina: stats.stamina,
+        base_intellect: stats.intellect,
+        base_spirit: stats.spirit
+    }
+  end
+
+  defp stat_inputs(unit, _template, _stats, _model), do: unit
+
+  defp experience_multiplier(template) do
+    if Bitwise.band(template.creature_type_flags || 0, 0x2) == 0, do: template.experience_multiplier, else: 0.0
+  end
+
+  def apply_addon_auras(%__MODULE__{internal: %Internal{creature: %Creature{addon_auras: [_ | _] = spells}}} = mob, now)
+      when is_integer(now) do
+    Enum.reduce(spells, mob, fn spell, acc ->
+      {acc, _events} = AuraLogic.apply_spell(acc, acc.object.guid, acc.unit.level, spell, now)
+      acc
+    end)
+  end
+
+  def apply_addon_auras(%__MODULE__{} = mob, _now), do: mob
+
+  def prepare_summon(%__MODULE__{internal: %Internal{spawn: %Spawn{} = spawn_state} = internal} = mob, opts)
+      when is_list(opts) do
+    spawn_state = %{
+      spawn_state
+      | temporary?: true,
+        summoner_guid: Keyword.get(opts, :summoner_guid),
+        despawn_type: Keyword.get(opts, :despawn_type),
+        despawn_delay_ms: Keyword.get(opts, :despawn_delay_ms),
+        movement_type: 0,
+        waypoint_route: nil
+    }
+
+    creature = %{internal.creature | db_guid: nil}
+
+    internal = %{
+      internal
+      | spawn: spawn_state,
+        creature: creature,
+        running: Keyword.get(opts, :run?, false) == true
+    }
+
+    %{mob | internal: internal}
+  end
+
+  @npc_flag_spirit_service 0x60
+
+  def critter?(%__MODULE__{internal: %Internal{pet: nil, totem: nil, creature: %Creature{critter?: true}}}), do: true
+  def critter?(_entity), do: false
+
+  def proximity_aggro?(%__MODULE__{internal: %Internal{creature: %Creature{critter?: true}}}), do: false
+
+  def proximity_aggro?(%__MODULE__{} = mob), do: CreatureReaction.mode(mob) == :aggressive
+
+  def visibility_metadata(%__MODULE__{
+        object: object,
+        unit: %Unit{} = unit,
+        internal: %Internal{creature: %Creature{} = creature, loot: loot, name: name}
+      }) do
+    %{
+      entry: object.entry,
+      name: name,
+      display_id: unit.display_id,
+      bounding_radius: unit.bounding_radius,
+      combat_reach: unit.combat_reach,
+      tameable?: ((creature.type_flags || 0) &&& @creature_type_flag_tameable) != 0,
+      detection_range: creature.detection_range,
+      db_guid: creature.db_guid,
+      npc_flags: unit.npc_flags || 0,
+      spirit_service?: ((unit.npc_flags || 0) &&& @npc_flag_spirit_service) != 0,
+      ghost_visible?: ((creature.type_flags || 0) &&& @creature_type_flag_ghost_visible) != 0,
+      creature_type: creature.creature_type,
+      civilian?: creature.civilian?,
+      pickpocket_id: if(loot, do: loot.pickpocket_id),
+      skinning_id: if(loot, do: loot.skinning_id),
+      skinned?: loot && loot.skinned?,
+      body_loot?: loot && not is_nil(loot.session)
+    }
+  end
+
+  def visibility_metadata(%__MODULE__{}), do: %{}
+
+  def respawn(%__MODULE__{} = mob) do
+    mob = CreatureEntry.restore(mob)
+    internal = mob.internal
+    spawn_state = internal.spawn || %Spawn{}
+    loot = internal.loot || %Loot{}
+
+    unit = respawn_unit(spawn_state, mob.unit)
+    movement_block = respawn_movement_block(spawn_state, mob.movement_block)
+
+    internal = %{
+      internal
+      | casting: nil,
+        invincibility_health_threshold:
+          CreatureFlags.invincibility_threshold(mob, internal.invincibility_health_threshold),
+        rooted?: false,
+        running: false,
+        killed_by: nil,
+        pve_reward_eligible?: nil,
+        death_finalized?: false,
+        movement_start_time: nil,
+        movement_start_position: nil,
+        movement_speed: nil,
+        movement_options: nil,
+        behavior_tree: nil,
+        broadcast_update?: false,
+        spawn: %{spawn_state | respawn_ref: nil, respawn_pending?: false, event_data: nil},
+        loot: %{loot | session: nil, pockets: nil, skinned?: false, corpse_removed?: false, corpse_token: nil}
+    }
+
+    %Engagement.Result{entity: mob} =
+      Engagement.reset(%{mob | unit: unit, movement_block: movement_block, internal: internal})
+
+    mob
+    |> Reactive.sync_health()
+    |> MovementStats.recompute()
+    |> CreatureMovement.sync()
+    |> Companion.project()
+    |> Skinning.sync()
+  end
+
+  defp effective_scale(%Mangos.CreatureTemplate{scale: scale}, _display_scale) when is_number(scale) and scale > 0,
+    do: scale
+
+  defp effective_scale(_template, display_scale) when is_number(display_scale) and display_scale > 0, do: display_scale
+
+  defp effective_scale(_template, _display_scale), do: 1.0
+
+  defp display_gender(%Mangos.CreatureDisplayInfoAddon{gender: gender}) when gender in 0..2, do: gender
+  defp display_gender(_display_info_addon), do: 0
+
+  defp level(%Mangos.Creature{} = creature) do
+    case creature.selected_level do
+      level when is_integer(level) and level > 0 -> level
+      _ -> random_template_level(creature)
+    end
+  end
+
+  defp random_template_level(%Mangos.Creature{
+         creature_template: %Mangos.CreatureTemplate{min_level: min_level, max_level: max_level}
+       }) do
+    Enum.random(min_level..max_level)
+  end
+
+  defp health_values(
+         %Mangos.Creature{} = creature,
+         %Mangos.CreatureTemplate{} = template,
+         %Mangos.CreatureClassLevelStats{} = stats
+       ) do
+    max_health = stats.health |> multiplied(template.health_multiplier) |> max(1)
+    {percent_value(max_health, creature.health_percent), max_health}
+  end
+
+  defp health_values(%Mangos.Creature{curhealth: health}, _template, _stats) when is_integer(health) and health > 0 do
+    {health, health}
+  end
+
+  defp health_values(_creature, _template, _stats), do: {1, 1}
+
+  defp mana_values(
+         %Mangos.Creature{} = creature,
+         %Mangos.CreatureTemplate{} = template,
+         %Mangos.CreatureClassLevelStats{} = stats
+       ) do
+    max_mana = multiplied(stats.mana, template.mana_multiplier)
+    {percent_value(max_mana, creature.mana_percent), max_mana}
+  end
+
+  defp mana_values(%Mangos.Creature{curmana: mana}, _template, _stats) when is_integer(mana) and mana > 0 do
+    {mana, mana}
+  end
+
+  defp mana_values(_creature, _template, _stats), do: {0, 0}
+
+  defp creature_power_type(max_mana, _unit_class) when is_integer(max_mana) and max_mana > 0, do: 0
+  defp creature_power_type(_max_mana, 4), do: 3
+  defp creature_power_type(_max_mana, _unit_class), do: 1
+
+  defp melee_damage_values(%Mangos.CreatureTemplate{} = template, %Mangos.CreatureClassLevelStats{} = stats) do
+    average = stats.melee_damage * (template.damage_multiplier || 1.0)
+    variance = average * (template.damage_variance || 0.14)
+    {average - variance, average + variance}
+  end
+
+  defp melee_damage_values(%Mangos.CreatureTemplate{} = template, _stats),
+    do: {template.min_melee_dmg, template.max_melee_dmg}
+
+  defp ranged_damage_min(%Mangos.CreatureTemplate{} = template, %Mangos.CreatureClassLevelStats{} = stats) do
+    average = stats.ranged_damage * (template.damage_multiplier || 1.0)
+    average - average * (template.damage_variance || 0.14)
+  end
+
+  defp ranged_damage_min(%Mangos.CreatureTemplate{} = template, _stats), do: template.min_ranged_dmg
+
+  defp ranged_damage_max(%Mangos.CreatureTemplate{} = template, %Mangos.CreatureClassLevelStats{} = stats) do
+    average = stats.ranged_damage * (template.damage_multiplier || 1.0)
+    average + average * (template.damage_variance || 0.14)
+  end
+
+  defp ranged_damage_max(%Mangos.CreatureTemplate{} = template, _stats), do: template.max_ranged_dmg
+
+  defp stat_value(%Mangos.CreatureClassLevelStats{} = stats, key, _default), do: Map.get(stats, key) || 0
+  defp stat_value(_stats, _key, default), do: default || 0
+
+  defp armor_value(%Mangos.CreatureTemplate{} = template, %Mangos.CreatureClassLevelStats{} = stats) do
+    multiplied(stats.armor, template.armor_multiplier)
+  end
+
+  defp armor_value(%Mangos.CreatureTemplate{} = template, _stats), do: template.armor || 0
+
+  defp multiplied(value, multiplier) when is_number(value) and is_number(multiplier), do: round(value * multiplier)
+  defp multiplied(value, _multiplier) when is_number(value), do: round(value)
+  defp multiplied(_value, _multiplier), do: 0
+
+  defp percent_value(value, percent) when is_integer(value) and value > 0 and is_number(percent) and percent < 100 do
+    value
+    |> Kernel.*(percent / 100.0)
+    |> round()
+    |> max(1)
+  end
+
+  defp percent_value(value, _percent), do: value
+
+  defp unit_flags(%Mangos.CreatureTemplate{unit_flags: flags, creature_type_flags: static_flags}) do
+    CreatureFlags.unit_flags(flags, static_flags)
+  end
+
+  defp type_flags(%Mangos.CreatureTemplate{creature_type_flags: flags}) when is_integer(flags) do
+    0
+    |> put_type_flag(flags, @static_flag_tameable, @creature_type_flag_tameable)
+    |> put_type_flag(flags, @static_flag_visible_to_ghosts, @creature_type_flag_ghost_visible)
+  end
+
+  defp put_type_flag(type_flags, static_flags, static_flag, type_flag) do
+    if (static_flags &&& static_flag) == 0, do: type_flags, else: type_flags ||| type_flag
+  end
+
+  defp regenerate_stats(%Mangos.CreatureTemplate{regenerate_stats: stats}) when is_integer(stats), do: stats
+
+  defp regenerate_stats(%Mangos.CreatureTemplate{creature_type_flags: flags}) when is_integer(flags) do
+    if (flags &&& @static_flag_no_automatic_regen) == 0, do: 0x3, else: 0x0
+  end
+
+  defp detection_range(%Mangos.CreatureTemplate{detection_range: range}) when is_number(range) and range >= 0, do: range
+  defp detection_range(_template), do: 20.0
+
+  defp call_for_help_range(%Mangos.CreatureTemplate{call_for_help_range: range}) when is_number(range) and range >= 0 do
+    range
+  end
+
+  defp call_for_help_range(_template), do: 5.0
+
+  defp leash_range(%Mangos.CreatureTemplate{leash_range: range} = template) when is_number(range) and range > 0 do
+    if range >= detection_range(template), do: range, else: 0.0
+  end
+
+  defp leash_range(_template), do: 0.0
+
+  defp respawn_delay_ms(%Mangos.Creature{spawntimesecsmin: min, spawntimesecsmax: max})
+       when is_integer(min) and is_integer(max) and min >= 0 and max > min do
+    (min + :rand.uniform(max - min + 1) - 1) * 1_000
+  end
+
+  defp respawn_delay_ms(%Mangos.Creature{spawntimesecs: seconds}) when is_integer(seconds) do
+    respawn_delay_ms(seconds)
+  end
+
+  defp respawn_delay_ms(%Mangos.Creature{spawntimesecsmin: seconds}) do
+    respawn_delay_ms(seconds)
+  end
+
+  defp respawn_delay_ms(seconds) when is_integer(seconds) and seconds >= 0 do
+    seconds * 1_000
+  end
+
+  defp respawn_delay_ms(_seconds), do: @default_respawn_delay_ms
+
+  defp spawn_distance(%Mangos.Creature{spawndist: distance}) when is_number(distance), do: distance
+  defp spawn_distance(%Mangos.Creature{wander_distance: distance}) when is_number(distance), do: distance
+  defp spawn_distance(_creature), do: 0.0
+
+  defp respawn_unit(%Spawn{unit: %Unit{} = unit}, _current_unit), do: unit
+
+  defp respawn_unit(%Spawn{}, %Unit{} = unit) do
+    %{
+      unit
+      | health: unit.max_health,
+        power1: unit.max_power1,
+        power2: unit.max_power2,
+        power3: unit.max_power3,
+        power4: unit.max_power4,
+        power5: unit.max_power5
+    }
+  end
+
+  defp respawn_movement_block(%Spawn{movement_block: %MovementBlock{} = movement_block}, _current_movement_block) do
+    movement_block
+  end
+
+  defp respawn_movement_block(%Spawn{position: {x, y, z}}, %MovementBlock{} = movement_block) do
+    %{movement_block | position: {x, y, z, 0.0}, movement_flags: 0}
+  end
+
+  defp respawn_movement_block(%Spawn{}, %MovementBlock{} = movement_block) do
+    %{movement_block | movement_flags: 0}
+  end
+
+  defp mob_bounding_radius(model_info, scale) do
+    normalize_model_value(model_info, :bounding_radius, Unit.default_bounding_radius()) * scale
+  end
+
+  defp mob_combat_reach(model_info, scale) do
+    normalize_model_value(model_info, :combat_reach, Unit.default_combat_reach()) * scale
+  end
+
+  defp virtual_items([_, _, _] = items) do
+    {pack_virtual_item_slot_display(items), pack_virtual_item_info(items)}
+  end
+
+  defp virtual_items(_items), do: {0, <<0::192>>}
+
+  defp pack_virtual_item_slot_display([a, b, c]) do
+    item_display_id(a) ||| item_display_id(b) <<< 32 ||| item_display_id(c) <<< 64
+  end
+
+  defp pack_virtual_item_info([a, b, c]) do
+    virtual_item_info_for(a) <> virtual_item_info_for(b) <> virtual_item_info_for(c)
+  end
+
+  defp virtual_item_info_for(%Mangos.ItemTemplate{
+         class: class,
+         subclass: subclass,
+         material: material,
+         inventory_type: inventory_type,
+         sheath: sheath_type
+       }) do
+    <<class, subclass, material, inventory_type, sheath_type, 0, 0, 0>>
+  end
+
+  defp virtual_item_info_for(nil), do: <<0::64>>
+
+  defp item_display_id(%Mangos.ItemTemplate{display_id: id}), do: id
+  defp item_display_id(nil), do: 0
+
+  defp normalize_model_value(model_info, key, default) when is_map(model_info) do
+    case Map.get(model_info, key) do
+      value when is_number(value) and value > 0 -> value
+      _ -> default
+    end
+  end
+
+  defp normalize_model_value(_model_info, _key, default), do: default
+end

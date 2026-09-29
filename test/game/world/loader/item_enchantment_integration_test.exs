@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.ItemEnchantmentIntegrationTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.World.Loader.ItemEnchantment
 
   @moduletag :dbc_db

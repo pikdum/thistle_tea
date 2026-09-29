@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Loader.FishingIntegrationTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Logic.Trainer
+  alias ThistleTea.Game.Core.Player.Trainer
   alias ThistleTea.Game.World.Loader.Fishing
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Loot

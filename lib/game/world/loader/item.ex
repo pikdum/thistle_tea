@@ -4,8 +4,8 @@ defmodule ThistleTea.Game.World.Loader.Item do
   generated characters.
   """
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Logic.Proficiency
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Item.Proficiency
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
   @random_candidates 50

@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.System.InstanceMembershipTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.System.Instance
   alias ThistleTea.Game.World.System.Party

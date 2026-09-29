@@ -1,0 +1,190 @@
+defmodule ThistleTea.Game.Core.Class.Paladin do
+  @moduledoc """
+  Pure Paladin-specific transitions that raw spell data cannot express.
+  """
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Proc
+  alias ThistleTea.Game.Core.Spell.Scripts
+  alias ThistleTea.Game.Core.Stats.AttackSpeed
+
+  @righteousness_damage_spells %{
+    20_154 => 25_742,
+    21_084 => 25_742,
+    20_287 => 25_740,
+    20_288 => 25_739,
+    20_289 => 25_738,
+    20_290 => 25_737,
+    20_291 => 25_736,
+    20_292 => 25_735,
+    20_293 => 25_713
+  }
+  @spell_family 10
+  @blessing_of_light_family_mask 0x10000000
+  @holy_light_family_mask 0x80000000
+  @flash_of_light_family_mask 0x40000000
+  @judgement_aura_family_mask 0x00080000
+  @forbearance 25_771
+  @eye_for_an_eye [9799, 25_988]
+  @eye_for_an_eye_damage 25_997
+  @illumination [20_210, 20_212, 20_213, 20_214, 20_215]
+  @illumination_energize 20_272
+
+  @holy_shock %{
+    20_473 => %{damage: 25_912, heal: 25_914},
+    20_929 => %{damage: 25_911, heal: 25_913},
+    20_930 => %{damage: 25_902, heal: 25_903}
+  }
+
+  @judgement_procs %{
+    20_185 => 20_267,
+    20_344 => 20_341,
+    20_345 => 20_342,
+    20_346 => 20_343,
+    20_186 => 20_268,
+    20_354 => 20_352,
+    20_355 => 20_353
+  }
+
+  def forbearance_id, do: @forbearance
+
+  def eye_for_an_eye?(%Spell{id: id}), do: id in @eye_for_an_eye
+  def eye_for_an_eye?(_spell), do: false
+
+  def eye_for_an_eye_damage_id, do: @eye_for_an_eye_damage
+
+  def illumination?(%Spell{id: id}), do: id in @illumination
+  def illumination?(_spell), do: false
+
+  def illumination_energize_id, do: @illumination_energize
+
+  def holy_shock_ids(spell_id), do: Map.get(@holy_shock, spell_id)
+
+  def judgement_proc_aura?(%Spell{} = spell), do: Spell.family_flag?(spell, @spell_family, @judgement_aura_family_mask)
+
+  def judgement_proc_id(spell_id), do: Map.get(@judgement_procs, spell_id)
+
+  def release_seal(
+        %{object: %{guid: caster_guid}, unit: %Unit{auras: holders}} = entity,
+        %Spell{} = spell,
+        target_guid,
+        now
+      )
+      when is_list(holders) and is_integer(target_guid) and is_integer(now) do
+    if Scripts.paladin_judgement?(spell) do
+      do_release_seal(entity, holders, caster_guid, target_guid, now)
+    else
+      entity
+    end
+  end
+
+  def release_seal(entity, _spell, _target_guid, _now), do: entity
+
+  defp do_release_seal(entity, holders, caster_guid, target_guid, now) do
+    case Enum.find(holders, &seal?/1) do
+      %Holder{spell: %Spell{id: seal_id}, auras: auras} ->
+        case judgement_spell_id(auras) do
+          judgement_id when is_integer(judgement_id) and judgement_id > 1 ->
+            {entity, aura_events} = Aura.remove_spells(entity, [seal_id], now)
+            level = entity.unit.level || 1
+
+            entity
+            |> Effects.enqueue(aura_events)
+            |> Effects.enqueue(Effects.trigger_spell(caster_guid, level, target_guid, judgement_id))
+
+          _no_judgement ->
+            entity
+        end
+
+      _no_seal ->
+        entity
+    end
+  end
+
+  def trigger_seal(entity, payload, spell \\ nil)
+
+  def trigger_seal(entity, %{outcome: outcome, victim_guid: victim_guid} = payload, spell)
+      when outcome in [:normal, :crit] do
+    case active_seal(entity) do
+      %Holder{spell: %Spell{id: seal_id}} = holder ->
+        proc_type = if is_struct(spell, Spell), do: :deal_melee_ability, else: :deal_melee_swing
+        spell_id = Map.get(@righteousness_damage_spells, seal_id)
+
+        if is_integer(spell_id) and Proc.origin_allowed?(holder.spell, spell, proc_type, payload) do
+          trigger_righteousness(entity, holder, victim_guid, spell_id)
+        else
+          entity
+        end
+
+      _no_seal ->
+        entity
+    end
+  end
+
+  def trigger_seal(entity, _payload, _spell), do: entity
+
+  def active_seal?(entity), do: not is_nil(active_seal(entity))
+
+  def blessing_of_light_bonus(%{unit: %Unit{auras: holders}}, %Spell{} = spell) when is_list(holders) do
+    aura_index = healing_bonus_index(spell)
+
+    for %Holder{spell: %Spell{spell_visual: 300} = blessing, auras: auras, stacks: stacks} <- holders,
+        Spell.family_flag?(blessing, @spell_family, @blessing_of_light_family_mask),
+        %Aura{index: ^aura_index, type: :dummy, amount: amount} <- auras,
+        is_integer(amount),
+        reduce: 0 do
+      bonus -> bonus + amount * max(stacks || 1, 1)
+    end
+  end
+
+  def blessing_of_light_bonus(_entity, _spell), do: 0
+
+  defp healing_bonus_index(spell) do
+    cond do
+      Spell.family_flag?(spell, @spell_family, @holy_light_family_mask) -> 0
+      Spell.family_flag?(spell, @spell_family, @flash_of_light_family_mask + 0x2000) -> 1
+      true -> nil
+    end
+  end
+
+  defp seal?(%Holder{spell: %Spell{exclusive_category: :paladin_seal}}), do: true
+  defp seal?(_holder), do: false
+
+  defp judgement_spell_id(auras) do
+    Enum.find_value(auras, fn
+      %Aura{index: 2, type: :dummy, amount: amount} when is_integer(amount) -> amount
+      _aura -> nil
+    end)
+  end
+
+  defp active_seal(%{unit: %Unit{auras: holders}}) when is_list(holders), do: Enum.find(holders, &seal?/1)
+  defp active_seal(_entity), do: nil
+
+  defp trigger_righteousness(entity, %Holder{auras: auras}, victim_guid, spell_id) do
+    case Enum.find(auras, &match?(%Aura{index: 0}, &1)) do
+      %Aura{amount: amount} when is_integer(amount) ->
+        speed = max(AttackSpeed.base_ms(entity.unit, :mainhand) / 1_000, 1.5)
+        damage = trunc(amount / 87 + (amount / 25 - amount / 87) * ((min(speed, 4.0) - 1.5) / 2.5))
+
+        spell = %Spell{
+          id: spell_id,
+          name: "Seal of Righteousness",
+          school: :holy,
+          effects: [
+            %Effect{index: 0, type: :school_damage, base_points: max(damage, 0), implicit_target_a: :target_enemy}
+          ]
+        }
+
+        context = CastContext.from_caster(entity, spell, victim_guid)
+        Effects.enqueue(entity, Effects.deliver_spell(victim_guid, context, spell))
+
+      _no_damage_aura ->
+        entity
+    end
+  end
+end

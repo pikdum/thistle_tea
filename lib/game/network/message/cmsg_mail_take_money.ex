@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMailTakeMoney do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MAIL_TAKE_MONEY
 
-  alias ThistleTea.Game.Player.Mail
+  alias ThistleTea.Game.World.Entity.Player.Mail
 
   defstruct [:mailbox, :mail_id]
 

@@ -1,13 +1,13 @@
 defmodule ThistleTea.Game.Network.Message.KnockbackTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
-  alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.World.Entity.Player.MovementControl
+  alias ThistleTea.Game.World.Entity.Player.State
 
   setup [:launch]
 

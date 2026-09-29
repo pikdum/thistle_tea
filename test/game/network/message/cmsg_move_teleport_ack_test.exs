@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.Network.Message.CmsgMoveTeleportAckTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message.CmsgMoveTeleportAck
+  alias ThistleTea.Game.World.Entity.Player.State
 
   describe "handle/2" do
     test "restores a suspended pet after the matching teleport acknowledgement" do

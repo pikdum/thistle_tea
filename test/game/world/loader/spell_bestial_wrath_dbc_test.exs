@@ -1,19 +1,19 @@
 defmodule ThistleTea.Game.World.Loader.SpellBestialWrathDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Aura.Holder
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.SpellEffect
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.SpellEffect
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db
@@ -115,7 +115,7 @@ defmodule ThistleTea.Game.World.Loader.SpellBestialWrathDbcTest do
   describe "take_damage/4" do
     test "death clears the boosts and restores scale", %{pet: pet, wrath: wrath} do
       {protected, _} = Aura.apply_spell(pet, 1, 50, wrath, 1_000)
-      dead = Core.take_damage(protected, 2_000, 2_000, school: :fire)
+      dead = Entity.take_damage(protected, 2_000, 2_000, school: :fire)
       assert dead.unit.health == 0
       assert dead.unit.auras == []
       assert dead.object.scale_x == 1.0

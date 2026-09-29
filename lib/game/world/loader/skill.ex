@@ -7,10 +7,10 @@ defmodule ThistleTea.Game.World.Loader.Skill do
   import Ecto.Query
 
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Logic.Skills
-  alias ThistleTea.Game.Entity.Logic.SpellSkills
-  alias ThistleTea.Game.Spell, as: SpellData
-  alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Core.Skills
+  alias ThistleTea.Game.Core.Skills.SpellSkills
+  alias ThistleTea.Game.Core.Spell, as: SpellData
+  alias ThistleTea.Game.Core.Spell.Effect
 
   @skill_fields [:id] ++
                   for(

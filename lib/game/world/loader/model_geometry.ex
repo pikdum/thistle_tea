@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.World.Loader.ModelGeometry do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.Model
+  alias ThistleTea.Game.Core.Entity.Model
 
   def init(table \\ __MODULE__) do
     case :ets.whereis(table) do

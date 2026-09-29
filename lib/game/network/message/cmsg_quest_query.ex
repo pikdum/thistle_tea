@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgQuestQuery do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_QUEST_QUERY
 
-  alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Core.Quest
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
 
   defstruct [:quest_id]

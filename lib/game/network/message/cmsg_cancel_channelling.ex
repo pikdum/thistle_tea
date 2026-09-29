@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelChannelling do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CANCEL_CHANNELLING
 
-  alias ThistleTea.Game.Player.Spellcasting
+  alias ThistleTea.Game.World.Entity.Player.Spellcasting
 
   defstruct [:spell_id]
 

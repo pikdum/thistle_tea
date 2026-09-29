@@ -1,0 +1,330 @@
+defmodule ThistleTea.Game.Core.Combat.ThreatTest do
+  use ExUnit.Case, async: true
+
+  alias ThistleTea.Game.Core.Combat.Threat
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
+
+  @mob_guid 100
+  @player_a 1
+  @player_b 2
+  @player_c 3
+
+  defp mob(attrs \\ []) do
+    %Mob{
+      object: %Object{guid: Keyword.get(attrs, :guid, @mob_guid)},
+      unit: %Unit{target: Keyword.get(attrs, :target, 0)},
+      internal: %Internal{
+        in_combat: Keyword.get(attrs, :in_combat, true),
+        threat: Keyword.get(attrs, :threat, %{})
+      }
+    }
+  end
+
+  defp reselect(entity, opts \\ []) do
+    opts =
+      opts
+      |> Keyword.put_new(:valid?, fn _guid -> true end)
+      |> Keyword.put_new(:in_melee?, fn _guid -> false end)
+
+    Threat.reselect(entity, opts)
+  end
+
+  describe "add/3" do
+    test "creates and accumulates entries" do
+      entity = mob() |> Threat.add(@player_a, 50) |> Threat.add(@player_a, 25)
+      assert entity.internal.threat == %{@player_a => 75.0}
+    end
+
+    test "ignores self, invalid guids, and negative amounts" do
+      entity =
+        mob()
+        |> Threat.add(@mob_guid, 50)
+        |> Threat.add(nil, 50)
+        |> Threat.add(0, 50)
+        |> Threat.add(@player_a, -10)
+
+      assert entity.internal.threat == %{}
+    end
+
+    test "seeds a zero-threat entry" do
+      entity = Threat.add(mob(), @player_a, 0)
+      assert entity.internal.threat == %{@player_a => 0.0}
+    end
+  end
+
+  describe "add_damage/3" do
+    test "accrues threat while in combat" do
+      entity = Threat.add_damage(mob(), @player_a, 40)
+      assert entity.internal.threat == %{@player_a => 40.0}
+    end
+
+    test "ignores damage while out of combat" do
+      entity = Threat.add_damage(mob(in_combat: false), @player_a, 40)
+      assert entity.internal.threat == %{}
+    end
+  end
+
+  describe "taunt/2" do
+    test "matches the current victim even when another entry has higher threat" do
+      entity =
+        mob(target: @player_a, threat: %{@player_a => 200.0, @player_b => 50.0, @player_c => 250.0})
+        |> Threat.taunt(@player_b)
+
+      assert entity.internal.threat == %{@player_a => 200.0, @player_b => 200.0, @player_c => 250.0}
+    end
+
+    test "does not affect a mob already attacking the taunter" do
+      entity =
+        mob(target: @player_a, threat: %{@player_a => 300.0, @player_b => 50.0})
+        |> Threat.taunt(@player_a)
+
+      assert entity.internal.threat == %{@player_a => 300.0, @player_b => 50.0}
+    end
+
+    test "does not borrow threat without a current victim" do
+      entity = mob(threat: %{@player_a => 100.0})
+      assert Threat.taunt(entity, @player_b) == entity
+    end
+
+    test "matches the victim when the taunter already has more threat" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 125.0})
+      assert Threat.taunt(entity, @player_b).internal.threat[@player_b] == 100.0
+    end
+  end
+
+  describe "modify/3" do
+    test "feint-style reductions cannot make threat negative" do
+      entity = mob(threat: %{@player_a => 100.0}) |> Threat.modify(@player_a, -150)
+      assert entity.internal.threat == %{@player_a => 0.0}
+    end
+  end
+
+  describe "set_temporary/3" do
+    test "restores threat while retaining gains made during Fade" do
+      entity = mob(threat: %{@player_a => 800.0, @player_b => 400.0}, target: @player_a)
+      faded = Threat.set_temporary(entity, @player_a, -600)
+      assert faded.internal.threat[@player_a] == 200.0
+      assert {_, {:switch, @player_b}} = reselect(faded)
+
+      restored = faded |> Threat.add(@player_a, 50) |> Threat.set_temporary(@player_a, 0)
+      assert restored.internal.threat[@player_a] == 850.0
+      assert restored.internal.temporary_threat == %{}
+      assert {_, {:switch, @player_a}} = reselect(%{restored | unit: %{restored.unit | target: @player_b}})
+    end
+
+    test "matches VMangos clamping and full modifier restoration" do
+      entity = mob(threat: %{@player_a => 100.0}) |> Threat.set_temporary(@player_a, -600)
+      assert entity.internal.threat[@player_a] == 0.0
+      assert Threat.set_temporary(entity, @player_a, 0).internal.threat[@player_a] == 600.0
+    end
+
+    test "refreshes are idempotent and replacements undo the previous modifier" do
+      entity = mob(threat: %{@player_a => 800.0}) |> Threat.set_temporary(@player_a, -200)
+      assert Threat.set_temporary(entity, @player_a, -200) == entity
+      assert Threat.set_temporary(entity, @player_a, -300).internal.threat[@player_a] == 500.0
+    end
+
+    test "does not create threat references" do
+      entity = mob()
+      assert Threat.set_temporary(entity, @player_a, -600) == entity
+      assert Threat.set_temporary(entity, @player_a, 0) == entity
+    end
+
+    test "removal and combat reset discard restoration state" do
+      entity = mob(threat: %{@player_a => 800.0}) |> Threat.set_temporary(@player_a, -600)
+
+      for cleared <- [Threat.remove(entity, @player_a), Threat.wipe(entity)] do
+        assert cleared.internal.temporary_threat == %{}
+        restored = cleared |> Threat.add(@player_a, 10) |> Threat.set_temporary(@player_a, 0)
+        assert restored.internal.threat[@player_a] == 10.0
+      end
+    end
+
+    test "pruning invalid targets discards restoration state" do
+      entity = mob(threat: %{@player_a => 800.0}) |> Threat.set_temporary(@player_a, -600)
+      {pruned, :none} = reselect(entity, valid?: fn _ -> false end)
+      assert pruned.internal.temporary_threat == %{}
+    end
+  end
+
+  describe "change/3" do
+    test "positive spell threat creates an entry" do
+      entity = Threat.change(mob(), @player_a, 10)
+      assert entity.internal.threat == %{@player_a => 10.0}
+    end
+
+    test "negative spell threat only reduces an existing entry" do
+      empty = Threat.change(mob(), @player_a, -10)
+      reduced = mob(threat: %{@player_a => 30.0}) |> Threat.change(@player_a, -10)
+
+      assert empty.internal.threat == %{}
+      assert reduced.internal.threat == %{@player_a => 20.0}
+    end
+  end
+
+  describe "wipe/1 and tracking?/2 and entries/1" do
+    test "wipe empties the table" do
+      entity = mob(threat: %{@player_a => 10.0}) |> Threat.wipe()
+      assert entity.internal.threat == %{}
+    end
+
+    test "tracking? reflects table membership" do
+      entity = mob(threat: %{@player_a => 10.0})
+      assert Threat.tracking?(entity, @player_a)
+      refute Threat.tracking?(entity, @player_b)
+    end
+
+    test "entries are sorted by threat descending" do
+      entity = mob(threat: %{@player_a => 10.0, @player_b => 30.0, @player_c => 20.0})
+      assert Threat.entries(entity) == [{@player_b, 30.0}, {@player_c, 20.0}, {@player_a, 10.0}]
+    end
+  end
+
+  describe "threat ref events" do
+    test "add enqueues threat_ref_gained only for new entries" do
+      entity = mob() |> Threat.add(@player_a, 10) |> Threat.add(@player_a, 10)
+
+      assert [%Effects.ThreatRefGained{target_guid: @player_a}] = entity.internal.events
+    end
+
+    test "wipe enqueues threat_ref_lost for each entry" do
+      entity = Threat.wipe(mob(threat: %{@player_a => 1.0, @player_b => 2.0}))
+
+      lost =
+        entity.internal.events
+        |> Enum.filter(&is_struct(&1, Effects.ThreatRefLost))
+        |> Enum.map(& &1.target_guid)
+        |> Enum.sort()
+
+      assert lost == [@player_a, @player_b]
+      assert entity.internal.threat == %{}
+    end
+
+    test "reselect enqueues threat_ref_lost for pruned entries" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 10.0})
+      {entity, _decision} = reselect(entity, valid?: fn guid -> guid != @player_a end)
+
+      assert [%Effects.ThreatRefLost{target_guid: @player_a}] = entity.internal.events
+    end
+
+    test "taunt seeds a missing taunter at the victim's threat with a gained event" do
+      entity = Threat.taunt(mob(target: @player_a, threat: %{@player_a => 200.0}), @player_b)
+
+      assert entity.internal.threat == %{@player_a => 200.0, @player_b => 200.0}
+      assert [%Effects.ThreatRefGained{target_guid: @player_b}] = entity.internal.events
+    end
+  end
+
+  describe "reselect/2" do
+    test "returns none on an empty table" do
+      assert {_entity, :none} = reselect(mob())
+    end
+
+    test "returns none when the current victim is the final invalid entry" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0})
+      {entity, decision} = reselect(entity, valid?: fn _guid -> false end)
+
+      assert decision == :none
+      assert entity.internal.threat == %{}
+      assert [%Effects.ThreatRefLost{target_guid: @player_a}] = entity.internal.events
+    end
+
+    test "picks the highest threat when there is no current victim" do
+      entity = mob(threat: %{@player_a => 10.0, @player_b => 30.0})
+      assert {_entity, {:switch, @player_b}} = reselect(entity)
+    end
+
+    test "selects a player who attacked a neutral mob" do
+      mob_guid = Guid.from_low_guid(:mob, 7, unique_guid())
+      player_guid = Guid.from_low_guid(:player, unique_guid())
+
+      Metadata.put(mob_guid, %{faction_template: neutral_creature()})
+
+      Metadata.put(player_guid, %{
+        alive?: true,
+        faction_template: alliance(),
+        unit_flags: 0
+      })
+
+      SpatialHash.update(:players, player_guid, 0, 1.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        Metadata.delete(mob_guid)
+        Metadata.delete(player_guid)
+        SpatialHash.remove(:players, player_guid)
+      end)
+
+      entity = mob(guid: mob_guid, threat: %{player_guid => 10.0})
+
+      assert {_entity, {:switch, ^player_guid}} =
+               Threat.reselect(entity, in_melee?: fn _guid -> false end)
+    end
+
+    test "switches away from an invalid victim" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 10.0})
+      {entity, decision} = reselect(entity, valid?: fn guid -> guid != @player_a end)
+
+      assert decision == {:switch, @player_b}
+      assert entity.internal.threat == %{@player_b => 10.0}
+    end
+
+    test "keeps the current victim below the 110% threshold" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 109.0})
+      assert {_entity, :keep} = reselect(entity, in_melee?: fn _guid -> true end)
+    end
+
+    test "switches above 110% in melee range" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 115.0})
+      assert {_entity, {:switch, @player_b}} = reselect(entity, in_melee?: fn _guid -> true end)
+    end
+
+    test "keeps the current victim between 110% and 130% at range" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 115.0})
+      assert {_entity, :keep} = reselect(entity)
+    end
+
+    test "switches above 130% regardless of range" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 131.0})
+      assert {_entity, {:switch, @player_b}} = reselect(entity)
+    end
+
+    test "skips a ranged mid-threshold candidate but takes a melee one further down" do
+      entity =
+        mob(
+          target: @player_a,
+          threat: %{@player_a => 100.0, @player_b => 125.0, @player_c => 115.0}
+        )
+
+      assert {_entity, {:switch, @player_c}} = reselect(entity, in_melee?: fn guid -> guid == @player_c end)
+    end
+
+    test "keeps the current victim when it tops the table" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 50.0})
+      assert {_entity, :keep} = reselect(entity, in_melee?: fn _guid -> true end)
+    end
+
+    test "no-ops for entities without a threat table" do
+      entity = %Mob{object: %Object{guid: @mob_guid}, unit: %Unit{}, internal: %Internal{}}
+      assert {^entity, :none} = Threat.reselect(entity, valid?: fn _ -> true end, in_melee?: fn _ -> false end)
+    end
+  end
+
+  defp alliance do
+    %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+  end
+
+  defp neutral_creature do
+    %FactionTemplate{id: 7, faction: 7, flags: 0, faction_group: 0, friend_group: 0, enemy_group: 0}
+  end
+
+  defp unique_guid do
+    System.unique_integer([:positive, :monotonic])
+  end
+end

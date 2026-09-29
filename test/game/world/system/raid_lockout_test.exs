@@ -1,10 +1,10 @@
 defmodule ThistleTea.Game.World.System.RaidLockoutTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Instance.Admission.Actor
-  alias ThistleTea.Game.Instance.Admission.Policy
-  alias ThistleTea.Game.Party.Group
+  alias ThistleTea.Game.Core.Instance.Admission.Actor
+  alias ThistleTea.Game.Core.Instance.Admission.Policy
+  alias ThistleTea.Game.Core.Party.Group
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.System.Instance
 
   setup [:start_raid_owner]

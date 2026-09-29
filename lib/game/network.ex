@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Network do
   Packet-sending facade: delivers messages to a player's network handler by
   pid or guid, hiding the cast/registry plumbing from callers.
   """
-  alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
 
   def send_packet(packet, target \\ self(), opts \\ [])
 

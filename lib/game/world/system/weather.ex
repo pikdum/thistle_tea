@@ -2,10 +2,10 @@ defmodule ThistleTea.Game.World.System.Weather do
   @moduledoc "Owns shared weather per world and zone, with monitored player subscriptions and independent roll timers."
   use GenServer
 
-  alias ThistleTea.Game.Time
-  alias ThistleTea.Game.Weather
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.Weather
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.Weather, as: WeatherLoader
-  alias ThistleTea.Game.WorldRef
 
   require Logger
 

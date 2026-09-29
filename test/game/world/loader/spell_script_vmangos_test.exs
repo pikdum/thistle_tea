@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.SpellScriptVmangosTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.World.Loader.SpellScript
 
   @moduletag :vmangos_db

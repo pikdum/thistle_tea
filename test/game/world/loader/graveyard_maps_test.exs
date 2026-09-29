@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.GraveyardMapsTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Dungeon
+  alias ThistleTea.Game.Core.Instance.Dungeon
   alias ThistleTea.Game.World.Loader.Graveyard
   alias ThistleTea.Game.World.Loader.MapTemplate
 

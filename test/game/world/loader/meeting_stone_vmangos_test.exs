@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.World.Loader.MeetingStoneVmangosTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.GameObjectTemplate
-  alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Entity.GameObjectTemplate
 
   @moduletag :vmangos_db
 

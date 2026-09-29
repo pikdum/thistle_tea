@@ -1,13 +1,14 @@
 defmodule ThistleTea.Game.Network.ConnectionStateTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Auth.Account
   alias ThistleTea.Game.Network.Connection
   alias ThistleTea.Game.Network.ConnectionState
 
   describe "inspect/1" do
     test "redacts credentials and authentication buffers in nested connection state" do
       state = %ConnectionState{
-        account: %ThistleTea.Account{
+        account: %Account{
           id: 42,
           username: "TEST",
           password_hash: "secret_hash",

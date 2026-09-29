@@ -1,10 +1,10 @@
 defmodule ThistleTea.Game.World.System.WeatherTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Weather
-  alias ThistleTea.Game.Weather.Season
+  alias ThistleTea.Game.Core.Weather
+  alias ThistleTea.Game.Core.Weather.Season
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.System.Weather, as: WeatherSystem
-  alias ThistleTea.Game.WorldRef
 
   setup [:server]
 

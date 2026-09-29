@@ -5,8 +5,8 @@ defmodule ThistleTea.Game.World.Loader.Durability do
   """
 
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Logic.Durability, as: DurabilityLogic
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Item.Durability, as: DurabilityLogic
 
   def init(table \\ __MODULE__) do
     case :ets.whereis(table) do

@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetStopAttack do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PET_STOP_ATTACK
 
-  alias ThistleTea.Game.Player.PetActions
+  alias ThistleTea.Game.World.Entity.Player.PetActions
 
   defstruct [:pet_guid]
 

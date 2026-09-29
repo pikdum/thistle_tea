@@ -1,17 +1,17 @@
 defmodule ThistleTea.Game.World.System.BattlegroundTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Battleground.CreatureDefeat
-  alias ThistleTea.Game.Battleground.Defeat
-  alias ThistleTea.Game.Battleground.Effects.OperateGates
-  alias ThistleTea.Game.Battleground.Effects.Scoreboard
-  alias ThistleTea.Game.Battleground.Effects.UpdateStatus
-  alias ThistleTea.Game.Battleground.Template
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.World.Battleground.Match
+  alias ThistleTea.Game.Core.Battleground.CreatureDefeat
+  alias ThistleTea.Game.Core.Battleground.Defeat
+  alias ThistleTea.Game.Core.Battleground.Effects.OperateGates
+  alias ThistleTea.Game.Core.Battleground.Effects.Scoreboard
+  alias ThistleTea.Game.Core.Battleground.Effects.UpdateStatus
+  alias ThistleTea.Game.Core.Battleground.Template
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
-  alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Game.World.System.Battleground.Match
 
   defmodule Catalog do
     @moduledoc false

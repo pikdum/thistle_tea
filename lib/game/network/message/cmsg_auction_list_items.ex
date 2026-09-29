@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgAuctionListItems do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_AUCTION_LIST_ITEMS
 
-  alias ThistleTea.Game.Entity.Data.Auction.Query
-  alias ThistleTea.Game.Player.Auction
+  alias ThistleTea.Game.Core.Auction.Query
+  alias ThistleTea.Game.World.Entity.Player.Auction
 
   defstruct [:auctioneer, :query]
   @impl ClientMessage

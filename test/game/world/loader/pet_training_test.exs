@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.PetTrainingTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.PetAbility
-  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Core.Pet.PetAbility
+  alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.World.Loader.PetTraining
 
   describe "family_passives/3" do

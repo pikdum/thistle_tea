@@ -5,8 +5,8 @@ defmodule ThistleTea.Game.World.System.Guild do
   """
   use GenServer
 
-  alias ThistleTea.Game.Guild
-  alias ThistleTea.Game.Guild.Member
+  alias ThistleTea.Game.Core.Guild
+  alias ThistleTea.Game.Core.Guild.Member
 
   require Logger
 

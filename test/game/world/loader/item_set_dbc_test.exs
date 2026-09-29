@@ -1,28 +1,28 @@
 defmodule ThistleTea.Game.World.Loader.ItemSetDbcTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.ItemSet
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Aura.Application
-  alias ThistleTea.Game.Entity.Logic.EquipmentAuras
-  alias ThistleTea.Game.Entity.Logic.EquipmentSets
-  alias ThistleTea.Game.Entity.Logic.Inventory
-  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
-  alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Application
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Inventory
+  alias ThistleTea.Game.Core.Item.EquipmentAuras
+  alias ThistleTea.Game.Core.Item.EquipmentSets
+  alias ThistleTea.Game.Core.Item.ItemSet
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message.CmsgMessagechat
-  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
+  alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemSet, as: ItemSetLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
-  alias ThistleTea.Game.WorldRef
 
   @moduletag :dbc_db
 

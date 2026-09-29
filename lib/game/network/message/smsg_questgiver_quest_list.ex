@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgQuestgiverQuestList do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_QUESTGIVER_QUEST_LIST
 
-  alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Core.Quest
 
   defstruct [:npc_guid, :entries, title: "", emote_delay: 0, emote: 0]
 

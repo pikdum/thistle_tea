@@ -1,22 +1,22 @@
 defmodule ThistleTea.Game.World.Loader.GossipVmangosTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Reputation
-  alias ThistleTea.Game.Entity.Data.ScriptStep
-  alias ThistleTea.Game.Entity.Logic.QuestLog.Entry
-  alias ThistleTea.Game.Player.ConditionContext
-  alias ThistleTea.Game.Player.Gossip, as: PlayerGossip
-  alias ThistleTea.Game.Player.GossipCondition
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Quest.QuestLog.Entry
+  alias ThistleTea.Game.Core.Reputation
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Entity.Player.ConditionContext
+  alias ThistleTea.Game.World.Entity.Player.Gossip, as: PlayerGossip
+  alias ThistleTea.Game.World.Entity.Player.GossipCondition
   alias ThistleTea.Game.World.Loader.Gossip
   alias ThistleTea.Game.World.Loader.Gossip.Menu
   alias ThistleTea.Game.World.Loader.Gossip.Option
-  alias ThistleTea.Game.WorldRef
 
   @moduletag :vmangos_db
 

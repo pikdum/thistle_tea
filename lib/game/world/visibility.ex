@@ -6,22 +6,23 @@ defmodule ThistleTea.Game.World.Visibility do
   packets as entities move in and out of view.
   """
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Corpse
-  alias ThistleTea.Game.Entity.Logic.Death
-  alias ThistleTea.Game.Entity.Logic.StealthDetection
-  alias ThistleTea.Game.Entity.Server.Player.State
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Math
+  alias ThistleTea.Game.Core.Aura.StealthDetection
+  alias ThistleTea.Game.Core.Death
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Corpse
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Math
+  alias ThistleTea.Game.Core.SpatialGrid
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.SpatialGrid
-  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.ChaseWatch
+  alias ThistleTea.Game.World.Combat.ChaseWatch
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.CellActivator
@@ -30,7 +31,6 @@ defmodule ThistleTea.Game.World.Visibility do
   alias ThistleTea.Game.World.Visibility.Filter
   alias ThistleTea.Game.World.Visibility.GameObjects
   alias ThistleTea.Game.World.Visibility.QuestGivers
-  alias ThistleTea.Game.WorldRef
 
   @group Groups
   @range 250

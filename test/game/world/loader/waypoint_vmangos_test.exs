@@ -1,12 +1,12 @@
 defmodule ThistleTea.Game.World.Loader.WaypointVmangosTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Data.ScriptStep
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Waypoints
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.AI.BT.Context.Waypoints
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Entity.Component.Internal.WaypointRoute
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.World.Loader.Waypoint, as: WaypointLoader
 
   @moduletag :vmangos_db

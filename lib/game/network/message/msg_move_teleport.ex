@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTeleport do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :MSG_MOVE_TELEPORT
 
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
 
   @enforce_keys [:guid, :movement_block]
   defstruct [:guid, :movement_block]

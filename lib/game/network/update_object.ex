@@ -8,14 +8,14 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   """
   use ThistleTea.Game.Network.Opcodes, [:SMSG_UPDATE_OBJECT]
 
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Item, as: DataItem
-  alias ThistleTea.Game.Entity.Logic.Empathy
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Item, as: DataItem
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Pet.Empathy
+  alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Packet
-  alias ThistleTea.Game.Time
 
   defstruct [
     :update_type,

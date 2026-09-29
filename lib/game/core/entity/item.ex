@@ -1,0 +1,283 @@
+defmodule ThistleTea.Game.Core.Entity.Item do
+  @moduledoc """
+  Item instance entity built from an `ItemTemplate`, optionally with a
+  container component for bags. Items live in the `ItemStore`, never in
+  visibility tracking.
+  """
+  import Bitwise, only: [bnot: 1, &&&: 2, <<<: 2, >>>: 2, |||: 2]
+
+  alias ThistleTea.Game.Core.Entity.Component.Container
+  alias ThistleTea.Game.Core.Entity.Component.Item, as: ItemComponent
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Item.ItemProperty
+  alias ThistleTea.Game.Core.Item.WrappedItem
+  alias ThistleTea.Game.Core.Loot
+
+  defstruct object: %Object{},
+            item: %ItemComponent{},
+            container: nil,
+            internal: %{template: nil}
+
+  def broken?(%__MODULE__{item: %ItemComponent{durability: 0, max_durability: maximum}})
+      when is_integer(maximum) and maximum > 0, do: true
+
+  def broken?(_item), do: false
+
+  def build(%ItemTemplate{} = template, guid, opts \\ []) do
+    owner = Keyword.get(opts, :owner, 0)
+    stack_count = Keyword.get(opts, :stack_count, 1)
+
+    %__MODULE__{
+      object: %Object{
+        guid: guid,
+        entry: template.entry,
+        scale_x: 1.0
+      },
+      item: %ItemComponent{
+        owner: owner,
+        contained: owner,
+        stack_count: stack_count,
+        duration: template.duration,
+        spell_charges: pack_spell_charges(template),
+        flags: initial_flags(template),
+        durability: template.max_durability,
+        max_durability: template.max_durability
+      },
+      container: build_container(template),
+      internal: %{template: template, enchantments: %{}}
+    }
+    |> put_random_property(Keyword.get(opts, :random_property))
+  end
+
+  def template(%__MODULE__{internal: %{template: template}}), do: template
+
+  def random_property(%__MODULE__{internal: internal}), do: Map.get(internal, :random_property)
+
+  def name(%__MODULE__{} = item) do
+    case {wrapped?(item), random_property(item)} do
+      {false, %ItemProperty{suffix: suffix}} when is_binary(suffix) and suffix != "" ->
+        template(item).name <> " " <> suffix
+
+      _ ->
+        template(item).name
+    end
+  end
+
+  defp put_random_property(%__MODULE__{} = item, nil), do: item
+
+  defp put_random_property(%__MODULE__{} = item, %ItemProperty{} = property) do
+    item = %{
+      item
+      | item: %{item.item | random_properties_id: property.id, property_seed: 0},
+        internal: Map.put(item.internal, :random_property, property)
+    }
+
+    property.enchantments
+    |> Enum.take(3)
+    |> Enum.with_index(3)
+    |> Enum.reduce(item, fn {id, slot}, item -> put_enchantment_word(item, slot, 0, id) end)
+  end
+
+  defp initial_flags(%ItemTemplate{bonding: bonding}) when bonding in [1, 4], do: 1
+  defp initial_flags(%ItemTemplate{}), do: 0
+
+  def unlocked?(%__MODULE__{} = item), do: ((item.item.flags || 0) &&& 4) != 0
+  def wrapped?(%__MODULE__{} = item), do: ((item.item.flags || 0) &&& 8) != 0
+
+  def wrap(%__MODULE__{} = item, %ItemTemplate{} = gift, creator) do
+    original = %WrappedItem{template: template(item), flags: item.item.flags || 0}
+    internal = item.internal |> Map.put(:wrapped_item, original) |> Map.put(:template, gift)
+
+    %{
+      item
+      | object: %{item.object | entry: gift.entry},
+        item: %{item.item | flags: 8, gift_creator: creator},
+        internal: internal
+    }
+  end
+
+  def unwrap(%__MODULE__{internal: %{wrapped_item: %WrappedItem{} = original}} = item) do
+    internal = item.internal |> Map.delete(:wrapped_item) |> Map.put(:template, original.template)
+
+    {:ok,
+     %{
+       item
+       | object: %{item.object | entry: original.template.entry},
+         item: %{item.item | flags: original.flags, gift_creator: 0},
+         internal: internal
+     }}
+  end
+
+  def unwrap(%__MODULE__{}), do: {:error, :cant_do_right_now}
+
+  def unlock(%__MODULE__{} = item), do: %{item | item: %{item.item | flags: (item.item.flags || 0) ||| 4}}
+  def loot(%__MODULE__{internal: internal}), do: Map.get(internal, :loot)
+  def loot_generated?(%__MODULE__{} = item), do: match?(%Loot{}, loot(item))
+
+  def put_loot(%__MODULE__{} = item, %Loot{} = loot), do: %{item | internal: Map.put(item.internal, :loot, loot)}
+
+  def bind_on_equip(%__MODULE__{} = item) do
+    if template(item).bonding in [1, 2, 4] do
+      %{item | item: %{item.item | flags: (item.item.flags || 0) ||| 1}}
+    else
+      item
+    end
+  end
+
+  def bind_on_use(%__MODULE__{} = item) do
+    if template(item).bonding == 3, do: %{item | item: %{item.item | flags: (item.item.flags || 0) ||| 1}}, else: item
+  end
+
+  def spell_charge(%__MODULE__{} = item, index) when index in 1..5 do
+    value = (item.item.spell_charges || 0) >>> ((index - 1) * 32) &&& 0xFFFFFFFF
+    if value >= 0x80000000, do: value - 0x100000000, else: value
+  end
+
+  def put_spell_charge(%__MODULE__{} = item, index, value) when index in 1..5 do
+    shift = (index - 1) * 32
+    mask = 0xFFFFFFFF <<< shift
+    packed = ((item.item.spell_charges || 0) &&& bnot(mask)) ||| (value &&& 0xFFFFFFFF) <<< shift
+    %{item | item: %{item.item | spell_charges: packed}}
+  end
+
+  def container?(%__MODULE__{container: %Container{}}), do: true
+  def container?(%__MODULE__{}), do: false
+
+  @temporary_enchantment_slot 1
+  @enchantment_words_per_slot 3
+
+  def temporary_enchantment_slot, do: @temporary_enchantment_slot
+
+  def copy_enchantments(%__MODULE__{} = target, %__MODULE__{} = source, now) do
+    {source, _enchantment} = refresh_temporary_enchantment(source, now)
+
+    target =
+      for slot <- 0..@temporary_enchantment_slot, offset <- 0..2, reduce: target do
+        item -> put_enchantment_word(item, slot, offset, enchantment_word(source, slot, offset))
+      end
+
+    enchantments = source.internal |> Map.get(:enchantments, %{}) |> Map.take([@temporary_enchantment_slot])
+    put_internal_enchantments(target, enchantments)
+  end
+
+  def put_permanent_enchantment(%__MODULE__{} = item, enchantment_id) do
+    item
+    |> put_enchantment_word(0, 0, enchantment_id)
+    |> put_enchantment_word(0, 1, 0)
+    |> put_enchantment_word(0, 2, 0)
+  end
+
+  def active_enchantments(%__MODULE__{} = item, now) do
+    for slot <- [0, 1, 3, 4, 5],
+        id = active_enchantment(item, slot, now),
+        id > 0,
+        do: {slot, id}
+  end
+
+  defp active_enchantment(item, @temporary_enchantment_slot, now) do
+    case temporary_enchantment(item) do
+      %{id: id, expires_at: expires_at} when expires_at > now -> id
+      _ -> 0
+    end
+  end
+
+  defp active_enchantment(item, slot, _now), do: enchantment_word(item, slot, 0)
+
+  def put_temporary_enchantment(%__MODULE__{} = item, enchantment_id, duration_ms, charges, expires_at, token) do
+    enchantment = %{id: enchantment_id, expires_at: expires_at, charges: charges, token: token}
+    enchantments = Map.put(Map.get(item.internal, :enchantments, %{}), @temporary_enchantment_slot, enchantment)
+
+    item
+    |> put_enchantment_word(@temporary_enchantment_slot, 0, enchantment_id)
+    |> put_enchantment_word(@temporary_enchantment_slot, 1, duration_ms)
+    |> put_enchantment_word(@temporary_enchantment_slot, 2, charges)
+    |> put_internal_enchantments(enchantments)
+  end
+
+  def clear_temporary_enchantment(%__MODULE__{} = item) do
+    enchantments = Map.delete(Map.get(item.internal, :enchantments, %{}), @temporary_enchantment_slot)
+
+    item
+    |> put_enchantment_word(@temporary_enchantment_slot, 0, 0)
+    |> put_enchantment_word(@temporary_enchantment_slot, 1, 0)
+    |> put_enchantment_word(@temporary_enchantment_slot, 2, 0)
+    |> put_internal_enchantments(enchantments)
+  end
+
+  def temporary_enchantment(%__MODULE__{internal: internal}) do
+    internal |> Map.get(:enchantments, %{}) |> Map.get(@temporary_enchantment_slot)
+  end
+
+  def spend_enchantment_charge(%__MODULE__{} = item, token) do
+    case temporary_enchantment(item) do
+      %{token: ^token, charges: 1} ->
+        clear_temporary_enchantment(item)
+
+      %{token: ^token, charges: charges} = enchantment when charges > 1 ->
+        enchantments =
+          Map.put(item.internal.enchantments, @temporary_enchantment_slot, %{enchantment | charges: charges - 1})
+
+        item
+        |> put_enchantment_word(@temporary_enchantment_slot, 2, charges - 1)
+        |> put_internal_enchantments(enchantments)
+
+      _ ->
+        item
+    end
+  end
+
+  def refresh_temporary_enchantment(%__MODULE__{} = item, now) do
+    case temporary_enchantment(item) do
+      %{expires_at: expires_at} when expires_at <= now ->
+        {clear_temporary_enchantment(item), nil}
+
+      %{expires_at: expires_at} = enchantment ->
+        remaining_ms = expires_at - now
+        {put_enchantment_word(item, @temporary_enchantment_slot, 1, remaining_ms), enchantment}
+
+      nil ->
+        {item, nil}
+    end
+  end
+
+  def visible_value(%__MODULE__{object: object} = item) do
+    permanent = enchantment_word(item, 0, 0)
+    temporary = enchantment_word(item, @temporary_enchantment_slot, 0)
+    object.entry ||| permanent <<< 32 ||| temporary <<< 64
+  end
+
+  def visible_entry(value) when is_integer(value), do: value &&& 0xFFFFFFFF
+  def visible_entry(_value), do: nil
+
+  defp put_internal_enchantments(%__MODULE__{internal: internal} = item, enchantments) do
+    %{item | internal: Map.put(internal, :enchantments, enchantments)}
+  end
+
+  defp put_enchantment_word(%__MODULE__{item: component} = item, slot, offset, value) do
+    shift = (slot * @enchantment_words_per_slot + offset) * 32
+    mask = 0xFFFFFFFF <<< shift
+    packed = ((component.enchantment || 0) &&& bnot(mask)) ||| (value &&& 0xFFFFFFFF) <<< shift
+    %{item | item: %{component | enchantment: packed}}
+  end
+
+  defp enchantment_word(%__MODULE__{item: component}, slot, offset) do
+    shift = (slot * @enchantment_words_per_slot + offset) * 32
+    (component.enchantment || 0) >>> shift &&& 0xFFFFFFFF
+  end
+
+  defp build_container(%ItemTemplate{container_slots: num_slots}) when is_integer(num_slots) and num_slots > 0 do
+    Enum.reduce(1..36, %Container{num_slots: num_slots}, fn i, container ->
+      Map.put(container, :"slot_#{i}", 0)
+    end)
+  end
+
+  defp build_container(_template), do: nil
+
+  defp pack_spell_charges(%ItemTemplate{} = template) do
+    Enum.reduce(5..1//-1, 0, fn i, acc ->
+      charges = Map.get(template, :"spellcharges_#{i}") || 0
+      acc <<< 32 ||| (charges &&& 0xFFFFFFFF)
+    end)
+  end
+end

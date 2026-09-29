@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAuthSession do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_AUTH_SESSION
 
+  alias ThistleTea.Auth.Account
   alias ThistleTea.Game.Network.Sessions
 
   defstruct [
@@ -24,7 +25,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAuthSession do
         queue_position: 0
       })
 
-      {:ok, account} = ThistleTea.Account.get_user(username)
+      {:ok, account} = Account.get_user(username)
       :ok = Sessions.authenticate(account.id)
 
       %{state | conn: conn, account: account}

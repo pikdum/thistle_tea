@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.World.Loader.ElementalCreatureVmangosTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.AttackTable
+  alias ThistleTea.Game.Core.Combat.AttackTable
+  alias ThistleTea.Game.Core.Entity.Mob
 
   @moduletag :vmangos_db
 

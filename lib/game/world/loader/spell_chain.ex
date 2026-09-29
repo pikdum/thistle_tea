@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.World.Loader.SpellChain do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Spell.RankChain
+  alias ThistleTea.Game.Core.Spell.RankChain
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 

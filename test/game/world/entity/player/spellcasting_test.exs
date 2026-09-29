@@ -1,0 +1,307 @@
+defmodule ThistleTea.Game.World.Entity.Player.SpellcastingTest do
+  use ExUnit.Case, async: true
+
+  alias ThistleTea.Game.Core.AI.CreatureSpell
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Pet.PlayerCharm
+  alias ThistleTea.Game.Core.Pet.Possession
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Cast
+  alias ThistleTea.Game.Core.Spell.Casting
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Network.BinaryUtils
+  alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.Entity.Player.Spellcasting
+  alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
+
+  describe "charm_cast/2" do
+    setup [:script_caster]
+
+    test "starts learned casts and retains death and resource validation", %{state: state, spell: spell} do
+      controller = Guid.from_low_guid(:mob, 1, state.guid)
+      target = state.guid + 1_000_000
+      world = state.character.internal.world
+      enemy = %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+      friendly = %FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}
+      Metadata.put(controller, %{alive?: true, in_combat: true, faction_template: enemy})
+      Metadata.put(state.guid, %{alive?: true, owner_guid: controller, faction_template: enemy})
+      Metadata.put(target, %{alive?: true, faction_template: friendly, unit_flags: 8})
+      SpatialHash.update(:mobs, controller, world, 0.0, 0.0, 0.0)
+      SpatialHash.update(:players, target, world, 5.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        Enum.each([state.guid, controller, target], &Metadata.delete/1)
+        SpatialHash.remove(:mobs, controller)
+        SpatialHash.remove(:players, target)
+      end)
+
+      spell = %{
+        spell
+        | attributes: MapSet.new([:ignore_line_of_sight]),
+          effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy}]
+      }
+
+      control = %Possession{
+        caster_guid: controller,
+        spell_id: 28_410,
+        applied_at: 1,
+        original_faction_template: 1,
+        kind: :charm,
+        spells: [spell]
+      }
+
+      character = state.character
+
+      character = %{
+        character
+        | unit: %{character.unit | target: target},
+          internal: %{character.internal | possession: control, spellbook: %{spell.id => spell}}
+      }
+
+      state = %{state | ready: true, character: character}
+
+      effect = %Effects.CharmCast{
+        controller_guid: controller,
+        control_spell_id: 28_410,
+        control_applied_at: 1,
+        spell_id: spell.id,
+        target_guid: target
+      }
+
+      cast = Spellcasting.charm_cast(state, effect)
+      assert %Cast{spell: ^spell} = cast.character.internal.casting
+      assert Target.unit_guid(cast.character.internal.casting.targets) == target
+      assert_receive :player_tick
+
+      ground_spell = %{
+        spell
+        | effects: [%Effect{type: :persistent_area_aura, implicit_target_a: :aoe_enemy_at_channel, radius_yards: 8.0}]
+      }
+
+      ground_control = %{control | spells: [ground_spell]}
+      ground_internal = %{character.internal | possession: ground_control, spellbook: %{spell.id => ground_spell}}
+      ground_state = %{state | character: %{character | internal: ground_internal}}
+      ground_cast = Spellcasting.charm_cast(ground_state, effect)
+      assert Target.ground_location(ground_cast.character.internal.casting.targets) == {5.0, 0.0, 0.0}
+
+      for unit <- [%{character.unit | health: 0}, %{character.unit | power1: 0}] do
+        rejected = %{state | character: %{character | unit: unit}}
+        assert Spellcasting.charm_cast(rejected, effect) == rejected
+      end
+
+      cancelled = %{state | character: PlayerCharm.command(character, :passive, 0, Time.now())}
+      assert Spellcasting.charm_cast(cancelled, effect) == cancelled
+      Metadata.update(controller, %{in_combat: false})
+      assert Spellcasting.charm_cast(state, effect) == state
+    end
+  end
+
+  describe "cast_result/3" do
+    setup [:script_caster]
+
+    test "rejects Swiftmend without a HoT before spending mana or starting cooldowns", %{state: state} do
+      spell = %Spell{
+        id: 18_562,
+        name: "Swiftmend",
+        script_name: "spell_druid_swiftmend",
+        mana_cost: 20,
+        power_type: 0,
+        gcd_ms: 1_500,
+        recovery_time_ms: 15_000,
+        effects: [%Effect{index: 0, type: :heal, implicit_target_a: :target_ally}]
+      }
+
+      assert {:error, rejected} = Spellcasting.cast_result(state, spell, <<0::16>>)
+      assert rejected.character.internal.casting == nil
+      assert rejected.character.internal.cooldowns == %{}
+      assert rejected.character.unit.power1 == state.character.unit.power1
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{spell: 18_562, reason: 0x67}}}
+      refute_received {:"$gen_cast", {:send_packet, %Message.SmsgSpellStart{}}}
+      refute_received {:"$gen_cast", {:send_packet, %Message.SmsgSpellGo{}}}
+    end
+
+    test "Black Qiraji use dismisses an existing mount without starting or paying for a cast", %{state: state} do
+      character = state.character
+      movement = struct!(character.movement_block, MovementBlock.player_speeds())
+      character = %{character | movement_block: movement}
+
+      mount = %Spell{
+        id: 458,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :mounted, misc_value: 2404},
+          %Effect{index: 1, type: :apply_aura, aura: :mod_increase_mounted_speed, base_points: 60}
+        ]
+      }
+
+      {mounted, _} = Aura.apply_spell(character, state.guid, 60, mount, Time.now())
+      state = %{state | character: mounted}
+
+      crystal = %Spell{
+        id: 26_656,
+        attributes: MapSet.new([:allow_while_mounted]),
+        effects: [%Effect{index: 0, type: :script_effect, implicit_target_a: :caster}]
+      }
+
+      assert {:error, dismissed} = Spellcasting.cast_result(state, crystal, <<0::16>>)
+      assert dismissed.character.unit.mount_display_id == 0
+      assert dismissed.character.movement_block.run_speed == 7.0
+      assert dismissed.character.unit.power1 == character.unit.power1
+      assert dismissed.character.internal.casting == nil
+      assert dismissed.character.internal.cooldowns == %{}
+      refute Aura.has_aura?(dismissed.character, :mounted)
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{spell: 26_656, reason: 0x17}}}
+      refute_received {:"$gen_cast", {:send_packet, %Message.SmsgSpellStart{}}}
+    end
+
+    test "reports seated admission failure without starting a cast", %{state: state, spell: spell} do
+      character = state.character
+      state = %{state | character: %{character | unit: %{character.unit | stand_state: 1}}}
+      assert {:error, rejected} = Spellcasting.cast_result(state, spell, <<0::16>>)
+      assert rejected.character.internal.casting == nil
+      assert rejected.character.internal.cooldowns == %{}
+      assert rejected.character.unit.power1 == state.character.unit.power1
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{spell: id, reason: 0x3E}}}
+      assert id == spell.id
+    end
+
+    test "rejects a visible stealth opener with its protocol error and no resource loss", %{state: state, spell: spell} do
+      spell = %{spell | attributes: MapSet.new([:only_stealthed])}
+      assert {:error, rejected} = Spellcasting.cast_result(state, spell, <<0::16>>)
+      assert rejected.character.internal.casting == nil
+      assert rejected.character.internal.cooldowns == %{}
+      assert rejected.character.unit.power1 == state.character.unit.power1
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{spell: id, reason: 0x57}}}
+      assert id == spell.id
+    end
+  end
+
+  describe "scripted_cast/4" do
+    setup [:script_caster]
+
+    test "rejects shapeshift-sensitive auras using the recipient's published form", %{
+      state: state,
+      spell: spell,
+      entry: entry
+    } do
+      guid = Guid.from_low_guid(:mob, 4952, System.unique_integer([:positive]))
+      Metadata.put(guid, %{alive?: true, shapeshift_form: 1})
+      on_exit(fn -> Metadata.delete(guid) end)
+
+      spell = %{
+        spell
+        | aura_interrupt_flags: 0x8000,
+          effects: [%Effect{type: :apply_aura, aura: :water_walk, implicit_target_a: :any_unit}],
+          attributes: MapSet.new([:ignore_line_of_sight])
+      }
+
+      rejected = Spellcasting.scripted_cast(state, spell, entry, guid)
+      assert rejected.character.internal.casting == nil
+      assert rejected.character.unit.power1 == state.character.unit.power1
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{result: 2}}}
+
+      Metadata.update(guid, %{shapeshift_form: 31})
+      allowed = Spellcasting.scripted_cast(state, spell, entry, guid)
+      assert allowed.character.internal.casting.spell.id == spell.id
+    end
+
+    test "any-unit casts receive template immunity from metadata", %{state: state, spell: spell, entry: entry} do
+      guid = Guid.from_low_guid(:mob, 4952, System.unique_integer([:positive]))
+      Metadata.put(guid, %{alive?: true, unit_flags: 0})
+      on_exit(fn -> Metadata.delete(guid) end)
+
+      spell = %{
+        spell
+        | effects: [%Effect{type: :instakill, implicit_target_a: :any_unit}],
+          attributes: MapSet.new([:ignore_line_of_sight])
+      }
+
+      allowed = Spellcasting.scripted_cast(state, spell, entry, guid)
+      assert allowed.character.internal.casting.spell.id == spell.id
+
+      Metadata.update(guid, %{unit_flags: 0x100})
+      rejected = Spellcasting.scripted_cast(state, spell, entry, guid)
+      assert rejected.character.internal.casting == nil
+      assert rejected.character.unit.power1 == state.character.unit.power1
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{result: 2}}}
+    end
+
+    test "starts an unlearned script spell with its real cast time", %{state: state, spell: spell, entry: entry} do
+      cast_state = Spellcasting.scripted_cast(state, spell, entry, state.guid)
+      assert %Cast{spell: ^spell} = cast_state.character.internal.casting
+      assert Target.unit_guid(cast_state.character.internal.casting.targets) == state.guid
+      assert cast_state.character.internal.spellbook == %{}
+      assert is_reference(cast_state.player_tick_ref)
+      assert_receive :player_tick
+    end
+
+    test "preserves a busy cast unless the script interrupts it", %{state: state, spell: spell, entry: entry} do
+      previous = %{spell | id: spell.id + 1}
+      character = Casting.start(state.character, previous, Target.unit(state.guid), Time.now())
+      state = %{state | character: character}
+      assert Spellcasting.scripted_cast(state, spell, entry, state.guid) == state
+      entry = %{entry | cast_flags: MapSet.new([:interrupt_previous])}
+      interrupted = Spellcasting.scripted_cast(state, spell, entry, state.guid)
+      assert interrupted.character.internal.casting.spell == spell
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgSpellFailure{spell: old_id}}}
+      assert old_id == previous.id
+      assert_receive :player_tick
+    end
+
+    test "retains player death and resource validation", %{state: state, spell: spell, entry: entry} do
+      for unit <- [%{state.character.unit | health: 0}, %{state.character.unit | power1: 0}] do
+        state = %{state | character: %{state.character | unit: unit}}
+        rejected = Spellcasting.scripted_cast(state, spell, entry, state.guid)
+        assert rejected.character.internal.casting == nil
+        assert rejected.character.unit.power1 == unit.power1
+        assert_received {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{result: 2}}}
+      end
+    end
+  end
+
+  defp script_caster(_context) do
+    guid = System.unique_integer([:positive, :monotonic])
+
+    character = %Character{
+      object: %Object{guid: guid},
+      unit: %Unit{level: 50, health: 100, max_health: 100, power1: 100, max_power1: 100, power_type: 0},
+      player: %Player{},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+      internal: %Internal{world: WorldRef.open(0), spellbook: %{}}
+    }
+
+    spell = %Spell{id: 999_001, name: "Script Cast", school: :holy, cast_time_ms: 1_500, power_type: 0, mana_cost: 10}
+
+    %{
+      state: %State{guid: guid, packed_guid: BinaryUtils.pack_guid(guid), character: character},
+      spell: spell,
+      entry: %CreatureSpell{spell_id: spell.id}
+    }
+  end
+
+  describe "complete/1" do
+    test "schedules the repeat loop after Auto Shot activates" do
+      character = %Character{
+        unit: %Unit{health: 100, max_health: 100},
+        internal: %Internal{auto_shot: %{target_guid: 42}}
+      }
+
+      state = Spellcasting.complete(%{character: character, player_tick_ref: nil})
+
+      assert is_reference(state.player_tick_ref)
+      assert_receive :player_tick
+    end
+  end
+end

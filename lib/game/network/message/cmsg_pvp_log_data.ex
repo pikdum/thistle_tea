@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPvpLogData do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_PVP_LOG_DATA
 
-  alias ThistleTea.Game.Player.Battlegrounds
+  alias ThistleTea.Game.World.Entity.Player.Battlegrounds
 
   defstruct []
 

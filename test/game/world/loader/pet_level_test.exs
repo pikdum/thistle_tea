@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.PetLevelTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.PetLevel
+  alias ThistleTea.Game.Core.Pet.PetLevel
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
 
   @moduletag :vmangos_db

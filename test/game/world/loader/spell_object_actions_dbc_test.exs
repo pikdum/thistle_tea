@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.SpellObjectActionsDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db

@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAreaSpiritHealerQuery do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_AREA_SPIRIT_HEALER_QUERY
 
-  alias ThistleTea.Game.Player.Battlegrounds
+  alias ThistleTea.Game.World.Entity.Player.Battlegrounds
 
   defstruct [:guid]
 

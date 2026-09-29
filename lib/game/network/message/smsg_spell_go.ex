@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgSpellGo do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_SPELL_GO
 
-  alias ThistleTea.Game.Spell.Target
-  alias ThistleTea.Game.Spell.TargetCodec
+  alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Game.Core.Spell.TargetCodec
 
   @cast_flags_ammo 0x20
 

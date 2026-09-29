@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.MsgCorpseQuery do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_CORPSE_QUERY
 
-  alias ThistleTea.Game.Player.Corpses
+  alias ThistleTea.Game.World.Entity.Player.Corpses
 
   defstruct []
 

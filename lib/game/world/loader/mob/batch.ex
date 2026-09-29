@@ -7,10 +7,10 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.AddonAuras
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.AIEvent
-  alias ThistleTea.Game.Entity.Data.CreatureSpell
-  alias ThistleTea.Game.Entity.Data.ScriptStep
-  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Core.AI.AIEvent
+  alias ThistleTea.Game.Core.AI.CreatureSpell
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.CreatureSpellList, as: CreatureSpellListLoader
   alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader

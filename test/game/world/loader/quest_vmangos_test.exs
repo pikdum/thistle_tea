@@ -1,18 +1,17 @@
 defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Condition
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Data.Quest
-  alias ThistleTea.Game.Entity.Data.QuestDependencies.Prerequisite
-  alias ThistleTea.Game.Entity.Data.ScriptStep
-  alias ThistleTea.Game.Entity.Logic.Condition, as: Evaluator
-  alias ThistleTea.Game.Entity.Logic.Condition.Context
-  alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
-  alias ThistleTea.Game.Entity.Logic.Condition.Subject
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Condition
+  alias ThistleTea.Game.Core.Condition.Context
+  alias ThistleTea.Game.Core.Condition.InstanceDataSnapshot, as: Snapshot
+  alias ThistleTea.Game.Core.Condition.Subject
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Quest
+  alias ThistleTea.Game.Core.Quest.QuestDependencies.Prerequisite
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
-  alias ThistleTea.Game.WorldRef
 
   @moduletag :vmangos_db
 
@@ -143,14 +142,14 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
 
       {known, unknown} =
         Enum.split_with(conditioned_quests(), fn quest ->
-          Evaluator.evaluate(context, quest.required_condition) in [:met, :unmet]
+          Condition.evaluate(context, quest.required_condition) in [:met, :unmet]
         end)
 
       assert length(known) == 74
       assert Enum.map(unknown, & &1.id) |> Enum.sort() == [5_122, 5_125]
 
       Enum.each(unknown, fn quest ->
-        assert {:unknown, reasons} = Evaluator.evaluate(context, quest.required_condition)
+        assert {:unknown, reasons} = Condition.evaluate(context, quest.required_condition)
         assert Enum.all?(reasons, &(&1.capability == {:missing_fact, :world, :instance_data}))
       end)
 
@@ -167,10 +166,10 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
       zero_context = %{context | world: %{instance_data: zero}}
       two_context = %{context | world: %{instance_data: two}}
 
-      assert Evaluator.evaluate(zero_context, QuestLoader.get(5_122).required_condition) == :met
-      assert Evaluator.evaluate(zero_context, QuestLoader.get(5_125).required_condition) == :unmet
-      assert Evaluator.evaluate(two_context, QuestLoader.get(5_122).required_condition) == :unmet
-      assert Evaluator.evaluate(two_context, QuestLoader.get(5_125).required_condition) == :met
+      assert Condition.evaluate(zero_context, QuestLoader.get(5_122).required_condition) == :met
+      assert Condition.evaluate(zero_context, QuestLoader.get(5_125).required_condition) == :unmet
+      assert Condition.evaluate(two_context, QuestLoader.get(5_122).required_condition) == :unmet
+      assert Condition.evaluate(two_context, QuestLoader.get(5_125).required_condition) == :met
     end
 
     test "preloads quest start scripts" do

@@ -2,9 +2,9 @@ defmodule ThistleTea.Game.World.Loader.ServerVariableVmangosTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.ScriptStep
-  alias ThistleTea.Game.Entity.Logic.Condition, as: Evaluator
-  alias ThistleTea.Game.Entity.Logic.Condition.Context
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Condition, as: Evaluator
+  alias ThistleTea.Game.Core.Condition.Context
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.Script
 

@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.MsgSaveGuildEmblemClient do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_SAVE_GUILD_EMBLEM
 
-  alias ThistleTea.Game.Player.Guilds
+  alias ThistleTea.Game.World.Entity.Player.Guilds
 
   defstruct [:vendor_guid, :emblem]
 

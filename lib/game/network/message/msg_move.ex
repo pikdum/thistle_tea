@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
 
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
-  alias ThistleTea.Game.Player.Movement
+  alias ThistleTea.Game.World.Entity.Player.Movement
 
   defstruct [:opcode, :payload]
 

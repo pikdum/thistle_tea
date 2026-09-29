@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.Network.Message.GuildTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Guild.Group
-  alias ThistleTea.Game.Guild.Rank
+  alias ThistleTea.Game.Core.Guild.Group
+  alias ThistleTea.Game.Core.Guild.Rank
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Message.SmsgGuildRoster.Entry

@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Network.Message.SmsgChannelListTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Chat.Channel.Member
+  alias ThistleTea.Game.Core.Chat.Channel.Member
   alias ThistleTea.Game.Network.Message.SmsgChannelList
 
   describe "to_binary/1" do

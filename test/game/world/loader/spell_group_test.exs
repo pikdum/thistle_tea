@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.SpellGroupTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.StackRules
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.StackRules
   alias ThistleTea.Game.World.Loader.SpellGroup
 
   @moduletag :vmangos_db

@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.WeaponProcsVmangosTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Logic.WeaponProcs
+  alias ThistleTea.Game.Core.Combat.WeaponProcs
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
   @moduletag :vmangos_db

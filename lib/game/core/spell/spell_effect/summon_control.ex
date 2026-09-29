@@ -1,0 +1,481 @@
+defmodule ThistleTea.Game.Core.Spell.SpellEffect.SummonControl do
+  @moduledoc false
+
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Class.Rogue
+  alias ThistleTea.Game.Core.Class.Warlock
+  alias ThistleTea.Game.Core.Combat.ExtraAttacks
+  alias ThistleTea.Game.Core.Combat.PlayerCombat
+  alias ThistleTea.Game.Core.Combat.Threat
+  alias ThistleTea.Game.Core.Death
+  alias ThistleTea.Game.Core.Death.Resurrection
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.PetResurrection
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.CasterLocation
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Modifiers
+  alias ThistleTea.Game.Core.Spell.SpellEffect.Amount
+  alias ThistleTea.Game.Core.Spell.SpellInterrupt
+
+  def apply(
+        %{object: %{guid: guid}} = state,
+        %CastContext{caster_guid: guid, destination_position: destination},
+        %Spell{id: spell_id, duration_ms: duration},
+        %Effect{type: :summon, misc_value: entry} = effect,
+        _now
+      )
+      when is_integer(entry) and entry > 0 do
+    {x, y, z, orientation} = state.movement_block.position
+    {x, y, z} = summon_position(effect, destination, {x, y, z}, orientation)
+
+    {state,
+     [
+       %Effects.SummonControlledPet{
+         source_guid: guid,
+         entry: entry,
+         spell_id: spell_id,
+         duration_ms: max(duration || 0, 0),
+         position: {x, y, z, -orientation},
+         resolve_collision?: is_nil(destination) and effect.implicit_target_a == :minion_position
+       }
+     ]}
+  end
+
+  def apply(
+        %Character{
+          object: %{guid: target_guid},
+          movement_block: %{position: {target_x, target_y, _target_z, _target_o}}
+        } = state,
+        %CastContext{
+          caster_guid: caster_guid,
+          caster_level: caster_level,
+          caster_type: :player,
+          caster_position: {world, caster_x, caster_y, caster_z},
+          caster_orientation: orientation
+        },
+        _spell,
+        %Effect{type: :duel, misc_value: entry},
+        _now
+      )
+      when is_integer(entry) and entry > 0 and target_guid != caster_guid do
+    flag_position = {world, (caster_x + target_x) / 2, (caster_y + target_y) / 2, caster_z}
+
+    {state,
+     [
+       Effects.duel_request(
+         caster_guid,
+         caster_level,
+         target_guid,
+         entry,
+         flag_position,
+         orientation
+       )
+     ]}
+  end
+
+  def apply(
+        state,
+        %CastContext{caster_guid: caster_guid},
+        %Spell{id: spell_id},
+        %Effect{type: :summon_pet, misc_value: entry, multiple_value: offset},
+        _now
+      )
+      when state.object.guid == caster_guid and is_integer(entry) and entry > 0 do
+    effect = %{Effects.summon_pet(caster_guid, entry, spell_id) | level_offset: offset || 0.0}
+    {state, [effect]}
+  end
+
+  def apply(
+        %Character{object: %{guid: guid}} = state,
+        %CastContext{caster_guid: guid} = context,
+        %Spell{id: spell_id, duration_ms: duration},
+        %Effect{type: :summon_mini_pet, misc_value: entry} = effect,
+        _now
+      )
+      when is_integer(entry) and entry > 0 do
+    {state,
+     [
+       %Effects.SummonMiniPet{
+         entry: entry,
+         spell_id: spell_id,
+         duration_ms: max(duration || 0, 0),
+         position: mini_pet_position(state, context, effect)
+       }
+     ]}
+  end
+
+  def apply(
+        %Character{} = state,
+        %CastContext{caster_guid: caster_guid} = context,
+        %Spell{id: spell_id} = spell,
+        effect,
+        _now
+      )
+      when effect.type in [:summon_pet, :revive_pet] and effect.misc_value == 0 do
+    case Companion.entry(state) do
+      entry when is_integer(entry) and entry > 0 ->
+        health_percent = if effect.type == :revive_pet, do: Amount.roll(spell, effect, context)
+        summon = %{Effects.summon_pet(caster_guid, entry, spell_id) | health_percent: health_percent}
+        {state, [summon]}
+
+      _ ->
+        {state, []}
+    end
+  end
+
+  def apply(
+        %{object: %{guid: guid}, unit: _unit} = state,
+        %CastContext{caster_guid: guid} = context,
+        %Spell{} = spell,
+        %Effect{type: :summon_guardian, misc_value: entry} = effect,
+        _now
+      )
+      when is_integer(entry) and entry > 0 do
+    {x, y, z, orientation} = state.movement_block.position
+    {x, y, z} = summon_position(effect, context.destination_position, {x, y, z}, orientation)
+
+    {state,
+     [
+       %Effects.SummonGuardians{
+         entry: entry,
+         spell_id: spell.id,
+         count: max(Amount.roll(spell, effect, context), 1),
+         duration_ms: max(spell.duration_ms || 0, 0),
+         position: {x, y, z, orientation},
+         radius_yards: max(effect.radius_yards || 0.0, 0.0),
+         level_offset: effect.multiple_value || 0.0,
+         cast_item_guid: context.cast_item_guid,
+         triggered?: context.triggered?,
+         replace?: spell.duration_ms not in [nil, 0] and spell.category > 0
+       }
+     ]}
+  end
+
+  def apply(
+        %{object: %{guid: guid}, unit: _unit} = state,
+        %CastContext{caster_guid: guid} = context,
+        %Spell{} = spell,
+        %Effect{type: :summon_wild, misc_value: entry} = effect,
+        _now
+      )
+      when is_integer(entry) and entry > 0 do
+    {x, y, z, orientation} = state.movement_block.position
+    radius = max(effect.radius_yards || 0.0, 0.0)
+
+    {x, y, z} =
+      context.destination_position || {x + radius * :math.cos(orientation), y + radius * :math.sin(orientation), z}
+
+    {state,
+     [
+       %Effects.SummonWild{
+         entry: entry,
+         spell_id: spell.id,
+         count: max(Amount.roll(spell, effect, context), 1),
+         duration_ms: max(spell.duration_ms || 0, 0),
+         position: {x, y, z, orientation},
+         radius_yards: radius,
+         scatter?: context.destination_position != nil
+       }
+     ]}
+  end
+
+  def apply(%Character{} = state, %CastContext{}, _spell, %Effect{type: :dismiss_pet}, _now) do
+    Companion.dismiss(state)
+  end
+
+  def apply(
+        %{object: %{guid: caster_guid}} = state,
+        %CastContext{caster_guid: caster_guid, destination_position: destination, caster_orientation: orientation},
+        spell,
+        %Effect{type: :summon_game_object, misc_value: entry, summon_slot: slot},
+        _now
+      )
+      when is_integer(entry) and entry > 0 do
+    position = if destination, do: Tuple.insert_at(destination, 3, orientation || 0.0)
+
+    {state,
+     [
+       Effects.summon_game_object(entry, max(spell.duration_ms || 0, 0),
+         spell_id: spell.id,
+         slot: slot || 1,
+         position: position
+       )
+     ]}
+  end
+
+  def apply(
+        %{object: %{guid: caster_guid}} = state,
+        %CastContext{
+          caster_guid: caster_guid,
+          caster_position: {_world, x, y, z},
+          caster_orientation: orientation,
+          destination_position: destination
+        },
+        %Spell{} = spell,
+        %Effect{type: :summon_object_wild, misc_value: entry} = effect,
+        _now
+      )
+      when is_integer(entry) and entry > 0 do
+    orientation = orientation || 0.0
+    {x, y, z} = summon_position(effect, destination, {x, y, z}, orientation)
+
+    {state,
+     [
+       Effects.summon_game_object(entry, max(spell.duration_ms || 0, 0),
+         owned?: false,
+         position: {x, y, z, orientation}
+       )
+     ]}
+  end
+
+  def apply(
+        state,
+        %CastContext{
+          caster_guid: summoner_guid,
+          selected_target_guid: target_guid,
+          caster_zone: zone_id,
+          caster_position: {_world, _x, _y, _z} = position
+        },
+        _spell,
+        %Effect{type: :summon_player},
+        _now
+      )
+      when is_integer(target_guid) do
+    {state, [Effects.summon_request(summoner_guid, target_guid, zone_id, position)]}
+  end
+
+  def apply(
+        state,
+        %CastContext{
+          caster_guid: owner_guid,
+          caster_position: {_world, caster_x, caster_y, caster_z},
+          caster_orientation: orientation,
+          destination_position: destination
+        },
+        spell,
+        %Effect{type: :summon_demon, misc_value: entry} = effect,
+        _now
+      )
+      when is_integer(entry) and entry > 0 do
+    orientation = orientation || 0.0
+    {x, y, z} = summon_position(effect, destination, {caster_x, caster_y, caster_z}, orientation)
+
+    summon = %{
+      entry: entry,
+      owner_guid: owner_guid,
+      position: {x, y, z, orientation},
+      despawn_delay_ms: summon_duration(spell),
+      despawn_type: 1,
+      run?: false,
+      unique?: false,
+      attack_target: nil,
+      script_id: 0,
+      post_spawn_spells: Warlock.summon_spells(spell)
+    }
+
+    {state, [Effects.summon_creature(summon, [], nil)]}
+  end
+
+  def apply(
+        state,
+        %CastContext{
+          caster_guid: owner_guid,
+          caster_position: {_world, caster_x, caster_y, caster_z},
+          caster_orientation: orientation,
+          destination_position: destination
+        },
+        %Spell{id: spell_id} = spell,
+        %Effect{type: :summon_possessed, misc_value: entry} = effect,
+        _now
+      )
+      when is_integer(entry) and entry > 0 do
+    orientation = orientation || 0.0
+    {x, y, z} = summon_position(effect, destination, {caster_x, caster_y, caster_z}, orientation)
+
+    summon = %{
+      entry: entry,
+      owner_guid: owner_guid,
+      position: {x, y, z, orientation},
+      despawn_delay_ms: summon_duration(spell),
+      despawn_type: 1,
+      run?: false,
+      unique?: false,
+      attack_target: nil,
+      script_id: 0,
+      post_spawn_spells: [],
+      control: :possessed,
+      control_spell_id: spell_id
+    }
+
+    {state, [Effects.summon_creature(summon, [], nil)]}
+  end
+
+  def apply(
+        %{object: %{guid: guid}} = state,
+        %CastContext{caster_guid: guid} = context,
+        spell,
+        %Effect{type: :summon_totem, summon_slot: slot, misc_value: entry} = effect,
+        _now
+      )
+      when (is_nil(slot) or slot in 1..4) and is_integer(entry) and entry > 0 do
+    duration = context.spell_modifiers |> Modifiers.value(:duration, spell.duration_ms || 0) |> round() |> max(0)
+
+    summon = %{
+      Effects.summon_totem(entry, slot, duration)
+      | spell_id: spell.id,
+        health: max(Amount.roll(spell, effect, context), 0)
+    }
+
+    {state, [summon]}
+  end
+
+  def apply(
+        %{object: %{entry: entry}} = state,
+        %CastContext{caster_guid: owner_guid},
+        _spell,
+        %Effect{type: :tame_creature},
+        _now
+      )
+      when is_integer(entry) and entry > 0 do
+    {state, [Effects.tame_creature(owner_guid, entry)]}
+  end
+
+  def apply(%Character{} = state, %CastContext{}, spell, %Effect{type: :clear_threat}, now) do
+    {state, aura_events} = remove_vanish_stalked(state, spell, now)
+    {state, mob_guids} = PlayerCombat.vanish(state, now)
+
+    events =
+      aura_events ++
+        [Effects.drop_nearby_threat()] ++
+        Enum.map(mob_guids, &Effects.drop_threat/1) ++
+        vanish_attack_stop_events(state) ++ maybe_vanish_stealth_events(state, spell)
+
+    {state, events}
+  end
+
+  def apply(state, %CastContext{} = context, _spell, %Effect{type: :attack_me}, _now) do
+    {Threat.taunt(state, context.caster_guid), []}
+  end
+
+  def apply(state, %CastContext{} = context, spell, %Effect{type: :add_extra_attacks} = effect, _now) do
+    count = max(Amount.roll(spell, effect, context), 1)
+    updated = ExtraAttacks.grant(state, count, context.extra_attack?)
+
+    events =
+      if updated == state do
+        []
+      else
+        [
+          %Effects.SpellExtraAttacks{
+            source_guid: context.caster_guid,
+            target_guid: state.object.guid,
+            spell_id: spell.id,
+            count: count
+          }
+        ]
+      end
+
+    {updated, events}
+  end
+
+  def apply(state, %CastContext{} = context, spell, %Effect{type: :modify_threat} = effect, _now) do
+    {Threat.change(state, context.caster_guid, Amount.roll(spell, effect, context)), []}
+  end
+
+  def apply(state, %CastContext{} = context, spell, %Effect{type: :interrupt_cast}, now),
+    do: SpellInterrupt.apply(state, context, spell, now)
+
+  def apply(%Mob{} = state, %CastContext{} = context, spell, %Effect{type: :resurrect_new} = effect, now) do
+    PetResurrection.revive(state, context, Amount.roll(spell, effect, context), now)
+  end
+
+  def apply(state, %CastContext{} = context, spell, %Effect{type: :resurrect_new} = effect, _now) do
+    if resurrectable?(state) do
+      health = max(Amount.roll(spell, effect, context), 1)
+      mana = max(effect.misc_value || 0, 0)
+      Resurrection.request(state, context, spell, health, mana)
+    else
+      {state, []}
+    end
+  end
+
+  def apply(state, %CastContext{} = context, spell, %Effect{type: :resurrect} = effect, _now) do
+    if resurrectable?(state) do
+      percent = max(Amount.roll(spell, effect, context), 0) / 100
+      health = max(trunc((state.unit.max_health || 1) * percent), 1)
+      mana = max(trunc((state.unit.max_power1 || 0) * percent), 0)
+      Resurrection.request(state, context, spell, health, mana)
+    else
+      {state, []}
+    end
+  end
+
+  def apply(state, _context, _spell, _effect, _now), do: {state, []}
+
+  defp summon_duration(%Spell{duration_ms: duration_ms}) when is_integer(duration_ms) and duration_ms > 0,
+    do: duration_ms
+
+  defp summon_duration(%Spell{}), do: 3_600_000
+
+  defp mini_pet_position(state, context, effect) do
+    if context.destination_position != nil or CasterLocation.required?(effect) do
+      {x, y, z, orientation} = state.movement_block.position
+      angle = orientation + :math.pi() / 4
+      {x + 2.0 * :math.cos(angle), y + 2.0 * :math.sin(angle), z, angle + :math.pi()}
+    end
+  end
+
+  defp summon_position(%Effect{}, {x, y, z}, _position, _orientation), do: {x, y, z}
+
+  defp summon_position(%Effect{} = effect, nil, {x, y, z} = position, orientation) do
+    CasterLocation.destination(effect, {x, y, z, orientation}) || position
+  end
+
+  defp maybe_vanish_stealth_events(state, %Spell{} = spell) do
+    if Rogue.vanish?(spell), do: vanish_stealth_events(state), else: []
+  end
+
+  defp remove_vanish_stalked(state, %Spell{} = spell, now) do
+    if Rogue.vanish?(spell) do
+      Aura.remove_aura_types(state, [:mod_stalked, :mod_root, :mod_decrease_speed], now)
+    else
+      {state, []}
+    end
+  end
+
+  defp vanish_stealth_events(%{object: %{guid: guid}, unit: %{level: level}, internal: %{spellbook: spellbook}})
+       when is_map(spellbook) do
+    spell_id =
+      spellbook
+      |> Map.values()
+      |> Enum.filter(&Rogue.stealth?/1)
+      |> Enum.max_by(&(&1.rank || 0), fn -> nil end)
+      |> case do
+        %Spell{id: id} -> id
+        _ -> nil
+      end
+
+    if is_integer(spell_id), do: [Effects.trigger_spell(guid, level || 1, guid, spell_id)], else: []
+  end
+
+  defp vanish_stealth_events(_state), do: []
+
+  defp vanish_attack_stop_events(%{object: %{guid: guid}, unit: %{target: target}})
+       when is_integer(target) and target > 0 do
+    [Effects.attack_stop(guid, target)]
+  end
+
+  defp vanish_attack_stop_events(_state), do: []
+
+  defp resurrectable?(%{player: _player} = state) do
+    Entity.dead?(state) or Death.ghost?(state)
+  end
+
+  defp resurrectable?(_state), do: false
+end

@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgPetNameQueryResponse do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_PET_NAME_QUERY_RESPONSE
 
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
-  alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
+  alias ThistleTea.Game.Core.Entity.Mob
 
   defstruct [:pet_number, :name, :timestamp]
 

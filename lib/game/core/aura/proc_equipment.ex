@@ -1,0 +1,47 @@
+defmodule ThistleTea.Game.Core.Aura.ProcEquipment do
+  @moduledoc "Checks outgoing aura procs against the player's current usable equipment."
+
+  alias ThistleTea.Game.Core.Combat.CombatWeapon
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Spell
+
+  def allowed?(%Character{} = character, %Spell{} = spell, context) do
+    Spell.attribute?(spell, :no_proc_equip_requirement) or equipped?(character, spell, context)
+  end
+
+  def allowed?(_entity, _spell, _context), do: true
+
+  defp equipped?(character, %Spell{equipped_item_class: 2} = spell, context) do
+    case CombatWeapon.usable(character, attack_hand(context)) do
+      %{class: 2, subclass: subclass} -> matches_subclass?(spell, subclass)
+      _weapon -> false
+    end
+  end
+
+  defp equipped?(%Character{unit: unit, player: player}, %Spell{equipped_item_class: 4} = spell, _context) do
+    :offhand not in (player.broken_equipment || []) and
+      Map.get(unit.equipment_bonuses || %{}, :shields, 0) > 0 and matches_subclass?(spell, 6)
+  end
+
+  defp equipped?(_character, _spell, _context), do: true
+
+  def attack_hand(%{hand: hand}) when hand in [:mainhand, :offhand, :ranged], do: hand
+  def attack_hand(%{attack_hand: hand}) when hand in [:mainhand, :offhand, :ranged], do: hand
+
+  def attack_hand(%{spell: %Spell{dmg_class: 2} = spell}) do
+    if Spell.attribute?(spell, :requires_offhand_weapon), do: :offhand, else: :mainhand
+  end
+
+  def attack_hand(%{spell: %Spell{} = spell}) do
+    if Spell.ranged_ability?(spell) or Spell.attribute?(spell, :auto_repeat), do: :ranged, else: :mainhand
+  end
+
+  def attack_hand(_context), do: :mainhand
+
+  defp matches_subclass?(%Spell{equipped_item_subclass_mask: mask}, subclass)
+       when is_integer(mask) and is_integer(subclass) and subclass >= 0 do
+    Bitwise.band(mask, Bitwise.bsl(1, subclass)) != 0
+  end
+
+  defp matches_subclass?(_spell, _subclass), do: false
+end

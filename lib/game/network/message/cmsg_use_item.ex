@@ -2,20 +2,20 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_USE_ITEM
 
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Item, as: DataItem
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Logic.Inventory
-  alias ThistleTea.Game.Entity.Logic.ItemUse
-  alias ThistleTea.Game.Entity.Logic.Proficiency
-  alias ThistleTea.Game.Network.InventoryUpdate
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Item, as: DataItem
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Inventory
+  alias ThistleTea.Game.Core.Item.ItemUse
+  alias ThistleTea.Game.Core.Item.Proficiency
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Player.Bank
-  alias ThistleTea.Game.Player.Items
-  alias ThistleTea.Game.Player.Reputation
-  alias ThistleTea.Game.Player.Spellcasting
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.World.Entity.Player.Bank
+  alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
+  alias ThistleTea.Game.World.Entity.Player.Items
+  alias ThistleTea.Game.World.Entity.Player.Reputation
+  alias ThistleTea.Game.World.Entity.Player.Spellcasting
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 

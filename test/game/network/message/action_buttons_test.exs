@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.Network.Message.ActionButtonsTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Network.Message.CmsgSetActionbarToggles
   alias ThistleTea.Game.Network.Message.CmsgSetActionButton
   alias ThistleTea.Game.Network.Message.Dispatch

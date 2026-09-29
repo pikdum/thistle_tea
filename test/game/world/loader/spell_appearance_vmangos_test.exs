@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.SpellAppearanceVmangosTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Data.Model
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Entity.Model
   alias ThistleTea.Game.World.Loader.SpellAppearance
 
   @moduletag :vmangos_db

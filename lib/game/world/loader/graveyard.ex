@@ -5,8 +5,8 @@ defmodule ThistleTea.Game.World.Loader.Graveyard do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.Dungeon
-  alias ThistleTea.Game.Math
+  alias ThistleTea.Game.Core.Instance.Dungeon
+  alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Terrain

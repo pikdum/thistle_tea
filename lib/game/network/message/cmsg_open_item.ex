@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgOpenItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_OPEN_ITEM
 
-  alias ThistleTea.Game.Player.Containers
+  alias ThistleTea.Game.World.Entity.Player.Containers
 
   defstruct [:bag, :slot]
 

@@ -1,13 +1,13 @@
 defmodule ThistleTea.Game.World.Loader.SpellCastMovementDbcTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Cast
-  alias ThistleTea.Game.Spell.CastMovement
-  alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Cast
+  alias ThistleTea.Game.Core.Spell.CastMovement
+  alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   describe "load/1" do

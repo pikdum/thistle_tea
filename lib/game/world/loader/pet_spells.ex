@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.World.Loader.PetSpells do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.PetAbility
+  alias ThistleTea.Game.Core.Pet.PetAbility
   alias ThistleTea.Game.World.Loader.PetTraining
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 

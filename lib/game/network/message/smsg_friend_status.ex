@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgFriendStatus do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_FRIEND_STATUS
 
-  alias ThistleTea.Game.Social.Friend
+  alias ThistleTea.Game.Core.Social.Friend
 
   defstruct [:result, :friend]
 

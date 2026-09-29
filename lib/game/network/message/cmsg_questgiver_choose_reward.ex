@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgQuestgiverChooseReward do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_QUESTGIVER_CHOOSE_REWARD
 
-  alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.World.Entity.Player.Quests
 
   defstruct [:guid, :quest_id, :reward_index]
 

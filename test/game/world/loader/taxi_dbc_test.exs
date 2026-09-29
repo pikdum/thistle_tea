@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.TaxiDbcTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Taxi.Path
+  alias ThistleTea.Game.Core.Travel.Taxi.Path
   alias ThistleTea.Game.World.Loader.Taxi
 
   @moduletag :dbc_db

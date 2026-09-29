@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.MapTemplateVmangosTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.InstanceScript
+  alias ThistleTea.Game.Core.InstanceScript
   alias ThistleTea.Game.World.Loader.MapTemplate
 
   @moduletag :vmangos_db

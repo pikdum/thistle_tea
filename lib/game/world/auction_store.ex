@@ -5,12 +5,12 @@ defmodule ThistleTea.Game.World.AuctionStore do
   settlement atomic and retains both across coordinator restarts.
   """
 
-  alias ThistleTea.Game.Entity.Data.Auction.Book
-  alias ThistleTea.Game.Entity.Data.Auction.Change
-  alias ThistleTea.Game.Entity.Data.Auction.Delivery
-  alias ThistleTea.Game.Entity.Data.Auction.Receipt
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
+  alias ThistleTea.Game.Core.Auction.Book
+  alias ThistleTea.Game.Core.Auction.Change
+  alias ThistleTea.Game.Core.Auction.Delivery
+  alias ThistleTea.Game.Core.Auction.Receipt
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Inventory.ChangeSet
   alias ThistleTea.Game.World.ItemStore
 
   def book(table \\ ItemStore) do

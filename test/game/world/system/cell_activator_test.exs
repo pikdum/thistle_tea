@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.System.CellActivatorTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.System.CellActivator
-  alias ThistleTea.Game.WorldRef
 
   describe "activate/2" do
     test "loads newly activated cells once" do

@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.RogueSkillsDbcTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Logic.Skills
+  alias ThistleTea.Game.Core.Skills
   alias ThistleTea.Game.World.Loader.Skill
 
   @moduletag :dbc_db

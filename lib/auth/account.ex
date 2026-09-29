@@ -1,4 +1,4 @@
-defmodule ThistleTea.Account do
+defmodule ThistleTea.Auth.Account do
   @moduledoc """
   ETS store of game accounts by upcased username — in-memory only, like
   `CharacterStore`; durable persistence is deferred until the runtime model

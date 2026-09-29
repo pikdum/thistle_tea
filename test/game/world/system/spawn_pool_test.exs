@@ -1,0 +1,570 @@
+defmodule ThistleTea.Game.World.System.SpawnPoolTest do
+  use ExUnit.Case, async: false
+
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Entity.Component.GameObject, as: GameObjectComponent
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.GameObject
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Loot.Actor
+  alias ThistleTea.Game.Core.Profession.OpenLock
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.Battleground.Spawns, as: BattlegroundSpawns
+  alias ThistleTea.Game.World.System.SpawnPool
+  alias ThistleTea.Game.World.System.SpawnPool.Supervisor, as: SpawnPoolSupervisor
+
+  describe "singleton lifecycle" do
+    test "disarmed and triggered static traps respawn through their pool with fresh state" do
+      {guid, group, world, _key, cell} = singleton_fixture()
+      blueprint = game_object(guid)
+
+      blueprint = %{
+        blueprint
+        | internal: %{
+            blueprint.internal
+            | trap: %Internal.Trap{charges: 1, radius: 0, start_delay_ms: 0},
+              gathering: %Internal.Gathering{lock_id: 12},
+              spawn: %Internal.Spawn{respawn_delay_ms: 300}
+          }
+      }
+
+      on_exit(fn -> SpawnPool.stop_world(world) end)
+      :ok = SpawnPool.activate(group, cell, blueprint)
+      first = await_entity(guid)
+      actor = %Actor{guid: 42, group_id: nil, needed_items: MapSet.new(), distance: 4.0}
+
+      assert Entity.call(guid, {:open_lock, actor, %OpenLock{lock_id: 12, lock_type: 4}, false}) ==
+               {:ok, :disarmed, false}
+
+      await_absent(guid)
+      assert Metadata.get(guid) == nil
+      replacement = await_replacement(guid, first)
+      refute :sys.get_state(replacement).internal.trap.depleted?
+      assert :sys.get_state(replacement).internal.gathering.opened_by == %{}
+      send(replacement, {:script_activate_object, actor.guid})
+      await_absent(guid)
+      triggered = await_replacement(guid, replacement)
+      refute :sys.get_state(triggered).internal.trap.depleted?
+    end
+
+    test "battleground ownership gates first activation, refresh, and delayed reactivation" do
+      db_guid = 8_000_000 + System.unique_integer([:positive])
+      guid = Guid.from_low_guid(:game_object, 1, db_guid)
+      world = WorldRef.instance(529, System.unique_integer([:positive]))
+      group = {:singleton, :game_object, db_guid}
+      key = {world, group}
+      member = {:game_object, db_guid}
+      binding = %{map: 529, event1: 0, event2: 3, kind: :game_object, db_guid: db_guid, entry: 1}
+      binding_key = {:bindings, 529, :game_object, db_guid}
+      event_key = {:event_member, 529, 0, 3, :game_object, db_guid}
+      :ets.insert(BattlegroundLoader, [{binding_key, [binding]}, {event_key, binding}])
+      BattlegroundSpawns.open(world)
+
+      on_exit(fn ->
+        SpawnPool.stop_world(world)
+        BattlegroundSpawns.close(world)
+        :ets.delete(BattlegroundLoader, binding_key)
+        :ets.delete(BattlegroundLoader, event_key)
+      end)
+
+      :ok = SpawnPool.activate(group, {world, 0, 0}, game_object(guid))
+      assert SpawnPool.status(key).running == []
+      BattlegroundSpawns.set_event(world, 0, 3)
+      await_pool_running(key, [member])
+      [{pool, _value}] = Registry.lookup(SpawnPool.Registry, key)
+      {first, _ref} = :sys.get_state(pool).running[member]
+      runtime_guid = :sys.get_state(first).object.guid
+
+      BattlegroundSpawns.stop_respawns(world, 0)
+      send(pool, {:reactivate, member})
+      GenServer.cast(pool, {:refresh, []})
+      assert SpawnPool.status(key).running == [member]
+      assert EntityRegistry.whereis(runtime_guid) == first
+
+      send(first, :chest_respawn)
+      await_absent(runtime_guid)
+      send(pool, {:reactivate, member})
+      GenServer.cast(pool, {:refresh, []})
+      assert SpawnPool.status(key).running == []
+
+      BattlegroundSpawns.set_event(world, 0, 3)
+      await_pool_running(key, [member])
+      assert :sys.get_state(pool).running[member] |> elem(0) != first
+
+      BattlegroundSpawns.set_event(world, 0, 4)
+      await_absent(runtime_guid)
+      send(pool, {:reactivate, member})
+      GenServer.cast(pool, {:refresh, []})
+      assert SpawnPool.status(key).running == []
+      BattlegroundSpawns.set_event(world, 0, 3)
+      await_pool_running(key, [member])
+      assert :sys.get_state(pool).running[member] |> elem(0) != first
+    end
+
+    test "consumed quest objects disappear and respawn with fresh use state" do
+      {guid, group, world, key, cell} = singleton_fixture()
+      blueprint = game_object(guid)
+
+      blueprint = %{
+        blueprint
+        | game_object: %{blueprint.game_object | type_id: 10, state: 1, flags: 0},
+          internal: %{
+            blueprint.internal
+            | goober: %Internal.Goober{consumable?: true},
+              spawn: %Internal.Spawn{respawn_delay_ms: 300}
+          }
+      }
+
+      on_exit(fn -> SpawnPool.stop_world(world) end)
+      :ok = SpawnPool.activate(group, cell, blueprint)
+      first = await_entity(guid)
+      user_guid = System.unique_integer([:positive])
+      SpatialHash.update(:players, user_guid, world, 1.0, 1.0, 1.0)
+      on_exit(fn -> SpatialHash.remove(:players, user_guid) end)
+      assert Entity.call(guid, {:use_goober, user_guid, world, true}) == :activated
+      send(first, {:finish_game_object_use, :sys.get_state(first).internal.object_action.revision})
+      await_absent(guid)
+      assert Metadata.get(guid) == nil
+      assert World.position(guid) == nil
+      fresh = await_replacement(guid, first)
+      refute :sys.get_state(fresh).internal.goober.depleted?
+      refute :sys.get_state(fresh).internal.object_action.active?
+      assert Entity.call(guid, {:use_goober, user_guid, world, true}) == :activated
+      stop_pool(key)
+    end
+
+    test "activates a linked member outside the triggering cell and drains it when unobserved" do
+      {guid, group, world, key, _cell} = singleton_fixture()
+      trigger = {world, 100, 100}
+      member = {:game_object, Guid.low_guid(guid)}
+      on_exit(fn -> SpawnPool.stop_world(world) end)
+
+      assert :ok = SpawnPool.activate(group, trigger, game_object(guid), [member])
+      assert is_pid(await_entity(guid))
+      assert :ok = SpawnPool.deactivate_cells(key, [trigger], MapSet.new())
+      await_absent(guid)
+      assert :ok = SpawnPool.activate(group, trigger)
+      assert is_pid(await_entity(guid))
+      stop_pool(key)
+    end
+
+    test "retains database identity across instance refreshes and repeated suspension" do
+      db_guid = 8_000_000 + System.unique_integer([:positive])
+      guid = Guid.from_low_guid(:game_object, 1, db_guid)
+      group = {:singleton, :game_object, db_guid}
+      world = WorldRef.instance(489, System.unique_integer([:positive]))
+      key = {world, group}
+      member = {:game_object, db_guid}
+      on_exit(fn -> SpawnPool.stop_world(world) end)
+
+      :ok = SpawnPool.activate(group, {world, 0, 0}, game_object(guid))
+      [{pool, _value}] = Registry.lookup(SpawnPool.Registry, key)
+      {first_pid, _monitor} = :sys.get_state(pool).running[member]
+      runtime_guid = :sys.get_state(first_pid).object.guid
+      refute runtime_guid == guid
+      assert Metadata.query(runtime_guid, [:db_guid]) == %{db_guid: db_guid}
+
+      Enum.reduce(1..3, first_pid, fn _cycle, previous_pid ->
+        GenServer.cast(pool, {:refresh, []})
+        assert SpawnPool.status(key) == %{selected: MapSet.new([member]), running: [member]}
+        assert EntityRegistry.whereis(runtime_guid) == previous_pid
+
+        SpawnPool.suspend_game_object(world, db_guid)
+        await_absent(runtime_guid)
+        SpawnPool.resume_game_object(world, db_guid)
+        await_replacement(runtime_guid, previous_pid)
+      end)
+    end
+
+    test "recycles a persistent entity into a fresh process" do
+      low_guid = System.unique_integer([:positive])
+      guid = Guid.from_low_guid(:game_object, 1, low_guid)
+      group = {:singleton, :game_object, low_guid}
+      key = {WorldRef.open(0), group}
+      blueprint = game_object(guid)
+
+      :ok = SpawnPool.activate(group, {WorldRef.open(0), 0, 0}, blueprint)
+      first_pid = EntityRegistry.whereis(guid)
+      assert is_pid(first_pid)
+
+      send(first_pid, :chest_respawn)
+      second_pid = await_replacement(guid, first_pid)
+
+      refute first_pid == second_pid
+
+      Process.exit(second_pid, :kill)
+      third_pid = await_replacement(guid, second_pid)
+
+      refute second_pid == third_pid
+
+      assert SpawnPool.status(key) == %{
+               selected: MapSet.new([{:game_object, low_guid}]),
+               running: [game_object: low_guid]
+             }
+
+      [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, key)
+      SpawnPoolSupervisor.terminate_child(pool_pid)
+    end
+
+    test "stops and restarts event-gated incarnations when eligibility changes" do
+      low_guid = System.unique_integer([:positive])
+      guid = Guid.from_low_guid(:game_object, 1, low_guid)
+      group = {:singleton, :game_object, low_guid}
+      key = {WorldRef.open(0), group}
+      blueprint = put_in(game_object(guid).internal.event, 42)
+
+      :ok = SpawnPool.activate(group, {WorldRef.open(0), 0, 0}, blueprint)
+      first_pid = await_entity(guid)
+
+      SpawnPool.refresh_all([])
+      await_absent(guid)
+
+      SpawnPool.refresh_all([42])
+      second_pid = await_replacement(guid, first_pid)
+
+      refute first_pid == second_pid
+
+      [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, key)
+      SpawnPoolSupervisor.terminate_child(pool_pid)
+    end
+
+    test "suspends a scripted object until its cell is activated again" do
+      {guid, group, _world, key, cell} = singleton_fixture()
+
+      :ok = SpawnPool.activate(group, cell, game_object(guid))
+      pid = await_entity(guid)
+
+      send(pid, {:script_remove_object, nil})
+      await_absent(guid)
+
+      Process.sleep(50)
+      assert EntityRegistry.whereis(guid) == nil
+
+      :ok = SpawnPool.activate(group, cell)
+      await_replacement(guid, pid)
+
+      stop_pool(key)
+    end
+
+    test "reactivates a scripted object after its respawn delay" do
+      {guid, group, _world, key, cell} = singleton_fixture()
+
+      :ok = SpawnPool.activate(group, cell, game_object(guid))
+      pid = await_entity(guid)
+
+      send(pid, {:script_remove_object, 100})
+      await_absent(guid)
+      await_replacement(guid, pid)
+
+      stop_pool(key)
+    end
+
+    test "activates a live game object through its owner" do
+      {guid, group, _world, key, cell} = singleton_fixture()
+
+      :ok = SpawnPool.activate(group, cell, game_object(guid))
+      pid = await_entity(guid)
+
+      send(pid, {:script_activate_object, Guid.from_low_guid(:player, 1)})
+      await_game_object_state(pid, 1)
+
+      stop_pool(key)
+    end
+
+    test "executes immediate and delayed scripts through the game object owner" do
+      {guid, group, _world, key, cell} = singleton_fixture()
+
+      :ok = SpawnPool.activate(group, cell, game_object(guid))
+      await_entity(guid)
+
+      steps = [
+        %ScriptStep{command: :set_game_object_state, datalong: 1},
+        %ScriptStep{command: :set_game_object_state, datalong: 2, delay_ms: 200}
+      ]
+
+      Entity.start_script(guid, steps, Guid.from_low_guid(:player, 1))
+      pid = await_game_object_state_by_guid(guid, 1)
+      await_game_object_state(pid, 2)
+
+      stop_pool(key)
+    end
+
+    test "operates and restores a scripted door through its spawn pool" do
+      {guid, group, world, key, cell} = singleton_fixture()
+      blueprint = put_in(game_object(guid).game_object.state, 1)
+
+      :ok = SpawnPool.activate(group, cell, blueprint)
+      pid = await_entity(guid)
+
+      :ok = SpawnPool.operate_game_object(world, blueprint, :open, 300)
+      await_game_object_state(pid, 0)
+      await_game_object_state(pid, 1)
+
+      stop_pool(key)
+    end
+
+    test "temporarily respawns a suspended game object" do
+      {guid, group, world, key, cell} = singleton_fixture()
+      blueprint = game_object(guid)
+
+      :ok = SpawnPool.activate(group, cell, blueprint)
+      pid = await_entity(guid)
+      send(pid, {:script_remove_object, nil})
+      await_absent(guid)
+      await_pool_running(key, [])
+
+      :ok = SpawnPool.respawn_game_object(world, blueprint, 500)
+      replacement = await_replacement(guid, pid)
+      refute replacement == pid
+      await_absent(guid, 100)
+
+      Process.sleep(50)
+      assert EntityRegistry.whereis(guid) == nil
+
+      stop_pool(key)
+    end
+
+    test "loads and despawns a game object spawn with delayed reactivation" do
+      {guid, _group, world, key, _cell} = singleton_fixture()
+      blueprint = game_object(guid)
+
+      :ok = SpawnPool.load_game_object(world, blueprint)
+      pid = await_entity(guid)
+
+      :ok = SpawnPool.suspend_game_object(world, blueprint, 100)
+      await_absent(guid)
+      await_replacement(guid, pid)
+
+      stop_pool(key)
+    end
+
+    test "suspends a game object by its database guid" do
+      {guid, _group, world, key, _cell} = singleton_fixture()
+      blueprint = game_object(guid)
+
+      :ok = SpawnPool.load_game_object(world, blueprint)
+      await_entity(guid)
+
+      :ok = SpawnPool.suspend_game_object(world, Guid.low_guid(guid))
+      await_absent(guid)
+
+      stop_pool(key)
+    end
+
+    test "isolates and stops pools by world copy" do
+      low_guid = System.unique_integer([:positive])
+      guid = Guid.from_low_guid(:game_object, 1, low_guid)
+      group = {:singleton, :game_object, low_guid}
+      first_world = WorldRef.instance(389, System.unique_integer([:positive]))
+      second_world = WorldRef.instance(389, System.unique_integer([:positive]))
+      first_key = {first_world, group}
+      second_key = {second_world, group}
+      blueprint = game_object(guid)
+
+      :ok = SpawnPool.activate(group, {first_world, 0, 0}, blueprint)
+      :ok = SpawnPool.activate(group, {second_world, 0, 0}, blueprint)
+
+      assert [{first_pid, _value}] = Registry.lookup(SpawnPool.Registry, first_key)
+      assert [{second_pid, _value}] = Registry.lookup(SpawnPool.Registry, second_key)
+      refute first_pid == second_pid
+      [{first_member, _monitor}] = Map.values(:sys.get_state(first_pid).running)
+      [{second_member, _monitor}] = Map.values(:sys.get_state(second_pid).running)
+      first_entity = :sys.get_state(first_member)
+      second_entity = :sys.get_state(second_member)
+      World.remove_position(first_entity)
+      refute first_entity.object.guid in World.guids(first_world)
+
+      SpawnPool.stop_world(first_world)
+
+      await_pool_absent(first_key)
+      await_absent(first_entity.object.guid)
+      refute Process.alive?(first_member)
+      assert Entity.pid(second_entity.object.guid) == second_member
+      assert [{^second_pid, _value}] = Registry.lookup(SpawnPool.Registry, second_key)
+
+      SpawnPoolSupervisor.terminate_child(second_pid)
+      await_absent(second_entity.object.guid)
+    end
+  end
+
+  describe "deactivate_cells/3" do
+    test "stops members whose home cell went inactive and reactivates from cached blueprints" do
+      {guid, group, _world, key, cell} = singleton_fixture()
+
+      :ok = SpawnPool.activate(group, cell, game_object(guid))
+      await_entity(guid)
+
+      :ok = SpawnPool.deactivate_cells(key, [cell], MapSet.new())
+      await_absent(guid)
+
+      Process.sleep(50)
+      assert EntityRegistry.whereis(guid) == nil
+
+      :ok = SpawnPool.activate(group, cell)
+      await_entity(guid)
+
+      stop_pool(key)
+    end
+
+    test "defers busy members until a drain tick clears them" do
+      {guid, group, _world, key, cell} = singleton_fixture()
+
+      :ok = SpawnPool.activate(group, cell, game_object(guid))
+      pid = await_entity(guid)
+
+      Metadata.update(guid, %{in_combat: true})
+      :ok = SpawnPool.deactivate_cells(key, [cell], MapSet.new())
+
+      Process.sleep(50)
+      assert EntityRegistry.whereis(guid) == pid
+
+      Metadata.update(guid, %{in_combat: false})
+      [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, key)
+      send(pool_pid, :drain_tick)
+      await_absent(guid)
+
+      stop_pool(key)
+    end
+
+    test "defers members observed by players until they leave" do
+      {guid, group, world, key, cell} = singleton_fixture()
+      player_guid = System.unique_integer([:positive])
+      SpatialHash.update(:players, player_guid, world, 1.0, 1.0, 1.0)
+      on_exit(fn -> SpatialHash.remove(:players, player_guid) end)
+
+      :ok = SpawnPool.activate(group, cell, game_object(guid))
+      pid = await_entity(guid)
+
+      :ok = SpawnPool.deactivate_cells(key, [cell], MapSet.new([cell]))
+      Process.sleep(50)
+      assert EntityRegistry.whereis(guid) == pid
+
+      [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, key)
+      send(pool_pid, :drain_tick)
+      Process.sleep(50)
+      assert EntityRegistry.whereis(guid) == pid
+
+      SpatialHash.remove(:players, player_guid)
+      send(pool_pid, :drain_tick)
+      await_absent(guid)
+
+      stop_pool(key)
+    end
+  end
+
+  defp singleton_fixture do
+    low_guid = 8_000_000 + System.unique_integer([:positive])
+    guid = Guid.from_low_guid(:game_object, 1, low_guid)
+    group = {:singleton, :game_object, low_guid}
+    world = WorldRef.open(0)
+    cell = SpatialHash.cell(world, 1.0, 1.0, 1.0)
+    {guid, group, world, {world, group}, cell}
+  end
+
+  defp stop_pool(key) do
+    [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, key)
+    SpawnPoolSupervisor.terminate_child(pool_pid)
+  end
+
+  defp game_object(guid) do
+    %GameObject{
+      object: %Object{guid: guid, entry: 1},
+      game_object: %GameObjectComponent{state: 0, type_id: 0},
+      movement_block: %MovementBlock{position: {1.0, 1.0, 1.0, 0.0}},
+      internal: %Internal{world: %WorldRef{map_id: 0}}
+    }
+  end
+
+  defp await_entity(guid, attempts \\ 50)
+  defp await_entity(_guid, 0), do: flunk("entity did not start")
+
+  defp await_entity(guid, attempts) do
+    case EntityRegistry.whereis(guid) do
+      pid when is_pid(pid) -> pid
+      nil -> Process.sleep(10) && await_entity(guid, attempts - 1)
+    end
+  end
+
+  defp await_replacement(guid, old_pid, attempts \\ 50)
+  defp await_replacement(_guid, _old_pid, 0), do: flunk("entity was not replaced")
+
+  defp await_replacement(guid, old_pid, attempts) do
+    case EntityRegistry.whereis(guid) do
+      pid when is_pid(pid) and pid != old_pid -> pid
+      _ -> Process.sleep(10) && await_replacement(guid, old_pid, attempts - 1)
+    end
+  end
+
+  defp await_absent(guid, attempts \\ 50)
+  defp await_absent(_guid, 0), do: flunk("entity did not stop")
+
+  defp await_absent(guid, attempts) do
+    case EntityRegistry.whereis(guid) do
+      nil -> :ok
+      _pid -> Process.sleep(10) && await_absent(guid, attempts - 1)
+    end
+  end
+
+  defp await_game_object_state(pid, expected_state, attempts \\ 50)
+  defp await_game_object_state(_pid, _expected_state, 0), do: flunk("game object state did not change")
+
+  defp await_game_object_state(pid, expected_state, attempts) do
+    case :sys.get_state(pid) do
+      %GameObject{game_object: %GameObjectComponent{state: ^expected_state}} ->
+        :ok
+
+      %GameObject{} ->
+        Process.sleep(10)
+        await_game_object_state(pid, expected_state, attempts - 1)
+    end
+  end
+
+  defp await_game_object_state_by_guid(guid, expected_state, attempts \\ 50)
+  defp await_game_object_state_by_guid(_guid, _expected_state, 0), do: flunk("game object state did not change")
+
+  defp await_game_object_state_by_guid(guid, expected_state, attempts) do
+    case EntityRegistry.whereis(guid) do
+      pid when is_pid(pid) ->
+        case :sys.get_state(pid) do
+          %GameObject{game_object: %GameObjectComponent{state: ^expected_state}} ->
+            pid
+
+          %GameObject{} ->
+            Process.sleep(10)
+            await_game_object_state_by_guid(guid, expected_state, attempts - 1)
+        end
+
+      nil ->
+        Process.sleep(10)
+        await_game_object_state_by_guid(guid, expected_state, attempts - 1)
+    end
+  end
+
+  defp await_pool_absent(key, attempts \\ 50)
+  defp await_pool_absent(_key, 0), do: flunk("spawn pool did not stop")
+
+  defp await_pool_absent(key, attempts) do
+    case Registry.lookup(SpawnPool.Registry, key) do
+      [] -> :ok
+      _present -> Process.sleep(10) && await_pool_absent(key, attempts - 1)
+    end
+  end
+
+  defp await_pool_running(key, expected, attempts \\ 50)
+  defp await_pool_running(_key, _expected, 0), do: flunk("spawn pool running members did not change")
+
+  defp await_pool_running(key, expected, attempts) do
+    case SpawnPool.status(key) do
+      %{running: ^expected} -> :ok
+      _status -> Process.sleep(10) && await_pool_running(key, expected, attempts - 1)
+    end
+  end
+end

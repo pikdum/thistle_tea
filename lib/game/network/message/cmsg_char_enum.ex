@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharEnum do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CHAR_ENUM
 
-  alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Core.Entity.Item
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgCharEnum.Character
   alias ThistleTea.Game.Network.Message.SmsgCharEnum.CharacterGear

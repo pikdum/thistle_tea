@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAutobankItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_AUTOBANK_ITEM
 
-  alias ThistleTea.Game.Player.Bank
+  alias ThistleTea.Game.World.Entity.Player.Bank
 
   defstruct [:source_bag, :source_slot]
 

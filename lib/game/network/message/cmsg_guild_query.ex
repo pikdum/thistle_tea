@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGuildQuery do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GUILD_QUERY
 
-  alias ThistleTea.Game.Player.Guilds
+  alias ThistleTea.Game.World.Entity.Player.Guilds
 
   defstruct [:guild_id]
 

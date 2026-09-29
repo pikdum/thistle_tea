@@ -4,8 +4,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgQuestgiverQuestDetails do
 
   import Bitwise
 
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Quest
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
   @hidden_rewards_flag 0x200

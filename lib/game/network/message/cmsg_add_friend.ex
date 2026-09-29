@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAddFriend do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ADD_FRIEND
 
-  alias ThistleTea.Game.Player.Social
+  alias ThistleTea.Game.World.Entity.Player.Social
 
   defstruct [:name]
 

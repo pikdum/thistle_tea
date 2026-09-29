@@ -1,0 +1,1677 @@
+defmodule ThistleTea.Game.Core.AI.ScriptTest do
+  use ExUnit.Case, async: true
+
+  alias ThistleTea.Game.Core.AI.BT.Blackboard
+  alias ThistleTea.Game.Core.AI.BT.Context
+  alias ThistleTea.Game.Core.AI.BT.Context.Navigation
+  alias ThistleTea.Game.Core.AI.BT.Context.Perception
+  alias ThistleTea.Game.Core.AI.BT.Context.Perception.Observation
+  alias ThistleTea.Game.Core.AI.BT.Context.Waypoints
+  alias ThistleTea.Game.Core.AI.Script
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Condition
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.GameObject, as: GameObjectComponent
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Spawn
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Waypoint
+  alias ThistleTea.Game.Core.Entity.Component.Internal.WaypointRoute
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.GameObject, as: GameObjectEntity
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Movement
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Cast
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Entity.NavigationResolver
+
+  setup [:mob]
+
+  describe "MOVE_TO completion" do
+    test "random-point moves use the observed destination without treating radius as facing", %{mob: mob} do
+      mob = %{mob | movement_block: %{mob.movement_block | position: {0.0, 0.0, 0.0, 0.0}, run_speed: 7.0}}
+
+      step = %ScriptStep{
+        command: :move_to,
+        datalong: 3,
+        datalong2: 2_000,
+        datalong3: 5,
+        datalong4: 2,
+        dataint: 7,
+        position: {10.0, 0.0, 0.0, 5.0}
+      }
+
+      destination = {11.0, 2.0, 0.5}
+      navigation = Navigation.new(%{{mob.internal.world.map_id, {10.0, 0.0, 0.0}, 5.0} => destination})
+      context = Context.new(100, navigation: navigation)
+      {requested, _} = Script.run(mob, Blackboard.new(), [step], nil, context)
+      assert [intent] = requested.internal.navigation_intents
+      assert intent.destination == destination
+      refute Keyword.has_key?(intent.opts, :face_angle)
+      moved = NavigationResolver.resolve(requested, 100, fn _, _, ^destination, _ -> [destination] end)
+      completed = Movement.sync_position(moved, 2_100)
+      assert {11.0, 2.0, 0.5, facing} = completed.movement_block.position
+      refute facing == 5.0
+      assert %Effects.MovementInform{motion_type: 9, point_id: 7} in completed.internal.events
+    end
+
+    test "random-point moves fall back to the authored center when navigation finds no point", %{mob: mob} do
+      for radius <- [0.0, 0.05, 5.0] do
+        step = %ScriptStep{command: :move_to, datalong: 3, position: {10.0, 20.0, 30.0, radius}}
+        {requested, _} = Script.run(mob, Blackboard.new(), [step], nil, Context.new(0))
+        assert [intent] = requested.internal.navigation_intents
+        assert intent.destination == {10.0, 20.0, 30.0}
+        refute Keyword.has_key?(intent.opts, :face_angle)
+      end
+    end
+
+    test "random-point moves preserve movement inhibition and the force flag", %{mob: mob} do
+      rooted = %{mob | movement_block: %{mob.movement_block | movement_flags: 0x08000000}}
+      step = %ScriptStep{command: :move_to, datalong: 3, position: {10.0, 0.0, 0.0, 5.0}}
+      {blocked, _} = Script.run(rooted, Blackboard.new(), [step], nil, Context.new(0))
+      assert blocked.internal.navigation_intents == []
+      {forced, _} = Script.run(rooted, Blackboard.new(), [%{step | datalong4: 1}], nil, Context.new(0))
+      assert length(forced.internal.navigation_intents) == 1
+      dead = %{mob | unit: %{mob.unit | health: 0}}
+      {blocked, _} = Script.run(dead, Blackboard.new(), [%{step | datalong4: 1}], nil, Context.new(0))
+      assert blocked.internal.navigation_intents == []
+    end
+
+    test "nested scripts request each random region once" do
+      point = %ScriptStep{command: :move_to, datalong: 3, position: {10.0, 0.0, 0.0, 5.0}}
+      nested = %ScriptStep{command: :start_script, sub_scripts: %{7 => [point]}}
+      tiny = %{point | position: {10.0, 0.0, 0.0, 0.05}}
+      assert Script.random_point_requests([point, nested, tiny]) == [{{10.0, 0.0, 0.0}, 5.0}]
+    end
+
+    test "preserves point identity, run mode, travel time, and facing", %{mob: mob} do
+      mob = %{mob | movement_block: %{mob.movement_block | position: {0.0, 0.0, 0.0, 0.0}, run_speed: 7.0}}
+
+      step = %ScriptStep{
+        command: :move_to,
+        datalong3: 68,
+        datalong4: 3,
+        datalong2: 2_000,
+        dataint: 1,
+        position: {10.0, 0.0, 0.0, 3.6}
+      }
+
+      {requested, _} = Script.run(mob, Blackboard.new(), [step], nil, 100)
+
+      moved =
+        NavigationResolver.resolve(requested, 100, fn _, _, _, _ -> flunk("direct movement must not pathfind") end)
+
+      assert moved.movement_block.duration == 2_000
+      assert moved.internal.movement_options[:run?]
+      assert [%Effects.MonsterMove{move_opts: opts}] = moved.internal.events
+      assert opts[:face_angle] == 3.6
+      completed = Movement.sync_position(moved, 2_100)
+      assert completed.movement_block.position == {10.0, 0.0, 0.0, 3.6}
+      assert %Effects.MovementInform{motion_type: 9, point_id: 1} in completed.internal.events
+    end
+
+    test "raw movement has no point callback and roots reject point movement", %{mob: mob} do
+      mob = %{mob | movement_block: %{mob.movement_block | position: {0.0, 0.0, 0.0, 0.0}, walk_speed: 2.5}}
+      step = %ScriptStep{command: :move_to, dataint: 1, position: {10.0, 0.0, 0.0, 0.0}}
+      {raw, _} = Script.run(mob, Blackboard.new(), [step], nil, 0)
+      moved = NavigationResolver.resolve(raw, 0)
+      assert moved.internal.movement_options[:movement_inform] == nil
+      rooted = %{mob | movement_block: %{mob.movement_block | movement_flags: 0x08000000}}
+      {blocked, _} = Script.run(rooted, Blackboard.new(), [%{step | datalong4: 2}], nil, 0)
+      assert blocked.internal.navigation_intents == []
+    end
+
+    test "failed replacement and partial paths never report the requested point", %{mob: mob} do
+      mob = %{mob | movement_block: %{mob.movement_block | position: {0.0, 0.0, 0.0, 0.0}, walk_speed: 2.5}}
+      step = %ScriptStep{command: :move_to, datalong3: 1, datalong4: 2, dataint: 1, position: {10.0, 0.0, 0.0, 0.0}}
+      {requested, _} = Script.run(mob, Blackboard.new(), [step], nil, 0)
+      moving = NavigationResolver.resolve(requested, 0, fn _, _, to, _ -> [to] end)
+      replacement = %{step | dataint: 2, position: {20.0, 0.0, 0.0, 0.0}}
+      {requested, _} = Script.run(moving, Blackboard.new(), [replacement], nil, 100)
+
+      for path <- [nil, [], [{5.0, 0.0, 0.0}], [{20.0, 0.0, 5.0}]] do
+        moved = NavigationResolver.resolve(requested, 100, fn _, _, _, _ -> path end)
+        completed = Movement.sync_position(moved, 10_000)
+        refute Enum.any?(completed.internal.events, &is_struct(&1, Effects.MovementInform))
+      end
+
+      refined = NavigationResolver.resolve(requested, 100, fn _, _, _, _ -> [{20.0, 0.0, 0.75}] end)
+      completed = Movement.sync_position(refined, 10_000)
+      assert %Effects.MovementInform{motion_type: 9, point_id: 2} in completed.internal.events
+    end
+  end
+
+  describe "run/5" do
+    test "enter_evade selects a living creature source or falls back to the creature target", %{mob: mob} do
+      step = %ScriptStep{command: :enter_evade}
+      {requested, _} = Script.run(mob, Blackboard.new(), [step], 2, 0)
+      assert [%Effects.EnterEvade{target_guid: guid}] = requested.internal.events
+      assert guid == mob.object.guid
+      dead = %{mob | unit: %{mob.unit | health: 0}}
+      {unchanged, _} = Script.run(dead, Blackboard.new(), [step], 2, 0)
+      assert unchanged == dead
+      character = %Character{object: %Object{guid: 2}, internal: %Internal{}}
+      {requested, _} = Script.run(character, Blackboard.new(), [step], guid, 0)
+      assert [%Effects.EnterEvade{target_guid: ^guid}] = requested.internal.events
+      {unchanged, _} = Script.run(character, Blackboard.new(), [step], 3, 0)
+      assert unchanged == character
+    end
+
+    test "normal player casts request the owner spellcasting path" do
+      character = %Character{object: %Object{guid: 2}, unit: %Unit{level: 50}, internal: %Internal{}}
+      step = %ScriptStep{command: :cast_spell, datalong: 15_065, target_self?: true}
+      {character, _} = Script.run(character, Blackboard.new(), [step], 123, 1_000)
+      assert [%Effects.ScriptedCast{entry: %{spell_id: 15_065}, target_guid: 2}] = character.internal.events
+      assert character.internal.casting == nil
+    end
+
+    test "triggered player casts retain trigger semantics" do
+      character = %Character{object: %Object{guid: 2}, unit: %Unit{level: 50}, internal: %Internal{}}
+      step = %ScriptStep{command: :cast_spell, datalong: 15_065, datalong2: 2, target_self?: true}
+      {character, _} = Script.run(character, Blackboard.new(), [step], 123, 1_000)
+      assert [%Effects.TriggerSpell{source_guid: 2, target_guid: 2, spell_id: 15_065}] = character.internal.events
+    end
+
+    test "rejects script casts whose source has no unit" do
+      object = %GameObjectEntity{object: %Object{guid: 123}, internal: %Internal{}}
+      step = %ScriptStep{command: :cast_spell, datalong: 15_065, target_self?: true}
+      assert {^object, _} = Script.run(object, Blackboard.new(), [step], 2, 1_000)
+    end
+
+    test "talk enqueues a monster talk event plus the text emote", %{mob: mob} do
+      step = %ScriptStep{
+        command: :talk,
+        texts: [%{text: "Hello there!", chat_type: :say, language: 0, emote_id: 5}]
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [
+               %Effects.MonsterTalk{text: "Hello there!", chat_type: :say},
+               %Effects.Emote{emote_id: 5}
+             ] = mob.internal.events
+    end
+
+    test "emote enqueues an emote event", %{mob: mob} do
+      step = %ScriptStep{command: :emote, datalong: 11}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Effects.Emote{emote_id: 11}] = mob.internal.events
+    end
+
+    test "triggered self cast enqueues a trigger spell event", %{mob: mob} do
+      step = %ScriptStep{command: :cast_spell, datalong: 12_544, datalong2: 0x02, target_self?: true}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      guid = mob.object.guid
+
+      assert [%Effects.TriggerSpell{spell_id: 12_544, source_guid: ^guid, target_guid: ^guid}] =
+               mob.internal.events
+    end
+
+    test "non-triggered casts use the real cast path, not the trigger pipeline", %{mob: mob} do
+      # castflags 0x01 = interrupt_previous only (not triggered) → visible cast via
+      # the mob casting machinery. With an empty fixture spellbook it finds no spell
+      # and no-ops, but it must never fall back to the instant trigger pipeline.
+      step = %ScriptStep{command: :cast_spell, datalong: 12_544, datalong2: 0x01, target_self?: true}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
+    end
+
+    test "cast without a resolvable target is skipped", %{mob: mob} do
+      step = %ScriptStep{command: :cast_spell, datalong: 12_544, target_type: :victim}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.internal.events == []
+    end
+
+    test "set_phase variants mutate the blackboard phase", %{mob: mob} do
+      blackboard = Blackboard.new()
+
+      {_mob, blackboard} = Script.run(mob, blackboard, [%ScriptStep{command: :set_phase, datalong: 3}], nil, 0)
+      assert blackboard.event_ai.phase == 3
+
+      {_mob, blackboard} =
+        Script.run(mob, blackboard, [%ScriptStep{command: :set_phase, datalong: 2, datalong2: 1}], nil, 0)
+
+      assert blackboard.event_ai.phase == 5
+
+      {_mob, blackboard} =
+        Script.run(mob, blackboard, [%ScriptStep{command: :set_phase, datalong: 9, datalong2: 2}], nil, 0)
+
+      assert blackboard.event_ai.phase == 0
+
+      {_mob, blackboard} =
+        Script.run(mob, blackboard, [%ScriptStep{command: :set_phase_range, datalong: 4, datalong2: 4}], nil, 0)
+
+      assert blackboard.event_ai.phase == 4
+
+      {_mob, blackboard} =
+        Script.run(mob, blackboard, [%ScriptStep{command: :set_phase_random, datalong: 7, datalong2: 7}], nil, 0)
+
+      assert blackboard.event_ai.phase == 7
+    end
+
+    test "combat capability commands update typed blackboard state", %{mob: mob} do
+      steps = [
+        %ScriptStep{command: :set_melee_attack, datalong: 0},
+        %ScriptStep{command: :set_combat_movement, datalong: 0}
+      ]
+
+      {_mob, blackboard} = Script.run(mob, Blackboard.new(), steps, nil, 0)
+
+      refute Blackboard.melee_enabled?(blackboard, mob)
+      refute Blackboard.combat_movement?(blackboard, mob)
+    end
+
+    test "call_for_help enqueues the scripted radius", %{mob: mob} do
+      target = Guid.from_low_guid(:player, 7)
+      mob = %{mob | unit: %{mob.unit | target: target}}
+      step = %ScriptStep{command: :call_for_help, position: {35.0, 0.0, 0.0, 0.0}}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 0)
+
+      assert [%Effects.CallForHelp{target_guid: ^target, radius: 35.0}] = mob.internal.events
+    end
+
+    test "modify_threat applies a percentage to one target or the whole table", %{mob: mob} do
+      target = Guid.from_low_guid(:player, 7)
+      other = Guid.from_low_guid(:player, 8)
+
+      mob = %{
+        mob
+        | unit: %{mob.unit | target: target},
+          internal: %{mob.internal | threat: %{target => 100.0, other => 50.0}}
+      }
+
+      one = %ScriptStep{command: :modify_threat, datalong: 1, position: {-30.0, 0.0, 0.0, 0.0}}
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [one], nil, 0)
+      assert mob.internal.threat == %{target => 70.0, other => 50.0}
+
+      all = %ScriptStep{command: :modify_threat, datalong: 8, position: {-100.0, 0.0, 0.0, 0.0}}
+      {mob, _blackboard} = Script.run(mob, blackboard, [all], nil, 0)
+      assert mob.internal.threat == %{target => 0.0, other => 0.0}
+    end
+
+    test "send_script_event targets the source AI with the selected invoker", %{mob: mob} do
+      target = Guid.from_low_guid(:mob, 5_895, 20)
+      step = %ScriptStep{command: :send_script_event, datalong: 5_944, datalong2: 3}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], target, 0)
+
+      assert [
+               %Effects.SendScriptEvent{
+                 owner_guid: owner,
+                 invoker_guid: ^target,
+                 event_id: 5_944,
+                 data: 3
+               }
+             ] = mob.internal.events
+
+      assert owner == mob.object.guid
+    end
+
+    test "hostile selectors use the threat table instead of always returning the victim", %{mob: mob} do
+      top = Guid.from_low_guid(:player, 1)
+      second = Guid.from_low_guid(:player, 2)
+      last = Guid.from_low_guid(:player, 3)
+      threat = %{top => 100.0, second => 70.0, last => 10.0}
+      mob = %{mob | unit: %{mob.unit | target: top}, internal: %{mob.internal | threat: threat}}
+      step = %ScriptStep{command: :cast_spell, datalong: 12_544, datalong2: 0x02, target_type: :hostile_random_not_top}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 0)
+
+      assert [%Effects.TriggerSpell{target_guid: ^second}] = mob.internal.events
+    end
+
+    test "farthest hostile and nearest player selectors use perception distances", %{mob: mob} do
+      near = Guid.from_low_guid(:player, 1)
+      far = Guid.from_low_guid(:player, 2)
+      mob = %{mob | internal: %{mob.internal | threat: %{near => 100.0, far => 50.0}}}
+
+      observations = %{
+        near => %Observation{guid: near, distance: 4.0},
+        far => %Observation{guid: far, distance: 18.0}
+      }
+
+      nearby = %{mobs: [], players: [{near, 4.0}, {far, 18.0}], game_objects: []}
+      perception = Perception.new(0, nil, observations, nearby)
+      context = Context.new(0, perception: perception)
+
+      farthest = %ScriptStep{command: :turn_to, target_type: :hostile_farthest, target_param1: 1}
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [farthest], nil, context)
+      assert [%Effects.SetFacing{facing: {:target, ^far}}] = mob.internal.events
+
+      mob = %{mob | internal: %{mob.internal | events: []}}
+      nearest = %ScriptStep{command: :turn_to, target_type: :nearest_player, target_param1: 20}
+      {mob, _blackboard} = Script.run(mob, blackboard, [nearest], nil, context)
+      assert [%Effects.SetFacing{facing: {:target, ^near}}] = mob.internal.events
+    end
+
+    test "nearest friendly player uses the perception faction snapshot", %{mob: mob} do
+      hostile = Guid.from_low_guid(:player, 1)
+      friendly = Guid.from_low_guid(:player, 2)
+      mob_faction = %FactionTemplate{faction: 15, faction_group: 8, friend_group: 8, enemy_group: 1}
+      hostile_faction = %FactionTemplate{faction: 1, faction_group: 1, friend_group: 1, enemy_group: 8}
+      friendly_faction = %FactionTemplate{faction: 15, faction_group: 8, friend_group: 8, enemy_group: 1}
+      mob = %{mob | unit: %{mob.unit | faction_template: mob_faction}}
+
+      observations = %{
+        mob.object.guid => %Observation{guid: mob.object.guid, metadata: %{faction_template: mob_faction}},
+        hostile => %Observation{guid: hostile, distance: 4.0, metadata: %{faction_template: hostile_faction}},
+        friendly => %Observation{guid: friendly, distance: 8.0, metadata: %{faction_template: friendly_faction}}
+      }
+
+      nearby = %{mobs: [], players: [{hostile, 4.0}, {friendly, 8.0}], game_objects: []}
+      context = Context.new(0, perception: Perception.new(0, nil, observations, nearby))
+      step = %ScriptStep{command: :turn_to, target_type: :nearest_friendly_player, target_param1: 20}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, context)
+
+      assert [%Effects.SetFacing{facing: {:target, ^friendly}}] = mob.internal.events
+    end
+
+    test "flee marks the blackboard and emotes when a victim exists", %{mob: mob} do
+      victim = Guid.from_low_guid(:player, 7)
+      mob = %{mob | unit: %{mob.unit | target: victim}}
+
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [%ScriptStep{command: :flee}], nil, 2_000)
+
+      assert Blackboard.fleeing?(blackboard)
+      assert blackboard.combat.flee_until == 2_000 + Script.flee_duration_ms()
+      assert blackboard.combat.flee_from == victim
+      assert [%Effects.MonsterTalk{chat_type: :text_emote}] = mob.internal.events
+    end
+
+    test "flee without a victim is ignored", %{mob: mob} do
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [%ScriptStep{command: :flee}], nil, 2_000)
+
+      refute Blackboard.fleeing?(blackboard)
+      assert mob.internal.events == []
+    end
+
+    test "morph to a display id swaps the model and marks a broadcast", %{mob: mob} do
+      step = %ScriptStep{command: :morph, datalong: 89, datalong2: 1}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.unit.display_id == 89
+      assert mob.internal.broadcast_update?
+    end
+
+    test "morph to zero restores the native display id", %{mob: mob} do
+      mob = %{mob | unit: %{mob.unit | display_id: 89}}
+      step = %ScriptStep{command: :morph, datalong: 0}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.unit.display_id == 11_354
+      assert mob.internal.broadcast_update?
+    end
+
+    test "morph to the current display id is a no-op", %{mob: mob} do
+      step = %ScriptStep{command: :morph, datalong: 11_354, datalong2: 1}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.unit.display_id == 11_354
+      refute mob.internal.broadcast_update?
+    end
+
+    test "morph by creature entry is skipped", %{mob: mob} do
+      step = %ScriptStep{command: :morph, datalong: 6_578, datalong2: 0}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.unit.display_id == 11_354
+      refute mob.internal.broadcast_update?
+    end
+
+    test "morph is skipped while dead", %{mob: mob} do
+      mob = %{mob | unit: %{mob.unit | health: 0}}
+      step = %ScriptStep{command: :morph, datalong: 89, datalong2: 1}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.unit.display_id == 11_354
+      refute mob.internal.broadcast_update?
+    end
+
+    test "set_run flips the running flag and persists run mode on the blackboard", %{mob: mob} do
+      {mob, blackboard} =
+        Script.run(mob, Blackboard.new(), [%ScriptStep{command: :set_run, datalong: 1}], nil, 1_000)
+
+      assert mob.internal.running
+      assert Blackboard.run_mode?(blackboard)
+
+      {mob, blackboard} = Script.run(mob, blackboard, [%ScriptStep{command: :set_run, datalong: 0}], nil, 1_000)
+
+      refute mob.internal.running
+      refute Blackboard.run_mode?(blackboard)
+    end
+
+    test "steps with a failing condition are skipped", %{mob: mob} do
+      failing = %Condition{type: :db_guid, value1: 12_345}
+
+      step = %ScriptStep{command: :emote, datalong: 11, condition: failing}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.internal.events == []
+    end
+
+    test "source and target swap before evaluating a step condition", %{mob: mob} do
+      target_guid = Guid.from_low_guid(:mob, 123, 456)
+      condition = %Condition{type: :source_entry, value1: 123, swap_targets?: true}
+      step = %ScriptStep{command: :emote, datalong: 11, condition: condition}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], target_guid, 1_000)
+
+      assert [%Effects.Emote{emote_id: 11}] = mob.internal.events
+    end
+
+    test "steps with an unknown condition are skipped", %{mob: mob} do
+      condition = %Condition{entry: 9, type: :item_with_bank, value1: 100, value2: 1}
+      step = %ScriptStep{command: :emote, datalong: 11, condition: condition}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.internal.events == []
+    end
+
+    test "summon_creature enqueues a summon event with explicit coordinates", %{mob: mob} do
+      step = %ScriptStep{
+        command: :summon_creature,
+        datalong: 1_500,
+        datalong2: 30_000,
+        dataint: 0x01,
+        dataint3: -1,
+        dataint4: 3,
+        position: {10.0, 20.0, 30.0, 1.5}
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Effects.SummonCreature{summon: summon, steps: []}] = mob.internal.events
+      assert summon.entry == 1_500
+      assert summon.despawn_delay_ms == 30_000
+      assert summon.despawn_type == 3
+      assert summon.run?
+      refute summon.unique?
+      assert summon.position == {10.0, 20.0, 30.0, 1.5}
+      assert summon.attack_guid == nil
+    end
+
+    test "summon_creature falls back to the summoner position and resolves the attack target", %{mob: mob} do
+      victim = Guid.from_low_guid(:player, 9)
+
+      mob = %{
+        mob
+        | unit: %{mob.unit | target: victim},
+          movement_block: %{mob.movement_block | position: {5.0, 6.0, 7.0, 0.5}}
+      }
+
+      sub_steps = [%ScriptStep{command: :emote, datalong: 11}]
+
+      step = %ScriptStep{
+        command: :summon_creature,
+        datalong: 1_500,
+        dataint2: 777,
+        dataint3: 1,
+        position: {0.0, 0.0, 0.0, 0.0},
+        sub_scripts: %{777 => sub_steps}
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Effects.SummonCreature{summon: summon, steps: ^sub_steps}] = mob.internal.events
+      assert summon.position == {5.0, 6.0, 7.0, 0.5}
+      assert summon.attack_guid == victim
+    end
+
+    test "despawn enqueues a despawn_self event with seconds-scaled respawn delay", %{mob: mob} do
+      step = %ScriptStep{command: :despawn, datalong: 2_000, datalong2: 30}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Effects.DespawnSelf{duration_ms: 2_000, respawn_delay_ms: 30_000}] = mob.internal.events
+    end
+
+    test "attack_start targets the victim and skips without one", %{mob: mob} do
+      step = %ScriptStep{command: :attack_start, target_type: :victim}
+
+      {idle, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+      assert idle.internal.events == []
+
+      victim = Guid.from_low_guid(:player, 9)
+      mob = %{mob | unit: %{mob.unit | target: victim}}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+      assert [%Effects.StartAttack{target_guid: ^victim}] = mob.internal.events
+    end
+
+    test "send_taxi_path targets a player through a semantic effect", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, 9)
+      step = %ScriptStep{command: :send_taxi_path, datalong: 315}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+
+      assert [%Effects.SendTaxiPath{target_guid: ^player_guid, path_id: 315}] = mob.internal.events
+    end
+
+    test "start_script runs the chosen resolved sub-script", %{mob: mob} do
+      sub_steps = [%ScriptStep{command: :emote, datalong: 11}]
+
+      step = %ScriptStep{
+        command: :start_script,
+        datalong: 555,
+        dataint: 100,
+        sub_scripts: %{555 => sub_steps}
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Effects.Emote{emote_id: 11}] = mob.internal.events
+    end
+
+    test "stand_state updates the unit and marks a broadcast", %{mob: mob} do
+      step = %ScriptStep{command: :stand_state, datalong: 1}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.unit.stand_state == 1
+      assert mob.internal.broadcast_update?
+    end
+
+    test "mount sets and clears the mount display id", %{mob: mob} do
+      step = %ScriptStep{command: :mount, datalong: 2_404, datalong2: 1}
+
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+      assert mob.unit.mount_display_id == 2_404
+
+      {mob, _blackboard} = Script.run(mob, blackboard, [%ScriptStep{command: :mount, datalong: 0}], nil, 1_000)
+      assert mob.unit.mount_display_id == 0
+    end
+
+    test "mount by unresolved creature entry is skipped", %{mob: mob} do
+      step = %ScriptStep{command: :mount, datalong: 14, datalong2: 0}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.unit.mount_display_id == nil
+      refute mob.internal.broadcast_update?
+    end
+
+    test "turn_to an orientation faces in place and enqueues a facing event", %{mob: mob} do
+      step = %ScriptStep{command: :turn_to, datalong: 1, position: {0.0, 0.0, 0.0, 2.5}}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert {_x, _y, _z, 2.5} = mob.movement_block.position
+      assert [%Effects.SetFacing{facing: {:angle, 2.5}}] = mob.internal.events
+    end
+
+    test "turn_to the victim enqueues a facing-target event", %{mob: mob} do
+      victim = Guid.from_low_guid(:player, 9)
+      mob = %{mob | unit: %{mob.unit | target: victim}}
+
+      step = %ScriptStep{command: :turn_to, datalong: 0, target_type: :victim}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Effects.SetFacing{facing: {:target, ^victim}}] = mob.internal.events
+    end
+
+    test "play_sound picks the object-sound variant for distance-dependent flags", %{mob: mob} do
+      steps = [
+        %ScriptStep{command: :play_sound, datalong: 6_943},
+        %ScriptStep{command: :play_sound, datalong: 6_944, datalong2: 0x2}
+      ]
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), steps, nil, 1_000)
+
+      assert [
+               %Effects.PlaySound{sound_id: 6_943},
+               %Effects.PlayObjectSound{sound_id: 6_944}
+             ] = mob.internal.events
+    end
+
+    test "swap-final steps are forwarded to the resolved buddy", %{mob: mob} do
+      buddy = Guid.from_low_guid(:mob, 10_616, 81_251)
+
+      step = %ScriptStep{
+        command: :talk,
+        target_type: :creature_with_guid,
+        target_param1: 81_251,
+        buddy_guid: buddy,
+        swap_final?: true,
+        texts: [%{text: "Back to work!", chat_type: :say, language: 0, emote_id: 0}]
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      self_guid = mob.object.guid
+
+      assert [
+               %Effects.ForwardScriptSteps{target_guid: ^buddy, source_guid: ^self_guid, steps: [forwarded]}
+             ] = mob.internal.events
+
+      assert forwarded.command == :talk
+      assert forwarded.target_type == :provided
+      refute forwarded.swap_final?
+    end
+
+    test "swap-final steps with an unresolved buddy are skipped", %{mob: mob} do
+      step = %ScriptStep{
+        command: :talk,
+        target_type: :creature_with_guid,
+        target_param1: 81_251,
+        swap_final?: true,
+        texts: [%{text: "Back to work!", chat_type: :say, language: 0, emote_id: 0}]
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.internal.events == []
+    end
+
+    test "swap-final steps resolving to self execute locally", %{mob: mob} do
+      step = %ScriptStep{
+        command: :emote,
+        datalong: 11,
+        target_type: :creature_with_guid,
+        buddy_guid: mob.object.guid,
+        swap_final?: true
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Effects.Emote{emote_id: 11}] = mob.internal.events
+    end
+
+    test "swap-initial steps without a supplied source are skipped", %{mob: mob} do
+      step = %ScriptStep{command: :emote, datalong: 11, swap_initial?: true}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.internal.events == []
+    end
+
+    test "turn_to faces a guid-selected buddy", %{mob: mob} do
+      buddy = Guid.from_low_guid(:mob, 10_616, 81_251)
+
+      step = %ScriptStep{
+        command: :turn_to,
+        datalong: 0,
+        target_type: :creature_with_guid,
+        buddy_guid: buddy
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Effects.SetFacing{facing: {:target, ^buddy}}] = mob.internal.events
+    end
+
+    test "quest_explored enqueues group event credit with distance context", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, 9)
+      world_object_guid = mob.object.guid
+      step = %ScriptStep{command: :quest_explored, datalong: 986, datalong2: 80, datalong3: 1}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+
+      assert [
+               %Effects.QuestEventCredit{
+                 player_guid: ^player_guid,
+                 quest_id: 986,
+                 group?: true,
+                 distance: 80,
+                 world_object_guid: ^world_object_guid
+               }
+             ] = mob.internal.events
+    end
+
+    test "kill_credit enqueues scripted creature credit", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, 9)
+      step = %ScriptStep{command: :kill_credit, datalong: 11_220, datalong2: 1}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+
+      assert [
+               %Effects.QuestKillCredit{
+                 player_guid: ^player_guid,
+                 creature_entry: 11_220,
+                 group?: true
+               }
+             ] = mob.internal.events
+    end
+
+    test "fail_quest enqueues group quest failure", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, 9)
+      step = %ScriptStep{command: :fail_quest, datalong: 986}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+
+      assert [%Effects.QuestFail{player_guid: ^player_guid, quest_id: 986, group?: true}] =
+               mob.internal.events
+    end
+
+    test "quest_credit enqueues interaction credit for the world object", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, 9)
+      world_object_guid = mob.object.guid
+      step = %ScriptStep{command: :quest_credit}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+
+      assert [
+               %Effects.QuestInteractionCredit{
+                 player_guid: ^player_guid,
+                 target_guid: ^world_object_guid
+               }
+             ] = mob.internal.events
+    end
+
+    test "start_waypoints installs the selected route and initial delay", %{mob: mob} do
+      route = %WaypointRoute{
+        first_point: 1,
+        destination_point: 1,
+        points: %{1 => %Waypoint{}, 2 => %Waypoint{}}
+      }
+
+      context =
+        Context.new(1_000,
+          waypoints: Waypoints.new(%{{:special, 7_784} => route})
+        )
+
+      step = %ScriptStep{
+        command: :start_waypoints,
+        datalong: 3,
+        datalong2: 2,
+        datalong3: 500,
+        datalong4: 0,
+        dataint2: 7_784
+      }
+
+      {_mob, blackboard} = Script.run(mob, Blackboard.new(), [step], nil, context)
+
+      assert %WaypointRoute{destination_point: 2, repeat?: false} =
+               blackboard.navigation.scripted_waypoint_route
+
+      assert blackboard.navigation.next_waypoint_at == 1_500
+    end
+
+    test "map event commands enqueue a world-system request", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, 9)
+      step = %ScriptStep{command: :start_map_event, datalong: 648, datalong2: 2_400}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+
+      assert [
+               %Effects.ScriptedEventCommand{
+                 source_guid: source_guid,
+                 target_guid: ^player_guid,
+                 step: ^step
+               }
+             ] = mob.internal.events
+
+      assert source_guid == mob.object.guid
+    end
+
+    test "modify_flags changes typed unit and npc flag fields", %{mob: mob} do
+      steps = [
+        %ScriptStep{command: :modify_flags, datalong: 46, datalong2: 0x200, datalong3: 1},
+        %ScriptStep{command: :modify_flags, datalong: 147, datalong2: 0x2, datalong3: 2}
+      ]
+
+      mob = %{mob | unit: %{mob.unit | flags: 0x100, npc_flags: 0x3}}
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), steps, nil, 1_000)
+
+      assert mob.unit.flags == 0x300
+      assert mob.unit.npc_flags == 0x1
+      assert mob.internal.broadcast_update?
+    end
+
+    test "modify_flags changes game object interaction flags" do
+      game_object = %GameObjectEntity{
+        object: %Object{guid: Guid.from_low_guid(:game_object, 1, 1)},
+        game_object: %GameObjectComponent{flags: 0x10},
+        internal: %Internal{}
+      }
+
+      step = %ScriptStep{command: :modify_flags, datalong: 9, datalong2: 0x10, datalong3: 2}
+      {game_object, _blackboard} = Script.run(game_object, Blackboard.new(), [step], nil, 1_000)
+
+      assert game_object.game_object.flags == 0
+      assert game_object.internal.broadcast_update?
+    end
+
+    test "set_faction applies and explicitly restores a scripted faction", %{mob: mob} do
+      mob = %{mob | unit: %{mob.unit | faction_template: 35}}
+      set = %ScriptStep{command: :set_faction, datalong: 113, datalong2: 1}
+
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [set], nil, 1_000)
+      assert mob.unit.faction_template == 113
+
+      clear = %ScriptStep{command: :set_faction, datalong: 0}
+      {mob, _blackboard} = Script.run(mob, blackboard, [clear], nil, 1_000)
+      assert mob.unit.faction_template == 35
+    end
+
+    test "summon_object reuses the semantic game object summon effect", %{mob: mob} do
+      step = %ScriptStep{
+        command: :summon_object,
+        datalong: 21_145,
+        datalong2: 300,
+        position: {-9084.64, 830.321, 109.609, 0.541051}
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [
+               %Effects.SummonGameObject{
+                 entry: 21_145,
+                 duration_ms: 300_000,
+                 position: {-9084.64, 830.321, 109.609, 0.541051}
+               }
+             ] = mob.internal.events
+    end
+
+    test "summon_object translates script zero coordinates into unspecified positions", %{mob: mob} do
+      step = %ScriptStep{command: :summon_object, datalong: 21_145, datalong2: 300, position: {0.0, 5.0, 0.0, 0.0}}
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+      assert [%Effects.SummonGameObject{position: {nil, 5.0, nil, nil}}] = mob.internal.events
+    end
+
+    test "game object state and animation commands stay typed" do
+      game_object = %GameObjectEntity{
+        object: %Object{guid: Guid.from_low_guid(:game_object, 1, 1)},
+        game_object: %GameObjectComponent{state: 0},
+        internal: %Internal{}
+      }
+
+      steps = [
+        %ScriptStep{command: :set_game_object_state, datalong: 2},
+        %ScriptStep{command: :play_custom_animation, datalong: 1}
+      ]
+
+      {game_object, _blackboard} = Script.run(game_object, Blackboard.new(), steps, nil, 1_000)
+
+      assert game_object.game_object.state == 2
+      assert game_object.internal.broadcast_update?
+      assert [%Effects.GameObjectCustomAnimation{animation: 1}] = game_object.internal.events
+    end
+
+    test "activate_object requests owner-local game object use" do
+      user_guid = Guid.from_low_guid(:player, 9)
+
+      game_object = %GameObjectEntity{
+        object: %Object{guid: Guid.from_low_guid(:game_object, 1, 1)},
+        game_object: %GameObjectComponent{state: 0},
+        internal: %Internal{}
+      }
+
+      {game_object, _blackboard} =
+        Script.run(
+          game_object,
+          Blackboard.new(),
+          [%ScriptStep{command: :activate_object}],
+          user_guid,
+          1_000
+        )
+
+      assert [%Effects.ActivateGameObject{user_guid: ^user_guid}] = game_object.internal.events
+    end
+
+    test "game object spawn lifecycle commands enqueue boundary effects", %{mob: mob} do
+      blueprint = %GameObjectEntity{
+        object: %Object{guid: Guid.from_low_guid(:game_object, 1_000, 22)},
+        game_object: %GameObjectComponent{state: 0},
+        movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0)}
+      }
+
+      steps = [
+        %ScriptStep{
+          command: :respawn_game_object,
+          datalong2: 2,
+          game_object_spawn: blueprint
+        },
+        %ScriptStep{
+          command: :despawn_game_object,
+          datalong2: 30,
+          game_object_spawn: blueprint
+        },
+        %ScriptStep{
+          command: :load_game_object_spawn,
+          game_object_spawn: blueprint
+        }
+      ]
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), steps, nil, 1_000)
+
+      assert [
+               %Effects.RespawnGameObject{blueprint: ^blueprint, duration_ms: 5_000},
+               %Effects.DespawnGameObject{blueprint: ^blueprint, respawn_delay_ms: 30_000},
+               %Effects.LoadGameObjectSpawn{blueprint: ^blueprint}
+             ] = mob.internal.events
+    end
+
+    test "door commands enqueue spawn and owner operations", %{mob: mob} do
+      blueprint = %GameObjectEntity{
+        object: %Object{guid: Guid.from_low_guid(:game_object, 1_000, 22)},
+        game_object: %GameObjectComponent{state: 1},
+        movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0)}
+      }
+
+      {mob, _blackboard} =
+        Script.run(
+          mob,
+          Blackboard.new(),
+          [%ScriptStep{command: :open_door, datalong2: 1, game_object_spawn: blueprint}],
+          nil,
+          1_000
+        )
+
+      assert [
+               %Effects.OperateGameObject{
+                 action: :open,
+                 reset_delay_ms: 3_000,
+                 blueprint: ^blueprint
+               }
+             ] = mob.internal.events
+
+      game_object = %{blueprint | internal: %Internal{}}
+
+      {game_object, _blackboard} =
+        Script.run(
+          game_object,
+          Blackboard.new(),
+          [%ScriptStep{command: :reset_door_or_button}],
+          nil,
+          1_000
+        )
+
+      assert [%Effects.OperateGameObject{action: :reset, reset_delay_ms: 0, blueprint: nil}] =
+               game_object.internal.events
+    end
+
+    test "nearest game object commands are forwarded to the object owner", %{mob: mob} do
+      game_object_guid = Guid.from_low_guid(:game_object, 1_000, 22)
+
+      perception =
+        Perception.new(
+          1_000,
+          nil,
+          %{},
+          %{mobs: [], players: [], game_objects: [{game_object_guid, 5.0}]}
+        )
+
+      context = Context.new(1_000, perception: perception)
+
+      step = %ScriptStep{
+        command: :activate_object,
+        target_type: :nearest_game_object_with_entry,
+        target_param1: 1_000,
+        target_param2: 10
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, context)
+
+      assert [%Effects.ForwardScriptSteps{target_guid: ^game_object_guid, steps: [forwarded]}] =
+               mob.internal.events
+
+      assert forwarded.command == :activate_object
+      assert forwarded.target_type == :provided
+    end
+
+    test "reports nested game object observation radius" do
+      nested = %ScriptStep{
+        command: :remove_object,
+        target_type: :nearest_game_object_with_entry,
+        target_param2: 45
+      }
+
+      step = %ScriptStep{sub_scripts: %{1 => [nested]}}
+
+      assert Script.game_object_observation_radius([step]) == 45
+      assert Script.observation_radius([step]) == 45
+    end
+
+    test "add_aura uses the trigger spell pipeline", %{mob: mob} do
+      step = %ScriptStep{command: :add_aura, datalong: 11_048}
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      guid = mob.object.guid
+      assert [%Effects.TriggerSpell{source_guid: ^guid, target_guid: ^guid, spell_id: 11_048}] = mob.internal.events
+    end
+
+    test "respawn_creature enqueues an owner lifecycle request", %{mob: mob} do
+      step = %ScriptStep{command: :respawn_creature, datalong: 1}
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Effects.RespawnSelf{even_if_alive?: true}] = mob.internal.events
+    end
+
+    test "create_item targets the player participating in the script", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, 9)
+      step = %ScriptStep{command: :create_item, datalong: 22_048, datalong2: 1}
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+
+      assert [%Effects.GiveItem{target_guid: ^player_guid, item_id: 22_048, count: 1}] = mob.internal.events
+    end
+
+    test "set_default_movement updates the spawn movement policy", %{mob: mob} do
+      spawn = %Spawn{distance: 0, movement_type: 0}
+      mob = %{mob | internal: %{mob.internal | spawn: spawn}}
+      step = %ScriptStep{command: :set_default_movement, datalong: 1, datalong3: 12}
+      blackboard = Blackboard.idle_movement(Blackboard.new())
+
+      {mob, blackboard} = Script.run(mob, blackboard, [step], nil, Context.new(1_000))
+
+      assert mob.internal.spawn.movement_type == 1
+      assert mob.internal.spawn.distance == 12
+      assert blackboard.navigation.movement_override == nil
+    end
+
+    test "movement idle halts the active spline and overrides spawn movement", %{mob: mob} do
+      mob = active_movement(mob)
+      step = %ScriptStep{command: :movement, datalong: 0}
+
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.movement_block.spline_nodes == []
+      assert [%Effects.MovementStopped{}] = mob.internal.events
+      assert blackboard.navigation.movement_override == :idle
+    end
+
+    test "teleport_to is an in-order movement barrier for a server-controlled mob", %{mob: mob} do
+      world = WorldRef.instance(329, 77)
+      destination = {4068.74, -3535.97, 122.825, 2.47837}
+      mob = %{mob | unit: %{mob.unit | target: Guid.from_low_guid(:player, 42)}}
+
+      mob =
+        mob
+        |> active_movement()
+        |> then(&%{&1 | internal: %{&1.internal | world: world, visibility_cell: {world, 0, 0}}})
+
+      blackboard =
+        Blackboard.new()
+        |> then(&%{&1 | navigation: %{&1.navigation | target: {9.0, 9.0, 9.0}, move_target: {8.0, 8.0, 8.0}}})
+
+      step = %ScriptStep{
+        script_id: 1_043_504,
+        command: :teleport_to,
+        datalong: 0,
+        datalong2: 7,
+        target_type: :victim,
+        position: destination
+      }
+
+      {mob, blackboard} = Script.run(mob, blackboard, [step], Guid.from_low_guid(:player, 42), 5_000)
+
+      assert mob.internal.world == world
+      assert mob.movement_block.position == destination
+      assert is_nil(blackboard.navigation.target)
+      assert is_nil(blackboard.navigation.move_target)
+
+      assert [%Effects.CreatureTeleported{} = effect] = mob.internal.events
+      assert effect.world == world
+      assert effect.from_position == {5.0, 0.0, 0.0, 0.0}
+      assert effect.position == destination
+      assert effect.script_id == 1_043_504
+      assert effect.declared_map_id == 0
+      assert effect.options == 7
+    end
+
+    test "teleport_to drops earlier movement work and preserves later movement and delays", %{mob: mob} do
+      world = WorldRef.instance(329, 41)
+      movement_block = %{mob.movement_block | walk_speed: 2.5, run_speed: 7.0}
+
+      mob = %{
+        mob
+        | movement_block: movement_block,
+          internal: %{mob.internal | world: world, visibility_cell: {world, 0, 0}}
+      }
+
+      steps = [
+        %ScriptStep{command: :move_to, datalong: 0, position: {10.0, 0.0, 0.0, 0.0}},
+        %ScriptStep{script_id: 10_917, command: :teleport_to, datalong: 329, position: {20.0, 0.0, 0.0, 1.0}},
+        %ScriptStep{command: :move_to, datalong: 0, position: {30.0, 0.0, 0.0, 0.0}},
+        %ScriptStep{command: :emote, datalong: 11, delay_ms: 1_000}
+      ]
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), steps, nil, 5_000)
+
+      assert [intent] = mob.internal.navigation_intents
+      assert intent.destination == {30.0, 0.0, 0.0}
+
+      mob =
+        NavigationResolver.resolve(mob, 5_000, fn map_id, from, to, _opts ->
+          assert map_id == 329
+          assert from == {20.0, 0.0, 0.0}
+          assert to == {30.0, 0.0, 0.0}
+          [{30.0, 0.0, 0.0}]
+        end)
+
+      assert [
+               %Effects.CreatureTeleported{} = effect,
+               %Effects.ScriptSteps{duration_ms: 1_000},
+               %Effects.MonsterMove{}
+             ] = mob.internal.events
+
+      assert effect.position == {20.0, 0.0, 0.0, 1.0}
+      assert mob.internal.movement_start_position == {20.0, 0.0, 0.0}
+    end
+
+    test "teleport_to fails closed for ineligible sources", %{mob: mob} do
+      step = %ScriptStep{command: :teleport_to, datalong: 0, datalong2: 9, position: {1.0, 2.0, 3.0, 4.0}}
+      player_controlled = %{mob | unit: %{mob.unit | flags: 0x00000008}}
+      possessed = %{mob | internal: %{mob.internal | pet: %Pet{possessed?: true}}}
+      absent = %{mob | internal: %{mob.internal | visibility_cell: nil}}
+      malformed = %{mob | movement_block: %{mob.movement_block | position: nil}}
+
+      for source <- [absent, player_controlled, possessed, malformed] do
+        {unchanged, blackboard} = Script.run(source, Blackboard.new(), [step], nil, 1_000)
+        assert unchanged == source
+        assert blackboard == Blackboard.new()
+      end
+
+      character = %Character{
+        object: %Object{guid: Guid.from_low_guid(:player, 7)},
+        unit: %Unit{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0)}
+      }
+
+      {unchanged, _blackboard} = Script.run(character, Blackboard.new(), [step], nil, 1_000)
+      assert unchanged == character
+
+      game_object = %GameObjectEntity{
+        object: %Object{guid: Guid.from_low_guid(:game_object, 1, 1)},
+        game_object: %GameObjectComponent{},
+        internal: %Internal{world: WorldRef.open(0)}
+      }
+
+      {unchanged, _blackboard} = Script.run(game_object, Blackboard.new(), [step], nil, 1_000)
+      assert unchanged == game_object
+    end
+
+    test "an unsupported teleport source keeps unrelated delayed steps", %{mob: mob} do
+      absent = %{mob | internal: %{mob.internal | visibility_cell: nil}}
+
+      steps = [
+        %ScriptStep{command: :teleport_to, datalong: 0, position: {1.0, 2.0, 3.0, 4.0}},
+        %ScriptStep{command: :emote, datalong: 11, delay_ms: 2_000}
+      ]
+
+      {unchanged, _blackboard} = Script.run(absent, Blackboard.new(), steps, nil, 1_000)
+
+      assert unchanged.movement_block == absent.movement_block
+      assert [%Effects.ScriptSteps{duration_ms: 2_000, steps: [scheduled]}] = unchanged.internal.events
+      assert scheduled.command == :emote
+    end
+
+    test "movement random stores the selected runtime anchor and radius", %{mob: mob} do
+      spawn = %Spawn{position: {1.0, 2.0, 3.0}, distance: 5, movement_type: 0}
+      mob = %{mob | internal: %{mob.internal | spawn: spawn}}
+      mob = %{mob | movement_block: %{mob.movement_block | position: {10.0, 20.0, 30.0, 0.0}}}
+      step = %ScriptStep{command: :movement, datalong: 1, datalong2: 1, position: {8.5, 0.0, 0.0, 0.0}}
+
+      {_mob, blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert blackboard.navigation.movement_override == :random
+      assert blackboard.navigation.wander_anchor == {10.0, 20.0, 30.0}
+      assert blackboard.navigation.wander_radius == 8.5
+      assert blackboard.navigation.next_wander_at == 0
+    end
+
+    test "movement waypoint resolves its start point and repeat policy", %{mob: mob} do
+      spawn = %Spawn{position: {0.0, 0.0, 0.0}, movement_type: 0}
+      mob = %{mob | internal: %{mob.internal | spawn: spawn}}
+
+      route = %WaypointRoute{
+        first_point: 1,
+        destination_point: 1,
+        points: %{
+          1 => %Waypoint{position: {1.0, 0.0, 0.0, nil}},
+          2 => %Waypoint{position: {2.0, 0.0, 0.0, nil}}
+        }
+      }
+
+      waypoints = Waypoints.new(%{{:guid, Guid.low_guid(mob.object.guid)} => route})
+      step = %ScriptStep{command: :movement, datalong: 2, datalong2: 0, datalong3: 2}
+
+      {_mob, blackboard} =
+        Script.run(mob, Blackboard.new(), [step], nil, Context.new(1_000, waypoints: waypoints))
+
+      assert blackboard.navigation.movement_override == :waypoint
+      assert blackboard.navigation.scripted_waypoint_route.destination_point == 2
+      refute blackboard.navigation.scripted_waypoint_route.repeat?
+    end
+
+    test "movement home records a temporary home target", %{mob: mob} do
+      spawn = %Spawn{position: {1.0, 2.0, 3.0}, movement_type: 1, distance: 5}
+      mob = %{mob | internal: %{mob.internal | spawn: spawn}}
+      step = %ScriptStep{command: :movement, datalong: 7}
+
+      {_mob, blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert blackboard.navigation.movement_override == :home
+      assert blackboard.navigation.target == {1.0, 2.0, 3.0}
+    end
+
+    test "movement commands are ignored while dead", %{mob: mob} do
+      mob = %{mob | unit: %{mob.unit | health: 0}}
+      blackboard = Blackboard.new()
+
+      assert {^mob, ^blackboard} =
+               Script.run(mob, blackboard, [%ScriptStep{command: :movement, datalong: 1}], nil, 1_000)
+    end
+
+    test "interrupt_casts cancels the selected active spell", %{mob: mob} do
+      casting = %Cast{spell: %Spell{id: 22_313}, channel_ms: 0}
+      mob = %{mob | internal: %{mob.internal | casting: casting}}
+
+      {mob, _blackboard} =
+        Script.run(mob, Blackboard.new(), [%ScriptStep{command: :interrupt_casts, datalong2: 22_313}], nil, 1_000)
+
+      assert mob.internal.casting == nil
+    end
+
+    test "interrupt_casts preserves a different active spell", %{mob: mob} do
+      casting = %Cast{spell: %Spell{id: 22_313}, channel_ms: 0}
+      mob = %{mob | internal: %{mob.internal | casting: casting}}
+
+      {mob, _blackboard} =
+        Script.run(mob, Blackboard.new(), [%ScriptStep{command: :interrupt_casts, datalong2: 1}], nil, 1_000)
+
+      assert mob.internal.casting == casting
+    end
+
+    test "set_home_position supports current, provided, and default homes", %{mob: mob} do
+      original = %MovementBlock{position: {1.0, 2.0, 3.0, 0.5}}
+      spawn = %Spawn{movement_block: original, position: {1.0, 2.0, 3.0}, home_orientation: 0.5}
+
+      mob = %{
+        mob
+        | movement_block: %{mob.movement_block | position: {4.0, 5.0, 6.0, 1.5}},
+          internal: %{mob.internal | spawn: spawn}
+      }
+
+      {mob, blackboard} =
+        Script.run(mob, Blackboard.new(), [%ScriptStep{command: :set_home_position, datalong: 1}], nil, 1_000)
+
+      assert mob.internal.spawn.position == {4.0, 5.0, 6.0}
+      assert mob.internal.spawn.home_orientation == 1.5
+
+      provided = %ScriptStep{command: :set_home_position, datalong: 0, position: {7.0, 8.0, 9.0, 2.5}}
+      {mob, blackboard} = Script.run(mob, blackboard, [provided], nil, 1_000)
+
+      assert mob.internal.spawn.position == {7.0, 8.0, 9.0}
+      assert mob.internal.spawn.home_orientation == 2.5
+
+      {mob, _blackboard} =
+        Script.run(mob, blackboard, [%ScriptStep{command: :set_home_position, datalong: 2}], nil, 1_000)
+
+      assert mob.internal.spawn.position == {1.0, 2.0, 3.0}
+      assert mob.internal.spawn.home_orientation == 0.5
+    end
+
+    test "set_equipment applies slot changes and restores spawn defaults", %{mob: mob} do
+      default = %{
+        mob.unit
+        | virtual_item_slot_display: 42,
+          virtual_item_info: <<1::64, 2::64, 3::64>>
+      }
+
+      mob = %{mob | unit: default, internal: %{mob.internal | spawn: %Spawn{unit: default}}}
+
+      item = %ItemTemplate{
+        display_id: 99,
+        class: 2,
+        subclass: 7,
+        material: 1,
+        inventory_type: 13,
+        sheath: 3
+      }
+
+      change = %ScriptStep{command: :set_equipment, equipment_items: [item, nil, :unchanged]}
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [change], nil, 1_000)
+
+      assert Bitwise.band(mob.unit.virtual_item_slot_display, 0xFFFFFFFF) == 99
+      assert Bitwise.band(Bitwise.bsr(mob.unit.virtual_item_slot_display, 32), 0xFFFFFFFF) == 0
+      assert mob.internal.broadcast_update?
+
+      reset = %ScriptStep{command: :set_equipment, datalong: 1}
+      {mob, _blackboard} = Script.run(mob, blackboard, [reset], nil, 1_000)
+
+      assert mob.unit.virtual_item_slot_display == 42
+      assert mob.unit.virtual_item_info == default.virtual_item_info
+    end
+
+    test "remove_object requests removal of its script owner", %{mob: mob} do
+      {mob, _blackboard} =
+        Script.run(mob, Blackboard.new(), [%ScriptStep{command: :remove_object}], nil, 1_000)
+
+      assert [%Effects.RemoveSelf{respawn_delay_ms: nil}] = mob.internal.events
+    end
+
+    test "set_sheath updates the unit field", %{mob: mob} do
+      {mob, _blackboard} =
+        Script.run(mob, Blackboard.new(), [%ScriptStep{command: :set_sheath, datalong: 1}], nil, 1_000)
+
+      assert mob.unit.sheath_state == 1
+      assert mob.internal.broadcast_update?
+    end
+
+    test "invincibility sets absolute and percentage health floors", %{mob: mob} do
+      {mob, blackboard} =
+        Script.run(
+          mob,
+          Blackboard.new(),
+          [%ScriptStep{command: :invincibility, datalong: 25, datalong2: 1}],
+          nil,
+          1_000
+        )
+
+      assert mob.internal.invincibility_health_threshold == 25
+
+      {mob, _blackboard} =
+        Script.run(
+          mob,
+          blackboard,
+          [%ScriptStep{command: :invincibility, datalong: 10, datalong2: 0}],
+          nil,
+          1_000
+        )
+
+      assert mob.internal.invincibility_health_threshold == 10
+    end
+
+    test "combat_stop clears mob combat ownership", %{mob: mob} do
+      target = Guid.from_low_guid(:player, 55)
+
+      mob = %{
+        mob
+        | unit: %{mob.unit | target: target},
+          internal: %{mob.internal | in_combat: true, threat: %{target => 10.0}}
+      }
+
+      {mob, blackboard} =
+        Script.run(mob, Blackboard.new(), [%ScriptStep{command: :combat_stop}], nil, 1_000)
+
+      refute mob.internal.in_combat
+      assert mob.internal.threat == %{}
+      assert mob.unit.target == 0
+      assert blackboard == mob.internal.blackboard
+    end
+
+    test "combat_stop disengages a player from referenced mobs" do
+      player_guid = Guid.from_low_guid(:player, 55)
+      mob_guid = Guid.from_low_guid(:mob, 589, 2)
+
+      character = %Character{
+        object: %Object{guid: player_guid},
+        unit: %Unit{target: mob_guid, flags: 0},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{
+          world: %WorldRef{map_id: 0},
+          in_combat: true,
+          threat_refs: MapSet.new([{mob_guid, 1}]),
+          blackboard: Blackboard.new()
+        }
+      }
+
+      {character, _blackboard} =
+        Script.run(character, Blackboard.new(), [%ScriptStep{command: :combat_stop}], mob_guid, 1_000)
+
+      refute character.internal.in_combat
+      assert character.internal.threat_refs == MapSet.new()
+      assert character.unit.target == 0
+      assert Enum.any?(character.internal.events, &is_struct(&1, Effects.DropThreat))
+    end
+
+    test "delayed steps are deferred through a script_steps event", %{mob: mob} do
+      immediate = %ScriptStep{command: :emote, datalong: 11}
+      delayed = %ScriptStep{command: :emote, datalong: 22, delay_ms: 4_000}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [immediate, delayed], nil, 1_000)
+
+      assert [%Effects.Emote{emote_id: 11}, %Effects.ScriptSteps{steps: [scheduled], duration_ms: 4_000}] =
+               mob.internal.events
+
+      assert scheduled == %{delayed | delay_ms: 0}
+    end
+
+    test "delayed steps form an ordered cancellable chain", %{mob: mob} do
+      steps = [
+        %ScriptStep{command: :emote, datalong: 11, delay_ms: 1_000},
+        %ScriptStep{command: :terminate_script, delay_ms: 2_000},
+        %ScriptStep{command: :emote, datalong: 22, delay_ms: 3_000}
+      ]
+
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), steps, nil, 1_000)
+
+      assert [%Effects.ScriptSteps{duration_ms: 1_000, steps: scheduled}] = mob.internal.events
+      assert Enum.map(scheduled, & &1.delay_ms) == [0, 1_000, 2_000]
+
+      mob = %{mob | internal: %{mob.internal | events: []}}
+      {mob, blackboard} = Script.run(mob, blackboard, scheduled, nil, 2_000)
+
+      assert [
+               %Effects.Emote{emote_id: 11},
+               %Effects.ScriptSteps{duration_ms: 1_000, steps: remaining}
+             ] = mob.internal.events
+
+      mob = %{mob | internal: %{mob.internal | events: []}}
+      {mob, _blackboard} = Script.run(mob, blackboard, remaining, nil, 3_000)
+      assert mob.internal.events == []
+    end
+
+    test "terminate_script checks nearby living creature presence", %{mob: mob} do
+      buddy_guid = Guid.from_low_guid(:mob, 5_895, 20)
+
+      perception =
+        Perception.new(
+          1_000,
+          nil,
+          %{buddy_guid => %Observation{guid: buddy_guid, metadata: %{alive?: true}}},
+          %{mobs: [{buddy_guid, 10.0}], players: [], game_objects: []}
+        )
+
+      context = Context.new(1_000, perception: perception)
+
+      terminate_if_found = %ScriptStep{
+        command: :terminate_script,
+        datalong: 5_895,
+        datalong2: 20,
+        datalong3: 1
+      }
+
+      {mob, _blackboard} =
+        Script.run(
+          mob,
+          Blackboard.new(),
+          [terminate_if_found, %ScriptStep{command: :emote, datalong: 11}],
+          nil,
+          context
+        )
+
+      assert mob.internal.events == []
+
+      terminate_if_missing = %{terminate_if_found | datalong3: 0}
+
+      {mob, _blackboard} =
+        Script.run(
+          mob,
+          Blackboard.new(),
+          [terminate_if_missing, %ScriptStep{command: :emote, datalong: 11}],
+          nil,
+          context
+        )
+
+      assert [%Effects.Emote{emote_id: 11}] = mob.internal.events
+    end
+
+    test "terminate_condition stops the chain and can fail the player's quest", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, 55)
+      condition = %Condition{entry: 5_713, type: :map_event_active, value1: 5_713}
+
+      step = %ScriptStep{
+        command: :terminate_condition,
+        datalong: 5_713,
+        datalong2: 5_713,
+        termination_condition: condition
+      }
+
+      context = Context.new(1_000, script_conditions: %{5_713 => true})
+
+      {mob, _blackboard} =
+        Script.run(
+          mob,
+          Blackboard.new(),
+          [step, %ScriptStep{command: :emote, datalong: 11}],
+          player_guid,
+          context
+        )
+
+      assert [%Effects.QuestFail{player_guid: ^player_guid, quest_id: 5_713, group?: true}] =
+               mob.internal.events
+    end
+
+    test "map event targets resolve from immutable context", %{mob: mob} do
+      event_target = Guid.from_low_guid(:player, 55)
+
+      step = %ScriptStep{
+        command: :talk,
+        target_type: :map_event_target,
+        target_param1: 5_944,
+        texts: [%{text: "Found you", chat_type: :say, language: 0, emote_id: 0}]
+      }
+
+      selector = {:map_event_target, 5_944, 0}
+      context = Context.new(1_000, script_targets: %{selector => event_target})
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, context)
+
+      assert [%Effects.MonsterTalk{target_guid: ^event_target}] = mob.internal.events
+      assert Script.target_requests([step]) == [selector]
+    end
+
+    test "creature database targets resolve to the current copy from immutable context", %{mob: mob} do
+      blueprint_guid = Guid.from_low_guid(:mob, 10_917, 53_297)
+      runtime_guid = Guid.runtime(:mob, 10_917)
+
+      step = %ScriptStep{
+        command: :start_script,
+        datalong: 10_917,
+        target_type: :creature_with_guid,
+        target_param1: 53_297,
+        buddy_guid: blueprint_guid,
+        swap_final?: true,
+        sub_scripts: %{10_917 => [%ScriptStep{command: :emote, datalong: 1}]}
+      }
+
+      selector = {:creature_with_guid, 53_297, 0}
+      context = Context.new(1_000, script_targets: %{selector => runtime_guid})
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, context)
+
+      assert [%Effects.ForwardScriptSteps{target_guid: ^runtime_guid}] = mob.internal.events
+      assert Script.target_requests([step]) == [selector]
+
+      missing_context = Context.new(1_000, script_targets: %{selector => nil})
+
+      {mob, _blackboard} =
+        Script.run(%{mob | internal: %{mob.internal | events: []}}, Blackboard.new(), [step], nil, missing_context)
+
+      assert mob.internal.events == []
+    end
+
+    test "unsupported commands are skipped", %{mob: mob} do
+      step = %ScriptStep{command: {:unsupported, 10}}
+
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.internal.events == []
+      assert blackboard == Blackboard.new()
+    end
+
+    test "instance data commands enqueue one semantic effect without changing the blackboard", %{mob: mob} do
+      world = WorldRef.instance(329, 17)
+      mob = %{mob | internal: %{mob.internal | world: world}}
+      blackboard = Blackboard.new()
+      step = %ScriptStep{script_id: 5_122, command: :set_instance_data, datalong: 7, datalong2: 1, datalong3: 0}
+
+      {updated, returned_blackboard} = Script.run(mob, blackboard, [step], nil, 1_000)
+
+      assert returned_blackboard == blackboard
+      assert %{updated | internal: %{updated.internal | events: []}} == mob
+
+      assert [%Effects.InstanceDataCommand{world: ^world, field: 7, value: 1, mode: :raw, script_id: 5_122}] =
+               updated.internal.events
+    end
+
+    test "invalid instance data modes enqueue no effect", %{mob: mob} do
+      step = %ScriptStep{command: :set_instance_data, datalong: 7, datalong2: 1, datalong3: 9}
+
+      {updated, blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert updated == mob
+      assert blackboard == Blackboard.new()
+    end
+  end
+
+  defp mob(_context) do
+    mob = %Mob{
+      object: %Object{guid: Guid.from_low_guid(:mob, 589, 1)},
+      unit: %Unit{
+        health: 100,
+        max_health: 100,
+        level: 14,
+        target: 0,
+        auras: [],
+        display_id: 11_354,
+        native_display_id: 11_354
+      },
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+      internal: %Internal{
+        world: %WorldRef{map_id: 0},
+        visibility_cell: {%WorldRef{map_id: 0}, 0, 0},
+        name: "Defias Pillager",
+        in_combat: false,
+        creature: %Creature{},
+        spellbook: %{}
+      }
+    }
+
+    {:ok, mob: mob}
+  end
+
+  defp active_movement(%Mob{} = mob) do
+    movement_block = %{
+      mob.movement_block
+      | duration: 10_000,
+        spline_nodes: [{10.0, 0.0, 0.0}],
+        spline_id: 1
+    }
+
+    internal = %{
+      mob.internal
+      | movement_start_time: 0,
+        movement_start_position: {0.0, 0.0, 0.0}
+    }
+
+    %{mob | movement_block: movement_block, internal: internal}
+  end
+end

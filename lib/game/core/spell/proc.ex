@@ -1,0 +1,234 @@
+defmodule ThistleTea.Game.Core.Spell.Proc do
+  @moduledoc """
+  Evaluates spell-proc eligibility from DBC proc flags and VMangos
+  `spell_proc_event` restrictions.
+  """
+  import Bitwise, only: [&&&: 2, |||: 2, bnot: 1]
+
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.ProcOrigin
+  alias ThistleTea.Game.Core.Spell.ProcRule
+
+  @normal_hit 0x1
+  @critical_hit 0x2
+  @block 0x40
+  @absorb 0x400
+  @periodic_positive 0x40000
+  @trigger_always 0x10000
+  @cast_end 0x80000
+  @trap_activation 0x00200000
+
+  def hit_mask(outcome, damage, absorbed) do
+    mask = outcome_mask(outcome)
+    mask = if outcome == :block and damage > 0, do: mask ||| @normal_hit, else: mask
+    if absorbed > 0, do: mask ||| @absorb, else: mask
+  end
+
+  def incoming_hit_mask(mask, false, nil), do: mask &&& bnot(@critical_hit)
+  def incoming_hit_mask(mask, _standing?, _spell), do: mask
+
+  def eligible?(%Spell{} = proc_spell, _triggering_spell, :kill, outcome) do
+    proc_flag?(proc_spell, :kill) and kill_outcome_allowed?(proc_spell.proc_rule, outcome)
+  end
+
+  def eligible?(%Spell{} = proc_spell, %Spell{} = triggering_spell, proc_type, outcome) do
+    mask = event_mask(triggering_spell, proc_type, outcome)
+
+    origin_allowed?(proc_spell, triggering_spell, proc_type, outcome) and proc_flag?(proc_spell, mask) and
+      school_allowed?(proc_spell.proc_rule, triggering_spell) and
+      family_allowed?(proc_spell.proc_rule, triggering_spell) and
+      outcome_allowed?(proc_spell.proc_rule, proc_type, outcome)
+  end
+
+  def eligible?(%Spell{} = proc_spell, nil, proc_type, outcome) do
+    origin_allowed?(proc_spell, nil, proc_type, outcome) and proc_flag?(proc_spell, proc_type) and
+      school_allowed?(proc_spell.proc_rule, nil) and
+      outcome_allowed?(proc_spell.proc_rule, proc_type, outcome)
+  end
+
+  def eligible?(_proc_spell, _triggering_spell, _proc_type, _outcome), do: false
+
+  def origin_allowed?(proc_spell, triggering_spell, proc_type, context) do
+    ProcOrigin.allowed?(proc_spell, triggering_spell, context) and
+      direction_allowed?(triggering_spell, proc_type)
+  end
+
+  def cast_type(%Spell{} = spell) do
+    cond do
+      Spell.ranged_ability?(spell) -> :deal_ranged_ability
+      Spell.melee_ability?(spell) -> :deal_melee_ability
+      Spell.harmful?(spell) and spell.dmg_class == 1 -> :deal_harmful_spell
+      Spell.harmful?(spell) -> :deal_harmful_ability
+      Spell.healing?(spell) -> :deal_helpful_spell
+      true -> :deal_helpful_ability
+    end
+  end
+
+  def trap_spell?(%Spell{} = spell), do: Spell.family_flag?(spell, 9, 0x1C)
+
+  defp event_mask(spell, proc_type, outcome) do
+    mask = proc_mask(proc_type)
+
+    if proc_type in [:deal_harmful_spell, :deal_harmful_ability] and trap_spell?(spell) and
+         (outcome_mask(outcome) &&& @cast_end) == 0,
+       do: mask ||| @trap_activation,
+       else: mask
+  end
+
+  defp direction_allowed?(%Spell{} = spell, proc_type) do
+    attribute = if outgoing?(proc_type), do: :suppress_caster_procs, else: :suppress_target_procs
+    not Spell.attribute?(spell, attribute)
+  end
+
+  defp direction_allowed?(_spell, _proc_type), do: true
+
+  defp outgoing?(proc_type) do
+    proc_type in [
+      :deal_melee_swing,
+      :deal_melee_ability,
+      :deal_ranged_attack,
+      :deal_ranged_ability,
+      :deal_harmful_spell,
+      :deal_harmful_ability,
+      :deal_harmful_periodic,
+      :deal_helpful_spell,
+      :deal_helpful_ability,
+      :deal_helpful_periodic,
+      :trap_activation
+    ]
+  end
+
+  def roll?(spell, attack_time_ms \\ nil, roll \\ &:rand.uniform/0, modifier \\ &Function.identity/1)
+
+  def roll?(%Spell{} = spell, attack_time_ms, roll, modifier) when is_function(roll, 0) and is_function(modifier, 1) do
+    chance = modifier.(chance(spell, attack_time_ms))
+    chance >= 100 or (chance > 0 and roll.() * 100 <= chance)
+  end
+
+  def roll?(_spell, _attack_time_ms, _roll, _modifier), do: false
+
+  defp kill_outcome_allowed?(%ProcRule{proc_ex: proc_ex}, outcome) when is_integer(proc_ex),
+    do: (proc_ex &&& @cast_end) == (outcome_mask(outcome) &&& @cast_end)
+
+  defp kill_outcome_allowed?(_rule, outcome), do: (outcome_mask(outcome) &&& @cast_end) == 0
+
+  defp proc_flag?(%Spell{proc_rule: %ProcRule{proc_flags: flags}}, proc_type) when flags > 0,
+    do: proc_flag?(flags, proc_type)
+
+  defp proc_flag?(%Spell{proc_type_mask: flags}, proc_type), do: proc_flag?(flags, proc_type)
+
+  defp proc_flag?(flags, proc_type) when is_integer(flags) do
+    case if(is_integer(proc_type), do: proc_type, else: proc_mask(proc_type)) do
+      0 -> false
+      mask -> (flags &&& mask) != 0
+    end
+  end
+
+  defp proc_flag?(_flags, _proc_type), do: false
+
+  defp proc_mask(:kill), do: 0x00000002
+  defp proc_mask(:trap_activation), do: @trap_activation
+  defp proc_mask(:deal_helpful_ability), do: 0x00000400
+  defp proc_mask(:deal_harmful_ability), do: 0x00001000
+  defp proc_mask(:deal_helpful_spell), do: 0x00004000
+  defp proc_mask(:deal_harmful_spell), do: 0x00010000
+  defp proc_mask(:deal_harmful_periodic), do: 0x00040000
+  defp proc_mask(:deal_helpful_periodic), do: 0x00040000
+  defp proc_mask(:deal_melee_swing), do: 0x00000004
+  defp proc_mask(:deal_melee_ability), do: 0x00000010
+  defp proc_mask(:take_melee_swing), do: 0x00000008
+  defp proc_mask(:take_melee_ability), do: 0x00000020
+  defp proc_mask(:deal_ranged_attack), do: 0x00000040
+  defp proc_mask(:take_ranged_attack), do: 0x00000080
+  defp proc_mask(:deal_ranged_ability), do: 0x00000100
+  defp proc_mask(:take_ranged_ability), do: 0x00000200
+  defp proc_mask(:take_harmful_spell), do: 0x00020000
+  defp proc_mask(:take_harmful_periodic), do: 0x00080000
+  defp proc_mask(_proc_type), do: 0
+
+  defp school_allowed?(%ProcRule{school_mask: 0}, _spell), do: true
+
+  defp school_allowed?(%ProcRule{school_mask: mask}, nil) when is_integer(mask), do: (mask &&& 1) != 0
+
+  defp school_allowed?(%ProcRule{school_mask: mask}, %Spell{} = spell) when is_integer(mask),
+    do: (mask &&& Spell.school_mask(spell)) != 0
+
+  defp school_allowed?(_rule, _spell), do: true
+
+  defp family_allowed?(%ProcRule{} = rule, %Spell{} = spell) do
+    family_matches?(rule, spell) and family_masks_match?(rule, spell)
+  end
+
+  defp family_allowed?(_rule, _spell), do: true
+
+  defp family_matches?(%ProcRule{spell_family: 0}, _spell), do: true
+  defp family_matches?(%ProcRule{spell_family: family}, %Spell{spell_family: family}), do: true
+  defp family_matches?(_rule, _spell), do: false
+
+  defp family_masks_match?(%ProcRule{family_mask_0: 0, family_mask_1: 0}, _spell), do: true
+
+  defp family_masks_match?(%ProcRule{} = rule, %Spell{} = spell) do
+    (rule.family_mask_0 &&& spell.family_flags_0) != 0 or
+      (rule.family_mask_1 &&& spell.family_flags_1) != 0
+  end
+
+  defp outcome_allowed?(%ProcRule{proc_ex: proc_ex}, proc_type, outcome) when is_integer(proc_ex) and proc_ex > 0 do
+    outcome_mask = outcome_mask(outcome) ||| periodic_outcome_mask(proc_type)
+
+    (proc_ex &&& @cast_end) == (outcome_mask &&& @cast_end) and
+      ((proc_ex &&& @trigger_always) != 0 or (proc_ex &&& outcome_mask) != 0)
+  end
+
+  defp outcome_allowed?(_rule, :deal_helpful_periodic, _outcome), do: false
+
+  defp outcome_allowed?(_rule, _proc_type, outcome),
+    do: (outcome_mask(outcome) &&& @cast_end) == 0 and (outcome_mask(outcome) &&& (@normal_hit ||| @critical_hit)) != 0
+
+  defp periodic_outcome_mask(:deal_helpful_periodic), do: @periodic_positive
+  defp periodic_outcome_mask(_proc_type), do: 0
+
+  def shield_outcome_allowed?(%Spell{proc_rule: %ProcRule{proc_ex: proc_ex}}, outcome)
+      when is_integer(proc_ex) and proc_ex > 0 do
+    (proc_ex &&& outcome_mask(outcome)) != 0
+  end
+
+  def shield_outcome_allowed?(_spell, %{outcome: :block}), do: true
+
+  def shield_outcome_allowed?(_spell, %{damage: damage} = context) do
+    damage > 0 and shield_outcome_allowed?(nil, context.outcome)
+  end
+
+  def shield_outcome_allowed?(_spell, %{outcome: outcome}), do: shield_outcome_allowed?(nil, outcome)
+  def shield_outcome_allowed?(_spell, outcome), do: outcome in [:normal, :crit, :glancing, :crushing, :block]
+
+  defp outcome_mask(%{proc_ex: mask}) when is_integer(mask), do: mask
+  defp outcome_mask(%{outcome: outcome}), do: outcome_mask(outcome)
+
+  defp outcome_mask(:normal), do: @normal_hit
+  defp outcome_mask(:cast_end), do: @cast_end
+  defp outcome_mask(:crit), do: @critical_hit
+  defp outcome_mask(:glancing), do: @normal_hit
+  defp outcome_mask(:crushing), do: @normal_hit
+  defp outcome_mask(:miss), do: 0x4
+  defp outcome_mask(:resist), do: 0x8
+  defp outcome_mask(:dodge), do: 0x10
+  defp outcome_mask(:parry), do: 0x20
+  defp outcome_mask(:block), do: @block
+  defp outcome_mask(:evade), do: 0x80
+  defp outcome_mask(:immune), do: 0x100
+  defp outcome_mask(:deflect), do: 0x200
+  defp outcome_mask(:absorb), do: @absorb
+  defp outcome_mask(:reflect), do: 0x800
+  defp outcome_mask(_outcome), do: 0
+
+  def chance(spell, attack_time_ms \\ nil)
+
+  def chance(%Spell{proc_rule: %ProcRule{ppm_rate: ppm}}, attack_time_ms)
+      when ppm > 0 and is_number(attack_time_ms) and attack_time_ms > 0 do
+    ppm * attack_time_ms / 600
+  end
+
+  def chance(%Spell{proc_rule: %ProcRule{custom_chance: chance}}, _attack_time_ms) when chance > 0, do: chance
+  def chance(%Spell{proc_chance: chance}, _attack_time_ms) when is_number(chance), do: chance
+  def chance(_spell, _attack_time_ms), do: 0
+end

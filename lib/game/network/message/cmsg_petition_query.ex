@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetitionQuery do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PETITION_QUERY
 
-  alias ThistleTea.Game.Player.Petitions
+  alias ThistleTea.Game.World.Entity.Player.Petitions
 
   defstruct [:petition_id, :item_guid]
 

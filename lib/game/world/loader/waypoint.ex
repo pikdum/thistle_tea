@@ -5,8 +5,8 @@ defmodule ThistleTea.Game.World.Loader.Waypoint do
   """
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Waypoints
+  alias ThistleTea.Game.Core.AI.BT.Context.Waypoints
+  alias ThistleTea.Game.Core.Entity.Component.Internal.WaypointRoute
   alias ThistleTea.Game.World.Loader.Script
 
   @catalog_key {__MODULE__, :catalog}

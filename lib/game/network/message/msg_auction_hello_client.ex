@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.MsgAuctionHelloClient do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_AUCTION_HELLO
 
-  alias ThistleTea.Game.Player.Auction
+  alias ThistleTea.Game.World.Entity.Player.Auction
 
   defstruct [:auctioneer]
   @impl ClientMessage

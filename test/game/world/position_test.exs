@@ -1,19 +1,19 @@
 defmodule ThistleTea.Game.World.PositionTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.EventSink
-  alias ThistleTea.Game.Entity.Logic.Movement
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Movement
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.Position.ClientMotion
   alias ThistleTea.Game.World.Position.Spline
-  alias ThistleTea.Game.WorldRef
 
   describe "put/2" do
     test "projects a falling corpse with the owner's acceleration and stops at the floor" do

@@ -1,17 +1,17 @@
 defmodule ThistleTea.Game.Network.Message.MovementSpeedTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.EventSink
-  alias ThistleTea.Game.Entity.EventSink.Context
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
-  alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.World.Entity.EventSink
+  alias ThistleTea.Game.World.Entity.EventSink.Context
+  alias ThistleTea.Game.World.Entity.Player.MovementControl
+  alias ThistleTea.Game.World.Entity.Player.State
 
   @modes [
     {:run_speed, Message.SmsgForceRunSpeedChange, Message.CmsgForceRunSpeedChangeAck, 0xE3},

@@ -4,9 +4,9 @@ defmodule ThistleTea.Game.World.Loader.AlteracValleyVMangosTest do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Battleground.AlteracValley
-  alias ThistleTea.Game.Battleground.AlteracValley.Mine
-  alias ThistleTea.Game.Battleground.AlteracValley.Node
+  alias ThistleTea.Game.Core.Battleground.AlteracValley
+  alias ThistleTea.Game.Core.Battleground.AlteracValley.Mine
+  alias ThistleTea.Game.Core.Battleground.AlteracValley.Node
 
   @moduletag :vmangos_db
 

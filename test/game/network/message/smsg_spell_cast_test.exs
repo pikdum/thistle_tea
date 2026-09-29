@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.Network.Message.SmsgSpellCastTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Spell.Target
 
   test "spell start appends projectile metadata when the ammo flag is set" do
     message = %Message.SmsgSpellStart{

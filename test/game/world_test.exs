@@ -1,20 +1,20 @@
 defmodule ThistleTea.Game.WorldTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.EntitySupervisor
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.EntitySupervisor
+  alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
-  alias ThistleTea.Game.WorldRef
 
   defmodule EntityProcess do
     @moduledoc false
     use GenServer
 
-    alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
+    alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
 
     def start_link(guid) do
       GenServer.start_link(__MODULE__, nil, name: EntityRegistry.via(guid))

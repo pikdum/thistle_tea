@@ -6,10 +6,10 @@ defmodule ThistleTea.Game.World.Loader.Taxi do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.Taxi.Network
-  alias ThistleTea.Game.Entity.Data.Taxi.Node
-  alias ThistleTea.Game.Entity.Data.Taxi.Path
-  alias ThistleTea.Game.Entity.Data.Taxi.PathNode
+  alias ThistleTea.Game.Core.Travel.Taxi.Network
+  alias ThistleTea.Game.Core.Travel.Taxi.Node
+  alias ThistleTea.Game.Core.Travel.Taxi.Path
+  alias ThistleTea.Game.Core.Travel.Taxi.PathNode
 
   @client_build 5875
   @send_taxi_effect 123

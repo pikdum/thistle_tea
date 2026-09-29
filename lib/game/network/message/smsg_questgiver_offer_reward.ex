@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgQuestgiverOfferReward do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_QUESTGIVER_OFFER_REWARD
 
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Quest
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
   defstruct [:npc_guid, :quest, enable_next: true]

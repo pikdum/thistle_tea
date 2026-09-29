@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.SocialStoreTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Social
+  alias ThistleTea.Game.Core.Social
   alias ThistleTea.Game.World.SocialStore
 
   setup [:store]

@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.EmoteTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Emote
+  alias ThistleTea.Game.Core.Chat.Emote
   alias ThistleTea.Game.World.Loader.Emote, as: Loader
 
   describe "load/3" do

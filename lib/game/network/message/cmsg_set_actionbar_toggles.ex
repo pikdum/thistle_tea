@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActionbarToggles do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SET_ACTIONBAR_TOGGLES
 
-  alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Player
 
   defstruct [:action_bar]
 

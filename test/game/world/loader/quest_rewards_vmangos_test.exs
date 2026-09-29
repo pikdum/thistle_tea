@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Loader.QuestRewardsVmangosTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Core.Quest
 
   @moduletag :vmangos_db
 

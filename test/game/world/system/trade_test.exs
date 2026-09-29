@@ -1,27 +1,27 @@
 defmodule ThistleTea.Game.World.System.TradeTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Data.Lock
-  alias ThistleTea.Game.Entity.Data.Lock.Requirement
-  alias ThistleTea.Game.Entity.Data.Trade.Cast, as: TradeCast
-  alias ThistleTea.Game.Entity.Data.Trade.Decision
-  alias ThistleTea.Game.Entity.Data.Trade.Prepare
-  alias ThistleTea.Game.Entity.Data.Trade.Receipt
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Profession.Lock
+  alias ThistleTea.Game.Core.Profession.Lock.Requirement
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Trade.Cast, as: TradeCast
+  alias ThistleTea.Game.Core.Trade.Decision
+  alias ThistleTea.Game.Core.Trade.Prepare
+  alias ThistleTea.Game.Core.Trade.Receipt
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Player.Trade, as: PlayerTrade
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Entity.Player.Trade, as: PlayerTrade
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.System.Trade
-  alias ThistleTea.Game.WorldRef
 
   setup [:build_session]
 

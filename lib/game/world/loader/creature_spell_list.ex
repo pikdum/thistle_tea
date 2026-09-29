@@ -4,8 +4,8 @@ defmodule ThistleTea.Game.World.Loader.CreatureSpellList do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.CreatureSpell
-  alias ThistleTea.Game.Entity.Data.CreatureSpellList
+  alias ThistleTea.Game.Core.AI.CreatureSpell
+  alias ThistleTea.Game.Core.AI.CreatureSpellList
 
   def load([]), do: %{}
 

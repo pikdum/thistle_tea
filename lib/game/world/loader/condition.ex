@@ -1,12 +1,12 @@
 defmodule ThistleTea.Game.World.Loader.Condition do
   @moduledoc """
   Loads `conditions` rows referenced by AI events and script steps into
-  resolved `Data.Condition` trees, recursively fetching child references so
+  resolved `Core.Condition` trees, recursively fetching child references so
   the runtime evaluator never touches the database. Missing and cyclic trees
   become explicit unresolved conditions.
   """
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.Condition
+  alias ThistleTea.Game.Core.Condition
 
   def load_by_ids([]), do: %{}
 

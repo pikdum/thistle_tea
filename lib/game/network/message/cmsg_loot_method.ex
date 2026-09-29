@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgLootMethod do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LOOT_METHOD
 
-  alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.System.Party.Notifier
 
   defstruct [:loot_method, :master_looter, :loot_threshold]
 

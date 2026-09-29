@@ -4,8 +4,8 @@ defmodule ThistleTea.Game.World.Loader.CreatureArchetype do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.CreatureArchetype
-  alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Core.Creature.CreatureArchetype
+  alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.World.Loader.Mob.Batch
 
   @tables ~w(creature_ai_scripts creature_movement_scripts generic_scripts quest_start_scripts quest_end_scripts

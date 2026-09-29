@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.MsgListStabledPetsClient do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_LIST_STABLED_PETS
 
-  alias ThistleTea.Game.Player.PetStable
+  alias ThistleTea.Game.World.Entity.Player.PetStable
 
   defstruct [:guid]
 

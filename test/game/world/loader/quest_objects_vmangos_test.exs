@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.World.Loader.QuestObjectsVmangosTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.GameObjectTemplate
-  alias ThistleTea.Game.Entity.Logic.Goober
+  alias ThistleTea.Game.Core.Entity.GameObjectTemplate
+  alias ThistleTea.Game.Core.GameObject.Goober
   alias ThistleTea.Game.World.Loader.EventScript
   alias ThistleTea.Game.World.Loader.PageText
 

@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.World.Loader.PetLevel do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.PetLevel
+  alias ThistleTea.Game.Core.Pet.PetLevel
 
   def init(table \\ __MODULE__) do
     case :ets.whereis(table) do

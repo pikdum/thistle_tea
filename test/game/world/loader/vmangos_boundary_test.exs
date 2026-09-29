@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Loader.VMangosBoundaryTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.GameObject
+  alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.World.Loader.GameObject, as: GameObjectLoader
   alias ThistleTea.Game.World.Loader.NpcText, as: NpcTextLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader

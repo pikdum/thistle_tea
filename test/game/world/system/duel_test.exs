@@ -1,12 +1,12 @@
 defmodule ThistleTea.Game.World.System.DuelTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Duel.Admission
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Core.Duel.Admission
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
-  alias ThistleTea.Game.WorldRef
 
   describe "disconnect/2 with controlled units" do
     setup [:controlled_duel]

@@ -1,13 +1,13 @@
 defmodule ThistleTea.Game.Network.Message.TradeTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Game.Core.Spell.TargetCodec
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
-  alias ThistleTea.Game.Spell.Target
-  alias ThistleTea.Game.Spell.TargetCodec
 
   describe "trade packets" do
     test "parses the seventh trade slot as a slot rather than an item GUID" do

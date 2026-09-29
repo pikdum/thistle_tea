@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.Pathfinding do
   Navigation-mesh queries over the namigator NIF: pathfinding, random points,
   terrain and liquid heights, interiors, and zone/area lookup.
   """
-  alias ThistleTea.Game.Math
+  alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.World.Pathfinding.Aquatic
   alias ThistleTea.Native.Namigator
 

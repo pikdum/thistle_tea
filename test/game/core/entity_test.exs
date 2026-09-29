@@ -1,0 +1,538 @@
+defmodule ThistleTea.Game.Core.EntityTest do
+  use ExUnit.Case, async: true
+
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Loot
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Spawn
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.Companion.EntityRef
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.WorldRef
+
+  describe "heal/2" do
+    test "restores health up to max health" do
+      entity = entity(health: 40, max_health: 100)
+
+      entity = Entity.heal(entity, 75)
+
+      assert entity.unit.health == 100
+      assert entity.internal.broadcast_update? == true
+    end
+
+    test "ignores non-positive amounts" do
+      entity = entity(health: 40, max_health: 100)
+
+      assert Entity.heal(entity, 0) == entity
+    end
+  end
+
+  describe "take_damage_with_absorb/4 damage splitting" do
+    test "redirects the split portion to the linked caster" do
+      entity = entity(health: 100, max_health: 100)
+      entity = Map.put(%{entity | unit: %{entity.unit | auras: [soul_link_holder()]}}, :object, %{guid: 1})
+
+      {entity, absorbed} =
+        Entity.take_damage_with_absorb(entity, 100, 1_000,
+          school: :physical,
+          source: 777,
+          damage_sharing_targets: MapSet.new([2])
+        )
+
+      assert entity.unit.health == 30
+      assert absorbed == 30
+
+      assert [
+               %Effects.SharedDamage{
+                 target_guid: 2,
+                 source_guid: 777,
+                 damage: 30,
+                 spell: %Spell{id: 25_228}
+               },
+               %Effects.DurabilityDamage{source_guid: 777, lethal?: false}
+             ] = entity.internal.events
+    end
+
+    test "skips the redirect when the split portion truncates to zero" do
+      entity = entity(health: 100, max_health: 100)
+      entity = Map.put(%{entity | unit: %{entity.unit | auras: [soul_link_holder()]}}, :object, %{guid: 1})
+
+      {entity, _absorbed} =
+        Entity.take_damage_with_absorb(entity, 2, 1_000,
+          school: :physical,
+          source: 777,
+          damage_sharing_targets: MapSet.new([2])
+        )
+
+      assert entity.unit.health == 98
+      assert [%Effects.DurabilityDamage{source_guid: 777, lethal?: false}] = entity.internal.events
+    end
+  end
+
+  describe "take_damage_with_absorb/4 invincibility" do
+    test "clamps damage at the scripted health threshold" do
+      entity = damageable(health: 100)
+      entity = %{entity | internal: %{entity.internal | invincibility_health_threshold: 10}}
+
+      {entity, absorbed} = Entity.take_damage_with_absorb(entity, 100, 1_000, source: 777)
+
+      assert entity.unit.health == 10
+      assert absorbed == 10
+
+      {entity, absorbed} = Entity.take_damage_with_absorb(entity, 100, 2_000, source: 777)
+
+      assert entity.unit.health == 10
+      assert absorbed == 100
+    end
+  end
+
+  describe "take_damage_with_absorb/4 killer recording" do
+    test "records the source on the killing blow" do
+      entity = damageable(health: 30)
+
+      {entity, _absorbed} = Entity.take_damage_with_absorb(entity, 30, 1_000, source: 777)
+
+      assert Entity.dead?(entity)
+      assert entity.internal.killed_by == 777
+    end
+
+    test "does not record a killer when the damage is not lethal" do
+      entity = damageable(health: 30)
+
+      {entity, _absorbed} = Entity.take_damage_with_absorb(entity, 10, 1_000, source: 777)
+
+      refute Entity.dead?(entity)
+      assert entity.internal.killed_by == nil
+    end
+
+    test "records nothing on a kill when no source is given" do
+      entity = damageable(health: 30)
+
+      {entity, _absorbed} = Entity.take_damage_with_absorb(entity, 30, 1_000)
+
+      assert Entity.dead?(entity)
+      assert entity.internal.killed_by == nil
+    end
+
+    test "ignores a zero source guid" do
+      entity = damageable(health: 30)
+
+      {entity, _absorbed} = Entity.take_damage_with_absorb(entity, 30, 1_000, source: 0)
+
+      assert entity.internal.killed_by == nil
+    end
+
+    test "stops projected movement on death" do
+      movement_block = %{
+        damageable(health: 30).movement_block
+        | position: {0.0, 0.0, 0.0, 0.0},
+          spline_nodes: [{10.0, 0.0, 0.0}],
+          duration: 1_000
+      }
+
+      entity = %{
+        damageable(health: 30)
+        | movement_block: movement_block,
+          internal: %Internal{movement_start_time: 500, movement_start_position: {0.0, 0.0, 0.0}}
+      }
+
+      {entity, _absorbed} = Entity.take_damage_with_absorb(entity, 30, 1_000, source: 777)
+
+      assert Enum.any?(entity.internal.events, &match?(%Effects.MovementStopped{}, &1))
+    end
+  end
+
+  describe "take_damage_with_absorb/4 pet dismissal" do
+    test "clears all player totem slots only on lethal damage" do
+      entity = player_with_pet(health: 30)
+      entity = %{entity | internal: %{entity.internal | totem_guids: %{1 => 101, 2 => 102}}}
+      {hurt, _} = Entity.take_damage_with_absorb(entity, 10, 1_000, source: 777)
+      assert hurt.internal.totem_guids == %{1 => 101, 2 => 102}
+      refute Enum.any?(hurt.internal.events, &match?(%Effects.DespawnEntity{}, &1))
+
+      {dead, _} = Entity.take_damage_with_absorb(hurt, 20, 2_000, source: 777)
+      assert dead.internal.totem_guids == %{}
+
+      assert dead.internal.events
+             |> Enum.filter(&match?(%Effects.DespawnEntity{}, &1))
+             |> Enum.map(& &1.target_guid)
+             |> Enum.sort() == [101, 102]
+    end
+
+    test "queues a saved pet dismissal when a player dies with a pet out" do
+      entity = player_with_pet(health: 30, summon: 123)
+
+      {entity, _absorbed} = Entity.take_damage_with_absorb(entity, 30, 1_000, source: 777)
+
+      assert Entity.dead?(entity)
+      assert entity.unit.summon == 0
+      assert entity.internal.companion == %Companion{kind: :hunter_pet, status: {:suspended, 416, 688}, pet_number: 123}
+
+      assert Enum.any?(
+               entity.internal.events,
+               &match?(%Effects.DismissPet{target_guid: 123}, &1)
+             )
+    end
+
+    test "does not dismiss the pet on non-lethal damage" do
+      entity = player_with_pet(health: 30, summon: 123)
+
+      {entity, _absorbed} = Entity.take_damage_with_absorb(entity, 10, 1_000, source: 777)
+
+      refute Enum.any?(entity.internal.events, &match?(%Effects.DismissPet{}, &1))
+    end
+
+    test "does not queue a dismissal when no pet is out" do
+      entity = player_with_pet(health: 30, summon: 0)
+
+      {entity, _absorbed} = Entity.take_damage_with_absorb(entity, 30, 1_000, source: 777)
+
+      refute Enum.any?(entity.internal.events, &match?(%Effects.DismissPet{}, &1))
+    end
+
+    test "queues a charm release when a player dies while controlling a unit" do
+      entity = player_with_pet(health: 30, summon: 0)
+
+      entity =
+        Companion.activate(
+          entity,
+          :charm,
+          %EntityRef{guid: 555, entry: 1, spell_id: 1098}
+        )
+
+      {entity, _absorbed} = Entity.take_damage_with_absorb(entity, 30, 1_000, source: 777)
+
+      assert Enum.any?(
+               entity.internal.events,
+               &match?(%Effects.ReleaseControlled{source_guid: 6, target_guid: 555, spell_id: 1098}, &1)
+             )
+    end
+  end
+
+  describe "take_damage_with_absorb/4 player combat cleanup" do
+    test "releases mob-owned threat when a player dies" do
+      mob_guid = Guid.from_low_guid(:mob, 1, 77)
+
+      entity =
+        player_with_pet(health: 30, summon: 0)
+        |> then(fn character ->
+          internal = %{
+            character.internal
+            | in_combat: true,
+              last_hostile_time: 1_000,
+              threat_refs: MapSet.new([{mob_guid, 1}])
+          }
+
+          %{character | unit: %{character.unit | target: mob_guid}, internal: internal}
+        end)
+
+      {entity, _absorbed} = Entity.take_damage_with_absorb(entity, 30, 1_000, source: mob_guid)
+
+      refute entity.internal.in_combat
+      assert entity.internal.last_hostile_time == nil
+      assert entity.internal.threat_refs == MapSet.new()
+      assert entity.unit.target == 0
+      assert Enum.any?(entity.internal.events, &match?(%Effects.DropNearbyThreat{}, &1))
+      assert Enum.any?(entity.internal.events, &match?(%Effects.DropThreat{target_guid: ^mob_guid}, &1))
+    end
+  end
+
+  describe "take_damage_with_absorb/4 aura cleanup" do
+    test "retains recomputed speeds after removing a snare on death" do
+      entity = entity(health: 20, max_health: 100)
+      holder = %Holder{spell: %Spell{id: 1}, auras: [%Aura{type: :mod_decrease_speed, amount: -50}]}
+
+      entity = %{
+        entity
+        | unit: %{entity.unit | auras: [holder]},
+          movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, base_run_speed: 7.0, run_speed: 3.5}
+      }
+
+      {entity, _absorbed} = Entity.take_damage_with_absorb(entity, 30, 1_000)
+
+      assert entity.unit.health == 0
+      assert entity.unit.auras == []
+      assert entity.movement_block.run_speed == 7.0
+    end
+
+    test "keeps passive auras and removes temporary auras on death" do
+      passive = %Holder{slot: 0, spell: %Spell{id: 1, attributes: MapSet.new([:passive])}}
+
+      temporary = %Holder{
+        slot: 1,
+        spell: %Spell{id: 2, attributes: MapSet.new()},
+        auras: [%Aura{type: :add_pct_modifier, amount: -100, misc_value: 10, class_mask: 1}]
+      }
+
+      entity = damageable(health: 30)
+      entity = %{entity | unit: %{entity.unit | auras: [passive, temporary]}}
+
+      {entity, _absorbed} = Entity.take_damage_with_absorb(entity, 30, 1_000)
+
+      assert entity.unit.auras == [%{passive | slot: nil}]
+
+      assert Enum.any?(
+               entity.internal.events,
+               &match?(%Effects.SpellModifier{modifier_type: :pct, effect_index: 0, amount: 0}, &1)
+             )
+    end
+  end
+
+  describe "take_damage_with_absorb/4 death items" do
+    test "captures one warlock reward before aura cleanup and only on the lethal transition" do
+      holder = %Holder{
+        spell: %Spell{id: 17_877, spell_family: 5},
+        caster_guid: 777,
+        caster_level: 10,
+        auras: [%Aura{type: :channel_death_item, item_type: 6265, amount: 1}]
+      }
+
+      duplicate = %{holder | spell: %Spell{id: 1120, spell_family: 5}}
+      entity = damageable(health: 30)
+      unit = %{entity.unit | level: 10, auras: [holder, duplicate]}
+      internal = %{entity.internal | loot: %Loot{tapped_by: %{player: 777}}}
+      entity = %{entity | unit: unit, internal: internal}
+      {alive, _absorbed} = Entity.take_damage_with_absorb(entity, 29, 1_000, source: 777)
+      refute Enum.any?(alive.internal.events, &is_struct(&1, Effects.DeathItemReward))
+
+      {dead, _absorbed} = Entity.take_damage_with_absorb(alive, 1, 1_001, source: 777)
+      assert dead.unit.auras == []
+
+      assert [%Effects.DeathItemReward{target_guid: 777, item_id: 6265, count: 1} = reward] =
+               Enum.filter(dead.internal.events, &is_struct(&1, Effects.DeathItemReward))
+
+      assert reward.victim.level == 10
+      assert reward.victim.tap == %{player: 777}
+
+      {dead, _absorbed} = Entity.take_damage_with_absorb(dead, 1, 1_002, source: 777)
+      assert Enum.count(dead.internal.events, &is_struct(&1, Effects.DeathItemReward)) == 1
+    end
+  end
+
+  describe "take_damage_with_absorb/4 self resurrection" do
+    test "captures Soulstone before death removes its aura" do
+      entity = damageable(health: 30)
+      holder = %Holder{spell: %Spell{id: 20_707}, auras: [%Aura{type: :dummy}]}
+      entity = %{entity | unit: %{entity.unit | auras: [holder]}}
+      entity = Map.put(entity, :player, %Player{})
+
+      {entity, _absorbed} = Entity.take_damage_with_absorb(entity, 30, 1_000)
+
+      assert entity.player.self_res_spell == 3026
+      assert entity.unit.auras == []
+    end
+  end
+
+  describe "take_damage_with_absorb/4 Spirit of Redemption" do
+    test "turns the first lethal hit into a fifteen-second spirit form" do
+      temporary = %Holder{spell: %Spell{id: 139}}
+      entity = spirit_priest([spirit_talent(), temporary])
+
+      {entity, absorbed} = Entity.take_damage_with_absorb(entity, 30, 1_000, source: 777)
+
+      assert absorbed == 0
+      refute Entity.dead?(entity)
+      assert entity.unit.health == 100
+      assert entity.unit.power1 == 80
+      assert entity.unit.target == 0
+      assert entity.internal.killed_by == 777
+      assert entity.internal.rooted?
+      assert entity.unit.auras == [spirit_talent()]
+      assert %Effects.PlayerDefeated{source_guid: 777, count_death?: false} in entity.internal.events
+
+      assert [
+               %Effects.TriggerSpell{spell_id: 27_827, duration_ms: 15_000, amount: 100, slot: 0},
+               %Effects.TriggerSpell{spell_id: 27_792, duration_ms: 15_000},
+               %Effects.TriggerSpell{spell_id: 27_795, duration_ms: 15_000}
+             ] = Enum.filter(entity.internal.events, &is_struct(&1, Effects.TriggerSpell))
+    end
+
+    test "absorbs damage while the spirit form is active" do
+      spirit_form = %Holder{spell: %Spell{id: 27_827}}
+      entity = spirit_priest([spirit_talent(), spirit_form])
+
+      {entity, absorbed} = Entity.take_damage_with_absorb(entity, 50, 1_000, source: 777)
+
+      assert entity.unit.health == 30
+      assert absorbed == 50
+    end
+
+    test "lets the expiry suicide perform the real death without retriggering" do
+      spirit_form = %Holder{spell: %Spell{id: 27_827}}
+      entity = spirit_priest([spirit_talent(), spirit_form])
+
+      {entity, _absorbed} =
+        Entity.take_damage_with_absorb(entity, 30, 16_000,
+          source: entity.object.guid,
+          spell_id: 27_965
+        )
+
+      assert Entity.dead?(entity)
+      refute Enum.any?(entity.internal.events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 27_827))
+      assert %Effects.PlayerDefeated{source_guid: entity.object.guid, count_death?: true} in entity.internal.events
+    end
+  end
+
+  describe "should_tether?/2" do
+    test "returns true when outside tether range after timeout" do
+      entity = entity(position: {100.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000)
+
+      assert Entity.should_tether?(entity, 13_001)
+    end
+
+    test "returns false inside tether range" do
+      entity = entity(position: {10.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000)
+
+      refute Entity.should_tether?(entity, 13_001)
+    end
+
+    test "returns false before timeout" do
+      entity = entity(position: {100.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000)
+
+      refute Entity.should_tether?(entity, 13_000)
+    end
+
+    test "tethers immediately when outside an explicit leash range" do
+      entity = entity(position: {60.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000, leash_range: 50.0)
+
+      assert Entity.should_tether?(entity, 1_500)
+    end
+
+    test "an explicit hard limit does not disable the ordinary threat-area timeout" do
+      entity = entity(position: {100.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000, leash_range: 120.0)
+
+      refute Entity.should_tether?(entity, 7_000)
+      assert Entity.should_tether?(entity, 13_001)
+    end
+
+    test "does not tether instance mobs outside the default range" do
+      entity =
+        entity(
+          position: {100.0, 0.0, 0.0, 0.0},
+          last_hostile_time: 1_000,
+          world: WorldRef.instance(389, 1)
+        )
+
+      refute Entity.should_tether?(entity, 13_001)
+    end
+
+    test "does not tether mobs with the no-leash evade flag outside the default range" do
+      entity = entity(position: {100.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000, extra_flags: 0x1)
+
+      refute Entity.should_tether?(entity, 13_001)
+    end
+
+    test "explicit leash ranges still tether instance mobs" do
+      entity =
+        entity(
+          position: {60.0, 0.0, 0.0, 0.0},
+          last_hostile_time: 1_000,
+          leash_range: 50.0,
+          extra_flags: 0x1,
+          world: WorldRef.instance(389, 1)
+        )
+
+      assert Entity.should_tether?(entity, 1_500)
+    end
+  end
+
+  describe "tether_range/1" do
+    test "uses the explicit leash range when set" do
+      assert Entity.tether_range(entity(leash_range: 120.0)) == 120.0
+    end
+
+    test "falls back to the reference threat radius when the leash range is unset" do
+      assert Entity.tether_range(entity([])) == 50.0
+    end
+  end
+
+  defp soul_link_holder do
+    %Holder{
+      slot: 0,
+      caster_guid: 2,
+      spell: %Spell{id: 25_228, name: "Soul Link"},
+      auras: [%Aura{type: :split_damage_percent, amount: 30, misc_value: 127}]
+    }
+  end
+
+  defp spirit_talent do
+    %Holder{spell: %Spell{id: 20_711, attributes: MapSet.new([:passive])}}
+  end
+
+  defp spirit_priest(auras) do
+    %Character{
+      object: %Object{guid: 5},
+      unit: %Unit{
+        class: 5,
+        level: 60,
+        health: 30,
+        max_health: 100,
+        power1: 10,
+        max_power1: 80,
+        target: 9,
+        auras: auras
+      },
+      player: %Player{},
+      internal: %Internal{in_combat: true},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, spline_nodes: []}
+    }
+  end
+
+  defp entity(opts) do
+    %{
+      unit: %Unit{
+        health: Keyword.get(opts, :health),
+        max_health: Keyword.get(opts, :max_health),
+        level: 1
+      },
+      internal: %Internal{
+        world: Keyword.get(opts, :world, WorldRef.open(0)),
+        spawn: %Spawn{position: {0.0, 0.0, 0.0}},
+        last_hostile_time: Keyword.get(opts, :last_hostile_time),
+        creature: %Creature{
+          extra_flags: Keyword.get(opts, :extra_flags, 0),
+          leash_range: Keyword.get(opts, :leash_range, 0.0)
+        }
+      },
+      movement_block: %MovementBlock{position: Keyword.get(opts, :position)}
+    }
+  end
+
+  defp damageable(opts) do
+    %{
+      unit: %Unit{health: Keyword.get(opts, :health), max_health: 100, level: 1, auras: []},
+      internal: %Internal{},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, spline_nodes: []}
+    }
+  end
+
+  defp player_with_pet(opts) do
+    base = damageable(opts)
+
+    character = %Character{
+      object: %Object{guid: 6},
+      player: %Player{},
+      unit: base.unit,
+      internal: base.internal,
+      movement_block: base.movement_block
+    }
+
+    case Keyword.get(opts, :summon, 0) do
+      guid when is_integer(guid) and guid > 0 ->
+        Companion.activate(character, :hunter_pet, %EntityRef{guid: guid, entry: 416, spell_id: 688})
+
+      _ ->
+        character
+    end
+  end
+end

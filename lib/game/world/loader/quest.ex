@@ -6,10 +6,10 @@ defmodule ThistleTea.Game.World.Loader.Quest do
   import Ecto.Query, only: [from: 2]
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.Condition
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Data.Quest
-  alias ThistleTea.Game.Entity.Logic.QuestGraph
+  alias ThistleTea.Game.Core.Condition
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Quest
+  alias ThistleTea.Game.Core.Quest.QuestGraph
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.Script
 

@@ -4,8 +4,8 @@ defmodule ThistleTea.DB.Mangos.Creature do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.SpatialGrid
-  alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Game.Core.SpatialGrid
+  alias ThistleTea.Game.Core.WorldRef
 
   @primary_key {:guid, :integer, autogenerate: false}
 

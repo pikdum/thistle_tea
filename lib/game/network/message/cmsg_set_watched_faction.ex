@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetWatchedFaction do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SET_WATCHED_FACTION
 
-  alias ThistleTea.Game.Player.Reputation
+  alias ThistleTea.Game.World.Entity.Player.Reputation
 
   defstruct [:index]
 

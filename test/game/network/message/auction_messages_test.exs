@@ -1,11 +1,11 @@
 defmodule ThistleTea.Game.Network.Message.AuctionMessagesTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Auction
-  alias ThistleTea.Game.Entity.Data.Auction.House
-  alias ThistleTea.Game.Entity.Data.Auction.Query
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Core.Auction
+  alias ThistleTea.Game.Core.Auction.House
+  alias ThistleTea.Game.Core.Auction.Query
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes

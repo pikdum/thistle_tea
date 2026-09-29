@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgRepopRequest do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_REPOP_REQUEST
 
-  alias ThistleTea.Game.Player.Corpses
+  alias ThistleTea.Game.World.Entity.Player.Corpses
 
   defstruct []
 

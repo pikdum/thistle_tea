@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPushquesttoparty do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PUSHQUESTTOPARTY
 
-  alias ThistleTea.Game.Player.QuestSharing
+  alias ThistleTea.Game.World.Entity.Player.QuestSharing
 
   defstruct [:quest_id]
 

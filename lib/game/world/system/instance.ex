@@ -5,27 +5,27 @@ defmodule ThistleTea.Game.World.System.Instance do
   """
   use GenServer
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Instance
-  alias ThistleTea.Game.Instance.Admission.Actor
-  alias ThistleTea.Game.Instance.Lockouts
-  alias ThistleTea.Game.Instance.ResetSchedule
-  alias ThistleTea.Game.InstanceScript.Effects
-  alias ThistleTea.Game.Party
-  alias ThistleTea.Game.Time
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Instance
+  alias ThistleTea.Game.Core.Instance.Admission.Actor
+  alias ThistleTea.Game.Core.Instance.Lockouts
+  alias ThistleTea.Game.Core.Instance.ResetSchedule
+  alias ThistleTea.Game.Core.InstanceScript.Effects
+  alias ThistleTea.Game.Core.Party
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
-  alias ThistleTea.Game.World.InstanceData
-  alias ThistleTea.Game.World.InstanceEffectSink
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
-  alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.System.CellActivator
+  alias ThistleTea.Game.World.System.Instance.InstanceData
+  alias ThistleTea.Game.World.System.Instance.InstanceEffectSink
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.System.SpawnPool
   alias ThistleTea.Game.World.System.VendorStock
-  alias ThistleTea.Game.WorldRef
 
   require Logger
 

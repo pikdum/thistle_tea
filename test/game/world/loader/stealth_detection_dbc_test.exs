@@ -1,15 +1,15 @@
 defmodule ThistleTea.Game.World.Loader.StealthDetectionDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.StealthDetection
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.StealthDetection
+  alias ThistleTea.Game.Core.Entity
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db
@@ -47,7 +47,7 @@ defmodule ThistleTea.Game.World.Loader.StealthDetectionDbcTest do
       assert StealthDetection.target_metadata(entity).stealthed?
       assert StealthDetection.target_metadata(entity).stealth_detection_bonus == 50
 
-      dead = Core.take_damage(entity, 1_000, 1_000)
+      dead = Entity.take_damage(entity, 1_000, 1_000)
       refute StealthDetection.target_metadata(dead).stealthed?
       assert StealthDetection.target_metadata(dead).stealth_detection_bonus == 0
     end

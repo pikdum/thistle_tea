@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveSetSwimSpeed do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :MSG_MOVE_SET_SWIM_SPEED
 
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
 
   @enforce_keys [:guid, :movement_block, :speed]
   defstruct [:guid, :movement_block, :speed]

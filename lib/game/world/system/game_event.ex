@@ -5,11 +5,11 @@ defmodule ThistleTea.Game.World.System.GameEvent do
   """
   use GenServer
 
-  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.GameEvent.Schedule
   alias ThistleTea.Game.World.Loader.GameEvent, as: GameEventLoader
-  alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.System.CellActivator
-  alias ThistleTea.Game.World.System.GameEvent.Schedule
+  alias ThistleTea.Game.World.System.SpawnPool
 
   @max_timer_ms 2_147_483_647
   @tick :scheduled_game_event_transition

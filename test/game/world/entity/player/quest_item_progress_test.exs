@@ -1,0 +1,198 @@
+defmodule ThistleTea.Game.World.Entity.Player.QuestItemProgressTest do
+  use ExUnit.Case, async: false
+
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Inventory
+  alias ThistleTea.Game.Core.Inventory.Batch
+  alias ThistleTea.Game.Core.Quest
+  alias ThistleTea.Game.Core.Quest.QuestLog
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
+  alias ThistleTea.Game.World.Entity.Player.Quests
+  alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.World.Metadata
+
+  @quest_id 3904
+  @item_id 11_119
+
+  setup do
+    ItemStore.init()
+    QuestLoader.init()
+
+    quest = %Quest{id: @quest_id, required_items: [{0, @item_id, 8}]}
+    :ets.insert(QuestLoader, {{:quest, @quest_id}, quest})
+    on_exit(fn -> :ets.delete(QuestLoader, {:quest, @quest_id}) end)
+
+    {:ok, quest_log} = QuestLog.add(%{}, @quest_id)
+    player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    on_exit(fn -> Metadata.delete(player_guid) end)
+
+    character = %Character{
+      object: %Object{guid: player_guid},
+      unit: %Unit{race: 1, class: 8, level: 1, health: 50, max_health: 50},
+      player: %Player{quest_log: quest_log},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+      internal: %Internal{world: %WorldRef{map_id: 0}}
+    }
+
+    {:ok, character: character, player_guid: player_guid}
+  end
+
+  defp grape_template, do: %ItemTemplate{entry: @item_id, name: "Milly's Harvest", stackable: 20}
+
+  test "first quest item reports the added delta before the bag update", %{
+    character: character,
+    player_guid: player_guid
+  } do
+    item = ItemStore.create(grape_template(), owner: player_guid)
+    on_exit(fn -> ItemStore.delete(item.object.guid) end)
+
+    player = %{character.player | inv1: item.object.guid}
+    state = %{character: character, guid: player_guid}
+
+    InventoryUpdate.apply(state, {:ok, %{player: player, items: [item], destroyed: []}})
+
+    assert_received {:"$gen_cast",
+                     {:send_packet, %Message.SmsgQuestupdateAddItem{item_id: @item_id, count: 1} = _progress}}
+
+    assert %{condition_subject: %{item_counts: %{@item_id => 1}}} =
+             Metadata.query(player_guid, [:condition_subject])
+  end
+
+  test "the progress packet precedes the item's create block", %{character: character, player_guid: player_guid} do
+    item = ItemStore.create(grape_template(), owner: player_guid)
+    on_exit(fn -> ItemStore.delete(item.object.guid) end)
+
+    placement = {:placed, {Inventory.bag_0(), 0}, item}
+    player = %{character.player | inv1: item.object.guid}
+    state = %{character: character, guid: player_guid}
+
+    InventoryUpdate.commit_placement(item, placement)
+    InventoryUpdate.apply(state, {:ok, %{player: player, items: [], destroyed: []}}, placement)
+
+    sent = sent_packets()
+    progress_at = Enum.find_index(sent, &match?(%Message.SmsgQuestupdateAddItem{count: 1}, &1))
+    create_at = Enum.find_index(sent, &match?(%UpdateObject{update_type: :create_object2, object_type: :item}, &1))
+
+    assert is_integer(progress_at) and is_integer(create_at)
+    assert progress_at < create_at
+  end
+
+  test "merging into an existing stack still reports the delta", %{
+    character: character,
+    player_guid: player_guid
+  } do
+    stack = ItemStore.create(grape_template(), owner: player_guid, stack_count: 2)
+    on_exit(fn -> ItemStore.delete(stack.object.guid) end)
+
+    character = %{character | player: %{character.player | inv1: stack.object.guid}}
+    state = %{character: character, guid: player_guid}
+
+    merged = %{stack | item: %{stack.item | stack_count: 3}}
+
+    InventoryUpdate.apply(state, {:ok, %{player: character.player, items: [merged], destroyed: []}})
+
+    assert_received {:"$gen_cast", {:send_packet, %Message.SmsgQuestupdateAddItem{item_id: @item_id, count: 1}}}
+    assert ItemStore.get(stack.object.guid).item.stack_count == 3
+
+    assert %{condition_subject: %{item_counts: %{@item_id => 3}}} =
+             Metadata.query(player_guid, [:condition_subject])
+  end
+
+  test "a planned batch commits new items before projecting its packets", %{
+    character: character,
+    player_guid: player_guid
+  } do
+    item = ItemStore.prepare(grape_template(), owner: player_guid)
+    on_exit(fn -> ItemStore.delete(item.object.guid) end)
+    batch = character.player |> Batch.new() |> Batch.add(item)
+    {:ok, change_set} = Inventory.plan(batch, &ItemStore.get/1)
+    state = %{character: character, guid: player_guid}
+
+    assert ItemStore.get(item.object.guid) == nil
+
+    InventoryUpdate.apply(state, {:ok, change_set})
+
+    assert ItemStore.get(item.object.guid) == item
+
+    sent = sent_packets()
+    progress_at = Enum.find_index(sent, &match?(%Message.SmsgQuestupdateAddItem{count: 1}, &1))
+    create_at = Enum.find_index(sent, &match?(%UpdateObject{update_type: :create_object2, object_type: :item}, &1))
+
+    assert is_integer(progress_at) and is_integer(create_at)
+    assert progress_at < create_at
+  end
+
+  test "a merged prepared item leaves no orphan in the store", %{
+    character: character,
+    player_guid: player_guid
+  } do
+    stack = ItemStore.create(grape_template(), owner: player_guid, stack_count: 2)
+    incoming = ItemStore.prepare(grape_template(), owner: player_guid)
+    on_exit(fn -> ItemStore.delete(stack.object.guid) end)
+    character = %{character | player: %{character.player | inv1: stack.object.guid}}
+    batch = character.player |> Batch.new() |> Batch.add(incoming)
+    {:ok, change_set} = Inventory.plan(batch, &ItemStore.get/1)
+
+    InventoryUpdate.apply(%{character: character, guid: player_guid}, {:ok, change_set})
+
+    assert ItemStore.get(stack.object.guid).item.stack_count == 3
+    assert ItemStore.get(incoming.object.guid) == nil
+    refute Enum.any?(sent_packets(), &match?(%UpdateObject{update_type: :create_object2, object_type: :item}, &1))
+  end
+
+  test "needed_items lists short quest items and drops satisfied ones", %{
+    character: character,
+    player_guid: player_guid
+  } do
+    assert Quests.needed_items(character) == MapSet.new([@item_id])
+
+    stack = ItemStore.create(grape_template(), owner: player_guid, stack_count: 8)
+    on_exit(fn -> ItemStore.delete(stack.object.guid) end)
+
+    character = %{character | player: %{character.player | inv1: stack.object.guid}}
+
+    assert Quests.needed_items(character) == MapSet.new()
+  end
+
+  test "sync_needed_items publishes the set for other processes to read", %{
+    character: character,
+    player_guid: player_guid
+  } do
+    Quests.sync_needed_items(character)
+
+    assert %{needed_quest_items: needed, condition_subject: condition_subject} =
+             Metadata.query(player_guid, [:needed_quest_items, :condition_subject])
+
+    assert MapSet.member?(needed, @item_id)
+    assert condition_subject.quest_log == character.player.quest_log
+  end
+
+  test "quest_item_counts snapshots current counts", %{character: character, player_guid: player_guid} do
+    stack = ItemStore.create(grape_template(), owner: player_guid, stack_count: 5)
+    on_exit(fn -> ItemStore.delete(stack.object.guid) end)
+
+    character = %{character | player: %{character.player | inv1: stack.object.guid}}
+
+    assert Quests.quest_item_counts(character) == %{@item_id => 5}
+  end
+
+  defp sent_packets(acc \\ []) do
+    receive do
+      {:"$gen_cast", {:send_packet, packet}} -> sent_packets([packet | acc])
+      {:"$gen_cast", {:send_packet, packet, _opts}} -> sent_packets([packet | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
+  end
+end

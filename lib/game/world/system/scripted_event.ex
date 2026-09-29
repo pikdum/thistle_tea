@@ -8,26 +8,26 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
 
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Condition
-  alias ThistleTea.Game.Entity.Data.ScriptStep
-  alias ThistleTea.Game.Entity.Logic.AI.Script.Request
-  alias ThistleTea.Game.Entity.Logic.Condition.Context
-  alias ThistleTea.Game.Entity.Logic.Condition.Leaf
-  alias ThistleTea.Game.Entity.Logic.Condition.Result
-  alias ThistleTea.Game.Entity.Logic.Condition.Subject
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Hostility
-  alias ThistleTea.Game.Entity.Logic.Reputation
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Math
-  alias ThistleTea.Game.Time
+  alias ThistleTea.Game.Core.AI.Script.Request
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Combat.Hostility
+  alias ThistleTea.Game.Core.Condition
+  alias ThistleTea.Game.Core.Condition.Context
+  alias ThistleTea.Game.Core.Condition.Leaf
+  alias ThistleTea.Game.Core.Condition.Result
+  alias ThistleTea.Game.Core.Condition.Subject
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Math
+  alias ThistleTea.Game.Core.Reputation
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.CreatureGroups
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.ServerVariables
-  alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Game.World.System.CreatureGroups
 
   require Logger
 

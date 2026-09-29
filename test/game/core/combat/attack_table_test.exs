@@ -1,0 +1,365 @@
+defmodule ThistleTea.Game.Core.Combat.AttackTableTest do
+  use ExUnit.Case, async: true
+
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Combat.AttackTable
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Cast
+  alias ThistleTea.Game.Core.Spell.Effect
+
+  @warrior 1
+  @mage 8
+
+  defp mob(overrides \\ []) do
+    unit = %Unit{health: 100, level: 20, strength: 40, auras: []}
+
+    %{
+      object: %Object{guid: 100},
+      unit: struct(unit, Keyword.get(overrides, :unit, [])),
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+      internal: %Internal{creature: struct(%Creature{creature_type: 7}, Keyword.get(overrides, :creature, []))}
+    }
+  end
+
+  defp character(overrides) do
+    unit = %Unit{health: 100, level: 20, class: @warrior, agility: 20, strength: 40, auras: [], sheath_state: 1}
+    unit = struct(unit, Keyword.get(overrides, :unit, []))
+
+    spellbook =
+      if unit.class == @warrior do
+        %{
+          107 => %Spell{id: 107, effects: [%Effect{type: :block}]},
+          3127 => %Spell{id: 3127, effects: [%Effect{type: :parry}]}
+        }
+      else
+        %{}
+      end
+
+    %Character{
+      object: %Object{guid: 200},
+      unit: unit,
+      player: struct(%Player{visible_item_16_0: 1}, Keyword.get(overrides, :player, [])),
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+      internal: struct(%Internal{spellbook: spellbook}, Keyword.get(overrides, :internal, []))
+    }
+  end
+
+  defp attack(overrides \\ []) do
+    Enum.into(overrides, %{caster: 1, caster_level: 20, caster_player?: true, crit_chance: 5.0})
+  end
+
+  describe "resolve/4 outcome roll" do
+    test "low roll against an even-level mob is a miss" do
+      result = AttackTable.resolve(mob(), attack(), 100, roll: 0)
+
+      assert result.outcome == :miss
+      assert result.damage == 0
+      assert result.hit_info == 0x12
+      assert result.victim_state == 0
+    end
+
+    test "rolls walk miss, dodge, parry, glancing, block in order against a mob" do
+      # even level: miss 500, dodge 500, parry 500, glancing 1000, block 500, crit 500
+      assert AttackTable.resolve(mob(), attack(), 100, roll: 499).outcome == :miss
+      assert AttackTable.resolve(mob(), attack(), 100, roll: 500).outcome == :dodge
+      assert AttackTable.resolve(mob(), attack(), 100, roll: 1_000).outcome == :parry
+      assert AttackTable.resolve(mob(), attack(), 100, roll: 1_500).outcome == :glancing
+      assert AttackTable.resolve(mob(), attack(), 100, roll: 2_500).outcome == :block
+      assert AttackTable.resolve(mob(), attack(), 100, roll: 3_000).outcome == :crit
+      assert AttackTable.resolve(mob(), attack(), 100, roll: 3_500).outcome == :normal
+      assert AttackTable.resolve(mob(), attack(), 100, roll: 9_999).outcome == :normal
+    end
+
+    test "crits deal double damage with the crit flag" do
+      result = AttackTable.resolve(mob(), attack(), 100, roll: 3_000)
+
+      assert result.outcome == :crit
+      assert result.damage == 200
+      assert result.hit_info == 0x82
+      assert result.victim_state == 1
+    end
+
+    test "glancing blows reduce damage" do
+      result = AttackTable.resolve(mob(), attack(), 100, roll: 1_500, glance_roll: 0.0)
+
+      assert result.outcome == :glancing
+      assert result.damage == 91
+      assert result.hit_info == 0x4002
+    end
+
+    test "mob blocks subtract the creature block value" do
+      result = AttackTable.resolve(mob(), attack(), 100, roll: 2_500)
+
+      # level 20 mob with 40 strength blocks 12
+      assert result.outcome == :block
+      assert result.damage == 88
+      assert result.blocked_amount == 12
+      assert result.victim_state == 1
+    end
+
+    test "creatures with the no-parry extra flag cannot parry" do
+      target = mob(creature: [extra_flags: 0x4])
+
+      assert AttackTable.resolve(target, attack(), 100, roll: 1_000).outcome == :glancing
+    end
+
+    test "creatures with the no-block extra flag cannot block" do
+      target = mob(creature: [extra_flags: 0x10])
+
+      assert AttackTable.resolve(target, attack(), 100, roll: 2_500).outcome == :crit
+    end
+
+    test "queued melee spells cannot glance" do
+      result = AttackTable.resolve(mob(), attack(queued_spell_id: 78), 100, roll: 1_500)
+
+      assert result.outcome == :block
+    end
+
+    test "mob attackers can crush players three or more levels below" do
+      target = character(unit: [level: 10, class: @mage, agility: 0])
+      swing = attack(caster_level: 13, caster_player?: false)
+
+      # miss 440, dodge 260, crit 560, then crushing 1500 from 1260
+      result = AttackTable.resolve(target, swing, 100, roll: 2_000)
+
+      assert result.outcome == :crushing
+      assert result.damage == 150
+      assert result.hit_info == 0x8002
+    end
+
+    test "player attackers never crush" do
+      target = character(unit: [level: 10, class: @mage, agility: 0])
+
+      result = AttackTable.resolve(target, attack(caster_level: 20), 100, roll: 9_999)
+
+      assert result.outcome == :normal
+    end
+
+    test "always-crush attackers always crush" do
+      swing = attack(caster_player?: false, always_crush?: true)
+      target = character(unit: [class: @mage, agility: 0])
+
+      assert AttackTable.resolve(target, swing, 100, roll: 9_999).outcome == :crushing
+    end
+
+    test "attacks against a sitting player auto-crit and never miss" do
+      target = character(unit: [stand_state: 1, class: @mage, agility: 0])
+
+      assert AttackTable.resolve(target, attack(), 100, roll: 0).outcome == :crit
+      assert AttackTable.resolve(target, attack(), 100, roll: 9_999).outcome == :crit
+    end
+
+    test "players cannot dodge, parry, or block attacks from behind" do
+      # defender at origin facing +x, attacker behind at -x
+      target = character(unit: [class: @warrior, agility: 1_000], player: [], internal: [])
+      target = %{target | unit: %{target.unit | equipment_bonuses: %{shields: 1, shield_block: 10}}}
+      swing = attack(caster_position: {-5.0, 0.0, 0.0})
+
+      result = AttackTable.resolve(target, swing, 100, roll: 700)
+
+      assert result.outcome in [:crit, :normal]
+    end
+
+    test "parry auras extend the player's parry range" do
+      holder = %Holder{auras: [%Aura{type: :mod_parry_percent, amount: 25}]}
+      target = character(unit: [class: @warrior, agility: 0, auras: [holder]])
+
+      assert AttackTable.resolve(target, attack(), 100, roll: 2_000).outcome == :parry
+    end
+
+    test "negative hit auras increase outgoing miss chance" do
+      holder = %Holder{auras: [%Aura{type: :mod_hit_chance, amount: -2}]}
+      attacker = character(unit: [auras: [holder]])
+      attack = attack() |> Map.merge(AttackTable.attacker_context(attacker))
+
+      assert AttackTable.resolve(mob(), attack, 100, roll: 600).outcome == :miss
+    end
+
+    test "mobs cannot parry or block from behind but still dodge" do
+      # defender at origin facing +x, attacker behind at -x
+      swing = attack(caster_position: {-5.0, 0.0, 0.0})
+
+      assert AttackTable.resolve(mob(), swing, 100, roll: 700).outcome == :dodge
+      refute AttackTable.resolve(mob(), swing, 100, roll: 1_200).outcome in [:parry, :block]
+    end
+
+    test "a casting defender cannot dodge, parry, or block" do
+      target = character(internal: [casting: %Cast{}])
+
+      result = AttackTable.resolve(target, attack(), 100, roll: 800)
+
+      refute result.outcome in [:dodge, :parry, :block]
+    end
+
+    test "player blocks use the shield block value plus strength bonus" do
+      target = character(unit: [class: @warrior, agility: 0, strength: 40])
+      target = %{target | unit: %{target.unit | equipment_bonuses: %{shields: 1, shield_block: 20}}}
+
+      # miss 500, no dodge at zero agility, parry 500, block 500
+      result = AttackTable.resolve(target, attack(caster_player?: false), 100, roll: 1_200)
+
+      assert result.outcome == :block
+      assert result.blocked_amount == 21
+      assert result.damage == 79
+    end
+
+    test "players without a shield cannot block" do
+      target = character(unit: [class: @warrior, agility: 0])
+
+      result = AttackTable.resolve(target, attack(caster_player?: false), 100, roll: 1_200)
+
+      refute result.outcome == :block
+    end
+  end
+
+  describe "roll_special/3 mechanic resistance" do
+    test "checks resistance after miss without shifting the avoidance table" do
+      holder = %Holder{auras: [%Aura{type: :mechanic_resistance, misc_value: 12, amount: 25}]}
+      defender = mob(unit: [auras: [holder]])
+      special = attack(mechanic: 12)
+
+      assert AttackTable.roll_special(defender, special, roll: 499).outcome == :miss
+      assert AttackTable.roll_special(defender, special, roll: 500).outcome == :resist
+      assert AttackTable.roll_special(defender, special, roll: 2_999).outcome == :resist
+      assert AttackTable.roll_special(defender, special, roll: 3_000, crit_roll: 9_999).outcome == :normal
+      assert AttackTable.roll_special(defender, attack(mechanic: 7), roll: 500).outcome == :dodge
+      assert AttackTable.resolve(defender, special, 100, roll: 500).outcome == :dodge
+    end
+  end
+
+  describe "creature-type versus bonuses" do
+    test "scales damage when the defender's creature type matches" do
+      humanoid_mask = 0x40
+      attack = attack(damage_done_versus: [{humanoid_mask, 10}])
+
+      result = AttackTable.resolve(mob(), attack, 100, roll: 5_000)
+
+      assert result.outcome == :normal
+      assert result.damage == 110
+    end
+
+    test "ignores bonuses for other creature types" do
+      beast_mask = 0x1
+      attack = attack(damage_done_versus: [{beast_mask, 10}])
+
+      result = AttackTable.resolve(mob(), attack, 100, roll: 5_000)
+
+      assert result.damage == 100
+    end
+
+    test "boosts crit damage against matching creature types" do
+      humanoid_mask = 0x40
+      attack = attack(crit_damage_versus: [{humanoid_mask, 100}])
+      plain = AttackTable.resolve(mob(), attack(), 100, roll: 3_100)
+      boosted = AttackTable.resolve(mob(), attack, 100, roll: 3_100)
+
+      assert plain.outcome == :crit
+      assert boosted.outcome == :crit
+      assert boosted.damage == trunc(plain.damage / 2 * 3)
+    end
+  end
+
+  describe "attacker hit debuffs" do
+    test "ranged attacks miss more against mod_attacker_ranged_hit_chance" do
+      debuff = %Aura{type: :mod_attacker_ranged_hit_chance, amount: -20}
+
+      defender =
+        character(
+          unit: [
+            auras: [%Holder{spell: %Spell{id: 1, name: "Test"}, slot: 0, caster_guid: 1, auras: [debuff]}]
+          ]
+        )
+
+      with_aura = AttackTable.resolve(defender, attack(ranged?: true), 100, roll: 2_000)
+      without_aura = AttackTable.resolve(character(unit: []), attack(ranged?: true), 100, roll: 2_000)
+
+      assert with_aura.outcome == :miss
+      refute without_aura.outcome == :miss
+    end
+  end
+
+  describe "roll_special/3" do
+    test "walks miss, dodge, parry, block in order against a mob" do
+      # even level: miss 500, dodge 500, parry 500, block 500
+      assert AttackTable.roll_special(mob(), attack(), roll: 499).outcome == :miss
+      assert AttackTable.roll_special(mob(), attack(), roll: 500).outcome == :dodge
+      assert AttackTable.roll_special(mob(), attack(), roll: 1_000).outcome == :parry
+      assert AttackTable.roll_special(mob(), attack(), roll: 1_500).outcome == :block
+      assert AttackTable.roll_special(mob(), attack(), roll: 2_000, crit_roll: 9_999).outcome == :normal
+    end
+
+    test "avoided specials never crit" do
+      result = AttackTable.roll_special(mob(), attack(), roll: 500)
+
+      assert result.outcome == :dodge
+      assert result.crit? == false
+    end
+
+    test "specials without the completely-blocked attribute skip block" do
+      result = AttackTable.roll_special(mob(), attack(block_allowed?: false), roll: 1_500, crit_roll: 9_999)
+
+      assert result.outcome == :normal
+    end
+
+    test "specials never glance or crush" do
+      # a glancing-range roll for a white swing lands as a plain hit for a special
+      result = AttackTable.roll_special(mob(), attack(), roll: 2_000, crit_roll: 9_999)
+
+      assert result.outcome == :normal
+      assert result.crit? == false
+    end
+
+    test "specials crit on the independent crit roll" do
+      result = AttackTable.roll_special(mob(), attack(), roll: 9_999, crit_roll: 0)
+
+      assert result.outcome == :crit
+      assert result.crit? == true
+    end
+  end
+
+  describe "armor mitigation" do
+    test "reduces physical damage by the vanilla armor formula" do
+      # armor 1000 vs level 20: 1000 / (1000 + 85*20 + 400) = 32.26% reduction
+      target = mob(unit: [normal_resistance: 1_000])
+
+      result = AttackTable.resolve(target, attack(), 100, roll: 9_999)
+
+      assert result.damage == 68
+      assert result.pre_armor_damage == 100
+    end
+
+    test "preserves the pre-armor basis for critical proc damage" do
+      target = mob(unit: [normal_resistance: 1_000])
+
+      result = AttackTable.resolve(target, attack(), 100, roll: 3_000)
+
+      assert result.outcome == :crit
+      assert result.damage == 136
+      assert result.pre_armor_damage == 200
+    end
+
+    test "does not reduce non-physical melee damage" do
+      target = mob(unit: [normal_resistance: 1_000])
+
+      result = AttackTable.resolve(target, attack(spell_school_mask: 0x4), 100, roll: 9_999)
+
+      assert result.damage == 100
+    end
+
+    test "armor reduction caps at 75 percent" do
+      assert AttackTable.armor_reduced_damage(100, 1_000_000, 20) == 25
+    end
+
+    test "landed hits deal at least 1 damage" do
+      assert AttackTable.armor_reduced_damage(1, 5_000, 20) == 1
+    end
+  end
+end

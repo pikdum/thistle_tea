@@ -1,0 +1,784 @@
+defmodule ThistleTea.Game.Core.Aura.Application do
+  @moduledoc """
+  Applies a cast spell's auras to an entity: builds the holder from the
+  spell's aura effects (channeled periodic triggers are excluded — those tick
+  through the channel, not as auras), enforces rank, same-source, exclusive-
+  category, and mechanic-immunity stacking rules before handing the desired
+  holders to the transition funnel.
+  """
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.AreaSources
+  alias ThistleTea.Game.Core.Aura.Capacity
+  alias ThistleTea.Game.Core.Aura.Change
+  alias ThistleTea.Game.Core.Aura.DiminishingReturns
+  alias ThistleTea.Game.Core.Aura.EffectImmunity
+  alias ThistleTea.Game.Core.Aura.Heartbeat
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Aura.Script
+  alias ThistleTea.Game.Core.Aura.SingleTarget
+  alias ThistleTea.Game.Core.Aura.StackingProc
+  alias ThistleTea.Game.Core.Aura.Transition
+  alias ThistleTea.Game.Core.Aura.TriggeredLifetime
+  alias ThistleTea.Game.Core.Battleground.Flags
+  alias ThistleTea.Game.Core.Combat.TargetDamage
+  alias ThistleTea.Game.Core.Creature.CreatureImmunity
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Totem
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Profession.Engineering.DeathRay
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.AbsorbBonus
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.Chain
+  alias ThistleTea.Game.Core.Spell.Coefficient
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Modifiers
+  alias ThistleTea.Game.Core.Spell.PersistentArea
+  alias ThistleTea.Game.Core.Spell.Radius
+  alias ThistleTea.Game.Core.Spell.Scripts
+  alias ThistleTea.Game.Core.Spell.Slow
+  alias ThistleTea.Game.Core.Spell.SpellEffect.Amount
+  alias ThistleTea.Game.Core.Spell.StackRules
+  alias ThistleTea.Game.Core.Stats.TargetSpellPower
+
+  @negative_auras [
+    :periodic_power_burn,
+    :periodic_damage_percent,
+    :periodic_damage,
+    :periodic_leech,
+    :mod_root,
+    :mod_decrease_speed,
+    :mod_stun,
+    :mod_fear,
+    :mod_confuse,
+    :mod_possess,
+    :mod_charm,
+    :mod_detect_range,
+    :mod_taunt
+  ]
+
+  @ignite_dot 12_654
+  @ignite_max_stacks 5
+
+  @context_auras [
+    :periodic_mana_leech,
+    :periodic_power_burn,
+    :periodic_trigger_spell,
+    :proc_trigger_spell,
+    :damage_shield,
+    :feign_death
+  ]
+
+  def apply_spell(entity, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
+    case Flags.admit(entity, spell) do
+      :ok ->
+        if not TriggeredLifetime.source_alive?(entity, context.required_aura_source, now) or
+             CreatureImmunity.spell?(entity, context, spell),
+           do: {entity, []},
+           else:
+             Script.instant_application(entity, context, spell) || apply_unblocked_spell(entity, context, spell, now)
+
+      {:error, effects} ->
+        {entity, effects}
+    end
+  end
+
+  defp apply_unblocked_spell(entity, context, spell, now) do
+    applied_at = DeathRay.application_time(entity, spell, now)
+
+    case build_auras(entity, context, spell, applied_at) do
+      [] ->
+        {entity, []}
+
+      auras ->
+        holder = build_holder(entity, context, spell, auras, applied_at)
+        do_apply(entity, Heartbeat.prepare(entity, holder, context), context, now)
+    end
+  end
+
+  defp build_holder(entity, context, spell, auras, now) do
+    target_guid = entity.object.guid
+
+    %Holder{
+      spell: spell,
+      caster_guid: context.caster_guid,
+      caster_totem?: context.caster_totem?,
+      cast_item_guid: context.cast_item_guid,
+      triggered?: context.triggered?,
+      cooldown_started_at: context.cooldown_started_at,
+      caster_owner_guid: context.caster_owner_guid,
+      reflected_by_guid: context.reflected_by_guid,
+      caster_level: context.caster_level,
+      caster_faction_template: context.caster_faction_template,
+      resistance_penetration: context.resistance_penetration,
+      cast_context: retained_context(context, auras),
+      applied_at: now,
+      expires_at: holder_expiry(spell, context, now),
+      charges: holder_charges(spell, context.spell_modifiers),
+      area_radius: area_radius(spell, context.spell_modifiers),
+      next_area_refresh_at: next_area_refresh_at(spell, context, target_guid, now),
+      next_area_check_at: if(context.persistent_area, do: now + 250),
+      auras: auras,
+      negative?: negative?(spell, auras, context, target_guid)
+    }
+  end
+
+  def apply_spell(entity, caster_guid, caster_level, %Spell{} = spell, now) when is_integer(now) do
+    context = %CastContext{
+      caster_guid: caster_guid,
+      caster_level: caster_level,
+      target_guid: entity.object.guid,
+      spell: spell
+    }
+
+    apply_spell(entity, context, spell, now)
+  end
+
+  def blocked_by_stronger_rank?(%{unit: %Unit{auras: holders}}, %Spell{} = spell) when is_list(holders) do
+    blocked_by_stronger_rank?(holders, spell)
+  end
+
+  def blocked_by_stronger_rank?(holders, %Spell{} = spell) when is_list(holders) do
+    Enum.any?(holders, fn %Holder{spell: other} -> Spell.stronger_rank_of_same_chain?(other, spell) end)
+  end
+
+  def blocked_by_stronger_rank?(_entity, _spell), do: false
+
+  def mechanic_immune?(%{unit: %Unit{auras: holders}}, %Spell{} = spell) when is_list(holders) do
+    blocked_by_mechanic_immunity?(holders, spell)
+  end
+
+  def mechanic_immune?(_entity, _spell), do: false
+
+  def dispel_immune?(%{unit: %Unit{auras: holders}}, %Spell{dispel_type: dispel_type})
+      when is_list(holders) and is_integer(dispel_type) and dispel_type > 0 do
+    blocked_by_dispel_immunity?(holders, dispel_type)
+  end
+
+  def dispel_immune?(_entity, _spell), do: false
+
+  def equipment_holder(entity, %Spell{} = spell, source, now) do
+    %{passive_holder(entity, spell, now) | item_source: source, cast_item_guid: equipment_item_guid(source)}
+  end
+
+  defp equipment_item_guid({:item_equip, guid, _spell}), do: guid
+  defp equipment_item_guid({guid, _slot, _spell}) when is_integer(guid), do: guid
+  defp equipment_item_guid(_source), do: nil
+
+  def linked_holder(entity, %Spell{} = spell, source, now) do
+    %{
+      passive_holder(entity, spell, now)
+      | linked_from: source,
+        expires_at: expires_at(now, spell.duration_ms),
+        charges: holder_charges(spell, Modifiers.snapshot(entity, spell))
+    }
+  end
+
+  def form_holder(entity, %Spell{} = spell, source, now) do
+    radius = area_radius(spell, Modifiers.snapshot(entity, spell))
+
+    %{
+      linked_holder(entity, spell, source, now)
+      | spell: spell,
+        area_radius: radius,
+        next_area_refresh_at: if(is_number(radius), do: now)
+    }
+  end
+
+  def boost_holder(entity, %Spell{} = spell, %Holder{} = parent, now) do
+    context = %CastContext{
+      spell: spell,
+      caster_guid: parent.caster_guid,
+      caster_level: parent.caster_level,
+      caster_owner_guid: parent.caster_owner_guid,
+      caster_faction_template: parent.caster_faction_template,
+      target_guid: entity.object.guid,
+      triggered?: true
+    }
+
+    case build_auras(entity, context, spell, now) do
+      [] ->
+        nil
+
+      auras ->
+        %{
+          build_holder(entity, context, spell, auras, now)
+          | linked_from: {Holder.key(parent), parent.applied_at},
+            expires_at: parent.expires_at
+        }
+    end
+  end
+
+  defp passive_holder(entity, %Spell{} = spell, now) do
+    context = %CastContext{caster_guid: entity.object.guid, caster_level: entity.unit.level || 1}
+
+    %Holder{
+      spell: %{spell | attributes: MapSet.put(spell.attributes, :passive), spell_visual: 0},
+      caster_guid: context.caster_guid,
+      caster_level: context.caster_level,
+      applied_at: now,
+      auras: build_auras(entity, context, spell, now)
+    }
+  end
+
+  defp blocked_by_dispel_immunity?(holders, dispel_type)
+       when is_list(holders) and is_integer(dispel_type) and dispel_type > 0 do
+    Enum.any?(holders, fn %Holder{auras: auras} ->
+      Enum.any?(auras, &match?(%Aura{type: :dispel_immunity, misc_value: ^dispel_type}, &1))
+    end)
+  end
+
+  defp blocked_by_dispel_immunity?(_holders, _dispel_type), do: false
+
+  defp negative?(spell, auras, %CastContext{} = context, target_guid) do
+    cond do
+      Spell.attribute?(spell, :negative) -> true
+      context.caster_guid == target_guid -> false
+      context.target_hostile? == true and Spell.harmful?(spell) -> true
+      Holder.charm?(%Holder{spell: spell, auras: auras}) -> true
+      Enum.any?(auras, fn %Aura{type: type} -> type in @negative_auras end) -> true
+      Enum.any?(auras, &negative_resistance_modifier?/1) -> true
+      true -> false
+    end
+  end
+
+  defp negative_resistance_modifier?(%Aura{type: type, amount: amount}) do
+    type in [:mod_resistance, :mod_resistance_exclusive] and is_number(amount) and amount < 0
+  end
+
+  defp do_apply(%{unit: %Unit{auras: existing}} = entity, %Holder{} = holder, context, now) when is_list(existing) do
+    cond do
+      blocked_by_stronger_rank?(existing, holder.spell) ->
+        {entity, []}
+
+      blocked_by_stronger_slow?(existing, holder.spell) ->
+        {entity, []}
+
+      blocked_by_group?(existing, holder.spell) ->
+        {entity, []}
+
+      blocked_by_mechanic_immunity?(existing, holder.spell) ->
+        consume_mechanic_immunity(entity, holder.spell, now)
+
+      blocked_by_dispel_immunity?(existing, holder.spell.dispel_type) ->
+        {entity, []}
+
+      true ->
+        apply_unblocked(entity, existing, holder, context, now)
+    end
+  end
+
+  defp do_apply(entity, %Holder{} = holder, context, now) do
+    apply_unblocked(entity, [], holder, context, now)
+  end
+
+  defp blocked_by_stronger_slow?(holders, spell) do
+    Enum.any?(holders, fn
+      %Holder{linked_from: nil, spell: existing} -> Slow.blocks?(existing, spell)
+      _holder -> false
+    end)
+  end
+
+  defp blocked_by_group?(holders, spell) do
+    Enum.any?(holders, fn
+      %Holder{linked_from: nil, spell: existing} -> StackRules.relation(existing, spell) == :block
+      _holder -> false
+    end)
+  end
+
+  defp apply_diminished(entity, holders, holder, context, now) do
+    case DiminishingReturns.apply(entity, holder, context, now) do
+      {:ok, entity, diminished} ->
+        diminished = Heartbeat.schedule(diminished)
+
+        holders =
+          Enum.map(holders, fn
+            ^holder -> diminished
+            current -> current
+          end)
+
+        Transition.run(entity, %Change{holders: holders, cause: :applied, now: now})
+
+      {:immune, entity} ->
+        {entity, [Effects.spell_log_miss(context.caster_guid, entity.object.guid, holder.spell.id, :immune)]}
+    end
+  end
+
+  defp apply_unblocked(entity, existing, %Holder{} = holder, context, now) do
+    case StackingProc.prepare(holder, existing) do
+      nil -> {entity, []}
+      holder -> upsert_unblocked(entity, existing, holder, context, now)
+    end
+  end
+
+  defp upsert_unblocked(entity, existing, %Holder{} = holder, context, now) do
+    {entity, holder} = SingleTarget.assign(entity, holder)
+
+    holders =
+      if holder.spell.id == @ignite_dot do
+        upsert_ignite(existing, holder)
+      else
+        existing
+        |> remove_non_stacking(holder)
+        |> upsert_holder(holder)
+      end
+
+    holders = Capacity.retain(holders, entity.object.guid)
+
+    case Enum.find(holders, &Holder.same_source?(&1, holder.spell.id, holder.caster_guid)) do
+      nil -> Transition.run(entity, %Change{holders: holders, cause: :applied, now: now})
+      applied -> apply_diminished(entity, holders, applied, context, now)
+    end
+  end
+
+  defp remove_non_stacking(holders, %Holder{} = incoming) do
+    shapeshift? = Holder.has_aura_type?(incoming, :mod_shapeshift)
+    Enum.reject(holders, &non_stacking?(&1, incoming, shapeshift?))
+  end
+
+  defp non_stacking?(%Holder{linked_from: source}, _incoming, _shapeshift?) when not is_nil(source), do: false
+
+  defp non_stacking?(
+         %Holder{spell: %Spell{} = other} = existing,
+         %Holder{spell: %Spell{} = spell} = incoming,
+         shapeshift?
+       ) do
+    cond do
+      control_conflict?(existing, incoming) -> true
+      spell_conflict?(existing, incoming) -> true
+      shapeshift? and Holder.has_aura_type?(existing, :mod_shapeshift) -> true
+      mount_conflict?(existing, incoming) -> true
+      other_caster_same_spell?(existing, incoming) -> replaces_same_spell?(existing, incoming)
+      Spell.same_chain?(other, spell) -> replaces_chain_rank?(existing, incoming)
+      true -> false
+    end
+  end
+
+  defp control_conflict?(existing, incoming), do: Holder.control?(existing) and Holder.control?(incoming)
+
+  defp spell_conflict?(existing, incoming) do
+    StackRules.relation(existing.spell, incoming.spell) == :replace or exclusive_category_conflict?(existing, incoming)
+  end
+
+  defp other_caster_same_spell?(existing, incoming),
+    do: existing.spell.id == incoming.spell.id and existing.caster_guid != incoming.caster_guid
+
+  defp mount_conflict?(existing, incoming) do
+    Holder.has_aura_type?(incoming, :mounted) and Holder.has_aura_type?(existing, :mounted)
+  end
+
+  defp replaces_same_spell?(existing, %Holder{spell: spell} = incoming) do
+    not Spell.custom?(spell, :allow_stack_between_caster) and not cross_caster_coexist?(existing, incoming)
+  end
+
+  defp replaces_chain_rank?(existing, %Holder{spell: spell} = incoming) do
+    existing.caster_guid == incoming.caster_guid or
+      Spell.custom?(spell, :allow_stack_between_caster) or
+      not cross_caster_coexist?(existing, incoming)
+  end
+
+  @personal_stack_auras [
+    :dummy,
+    :periodic_damage_percent,
+    :periodic_damage,
+    :periodic_leech,
+    :periodic_health_funnel,
+    :periodic_heal,
+    :periodic_mana_leech,
+    :channel_death_item
+  ]
+
+  defp cross_caster_coexist?(%Holder{} = existing, %Holder{spell: %Spell{} = spell} = incoming) do
+    Spell.attribute?(spell, :channeled) or
+      Spell.custom?(spell, :separate_aura_per_caster) or
+      Spell.attribute?(spell, :dot_stacking_rule) or
+      personal_overlap_only?(existing, incoming)
+  end
+
+  defp personal_overlap_only?(%Holder{auras: existing_auras}, %Holder{auras: incoming_auras}) do
+    existing_indexes = MapSet.new(existing_auras, & &1.index)
+
+    incoming_auras
+    |> Enum.filter(&MapSet.member?(existing_indexes, &1.index))
+    |> Enum.all?(&(&1.type in @personal_stack_auras))
+  end
+
+  defp exclusive_category_conflict?(
+         %Holder{spell: %Spell{exclusive_category: :paladin_blessing}, caster_guid: existing_caster},
+         %Holder{spell: %Spell{exclusive_category: :paladin_blessing}, caster_guid: incoming_caster}
+       ) do
+    existing_caster == incoming_caster
+  end
+
+  defp exclusive_category_conflict?(
+         %Holder{spell: %Spell{exclusive_category: :warlock_curse}, caster_guid: existing_caster},
+         %Holder{spell: %Spell{exclusive_category: :warlock_curse}, caster_guid: incoming_caster}
+       ) do
+    existing_caster == incoming_caster
+  end
+
+  defp exclusive_category_conflict?(
+         %Holder{spell: %Spell{exclusive_category: :hunter_sting}, caster_guid: existing_caster},
+         %Holder{spell: %Spell{exclusive_category: :hunter_sting}, caster_guid: incoming_caster}
+       ) do
+    existing_caster == incoming_caster
+  end
+
+  defp exclusive_category_conflict?(
+         %Holder{spell: %Spell{exclusive_category: :paladin_judgement}, caster_guid: existing_caster},
+         %Holder{spell: %Spell{exclusive_category: :paladin_judgement}, caster_guid: incoming_caster}
+       ) do
+    existing_caster == incoming_caster
+  end
+
+  defp exclusive_category_conflict?(%Holder{spell: existing}, %Holder{spell: incoming}) do
+    Spell.exclusive_with?(existing, incoming)
+  end
+
+  defp holder_charges(%Spell{id: id}, _modifiers) when id in [17_941, 22_008], do: 1
+
+  defp holder_charges(%Spell{proc_charges: charges}, modifiers) do
+    charges = trunc(Modifiers.value(modifiers, :charges, charges || 0))
+    if charges > 0, do: charges
+  end
+
+  defp blocked_by_mechanic_immunity?(holders, %Spell{} = spell) do
+    Enum.any?(holders, &EffectImmunity.mechanic?(&1, spell))
+  end
+
+  defp blocked_by_mechanic_immunity?(_holders, _spell), do: false
+
+  def consume_mechanic_immunity(%{unit: %Unit{auras: holders}} = entity, %Spell{} = spell, now) when is_list(holders) do
+    case Enum.find_index(holders, &(&1.charges != nil and EffectImmunity.mechanic?(&1, spell))) do
+      nil ->
+        {entity, []}
+
+      index ->
+        holders = spend_holder_charge(holders, index)
+        Transition.run(entity, %Change{holders: holders, cause: :consumed, now: now})
+    end
+  end
+
+  def consume_mechanic_immunity(entity, _spell, _now), do: {entity, []}
+
+  defp spend_holder_charge(holders, index) do
+    case Enum.at(holders, index) do
+      %Holder{charges: charges} when is_integer(charges) and charges > 1 ->
+        List.update_at(holders, index, &%{&1 | charges: charges - 1})
+
+      %Holder{charges: charges} when is_integer(charges) ->
+        List.delete_at(holders, index)
+
+      _holder ->
+        holders
+    end
+  end
+
+  defp upsert_holder(existing, %Holder{spell: %Spell{id: spell_id} = spell, caster_guid: caster_guid} = incoming) do
+    index =
+      Enum.find_index(existing, &(is_nil(&1.linked_from) and Holder.same_source?(&1, spell_id, caster_guid))) ||
+        shared_stack_index(existing, spell)
+
+    case index do
+      nil ->
+        existing ++ [%{incoming | slot: nil}]
+
+      index ->
+        old = Enum.at(existing, index)
+
+        refreshed = %{
+          incoming
+          | slot: nil,
+            stacks: next_stacks(old, incoming),
+            next_proc_at: old.next_proc_at,
+            heartbeat: old.heartbeat,
+            auras: refresh_tick_state(old.auras, incoming.auras, spell)
+        }
+
+        List.replace_at(existing, index, AreaSources.merge(old, refreshed))
+    end
+  end
+
+  defp upsert_ignite(existing, %Holder{} = incoming) do
+    case Enum.find_index(existing, &match?(%Holder{spell: %Spell{id: @ignite_dot}}, &1)) do
+      nil ->
+        existing ++ [%{incoming | slot: nil}]
+
+      index ->
+        current = Enum.at(existing, index)
+
+        refreshed =
+          if ignite_finished?(current) do
+            %{incoming | slot: current.slot}
+          else
+            refresh_ignite(current, incoming)
+          end
+
+        List.replace_at(existing, index, refreshed)
+    end
+  end
+
+  defp refresh_ignite(%Holder{} = current, %Holder{} = incoming) do
+    add_amount? = current.stacks < @ignite_max_stacks
+
+    %{
+      current
+      | applied_at: incoming.applied_at,
+        expires_at: incoming.expires_at,
+        stacks: min(current.stacks + 1, @ignite_max_stacks),
+        auras: refresh_ignite_auras(current.auras, incoming.auras, add_amount?)
+    }
+  end
+
+  defp refresh_ignite_auras(current, incoming, add_amount?) do
+    Enum.map(incoming, fn %Aura{} = aura ->
+      case Enum.find(current, &(&1.index == aura.index and &1.type == aura.type)) do
+        %Aura{amount: current_amount} when add_amount? and is_integer(current_amount) and is_integer(aura.amount) ->
+          %{aura | amount: current_amount + aura.amount}
+
+        %Aura{amount: current_amount} when is_integer(current_amount) ->
+          %{aura | amount: current_amount}
+
+        _current_aura ->
+          aura
+      end
+    end)
+  end
+
+  defp ignite_finished?(%Holder{expires_at: expires_at, auras: auras}) when is_integer(expires_at) do
+    Enum.any?(auras, fn
+      %Aura{type: :periodic_damage, next_tick_at: next_tick_at} when is_integer(next_tick_at) ->
+        next_tick_at > expires_at
+
+      _aura ->
+        false
+    end)
+  end
+
+  defp ignite_finished?(_holder), do: false
+
+  defp shared_stack_index(existing, %Spell{id: spell_id} = spell) do
+    if Spell.custom?(spell, :allow_stack_between_caster) do
+      Enum.find_index(existing, &(&1.spell.id == spell_id and is_nil(&1.linked_from)))
+    end
+  end
+
+  defp next_stacks(%Holder{stacks: stacks}, %Holder{spell: %Spell{stack_amount: cap}, stacks: incoming_stacks})
+       when is_integer(cap) and cap > 1 do
+    min((stacks || 1) + incoming_stacks, cap)
+  end
+
+  defp next_stacks(_old, _incoming), do: 1
+
+  defp refresh_tick_state(old_auras, new_auras, spell) do
+    Enum.map(new_auras, fn %Aura{} = aura ->
+      case Enum.find(old_auras, &(&1.index == aura.index and &1.type == aura.type)) do
+        %Aura{} = old -> refresh_aura_tick(old, aura, spell)
+        _ -> aura
+      end
+    end)
+  end
+
+  defp refresh_aura_tick(%Aura{} = old, %Aura{} = incoming, %Spell{} = spell) do
+    stacking? = is_integer(spell.stack_amount) and spell.stack_amount > 0
+
+    %{
+      incoming
+      | next_tick_at: if(Scripts.preserve_periodic_timer?(spell), do: old.next_tick_at, else: incoming.next_tick_at),
+        tick_count: if(stacking?, do: old.tick_count, else: incoming.tick_count)
+    }
+  end
+
+  defp expires_at(_now, 0), do: nil
+  defp expires_at(_now, nil), do: nil
+  defp expires_at(_now, -1), do: -1
+  defp expires_at(now, duration_ms) when is_integer(duration_ms), do: now + duration_ms
+
+  defp holder_expiry(_spell, %CastContext{persistent_area: %PersistentArea{expires_at: at}}, _now), do: at
+  defp holder_expiry(spell, context, now), do: expires_at(now, effective_duration(spell, context))
+
+  defp retained_context(context, auras) do
+    if context.persistent_area || Enum.any?(auras, &(&1.type in @context_auras)),
+      do: %{context | persistent_area: nil}
+  end
+
+  defp effective_duration(%Spell{} = spell, %CastContext{} = context) do
+    spell
+    |> base_duration(context)
+    |> modified_duration(context)
+  end
+
+  defp base_duration(%Spell{} = spell, %CastContext{combo_points: points}) when is_integer(points) and points > 0 do
+    Spell.duration_for_combo_points(spell, points)
+  end
+
+  defp base_duration(%Spell{} = spell, %CastContext{caster_guid: caster, target_guid: target}) when caster != target do
+    if area_radius(spell), do: 2_500, else: spell.duration_ms
+  end
+
+  defp base_duration(%Spell{duration_ms: duration_ms}, _context), do: duration_ms
+
+  defp modified_duration(duration, %CastContext{} = context) when is_integer(duration) and duration > 0 do
+    round(Modifiers.value(context.spell_modifiers, :duration, duration))
+  end
+
+  defp modified_duration(duration, _context), do: duration
+
+  defp area_radius(%Spell{effects: effects}, modifiers \\ []) do
+    effects
+    |> Enum.filter(&match?(%Effect{type: :apply_area_aura}, &1))
+    |> Radius.maximum(modifiers, nil)
+  end
+
+  defp next_area_refresh_at(%Spell{} = spell, %CastContext{caster_guid: caster_guid}, caster_guid, now) do
+    if area_radius(spell), do: now + 1_000
+  end
+
+  defp next_area_refresh_at(_spell, _context, _target_guid, _now), do: nil
+
+  defp build_auras(entity, %CastContext{} = context, %Spell{} = spell, now) do
+    amount_override = Scripts.aura_amount_override(spell, entity)
+
+    spell
+    |> Spell.aura_effects()
+    |> Enum.reject(
+      &(EffectImmunity.blocked?(entity, spell, &1) or CreatureImmunity.effect?(entity, context, spell, &1) or
+          channel_ticked?(spell, &1))
+    )
+    |> Enum.reduce([], fn effect, acc ->
+      case build_aura(entity, spell, effect, amount_override, context, now) do
+        nil -> acc
+        aura -> [aura | acc]
+      end
+    end)
+    |> Enum.reverse()
+  end
+
+  defp channel_ticked?(%Spell{} = spell, %Effect{aura: :periodic_trigger_spell}) do
+    Spell.attribute?(spell, :channeled)
+  end
+
+  defp channel_ticked?(_spell, _effect), do: false
+
+  defp build_aura(_entity, _spell, %Effect{aura: nil}, _amount_override, _context, _now), do: nil
+
+  defp build_aura(
+         %{internal: %{totem: %Totem{}}},
+         _spell,
+         %Effect{type: :apply_area_aura, index: index},
+         _amount_override,
+         _context,
+         _now
+       ), do: %Aura{index: index, type: :none, amount: 0}
+
+  defp build_aura(entity, %Spell{} = spell, %Effect{} = effect, amount_override, %CastContext{} = context, now) do
+    amplitude_ms = Modifiers.periodic_interval(context.spell_modifiers, effect)
+
+    %Aura{
+      index: effect.index,
+      type: effect.aura,
+      appearance: effect.appearance,
+      amount: modified_aura_amount(entity, spell, effect, amount_override, context),
+      misc_value: effect.misc_value,
+      multiple_value: transfer_multiplier(effect, context),
+      class_mask: effect.class_mask,
+      item_type: effect.item_type,
+      amplitude_ms: amplitude_ms,
+      next_tick_at: next_tick(spell, effect, amplitude_ms, context, now),
+      persistent_area: context.persistent_area,
+      trigger_spell_id: effect.trigger_spell_id
+    }
+  end
+
+  defp aura_amount(%Spell{} = spell, %Effect{}, amount_override, context) when is_integer(amount_override),
+    do: Amount.modify_base(spell, context, amount_override)
+
+  defp aura_amount(%Spell{} = spell, %Effect{} = effect, _amount_override, %CastContext{} = context) do
+    combo_points = finisher_combo_points(spell, context)
+
+    spell
+    |> Amount.base(effect, context, combo_points)
+    |> Chain.scale(effect, context)
+  end
+
+  defp finisher_combo_points(%Spell{} = spell, %CastContext{combo_points: points}) do
+    if Scripts.finisher?(spell) and is_integer(points), do: max(points, 0), else: 0
+  end
+
+  defp modified_aura_amount(entity, %Spell{} = spell, %Effect{} = effect, amount_override, %CastContext{} = context) do
+    amount = aura_amount(spell, effect, amount_override, context)
+
+    if Spell.attribute?(spell, :ignore_caster_modifiers),
+      do: amount,
+      else: apply_aura_bonuses(entity, spell, effect, amount, context)
+  end
+
+  defp apply_aura_bonuses(entity, spell, effect, amount, context) do
+    amount = modify_aura_base_amount(effect.aura, amount, context)
+    amount = amount + periodic_benefit(entity, spell, effect, context)
+
+    amount = periodic_done_amount(entity, spell, effect, context, amount)
+    amount = trunc(amount + AbsorbBonus.value(spell, effect, context))
+    Modifiers.aura_amount(context.spell_modifiers, effect, amount)
+  end
+
+  defp periodic_done_amount(entity, spell, %Effect{aura: type}, context, amount)
+       when type in [:periodic_damage, :periodic_leech, :periodic_health_funnel] do
+    if Spell.custom?(spell, :fixed_damage) or spell.id == @ignite_dot do
+      amount
+    else
+      versus = max(100 + TargetDamage.bonus(entity, context.damage_done_versus), 0) / 100
+      amount = amount * (context.damage_done_multiplier || 1.0) * versus * context.happiness_multiplier
+      Modifiers.value(context.spell_modifiers, :dot, amount)
+    end
+  end
+
+  defp periodic_done_amount(_entity, spell, %Effect{aura: :periodic_heal}, context, amount) do
+    if Spell.custom?(spell, :fixed_damage),
+      do: amount,
+      else: Modifiers.value(context.spell_modifiers, :dot, amount * context.healing_done_multiplier)
+  end
+
+  defp periodic_done_amount(_entity, _spell, _effect, _context, amount), do: amount
+
+  defp modify_aura_base_amount(aura, amount, %CastContext{} = context)
+       when aura in [:mod_increase_speed, :mod_decrease_speed, :mod_increase_swim_speed] do
+    Modifiers.value(context.spell_modifiers, :speed, amount)
+  end
+
+  defp modify_aura_base_amount(:reflect_spells_school, amount, %CastContext{} = context) do
+    amount + (context.reflect_chance_bonus || 0)
+  end
+
+  defp modify_aura_base_amount(_aura, amount, _context), do: amount
+
+  defp periodic_benefit(entity, %Spell{} = spell, %Effect{aura: aura} = effect, %CastContext{} = context)
+       when aura in [:periodic_damage, :periodic_leech, :periodic_health_funnel] do
+    Coefficient.bonus(TargetSpellPower.benefit(entity, context, spell), spell, effect, :dot) +
+      TargetDamage.spell_bonus(entity, context.target_damage, spell, effect, :dot)
+  end
+
+  defp periodic_benefit(_entity, %Spell{} = spell, %Effect{aura: :periodic_heal} = effect, %CastContext{} = context) do
+    Coefficient.bonus(context.healing_bonus || 0, spell, effect, :dot)
+  end
+
+  defp periodic_benefit(_entity, _spell, _effect, _context), do: 0
+
+  defp transfer_multiplier(%Effect{aura: aura, multiple_value: value}, %CastContext{} = context)
+       when aura in [:periodic_leech, :periodic_health_funnel] do
+    base = if is_number(value) and value > 0, do: value, else: 1.0
+    max(Modifiers.value(context.spell_modifiers, :multiple_value, base), 0.0)
+  end
+
+  defp transfer_multiplier(%Effect{multiple_value: value}, _context), do: value
+
+  defp next_tick(_spell, %Effect{} = effect, amplitude_ms, %CastContext{persistent_area: %PersistentArea{} = area}, now) do
+    if Effect.periodic?(effect) and is_integer(amplitude_ms) and amplitude_ms > 0,
+      do: PersistentArea.next_tick(area, amplitude_ms, now)
+  end
+
+  defp next_tick(spell, %Effect{} = effect, amplitude_ms, _context, now) do
+    if Effect.periodic?(effect) and is_integer(amplitude_ms) and amplitude_ms > 0,
+      do: now + Scripts.initial_periodic_delay(spell, amplitude_ms)
+  end
+end

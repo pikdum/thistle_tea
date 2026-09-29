@@ -1,12 +1,12 @@
 defmodule ThistleTea.Game.Network.Message.CmsgMoveFeatherFallAckTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.CmsgMoveFeatherFallAck
   alias ThistleTea.Game.Network.Message.Dispatch
-  alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.World.Entity.Player.MovementControl
+  alias ThistleTea.Game.World.Entity.Player.State
 
   describe "from_binary/1" do
     test "dispatches a vanilla acknowledgment with its trailing apply flag" do

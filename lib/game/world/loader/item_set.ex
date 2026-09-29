@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.World.Loader.ItemSet do
   """
 
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.ItemSet
+  alias ThistleTea.Game.Core.Item.ItemSet
 
   def init(table \\ __MODULE__) do
     case :ets.whereis(table) do

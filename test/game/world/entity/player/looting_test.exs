@@ -1,0 +1,113 @@
+defmodule ThistleTea.Game.World.Entity.Player.LootingTest do
+  use ExUnit.Case, async: false
+
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Loot
+  alias ThistleTea.Game.Core.Loot.Release
+  alias ThistleTea.Game.Core.Loot.Reservation
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Network.Message.SmsgLootReleaseResponse
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Player.Looting
+  alias ThistleTea.Game.World.Entity.Player.State
+
+  describe "open/3" do
+    test "fear and confusion prevent new loot sessions" do
+      for type <- [:mod_fear, :mod_confuse] do
+        holder = %Holder{spell: %Spell{id: 1}, auras: [%Aura{type: type}]}
+        character = %Character{unit: %Unit{health: 100, auras: [holder]}}
+        state = %State{guid: 42, character: character}
+        assert Looting.open(state, 123) == state
+        assert_receive {:"$gen_cast", {:send_packet, %SmsgLootReleaseResponse{guid: 123}}}
+      end
+    end
+
+    test "closes pocket viewing before opening a corpse window" do
+      parent = self()
+      guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive, :monotonic]))
+
+      spawn_link(fn ->
+        Entity.register(guid)
+        send(parent, :registered)
+
+        receive do
+          {:"$gen_call", from, {:pocket_loot, _actor, :release}} ->
+            send(parent, :pockets_released)
+            GenServer.reply(from, :ok)
+        end
+
+        receive do
+          {:"$gen_call", from, {:loot_view, _actor}} ->
+            send(parent, :corpse_opened)
+            GenServer.reply(from, {:ok, %Loot{gold: 10}})
+        end
+      end)
+
+      assert_receive :registered
+
+      character = %Character{
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        object: %Object{guid: 42},
+        unit: %Unit{health: 100},
+        player: %Player{},
+        internal: %Internal{}
+      }
+
+      state = %State{guid: 42, character: character, loot_guid: guid, loot_type: :pickpocket}
+      opened = Looting.open(state, guid)
+      assert opened.loot_type == :corpse
+      assert opened.loot_guid == guid
+      assert_receive :pockets_released
+      assert_receive :corpse_opened
+
+      holder = %Holder{spell: %Spell{id: 1}, auras: [%Aura{type: :mod_fear}]}
+      character = %{opened.character | unit: %{opened.character.unit | auras: [holder]}}
+      closed = Looting.close_unavailable(%{opened | character: character})
+      assert closed.loot_guid == nil
+      assert closed.loot_type == nil
+    end
+  end
+
+  describe "accept_reservation/3" do
+    test "releases the slot when inventory placement fails" do
+      parent = self()
+      loot_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive, :monotonic]))
+      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+
+      owner =
+        spawn_link(fn ->
+          Entity.register(loot_guid)
+          send(parent, :registered)
+
+          receive do
+            {:"$gen_cast", %Release{} = release} -> send(parent, {:released, release})
+          end
+        end)
+
+      assert_receive :registered
+      token = make_ref()
+
+      reservation = %Reservation{
+        token: token,
+        slot: 0,
+        actor_guid: player_guid,
+        item: %Loot.Item{slot: 0, item_id: -1, count: 1},
+        release_blocked?: false
+      }
+
+      state = %{guid: player_guid}
+      assert ^state = Looting.accept_reservation(state, loot_guid, reservation)
+      assert_receive {:released, %Release{token: ^token, actor_guid: ^player_guid}}
+
+      Process.unlink(owner)
+    end
+  end
+end

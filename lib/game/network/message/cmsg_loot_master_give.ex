@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLootMasterGive do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LOOT_MASTER_GIVE
 
-  alias ThistleTea.Game.Player.Looting
+  alias ThistleTea.Game.World.Entity.Player.Looting
 
   defstruct [:loot_guid, :slot, :target]
 

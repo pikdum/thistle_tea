@@ -8,18 +8,18 @@ defmodule ThistleTea.Game.World.Loader.Character do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.HomeBind
-  alias ThistleTea.Game.Entity.Data.Taxi.Network, as: TaxiNetwork
-  alias ThistleTea.Game.Player.Stats
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Travel.HomeBind
+  alias ThistleTea.Game.Core.Travel.Taxi.Network, as: TaxiNetwork
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Entity.Player.Stats
   alias ThistleTea.Game.World.Loader.ModelGeometry
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
-  alias ThistleTea.Game.WorldRef
 
   @unit_flag_player_controlled 0x00000008
   @unit_flag_use_swim_animation 0x00008000

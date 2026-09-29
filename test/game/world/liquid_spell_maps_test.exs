@@ -1,12 +1,12 @@
 defmodule ThistleTea.Game.World.LiquidSpellMapsTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Player.Movement
-  alias ThistleTea.Game.Terrain.Liquid
-  alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Terrain.Liquid
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Entity.Player.Movement
 
   @moduletag :namigator_maps
 

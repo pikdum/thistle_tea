@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgQuestgiverQuestComplete do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_QUESTGIVER_QUEST_COMPLETE
 
-  alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Core.Quest
 
   defstruct [:quest, xp: 0, money: 0]
 

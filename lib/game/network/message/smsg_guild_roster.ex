@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgGuildRoster do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_GUILD_ROSTER
 
-  alias ThistleTea.Game.Guild.Group
+  alias ThistleTea.Game.Core.Guild.Group
 
   defmodule Entry do
     @moduledoc false

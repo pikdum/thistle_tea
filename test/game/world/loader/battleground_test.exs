@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Loader.BattlegroundTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Battleground.Template
+  alias ThistleTea.Game.Core.Battleground.Template
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
 
   setup do

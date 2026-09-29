@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ATTACKSWING
 
-  alias ThistleTea.Game.Player.Attacking
+  alias ThistleTea.Game.World.Entity.Player.Attacking
 
   defstruct [:target_guid]
 

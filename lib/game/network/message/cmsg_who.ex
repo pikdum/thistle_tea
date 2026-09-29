@@ -2,10 +2,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgWho do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_WHO
 
-  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgWho.WhoPlayer
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Entity
 
   defstruct []
 

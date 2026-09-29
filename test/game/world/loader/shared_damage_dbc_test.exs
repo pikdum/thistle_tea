@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.SharedDamageDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.SharedDamage
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.SharedDamage
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellScriptName
 

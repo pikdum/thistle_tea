@@ -1,0 +1,2274 @@
+defmodule ThistleTea.Game.World.Entity.Mob do
+  @moduledoc """
+  Owning GenServer for a mob: ticks its behavior tree and applies incoming
+  attacks and spells through the pure core. The post-death lifecycle is
+  delegated — the corpse phase (loot, rolls, decay, removal) to `Mob.Corpse`
+  and the respawn state machine to `Mob.Respawn`.
+  """
+  use GenServer
+
+  alias ThistleTea.Game.Core.AI.BehaviorRunner
+  alias ThistleTea.Game.Core.AI.BT
+  alias ThistleTea.Game.Core.AI.BT.Blackboard
+  alias ThistleTea.Game.Core.AI.BT.Context.Perception.Request, as: ObservationRequest
+  alias ThistleTea.Game.Core.AI.BT.CreaturePet, as: CreaturePetBT
+  alias ThistleTea.Game.Core.AI.BT.Guardian, as: GuardianBT
+  alias ThistleTea.Game.Core.AI.BT.MiniPet
+  alias ThistleTea.Game.Core.AI.BT.Mob, as: MobBT
+  alias ThistleTea.Game.Core.AI.BT.Passive, as: PassiveBT
+  alias ThistleTea.Game.Core.AI.BT.Pet, as: PetBT
+  alias ThistleTea.Game.Core.AI.BT.Pet.Targeting, as: PetTargeting
+  alias ThistleTea.Game.Core.AI.BT.Regen, as: RegenBT
+  alias ThistleTea.Game.Core.AI.BT.Totem, as: TotemBT
+  alias ThistleTea.Game.Core.AI.EventAI
+  alias ThistleTea.Game.Core.AI.Script
+  alias ThistleTea.Game.Core.AI.Script.Request, as: ScriptRequest
+  alias ThistleTea.Game.Core.AI.Tick
+  alias ThistleTea.Game.Core.AI.TickPlan
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.StealthDetection
+  alias ThistleTea.Game.Core.Combat
+  alias ThistleTea.Game.Core.Combat.Assistance
+  alias ThistleTea.Game.Core.Combat.AttackFeedback
+  alias ThistleTea.Game.Core.Combat.Engagement
+  alias ThistleTea.Game.Core.Combat.Engagement.Tap
+  alias ThistleTea.Game.Core.Combat.FeignDeath
+  alias ThistleTea.Game.Core.Combat.Hostility
+  alias ThistleTea.Game.Core.Combat.KillCredit
+  alias ThistleTea.Game.Core.Combat.KillFeedback
+  alias ThistleTea.Game.Core.Combat.Threat
+  alias ThistleTea.Game.Core.Creature.CreatureFlags
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Effects.BoundaryResult
+  alias ThistleTea.Game.Core.Entity, as: EntityCore
+  alias ThistleTea.Game.Core.Entity.Appearance
+  alias ThistleTea.Game.Core.Entity.Commands
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Loot
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Spawn
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Totem
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Entity.TargetRef
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Loot.Actor
+  alias ThistleTea.Game.Core.Loot.Commit
+  alias ThistleTea.Game.Core.Loot.LootSession
+  alias ThistleTea.Game.Core.Loot.Release
+  alias ThistleTea.Game.Core.Movement
+  alias ThistleTea.Game.Core.Movement.ControlMovement
+  alias ThistleTea.Game.Core.Movement.MovementHandoff
+  alias ThistleTea.Game.Core.Party
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.ControlledCombat
+  alias ThistleTea.Game.Core.Pet.PetControls
+  alias ThistleTea.Game.Core.Pet.PetHappiness
+  alias ThistleTea.Game.Core.Pet.PetLoyalty
+  alias ThistleTea.Game.Core.Pet.PetNaming
+  alias ThistleTea.Game.Core.Pet.PetProgression
+  alias ThistleTea.Game.Core.Pet.PetResurrection
+  alias ThistleTea.Game.Core.Pet.PetSpellModifiers
+  alias ThistleTea.Game.Core.Pet.PetTraining
+  alias ThistleTea.Game.Core.Pet.PetUntraining
+  alias ThistleTea.Game.Core.Pet.SummonEvent
+  alias ThistleTea.Game.Core.Pet.Totems
+  alias ThistleTea.Game.Core.Power.PowerLeech
+  alias ThistleTea.Game.Core.Power.PowerRestoration
+  alias ThistleTea.Game.Core.Pvp
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Combat, as: SpellCombat
+  alias ThistleTea.Game.Core.Spell.Cooldowns
+  alias ThistleTea.Game.Core.Spell.SpellFeedback
+  alias ThistleTea.Game.Core.Spell.SpellResist
+  alias ThistleTea.Game.Core.Spell.SpellThreat
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Combat.CallForHelp
+  alias ThistleTea.Game.World.Combat.ChaseWatch
+  alias ThistleTea.Game.World.Combat.DamageSharing
+  alias ThistleTea.Game.World.Combat.KillReward
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.AIEnvironment
+  alias ThistleTea.Game.World.Entity.EventSink
+  alias ThistleTea.Game.World.Entity.EventSink.Context, as: EventContext
+  alias ThistleTea.Game.World.Entity.GameObjectSummons
+  alias ThistleTea.Game.World.Entity.GuardianOwner
+  alias ThistleTea.Game.World.Entity.Mob.Corpse
+  alias ThistleTea.Game.World.Entity.Mob.CreatureEventEnvironment
+  alias ThistleTea.Game.World.Entity.Mob.CreaturePetOwner
+  alias ThistleTea.Game.World.Entity.Mob.Flight
+  alias ThistleTea.Game.World.Entity.Mob.Incarnation
+  alias ThistleTea.Game.World.Entity.Mob.PetCasting
+  alias ThistleTea.Game.World.Entity.Mob.PetCommands
+  alias ThistleTea.Game.World.Entity.Mob.Pockets
+  alias ThistleTea.Game.World.Entity.Mob.Respawn
+  alias ThistleTea.Game.World.Entity.Mob.SummonLifecycle
+  alias ThistleTea.Game.World.Entity.Mob.TotemOwner
+  alias ThistleTea.Game.World.Entity.NavigationResolver
+  alias ThistleTea.Game.World.Entity.Player.CompanionOwner.Attachment
+  alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.World.Entity.ScriptDelivery
+  alias ThistleTea.Game.World.Entity.ScriptExecution
+  alias ThistleTea.Game.World.Entity.ScriptSpells
+  alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
+  alias ThistleTea.Game.World.Loader.MapTemplate
+  alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Spell.SpellReception
+  alias ThistleTea.Game.World.System.CreatureGroups
+  alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.System.SpawnPool
+  alias ThistleTea.Game.World.Visibility
+
+  require Logger
+
+  @ai_tick_retry_ms 1_000
+  @summon_despawn_retry_ms 10_000
+
+  def child_spec(%Mob{internal: %Internal{totem: %Totem{}}} = state) do
+    Map.put(super(state), :restart, :temporary)
+  end
+
+  def child_spec(%Mob{internal: %Internal{pet: %Pet{}}} = state) do
+    Map.put(super(state), :restart, :temporary)
+  end
+
+  def child_spec(%Mob{internal: %Internal{spawn: %Spawn{temporary?: true}}} = state) do
+    Map.put(super(state), :restart, :temporary)
+  end
+
+  def child_spec(state), do: super(state)
+
+  def start_link(%Mob{} = state) do
+    GenServer.start_link(__MODULE__, state, name: EntityRegistry.via(state.object.guid))
+  end
+
+  @impl GenServer
+  def init(%Mob{} = state) do
+    GameEvent.subscribe(state)
+    Process.flag(:trap_exit, true)
+    state = Incarnation.ensure(state)
+    state = sync_owner_pvp(state)
+    now = Time.now()
+    state = CreatureEventEnvironment.initialize(state, now)
+    blackboard = RegenBT.initialize(state, Blackboard.new(), now)
+    state = BT.init(state, behavior_tree(state), blackboard)
+
+    Metadata.update(
+      state.object.guid,
+      StealthDetection.target_metadata(state)
+      |> Map.put(:incarnation_id, Incarnation.id(state))
+      |> Map.put(:pet_guid, Companion.active_guid(state))
+      |> Map.put(:unit_flags, state.unit.flags)
+      |> Map.put(:no_spell_defense?, CreatureFlags.has?(state, :no_spell_defense))
+      |> Map.put(:no_threat_list?, CreatureFlags.no_threat_list?(state))
+      |> Map.merge(SpellResist.defense_snapshot(state))
+      |> Map.put(:spell_threat, SpellThreat.projection(state))
+      |> Map.merge(control_metadata(state))
+      |> Map.merge(ControlledCombat.projection(state))
+      |> Map.merge(Mob.visibility_metadata(state))
+      |> Map.merge(FactionLoader.metadata(state.unit.faction_template))
+      |> Map.put(:level, state.unit.level)
+    )
+
+    state = sync_perception_metadata(state)
+    World.update_position(state)
+    state = Visibility.join_entity(state)
+    CreatureGroups.register(state, self())
+
+    state =
+      state
+      |> EventSink.emit_pending()
+      |> EventAI.with_blackboard(&EventAI.on_spawned(&1, &2, now, AIEnvironment.context(&1, now)))
+      |> NavigationResolver.resolve(now)
+      |> EventSink.emit_pending()
+
+    state =
+      state
+      |> schedule_summon_despawn()
+      |> schedule_ai_tick(0)
+      |> SummonLifecycle.notify(:summoned_unit)
+
+    {:ok, state}
+  end
+
+  @impl GenServer
+  def handle_cast({:send_update_to, pid}, state) do
+    if Corpse.removed?(state) do
+      {:noreply, state}
+    else
+      now = Time.now()
+      state = Movement.sync_position(state, now)
+      World.update_position(state)
+      state = Visibility.refresh_entity(state)
+
+      EntityCore.update_object(state)
+      |> Network.send_packet(pid)
+
+      case Message.SmsgPetNameQueryResponse.for_pet(state) do
+        %Message.SmsgPetNameQueryResponse{} = packet -> Network.send_packet(packet, pid)
+        nil -> :ok
+      end
+
+      send_resume_move(state, pid, now)
+
+      {:noreply, state}
+    end
+  end
+
+  def handle_cast({:start_script, steps, target_guid, world}, %Mob{internal: %{world: world}} = state) do
+    handle_cast({:start_script, steps, target_guid}, state)
+  end
+
+  def handle_cast({:start_script, _steps, _target_guid, _world}, %Mob{} = state), do: {:noreply, state}
+
+  def handle_cast({:start_script, steps, target_guid}, %Mob{} = state)
+      when is_list(steps) and is_integer(target_guid) do
+    now = Time.now()
+
+    state =
+      state
+      |> ScriptSpells.prepare(steps)
+      |> EventAI.with_blackboard(
+        &Script.run(
+          &1,
+          &2,
+          steps,
+          target_guid,
+          AIEnvironment.context(
+            &1,
+            now,
+            ObservationRequest.for_script(steps, [target_guid])
+          )
+        )
+      )
+      |> NavigationResolver.resolve(now)
+      |> EventSink.emit_pending()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("start_script crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:script_event, event_id, data, invoker_guid}, %Mob{} = state)
+      when is_integer(event_id) and is_integer(data) and (is_integer(invoker_guid) or is_nil(invoker_guid)) do
+    now = Time.now()
+    request = if is_integer(invoker_guid), do: ObservationRequest.actor(invoker_guid), else: %ObservationRequest{}
+
+    state =
+      state
+      |> EventAI.with_blackboard(
+        &EventAI.on_script_event(
+          &1,
+          &2,
+          event_id,
+          data,
+          invoker_guid,
+          now,
+          AIEnvironment.context(&1, now, request)
+        )
+      )
+      |> NavigationResolver.resolve(now)
+      |> EventSink.emit_pending()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("script_event crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:receive_emote, player_guid, emote_id}, %Mob{} = state)
+      when is_integer(player_guid) and is_integer(emote_id) do
+    now = Time.now()
+
+    state =
+      state
+      |> EventAI.with_blackboard(
+        &EventAI.on_receive_emote(
+          &1,
+          &2,
+          player_guid,
+          emote_id,
+          now,
+          AIEnvironment.context(&1, now, ObservationRequest.actor(player_guid))
+        )
+      )
+      |> NavigationResolver.resolve(now)
+      |> EventSink.emit_pending()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("receive_emote crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:spell_hit_target, target_guid, %Spell{} = spell}, %Mob{} = state) when is_integer(target_guid) do
+    now = Time.now()
+
+    state =
+      state
+      |> eventai_spell_hit_target(target_guid, spell, now)
+      |> EventSink.emit_pending()
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("spell_hit_target crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_cast(%SummonEvent{} = event, %Mob{} = state) do
+    now = Time.now()
+
+    state =
+      state
+      |> SummonLifecycle.receive_event(event, now)
+      |> NavigationResolver.resolve(now)
+      |> EventSink.emit_pending()
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("summon event crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:movement_inform, motion_type, point_id}, %Mob{} = state) do
+    now = Time.now()
+    context = AIEnvironment.context(state, now)
+
+    state =
+      state
+      |> EventAI.with_blackboard(&EventAI.on_movement_inform(&1, &2, motion_type, point_id, context))
+      |> NavigationResolver.resolve(now)
+      |> EventSink.emit_pending()
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("movement inform crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_cast(:enter_evade, %Mob{} = state) do
+    state = state |> enter_evade() |> EventSink.emit_pending()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("scripted evade crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_cast({:move_to, x, y, z}, state) do
+    handle_cast({:move_to, x, y, z, []}, state)
+  end
+
+  def handle_cast({:finish_movement, controller, payload}, %Mob{} = state) do
+    case MovementHandoff.take(state, controller, Time.now()) do
+      {:ok, state} ->
+        message = Message.MsgMove.from_final_movement(payload)
+        {:noreply, apply_controlled_move(state, payload, message.opcode, controller)}
+
+      {:error, state} ->
+        {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Movement handoff failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:move_to, x, y, z, opts}, state) when is_list(opts) do
+    state = AIEnvironment.move_to(state, {x, y, z}, opts)
+    state = EventSink.emit_pending(state)
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("move_to crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_cast({:aggro_probe, target}, %Mob{internal: %Internal{in_combat: false}} = state)
+      when is_integer(target) do
+    state
+    |> mark_aggro_ready()
+    |> cancel_ai_tick()
+    |> run_ai_tick()
+  end
+
+  def handle_cast({:aggro_probe, _target}, state) do
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_cast({:assist_attack, target_guid}, state) do
+    handle_cast({:assist_attack, target_guid, nil}, state)
+  end
+
+  def handle_cast(
+        {:assist_attack, target_guid, source},
+        %Mob{internal: %Internal{in_combat: false, pet: nil, totem: nil}} = state
+      )
+      when is_integer(target_guid) do
+    if Assistance.available?(state) and Hostility.valid_attack_target?(state, target_guid) do
+      state =
+        state
+        |> engage_combat(target_guid, call_assistance: false, leash_source: source)
+        |> wake_ai_tick()
+
+      {:noreply, state, {:continue, :maybe_broadcast}}
+    else
+      {:noreply, state}
+    end
+  end
+
+  def handle_cast({:assist_attack, _target_guid, _source}, state) do
+    {:noreply, state}
+  end
+
+  def handle_cast({:flee_from_help, caller_guid, target_guid}, %Mob{} = state) do
+    now = Time.now()
+
+    if Assistance.flee_available?(state) and Hostility.valid_attack_target?(state, target_guid) do
+      context = AIEnvironment.context(state, now, %ObservationRequest{actors: [caller_guid, target_guid]})
+
+      state =
+        state
+        |> Assistance.flee_from_help(caller_guid, target_guid, context)
+        |> NavigationResolver.resolve(now)
+        |> wake_ai_tick()
+
+      {:noreply, state, {:continue, :maybe_broadcast}}
+    else
+      {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Creature help retreat failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_cast({:receive_spell, caster, spell}, state) do
+    previous = state
+    caster_guid = caster_guid(caster)
+    now = Time.now()
+    prepared = SpellReception.prepare(state, caster, spell, now)
+
+    state =
+      if SpellReception.starts_combat?(prepared) and not EntityCore.dead?(state) do
+        receive_combat_contact(state, caster_guid, now)
+      else
+        state
+      end
+
+    before_damage = state
+    {state, events} = SpellReception.apply_prepared(state, prepared, now)
+
+    state =
+      if SpellReception.cast_hit?(prepared, events) do
+        notify_spell_hit_target(caster_guid, state.object.guid, spell)
+        eventai_spell_hit(state, caster_guid, spell)
+      else
+        state
+      end
+
+    state =
+      state
+      |> react_to_spell_damage(events, before_damage)
+      |> EventSink.emit(events)
+      |> sync_behavior_tree(previous)
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Incoming spell failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:spell_contact, %Effects.SpellContact{} = effect}, state) do
+    previous = state
+    state = SpellCombat.apply_caster(state, effect)
+
+    state =
+      if effect.decision.combat? and not EntityCore.dead?(state),
+        do: receive_combat_contact(state, effect.other_guid, effect.now, :attack, effect.other_uses_timer?),
+        else: state
+
+    state =
+      state
+      |> EventSink.emit_pending()
+      |> sync_behavior_tree(previous)
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Spell combat contact failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:hold_combat, %Effects.HoldCombat{} = effect}, %Mob{} = state) do
+    state = state |> Engagement.hold_combat(effect.now, effect.duration_ms, effect.opponent_guid) |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Combat hold failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:trigger_spell, spell_id, target_guid, opts}, %Mob{} = state)
+      when is_integer(spell_id) and is_integer(target_guid) and is_list(opts) do
+    event = Effects.trigger_spell(state.object.guid, state.unit.level || 1, target_guid, spell_id, opts)
+    state = state |> EventSink.emit(event) |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
+  def handle_cast({:remove_aura, spell_id, caster_guid}, state) do
+    previous = state
+    {state, events} = Aura.remove_source_spell(state, spell_id, caster_guid, Time.now())
+    state = state |> EventSink.emit(events) |> sync_behavior_tree(previous)
+    {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
+  end
+
+  def handle_cast({:remove_single_target_aura, claim, cause}, %Mob{} = state) do
+    previous = state
+    {state, events} = Aura.SingleTarget.remove(state, claim, Time.now(), cause)
+    state = state |> EventSink.emit(events) |> sync_behavior_tree(previous) |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Single-target aura removal failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:remove_area_aura, area_guid}, %Mob{} = state) do
+    previous = state
+    {state, events} = Aura.remove_area_aura(state, area_guid, Time.now())
+    state = state |> EventSink.emit(events) |> sync_behavior_tree(previous) |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Area aura removal failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:shorten_area_aura, area_guid, expires_at}, %Mob{} = state) do
+    {state, events} = Aura.shorten_area_aura(state, area_guid, expires_at, Time.now())
+    state = EventSink.emit(state, events)
+    {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Area aura shortening failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:remove_spell_auras, spell_ids}, state) when is_list(spell_ids) do
+    previous = state
+    {state, events} = Aura.remove_spells(state, spell_ids, Time.now())
+    state = state |> EventSink.emit(events) |> sync_behavior_tree(previous)
+    {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
+  end
+
+  def handle_cast({:monster_talk, text, chat_type}, state) when is_binary(text) and is_atom(chat_type) do
+    state = EventSink.emit(state, Effects.monster_talk(text, chat_type, nil))
+    {:noreply, state}
+  end
+
+  def handle_cast({:modify_npc_flags, flags, mode}, %Mob{} = state)
+      when is_integer(flags) and mode in [:add, :remove] do
+    npc_flags = modify_flags(state.unit.npc_flags || 0, flags, mode)
+    state = %{state | unit: %{state.unit | npc_flags: npc_flags}} |> EntityCore.mark_broadcast_update()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
+  def handle_cast({:modify_unit_flags, flags, mode}, %Mob{} = state)
+      when is_integer(flags) and mode in [:add, :remove] do
+    flags = modify_flags(state.unit.flags || 0, flags, mode)
+    state = %{state | unit: %{state.unit | flags: flags}} |> EntityCore.mark_broadcast_update()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
+  def handle_cast({:delay_aura, spell_id, caster_guid, delay_ms}, state) do
+    state =
+      state
+      |> Aura.delay_source_spell(spell_id, caster_guid, delay_ms, Time.now())
+      |> EventSink.emit_pending()
+
+    {:noreply, wake_ai_tick(state)}
+  end
+
+  @impl GenServer
+  def handle_cast({:receive_heal, amount}, state) do
+    state = SpellReception.heal(state, amount)
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
+  def handle_cast({:grant_power, %Effects.GrantPower{} = grant}, %Mob{} = state) do
+    {state, events} = PowerRestoration.apply(state, grant, Time.now())
+    state = state |> Effects.enqueue(events) |> EventSink.emit_pending(EventContext.new(self()))
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Power restoration failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:leech_power, %Effects.LeechPower{} = leech}, %Mob{} = state) do
+    {state, events} = PowerLeech.restore(state, leech, :rand.uniform())
+    state = state |> Effects.enqueue(events) |> EventSink.emit_pending(EventContext.new(self()))
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Power leech failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:add_threat, %Effects.AddThreat{} = effect}, %Mob{internal: %Internal{in_combat: true}} = state) do
+    if Hostility.valid_hostile_target?(state, effect.source_guid) do
+      state =
+        state
+        |> Threat.add(effect.source_guid, effect.amount)
+        |> EventSink.emit_pending(EventContext.new(self()))
+        |> wake_ai_tick()
+
+      {:noreply, state}
+    else
+      {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Power leech threat failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:add_threat, %Effects.AddThreat{}}, state), do: {:noreply, state}
+
+  @impl GenServer
+  def handle_cast({:heal_threat, healer_guid, healed_guid, amount}, %Mob{internal: %Internal{in_combat: true}} = state)
+      when is_integer(healer_guid) and is_number(amount) and amount > 0 do
+    if Threat.tracking?(state, healed_guid) and Hostility.valid_hostile_target?(state, healer_guid) do
+      state =
+        state
+        |> Threat.add(healer_guid, amount / attacker_count(healed_guid))
+        |> wake_ai_tick()
+
+      {:noreply, state}
+    else
+      {:noreply, state}
+    end
+  end
+
+  def handle_cast({:heal_threat, _healer_guid, _healed_guid, _amount}, state) do
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_cast({:drop_threat, source_guid}, %Mob{} = state) do
+    now = Time.now()
+
+    state =
+      state
+      |> MobBT.drop_threat(source_guid, AIEnvironment.context(state, now, ObservationRequest.actor(source_guid)))
+      |> NavigationResolver.resolve(now)
+      |> EventSink.emit_pending()
+      |> wake_ai_tick()
+
+    {:noreply, state}
+  end
+
+  def handle_cast({:feign_death_target_lost, source_guid}, %Mob{} = state) do
+    state = FeignDeath.target_lost(state, source_guid, Time.now())
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Feign Death target cleanup failed: #{inspect(error)}")
+      {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_cast({:temporary_threat, source_guid, incarnation_id, amount}, %Mob{} = state) do
+    if is_integer(incarnation_id) and Incarnation.id(state) == incarnation_id do
+      {:noreply, state |> Threat.set_temporary(source_guid, amount) |> wake_ai_tick()}
+    else
+      {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Temporary threat update failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_cast({:loot_roll_vote, voter_guid, slot, vote}, %Mob{} = state) do
+    {:noreply, Corpse.roll_vote(state, voter_guid, slot, vote)}
+  end
+
+  def handle_cast(%Commit{} = command, %Mob{} = state) do
+    owner = if Pockets.owns_reservation?(state, command.token), do: Pockets, else: Corpse
+    {_result, state} = owner.commit(state, command)
+    {:noreply, state}
+  end
+
+  def handle_cast(%Release{} = command, %Mob{} = state) do
+    owner = if Pockets.owns_reservation?(state, command.token), do: Pockets, else: Corpse
+    {_result, state} = owner.release_reservation(state, command)
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_cast({:receive_attack, %{caster: caster} = attack}, state) do
+    state = receive_combat_contact(state, caster, Time.now())
+
+    {state, events} =
+      Combat.receive_attack(state, attack, Time.now(), damage_sharing_targets: DamageSharing.targets(state))
+
+    state =
+      state
+      |> EventSink.emit(events)
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Attack reception failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_cast({:attack_outcome, payload}, %Mob{} = state) do
+    spell = Map.get(payload, :spell) || spellbook_spell(state, Map.get(payload, :spell_id))
+
+    state =
+      state
+      |> AttackFeedback.receive(payload, spell, Time.now())
+      |> EventSink.emit_pending()
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
+  def handle_cast({:threat_ref_gained, guid, incarnation}, %Mob{internal: %{pet: %Pet{}}} = state) do
+    state = Engagement.gain_threat_ref(state, guid, incarnation, Time.now())
+    {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet combat reference failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:threat_ref_lost, guid, incarnation}, %Mob{internal: %{pet: %Pet{}}} = state) do
+    state = Engagement.lose_threat_ref(state, guid, incarnation)
+    {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet combat reference release failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({reference, _guid, _incarnation}, %Mob{} = state)
+      when reference in [:threat_ref_gained, :threat_ref_lost], do: {:noreply, state}
+
+  def handle_cast({:kill_outcome, %KillFeedback.Victim{} = victim}, %Mob{} = state) do
+    now = Time.now()
+
+    state =
+      state
+      |> KillFeedback.receive(victim, now)
+      |> pet_victim_died(victim.guid, now)
+      |> EventSink.emit_pending()
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Kill proc failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:receive_shared_damage, %Effects.SharedDamage{} = transfer}, %Mob{} = state) do
+    previous = state
+
+    state =
+      state
+      |> DamageSharing.receive(transfer, Time.now())
+      |> then(&react_to_spell_damage(&1, &1.internal.events, previous))
+      |> EventSink.emit_pending()
+      |> sync_behavior_tree(previous)
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Shared damage failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_cast({:spell_outcome, payload}, %Mob{} = state) do
+    spell = Map.get(payload, :spell) || spellbook_spell(state, Map.get(payload, :spell_id))
+
+    state =
+      state
+      |> SpellFeedback.receive(payload, spell, Time.now())
+      |> EventSink.emit_pending()
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
+  def handle_cast({:pet_spell_modifiers, owner, holders}, %Mob{} = state) do
+    updated = state |> PetSpellModifiers.sync(owner, holders, Time.now()) |> EventSink.emit_pending()
+    {:noreply, updated, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet spell modifiers failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:sync_pvp, owner, enabled}, %Mob{} = state) when is_boolean(enabled) do
+    state = if control_owner(state) == owner, do: set_pvp(state, enabled), else: state
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Controlled PvP update failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_call({:pet_controls, owner, request}, _from, %Mob{} = state) do
+    case PetControls.update(state, owner, request) do
+      {:ok, updated} ->
+        blackboard = updated.internal.blackboard |> Blackboard.ensure() |> Blackboard.reset_spells()
+        updated = %{updated | internal: %{updated.internal | blackboard: blackboard}} |> wake_ai_tick()
+        {:reply, {:ok, Map.values(updated.internal.spellbook), updated.internal.pet}, updated}
+
+      error ->
+        {:reply, error, state}
+    end
+  rescue
+    error ->
+      Logger.error("Pet controls failed: #{Exception.message(error)}")
+      {:reply, {:error, :unavailable}, state}
+  end
+
+  def handle_call(:threat_table, _from, %Mob{} = state) do
+    {:reply, {:ok, %{victim: state.unit.target, entries: Threat.entries(state)}}, state}
+  end
+
+  def handle_call({command, owner, %Spell{} = spell}, _from, %Mob{} = state)
+      when command in [:validate_pet_training, :learn_pet_spell] do
+    abilities = ThistleTea.Game.World.Loader.PetTraining.abilities()
+    skill = ThistleTea.Game.World.Loader.PetTraining.family_skill(state.internal.creature.family)
+
+    if command == :validate_pet_training do
+      {:reply, PetTraining.validate(state, owner, spell, abilities, skill), state}
+    else
+      case PetTraining.learn(state, owner, spell, abilities, skill, Time.now()) do
+        {:ok, updated} ->
+          blackboard = updated.internal.blackboard |> Blackboard.ensure() |> Blackboard.reset_spells()
+          updated = %{updated | internal: %{updated.internal | blackboard: blackboard}}
+          updated = updated |> PetProgression.publish() |> EventSink.emit_pending() |> wake_ai_tick()
+          result = {:ok, Map.values(updated.internal.spellbook), updated.internal.pet}
+          {:reply, result, updated, {:continue, :maybe_broadcast}}
+
+        {:error, reason} ->
+          {:reply, {:error, reason}, state}
+      end
+    end
+  rescue
+    error ->
+      Logger.error("Pet training failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:reply, {:error, :bad_targets}, state}
+  end
+
+  def handle_call({:pet_unlearn_cost, owner}, _from, %Mob{} = state) do
+    {:reply, PetUntraining.quote(state, owner, Time.now()), state}
+  rescue
+    error ->
+      Logger.error("Pet untraining quote failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:reply, {:error, :no_pet}, state}
+  end
+
+  def handle_call({:unlearn_pet, owner, money, maximum_cost}, _from, %Mob{} = state) do
+    family_spells = ThistleTea.Game.World.Loader.PetTraining.family_passives(state.internal.creature.family)
+
+    case PetUntraining.reset(state, owner, money, maximum_cost, family_spells, Time.now()) do
+      {:ok, updated, cost} ->
+        blackboard = updated.internal.blackboard |> Blackboard.ensure() |> Blackboard.reset_spells()
+        updated = %{updated | internal: %{updated.internal | blackboard: blackboard}}
+        updated = updated |> PetProgression.publish() |> EventSink.emit_pending() |> wake_ai_tick()
+
+        result =
+          {:ok, cost, PetProgression.snapshot(updated), Map.values(updated.internal.spellbook), updated.internal.pet}
+
+        {:reply, result, updated, {:continue, :maybe_broadcast}}
+
+      error ->
+        {:reply, error, state}
+    end
+  rescue
+    error ->
+      Logger.error("Pet untraining failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:reply, {:error, :no_pet}, state}
+  end
+
+  def handle_call(
+        {:debug_pet, owner_guid, adjustment},
+        _from,
+        %Mob{internal: %Internal{pet: %Pet{kind: :hunter, owner_guid: owner_guid, broken?: false}}} = state
+      ) do
+    state = adjust_debug_pet(state, adjustment)
+    info = state |> PetProgression.snapshot() |> Map.from_struct() |> Map.put(:happiness, state.unit.power5)
+    {:reply, {:ok, info}, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("debug_pet crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:reply, {:error, :invalid_pet}, state}
+  end
+
+  def handle_call({:debug_pet, _owner_guid, _adjustment}, _from, %Mob{} = state) do
+    {:reply, {:error, :not_hunter_pet}, state}
+  end
+
+  def handle_call({:rename_pet, owner_guid, name}, _from, %Mob{} = state) do
+    case PetNaming.rename(state, owner_guid, name, System.system_time(:second)) do
+      {:ok, updated, identity} ->
+        Metadata.update(updated.object.guid, %{name: identity.name, pet_name_timestamp: identity.timestamp})
+        {:reply, {:ok, identity}, updated, {:continue, :maybe_broadcast}}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  rescue
+    error ->
+      Logger.error("rename_pet crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:reply, {:error, :unavailable}, state}
+  end
+
+  def handle_call(:feed_info, _from, %Mob{internal: %Internal{pet: %Pet{} = pet}} = state) do
+    info = %{
+      alive?: not EntityCore.dead?(state),
+      food_mask: pet.food_mask || 0,
+      in_combat: state.internal.in_combat,
+      level: state.unit.level
+    }
+
+    {:reply, {:ok, info}, state}
+  end
+
+  def handle_call(:feed_info, _from, %Mob{} = state), do: {:reply, {:error, :not_pet}, state}
+
+  def handle_call(
+        :suspend_hunter_pet,
+        _from,
+        %Mob{internal: %Internal{pet: %Pet{kind: :hunter, broken?: true}}} = state
+      ) do
+    {:stop, :normal, {:error, :pet_broken}, state}
+  end
+
+  def handle_call(:suspend_hunter_pet, _from, %Mob{internal: %Internal{pet: %Pet{kind: :hunter}}} = state) do
+    snapshot =
+      {:ok, state.unit.power5, EntityCore.dead?(state), PetProgression.snapshot(state),
+       state.internal.pet.reaction_state, state.unit.health}
+
+    {:stop, :normal, snapshot, state}
+  end
+
+  def handle_call(:suspend_hunter_pet, _from, %Mob{} = state), do: {:reply, {:error, :not_hunter_pet}, state}
+
+  def handle_call(
+        :hunter_pet_snapshot,
+        _from,
+        %Mob{internal: %Internal{pet: %Pet{kind: :hunter, broken?: false}}} = state
+      ) do
+    snapshot =
+      {:ok, state.unit.power5, EntityCore.dead?(state), PetProgression.snapshot(state),
+       state.internal.pet.reaction_state, state.unit.health}
+
+    {:reply, snapshot, state}
+  end
+
+  def handle_call(:hunter_pet_snapshot, _from, %Mob{} = state), do: {:reply, {:error, :not_hunter_pet}, state}
+
+  def handle_call({:loot_view, %Actor{} = actor}, _from, %Mob{} = state) do
+    {result, state} = Corpse.view(state, actor)
+    {:reply, result, state}
+  end
+
+  def handle_call({:pickpocket, %Actor{} = actor, level}, _from, %Mob{} = state) do
+    {result, state} = Pockets.open(state, actor, level)
+    {:reply, result, state}
+  rescue
+    error ->
+      Logger.error("Pickpocket failed: #{Exception.message(error)}")
+      {:reply, {:error, :no_loot}, state}
+  end
+
+  def handle_call({:skin_corpse, %Actor{} = actor, skill}, _from, %Mob{} = state) do
+    {result, state} = Corpse.skin(state, actor, skill)
+    {:reply, result, state}
+  rescue
+    error ->
+      Logger.error("Skinning failed: #{Exception.message(error)}")
+      {:reply, {:error, :bad_targets}, state}
+  end
+
+  def handle_call({:pocket_loot, %Actor{} = actor, :release}, _from, %Mob{} = state) do
+    {:reply, :ok, Pockets.release(state, actor)}
+  end
+
+  def handle_call({:pocket_loot, %Actor{} = actor, command}, {owner_pid, _tag}, %Mob{} = state) do
+    {result, state} = Pockets.interact(state, actor, command, owner_pid)
+    {:reply, result, state}
+  rescue
+    error ->
+      Logger.error("Pocket loot failed: #{Exception.message(error)}")
+      {:reply, {:error, :no_loot}, state}
+  end
+
+  def handle_call({:loot_master_give, %Actor{} = giver, slot, %Actor{} = recipient}, _from, %Mob{} = state) do
+    {result, state} = Corpse.master_give(state, giver, slot, recipient)
+    {:reply, result, state}
+  end
+
+  def handle_call({:loot_reserve_item, %Actor{} = actor, slot}, {owner_pid, _tag}, %Mob{} = state) do
+    {result, state} = Corpse.reserve_item(state, actor, slot, owner_pid)
+    {:reply, result, state}
+  end
+
+  def handle_call({:loot_validate_commit, %Actor{} = actor, token}, _from, %Mob{} = state) do
+    reply =
+      if Pockets.owns_reservation?(state, token),
+        do: Pockets.validate_commit(state, actor, token),
+        else: LootSession.validate_commit(state.internal.loot.session, actor, token)
+
+    {:reply, reply, state}
+  end
+
+  def handle_call({:loot_take_gold, %Actor{} = actor}, _from, %Mob{} = state) do
+    {result, state} = Corpse.take_gold(state, actor)
+    {:reply, result, state}
+  end
+
+  def handle_call({:loot_release, %Actor{} = actor}, _from, %Mob{} = state) do
+    {:reply, :ok, Corpse.release(state, actor)}
+  end
+
+  @impl GenServer
+  def handle_info({:loot_roll_timeout, slot}, %Mob{} = state) do
+    {:noreply, Corpse.roll_timeout(state, slot)}
+  end
+
+  def handle_info({:DOWN, token, :process, _pid, _reason}, %Mob{internal: %{guardian_monitors: monitors}} = state)
+      when is_map_key(monitors, token) do
+    {state, monitors} = GuardianOwner.process_down(state, monitors, token)
+    {:noreply, %{state | internal: %{state.internal | guardian_monitors: monitors}}}
+  rescue
+    error ->
+      Logger.error("Guardian cleanup failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info(
+        {:DOWN, token, :process, _pid, _reason},
+        %Mob{internal: %{companion_monitor: %CreaturePetOwner.Monitor{token: token}}} = state
+      ) do
+    {:noreply, CreaturePetOwner.process_down(state, token), {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Creature pet cleanup failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info(
+        {:game_object_down, token, :process, _pid, _reason},
+        %Mob{internal: %{game_object_monitors: monitors}} = state
+      ) do
+    {:noreply, %{state | internal: %{state.internal | game_object_monitors: Map.delete(monitors, token)}}}
+  end
+
+  def handle_info(%Effects.SummonGameObject{} = effect, %Mob{} = state) do
+    monitors = GameObjectSummons.summon(state, state.internal.game_object_monitors, effect, EventContext.new(self()))
+    {:noreply, %{state | internal: %{state.internal | game_object_monitors: monitors}}}
+  rescue
+    error ->
+      Logger.error("Creature game object summon failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:DOWN, token, :process, _pid, _reason}, %Mob{} = state) when is_reference(token) do
+    owner = if Pockets.owns_reservation?(state, token), do: Pockets, else: Corpse
+    {:noreply, owner.reservation_lost(state, token)}
+  end
+
+  def handle_info(%Effects.ActivateCooldown{} = event, %Mob{} = state) do
+    {state, events} = Cooldowns.handle_event(state, event, Time.now())
+    {:noreply, EventSink.emit(state, events)}
+  rescue
+    error ->
+      Logger.error("Cooldown event failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info(%Effects.SummonGuardians{} = effect, %Mob{} = state) do
+    {state, monitors} = GuardianOwner.summon(state, state.internal.guardian_monitors, effect)
+    {:noreply, %{state | internal: %{state.internal | guardian_monitors: monitors}}}
+  rescue
+    error ->
+      Logger.error("Guardian summon failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info(%Effects.SummonPet{} = effect, %Mob{} = state) do
+    {:noreply, CreaturePetOwner.summon(state, effect), {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Creature pet summon failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info(%Effects.SummonControlledPet{} = effect, %Mob{} = state) do
+    {:noreply, CreaturePetOwner.summon(state, effect), {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Controlled pet summon failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info({:remove_corpse, token}, %Mob{} = state) do
+    {:noreply, state |> Corpse.remove(token) |> Respawn.after_corpse_removed()}
+  rescue
+    error ->
+      Logger.error("Corpse removal failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info({:deliver_spell, event}, state) do
+    EventSink.deliver_spell(event)
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("deliver_spell crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info({:ai_tick, token}, %{internal: %Internal{ai_tick_token: token}} = state) when is_reference(token) do
+    state
+    |> clear_ai_tick_ref()
+    |> run_ai_tick()
+  end
+
+  def handle_info({:ai_tick, _token}, state) do
+    {:noreply, state}
+  end
+
+  def handle_info(:ai_tick, state) do
+    state
+    |> cancel_ai_tick()
+    |> run_ai_tick()
+  end
+
+  def handle_info(:formation_changed, state), do: {:noreply, wake_ai_tick(state)}
+
+  def handle_info({:target_moved, target}, %Mob{unit: %Unit{target: target}} = state) when is_integer(target) do
+    state
+    |> mark_chase_ready()
+    |> cancel_ai_tick()
+    |> run_ai_tick()
+  end
+
+  def handle_info({:target_moved, _target}, state) do
+    {:noreply, sync_chase_watch(state)}
+  end
+
+  def handle_info(
+        {:controlled_move, owner_guid, payload, opcode},
+        %Mob{internal: %Internal{pet: %Pet{possessed?: true, owner_guid: owner_guid}}} = state
+      ) do
+    if EntityCore.dead?(state) or ControlMovement.active?(state),
+      do: {:noreply, state},
+      else: {:noreply, apply_controlled_move(state, payload, opcode, owner_guid)}
+  rescue
+    error ->
+      Logger.error("Controlled movement failed: #{inspect(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:controlled_move, _owner_guid, _payload, _opcode}, state), do: {:noreply, state}
+
+  def handle_info(
+        {:release_control, owner_guid, spell_id},
+        %Mob{internal: %Internal{pet: %Pet{kind: :possessed, owner_guid: owner_guid, control_spell_id: spell_id}}} =
+          state
+      ) do
+    {:noreply, Respawn.despawn(state, nil)}
+  end
+
+  def handle_info(
+        {:release_control, owner_guid, spell_id},
+        %Mob{internal: %Internal{pet: %Pet{possessed?: true, owner_guid: owner_guid, control_spell_id: spell_id}}} =
+          state
+      ) do
+    {state, events} = Aura.remove_source_spell(state, spell_id, owner_guid, Time.now())
+    {:noreply, EventSink.emit(state, events), {:continue, :maybe_broadcast}}
+  end
+
+  def handle_info(
+        {:release_control, owner_guid, nil},
+        %Mob{internal: %Internal{pet: %Pet{kind: :charmed, owner_guid: owner_guid, control_spell_id: spell_id}}} = state
+      )
+      when is_integer(spell_id) do
+    {state, events} = Aura.remove_source_spell(state, spell_id, owner_guid, Time.now())
+    {:noreply, EventSink.emit(state, events), {:continue, :maybe_broadcast}}
+  end
+
+  def handle_info({:release_control, _owner_guid, _spell_id}, state), do: {:noreply, state}
+
+  def handle_info(:respawn, %Mob{} = state) do
+    {:noreply, Respawn.handle(state)}
+  end
+
+  def handle_info({:creature_group, token, command}, %Mob{} = state) do
+    if CreatureGroups.valid_command?(state.internal.world, state.object.guid, token, self()) do
+      state = apply_creature_group_command(state, command)
+      {:noreply, state, {:continue, :maybe_broadcast}}
+    else
+      {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("creature group command crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:script_respawn, even_if_alive?}, %Mob{} = state) when is_boolean(even_if_alive?) do
+    {:noreply, Respawn.force(state, even_if_alive?)}
+  rescue
+    error ->
+      Logger.error("script respawn crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:script_remove_object, respawn_delay_ms}, %Mob{} = state) do
+    case SpawnPool.suspend(state, respawn_delay_ms) do
+      :pooled ->
+        {:noreply, state}
+
+      :unpooled ->
+        pid = self()
+        Task.start(fn -> World.stop_entity(pid) end)
+        {:noreply, state}
+    end
+  end
+
+  def handle_info({:script_command, %ScriptRequest{} = request}, %Mob{} = state) do
+    state = state |> ScriptExecution.command(request) |> EventSink.emit_pending()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("script command crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      ScriptDelivery.reply(request, :failed)
+      {:noreply, state}
+  end
+
+  def handle_info({:script_resume, id, receipt, world, result}, %Mob{} = state) do
+    state = state |> ScriptExecution.resume(id, receipt, world, result) |> EventSink.emit_pending()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("script resume crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info(%Effects.ScriptCompleted{} = effect, %Mob{} = state) do
+    state = EventAI.with_blackboard(state, &EventAI.complete_script(&1, &2, effect, Time.now()))
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("script completion crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:ai_script_steps, steps, target_guid, world}, %Mob{internal: %{world: world}} = state) do
+    handle_info({:ai_script_steps, steps, target_guid}, state)
+  end
+
+  def handle_info({:ai_script_steps, _steps, _target_guid, _world}, %Mob{} = state), do: {:noreply, state}
+
+  def handle_info({:ai_script_steps, steps, target_guid}, %Mob{} = state) do
+    if Corpse.removed?(state) do
+      {:noreply, state}
+    else
+      now = Time.now()
+
+      state =
+        state
+        |> ScriptSpells.prepare(steps)
+        |> EventAI.with_blackboard(
+          &Script.run(
+            &1,
+            &2,
+            steps,
+            target_guid,
+            AIEnvironment.context(
+              &1,
+              now,
+              ObservationRequest.for_script(steps, [target_guid])
+            )
+          )
+        )
+        |> NavigationResolver.resolve(now)
+        |> EventSink.emit_pending()
+
+      {:noreply, state, {:continue, :maybe_broadcast}}
+    end
+  rescue
+    error ->
+      Logger.error("ai_script_steps crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:force_attack, %TargetRef{guid: guid} = target}, %Mob{} = state) do
+    metadata = Metadata.query(guid, [:alive?, :incarnation_id]) || %{}
+    world = state.internal.world
+
+    if TargetRef.active?(target, metadata) and
+         match?({^world, _, _, _}, World.position(guid)) and Hostility.attackable?(state, guid) do
+      handle_info({:force_attack, guid}, state)
+    else
+      {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Creature automatic attack failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:force_attack, target_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state)
+      when is_integer(target_guid) do
+    if EntityCore.dead?(state) or Corpse.removed?(state) do
+      {:noreply, state}
+    else
+      state = state |> PetBT.command(:attack, target_guid) |> wake_ai_tick()
+      {:noreply, state, {:continue, :maybe_broadcast}}
+    end
+  rescue
+    error ->
+      Logger.error("Pet automatic attack failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:force_attack, target_guid}, %Mob{} = state) when is_integer(target_guid) do
+    if EntityCore.dead?(state) or Corpse.removed?(state) do
+      {:noreply, state}
+    else
+      state =
+        state
+        |> engage_combat(target_guid)
+        |> wake_ai_tick()
+
+      {:noreply, state, {:continue, :maybe_broadcast}}
+    end
+  end
+
+  def handle_info({:call_assistance, target_guid, helpers, source}, %Mob{} = state) do
+    CallForHelp.deliver(state, target_guid, helpers, source)
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("Creature assistance failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:pet_stop_attack, controller}, %Mob{} = state) do
+    state = state |> PetCommands.stop_attack(controller) |> EventSink.emit_pending() |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet attack stop failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:pet_cancel_aura, controller, spell}, %Mob{} = state) do
+    previous = state
+    state = state |> PetCommands.cancel_aura(controller, spell) |> EventSink.emit_pending()
+    state = state |> sync_behavior_tree(previous) |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet aura cancellation failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:pet_command, command, target_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
+    state = state |> PetBT.command(command, target_guid) |> wake_ai_tick() |> EventSink.emit_pending()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
+  def handle_info({:pet_reaction, reaction}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
+    state = state |> PetBT.reaction(reaction) |> wake_ai_tick() |> EventSink.emit_pending()
+    {:noreply, state}
+  end
+
+  def handle_info({:attach_pet, owner_pid, spell_id, pet_spells}, %Mob{internal: %Internal{pet: %Pet{}}} = state)
+      when is_pid(owner_pid) do
+    attachment = Attachment.from_pet(state, self(), spell_id, pet_spells)
+    send(owner_pid, attachment)
+    {:noreply, state}
+  end
+
+  def handle_info(
+        {:reward_pet_kill, owner_guid, owner_level, reward},
+        %Mob{internal: %Internal{pet: %Pet{kind: :hunter, owner_guid: owner_guid}}} = state
+      ) do
+    amount = PetProgression.reward(state, reward, owner_level)
+    state = PetProgression.gain(state, amount, owner_level, PetLevelLoader.levels())
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet experience failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:reward_pet_kill, _owner_guid, _owner_level, _reward}, %Mob{} = state), do: {:noreply, state}
+
+  def handle_info({reaction, attacker_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state)
+      when reaction in [:owner_attacked, :pet_attacked] and is_integer(attacker_guid) do
+    previous = state
+    state = engage_combat(state, attacker_guid)
+    state = if state == previous, do: state, else: wake_ai_tick(state)
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet retaliation failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:owner_killed, owner, victim}, %Mob{internal: %{pet: %Pet{owner_guid: owner}}} = state) do
+    state = state |> pet_victim_died(victim, Time.now()) |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet kill reaction failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:owner_killed, _owner, _victim}, %Mob{} = state), do: {:noreply, state}
+
+  def handle_info({:pet_cast, controller, spell_id, targets}, %Mob{} = state) when is_integer(spell_id) do
+    state = PetCasting.cast(state, controller, spell_id, targets)
+    {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet cast failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info(:summon_despawn, %Mob{} = state) do
+    if Respawn.summon_despawn_blocked?(state) do
+      Process.send_after(self(), :summon_despawn, @summon_despawn_retry_ms)
+      {:noreply, state}
+    else
+      {:noreply, Respawn.despawn(state, nil)}
+    end
+  end
+
+  def handle_info({:despawn_creature, respawn_delay_ms}, %Mob{} = state) do
+    {:noreply, Respawn.despawn(state, respawn_delay_ms)}
+  end
+
+  def handle_info({:pet_corpse_expired, generation}, %Mob{} = state) do
+    if PetResurrection.corpse_expired?(state, generation), do: {:stop, :normal, state}, else: {:noreply, state}
+  end
+
+  def handle_info(:pet_stop, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
+    pid = self()
+    Task.start(fn -> World.stop_entity(pid) end)
+    {:noreply, state}
+  end
+
+  def handle_info(:tame_stop, %Mob{} = state) do
+    state = state |> Engagement.leave(:tamed) |> Map.fetch!(:entity) |> EventSink.emit_pending()
+    pid = self()
+    Task.start(fn -> World.stop_entity(pid) end)
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("tame_stop crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info(%Commands.TotemStopped{guid: guid}, %Mob{} = state) do
+    {:noreply, Totems.stopped(state, guid)}
+  rescue
+    error ->
+      Logger.error("Totem departure failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info(:totem_stop, %Mob{internal: %Internal{totem: %Totem{}}} = state) do
+    {:stop, :normal, state}
+  end
+
+  def handle_info({:event_stop, _event}, state) do
+    case SpawnPool.deactivate(state) do
+      :pooled -> {:noreply, state}
+      :unpooled -> stop_after_event(state)
+    end
+  end
+
+  def handle_info(:creature_events_changed, %Mob{} = state) do
+    previous = state
+    state = state |> CreatureEventEnvironment.reconcile(Time.now()) |> sync_behavior_tree(previous) |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Creature world-event update failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:event_start, _event}, state) do
+    {:noreply, state}
+  end
+
+  def handle_info(%Commands.ChargePathResolved{} = command, %Mob{} = state) do
+    state |> BoundaryResult.apply(command) |> run_ai_tick()
+  rescue
+    error ->
+      Logger.error("Creature charge failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  defp apply_controlled_move(%Mob{} = state, payload, opcode, owner_guid) do
+    state = MovementHandoff.clear(state)
+    movement_block = MovementBlock.from_binary(payload, state.movement_block)
+    {x, y, z, _orientation} = movement_block.position
+    state = %{state | movement_block: movement_block, unit: %{state.unit | stand_state: 0}}
+
+    World.update_position(state)
+    sync_perception_metadata(state)
+    state = Visibility.refresh_entity(state)
+
+    observers = World.tracking_players(state)
+
+    recipients =
+      if opcode == Message.MsgMoveKnockBack.opcode(),
+        do: List.delete(observers, owner_guid),
+        else: Enum.uniq([owner_guid | observers])
+
+    Message.MsgMove.to_packet(state.object.guid, payload, opcode)
+    |> World.broadcast_packet(state, recipients: recipients)
+
+    ChaseWatch.notify_moved(state.object.guid, {x, y, z})
+    state
+  end
+
+  defp stop_after_event(state) do
+    pid = self()
+    Task.start(fn -> World.stop_entity(pid) end)
+    {:noreply, state}
+  end
+
+  defp run_ai_tick(%{internal: %Internal{behavior_tree: behavior_tree}} = state) do
+    if Corpse.removed?(state) do
+      {:noreply, unwatch_chase(state)}
+    else
+      now = Time.now()
+      state = Movement.sync_position(state, now)
+      World.update_position(state)
+      state = Visibility.refresh_entity(state)
+      started_at = System.monotonic_time()
+      previous = state
+      {status, state} = BehaviorRunner.tick(behavior_tree, state, AIEnvironment.context(state, now))
+      state = react_to_spell_damage(state, state.internal.events, previous)
+      state = NavigationResolver.resolve(state, now)
+      state = sync_behavior_tree(state, previous)
+      duration = System.monotonic_time() - started_at
+      state = EventSink.emit_pending(state)
+      state = sync_chase_watch(state)
+      plan = Tick.plan(state, status, now)
+      emit_ai_tick_telemetry(state, status, duration, plan)
+      state = schedule_next_ai_tick(state, plan)
+      {:noreply, state, {:continue, :maybe_broadcast}}
+    end
+  rescue
+    error ->
+      Logger.error("Mob AI tick crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      state = schedule_ai_tick(state, @ai_tick_retry_ms)
+      {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_continue(:maybe_broadcast, %Mob{} = state) do
+    state =
+      state
+      |> EventSink.emit_pending()
+      |> sync_owner_pvp()
+      |> maybe_finalize_death()
+      |> broadcast_if_pending()
+      |> sync_perception_metadata()
+      |> schedule_movement_completion()
+
+    {:noreply, state}
+  end
+
+  defp broadcast_if_pending(%Mob{internal: %Internal{broadcast_update?: true}} = state) do
+    if !Corpse.removed?(state) do
+      visibility = Map.merge(StealthDetection.target_metadata(state), Mob.visibility_metadata(state))
+      previous_visibility = Metadata.query(state.object.guid, Map.keys(visibility))
+
+      metadata =
+        %{
+          alive?: not EntityCore.dead?(state),
+          feigning_death?: FeignDeath.successful?(state),
+          victim_guid: state.unit.target,
+          combat_victim_guid: state.unit.target,
+          combat_targets: Threat.targets(state),
+          evading?: evading?(state.internal.blackboard),
+          charmed_by: state.unit.charmed_by,
+          detect_range_modifier: Aura.flat_amount(state, :mod_detect_range),
+          level: state.unit.level,
+          in_combat: state.internal.in_combat == true,
+          rooted?: state.internal.rooted? == true,
+          root_aura?: Aura.has_aura?(state, :mod_root),
+          health_pct: EntityCore.health_pct(state),
+          health_deficit: EntityCore.health_deficit(state),
+          mana_pct: EntityCore.mana_pct(state),
+          power_type: state.unit.power_type,
+          shapeshift_form: state.unit.shapeshift_form || 0,
+          unit_flags: state.unit.flags,
+          transport_guid: state.movement_block.transport_guid,
+          aura_sources: Aura.source_spells(state),
+          aura_stacks: Aura.spell_stacks(state),
+          aura_effects: Aura.effect_keys(state),
+          crowd_controlled?: Aura.crowd_controlled?(state),
+          breakable_crowd_control?: Aura.breakable_crowd_control?(state),
+          dispel_options: Aura.dispel_options(state),
+          friendly_mechanic_immunities: Aura.friendly_mechanics(state),
+          invulnerability_interruptible?: Aura.Invulnerability.carrier?(state),
+          spell_threat: SpellThreat.projection(state)
+        }
+        |> Map.merge(SpellResist.defense_snapshot(state))
+        |> Map.merge(FactionLoader.metadata(state.unit.faction_template))
+        |> Map.merge(Appearance.metadata(state))
+        |> Map.merge(control_metadata(state))
+        |> Map.merge(ControlledCombat.projection(state))
+        |> Map.put(:proximity_aggro?, Mob.proximity_aggro?(state))
+        |> Map.put(:no_spell_defense?, CreatureFlags.has?(state, :no_spell_defense))
+        |> Map.put(:no_threat_list?, CreatureFlags.no_threat_list?(state))
+        |> Map.merge(visibility)
+
+      Metadata.update(state.object.guid, metadata)
+      if previous_visibility != visibility, do: Visibility.notify_visibility_changed(state)
+      update_type = if EntityCore.dead?(state), do: :create_object2, else: :values
+      EntityCore.update_object(state, update_type) |> World.broadcast_packet(state)
+    end
+
+    %{state | internal: %{state.internal | broadcast_update?: false}}
+  end
+
+  defp broadcast_if_pending(%Mob{} = state), do: state
+
+  defp modify_flags(value, flags, :add), do: Bitwise.bor(value, flags)
+  defp modify_flags(value, flags, :remove), do: Bitwise.band(value, Bitwise.bnot(flags))
+
+  defp sync_perception_metadata(
+         %Mob{object: %{guid: guid}, movement_block: %MovementBlock{position: {_x, _y, _z, orientation}}} = state
+       )
+       when is_integer(guid) and is_number(orientation) do
+    Metadata.update(guid, %{
+      orientation: orientation,
+      lateral_speed: MovementBlock.lateral_speed(state.movement_block),
+      assistance_available?: Assistance.available?(state),
+      flee_from_help_available?: Assistance.flee_available?(state)
+    })
+
+    state
+  end
+
+  defp sync_perception_metadata(%Mob{} = state), do: state
+
+  @impl GenServer
+  def terminate(_reason, state) do
+    SummonLifecycle.notify(state, :summoned_just_despawn)
+    CreaturePetOwner.owner_stopped(state)
+    GuardianOwner.owner_stopped(state)
+    TotemOwner.stopped(state)
+    release_victim(state)
+    unwatch_chase(state)
+    World.remove_position(state)
+    Visibility.leave_entity(state)
+    Metadata.delete(state.object.guid)
+  end
+
+  defp behavior_tree(%Mob{internal: %Internal{totem: %Totem{}}}), do: TotemBT.tree()
+
+  defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{kind: :mini_pet}}}), do: MiniPet.tree()
+  defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{kind: :guardian}}}), do: GuardianBT.tree()
+  defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{kind: :creature_pet}}}), do: CreaturePetBT.tree()
+
+  defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{}}}), do: PetBT.tree()
+  defp behavior_tree(%Mob{internal: %Internal{creature: %Creature{stationary?: true}}}), do: PassiveBT.tree()
+  defp behavior_tree(%Mob{}), do: MobBT.tree()
+
+  defp sync_behavior_tree(%Mob{} = state, %Mob{} = previous) do
+    cond do
+      EntityCore.dead?(previous) and not EntityCore.dead?(state) ->
+        blackboard = RegenBT.initialize(state, Blackboard.new(), Time.now())
+        BT.init(state, behavior_tree(state), blackboard)
+
+      control_mode(state) != control_mode(previous) ->
+        BT.init(state, behavior_tree(state))
+
+      true ->
+        state
+    end
+  end
+
+  defp control_mode(%Mob{internal: %Internal{pet: %Pet{kind: kind}}}), do: {:pet, kind}
+  defp control_mode(%Mob{}), do: :mob
+
+  defp control_metadata(%Mob{internal: %Internal{pet: %Pet{} = pet}}) do
+    %{owner_guid: pet.owner_guid, pet_profile: pet.profile, pet_kind: pet.kind}
+  end
+
+  defp control_metadata(%Mob{internal: %Internal{totem: %Totem{owner_guid: owner}}}) do
+    %{owner_guid: owner, pet_profile: nil}
+  end
+
+  defp control_metadata(%Mob{}), do: %{owner_guid: nil, pet_profile: nil, pet_kind: nil}
+
+  defp control_owner(%Mob{internal: %Internal{pet: %Pet{owner_guid: owner}}}), do: owner
+  defp control_owner(%Mob{internal: %Internal{totem: %Totem{owner_guid: owner}}}), do: owner
+  defp control_owner(%Mob{}), do: nil
+
+  defp sync_owner_pvp(%Mob{} = state) do
+    case control_owner(state) do
+      owner when is_integer(owner) ->
+        case Metadata.query(owner, [:pvp?]) do
+          %{pvp?: enabled} when is_boolean(enabled) -> set_pvp(state, enabled)
+          _ -> state
+        end
+
+      _ ->
+        state
+    end
+  end
+
+  defp set_pvp(%Mob{} = state, enabled) do
+    flags = Pvp.unit_flags(state.unit.flags, enabled)
+
+    if flags == state.unit.flags,
+      do: state,
+      else: EntityCore.mark_broadcast_update(%{state | unit: %{state.unit | flags: flags}})
+  end
+
+  defp schedule_summon_despawn(
+         %Mob{
+           internal:
+             %Internal{spawn: %Spawn{despawn_type: 11, death_at: nil, despawn_delay_ms: delay} = spawn} = internal
+         } = state
+       )
+       when is_integer(delay) and delay > 0 do
+    %{state | internal: %{internal | spawn: %{spawn | death_at: Time.now() + delay}}}
+  end
+
+  defp schedule_summon_despawn(%Mob{internal: %{spawn: %Spawn{despawn_type: type}}} = state) when type in [7, 11],
+    do: state
+
+  defp schedule_summon_despawn(
+         %Mob{internal: %Internal{spawn: %Spawn{temporary?: true, despawn_delay_ms: delay}}} = state
+       )
+       when is_integer(delay) and delay > 0 do
+    Process.send_after(self(), :summon_despawn, delay)
+    state
+  end
+
+  defp schedule_summon_despawn(%Mob{} = state), do: state
+
+  defp release_victim(%Mob{internal: %Internal{in_combat: true}, unit: %Unit{target: target}})
+       when is_integer(target) and target > 0 do
+    Metadata.decrement(target, :attacker_count, 0)
+  end
+
+  defp release_victim(_state), do: :ok
+
+  defp adjust_debug_pet(state, {:loyalty, amount}) when is_integer(amount) do
+    state |> PetLoyalty.change(amount) |> PetProgression.publish()
+  end
+
+  defp adjust_debug_pet(state, {:happiness, amount}) when is_integer(amount), do: PetHappiness.change(state, amount)
+  defp adjust_debug_pet(state, _adjustment), do: state
+
+  defp wake_ai_tick(%Mob{} = state) do
+    if EntityCore.dead?(state), do: deactivate_ai(state), else: schedule_ai_tick(state, 0)
+  end
+
+  defp enter_evade(%Mob{} = state) do
+    if EntityCore.dead?(state) do
+      state
+    else
+      now = Time.now()
+
+      state
+      |> MobBT.reset_after_combat(AIEnvironment.context(state, now))
+      |> NavigationResolver.resolve(now)
+      |> wake_ai_tick()
+    end
+  end
+
+  defp spellbook_spell(%Mob{internal: %Internal{spellbook: spellbook}}, spell_id)
+       when is_map(spellbook) and is_integer(spell_id) do
+    Map.get(spellbook, spell_id)
+  end
+
+  defp spellbook_spell(%Mob{}, _spell_id), do: nil
+
+  defp schedule_next_ai_tick(%Mob{} = state, %TickPlan{} = plan) do
+    if EntityCore.dead?(state) and not Movement.falling?(state),
+      do: deactivate_ai(state),
+      else: schedule_ai_tick(state, TickPlan.delay(plan))
+  end
+
+  defp schedule_movement_completion(%Mob{} = state) do
+    case Movement.completion_at(state) do
+      at when is_integer(at) ->
+        delay = max(at - Time.now(), 0)
+        ref = state.internal.ai_tick_ref
+        remaining = if is_reference(ref), do: Process.read_timer(ref)
+
+        if (EntityCore.dead?(state) and not Movement.falling?(state)) or (is_integer(remaining) and remaining <= delay),
+          do: state,
+          else: schedule_ai_tick(state, delay)
+
+      nil ->
+        state
+    end
+  end
+
+  defp emit_ai_tick_telemetry(%Mob{object: %{guid: guid}}, status, duration, %TickPlan{} = plan) do
+    wake = TickPlan.next(plan)
+
+    :telemetry.execute(
+      [:thistle_tea, :mob, :ai_tick],
+      %{duration: duration, next_delay_ms: TickPlan.delay(plan)},
+      %{guid: guid, status: tick_status(status), wake_reason: wake.source}
+    )
+  end
+
+  defp tick_status({:running, _delay}), do: :running
+  defp tick_status({:running, _delay, _reason}), do: :running
+  defp tick_status(status) when is_atom(status), do: status
+  defp tick_status(_status), do: :unknown
+
+  defp send_resume_move(%Mob{} = state, pid, now) do
+    case Movement.resume_spline(state, now) do
+      nil ->
+        :ok
+
+      resumed ->
+        resumed
+        |> Message.SmsgMonsterMove.build(resumed.internal.movement_options || [])
+        |> Network.send_packet(pid)
+    end
+  end
+
+  defp deactivate_ai(%Mob{} = state) do
+    state
+    |> cancel_ai_tick()
+    |> unwatch_chase()
+  end
+
+  defp schedule_ai_tick(%Mob{} = state, delay) when is_integer(delay) and delay >= 0 do
+    state = cancel_ai_tick(state)
+    token = make_ref()
+    ref = Process.send_after(self(), {:ai_tick, token}, delay)
+    put_ai_tick_ref(state, ref, token)
+  end
+
+  defp cancel_ai_tick(%Mob{internal: %Internal{ai_tick_ref: ref}} = state) when is_reference(ref) do
+    Process.cancel_timer(ref)
+    clear_ai_tick_ref(state)
+  end
+
+  defp cancel_ai_tick(%Mob{} = state), do: clear_ai_tick_ref(state)
+
+  defp put_ai_tick_ref(%Mob{internal: %Internal{} = internal} = state, ref, token)
+       when is_reference(ref) and is_reference(token) do
+    %{state | internal: %{internal | ai_tick_ref: ref, ai_tick_token: token}}
+  end
+
+  defp clear_ai_tick_ref(%Mob{internal: %Internal{} = internal} = state) do
+    %{state | internal: %{internal | ai_tick_ref: nil, ai_tick_token: nil}}
+  end
+
+  defp sync_chase_watch(%Mob{} = state) do
+    case chase_watch(state) do
+      {target, last_position, threshold} ->
+        ChaseWatch.watch(target, self(), last_position, threshold)
+
+      nil ->
+        ChaseWatch.unwatch(self())
+    end
+
+    state
+  end
+
+  defp unwatch_chase(%Mob{} = state) do
+    ChaseWatch.unwatch(self())
+    state
+  end
+
+  defp chase_watch(
+         %Mob{internal: %Internal{in_combat: true, blackboard: blackboard}, unit: %Unit{target: target}} = state
+       )
+       when is_integer(target) and target > 0 do
+    case Blackboard.ensure(blackboard) do
+      %Blackboard{navigation: %Blackboard.Navigation{last_target_pos: {x, y, z}}} ->
+        {target, {x, y, z}, MobBT.chase_repath_distance(state, target)}
+
+      %Blackboard{} ->
+        melee_hold_watch(state, target)
+    end
+  end
+
+  defp chase_watch(%Mob{}), do: nil
+
+  defp melee_hold_watch(%Mob{internal: %Internal{world: world}} = state, target) do
+    with {^world, x, y, z} <- World.target_position(target),
+         distance when is_number(distance) <- World.distance_between(state, target) do
+      {target, {x, y, z}, MobBT.melee_escape_distance(state, target, distance)}
+    else
+      _ -> nil
+    end
+  end
+
+  defp mark_chase_ready(%Mob{internal: %Internal{blackboard: blackboard} = internal} = state) do
+    blackboard = blackboard |> Blackboard.ensure() |> Blackboard.reset_deadline(:next_chase_at)
+    %{state | internal: %{internal | blackboard: blackboard}}
+  end
+
+  defp mark_aggro_ready(%Mob{internal: %Internal{blackboard: blackboard} = internal} = state) do
+    blackboard = blackboard |> Blackboard.ensure() |> Blackboard.reset_deadline(:next_aggro_at)
+    %{state | internal: %{internal | blackboard: blackboard}}
+  end
+
+  defp evading?(%Blackboard{navigation: %{returning_home?: true}}), do: true
+  defp evading?(_blackboard), do: false
+
+  defp pet_victim_died(%Mob{internal: %{pet: %Pet{}}, unit: %{target: victim}} = state, victim, now) do
+    PetBT.victim_died(state, victim, AIEnvironment.context(state, now))
+  end
+
+  defp pet_victim_died(state, _victim, _now), do: state
+
+  defp engage_combat(state, caster), do: engage_combat(state, caster, [])
+
+  defp apply_creature_group_command(%Mob{} = state, {:attack, target}),
+    do: apply_creature_group_command(state, {:attack, target, nil})
+
+  defp apply_creature_group_command(%Mob{internal: %Internal{in_combat: false}} = state, {:attack, target, source}) do
+    if not EntityCore.dead?(state) and not Corpse.removed?(state) and Hostility.valid_attack_target?(state, target) do
+      state |> engage_combat(target, call_assistance: false, leash_source: source) |> wake_ai_tick()
+    else
+      state
+    end
+  end
+
+  defp apply_creature_group_command(%Mob{internal: %Internal{in_combat: true}} = state, :evade) do
+    enter_evade(state)
+  end
+
+  defp apply_creature_group_command(%Mob{} = state, :respawn), do: Respawn.force_group_member(state)
+
+  defp apply_creature_group_command(%Mob{} = state, {:member_died, guid, entry, leader?}) do
+    if EntityCore.dead?(state) do
+      state
+    else
+      now = Time.now()
+      context = AIEnvironment.context(state, now, ObservationRequest.actor(guid))
+
+      state
+      |> EventAI.with_blackboard(&EventAI.on_group_member_died(&1, &2, guid, entry, leader?, context))
+      |> NavigationResolver.resolve(now)
+      |> wake_ai_tick()
+    end
+  end
+
+  defp apply_creature_group_command(%Mob{} = state, _command), do: state
+
+  defp engage_combat(%Mob{internal: %Internal{pet: %Pet{}}} = state, caster, opts) when is_integer(caster) do
+    now = Time.now()
+    context = AIEnvironment.context(state, now, ObservationRequest.actor(caster))
+
+    if PetTargeting.retaliation?(state, caster, context),
+      do: enter_combat(state, caster, Keyword.put(opts, :selection, :target), now),
+      else: state
+  end
+
+  defp engage_combat(%Mob{} = state, caster, opts) when is_integer(caster) do
+    enter_combat(state, caster, opts, Time.now())
+  end
+
+  defp engage_combat(%Mob{} = state, _caster, _opts), do: state
+
+  defp receive_combat_contact(state, caster, now, role \\ :attacked, timed? \\ nil) do
+    state |> Engagement.contact(caster, now, role, timed?) |> engage_combat(caster, contact?: true)
+  end
+
+  defp enter_combat(%Mob{} = state, caster, opts, now) do
+    %Engagement.Result{entity: state, from: from, to: to} = Engagement.enter(state, caster, now, opts)
+    was_in_combat = from == :engaged
+
+    if to == :engaged do
+      combat_entered(state, caster, was_in_combat, opts, now)
+    else
+      state
+    end
+  end
+
+  defp combat_entered(state, caster, was_in_combat, opts, now) do
+    GuardianOwner.defend(state, caster)
+    CreaturePetOwner.defend(state, caster)
+
+    state
+    |> maybe_tap(caster)
+    |> maybe_call_assistance(was_in_combat, caster, opts)
+    |> maybe_eventai_enter_combat(was_in_combat, caster, now)
+  end
+
+  defp maybe_call_assistance(%Mob{} = state, true, _caster, _opts), do: state
+
+  defp maybe_call_assistance(%Mob{} = state, false, caster, opts) do
+    if Keyword.get(opts, :call_assistance, true) do
+      MobBT.maybe_enqueue_call_assistance(state, caster)
+    else
+      state
+    end
+  end
+
+  defp maybe_eventai_enter_combat(%Mob{} = state, true, _caster, _now), do: state
+
+  defp maybe_eventai_enter_combat(%Mob{} = state, false, caster, now) do
+    EventAI.with_blackboard(
+      state,
+      &EventAI.enter_combat(&1, &2, caster, now, AIEnvironment.context(&1, now, ObservationRequest.actor(caster)))
+    )
+    |> NavigationResolver.resolve(now)
+  end
+
+  defp eventai_spell_hit(%Mob{} = state, caster_guid, %Spell{id: spell_id} = spell) when is_integer(caster_guid) do
+    now = Time.now()
+
+    EventAI.with_blackboard(
+      state,
+      &EventAI.on_spell_hit(
+        &1,
+        &2,
+        caster_guid,
+        spell_id,
+        Spell.school_mask(spell),
+        now,
+        AIEnvironment.context(&1, now, ObservationRequest.actor(caster_guid))
+      )
+    )
+    |> NavigationResolver.resolve(now)
+  end
+
+  defp eventai_spell_hit(%Mob{} = state, _caster_guid, _spell), do: state
+
+  defp eventai_spell_hit_target(%Mob{} = state, target_guid, %Spell{id: spell_id} = spell, now)
+       when is_integer(target_guid) and is_integer(now) do
+    EventAI.with_blackboard(
+      state,
+      &EventAI.on_spell_hit_target(
+        &1,
+        &2,
+        target_guid,
+        spell_id,
+        Spell.school_mask(spell),
+        now,
+        AIEnvironment.context(&1, now, ObservationRequest.actor(target_guid))
+      )
+    )
+    |> NavigationResolver.resolve(now)
+  end
+
+  defp eventai_spell_hit_target(%Mob{} = state, _target_guid, _spell, _now), do: state
+
+  defp notify_spell_hit_target(caster_guid, target_guid, %Spell{} = spell)
+       when is_integer(caster_guid) and is_integer(target_guid) do
+    if Guid.entity_type(caster_guid) == :mob do
+      Entity.spell_hit_target(caster_guid, target_guid, spell)
+    end
+  end
+
+  defp notify_spell_hit_target(_caster_guid, _target_guid, _spell), do: :ok
+
+  defp react_to_spell_damage(state, _events, %Mob{internal: %Internal{in_combat: true}}), do: state
+
+  defp react_to_spell_damage(state, events, _previous) do
+    damage =
+      Enum.find(events, fn
+        %Effects.SpellDamage{source_guid: source, target_guid: target, damage: damage} ->
+          is_integer(source) and source > 0 and source != target and target == state.object.guid and
+            is_number(damage) and damage > 0
+
+        _ ->
+          false
+      end)
+
+    case damage do
+      %Effects.SpellDamage{source_guid: source} ->
+        if state.internal.in_combat,
+          do: combat_entered(state, source, false, [], Time.now()),
+          else: maybe_tap(state, source, true)
+
+      nil ->
+        state
+    end
+  end
+
+  defp maybe_tap(state, caster, allow_dead? \\ false)
+
+  defp maybe_tap(%Mob{internal: %Internal{loot: %Loot{tapped_by: nil}}} = state, caster, allow_dead?) do
+    caster = controlling_player(caster)
+
+    if not KillCredit.pet?(state) and (allow_dead? or not EntityCore.dead?(state)) and
+         Guid.entity_type(caster) == :player do
+      group_id =
+        case PartySystem.group_of(caster) do
+          %Party.Group{id: id} -> id
+          _ -> nil
+        end
+
+      Engagement.claim(state, %Tap{player: caster, group_id: group_id})
+    else
+      state
+    end
+  end
+
+  defp maybe_tap(%Mob{} = state, _caster, _allow_dead?), do: state
+
+  defp maybe_finalize_death(%Mob{internal: %Internal{death_finalized?: true}} = state), do: state
+
+  defp maybe_finalize_death(%Mob{internal: %Internal{totem: %Totem{}}} = state) do
+    if EntityCore.dead?(state) do
+      send(self(), :totem_stop)
+      state |> mark_death_finalized() |> EntityCore.mark_broadcast_update()
+    else
+      state
+    end
+  end
+
+  defp maybe_finalize_death(%Mob{internal: %Internal{pet: %Pet{}}} = state) do
+    if EntityCore.dead?(state) do
+      state = PetResurrection.prepare_corpse(state)
+
+      Process.send_after(
+        self(),
+        {:pet_corpse_expired, state.internal.pet.corpse_generation},
+        PetResurrection.corpse_delay(state)
+      )
+
+      state
+      |> PetHappiness.on_death(MapTemplate.battleground?(state.internal.world.map_id))
+      |> mark_death_finalized()
+      |> EventSink.emit_pending()
+      |> maybe_reward_kill(state.internal.killed_by)
+      |> EntityCore.mark_broadcast_update()
+    else
+      state
+    end
+  end
+
+  defp maybe_finalize_death(%Mob{} = state) do
+    if EntityCore.dead?(state) do
+      killer = state.internal.killed_by
+      now = Time.now()
+
+      state
+      |> mark_death_finalized()
+      |> EventAI.with_blackboard(
+        &EventAI.on_death(
+          &1,
+          &2,
+          killer,
+          now,
+          AIEnvironment.context(&1, now, ObservationRequest.actor(killer))
+        )
+      )
+      |> NavigationResolver.resolve(now)
+      |> Flight.land_corpse(now)
+      |> EventSink.emit_pending()
+      |> maybe_reward_kill(killer)
+      |> Corpse.prepare(killer)
+      |> Respawn.schedule()
+      |> EntityCore.mark_broadcast_update()
+    else
+      state
+    end
+  end
+
+  defp mark_death_finalized(%Mob{internal: internal} = state) do
+    SummonLifecycle.notify(state, :summoned_just_died)
+    %{state | internal: %{internal | death_finalized?: true}}
+  end
+
+  defp maybe_reward_kill(%Mob{} = state, target) do
+    if KillCredit.eligible?(state) do
+      case KillReward.selection(state, target) do
+        {:group, group} -> reward_group_kill(state, group)
+        {:solo, guid} -> Entity.reward_kill(guid, state)
+        nil -> :ok
+      end
+    end
+
+    state
+  end
+
+  defp reward_group_kill(%Mob{} = state, group) do
+    state
+    |> KillReward.group_rewards(group)
+    |> Enum.each(&Entity.reward_kill_share(&1.guid, state, &1))
+  end
+
+  defp attacker_count(guid) do
+    case Metadata.query(guid, [:attacker_count]) do
+      %{attacker_count: count} when is_integer(count) and count > 0 -> count
+      _ -> 1
+    end
+  end
+
+  defp caster_guid(%{caster_guid: caster_guid}) when is_integer(caster_guid), do: caster_guid
+  defp caster_guid(caster_guid) when is_integer(caster_guid), do: caster_guid
+  defp caster_guid(_caster), do: nil
+
+  defp controlling_player(guid) when is_integer(guid) do
+    case Metadata.query(guid, [:owner_guid]) do
+      %{owner_guid: owner_guid} when is_integer(owner_guid) and owner_guid > 0 -> owner_guid
+      _ -> guid
+    end
+  end
+end

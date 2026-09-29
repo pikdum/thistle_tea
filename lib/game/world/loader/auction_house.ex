@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.World.Loader.AuctionHouse do
   import Bitwise, only: [band: 2]
 
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Data.Auction.House
+  alias ThistleTea.Game.Core.Auction.House
 
   def init(table \\ __MODULE__) do
     case :ets.whereis(table) do

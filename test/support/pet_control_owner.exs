@@ -2,12 +2,12 @@ defmodule ThistleTea.Test.PetControlOwner do
   @moduledoc false
   use GenServer
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Mob, as: MobServer
 
   def start_link(options), do: GenServer.start_link(__MODULE__, options)
 

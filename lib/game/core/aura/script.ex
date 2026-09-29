@@ -1,0 +1,386 @@
+defmodule ThistleTea.Game.Core.Aura.Script do
+  @moduledoc """
+  Interprets aura behavior that VMangos handles in spell scripts or explicit
+  core spell-id branches because the spell data cannot express it.
+  """
+
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Aura.ProcChance
+  alias ThistleTea.Game.Core.Aura.StackingProc
+  alias ThistleTea.Game.Core.Battleground.Flags
+  alias ThistleTea.Game.Core.Battleground.Resurrection, as: BattlegroundResurrection
+  alias ThistleTea.Game.Core.Class.Paladin
+  alias ThistleTea.Game.Core.Class.Priest
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Math
+  alias ThistleTea.Game.Core.OutdoorPvp.Silithyst
+  alias ThistleTea.Game.Core.Profession.Engineering
+  alias ThistleTea.Game.Core.Profession.Engineering.DeathRay
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Proc
+
+  @wyvern_sting_poison_by_rank %{19_386 => 24_131, 24_132 => 24_134, 24_133 => 24_135}
+  @combustion_proc_aura 11_129
+  @sweeping_strikes [12_292, 18_765]
+  @sweeping_strikes_damage 12_723
+  @sweeping_strikes_loop_spells [12_723, 26_654]
+  @retaliation 20_230
+  @retaliation_strike 22_858
+  @spirit_of_redemption_state 27_795
+  @spirit_of_redemption_suicide 27_965
+  @whirlwind 1680
+  @melee_radius 5.0
+  @whirlwind_radius 8.0
+
+  def instant_application(entity, context, %Spell{id: 13_139}), do: Engineering.net_backfire(entity, context)
+  def instant_application(_entity, _context, _spell), do: nil
+
+  def after_remove(entity, holders, cause) when is_list(holders) do
+    Enum.flat_map(holders, fn holder ->
+      after_remove_holder(entity, holder, cause) ++
+        DeathRay.after_remove(entity, holder, cause) ++
+        Silithyst.after_remove(entity, holder, cause) ++
+        Flags.after_remove(entity, holder) ++ BattlegroundResurrection.after_remove(entity, holder)
+    end)
+  end
+
+  def periodic_events(%{unit: %{health: health}}, %Holder{spell: spell}) when is_integer(health) and health > 0 do
+    if Spell.vmangos_script?(spell, "spell_cannibalize_aura"), do: [%Effects.EmoteState{emote_id: 398}], else: []
+  end
+
+  def periodic_events(_entity, _holder), do: []
+
+  def periodic_trigger_events(%{object: %{guid: guid}, unit: %{health: health}}, %Holder{} = holder)
+      when is_integer(health) and health > 0 do
+    if Spell.vmangos_script?(holder.spell, "spell_hunter_frost_trap_aura") do
+      [
+        %Effects.SpellProc{
+          source_guid: holder.caster_guid,
+          target_guid: guid,
+          spell: holder.spell,
+          proc_type: :trap_activation,
+          proc_origin: :cast
+        }
+      ]
+    else
+      []
+    end
+  end
+
+  def periodic_trigger_events(_entity, _holder), do: []
+
+  @ignite_pct %{11_119 => 4, 11_120 => 8, 12_846 => 12, 12_847 => 16, 12_848 => 20}
+  @ignite_dot 12_654
+  @master_of_elements [29_074, 29_075, 29_076]
+  @master_of_elements_energize 29_077
+  @magic_absorption [29_441, 29_444, 29_445, 29_446, 29_447]
+  @magic_absorption_energize 29_442
+
+  def outgoing_proc(holders, %Holder{spell: %Spell{} = spell} = holder, owner_guid, context)
+      when is_list(holders) and is_integer(owner_guid) do
+    cond do
+      Spell.vmangos_script?(spell, "spell_mage_combustion_proc") ->
+        combustion_proc(holders, holder, owner_guid, context)
+
+      Paladin.illumination?(spell) ->
+        illumination_proc(holders, holder, owner_guid, context)
+
+      is_map_key(@ignite_pct, spell.id) ->
+        ignite_proc(holders, holder, owner_guid, context)
+
+      spell.id in @master_of_elements ->
+        master_of_elements_proc(holders, holder, owner_guid, context)
+
+      true ->
+        StackingProc.outgoing_proc(holders, holder, owner_guid, context)
+    end
+  end
+
+  def outgoing_proc(_holders, _holder, _owner_guid, _context), do: :unhandled
+
+  defp illumination_proc(holders, %Holder{} = holder, owner_guid, %{spell: %Spell{mana_cost: cost}})
+       when is_integer(cost) and cost > 0 do
+    event =
+      Effects.trigger_spell(owner_guid, holder.caster_level || 1, owner_guid, Paladin.illumination_energize_id(),
+        base_points: cost,
+        effect_index: 0,
+        triggered_by_spell_id: holder.spell.id
+      )
+
+    {:handled, holders, [event]}
+  end
+
+  defp illumination_proc(holders, _holder, _owner_guid, _context), do: {:handled, holders, []}
+
+  defp ignite_proc(holders, %Holder{spell: %Spell{id: id}} = holder, owner_guid, context) do
+    damage = Map.get(context, :damage) || 0
+    victim_guid = Map.get(context, :victim_guid)
+    tick = trunc(damage * Map.fetch!(@ignite_pct, id) / 100)
+
+    if tick > 0 and is_integer(victim_guid) do
+      event =
+        Effects.trigger_spell(owner_guid, holder.caster_level || 1, victim_guid, @ignite_dot,
+          base_points: tick,
+          effect_index: 0,
+          triggered_by_spell_id: id
+        )
+
+      {:handled, holders, [event]}
+    else
+      {:handled, holders, []}
+    end
+  end
+
+  defp master_of_elements_proc(holders, %Holder{} = holder, owner_guid, context) do
+    cost =
+      case Map.get(context, :spell) do
+        %Spell{mana_cost: cost} when is_integer(cost) -> cost
+        _spell -> 0
+      end
+
+    refund = trunc(cost * dummy_amount(holder, 0) / 100)
+
+    if refund > 0 do
+      event =
+        Effects.trigger_spell(owner_guid, holder.caster_level || 1, owner_guid, @master_of_elements_energize,
+          base_points: refund,
+          effect_index: 0,
+          triggered_by_spell_id: holder.spell.id
+        )
+
+      {:handled, holders, [event]}
+    else
+      {:handled, holders, []}
+    end
+  end
+
+  def outgoing_melee(entity, %Holder{spell: %Spell{id: id}} = holder, owner_guid, victim_guid, context)
+      when id in @sweeping_strikes and is_integer(owner_guid) and is_integer(victim_guid) do
+    damage = Map.get(context, :proc_damage, Map.get(context, :damage, 0))
+    triggering_spell_id = Map.get(context, :triggering_spell_id)
+    triggering_spell = Map.get(context, :spell)
+    proc_type = Map.get(context, :proc_type)
+
+    proc? =
+      is_integer(damage) and damage > 1 and triggering_spell_id not in @sweeping_strikes_loop_spells and
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and
+        ProcChance.roll?(entity, holder.spell, :outgoing, context)
+
+    if proc? do
+      radius = if triggering_spell_id == @whirlwind, do: @whirlwind_radius, else: @melee_radius
+      event = Effects.secondary_melee(victim_guid, damage, @sweeping_strikes_damage, radius)
+      {:handled, spend_charge(holder), [event]}
+    else
+      {:handled, holder, []}
+    end
+  end
+
+  def outgoing_melee(_entity, _holder, _owner_guid, _victim_guid, _context), do: :unhandled
+
+  def incoming_melee(entity, %Holder{spell: %Spell{id: @retaliation}} = holder, owner_guid, attacker_guid, context)
+      when is_integer(owner_guid) and is_integer(attacker_guid) do
+    triggering_spell = Map.get(context, :spell)
+    proc_type = Map.get(context, :proc_type)
+
+    proc? =
+      attacker_in_front?(entity, Map.get(context, :attacker_position)) and not stunned?(entity) and
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, context) and
+        ProcChance.roll?(entity, holder.spell, :incoming, context)
+
+    if proc? do
+      event = Effects.trigger_spell(owner_guid, holder.caster_level || 1, attacker_guid, @retaliation_strike)
+      {:handled, spend_charge(holder), [event]}
+    else
+      {:handled, holder, []}
+    end
+  end
+
+  def incoming_melee(_entity, _holder, _owner_guid, _attacker_guid, _context), do: :unhandled
+
+  def incoming_spell(%Holder{spell: %Spell{} = spell} = holder, owner_guid, attacker_guid, context) do
+    cond do
+      spell.id in @magic_absorption -> magic_absorption_proc(holder, owner_guid, context)
+      Priest.vampiric_embrace?(spell) -> vampiric_embrace_proc(holder, attacker_guid, context)
+      Paladin.eye_for_an_eye?(spell) -> eye_for_an_eye_proc(holder, owner_guid, attacker_guid, context)
+      true -> :unhandled
+    end
+  end
+
+  def incoming_spell(_holder, _owner_guid, _attacker_guid, _context), do: :unhandled
+
+  defp magic_absorption_proc(%Holder{} = holder, owner_guid, context) do
+    restored = trunc((Map.get(context, :owner_max_mana) || 0) * dummy_amount(holder, 0) / 100)
+
+    if restored > 0 do
+      event =
+        Effects.trigger_spell(owner_guid, holder.caster_level || 1, owner_guid, @magic_absorption_energize,
+          base_points: restored,
+          effect_index: 0,
+          triggered_by_spell_id: holder.spell.id
+        )
+
+      {:handled, holder, [event]}
+    else
+      {:handled, holder, []}
+    end
+  end
+
+  defp vampiric_embrace_proc(%Holder{caster_guid: caster_guid} = holder, attacker_guid, %{damage: damage})
+       when is_integer(caster_guid) and caster_guid == attacker_guid and is_integer(damage) and damage > 0 do
+    heal = max(div(damage * dummy_amount(holder, 20), 100), 1)
+
+    event =
+      Effects.trigger_spell(caster_guid, holder.caster_level || 1, caster_guid, Priest.vampiric_embrace_heal_id(),
+        base_points: heal,
+        effect_index: 0,
+        resolve_targets?: true,
+        triggered_by_spell_id: holder.spell.id
+      )
+
+    {:handled, holder, [event]}
+  end
+
+  defp vampiric_embrace_proc(holder, _attacker_guid, _context), do: {:handled, holder, []}
+
+  defp eye_for_an_eye_proc(%Holder{} = holder, owner_guid, attacker_guid, %{damage: damage} = context)
+       when is_integer(damage) and damage > 0 do
+    max_health = Map.get(context, :owner_max_health) || 0
+    reflected = damage |> Kernel.*(dummy_amount(holder, 0)) |> div(100) |> min(div(max_health, 2))
+
+    if reflected > 0 do
+      event =
+        Effects.trigger_spell(owner_guid, holder.caster_level || 1, attacker_guid, Paladin.eye_for_an_eye_damage_id(),
+          base_points: reflected,
+          effect_index: 0,
+          triggered_by_spell_id: holder.spell.id
+        )
+
+      {:handled, holder, [event]}
+    else
+      {:handled, holder, []}
+    end
+  end
+
+  defp eye_for_an_eye_proc(holder, _owner_guid, _attacker_guid, _context), do: {:handled, holder, []}
+
+  defp dummy_amount(%Holder{auras: auras}, default) do
+    Enum.find_value(auras, default, fn
+      %{type: :dummy, amount: amount} when is_integer(amount) and amount > 0 -> amount
+      _aura -> nil
+    end)
+  end
+
+  def cancel_linked_spell_ids(%Holder{spell: %Spell{} = spell}) do
+    if Spell.vmangos_script?(spell, "spell_mage_combustion_buff"), do: [@combustion_proc_aura], else: []
+  end
+
+  def cancel_linked_spell_ids(_holder), do: []
+
+  @leader_of_the_pack_aura 24_932
+
+  defp after_remove_holder(
+         %{object: %{guid: target_guid}},
+         %Holder{spell: %Spell{id: @spirit_of_redemption_state}, caster_guid: caster_guid, caster_level: caster_level},
+         :expired
+       )
+       when is_integer(caster_guid) and is_integer(target_guid) do
+    [
+      Effects.trigger_spell(
+        caster_guid,
+        caster_level || 1,
+        target_guid,
+        @spirit_of_redemption_suicide,
+        triggered_by_spell_id: @spirit_of_redemption_state
+      )
+    ]
+  end
+
+  defp after_remove_holder(
+         %{object: %{guid: target_guid}} = entity,
+         %Holder{spell: %Spell{id: spell_id} = spell, caster_guid: caster_guid, caster_level: caster_level},
+         cause
+       )
+       when is_integer(caster_guid) and is_integer(target_guid) do
+    cond do
+      wyvern_sting_removal?(spell, cause) -> wyvern_sting_events(spell_id, caster_guid, caster_level, target_guid)
+      Spell.vmangos_script?(spell, "spell_cannibalize_aura") -> [%Effects.EmoteState{emote_id: 0}]
+      true -> shapeshift_after_remove(entity, spell)
+    end
+  end
+
+  defp after_remove_holder(_entity, _holder, _cause), do: []
+
+  defp wyvern_sting_removal?(%Spell{} = spell, cause) do
+    cause not in [:death, :duel_end] and Spell.vmangos_script?(spell, "spell_hunter_wyvern_sting")
+  end
+
+  defp wyvern_sting_events(spell_id, caster_guid, caster_level, target_guid) do
+    case @wyvern_sting_poison_by_rank[spell_id] do
+      poison_id when is_integer(poison_id) ->
+        [Effects.trigger_spell(caster_guid, caster_level, target_guid, poison_id)]
+
+      _poison_id ->
+        []
+    end
+  end
+
+  defp shapeshift_after_remove(%{object: %{guid: guid}, unit: %{auras: holders}}, %Spell{} = spell)
+       when is_list(holders) do
+    shapeshift? = Enum.any?(spell.effects, &match?(%{type: :apply_aura, aura: :mod_shapeshift}, &1))
+    still_shifted? = Enum.any?(holders, &Holder.has_aura_type?(&1, :mod_shapeshift))
+
+    if shapeshift? and not still_shifted? do
+      [Effects.remove_aura(guid, guid, @leader_of_the_pack_aura)]
+    else
+      []
+    end
+  end
+
+  defp shapeshift_after_remove(_entity, _spell), do: []
+
+  defp combustion_proc(holders, %Holder{} = holder, owner_guid, %{outcome: outcome}) do
+    with visible_id when is_integer(visible_id) <- combustion_visible_spell_id(holder.spell),
+         %Holder{spell: %Spell{} = visible} <- Enum.find(holders, &match?(%Holder{spell: %Spell{id: ^visible_id}}, &1)),
+         true <- Spell.vmangos_script?(visible, "spell_mage_combustion_buff") do
+      combustion_transition(holders, holder, owner_guid, visible_id, outcome)
+    else
+      _missing_visible -> {:handled, List.delete(holders, holder), []}
+    end
+  end
+
+  defp combustion_visible_spell_id(%Spell{effects: effects}) do
+    Enum.find_value(effects, fn
+      %{type: :trigger_spell, trigger_spell_id: spell_id} when is_integer(spell_id) and spell_id > 0 -> spell_id
+      _effect -> nil
+    end)
+  end
+
+  defp combustion_transition(holders, %Holder{charges: charges} = holder, _owner_guid, visible_id, :crit)
+       when is_integer(charges) and charges <= 1 do
+    kept = Enum.reject(holders, &(&1 == holder or match?(%Holder{spell: %Spell{id: ^visible_id}}, &1)))
+    {:handled, kept, []}
+  end
+
+  defp combustion_transition(holders, %Holder{} = holder, owner_guid, visible_id, outcome) do
+    updated_holder = if outcome == :crit, do: %{holder | charges: max((holder.charges || 1) - 1, 0)}, else: holder
+    updated_holders = List.replace_at(holders, Enum.find_index(holders, &(&1 == holder)), updated_holder)
+    event = Effects.trigger_spell(owner_guid, holder.caster_level || 1, owner_guid, visible_id)
+    {:handled, updated_holders, [event]}
+  end
+
+  defp spend_charge(%Holder{charges: charges}) when is_integer(charges) and charges <= 1, do: nil
+  defp spend_charge(%Holder{charges: charges} = holder) when is_integer(charges), do: %{holder | charges: charges - 1}
+  defp spend_charge(%Holder{} = holder), do: holder
+
+  defp attacker_in_front?(%{movement_block: %{position: {x, y, _z, orientation}}}, {ax, ay, _az}) do
+    not Math.behind?({x, y, orientation}, {ax, ay})
+  end
+
+  defp attacker_in_front?(_entity, _attacker_position), do: true
+
+  defp stunned?(%{unit: %{auras: holders}}) when is_list(holders) do
+    Enum.any?(holders, &Holder.has_aura_type?(&1, :mod_stun))
+  end
+
+  defp stunned?(_entity), do: false
+end

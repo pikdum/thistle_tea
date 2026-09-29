@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLearnTalent do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LEARN_TALENT
 
-  alias ThistleTea.Game.Player.Talents
+  alias ThistleTea.Game.World.Entity.Player.Talents
 
   defstruct [:talent_id, :requested_rank]
 

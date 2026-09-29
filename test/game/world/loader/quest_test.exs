@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.QuestTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Condition
-  alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Core.Condition
+  alias ThistleTea.Game.Core.Quest
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
 
   describe "attach_required_condition/2" do

@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgTextEmote do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_TEXT_EMOTE
 
-  alias ThistleTea.Game.Player.Emotes
+  alias ThistleTea.Game.World.Entity.Player.Emotes
 
   defstruct [:text_emote, :emote, :target]
 

@@ -1,11 +1,11 @@
 defmodule ThistleTea.Game.Network.Message.SocialMessagesTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.Social.Friend
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
-  alias ThistleTea.Game.Social.Friend
 
   describe "from_binary/1" do
     test "dispatches the vanilla social requests" do

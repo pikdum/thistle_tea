@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.Network.Message.MailMessagesTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Data.Mail
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Mail
   alias ThistleTea.Game.Network.Message.CmsgSendMail
   alias ThistleTea.Game.Network.Message.MsgQueryNextMailTime
   alias ThistleTea.Game.Network.Message.SmsgMailListResult

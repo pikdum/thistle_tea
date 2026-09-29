@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.SpellRankReplacementDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Logic.SpellBook
+  alias ThistleTea.Game.Core.Spell.SpellBook
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellChain
 

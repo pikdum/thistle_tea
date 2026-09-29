@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Terrain do
   @moduledoc "Boot-loaded terrain liquid data; runtime queries sample immutable tiles from ETS."
 
-  alias ThistleTea.Game.Terrain.Tile
+  alias ThistleTea.Game.Core.Terrain.Tile
   alias ThistleTea.Game.World.Loader.Exploration
 
   require Logger

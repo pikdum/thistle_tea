@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.MsgInspectHonorStats do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :MSG_INSPECT_HONOR_STATS
 
-  alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Player
 
   defstruct [:guid, :player]
 

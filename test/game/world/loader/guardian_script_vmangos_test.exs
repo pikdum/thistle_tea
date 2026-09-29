@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Loader.GuardianScriptVmangosTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.World.Loader.Script
 
   @moduletag :vmangos_db

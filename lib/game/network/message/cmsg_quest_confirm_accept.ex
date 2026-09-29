@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgQuestConfirmAccept do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_QUEST_CONFIRM_ACCEPT
 
-  alias ThistleTea.Game.Player.QuestSharing
+  alias ThistleTea.Game.World.Entity.Player.QuestSharing
 
   defstruct [:quest_id]
 

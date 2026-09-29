@@ -6,20 +6,20 @@ defmodule ThistleTea.Game.World.Loader.Guardian do
 
   import Bitwise, only: [&&&: 2, |||: 2, bnot: 1]
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
-  alias ThistleTea.Game.Entity.Data.Item
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.AttackPower
-  alias ThistleTea.Game.Entity.Logic.Companion
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Engineering
-  alias ThistleTea.Game.Entity.Logic.PetSpellModifiers
-  alias ThistleTea.Game.Entity.Logic.Skills
-  alias ThistleTea.Game.Entity.Logic.Stats
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Spell.Cooldowns
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
+  alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.PetSpellModifiers
+  alias ThistleTea.Game.Core.Profession.Engineering
+  alias ThistleTea.Game.Core.Skills
+  alias ThistleTea.Game.Core.Spell.Cooldowns
+  alias ThistleTea.Game.Core.Stats
+  alias ThistleTea.Game.Core.Stats.AttackPower
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon

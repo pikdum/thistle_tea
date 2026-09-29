@@ -4,8 +4,8 @@ defmodule ThistleTea.Game.World.Loader.Totem do
   import Ecto.Query
 
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Totems
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Pet.Totems
   alias ThistleTea.Game.World.Loader.Summon
   alias ThistleTea.Game.World.Pathfinding
 

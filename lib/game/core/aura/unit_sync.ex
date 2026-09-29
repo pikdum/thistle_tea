@@ -1,0 +1,260 @@
+defmodule ThistleTea.Game.Core.Aura.UnitSync do
+  @moduledoc """
+  Derives the unit's aura-driven fields from its holders: recomputed stats,
+  transform display id, the packed aura id/flag/level blocks the client
+  renders, and display-slot allocation (positive 0-31, negative 32-47).
+  """
+  import Bitwise, only: [|||: 2, <<<: 2, &&&: 2, bnot: 1]
+
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Aura.PowerCostSync
+  alias ThistleTea.Game.Core.Aura.Shapeshift
+  alias ThistleTea.Game.Core.Combat.CombatControl
+  alias ThistleTea.Game.Core.Entity.Appearance
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Pet.Empathy
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Immunity
+  alias ThistleTea.Game.Core.Stats
+
+  @max_slots 48
+  @max_positive_slots 32
+
+  @aflag_cancelable 0x01
+  @aflag_eff_index_2 0x02
+  @aflag_eff_index_1 0x04
+  @aflag_eff_index_0 0x08
+
+  @unit_flag_disarmed 0x00200000
+  @unit_flag_non_attackable 0x00010000
+  @unit_flag_auras_visible 0x08000000
+  @unit_flag_immune 0x80000000
+  @judgement_aura_state_bit 1 <<< 4
+
+  def sync_unit(%Unit{} = unit) do
+    unit
+    |> sync_shapeshift()
+    |> Stats.recompute()
+    |> PowerCostSync.sync()
+    |> Empathy.sync()
+    |> Appearance.sync_unit()
+    |> sync_disarm()
+    |> CombatControl.sync()
+    |> sync_unattackable()
+    |> sync_immunity()
+    |> sync_auras_visible()
+    |> sync_aura_state()
+    |> sync_aura_fields()
+  end
+
+  def display_slot(holders, %Holder{negative?: negative?}), do: next_free_slot(holders, negative?)
+
+  def visible?(%Holder{spell: %Spell{} = spell} = holder, target_guid) do
+    cond do
+      hidden_area_damage?(spell) ->
+        false
+
+      Enum.any?(spell.effects, &(&1.type == :apply_area_aura)) ->
+        holder.caster_guid != target_guid or holder.caster_totem? or not Spell.attribute?(spell, :passive)
+
+      holder.caster_totem? ->
+        true
+
+      true ->
+        visible?(spell)
+    end
+  end
+
+  def visible?(%Spell{spell_visual: visual} = spell) do
+    not hidden_area_damage?(spell) and
+      (not Spell.attribute?(spell, :passive) or (is_integer(visual) and visual > 0))
+  end
+
+  def visible?(_spell), do: false
+
+  defp hidden_area_damage?(%Spell{hidden_aura?: true}), do: true
+
+  defp hidden_area_damage?(%Spell{effects: [%Effect{type: :persistent_area_aura} | _] = effects}) do
+    effects
+    |> Enum.filter(&(&1.type == :persistent_area_aura))
+    |> Enum.all?(&(&1.aura == :periodic_damage))
+  end
+
+  defp hidden_area_damage?(_spell), do: false
+
+  defp next_free_slot(holders, negative?) do
+    used = MapSet.new(holders, & &1.slot)
+    range = if negative?, do: @max_positive_slots..(@max_slots - 1), else: 0..(@max_positive_slots - 1)
+    Enum.find(range, &(not MapSet.member?(used, &1)))
+  end
+
+  defp sync_shapeshift(%Unit{auras: holders} = unit) when is_list(holders) do
+    form = Shapeshift.form(holders)
+    sync_druid_power(%{unit | shapeshift_form: form}, form)
+  end
+
+  defp sync_shapeshift(unit), do: unit
+
+  defp sync_druid_power(%Unit{class: 11} = unit, 1), do: %{unit | power_type: 3}
+
+  defp sync_druid_power(%Unit{class: 11} = unit, form) when form in [5, 8],
+    do: %{unit | power_type: 1, max_power2: 1_000}
+
+  defp sync_druid_power(%Unit{class: 11} = unit, _form), do: %{unit | power_type: 0, power2: 0}
+  defp sync_druid_power(unit, _form), do: unit
+
+  defp sync_disarm(%Unit{auras: holders} = unit) when is_list(holders) do
+    disarmed? = Enum.any?(holders, &Holder.has_aura_type?(&1, :mod_disarm))
+    flags = unit.flags || 0
+
+    flags =
+      if disarmed? do
+        flags ||| @unit_flag_disarmed
+      else
+        flags &&& bnot(@unit_flag_disarmed)
+      end
+
+    %{unit | flags: flags}
+  end
+
+  defp sync_disarm(unit), do: unit
+
+  defp sync_unattackable(%Unit{auras: holders} = unit) when is_list(holders) do
+    unattackable? = Enum.any?(holders, &Holder.has_aura_type?(&1, :mod_unattackable))
+    flags = unit.flags || 0
+
+    flags =
+      if unattackable? do
+        flags ||| @unit_flag_non_attackable
+      else
+        flags &&& bnot(@unit_flag_non_attackable)
+      end
+
+    %{unit | flags: flags}
+  end
+
+  defp sync_unattackable(unit), do: unit
+
+  defp sync_immunity(%Unit{auras: holders} = unit) do
+    immune? = Enum.any?(holders || [], &(not &1.negative? and Immunity.purging(&1).schools != 0))
+    flags = (unit.flags || 0) &&& bnot(@unit_flag_immune)
+    %{unit | flags: if(immune?, do: flags ||| @unit_flag_immune, else: flags)}
+  end
+
+  defp sync_auras_visible(%Unit{auras: holders} = unit) do
+    visible? = Enum.any?(holders || [], &Holder.has_aura_type?(&1, :auras_visible))
+    flags = unit.flags || 0
+
+    flags =
+      if visible? do
+        flags ||| @unit_flag_auras_visible
+      else
+        flags &&& bnot(@unit_flag_auras_visible)
+      end
+
+    %{unit | flags: flags}
+  end
+
+  defp sync_aura_state(%Unit{auras: holders, aura_state: aura_state} = unit) when is_list(holders) do
+    active? = Enum.any?(holders, &match?(%Holder{spell: %Spell{exclusive_category: :paladin_seal}}, &1))
+    aura_state = aura_state || 0
+
+    if active? do
+      %{unit | aura_state: aura_state ||| @judgement_aura_state_bit}
+    else
+      %{unit | aura_state: aura_state &&& bnot(@judgement_aura_state_bit)}
+    end
+  end
+
+  defp sync_aura_state(unit), do: unit
+
+  defp sync_aura_fields(%Unit{auras: holders} = unit) when is_list(holders) and holders != [] do
+    %{
+      unit
+      | aura: pack_aura_ids(holders),
+        aura_flags: pack_aura_flags(holders),
+        aura_levels: pack_aura_levels(holders),
+        aura_applications: pack_aura_applications(holders)
+    }
+  end
+
+  defp sync_aura_fields(%Unit{} = unit) do
+    %{
+      unit
+      | aura: 0,
+        aura_flags: <<0::size(@max_slots * 4)>>,
+        aura_levels: <<0::size(@max_slots * 8)>>,
+        aura_applications: <<0::size(@max_slots * 8)>>
+    }
+  end
+
+  defp pack_aura_ids(holders) do
+    Enum.reduce(holders, 0, fn
+      %Holder{slot: slot, spell: %Spell{id: id}}, acc when is_integer(slot) and slot >= 0 and slot < @max_slots ->
+        acc ||| id <<< (32 * slot)
+
+      _holder, acc ->
+        acc
+    end)
+  end
+
+  defp pack_aura_flags(holders) do
+    int =
+      Enum.reduce(holders, 0, fn
+        %Holder{slot: slot} = holder, acc when is_integer(slot) and slot >= 0 and slot < @max_slots ->
+          acc ||| holder_flag_bits(holder) <<< (4 * slot)
+
+        _holder, acc ->
+          acc
+      end)
+
+    <<int::little-size(24 * 8)>>
+  end
+
+  defp holder_flag_bits(%Holder{auras: auras, negative?: negative?}) do
+    base = if negative?, do: 0, else: @aflag_cancelable
+
+    Enum.reduce(auras, base, fn %Aura{index: index}, acc ->
+      acc ||| aura_index_bit(index)
+    end)
+  end
+
+  defp aura_index_bit(0), do: @aflag_eff_index_0
+  defp aura_index_bit(1), do: @aflag_eff_index_1
+  defp aura_index_bit(2), do: @aflag_eff_index_2
+  defp aura_index_bit(_), do: 0
+
+  defp pack_aura_levels(holders) do
+    for slot <- 0..(@max_slots - 1), into: <<>> do
+      level = level_for_slot(holders, slot)
+      <<level::8>>
+    end
+  end
+
+  defp pack_aura_applications(holders) do
+    for slot <- 0..(@max_slots - 1), into: <<>> do
+      apps =
+        case Enum.find(holders, &(&1.slot == slot)) do
+          %Holder{charges: charges, stacks: stacks} when is_integer(charges) and charges > 0 ->
+            min(charges * max(stacks || 1, 1), 255) - 1
+
+          %Holder{stacks: stacks} when is_integer(stacks) and stacks > 0 ->
+            min(stacks, 255) - 1
+
+          _ ->
+            0
+        end
+
+      <<apps::8>>
+    end
+  end
+
+  defp level_for_slot(holders, slot) do
+    case Enum.find(holders, &(&1.slot == slot)) do
+      %Holder{caster_level: level} when is_integer(level) -> level
+      _ -> 0
+    end
+  end
+end

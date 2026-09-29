@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgChannelPassword do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CHANNEL_PASSWORD
 
-  alias ThistleTea.Game.Chat
   alias ThistleTea.Game.Network.Message.ChannelCommand
+  alias ThistleTea.Game.World.Chat
   alias ThistleTea.Game.World.System.ChatChannels
 
   defstruct [:channel_name, :password]

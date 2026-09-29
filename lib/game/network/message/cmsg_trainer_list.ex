@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgTrainerList do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_TRAINER_LIST
 
-  alias ThistleTea.Game.Player.Training
+  alias ThistleTea.Game.World.Entity.Player.Training
 
   defstruct [:guid]
 

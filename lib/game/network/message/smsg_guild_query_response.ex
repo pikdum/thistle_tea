@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgGuildQueryResponse do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_GUILD_QUERY_RESPONSE
 
-  alias ThistleTea.Game.Guild.Group
+  alias ThistleTea.Game.Core.Guild.Group
 
   defstruct [:guild]
 

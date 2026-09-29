@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLootRoll do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LOOT_ROLL
 
-  alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.World.Entity
 
   defstruct [:guid, :slot, :vote]
 

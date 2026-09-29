@@ -1,0 +1,1865 @@
+defmodule ThistleTea.Game.Core.Spell.CastingTest do
+  use ExUnit.Case, async: true
+
+  alias ThistleTea.Game.Core.AI.BehaviorRunner
+  alias ThistleTea.Game.Core.AI.BT.Blackboard
+  alias ThistleTea.Game.Core.AI.BT.Context
+  alias ThistleTea.Game.Core.AI.BT.Spell, as: SpellBT
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Entity.TargetRef
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.Companion.EntityRef
+  alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Cast
+  alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.Core.Spell.Casting
+  alias ThistleTea.Game.Core.Spell.CastResolution
+  alias ThistleTea.Game.Core.Spell.CastResolution.Costs
+  alias ThistleTea.Game.Core.Spell.CastResolution.Followups
+  alias ThistleTea.Game.Core.Spell.CastResolution.Impact
+  alias ThistleTea.Game.Core.Spell.CastResolution.PowerCost
+  alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Requirements
+  alias ThistleTea.Game.Core.Spell.SpellEffect
+  alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
+
+  describe "cancel/2" do
+    test "removes a channel aura from its recorded target after pet possession changes ownership" do
+      pet_guid = Guid.from_low_guid(:pet, 1, 44)
+
+      spell = %Spell{
+        id: 1002,
+        duration_ms: 60_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{type: :apply_aura, aura: :mod_possess_pet, implicit_target_a: :pet}]
+      }
+
+      cast = %{Cast.new(spell, Target.self(1), 1_000) | phase: :channel_tick, channel_ms: 60_000}
+
+      character =
+        %Character{
+          object: %Object{guid: 1},
+          unit: %Unit{target: 10, channel_object: pet_guid, channel_spell: 1002},
+          internal: %Internal{casting: cast}
+        }
+        |> Companion.activate(:possession, %EntityRef{guid: pet_guid, entry: 1, spell_id: 1002})
+
+      assert Companion.summon_guid(character) == nil
+      cancelled = Casting.cancel(character, 2_000)
+      assert cancelled.internal.casting == nil
+      assert cancelled.unit.channel_object == 0
+      assert cancelled.unit.channel_spell == 0
+
+      assert [
+               %Effects.RemoveAura{source_guid: 1, target_guid: ^pet_guid, spell_id: 1002},
+               %Effects.DespawnAreaEffects{spell_id: 1002},
+               %Effects.ChannelUpdate{channel_time_ms: 0}
+             ] = cancelled.internal.events
+    end
+  end
+
+  describe "start/5" do
+    test "waits for the scheduled tick before delivering a periodic channel trigger" do
+      fixture = final_channel_tick_fixture()
+      spell = fixture.internal.casting.spell
+      mob = %{fixture | internal: %{fixture.internal | casting: nil}}
+
+      mob = Casting.start(mob, spell, Target.unit(1), 1_000)
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
+
+      mob = %{mob | internal: %{mob.internal | events: []}}
+      assert {:waiting, mob, _delay} = Casting.advance(mob, 20_999)
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
+
+      assert {:finished, mob} = Casting.advance(mob, 21_000)
+      assert Enum.count(mob.internal.events, &is_struct(&1, Effects.TriggerSpell)) == 1
+    end
+
+    test "queues on-next-swing spells instead of starting a cast" do
+      spell = %Spell{id: 78, attributes: MapSet.new([:on_next_swing])}
+      mob = %Mob{internal: %Internal{}}
+
+      mob = Casting.start(mob, spell, Target.none(), 1_000)
+
+      assert mob.internal.next_swing_spell == spell
+      assert mob.internal.casting == nil
+      assert mob.internal.events in [nil, []]
+    end
+
+    test "initializes channel tick scheduling and visuals for channeled spells" do
+      spell = %Spell{
+        id: 10,
+        duration_ms: 8_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{amplitude_ms: 2_000}]
+      }
+
+      mob = %Mob{object: %Object{guid: 1}, unit: %Unit{target: 7}, internal: %Internal{}}
+
+      mob = Casting.start(mob, spell, Target.none(), 1_000)
+
+      assert mob.internal.casting.channel_ms == 8_000
+      assert mob.internal.casting.phase == :channel_tick
+      assert mob.internal.casting.channel_tick_ms == 2_000
+      assert mob.internal.casting.next_channel_tick_at == 3_000
+      assert mob.unit.channel_spell == 10
+      assert mob.unit.channel_object == 7
+      assert mob.internal.broadcast_update? == true
+
+      assert [
+               %Effects.SpellCastResult{spell_id: 10},
+               %Effects.SpellGo{spell_id: 10},
+               %Effects.ChannelStart{spell_id: 10, channel_time_ms: 8_000}
+             ] = mob.internal.events
+    end
+
+    test "snapshots one resolution for launch and channel ticks" do
+      spell = %Spell{
+        id: 5143,
+        power_type: 0,
+        mana_cost: 10,
+        mana_cost_per_second: 5,
+        duration_ms: 3_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{implicit_target_a: :caster, amplitude_ms: 1_000}]
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{level: 10, power1: 50, max_power1: 50},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}}
+      }
+
+      mob = Casting.start(mob, spell, Target.unit(1), 1_000)
+      resolution = mob.internal.casting.resolution
+
+      assert %CastResolution{
+               hits: [1],
+               costs: %Costs{
+                 power: %PowerCost{power_type: 0, amount: 10},
+                 channel_power: %PowerCost{power_type: 0, amount: 5}
+               },
+               impacts: [%Impact{target_guid: 1, target_role: :caster}]
+             } = resolution
+
+      assert {:waiting, mob, _delay_ms} = Casting.advance(mob, 2_000)
+      assert mob.internal.casting.resolution == resolution
+      assert mob.unit.power1 == 35
+    end
+
+    test "applies DBC casting-time modifiers selected by effect class mask" do
+      modifier = %Holder{
+        spell: %Spell{id: 22_812, spell_family: 7},
+        auras: [%Aura{type: :add_flat_modifier, amount: 1_000, misc_value: 10, class_mask: 0x4}]
+      }
+
+      spell = %Spell{id: 5185, spell_family: 7, family_flags_0: 0x4, cast_time_ms: 1_500}
+      mob = %Mob{object: %Object{guid: 1}, unit: %Unit{auras: [modifier]}, internal: %Internal{}}
+      mob = Casting.start(mob, spell, Target.none(), 1_000)
+
+      assert mob.internal.casting.cast_time_ms == 2_500
+      assert mob.internal.casting.ends_at == 3_500
+    end
+
+    test "remembers a charged casting-time modifier after it makes the cast instant" do
+      modifier = %Holder{
+        spell: %Spell{id: 12_043, spell_family: 3},
+        charges: 1,
+        slot: 0,
+        auras: [%Aura{type: :add_pct_modifier, amount: -100, misc_value: 10, class_mask: 0x40000000}]
+      }
+
+      spell = %Spell{id: 11_360, spell_family: 3, family_flags_0: 0x40000000, cast_time_ms: 6_000}
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{auras: [modifier]},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}}
+      }
+
+      mob = Casting.start(mob, spell, Target.unit(1), 1_000)
+
+      assert mob.internal.casting.cast_time_ms == 0
+      assert mob.internal.casting.modifier_holder_ids == [12_043]
+
+      mob = Casting.complete(mob, 1_000)
+
+      assert mob.unit.auras == []
+    end
+
+    test "spends charged modifiers when an affected channel starts" do
+      modifier = %Holder{
+        spell: %Spell{id: 14_751, spell_family: 6},
+        charges: 1,
+        slot: 0,
+        auras: [%Aura{type: :add_pct_modifier, amount: -100, misc_value: 14, class_mask: 1}]
+      }
+
+      spell = %Spell{
+        id: 15_407,
+        spell_family: 6,
+        family_flags_0: 1,
+        mana_cost: 45,
+        power_type: 0,
+        duration_ms: 3_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{amplitude_ms: 1_000}]
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{power1: 100, max_power1: 100, auras: [modifier]},
+        internal: %Internal{}
+      }
+
+      mob = Casting.start(mob, spell, Target.none(), 1_000)
+
+      assert mob.unit.power1 == 100
+      assert mob.unit.auras == []
+    end
+
+    test "waits for a channel's cast time before starting the channel" do
+      spell = %Spell{
+        id: 605,
+        cast_time_ms: 3_000,
+        duration_ms: 60_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{implicit_target_a: :caster}]
+      }
+
+      mob = %Mob{object: %Object{guid: 1}, unit: %Unit{}, internal: %Internal{}}
+      mob = Casting.start(mob, spell, Target.none(), 1_000)
+
+      assert mob.internal.casting.phase == :preparing
+      assert mob.unit.channel_spell in [nil, 0]
+      assert mob.internal.events in [nil, []]
+
+      assert {{:running, 1_000}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), 4_000)
+      assert mob.internal.casting.phase == :channel_tick
+      assert mob.unit.channel_spell == 605
+      assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.ChannelStart))
+    end
+  end
+
+  describe "cast_tick/3" do
+    test "retains cast completion changes and memory from preceding behavior nodes" do
+      spell = %Spell{id: 118, aura_interrupt_flags: 2, attributes: MapSet.new([:cancels_auto_attack_combat])}
+      resolution = %{channel_resolution() | hits: [9]}
+      casting = %{Cast.new(spell, Target.unit(9), 1_000) | phase: :finish, resolution: resolution}
+
+      blackboard =
+        Blackboard.new()
+        |> Blackboard.enable_auto_attack(%TargetRef{guid: 9})
+        |> Blackboard.put_next_at(:next_attack_at, 2_000, 1_000)
+        |> Blackboard.put_next_at(:next_chase_at, 500, 1_000)
+
+      entity = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, target: 9},
+        internal: %Internal{casting: casting, blackboard: Blackboard.new()}
+      }
+
+      assert {:success, finished, memory} = SpellBT.cast_tick(entity, blackboard, 1_000)
+      refute memory.combat.auto_attacking
+      assert memory.combat.next_attack_at == 3_000
+      assert memory.navigation.next_chase_at == 1_500
+      assert finished.internal.blackboard == memory
+      assert finished.internal.casting == nil
+      assert Enum.any?(finished.internal.events, &match?(%Effects.AttackStop{target_guid: 9}, &1))
+    end
+
+    test "upkeep expiry preserves the channel's completion tick" do
+      for now <- [21_000, 21_050] do
+        mob = channel_aura_fixture(21_000)
+
+        assert {:success, mob} = BehaviorRunner.tick(SpellBT.casting_sequence(), mob, Context.new(now))
+        assert mob.unit.auras == []
+        assert mob.internal.casting == nil
+        assert Enum.count(mob.internal.events, &match?(%Effects.TriggerSpell{spell_id: 13_481}, &1)) == 1
+        assert {:idle, ^mob} = Casting.advance(mob, now + 100)
+      end
+    end
+
+    test "early aura expiry cancels the channel even when upkeep runs late" do
+      for now <- [20_000, 21_050] do
+        mob = channel_aura_fixture(20_000)
+
+        assert {:failure, mob} = BehaviorRunner.tick(SpellBT.casting_sequence(), mob, Context.new(now))
+        assert mob.internal.casting == nil
+        refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
+      end
+    end
+
+    test "explicit aura removal cancels the channel at its completion deadline" do
+      {mob, _events} = Aura.remove_spells(channel_aura_fixture(21_000), [1515], 21_000)
+
+      assert {:idle, ^mob} = Casting.advance(mob, 21_000)
+      assert mob.internal.casting == nil
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
+    end
+
+    test "delivers a channel tick at its exact completion deadline only once" do
+      mob = final_channel_tick_fixture()
+
+      assert {:finished, mob} = Casting.advance(mob, 21_000)
+      assert mob.internal.casting == nil
+
+      assert [%Effects.TriggerSpell{spell_id: 13_481}, %Effects.ChannelUpdate{channel_time_ms: 0}] =
+               mob.internal.events
+
+      assert {:idle, ^mob} = Casting.advance(mob, 21_100)
+    end
+
+    test "delivers the final channel tick when the scheduled callback runs late" do
+      assert {:finished, mob} = Casting.advance(final_channel_tick_fixture(), 21_050)
+      assert Enum.count(mob.internal.events, &match?(%Effects.TriggerSpell{spell_id: 13_481}, &1)) == 1
+    end
+
+    test "does not deliver a tick beyond a shortened channel deadline" do
+      mob = final_channel_tick_fixture()
+      casting = %{mob.internal.casting | ends_at: 20_000}
+      mob = %{mob | internal: %{mob.internal | casting: casting}}
+
+      assert {:finished, mob} = Casting.advance(mob, 21_050)
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
+    end
+
+    test "a cancelled channel cannot deliver its pending completion tick" do
+      mob = Casting.cancel(final_channel_tick_fixture())
+
+      assert {:idle, ^mob} = Casting.advance(mob, 21_000)
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
+    end
+
+    test "does not deliver the final channel tick without its resource cost" do
+      mob = final_channel_tick_fixture()
+      resolution = channel_resolution(channel_power: %PowerCost{power_type: 0, amount: 10})
+      casting = %{mob.internal.casting | resolution: resolution}
+      mob = %{mob | unit: %{mob.unit | power1: 0}, internal: %{mob.internal | casting: casting}}
+
+      assert {:finished, mob} = Casting.advance(mob, 21_000)
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
+    end
+
+    test "ending a channel clears casting without applying a final spell hit" do
+      now = 1_000
+      spell = %Spell{id: 10, attributes: MapSet.new([:channeled])}
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        internal: %Internal{
+          casting: %Cast{
+            spell: spell,
+            targets: Target.none(),
+            channel_ms: 8_000,
+            phase: :channel_tick,
+            resolution: channel_resolution(),
+            ends_at: now - 1
+          }
+        }
+      }
+
+      assert {:success, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
+      assert mob.internal.casting == nil
+      assert mob.unit.channel_spell == 0
+
+      assert [%Effects.ChannelUpdate{channel_time_ms: 0}] = mob.internal.events
+    end
+
+    test "channel tick applies periodic trigger effects and advances the next tick" do
+      now = 1_000
+
+      spell = %Spell{
+        id: 5143,
+        duration_ms: 3_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [
+          %Effect{
+            type: :apply_aura,
+            aura: :periodic_trigger_spell,
+            trigger_spell_id: 7268,
+            implicit_target_a: :caster,
+            amplitude_ms: 1_000
+          }
+        ]
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{
+          world: %WorldRef{map_id: 0},
+          casting: %Cast{
+            spell: spell,
+            targets: Target.unit(1),
+            channel_ms: 3_000,
+            phase: :channel_tick,
+            resolution: %{
+              channel_resolution()
+              | impacts: [
+                  %Impact{target_guid: 1, target_role: :caster},
+                  %Impact{target_guid: 2, target_role: :other, hit_outcome: :resist}
+                ]
+            },
+            channel_tick_ms: 1_000,
+            next_channel_tick_at: now - 1,
+            ends_at: now + 3_000
+          }
+        }
+      }
+
+      assert {{:running, delay_ms}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
+      assert delay_ms > 0
+      assert mob.internal.casting.next_channel_tick_at > now
+
+      assert [%Effects.TriggerSpell{source_guid: 1, target_guid: 1, spell_id: 7268}] =
+               mob.internal.events
+    end
+
+    test "channel tick does not re-apply plain channel auras" do
+      now = 5_000
+
+      spell = %Spell{
+        id: 12_051,
+        duration_ms: 8_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{type: :apply_aura, aura: :mod_power_regen_percent, implicit_target_a: :caster}]
+      }
+
+      holder = %Holder{
+        spell: spell,
+        caster_guid: 1,
+        slot: 5,
+        applied_at: 1_000,
+        expires_at: 9_000,
+        auras: []
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100, auras: [holder]},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{
+          world: %WorldRef{map_id: 0},
+          casting: %Cast{
+            spell: spell,
+            targets: Target.unit(1),
+            channel_ms: 8_000,
+            phase: :channel_tick,
+            resolution: channel_resolution(),
+            channel_tick_ms: 1_000,
+            next_channel_tick_at: now - 1,
+            ends_at: 9_000
+          }
+        }
+      }
+
+      assert {{:running, _delay_ms}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
+
+      assert [%Holder{expires_at: 9_000}] = mob.unit.auras
+      assert mob.internal.events in [nil, []]
+      assert mob.internal.casting.next_channel_tick_at > now
+    end
+
+    test "channel tick spends the spell's per-second health cost" do
+      now = 1_000
+
+      spell = %Spell{
+        id: 11_693,
+        power_type: -2,
+        mana_cost_per_second: 33,
+        attributes: MapSet.new([:channeled]),
+        effects: []
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{level: 50, health: 100, max_health: 100},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{
+          world: %WorldRef{map_id: 0},
+          casting: %Cast{
+            spell: spell,
+            targets: Target.unit(1),
+            channel_ms: 10_000,
+            phase: :channel_tick,
+            resolution: channel_resolution(channel_power: %PowerCost{power_type: -2, amount: 33}),
+            channel_tick_ms: 1_000,
+            next_channel_tick_at: now - 1,
+            ends_at: now + 10_000
+          }
+        }
+      }
+
+      assert {{:running, _delay_ms}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
+      assert mob.unit.health == 67
+    end
+
+    test "stops when the channel object dies even if the cast target is the caster" do
+      now = 1_000
+      target_guid = System.unique_integer([:positive])
+      Metadata.put(target_guid, %{alive?: false})
+      on_exit(fn -> Metadata.delete(target_guid) end)
+
+      spell = %Spell{id: 5143, attributes: MapSet.new([:channeled]), effects: []}
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{channel_object: target_guid, channel_spell: spell.id},
+        internal: %Internal{
+          casting: %Cast{
+            spell: spell,
+            targets: Target.unit(1),
+            channel_ms: 5_000,
+            phase: :channel_tick,
+            resolution: channel_resolution(),
+            channel_tick_ms: 1_000,
+            next_channel_tick_at: now - 1,
+            ends_at: now + 5_000
+          }
+        }
+      }
+
+      assert {:success, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
+      assert mob.internal.casting == nil
+      assert mob.unit.channel_object == 0
+      assert mob.unit.channel_spell == 0
+    end
+
+    test "keeps ticking inside the reach-aware hostile channel grace range" do
+      now = 1_000
+      target_guid = System.unique_integer([:positive])
+      world = WorldRef.open(0)
+      SpatialHash.insert(:mobs, target_guid, world, 53.0, 0.0, 0.0)
+      Metadata.put(target_guid, %{alive?: true, combat_reach: 12.5})
+
+      on_exit(fn ->
+        SpatialHash.remove(:mobs, target_guid)
+        Metadata.delete(target_guid)
+      end)
+
+      spell = %Spell{
+        id: 19_304,
+        range_yards: 30.0,
+        duration_ms: 6_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [
+          %Effect{
+            type: :apply_aura,
+            aura: :periodic_damage,
+            implicit_target_a: :target_enemy,
+            amplitude_ms: 1_000
+          }
+        ]
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{channel_object: target_guid, channel_spell: spell.id, combat_reach: 1.5},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{
+          world: world,
+          casting: %Cast{
+            spell: spell,
+            targets: Target.unit(1),
+            channel_ms: 6_000,
+            phase: :channel_tick,
+            resolution: channel_resolution(),
+            channel_tick_ms: 1_000,
+            next_channel_tick_at: now - 1,
+            ends_at: now + 6_000
+          }
+        }
+      }
+
+      assert {{:running, _delay_ms}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
+      assert %Cast{} = mob.internal.casting
+      assert mob.internal.casting.next_channel_tick_at > now
+      assert mob.internal.events in [nil, []]
+    end
+  end
+
+  describe "complete/3" do
+    test "enemy-targeted spells interrupt attack auras on completion, including misses" do
+      holder = %Holder{
+        spell: %Spell{id: 2479, aura_interrupt_flags: 0x1000},
+        auras: [%Aura{type: :honorless_target}]
+      }
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, auras: [holder]},
+        player: %Player{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0)}
+      }
+
+      for target <- [:target_enemy, :aoe_enemy_at_dest, :caster, :target_ally], missed? <- [false, true] do
+        spell = %Spell{id: 123, cast_time_ms: 1_000, effects: [%Effect{type: :dummy, implicit_target_a: target}]}
+        preparing = Casting.start(character, spell, Target.unit(7), 1_000)
+        assert Aura.has_aura?(preparing, :honorless_target)
+        assert Aura.has_aura?(Casting.cancel(preparing), :honorless_target)
+
+        resolution =
+          if missed?,
+            do: %{channel_resolution() | hits: [], misses: [%{guid: 7, reason: 2}], impacts: []},
+            else: channel_resolution()
+
+        casting =
+          spell
+          |> Cast.new(Target.unit(7), 1_000)
+          |> Cast.transition(:launch)
+          |> Cast.put_resolution(resolution)
+
+        completed = Casting.complete(character, casting, 2_000)
+        assert Aura.has_aura?(completed, :honorless_target) == target in [:caster, :target_ally]
+      end
+    end
+
+    test "a no-threat distraction preserves stealth and avoids combat" do
+      stealth = %Holder{
+        spell: %Spell{id: 1784, aura_interrupt_flags: Aura.interrupt_mask(:cast)},
+        auras: [%Aura{type: :mod_stealth, amount: 100}]
+      }
+
+      spell = %Spell{
+        id: 1725,
+        attributes: MapSet.new([:no_threat, :allow_while_stealthed]),
+        effects: [%Effect{type: :distract, implicit_target_a: :aoe_enemy_at_dest}]
+      }
+
+      resolution = %{channel_resolution() | hits: [7], impacts: [%Impact{target_guid: 7, target_role: :other}]}
+
+      casting =
+        spell
+        |> Cast.new(Target.at({1.0, 2.0, 3.0}), 1_000)
+        |> Cast.transition(:launch)
+        |> Cast.put_resolution(resolution)
+        |> Cast.transition(:impact)
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, auras: [stealth]},
+        player: %Player{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0), in_combat: false}
+      }
+
+      character = Casting.complete(character, casting, 1_000)
+      assert Aura.has_aura?(character, :mod_stealth)
+      refute character.internal.in_combat
+      assert Enum.any?(character.internal.events, &is_struct(&1, Effects.DeliverSpell))
+    end
+
+    test "keeps pet channels active when the client selects the caster" do
+      pet_guid = Guid.from_low_guid(:pet, 2960, 45)
+
+      for {spell_id, hits} <- [{13_542, [pet_guid]}, {755, [1, pet_guid]}] do
+        spell = %Spell{
+          id: spell_id,
+          duration_ms: 5_000,
+          attributes: MapSet.new([:channeled]),
+          effects: [%Effect{type: :apply_aura, aura: :periodic_heal, implicit_target_a: :pet}]
+        }
+
+        resolution = %{channel_resolution() | hits: hits, impacts: []}
+
+        cast =
+          spell
+          |> Cast.new(Target.self(1), 1_000)
+          |> Cast.transition(:launch)
+          |> Cast.put_resolution(resolution)
+          |> Cast.transition(:impact)
+
+        character =
+          %Character{
+            object: %Object{guid: 1},
+            unit: %Unit{target: 7},
+            player: %Player{},
+            internal: %Internal{}
+          }
+          |> Companion.activate(:hunter_pet, %EntityRef{guid: pet_guid, entry: 2960, spell_id: 1515})
+
+        channeling = Casting.complete(character, cast, 1_000)
+        assert %Cast{phase: :channel_tick} = channeling.internal.casting
+        assert channeling.unit.channel_object == pet_guid
+        assert channeling.unit.channel_spell == spell_id
+
+        cancelled = Casting.cancel(channeling, 2_000)
+        assert cancelled.internal.casting == nil
+        assert Enum.any?(cancelled.internal.events, &match?(%Effects.RemoveAura{target_guid: ^pet_guid}, &1))
+
+        rejected = %{cast | resolution: %{resolution | hits: [1]}}
+        assert Casting.complete(character, rejected, 1_000).internal.casting == nil
+      end
+    end
+
+    test "stops a target-dependent channel when its only target resists" do
+      now = 1_000
+      target_guid = 7
+
+      spell = %Spell{
+        id: 19_304,
+        duration_ms: 6_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [
+          %Effect{
+            type: :apply_aura,
+            aura: :periodic_damage,
+            implicit_target_a: :target_enemy,
+            amplitude_ms: 1_000
+          }
+        ]
+      }
+
+      resolution = %{
+        channel_resolution()
+        | hits: [],
+          misses: [%{guid: target_guid, reason: 2}],
+          impacts: [],
+          followups: %{channel_resolution().followups | packet_hits: [], selected_unit_guid: target_guid}
+      }
+
+      casting =
+        spell
+        |> Cast.new(Target.unit(target_guid), now)
+        |> Cast.transition(:launch)
+        |> Cast.put_resolution(resolution)
+        |> Cast.transition(:impact)
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{target: target_guid},
+        internal: %Internal{}
+      }
+
+      mob = Casting.complete(mob, casting, now)
+
+      assert mob.internal.casting == nil
+      assert mob.unit.channel_object == 0
+      assert mob.unit.channel_spell == 0
+
+      assert [
+               %Effects.ChannelStart{spell_id: 19_304, channel_time_ms: 6_000},
+               %Effects.RemoveAura{target_guid: ^target_guid, spell_id: 19_304},
+               %Effects.DespawnAreaEffects{spell_id: 19_304},
+               %Effects.ChannelUpdate{channel_time_ms: 0}
+             ] = mob.internal.events
+    end
+
+    test "keeps a self-aura channel active when its selected enemy is not an impact target" do
+      now = 1_000
+      target_guid = 7
+
+      spell = %Spell{
+        id: 5143,
+        duration_ms: 5_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [
+          %Effect{
+            type: :apply_aura,
+            aura: :periodic_trigger_spell,
+            implicit_target_a: :caster,
+            trigger_spell_id: 7268,
+            amplitude_ms: 1_000
+          }
+        ]
+      }
+
+      resolution = %{
+        channel_resolution()
+        | hits: [],
+          impacts: [],
+          followups: %{channel_resolution().followups | packet_hits: [], selected_unit_guid: target_guid}
+      }
+
+      casting =
+        spell
+        |> Cast.new(Target.unit(target_guid), now)
+        |> Cast.transition(:launch)
+        |> Cast.put_resolution(resolution)
+        |> Cast.transition(:impact)
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{target: target_guid},
+        internal: %Internal{}
+      }
+
+      mob = Casting.complete(mob, casting, now)
+
+      assert %Cast{phase: :channel_tick} = mob.internal.casting
+      assert mob.unit.channel_object == target_guid
+      assert mob.unit.channel_spell == 5143
+      assert [%Effects.ChannelStart{spell_id: 5143, channel_time_ms: 5_000}] = mob.internal.events
+    end
+
+    test "queues quest cast credit for successful unit and gameobject targets" do
+      unit_guid = Guid.from_low_guid(:mob, 10_978, 1)
+      object_guid = Guid.from_low_guid(:game_object, 176_158, 2)
+      spell = %Spell{id: 17_166}
+
+      resolution = %{
+        channel_resolution()
+        | hits: [unit_guid],
+          followups: %{channel_resolution().followups | object_guid: object_guid}
+      }
+
+      casting = %Cast{
+        spell: spell,
+        targets: Target.object(object_guid),
+        phase: :finish,
+        resolution: resolution,
+        ends_at: 1_000
+      }
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{},
+        player: %Player{},
+        internal: %Internal{},
+        movement_block: %MovementBlock{}
+      }
+
+      character = Casting.complete(character, casting, 1_000)
+
+      assert Enum.any?(character.internal.events, fn
+               %Effects.QuestCastCredit{target_guids: targets, spell_id: 17_166} ->
+                 targets == [object_guid, unit_guid]
+
+               _effect ->
+                 false
+             end)
+    end
+
+    test "dismiss pet transitions the owner instead of the pet target" do
+      spell = %Spell{
+        id: 2641,
+        effects: [%Effect{index: 0, type: :dismiss_pet, implicit_target_a: :pet}]
+      }
+
+      resolution = %{
+        channel_resolution()
+        | hits: [1],
+          impacts: [%Impact{target_guid: 1, target_role: :caster}],
+          followups: %{channel_resolution().followups | packet_hits: [], selected_unit_guid: 44}
+      }
+
+      casting = %Cast{
+        spell: spell,
+        targets: Target.none(),
+        phase: :impact,
+        resolution: resolution,
+        ends_at: 1_000
+      }
+
+      character =
+        %Character{
+          object: %Object{guid: 1},
+          unit: %Unit{health: 100, level: 10},
+          player: %Player{},
+          internal: %Internal{},
+          movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+        }
+        |> Companion.activate(:hunter_pet, %EntityRef{guid: 44, entry: 2960, spell_id: 1515})
+        |> Casting.complete(casting, 1_000)
+
+      assert character.unit.summon == 0
+
+      assert character.internal.companion ==
+               %Companion{
+                 kind: :hunter_pet,
+                 status: {:suspended, 2960, 1515},
+                 pet_number: 44,
+                 restore_automatically?: false
+               }
+
+      assert Enum.any?(character.internal.events, &match?(%Effects.DismissPet{target_guid: 44}, &1))
+    end
+
+    test "delivers corpse capture separately from its caster reward" do
+      target_guid = Guid.from_low_guid(:mob, 7584, System.unique_integer([:positive]))
+      Metadata.put(target_guid, %{alive?: false, unit_flags: 0})
+      on_exit(fn -> Metadata.delete(target_guid) end)
+
+      spell = %Spell{
+        id: 11_885,
+        attributes: MapSet.new([:allow_dead_target]),
+        effects: [
+          %Effect{index: 0, type: :dummy, implicit_target_a: :target_enemy},
+          %Effect{index: 1, type: :create_item, misc_value: 9593, base_points: 1, implicit_target_a: :caster}
+        ]
+      }
+
+      resolution = %{
+        channel_resolution()
+        | hits: [target_guid, 1],
+          impacts: [
+            %Impact{target_guid: target_guid, target_role: :other},
+            %Impact{target_guid: 1, target_role: :caster}
+          ]
+      }
+
+      casting = %Cast{
+        spell: spell,
+        targets: Target.unit(target_guid),
+        phase: :impact,
+        resolution: resolution,
+        ends_at: 1_000
+      }
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, level: 50},
+        player: %Player{},
+        internal: %Internal{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      character = Casting.complete(character, casting, 1_000)
+      delivery = Enum.find(character.internal.events, &is_struct(&1, Effects.DeliverSpell))
+      assert delivery.target_guid == target_guid
+
+      corpse = %Mob{object: %Object{guid: target_guid}, unit: %Unit{health: 0}, internal: %Internal{}}
+      {corpse, events} = SpellEffect.receive(corpse, delivery.cast_context, delivery.spell, 1_000)
+      assert corpse.unit.health == 0
+      assert [%Effects.DespawnSelf{duration_ms: 1_000}] = events
+      assert Enum.any?(character.internal.events, &match?(%Effects.CreateItem{item_id: 9593}, &1))
+      refute Enum.any?(character.internal.events, &is_struct(&1, Effects.DespawnSelf))
+    end
+
+    test "queues a take-side outcome when a hostile magic spell is fully resisted" do
+      caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+      target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
+      target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
+
+      Metadata.put(caster_guid, %{
+        alive?: true,
+        faction_template: caster_faction,
+        faction_can_have_reputation?: false,
+        unit_flags: 0,
+        level: 60
+      })
+
+      Metadata.put(target_guid, %{
+        alive?: true,
+        faction_template: target_faction,
+        faction_can_have_reputation?: false,
+        unit_flags: 0,
+        level: 60
+      })
+
+      on_exit(fn ->
+        Metadata.delete(caster_guid)
+        Metadata.delete(target_guid)
+      end)
+
+      hit_penalty = %Holder{
+        spell: %Spell{id: 1},
+        auras: [%Aura{type: :mod_spell_hit_chance, amount: -100}]
+      }
+
+      spell = %Spell{
+        id: 116,
+        school: :frost,
+        dmg_class: 1,
+        attributes: MapSet.new([:no_reflection]),
+        effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy}]
+      }
+
+      casting = %Cast{
+        spell: spell,
+        targets: Target.unit(target_guid),
+        ends_at: Time.now()
+      }
+
+      mob = %Mob{
+        object: %Object{guid: caster_guid},
+        unit: %Unit{level: 60, auras: [hit_penalty]},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      :rand.seed(:exsss, {1, 2, 3})
+      mob = Casting.complete(mob, casting, 1_000)
+
+      assert [
+               %Effects.SpellCastResult{spell_id: 116},
+               %Effects.SpellGo{hit_guids: [], misses: [%{guid: ^target_guid, reason: 2}]},
+               %Effects.DeliverSpell{
+                 cast_context: %CastContext{caster_guid: ^caster_guid, hit_outcome: :resist},
+                 target_guid: ^target_guid,
+                 spell: ^spell
+               }
+             ] = mob.internal.events
+
+      spell = %{spell | attributes: MapSet.new()}
+      casting = %{casting | spell: spell}
+      mob = %{mob | internal: %{mob.internal | events: [], casting: casting}}
+      :rand.seed(:exsss, {1, 2, 3})
+      mob = Casting.complete(mob, casting, 1_000)
+
+      assert [
+               %Effects.SpellCastResult{},
+               %Effects.SpellGo{hit_guids: [^target_guid], misses: []},
+               %Effects.DeliverSpell{cast_context: context, target_guid: ^target_guid}
+             ] = mob.internal.events
+
+      assert context.hit_outcome == :resist
+
+      target = %Mob{
+        object: %Object{guid: target_guid},
+        unit: %Unit{health: 100, max_health: 100},
+        internal: %Internal{}
+      }
+
+      {target, [%Effects.SpellLogMiss{reason: :resist}]} = SpellEffect.receive(target, context, spell, 1_000)
+      assert target.unit.health == 100
+
+      reflection = %Holder{spell: %Spell{id: 112}, auras: [%Aura{type: :reflect_spells, amount: 100}]}
+      target = %{target | unit: %{target.unit | auras: [reflection]}}
+
+      {_target, [%Effects.SpellLogMiss{reason: :reflect}, %Effects.DeliverSpell{}]} =
+        SpellEffect.receive(target, context, spell, 1_000)
+
+      spell = %{spell | dmg_class: 0}
+      casting = %{casting | spell: spell}
+      mob = %{mob | internal: %{mob.internal | events: [], casting: casting}}
+      :rand.seed(:exsss, {1, 2, 3})
+      mob = Casting.complete(mob, casting, 1_000)
+
+      assert [
+               %Effects.SpellCastResult{},
+               %Effects.SpellGo{hit_guids: [^target_guid], misses: []},
+               %Effects.DeliverSpell{cast_context: %{hit_outcome: :hit}, target_guid: ^target_guid}
+             ] = mob.internal.events
+    end
+
+    test "applies the victim's school-masked spell hit modifier from metadata" do
+      caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+      target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
+      target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
+
+      Metadata.put(caster_guid, %{
+        alive?: true,
+        faction_template: caster_faction,
+        faction_can_have_reputation?: false,
+        unit_flags: 0,
+        level: 60
+      })
+
+      Metadata.put(target_guid, %{
+        alive?: true,
+        faction_template: target_faction,
+        faction_can_have_reputation?: false,
+        unit_flags: 0,
+        level: 60,
+        attacker_spell_hit_chance: [{0x7E, -2}]
+      })
+
+      on_exit(fn ->
+        Metadata.delete(caster_guid)
+        Metadata.delete(target_guid)
+      end)
+
+      spell = %Spell{
+        id: 133,
+        school: :fire,
+        dmg_class: 1,
+        attributes: MapSet.new([:no_reflection]),
+        effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy}]
+      }
+
+      casting = %Cast{
+        spell: spell,
+        targets: Target.unit(target_guid),
+        ends_at: Time.now()
+      }
+
+      mob = %Mob{
+        object: %Object{guid: caster_guid},
+        unit: %Unit{level: 60},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      :rand.seed(:exsss, {1, 1, 66})
+      missed = Casting.complete(mob, casting, 1_000)
+
+      assert Enum.any?(missed.internal.events, fn
+               %Effects.SpellGo{hit_guids: [], misses: [%{guid: ^target_guid, reason: 2}]} -> true
+               _event -> false
+             end)
+
+      Metadata.update(target_guid, %{attacker_spell_hit_chance: []})
+
+      :rand.seed(:exsss, {1, 1, 66})
+      hit = Casting.complete(mob, casting, 1_000)
+
+      assert Enum.any?(hit.internal.events, fn
+               %Effects.SpellGo{hit_guids: [^target_guid], misses: []} -> true
+               _event -> false
+             end)
+    end
+
+    test "creatures without spell defense cannot fail the caster hit roll" do
+      caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+      target_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+      caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
+      target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
+
+      Metadata.put(caster_guid, %{alive?: true, faction_template: caster_faction, level: 1})
+
+      Metadata.put(target_guid, %{
+        alive?: true,
+        faction_template: target_faction,
+        level: 60,
+        unit_flags: 0,
+        no_spell_defense?: true,
+        attacker_spell_hit_chance: [{0x7E, -100}]
+      })
+
+      on_exit(fn ->
+        Metadata.delete(caster_guid)
+        Metadata.delete(target_guid)
+      end)
+
+      spell = %Spell{
+        id: 133,
+        school: :fire,
+        dmg_class: 1,
+        attributes: MapSet.new([:no_reflection]),
+        effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy}]
+      }
+
+      casting = %Cast{spell: spell, targets: Target.unit(target_guid), ends_at: Time.now()}
+
+      caster = %Mob{
+        object: %Object{guid: caster_guid},
+        unit: %Unit{level: 1},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0), casting: casting}
+      }
+
+      :rand.seed(:exsss, {1, 1, 66})
+      hit = Casting.complete(caster, casting, 1_000)
+      assert Enum.any?(hit.internal.events, &match?(%Effects.SpellGo{hit_guids: [^target_guid], misses: []}, &1))
+      assert Enum.any?(hit.internal.events, &match?(%Effects.DeliverSpell{cast_context: %{hit_outcome: :hit}}, &1))
+
+      Metadata.update(target_guid, %{no_spell_defense?: false})
+      :rand.seed(:exsss, {1, 1, 66})
+      missed = Casting.complete(caster, casting, 1_000)
+      assert Enum.any?(missed.internal.events, &match?(%Effects.SpellGo{hit_guids: [], misses: [%{reason: 2}]}, &1))
+    end
+
+    test "applies matching mechanic resistance from metadata and observes its removal" do
+      caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+      target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
+      target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
+
+      Metadata.put(caster_guid, %{
+        alive?: true,
+        faction_template: caster_faction,
+        faction_can_have_reputation?: false,
+        unit_flags: 0,
+        level: 60
+      })
+
+      Metadata.put(target_guid, %{
+        alive?: true,
+        faction_template: target_faction,
+        faction_can_have_reputation?: false,
+        unit_flags: 0,
+        level: 60,
+        mechanic_resistance: [{12, 25}, {7, 100}]
+      })
+
+      on_exit(fn ->
+        Metadata.delete(caster_guid)
+        Metadata.delete(target_guid)
+      end)
+
+      spell = %Spell{
+        id: 133,
+        school: :physical,
+        dmg_class: 1,
+        mechanic: 12,
+        effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy}]
+      }
+
+      casting = %Cast{
+        spell: spell,
+        targets: Target.unit(target_guid),
+        ends_at: Time.now()
+      }
+
+      mob = %Mob{
+        object: %Object{guid: caster_guid},
+        unit: %Unit{level: 60},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      :rand.seed(:exsss, {1, 1, 66})
+      missed = Casting.complete(mob, casting, 1_000)
+
+      assert Enum.any?(missed.internal.events, fn
+               %Effects.DeliverSpell{target_guid: ^target_guid, cast_context: %{hit_outcome: :resist}} -> true
+               _event -> false
+             end)
+
+      Metadata.update(target_guid, %{mechanic_resistance: [{7, 100}]})
+
+      :rand.seed(:exsss, {1, 1, 66})
+      hit = Casting.complete(mob, casting, 1_000)
+
+      assert Enum.any?(hit.internal.events, fn
+               %Effects.SpellGo{hit_guids: [^target_guid], misses: []} -> true
+               _event -> false
+             end)
+    end
+
+    test "queues cast result and spell go events before clearing cast state" do
+      spell = %Spell{id: 133, effects: []}
+
+      casting = %Cast{
+        spell: spell,
+        targets: Target.unit(1),
+        ends_at: Time.now()
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      mob = Casting.complete(mob, casting, 1_000)
+
+      assert mob.internal.casting == nil
+
+      assert [
+               %Effects.SpellCastResult{spell_id: 133},
+               %Effects.SpellGo{spell_id: 133, source_guid: 1, hit_guids: [1], targets: %Target{}}
+             ] = mob.internal.events
+    end
+
+    test "spends charged spell modifiers after an affected successful cast" do
+      modifier = %Holder{
+        spell: %Spell{id: 14_751, spell_family: 6},
+        charges: 1,
+        slot: 0,
+        auras: [%Aura{type: :add_pct_modifier, amount: -100, misc_value: 14, class_mask: 1}]
+      }
+
+      spell = %Spell{id: 2061, spell_family: 6, family_flags_0: 1, mana_cost: 10, power_type: 0}
+      targets = Target.unit(1)
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{level: 60, health: 100, max_health: 100, power1: 100, max_power1: 100, auras: [modifier]},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}}
+      }
+
+      casting = %Cast{spell: spell, targets: targets, started_at: 1_000, ends_at: 1_000, modifier_holder_ids: [14_751]}
+      mob = Casting.complete(mob, casting, 1_000)
+
+      assert mob.unit.power1 == 100
+      assert mob.unit.auras == []
+    end
+
+    test "queues the spell identity for open-lock casts at objects" do
+      spell = %Spell{id: 6478, reagents: [{123, 1}], effects: [%Effect{index: 0, type: :open_lock}]}
+
+      casting = %Cast{
+        spell: spell,
+        targets: Target.object(0xF110_0001, :locked),
+        cast_item_guid: 55,
+        consume_item: true,
+        ends_at: Time.now()
+      }
+
+      character = %Character{
+        player: %Player{},
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      character = Casting.complete(character, casting, 1_000)
+
+      assert Enum.any?(character.internal.events, fn event ->
+               is_struct(event, Effects.OpenLock) and event.target_guid == 0xF110_0001 and event.spell == spell and
+                 event.cast_item_guid == 55
+             end)
+
+      refute Enum.any?(
+               character.internal.events,
+               &(&1.__struct__ in [
+                   Effects.ConsumeCastItem,
+                   Effects.ConsumeReagents,
+                   Effects.SpellGo,
+                   Effects.SpellCastResult,
+                   Effects.QuestCastCredit
+                 ])
+             )
+
+      opening = Enum.find(character.internal.events, &is_struct(&1, Effects.OpenLock))
+      assert Enum.any?(opening.success_events, &is_struct(&1, Effects.SpellCastResult))
+      assert Enum.any?(opening.success_events, &is_struct(&1, Effects.QuestCastCredit))
+
+      assert Enum.any?(opening.success_events, fn event ->
+               is_struct(event, Effects.SpellGo) and event.hit_guids == [0xF110_0001]
+             end)
+    end
+
+    test "retains the activating spell for a game object completion" do
+      spell = %Spell{id: 6_250, effects: [%Effect{index: 0, type: :open_lock_item}]}
+      casting = %Cast{spell: spell, targets: Target.object(0xF110_0001), ends_at: 1_000}
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      mob = Casting.complete(mob, casting, 1_000)
+      assert %Effects.OpenGameObject{target_guid: 0xF110_0001, spell_id: 6_250} in mob.internal.events
+    end
+
+    test "defers object cast credit until live activation succeeds" do
+      spell = %Spell{id: 3366, range_yards: 5.0, effects: [%Effect{index: 0, type: :open_lock_item}]}
+      casting = %Cast{spell: spell, targets: Target.object(0xF110_0001), ends_at: 1_000, requirements: %Requirements{}}
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100},
+        player: %Player{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      character = Casting.complete(character, casting, 1_000)
+
+      assert %Effects.OpenGameObject{target_guid: 0xF110_0001, spell_id: 3366, range_yards: 5.0} in character.internal.events
+
+      refute Enum.any?(character.internal.events, &is_struct(&1, Effects.QuestCastCredit))
+    end
+
+    test "queues temporary item enchantments for the targeted item" do
+      effect = %Effect{index: 0, type: :enchant_item_temporary, misc_value: 263}
+      spell = %Spell{id: 8087, effects: [effect]}
+
+      casting = %Cast{
+        spell: spell,
+        targets: Target.item(0x4000_002A),
+        ends_at: Time.now()
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      mob = Casting.complete(mob, casting, 1_000)
+
+      assert Enum.any?(mob.internal.events, fn event ->
+               is_struct(event, Effects.EnchantItem) and event.target_guid == 0x4000_002A and event.spell == spell and
+                 event.effect == effect
+             end)
+    end
+
+    test "queues disenchant exactly once after completion and never after cancellation" do
+      spell = %Spell{id: 13_262, cast_time_ms: 3_000, effects: [%Effect{index: 0, type: :disenchant}]}
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100},
+        player: %Player{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{}
+      }
+
+      casting = Casting.start(character, spell, Target.item(42), 1_000)
+      assert casting.internal.casting.ends_at == 4_000
+      refute Enum.any?(casting.internal.events || [], &is_struct(&1, Effects.DisenchantItem))
+      cancelled = casting |> Casting.cancel() |> Casting.complete(4_000)
+      refute Enum.any?(cancelled.internal.events || [], &is_struct(&1, Effects.DisenchantItem))
+
+      completed = Casting.complete(casting, 4_000)
+      expected = %Effects.DisenchantItem{target_guid: 42, spell_id: 13_262}
+      assert Enum.filter(completed.internal.events, &is_struct(&1, Effects.DisenchantItem)) == [expected]
+      assert Casting.complete(completed, 5_000) == completed
+    end
+
+    test "permanent enchants defer material costs to completion and cancel cleanly" do
+      effect = %Effect{type: :enchant_item, misc_value: 41}
+      spell = %Spell{id: 7418, cast_time_ms: 5_000, reagents: [{10_940, 1}], effects: [effect]}
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100},
+        player: %Player{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{}
+      }
+
+      casting = Casting.start(character, spell, Target.item(42), 1_000)
+      cancelled = casting |> Casting.cancel() |> Casting.complete(6_000)
+      refute Enum.any?(cancelled.internal.events, &is_struct(&1, Effects.EnchantItem))
+      completed = Casting.complete(casting, 6_000)
+
+      assert [%Effects.EnchantItem{target_guid: 42, effect: ^effect}] =
+               Enum.filter(completed.internal.events, &is_struct(&1, Effects.EnchantItem))
+
+      refute Enum.any?(completed.internal.events, &is_struct(&1, Effects.ConsumeReagents))
+      assert Casting.complete(completed, 7_000) == completed
+    end
+
+    test "coating costs travel with the completed enchant and interruption consumes nothing" do
+      effect = %Effect{type: :enchant_item_temporary, misc_value: 323}
+      spell = %Spell{id: 8679, cast_time_ms: 3_000, reagents: [{10, 1}], effects: [effect]}
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100},
+        player: %Player{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{}
+      }
+
+      casting = Casting.start(character, spell, Target.item(42), 1_000, 43)
+      cancelled = casting |> Casting.cancel() |> Casting.complete(4_000)
+      refute Enum.any?(cancelled.internal.events, &is_struct(&1, Effects.EnchantItem))
+      completed = Casting.complete(casting, 4_000)
+
+      assert [%Effects.EnchantItem{target_guid: 42, cast_item_guid: 43, effect: ^effect}] =
+               Enum.filter(completed.internal.events, &is_struct(&1, Effects.EnchantItem))
+
+      refute Enum.any?(
+               completed.internal.events,
+               &(is_struct(&1, Effects.ConsumeReagents) or is_struct(&1, Effects.ConsumeCastItem))
+             )
+    end
+
+    test "item transformation replaces only its casting item and defers all inventory costs" do
+      spell = %Spell{
+        id: 21_180,
+        cast_time_ms: 1000,
+        reagents: [{10, 1}],
+        effects: [%Effect{type: :summon_change_item, misc_value: 17_223}]
+      }
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100},
+        player: %Player{},
+        internal: %Internal{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      casting = Casting.start(character, spell, Target.item(42), 1000, 43)
+      cancelled = casting |> Casting.cancel() |> Casting.complete(2000)
+      refute Enum.any?(cancelled.internal.events, &is_struct(&1, Effects.TransformItem))
+      completed = Casting.complete(casting, 2000)
+
+      assert [%Effects.TransformItem{cast_item_guid: 43, spell: ^spell, item_id: 17_223}] =
+               Enum.filter(completed.internal.events, &is_struct(&1, Effects.TransformItem))
+
+      refute Enum.any?(
+               completed.internal.events,
+               &(is_struct(&1, Effects.ConsumeReagents) or is_struct(&1, Effects.ConsumeCastItem))
+             )
+
+      assert Casting.complete(completed, 3000) == completed
+      no_item = character |> Casting.start(spell, Target.item(42), 1000) |> Casting.complete(2000)
+      refute Enum.any?(no_item.internal.events, &is_struct(&1, Effects.TransformItem))
+    end
+
+    test "queues self spell hit events after spell go" do
+      spell = %Spell{id: 133, school: :fire, effects: [%Effect{type: :school_damage, base_points: 5, die_sides: 0}]}
+
+      casting = %Cast{
+        spell: spell,
+        targets: Target.unit(1),
+        ends_at: Time.now()
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 20, max_health: 20},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      mob = Casting.complete(mob, casting, 1_000)
+
+      assert mob.unit.health == 15
+
+      assert [
+               %Effects.SpellCastResult{},
+               %Effects.SpellGo{},
+               %Effects.SpellDamage{damage: 5, periodic?: false}
+             ] = mob.internal.events
+    end
+
+    test "queues remote spell delivery events after spell go" do
+      spell = %Spell{id: 133, effects: []}
+
+      casting = %Cast{
+        spell: spell,
+        targets: Target.unit(2),
+        ends_at: Time.now()
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 20, max_health: 20},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      mob = Casting.complete(mob, casting, 1_000)
+
+      assert [
+               %Effects.SpellCastResult{},
+               %Effects.SpellGo{hit_guids: [2]},
+               %Effects.DeliverSpell{target_guid: 2, spell: ^spell}
+             ] = mob.internal.events
+    end
+
+    test "routes self dispels through the owner boundary for current caster resistance" do
+      spell = %Spell{id: 527, effects: [%Effect{type: :dispel, misc_value: 1}]}
+      holder = %Holder{spell: %Spell{id: 10, dispel_type: 1}, caster_guid: 2, negative?: true}
+      casting = %Cast{spell: spell, targets: Target.unit(1), ends_at: 1_000}
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 20, max_health: 20, auras: [holder]},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0), casting: casting}
+      }
+
+      mob = Casting.complete(mob, casting, 1_000)
+      assert mob.unit.auras == [holder]
+
+      assert [
+               %Effects.SpellCastResult{},
+               %Effects.SpellGo{},
+               %Effects.DeliverSpell{target_guid: 1, spell: ^spell}
+             ] = mob.internal.events
+    end
+
+    test "routes self heartbeat auras through the owner boundary for a sampled break" do
+      spell = %Spell{
+        id: 50,
+        attributes: MapSet.new([:heartbeat_resist, :negative]),
+        duration_ms: 20_000,
+        effects: [%Effect{type: :apply_aura, aura: :mod_stun}]
+      }
+
+      casting = %Cast{spell: spell, targets: Target.unit(1), ends_at: 1_000}
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 20, max_health: 20, auras: []},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0), casting: casting}
+      }
+
+      mob = Casting.complete(mob, casting, 1_000)
+      assert mob.unit.auras == []
+      assert Enum.any?(mob.internal.events, &match?(%Effects.DeliverSpell{target_guid: 1, spell: ^spell}, &1))
+    end
+  end
+
+  describe "Feed Pet" do
+    test "queues the DBC trigger spell for the selected food item and active pet" do
+      spell = %Spell{
+        id: 6991,
+        range_yards: 10.0,
+        effects: [%Effect{index: 0, type: :feed_pet, trigger_spell_id: 1539}]
+      }
+
+      targets = Target.item(22)
+      casting = %{Cast.new(spell, targets, 1_000) | requirements: %Requirements{}}
+
+      character =
+        %Character{
+          object: %Object{guid: 1},
+          unit: %Unit{},
+          movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+          internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+        }
+        |> Companion.activate(:hunter_pet, %EntityRef{guid: 33, entry: 1, spell_id: 1515})
+
+      character = Casting.complete(character, casting, 1_000)
+
+      assert Enum.any?(character.internal.events, fn
+               %Effects.FeedPet{cast_item_guid: 22, target_guid: 33, spell_id: 1539, range_yards: 10.0} ->
+                 true
+
+               _ ->
+                 false
+             end)
+    end
+  end
+
+  describe "persistent area auras" do
+    test "ground-targeted cast queues a spawn_area_effect event" do
+      spell = %Spell{
+        id: 2120,
+        name: "Flamestrike",
+        school: :fire,
+        duration_ms: 8_000,
+        effects: [
+          %Effect{index: 0, type: :school_damage, base_points: 50, die_sides: 0, radius_yards: 5.0},
+          %Effect{
+            index: 1,
+            type: :persistent_area_aura,
+            aura: :periodic_damage,
+            base_points: 10,
+            die_sides: 0,
+            amplitude_ms: 2_000,
+            radius_yards: 5.0
+          }
+        ]
+      }
+
+      targets = Target.at({10.0, 20.0, 30.0})
+      casting = Cast.new(spell, targets, 1_000)
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      mob = Casting.complete(mob, casting, 1_000)
+
+      assert Enum.any?(mob.internal.events, fn
+               %Effects.SpawnAreaEffect{position: {10.0, 20.0, 30.0}, duration_ms: 8_000, spell: %Spell{id: 2120}} ->
+                 true
+
+               _ ->
+                 false
+             end)
+    end
+
+    test "cast without ground location does not queue area effects" do
+      spell = %Spell{
+        id: 2120,
+        name: "Flamestrike",
+        school: :fire,
+        duration_ms: 8_000,
+        effects: [
+          %Effect{index: 1, type: :persistent_area_aura, aura: :periodic_damage, base_points: 10, die_sides: 0}
+        ]
+      }
+
+      targets = Target.none()
+      casting = Cast.new(spell, targets, 1_000)
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      mob = Casting.complete(mob, casting, 1_000)
+
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.SpawnAreaEffect))
+    end
+
+    test "caster-centered persistent aura uses the caster position without a ground target" do
+      spell = %Spell{
+        id: 26_573,
+        name: "Consecration",
+        school: :holy,
+        duration_ms: 8_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :persistent_area_aura,
+            aura: :periodic_damage,
+            base_points: 8,
+            amplitude_ms: 1_000,
+            radius_yards: 8.0,
+            implicit_target_a: :caster_destination,
+            implicit_target_b: :aoe_enemy_at_dest
+          }
+        ]
+      }
+
+      targets = Target.none()
+      casting = Cast.new(spell, targets, 1_000)
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{},
+        movement_block: %MovementBlock{position: {4.0, 5.0, 6.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      mob = Casting.complete(mob, casting, 1_000)
+
+      assert Enum.any?(mob.internal.events, &match?(%Effects.SpawnAreaEffect{position: {4.0, 5.0, 6.0}}, &1))
+    end
+  end
+
+  describe "farsight" do
+    test "DBC farsight effects queue a remote viewpoint at the destination" do
+      spell = %Spell{
+        id: 6196,
+        name: "Far Sight",
+        duration_ms: 60_000,
+        effects: [%Effect{index: 0, type: :add_farsight}]
+      }
+
+      targets = Target.at({10.0, 20.0, 30.0})
+      casting = Cast.new(spell, targets, 1_000)
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      mob = Casting.complete(mob, casting, 1_000)
+
+      assert Enum.any?(mob.internal.events, fn
+               %Effects.SpawnFarsight{position: {10.0, 20.0, 30.0}, duration_ms: 60_000} -> true
+               _ -> false
+             end)
+    end
+  end
+
+  describe "channel auras" do
+    test "a completed self channel leaves its aura to expire after the final tick" do
+      spell = %Spell{
+        id: 12_051,
+        name: "Evocation",
+        duration_ms: 8_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :mod_power_regen_percent,
+            base_points: 1499,
+            die_sides: 1,
+            base_dice: 1
+          }
+        ]
+      }
+
+      now = 1_000
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100, power1: 0, max_power1: 100},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}}
+      }
+
+      mob = Casting.start(mob, spell, Target.none(), now)
+      {mob, _events} = Aura.apply_spell(mob, 1, 1, spell, now)
+      assert length(mob.unit.auras) == 1
+
+      assert {:success, mob, _bb} = SpellBT.cast_tick(mob, Blackboard.new(), now + 8_001)
+      {mob, _events} = Aura.tick(mob, now + 8_001)
+      assert mob.unit.auras == []
+    end
+  end
+
+  defp channel_aura_fixture(expires_at) do
+    mob = final_channel_tick_fixture()
+
+    holder = %Holder{
+      spell: mob.internal.casting.spell,
+      caster_guid: mob.object.guid,
+      expires_at: expires_at,
+      auras: [%Aura{type: :dummy}]
+    }
+
+    %{mob | unit: %{mob.unit | auras: [holder]}}
+  end
+
+  defp final_channel_tick_fixture do
+    spell = %Spell{
+      id: 1515,
+      duration_ms: 20_000,
+      attributes: MapSet.new([:channeled]),
+      effects: [
+        %Effect{
+          type: :apply_aura,
+          aura: :periodic_trigger_spell,
+          trigger_spell_id: 13_535,
+          implicit_target_a: :caster,
+          amplitude_ms: 20_000
+        }
+      ]
+    }
+
+    casting = %{Cast.new(spell, Target.unit(1), 1_000) | phase: :channel_tick, resolution: channel_resolution()}
+
+    %Mob{
+      object: %Object{guid: 1},
+      unit: %Unit{level: 10, health: 100, max_health: 100},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+      internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+    }
+  end
+
+  defp channel_resolution(opts \\ []) do
+    %CastResolution{
+      hits: [1],
+      misses: [],
+      costs: %Costs{
+        power: %PowerCost{power_type: nil, amount: 0},
+        channel_power: Keyword.get(opts, :channel_power, %PowerCost{power_type: nil, amount: 0}),
+        reagents: [],
+        cast_item_guid: nil,
+        modifier_holder_ids: []
+      },
+      impacts: [%Impact{target_guid: 1, target_role: :caster}],
+      followups: %Followups{
+        packet_hits: [1],
+        selected_unit_guid: 1,
+        object_guid: nil,
+        item_guid: nil,
+        ground_position: nil,
+        area_position: nil
+      }
+    }
+  end
+end

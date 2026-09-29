@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetFactionAtwar do
 
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.Game.Player.Reputation
+  alias ThistleTea.Game.World.Entity.Player.Reputation
 
   defstruct [:index, :flags]
 

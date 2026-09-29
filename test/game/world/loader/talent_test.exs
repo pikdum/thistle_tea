@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.TalentTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Entity.Data.Talent, as: TalentData
-  alias ThistleTea.Game.Entity.Logic.Talents
+  alias ThistleTea.Game.Core.Player.Talent, as: TalentData
+  alias ThistleTea.Game.Core.Player.Talents
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
 
   @moduletag :dbc_db
