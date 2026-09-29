@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.ActionButtonsTest do
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Player
+  alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Network.Message.CmsgSetActionbarToggles
   alias ThistleTea.Game.Network.Message.CmsgSetActionButton
   alias ThistleTea.Game.Network.Message.Dispatch
@@ -12,7 +13,9 @@ defmodule ThistleTea.Game.Network.Message.ActionButtonsTest do
   alias ThistleTea.Game.World.Inbound
 
   defp state_with_buttons(action_buttons) do
-    %{character: %Character{internal: %Internal{action_buttons: action_buttons}}}
+    %{
+      character: %Character{internal: %Internal{action_buttons: action_buttons, spellbook: %{6603 => %Spell{id: 6603}}}}
+    }
   end
 
   describe "SmsgActionButtons.to_binary/1" do
@@ -58,6 +61,16 @@ defmodule ThistleTea.Game.Network.Message.ActionButtonsTest do
         )
 
       assert state.character.internal.action_buttons == %{4 => 78}
+    end
+
+    test "ignores spells the character does not know" do
+      state =
+        Inbound.handle(
+          %CmsgSetActionButton{button: 3, packed_data: 133},
+          state_with_buttons(%{})
+        )
+
+      assert state.character.internal.action_buttons == %{}
     end
 
     test "ignores out-of-range buttons" do

@@ -1,10 +1,12 @@
 defmodule ThistleTea.Game.World.Entity.Player.Attacking do
-  @moduledoc "Validates player melee targets and starts the shared attack behavior."
+  @moduledoc "Validates player melee targets, starts the shared attack behavior, and applies weapon sheath toggles."
   alias ThistleTea.Game.Core.Combat.PlayerCombat
+  alias ThistleTea.Game.Core.Combat.Sheath
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.TargetRef
   alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
@@ -66,6 +68,12 @@ defmodule ThistleTea.Game.World.Entity.Player.Attacking do
   end
 
   def stop(state), do: state
+
+  def sheathe(%{character: %Character{} = character} = state, sheath_state) do
+    %{state | character: Sheath.request(character, sheath_state, Time.now())}
+  end
+
+  def sheathe(state, _sheath_state), do: state
 
   defp valid_attack_target?(
          %{guid: guid, character: %Character{internal: %{world: world}} = character} = state,

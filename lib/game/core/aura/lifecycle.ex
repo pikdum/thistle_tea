@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Core.Aura.Lifecycle do
   @aura_interrupt_not_seated 0x40000
   @aura_interrupt_above_water 0x100
   @aura_interrupt_under_water 0x80
+  @aura_interrupt_sheathing 0x200
 
   def interrupt_mask(:move), do: @aura_interrupt_move ||| @aura_interrupt_turning ||| @aura_interrupt_not_seated
   def interrupt_mask(:cast), do: @aura_interrupt_cast
@@ -37,6 +38,7 @@ defmodule ThistleTea.Game.Core.Aura.Lifecycle do
   def interrupt_mask(:stand), do: @aura_interrupt_not_seated
   def interrupt_mask(:above_water), do: @aura_interrupt_above_water
   def interrupt_mask(:under_water), do: @aura_interrupt_under_water
+  def interrupt_mask(:sheathing), do: @aura_interrupt_sheathing
   def interrupt_mask(:action), do: 0x00000004
   def interrupt_mask(:action_complete), do: 0x00010000
   def interrupt_mask(:attack), do: 0x00001000

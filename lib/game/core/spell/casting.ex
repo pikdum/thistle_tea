@@ -874,6 +874,15 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
 
   def interrupt(entity, _now), do: entity
 
+  def interrupt_channel(%{internal: %Internal{casting: %Cast{spell: %Spell{} = spell} = cast}} = entity, flags, now)
+      when is_integer(flags) do
+    if Cast.channeled?(cast) and Bitwise.band(spell.channel_interrupt_flags || 0, flags) != 0,
+      do: interrupt(entity, now),
+      else: entity
+  end
+
+  def interrupt_channel(entity, _flags, _now), do: entity
+
   def interrupt_movement(%{internal: %Internal{casting: %Cast{} = cast}} = entity, now) do
     if CastMovement.interrupts?(entity, cast) do
       entity

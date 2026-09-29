@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
   alias ThistleTea.Game.Core.Combat.Engagement
   alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Combat.PlayerCombat
+  alias ThistleTea.Game.Core.Combat.Sheath
   alias ThistleTea.Game.Core.Combat.Threat
   alias ThistleTea.Game.Core.Combat.ZoneCombat
   alias ThistleTea.Game.Core.Condition, as: ConditionEvaluator
@@ -1279,9 +1280,8 @@ defmodule ThistleTea.Game.Core.AI.Script do
     {state, blackboard}
   end
 
-  defp execute(%{unit: %Unit{} = unit} = state, blackboard, %ScriptStep{command: :set_sheath} = step, _target, _now) do
-    state = %{state | unit: %{unit | sheath_state: step.datalong}} |> Entity.mark_broadcast_update()
-    {state, blackboard}
+  defp execute(%{unit: %Unit{}} = state, blackboard, %ScriptStep{command: :set_sheath} = step, _target, _now) do
+    {Sheath.put(state, step.datalong), blackboard}
   end
 
   defp execute(

@@ -14,7 +14,6 @@ defmodule ThistleTea.Game.Core.Chat.Emote do
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Unit
-  alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Spell.Casting
 
   @enforce_keys [:id]
@@ -109,17 +108,9 @@ defmodule ThistleTea.Game.Core.Chat.Emote do
 
   defp interrupt(entity, now) do
     entity
-    |> interrupt_channel(now)
+    |> Casting.interrupt_channel(@animation_interrupt, now)
     |> remove_auras(@animation_interrupt, now)
   end
-
-  defp interrupt_channel(%{internal: %{casting: %Cast{spell: spell} = cast}} = entity, now) do
-    if Cast.channeled?(cast) and band(spell.channel_interrupt_flags, @animation_interrupt) != 0,
-      do: Casting.cancel(entity, now),
-      else: entity
-  end
-
-  defp interrupt_channel(entity, _now), do: entity
 
   defp remove_auras(entity, mask, now) do
     {entity, events} = Aura.remove_with_interrupt_flags(entity, mask, now)
