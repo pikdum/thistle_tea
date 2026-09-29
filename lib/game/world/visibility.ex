@@ -4,9 +4,15 @@ defmodule ThistleTea.Game.World.Visibility do
   `tracked_entities` in sync with the world (sole owner of both keys),
   exchanges join/leave events through cell groups, and sends create/destroy
   packets as entities move in and out of view.
+
+  Stealth is re-checked by event rather than on a timer: a viewer that moves
+  or turns re-checks the hidden members listed near it, a viewer whose
+  reaction facts change re-checks every hidden member in view, and a hidden
+  announcer is re-checked by every viewer that hears it.
   """
 
   alias ThistleTea.Game.Core.Aura.StealthDetection
+  alias ThistleTea.Game.Core.Combat.Proximity.Announcement
   alias ThistleTea.Game.Core.Death
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -35,7 +41,7 @@ defmodule ThistleTea.Game.World.Visibility do
 
   @group Groups
   @range 250
-  @stealth_detection_ms 500
+  @reveal_reach 60.0
 
   def enter_player(%{visibility_cells: %MapSet{}} = state), do: state
 
@@ -49,7 +55,6 @@ defmodule ThistleTea.Game.World.Visibility do
     |> Map.put(:character, character)
     |> Map.put(:visibility_cells, cells)
     |> sync_visible_entities(guid, cells)
-    |> schedule_stealth_detection()
     |> QuestGivers.enter()
   end
 
@@ -113,7 +118,6 @@ defmodule ThistleTea.Game.World.Visibility do
   def reset_viewpoint(state), do: put_viewpoint(state, nil)
 
   def leave_player(%{character: character, visibility_cells: %MapSet{} = cells} = state) do
-    state = cancel_stealth_detection(state)
     ChaseWatch.unwatch(self())
     Enum.each(cells, &Group.demonitor(@group, cell_key(&1)))
     character = leave_entity(character)
@@ -131,7 +135,6 @@ defmodule ThistleTea.Game.World.Visibility do
 
   def leave_player(%{character: character} = state) do
     ChaseWatch.unwatch(self())
-    state = cancel_stealth_detection(state)
     QuestGivers.leave(%{state | character: leave_entity(character)})
   end
 
@@ -291,37 +294,30 @@ defmodule ThistleTea.Game.World.Visibility do
     end
   end
 
-  def stealth_detection_tick(%{stealth_detection_ref: ref, visibility_cells: %MapSet{}} = state, ref)
-      when is_reference(ref) do
-    (Map.get(state, :player_guids, []) ++ Map.get(state, :mob_guids, []))
-    |> Enum.filter(&match?(%{stealthed?: true}, Metadata.get(&1)))
-    |> Kernel.++(stealthed_traps(state))
-    |> Enum.reduce(state, &reevaluate_entity(&2, &1))
-    |> schedule_stealth_detection()
-  end
+  def hear(state, %Announcement{hidden?: true, guid: guid}), do: reevaluate_entity(state, guid)
+  def hear(state, _announcement), do: state
 
-  def stealth_detection_tick(state, _ref), do: state
+  def reveal_nearby(%{visibility_cells: %MapSet{}, character: %Character{} = character} = state) do
+    case World.position(character) do
+      {world, x, y, _z} ->
+        world
+        |> SpatialGrid.cells_overlapping({x - @reveal_reach, y - @reveal_reach, x + @reveal_reach, y + @reveal_reach})
+        |> reveal(state)
 
-  defp stealthed_traps(state) do
-    state
-    |> Map.get(:game_object_guids, [])
-    |> Enum.filter(&match?(%{go_trap_stealthed?: true}, Metadata.get(&1)))
-  end
-
-  def schedule_stealth_detection(%{visibility_cells: %MapSet{}} = state) do
-    ref = :erlang.start_timer(@stealth_detection_ms, self(), :stealth_detection)
-    Map.put(state, :stealth_detection_ref, ref)
-  end
-
-  def schedule_stealth_detection(state), do: state
-
-  defp cancel_stealth_detection(state) do
-    case Map.get(state, :stealth_detection_ref) do
-      ref when is_reference(ref) -> Process.cancel_timer(ref)
-      _ -> :ok
+      nil ->
+        state
     end
+  end
 
-    Map.put(state, :stealth_detection_ref, nil)
+  def reveal_nearby(state), do: state
+
+  def reveal_hidden(%{visibility_cells: %MapSet{} = cells} = state), do: reveal(cells, state)
+  def reveal_hidden(state), do: state
+
+  defp reveal(cells, state) do
+    cells
+    |> Proximity.hidden_members()
+    |> Enum.reduce(state, &reevaluate_entity(&2, &1))
   end
 
   defp detectable?(character, guid, meta) do

@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.World.StealthVisibilityTest do
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Aura.StealthDetection
+  alias ThistleTea.Game.Core.Combat.Proximity.Announcement
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -16,9 +17,11 @@ defmodule ThistleTea.Game.World.StealthVisibilityTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Game.World.Proximity
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
 
@@ -66,48 +69,57 @@ defmodule ThistleTea.Game.World.StealthVisibilityTest do
     end
   end
 
-  describe "stealth_detection_tick/2" do
-    test "hides and recreates targets when either side moves within a cell", %{state: state, target: target} do
-      state = %{state | tracked_entities: MapSet.new([target])}
-      state = tick(state)
+  describe "reveal_nearby/1" do
+    test "re-checks hidden units near a viewer that moves or turns", %{state: state, target: target} do
+      state = %{state | tracked_entities: MapSet.new([target])} |> Visibility.reveal_nearby()
       refute Visibility.tracked?(state, target)
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{guid: ^target}, force: true}}
 
-      state = %{state | character: move(state.character, 12.0)}
-      state = tick(state)
+      state = %{state | character: move(state.character, 12.0)} |> Visibility.reveal_nearby()
       self_guid = state.guid
+      assert_receive {:"$gen_cast", {:send_update_to, ^self_guid}}
+    end
+
+    test "turning away hides a unit only seen from the front", %{state: state, target: target} do
+      state = %{state | tracked_entities: MapSet.new([target])} |> with_detection()
+      assert Visibility.reveal_nearby(state) == state
+
+      state = state |> turn(:math.pi()) |> Visibility.reveal_nearby()
+      refute Visibility.tracked?(state, target)
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{guid: ^target}, force: true}}
+    end
+
+    test "leaves units that are not listed as hidden alone", %{state: state, target: target, cell: cell} do
+      Group.leave(Groups, Proximity.hidden_key(cell))
+      state = %{state | tracked_entities: MapSet.new([target])} |> Visibility.reveal_nearby()
+      assert Visibility.tracked?(state, target)
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{}, force: true}}
+    end
+  end
+
+  describe "hear/2" do
+    test "a hidden announcement re-checks its announcer where it now stands", %{state: state, target: target} do
+      state = %{state | character: move(state.character, 12.0)}
+      self_guid = state.guid
+      Visibility.hear(state, announcement(target, true))
       assert_receive {:"$gen_cast", {:send_update_to, ^self_guid}}
 
       SpatialHash.insert(:players, target, WorldRef.open(451), 16_343.2, 16_318.1, 69.44)
-      state = %{state | tracked_entities: MapSet.new([target])} |> tick()
+      state = %{state | tracked_entities: MapSet.new([target])}
+      assert Visibility.hear(state, announcement(target, false)) == state
+      state = Visibility.hear(state, announcement(target, true))
       refute Visibility.tracked?(state, target)
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{guid: ^target}, force: true}}
-      Visibility.leave_player(state)
     end
 
-    test "detects again when Vanish immunity ends without movement", %{state: state, target: target} do
+    test "the announcement that ends Vanish's immunity reveals a unit nobody moved", %{state: state, target: target} do
       state = with_detection(state)
       Metadata.update(target, %{undetectable_until: ThistleTea.Game.Core.Time.now() + 10_000})
       refute Visibility.can_see?(state, target)
       Metadata.update(target, %{undetectable_until: ThistleTea.Game.Core.Time.now()})
-      state = tick(state)
+      Visibility.hear(state, announcement(target, true))
       self_guid = state.guid
       assert_receive {:"$gen_cast", {:send_update_to, ^self_guid}}
-      Visibility.leave_player(state)
-    end
-
-    test "ignores stale timers after leaving and reentering", %{state: state} do
-      state = Visibility.schedule_stealth_detection(state)
-      old_ref = state.stealth_detection_ref
-      left = Visibility.leave_player(state)
-      assert left.stealth_detection_ref == nil
-      assert Process.read_timer(old_ref) == false
-      assert Visibility.stealth_detection_tick(left, old_ref) == left
-
-      entered = Visibility.enter_player(left)
-      assert entered.stealth_detection_ref != old_ref
-      assert Visibility.stealth_detection_tick(entered, old_ref) == entered
-      Visibility.leave_player(entered)
     end
   end
 
@@ -129,6 +141,7 @@ defmodule ThistleTea.Game.World.StealthVisibilityTest do
     Entity.register(target)
     cell = Visibility.current_cell(character)
     Group.join(Visibility.group_name(), Visibility.cell_key(cell), %{guid: target, type: :player})
+    Group.join(Groups, Proximity.hidden_key(cell), %{guid: target})
 
     on_exit(fn ->
       Presence.leave(character)
@@ -144,7 +157,8 @@ defmodule ThistleTea.Game.World.StealthVisibilityTest do
         visibility_cells: MapSet.new([cell]),
         cell_activator: nil
       },
-      target: target
+      target: target,
+      cell: cell
     }
   end
 
@@ -166,9 +180,13 @@ defmodule ThistleTea.Game.World.StealthVisibilityTest do
     %{state | character: %{character | movement_block: %{character.movement_block | position: {x, y, z, orientation}}}}
   end
 
-  defp tick(state) do
-    if is_reference(state.stealth_detection_ref), do: Process.cancel_timer(state.stealth_detection_ref)
-    ref = make_ref()
-    Visibility.stealth_detection_tick(%{state | stealth_detection_ref: ref}, ref)
+  defp announcement(guid, hidden?) do
+    %Announcement{
+      guid: guid,
+      world: WorldRef.open(451),
+      position: {16_323.2, 16_318.1, 69.44},
+      level: 10,
+      hidden?: hidden?
+    }
   end
 end

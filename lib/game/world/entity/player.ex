@@ -1089,6 +1089,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
         |> PlayerRest.check_tavern_exit()
         |> PlayerExploration.check_movement()
         |> Visibility.refresh_player()
+        |> Visibility.reveal_nearby()
 
       {:noreply, state}
     else
@@ -1102,7 +1103,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
 
   def handle_info({:proximity, %Announcement{} = announcement}, %State{character: %Character{} = character} = state) do
     Proximity.hear(character, announcement, Time.now())
-    {:noreply, state}
+    {:noreply, Visibility.hear(state, announcement)}
   rescue
     error ->
       Logger.error("Proximity announcement failed: #{Exception.format(:error, error, __STACKTRACE__)}")
@@ -1118,8 +1119,17 @@ defmodule ThistleTea.Game.World.Entity.Player do
       {:noreply, state}
   end
 
+  def handle_info({:timeout, ref, :proximity_refresh}, %State{character: %Character{} = character} = state) do
+    {:noreply, %{state | character: Proximity.refresh(character, ref, Time.now())}}
+  rescue
+    error ->
+      Logger.error("Proximity refresh failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_info({:proximity, _announcement}, state), do: {:noreply, state}
   def handle_info({:proximity_due, _guid, _role}, state), do: {:noreply, state}
+  def handle_info({:timeout, _ref, :proximity_refresh}, state), do: {:noreply, state}
 
   def handle_info({:transport_lost, transport_guid}, %State{character: %Character{} = character} = state) do
     if character.movement_block.transport_guid == transport_guid do
@@ -1843,14 +1853,6 @@ defmodule ThistleTea.Game.World.Entity.Player do
     {:noreply, state}
   end
 
-  def handle_info({:timeout, ref, :stealth_detection}, state) do
-    {:noreply, Visibility.stealth_detection_tick(state, ref)}
-  rescue
-    error ->
-      Logger.error("Stealth detection crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
-      {:noreply, Visibility.schedule_stealth_detection(state)}
-  end
-
   @impl GenServer
   def handle_info({:group, events, _info}, state) do
     state = Visibility.handle_events(state, events)
@@ -1973,8 +1975,10 @@ defmodule ThistleTea.Game.World.Entity.Player do
 
   defp do_broadcast_update(state), do: state
 
-  defp sync_proximity(%State{character: %Character{} = character} = state),
-    do: %{state | character: Proximity.sync(character)}
+  defp sync_proximity(%State{character: %Character{} = character} = state) do
+    synced = %{state | character: Proximity.sync(character)}
+    if Proximity.reaction_changed?(character, synced.character), do: Visibility.reveal_hidden(synced), else: synced
+  end
 
   defp sync_proximity(state), do: state
 

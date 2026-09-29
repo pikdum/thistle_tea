@@ -11,6 +11,11 @@ defmodule ThistleTea.Game.Core.Combat.Proximity do
   whether it notices the announcer and whether the announcer should notice it.
   `contact/4` turns a walking announcer's path into the moment it first comes
   within a radius, so a listener schedules one check instead of polling.
+
+  A hidden announcer's position decides who can see it, so a hidden unit
+  walking a path announces itself again every `movement_step/0` yards, and a
+  unit that is undetectable for a while announces itself again the moment
+  that ends. `refresh_at/4` is the next of those moments.
   """
 
   alias ThistleTea.Game.Core.AI.BT.Blackboard
@@ -26,6 +31,7 @@ defmodule ThistleTea.Game.Core.Combat.Proximity do
   @contact_margin_ms 50
   @max_path_extent 250.0
   @max_sight_range 80.0
+  @movement_step 2.0
 
   defmodule Path do
     @moduledoc false
@@ -42,40 +48,65 @@ defmodule ThistleTea.Game.Core.Combat.Proximity do
   defmodule Announcement do
     @moduledoc false
     @enforce_keys [:guid, :world, :position, :level]
-    defstruct [:guid, :world, :position, :level, :path, :aggressor]
+    defstruct [:guid, :world, :position, :level, :path, :aggressor, hidden?: false]
   end
 
   def announcement(
         %{object: %{guid: guid}, internal: %Internal{world: world}} = entity,
         level,
         {_x, _y, _z} = position,
-        now
+        now,
+        hidden? \\ false
       )
-      when is_integer(guid) and is_integer(level) and is_integer(now) do
+      when is_integer(guid) and is_integer(level) and is_integer(now) and is_boolean(hidden?) do
     %Announcement{
       guid: guid,
       world: world,
       position: position,
       level: level,
       path: path(entity, now),
-      aggressor: aggressor(entity)
+      aggressor: aggressor(entity),
+      hidden?: hidden?
     }
   end
 
-  def path(
-        %{
-          internal: %Internal{movement_start_time: started_at, movement_start_position: origin},
-          movement_block: %MovementBlock{spline_nodes: [_ | _] = nodes, duration: duration}
-        } = entity,
-        now
-      )
-      when is_integer(started_at) and is_tuple(origin) and is_integer(duration) and duration > 0 do
-    path = %Path{origin: origin, nodes: nodes, started_at: started_at, duration_ms: duration}
+  def movement_step, do: @movement_step
 
-    if Movement.moving?(entity, now) and not Movement.falling?(entity) and short?(path), do: path
+  def path(entity, now) do
+    path = walking_path(entity, now)
+    if path && short?(path), do: path
   end
 
-  def path(_entity, _now), do: nil
+  def refresh_at(entity, undetectable_until, hidden?, now) when is_boolean(hidden?) and is_integer(now) do
+    [expiry(undetectable_until, now), if(hidden?, do: step_at(walking_path(entity, now), now))]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.min(fn -> nil end)
+  end
+
+  defp walking_path(
+         %{
+           internal: %Internal{movement_start_time: started_at, movement_start_position: origin},
+           movement_block: %MovementBlock{spline_nodes: [_ | _] = nodes, duration: duration}
+         } = entity,
+         now
+       )
+       when is_integer(started_at) and is_tuple(origin) and is_integer(duration) and duration > 0 do
+    if Movement.moving?(entity, now) and not Movement.falling?(entity),
+      do: %Path{origin: origin, nodes: nodes, started_at: started_at, duration_ms: duration}
+  end
+
+  defp walking_path(_entity, _now), do: nil
+
+  defp expiry(until, now) when is_integer(until) and until > now, do: until
+  defp expiry(_until, _now), do: nil
+
+  defp step_at(%Path{origin: origin, nodes: nodes, started_at: started_at, duration_ms: duration}, now) do
+    total = path_length([origin | nodes])
+    at = if total > 0, do: now + ceil(@movement_step * duration / total)
+    if at && at < started_at + duration, do: at
+  end
+
+  defp step_at(nil, _now), do: nil
 
   def aggressor(
         %Mob{

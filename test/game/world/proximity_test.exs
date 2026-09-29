@@ -7,17 +7,21 @@ defmodule ThistleTea.Game.World.ProximityTest do
   alias ThistleTea.Game.Core.Combat.Proximity.Announcement
   alias ThistleTea.Game.Core.Combat.Proximity.Path
   alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.GameObject, as: GameObjectComponent
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Trap
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.SpatialGrid
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Proximity
   alias ThistleTea.Game.World.SpatialHash
@@ -241,6 +245,93 @@ defmodule ThistleTea.Game.World.ProximityTest do
       left |> Proximity.join(cell) |> Proximity.sync(Time.now())
       assert_receive {:proximity, %Announcement{}}
     end
+
+    test "a stealthed unit is listed as hidden and its announcements are marked hidden" do
+      guid = put_player(player_guid(), stealthed?: true)
+      player = guid |> player() |> join()
+      cell = player.internal.visibility_cell
+      assert Proximity.hidden_members([cell]) == [guid]
+
+      player = Proximity.sync(player, Time.now())
+      assert_receive {:proximity, %Announcement{guid: ^guid, hidden?: true}}
+
+      Metadata.update(guid, %{stealthed?: false})
+      player = Proximity.sync(player, Time.now())
+      assert_receive {:proximity, %Announcement{guid: ^guid, hidden?: false}}
+      assert Proximity.hidden_members([cell]) == []
+
+      Metadata.update(guid, %{stealthed?: true})
+      player = Proximity.sync(player, Time.now())
+      assert Proximity.hidden_members([cell]) == [guid]
+      assert Proximity.leave(player, cell).internal.hidden_cell == nil
+      assert Proximity.hidden_members([cell]) == []
+    end
+
+    test "a reaction change tells the traps the unit owns" do
+      guid = put_player(player_guid())
+      player = guid |> player() |> join() |> Proximity.sync(Time.now())
+      :ok = Group.join(Groups, Proximity.owned_key(guid), %{})
+
+      Metadata.update(guid, %{duel_started?: true})
+      synced = Proximity.sync(player, Time.now())
+      assert Proximity.reaction_changed?(player, synced)
+      assert_receive {:owner_reaction_changed, ^guid}
+
+      Metadata.update(guid, %{level: 6})
+      leveled = Proximity.sync(synced, Time.now())
+      refute Proximity.reaction_changed?(synced, leveled)
+      refute_receive {:owner_reaction_changed, _guid}
+    end
+  end
+
+  describe "refresh/3" do
+    test "an undetectable unit announces again the moment that ends" do
+      guid = put_player(player_guid(), undetectable_until: Time.now() + 30)
+      player = guid |> player() |> join() |> Proximity.sync(Time.now())
+      assert_receive {:proximity, %Announcement{guid: ^guid, hidden?: false}}
+      assert {ref, _at} = player.internal.proximity_refresh
+
+      assert_receive {:timeout, ^ref, :proximity_refresh}, 500
+      assert Proximity.refresh(player, make_ref(), Time.now()) == player
+      refute_receive {:proximity, %Announcement{}}
+
+      refreshed = Proximity.refresh(player, ref, Time.now())
+      assert_receive {:proximity, %Announcement{guid: ^guid, hidden?: true}}
+      assert refreshed.internal.proximity_refresh == nil
+    end
+
+    test "a stealthed walker keeps announcing every two yards until it arrives" do
+      guid = put_player(player_guid(), stealthed?: true)
+      now = Time.now()
+      player = guid |> player() |> walk({40.0, 0.0, 0.0}, now, 4_000) |> join() |> Proximity.sync(now)
+      assert_receive {:proximity, %Announcement{guid: ^guid, hidden?: true}}
+      assert {_ref, at} = player.internal.proximity_refresh
+      assert at == now + 200
+
+      Metadata.update(guid, %{stealthed?: false})
+      unhidden = Proximity.sync(player, now)
+      assert unhidden.internal.proximity_refresh == nil
+    end
+  end
+
+  describe "join/2" do
+    test "stealthed traps are listed as hidden and join their owner's owned key" do
+      owner = player_guid()
+      trap = trap(owner, true)
+      cell = SpatialGrid.cell(WorldRef.open(0), 0.0, 0.0, 0.0)
+
+      joined = Proximity.join(trap, cell)
+      assert Proximity.hidden_members([cell]) == [trap.object.guid]
+      assert [{pid, _meta}] = Group.members(Groups, Proximity.owned_key(owner))
+      assert pid == self()
+
+      Proximity.leave(joined, cell)
+      assert Proximity.hidden_members([cell]) == []
+      assert Group.members(Groups, Proximity.owned_key(owner)) == []
+
+      assert Proximity.join(trap(owner, false), cell).internal.hidden_cell == nil
+      assert Proximity.hidden_members([cell]) == []
+    end
   end
 
   defp hostile_pair(mob_position) do
@@ -254,6 +345,23 @@ defmodule ThistleTea.Game.World.ProximityTest do
 
   defp move(%Character{movement_block: movement_block} = character, {x, y, z}) do
     %{character | movement_block: %{movement_block | position: {x, y, z, 0.0}}}
+  end
+
+  defp walk(%Character{internal: internal, movement_block: movement_block} = character, destination, now, duration) do
+    %{
+      character
+      | internal: %{internal | movement_start_time: now, movement_start_position: {0.0, 0.0, 0.0}},
+        movement_block: %{movement_block | spline_nodes: [destination], duration: duration}
+    }
+  end
+
+  defp trap(owner, stealthed?) do
+    %GameObject{
+      object: %Object{guid: Guid.from_low_guid(:game_object, 1, System.unique_integer([:positive]))},
+      game_object: %GameObjectComponent{created_by: owner},
+      internal: %Internal{world: WorldRef.open(0), trap: %Trap{stealthed?: stealthed?}},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+    }
   end
 
   defp creature_announcement(guid, position) do

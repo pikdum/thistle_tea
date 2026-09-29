@@ -1577,6 +1577,14 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       {:noreply, state}
   end
 
+  def handle_info({:timeout, ref, :proximity_refresh}, %Mob{} = state) do
+    {:noreply, Proximity.refresh(state, ref, Time.now())}
+  rescue
+    error ->
+      Logger.error("Proximity refresh failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_info({:event_start, _event}, state) do
     {:noreply, state}
   end

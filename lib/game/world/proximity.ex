@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.World.Proximity do
   @moduledoc """
-  Proximity aggro by announcement instead of polling.
+  Proximity aggro and stealth sight by announcement instead of polling.
 
   Every unit in the world is a member of its visibility cell's proximity key.
   A unit announces itself to the keys within aggro reach when it moves two
@@ -12,6 +12,14 @@ defmodule ThistleTea.Game.World.Proximity do
   EventAI event also wakes for any announcer within that event's range. A
   walking announcer's path becomes one scheduled check at the moment of
   contact, rechecked against the authoritative position when it fires.
+
+  Stealthed units and stealthed traps are also listed under their cell's
+  hidden key, so a viewer that moves or turns re-checks only them. A
+  stealthed unit's announcements are marked hidden so the viewers that hear
+  them re-check it. It announces again every two yards while walking a path,
+  and a unit that is undetectable for a while announces again when that
+  ends. A unit whose reaction facts change tells the traps it owns through
+  its owned key, since whether an enemy sees a trap depends on its owner.
   """
 
   alias ThistleTea.Game.Core.AI.BT.Blackboard
@@ -26,7 +34,9 @@ defmodule ThistleTea.Game.World.Proximity do
   alias ThistleTea.Game.Core.Combat.Proximity.Path
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Trap
   alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.SpatialGrid
   alias ThistleTea.Game.Core.Time
@@ -40,7 +50,6 @@ defmodule ThistleTea.Game.World.Proximity do
   alias ThistleTea.Game.World.Reaction
 
   @group Groups
-  @movement_threshold 2.0
   @watched_keys Reaction.actor_keys() ++
                   [
                     :level,
@@ -59,52 +68,141 @@ defmodule ThistleTea.Game.World.Proximity do
 
   defguardp unit?(entity) when is_struct(entity, Mob) or is_struct(entity, Character)
 
+  defguardp stealthed_trap?(entity)
+            when is_struct(entity, GameObject) and is_struct(entity.internal.trap, Trap) and
+                   entity.internal.trap.stealthed? == true
+
   def key({%WorldRef{map_id: map_id, instance_id: instance_id}, x, y}),
     do: "proximity/#{map_id}/#{instance_id || "world"}/#{x}/#{y}"
 
-  def join(entity, cell) when unit?(entity) do
+  def hidden_key({%WorldRef{map_id: map_id, instance_id: instance_id}, x, y}),
+    do: "hidden/#{map_id}/#{instance_id || "world"}/#{x}/#{y}"
+
+  def owned_key(guid) when is_integer(guid), do: "owned/#{guid}"
+
+  def hidden_members(cells) do
+    cells
+    |> Enum.flat_map(&Group.members(@group, hidden_key(&1)))
+    |> Enum.map(fn {_pid, %{guid: guid}} -> guid end)
+    |> Enum.uniq()
+  end
+
+  def join(%{object: %{guid: guid}} = entity, cell) when unit?(entity) do
     :ok = Group.join(@group, key(cell), %{})
-    entity
+    list_hidden(entity, match?(%{stealthed?: true}, Metadata.query(guid, [:stealthed?])), cell)
+  end
+
+  def join(entity, cell) when stealthed_trap?(entity) do
+    case entity.game_object.created_by do
+      owner when is_integer(owner) and owner > 0 -> :ok = Group.join(@group, owned_key(owner), %{})
+      _unowned -> :ok
+    end
+
+    list_hidden(entity, true, cell)
   end
 
   def join(entity, _cell), do: entity
 
   def leave(%{internal: %Internal{} = internal} = entity, cell) when unit?(entity) do
     Group.leave(@group, key(cell))
-    %{entity | internal: %{internal | proximity: nil}}
+    list_hidden(%{entity | internal: %{internal | proximity: nil}}, false, cell)
+  end
+
+  def leave(entity, cell) when stealthed_trap?(entity) do
+    case entity.game_object.created_by do
+      owner when is_integer(owner) and owner > 0 -> Group.leave(@group, owned_key(owner))
+      _unowned -> :ok
+    end
+
+    list_hidden(entity, false, cell)
   end
 
   def leave(entity, _cell), do: entity
 
-  def sync(entity, now \\ Time.now())
+  def sync(entity, now \\ Time.now()), do: sync(entity, now, false)
 
-  def sync(%{object: %{guid: guid}, internal: %Internal{visibility_cell: {_, _, _}} = internal} = entity, now)
-      when unit?(entity) and is_integer(guid) do
+  def refresh(%{internal: %Internal{proximity_refresh: {ref, _at}} = internal} = entity, ref, now) do
+    sync(%{entity | internal: %{internal | proximity_refresh: nil}}, now, true)
+  end
+
+  def refresh(entity, _ref, _now), do: entity
+
+  def reaction_changed?(%{internal: %Internal{proximity: previous}}, %{internal: %Internal{proximity: current}}),
+    do: reaction_changed?(previous, current)
+
+  def reaction_changed?({_world, _motion, previous, _aggressor}, {_, _, current, _}),
+    do: Map.take(previous, Reaction.actor_keys()) != Map.take(current, Reaction.actor_keys())
+
+  def reaction_changed?(_previous, _current), do: false
+
+  defp sync(
+         %{object: %{guid: guid}, internal: %Internal{visibility_cell: {_, _, _} = cell} = internal} = entity,
+         now,
+         forced?
+       )
+       when unit?(entity) and is_integer(guid) do
     case World.position(entity, now) do
       {world, x, y, z} ->
-        current = {world, motion(entity, {x, y, z}, now), facts(guid), ProximityCore.aggressor(entity)}
+        facts = facts(guid)
+        hidden? = Map.get(facts, :stealthed?) == true
+        current = {world, motion(entity, {x, y, z}, now), facts, ProximityCore.aggressor(entity)}
+        entity = list_hidden(entity, hidden?, cell)
 
-        if changed?(internal.proximity, current) do
-          announce(entity, {x, y, z}, now)
-          %{entity | internal: %{internal | proximity: current}}
-        else
-          entity
-        end
+        if forced? or changed?(internal.proximity, current),
+          do: publish(entity, current, {x, y, z}, hidden? or forced?, now),
+          else: entity
 
       nil ->
         entity
     end
   end
 
-  def sync(entity, _now), do: entity
+  defp sync(entity, _now, _forced?), do: entity
 
-  def announce(entity, position, now) do
-    announcement = ProximityCore.announcement(entity, aggro_level(entity), position, now)
+  defp publish(
+         %{object: %{guid: guid}, internal: internal} = entity,
+         {_, _, facts, _} = current,
+         position,
+         hidden?,
+         now
+       ) do
+    if reaction_changed?(internal.proximity, current),
+      do: Group.dispatch(@group, owned_key(guid), {:owner_reaction_changed, guid})
+
+    refresh_at =
+      ProximityCore.refresh_at(entity, Map.get(facts, :undetectable_until), Map.get(facts, :stealthed?) == true, now)
+
+    %{entity | internal: %{internal | proximity: current}}
+    |> announce(position, now, hidden?)
+    |> schedule_refresh(refresh_at, now)
+  end
+
+  defp announce(entity, position, now, hidden?) do
+    announcement = ProximityCore.announcement(entity, aggro_level(entity), position, now, hidden?)
     message = {:proximity, announcement}
 
     announcement.world
     |> SpatialGrid.cells_overlapping(ProximityCore.extent(announcement))
     |> Enum.each(&Group.dispatch(@group, key(&1), message))
+
+    entity
+  end
+
+  defp schedule_refresh(%{internal: %Internal{proximity_refresh: {_ref, at}}} = entity, at, _now), do: entity
+
+  defp schedule_refresh(%{internal: %Internal{proximity_refresh: refresh} = internal} = entity, at, now) do
+    with {ref, _at} <- refresh, do: :erlang.cancel_timer(ref)
+    refresh = if at, do: {:erlang.start_timer(max(at - now, 0) + 1, self(), :proximity_refresh), at}
+    %{entity | internal: %{internal | proximity_refresh: refresh}}
+  end
+
+  defp list_hidden(%{internal: %Internal{hidden_cell: cell}} = entity, true, cell), do: entity
+  defp list_hidden(%{internal: %Internal{hidden_cell: nil}} = entity, false, _cell), do: entity
+
+  defp list_hidden(%{object: %{guid: guid}, internal: %Internal{} = internal} = entity, hidden?, cell) do
+    if internal.hidden_cell, do: Group.leave(@group, hidden_key(internal.hidden_cell))
+    if hidden?, do: :ok = Group.join(@group, hidden_key(cell), %{guid: guid})
+    %{entity | internal: %{internal | hidden_cell: if(hidden?, do: cell)}}
   end
 
   def hear(%{object: %{guid: guid}}, %Announcement{guid: guid}, _now), do: :ignore
@@ -274,7 +372,8 @@ defmodule ThistleTea.Game.World.Proximity do
   defp moved?({:at, {fx, fy, _fz}}, {:at, {tx, ty, _tz}}) do
     dx = tx - fx
     dy = ty - fy
-    dx * dx + dy * dy >= @movement_threshold * @movement_threshold
+    step = ProximityCore.movement_step()
+    dx * dx + dy * dy >= step * step
   end
 
   defp moved?(from, to), do: from != to

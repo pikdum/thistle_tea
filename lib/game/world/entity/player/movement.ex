@@ -264,6 +264,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Movement do
 
     new_state
     |> Visibility.refresh_player()
+    |> Visibility.reveal_nearby()
     |> broadcast(message, Keyword.get(opts, :controller))
     |> publish_changes()
   end

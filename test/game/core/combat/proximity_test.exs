@@ -87,7 +87,7 @@ defmodule ThistleTea.Game.Core.Combat.ProximityTest do
     end
   end
 
-  describe "announcement/4" do
+  describe "announcement/5" do
     test "carries the path while walking and drops it once stopped" do
       walking = %{
         mob()
@@ -112,6 +112,28 @@ defmodule ThistleTea.Game.Core.Combat.ProximityTest do
 
       assert %Announcement{path: nil} = Proximity.announcement(travelling, 12, {10.0, 0.0, 0.0}, 1_000)
     end
+
+    test "marks a hidden announcer" do
+      assert %Announcement{hidden?: false} = Proximity.announcement(mob(), 12, {0.0, 0.0, 0.0}, 0)
+      assert %Announcement{hidden?: true} = Proximity.announcement(mob(), 12, {0.0, 0.0, 0.0}, 0, true)
+    end
+  end
+
+  describe "refresh_at/4" do
+    test "a unit announces again when it stops being undetectable" do
+      assert Proximity.refresh_at(mob(), 1_500, false, 1_000) == 1_500
+      assert Proximity.refresh_at(mob(), 1_000, false, 1_000) == nil
+      assert Proximity.refresh_at(mob(), nil, true, 1_000) == nil
+    end
+
+    test "a hidden walker announces again every movement step, even on long journeys" do
+      walking = walking(1_000.0, 100_000)
+
+      assert Proximity.refresh_at(walking, nil, true, 1_000) == 1_200
+      assert Proximity.refresh_at(walking, nil, false, 1_000) == nil
+      assert Proximity.refresh_at(walking, 1_100, true, 1_000) == 1_100
+      assert Proximity.refresh_at(walking, nil, true, 99_900) == nil
+    end
   end
 
   describe "extent/1" do
@@ -133,6 +155,14 @@ defmodule ThistleTea.Game.Core.Combat.ProximityTest do
       level: 10,
       path: Keyword.get(opts, :path),
       aggressor: Keyword.get(opts, :aggressor)
+    }
+  end
+
+  defp walking(distance, duration) do
+    %{
+      mob()
+      | internal: %{mob().internal | movement_start_time: 0, movement_start_position: {0.0, 0.0, 0.0}},
+        movement_block: %{mob().movement_block | spline_nodes: [{distance, 0.0, 0.0}], duration: duration}
     }
   end
 

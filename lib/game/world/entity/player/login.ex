@@ -486,6 +486,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
           internal
           | visibility_cell: nil,
             proximity: nil,
+            proximity_refresh: nil,
+            hidden_cell: nil,
             breath: nil,
             fatigue: nil,
             lava_exposure: nil,

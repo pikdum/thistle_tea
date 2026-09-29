@@ -399,6 +399,11 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
     {:noreply, Chest.reservation_lost(state, token)}
   end
 
+  def handle_info({:owner_reaction_changed, _owner_guid}, %GameObject{} = state) do
+    Visibility.notify_visibility_changed(state)
+    {:noreply, state}
+  end
+
   def handle_info(:despawn, state) do
     despawn(state)
   end

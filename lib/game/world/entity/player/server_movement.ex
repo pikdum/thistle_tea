@@ -50,6 +50,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ServerMovement do
       |> Rest.check_tavern_exit()
       |> Exploration.check_movement(now)
       |> Visibility.refresh_player()
+      |> Visibility.reveal_nearby()
     end
   end
 

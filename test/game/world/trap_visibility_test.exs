@@ -9,13 +9,17 @@ defmodule ThistleTea.Game.World.TrapVisibilityTest do
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.GameObject, as: GameObjectServer
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Proximity
   alias ThistleTea.Game.World.Visibility
 
   setup [:trap]
@@ -55,29 +59,49 @@ defmodule ThistleTea.Game.World.TrapVisibilityTest do
     end
   end
 
-  describe "stealth_detection_tick/2" do
-    test "reevaluates owner hostility and detection without moving either observer", context do
+  describe "reveal_hidden/1" do
+    test "re-checks listed traps against the viewer's current hostility and detection", context do
       %{state: state, trap: trap, owner: owner} = context
       Entity.register(trap)
-      state = %{state | tracked_entities: MapSet.new([trap])} |> tick()
+      Group.join(Groups, Proximity.hidden_key({state.character.internal.world, 0, 0}), %{guid: trap})
+      state = %{state | tracked_entities: MapSet.new([trap])} |> Visibility.reveal_hidden()
       refute Visibility.tracked?(state, trap)
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{guid: ^trap}, force: true}}
 
       Metadata.update(owner, %{faction_template: alliance()})
-      tick(state)
+      Visibility.reveal_hidden(state)
       guid = state.guid
       assert_receive {:"$gen_cast", {:send_update_to, ^guid}}
 
       Metadata.update(owner, %{faction_template: horde()})
       aura = %Aura{type: :mod_invisibility_detect, misc_value: 3, amount: 300}
       character = %{state.character | unit: %{state.character.unit | auras: [%Holder{auras: [aura]}]}}
-      tick(%{state | character: character})
+      Visibility.reveal_hidden(%{state | character: character})
       assert_receive {:"$gen_cast", {:send_update_to, ^guid}}
 
-      state = %{state | tracked_entities: MapSet.new([trap])} |> tick()
+      state = %{state | tracked_entities: MapSet.new([trap])} |> Visibility.reveal_hidden()
       refute Visibility.tracked?(state, trap)
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{guid: ^trap}, force: true}}
       assert Visibility.leave_player(state).game_object_guids == []
+    end
+  end
+
+  describe "GameObjectServer.handle_info/2" do
+    test "a trap asks nearby viewers to re-check it when its owner's reactions change", context do
+      %{state: state, trap: trap, owner: owner} = context
+      world = state.character.internal.world
+      Entity.register(state.guid)
+      World.SpatialHash.insert(:players, state.guid, world, 0.0, 0.0, 0.0)
+      on_exit(fn -> World.SpatialHash.remove(:players, state.guid) end)
+
+      game_object = %GameObject{
+        object: %Object{guid: trap},
+        internal: %Internal{world: world},
+        movement_block: %MovementBlock{position: {4.0, 0.0, 0.0, 0.0}}
+      }
+
+      assert {:noreply, ^game_object} = GameObjectServer.handle_info({:owner_reaction_changed, owner}, game_object)
+      assert_receive {:"$gen_cast", {:visibility_changed, ^trap}}
     end
   end
 
@@ -95,14 +119,6 @@ defmodule ThistleTea.Game.World.TrapVisibilityTest do
       left = Visibility.handle_events(joined, [%{event | type: :left}])
       assert left.game_object_guids == []
     end
-  end
-
-  defp tick(state) do
-    state = Visibility.schedule_stealth_detection(state)
-    Process.cancel_timer(state.stealth_detection_ref)
-    updated = Visibility.stealth_detection_tick(state, state.stealth_detection_ref)
-    Process.cancel_timer(updated.stealth_detection_ref)
-    updated
   end
 
   defp trap(_context) do
