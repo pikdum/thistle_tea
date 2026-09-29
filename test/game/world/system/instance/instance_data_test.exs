@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceDataTest do
   alias ThistleTea.Game.Core.Instance.Copy
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.System.Instance.InstanceData
+  alias ThistleTea.Game.World.Topics
 
   describe "read/3" do
     test "projects supported defaults and stored values in one batch" do
@@ -51,6 +52,22 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceDataTest do
 
       assert :ok = InstanceData.remove(table, world)
       assert %Snapshot{status: :missing_copy} = InstanceData.read(world, [7], table)
+    end
+  end
+
+  describe "publish/2" do
+    test "announces a copy's data to its world facts subscribers only when it changes" do
+      table = table()
+      world = WorldRef.instance(329, System.unique_integer([:positive]))
+      copy = %Copy{world: world, owner: {:player, 1}, script_name: "instance_stratholme", data: %{7 => 2}}
+      :ok = Topics.subscribe(Topics.world_facts(world))
+
+      :ok = InstanceData.publish(table, copy)
+      assert_receive {:world_facts_changed, ^world}
+      :ok = InstanceData.publish(table, copy)
+      refute_receive {:world_facts_changed, ^world}, 50
+      :ok = InstanceData.publish(table, %{copy | data: %{7 => 3}})
+      assert_receive {:world_facts_changed, ^world}
     end
   end
 

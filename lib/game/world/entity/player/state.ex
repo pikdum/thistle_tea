@@ -99,6 +99,8 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
     :outdoor_pvp_token,
     :outdoor_pvp_tower_buff,
     :reputation_projection,
+    :quest_eligibility,
+    :world_facts_key,
     outdoor_pvp_favor?: false,
     item_durations_active?: false,
     ready: false,

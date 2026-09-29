@@ -15,12 +15,14 @@ defmodule ThistleTea.Game.World.Visibility.QuestGiversTest do
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThistleTea.Game.World.Entity.Player.PacketSink
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.World.Topics
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.World.Visibility.QuestGivers
 
@@ -111,6 +113,64 @@ defmodule ThistleTea.Game.World.Visibility.QuestGiversTest do
     end
   end
 
+  describe "sync/1" do
+    test "re-evaluates visible givers only when the viewer's eligibility changes", context do
+      state = sync_and_deliver(context.state, context.guid, 0)
+      assert QuestGivers.sync(state) == state
+      refute_received {:"$gen_cast", {:send_packet, %SmsgQuestgiverStatus{}, _}}
+
+      player = %{state.character.player | skills: %{185 => %{value: 50}}}
+      state = sync_and_deliver(%{state | character: %{state.character | player: player}}, context.guid, 5)
+      assert state.questgiver_statuses == %{context.guid => 5}
+    end
+  end
+
+  describe "enter/1" do
+    test "subscribes the viewer to game events and its world's facts until it leaves", context do
+      saved = GameEvent.get_events()
+      on_exit(fn -> GameEvent.set_events(saved) end)
+      world = context.state.character.internal.world
+      state = QuestGivers.enter(context.state)
+      assert state.world_facts_key == Topics.world_facts(world)
+
+      Topics.publish(Topics.world_facts(world), {:world_facts_changed, world})
+      assert_receive {:world_facts_changed, ^world}
+      GameEvent.set_events([context.quest.id | saved])
+      assert_receive {:game_events_changed, _active}
+
+      other = WorldRef.open(1)
+
+      moved =
+        QuestGivers.enter(%{
+          state
+          | character: %{state.character | internal: %{state.character.internal | world: other}}
+        })
+
+      assert moved.world_facts_key == Topics.world_facts(other)
+      Topics.publish(Topics.world_facts(world), {:world_facts_changed, world})
+      refute_receive {:world_facts_changed, ^world}, 50
+
+      left = QuestGivers.leave(moved)
+      assert left.world_facts_key == nil
+      GameEvent.set_events(saved)
+      refute_receive {:game_events_changed, _active}, 50
+    end
+
+    test "a published world event refreshes a stationary viewer", context do
+      saved = GameEvent.get_events()
+      on_exit(fn -> GameEvent.set_events(saved) end)
+      quest = %{context.quest | required_skill: 0, event_id: context.quest.id}
+      :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
+      state = context.state |> QuestGivers.enter() |> sync_and_deliver(context.guid, 0)
+
+      GameEvent.set_events([quest.event_id | saved])
+      assert_receive {:game_events_changed, _active} = message
+      assert {:noreply, _state} = PlayerServer.handle_info(message, state)
+      assert_received {:"$gen_cast", {:send_packet, %SmsgQuestgiverStatus{guid: guid, status: 5}, _opts}}
+      assert guid == context.guid
+    end
+  end
+
   describe "remember/2" do
     test "shares the status cache with ordinary client query responses", context do
       packet = %SmsgQuestgiverStatus{guid: context.guid, status: 0}
@@ -124,8 +184,11 @@ defmodule ThistleTea.Game.World.Visibility.QuestGiversTest do
     end
   end
 
-  defp refresh_and_deliver(state, guid, status) do
-    state = QuestGivers.refresh(state)
+  defp refresh_and_deliver(state, guid, status), do: deliver(QuestGivers.refresh(state), guid, status)
+
+  defp sync_and_deliver(state, guid, status), do: deliver(QuestGivers.sync(state), guid, status)
+
+  defp deliver(state, guid, status) do
     assert_received {:"$gen_cast", {:send_packet, %SmsgQuestgiverStatus{guid: ^guid, status: ^status} = packet, opts}}
     assert opts == [source_guid: guid]
     state = PacketSink.send(state, packet, opts)

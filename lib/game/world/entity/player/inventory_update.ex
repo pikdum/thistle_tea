@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InventoryUpdate do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Game.World.Visibility.QuestGivers
 
   def apply(state, result, placement \\ nil)
 
@@ -136,7 +137,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InventoryUpdate do
   end
 
   defp finish_update(state) do
-    state = sync_condition_subject(state)
+    state = state |> sync_condition_subject() |> QuestGivers.refresh()
     broadcast_player(state)
     character = state.character |> EventSink.emit_pending(Context.new(self())) |> store_character()
     ItemDurations.sync(%{state | character: character})

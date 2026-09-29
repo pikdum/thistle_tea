@@ -1,7 +1,8 @@
 defmodule ThistleTea.Game.World.System.ScriptedEvent do
   @moduledoc """
   Owns VMangos scripted map events, their timers, targets, mutable counters,
-  condition checks, and success or failure script dispatch.
+  condition checks, and success or failure script dispatch. Starting or ending
+  an event is announced on its world's `World.Topics` facts key.
   """
 
   use GenServer
@@ -28,6 +29,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.System.CreatureGroups
+  alias ThistleTea.Game.World.Topics
 
   require Logger
 
@@ -96,7 +98,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   @impl GenServer
   def handle_call({:command_result, %Effects.ScriptedEventCommand{} = effect}, _from, events) do
     if current_request?(effect.reply) and command_allowed?(events, effect) do
-      {:reply, :ok, apply_command(events, effect)}
+      {:reply, :ok, events |> apply_command(effect) |> announce(events)}
     else
       {:reply, {:error, :event_state}, events}
     end
@@ -127,7 +129,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
 
   @impl GenServer
   def handle_cast({:command, %Effects.ScriptedEventCommand{} = effect}, events) do
-    {:noreply, apply_command(events, effect)}
+    {:noreply, events |> apply_command(effect) |> announce(events)}
   rescue
     error ->
       Logger.error("scripted event command crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
@@ -137,7 +139,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   @impl GenServer
   def handle_info({:evaluate, key, token}, events) do
     case Map.get(events, key) do
-      %Event{token: ^token} = event -> {:noreply, evaluate(events, key, event)}
+      %Event{token: ^token} = event -> {:noreply, events |> evaluate(key, event) |> announce(events)}
       _event -> {:noreply, events}
     end
   rescue
@@ -833,6 +835,19 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
 
   defp schedule(key, token), do: Process.send_after(self(), {:evaluate, key, token}, 1_000)
   defp event_key(world, id), do: {WorldRef.coerce(world), id}
+
+  defp announce(events, previous) do
+    started = Map.keys(events) -- Map.keys(previous)
+    ended = Map.keys(previous) -- Map.keys(events)
+
+    (started ++ ended)
+    |> Enum.map(fn {world, _id} -> world end)
+    |> Enum.uniq()
+    |> Enum.each(&Topics.publish(Topics.world_facts(&1), {:world_facts_changed, &1}))
+
+    events
+  end
+
   defp condition_key(%Condition{entry: entry}) when is_integer(entry) and entry > 0, do: entry
   defp condition_key(%Condition{} = condition), do: condition
 end

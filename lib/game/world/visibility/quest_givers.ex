@@ -1,14 +1,22 @@
 defmodule ThistleTea.Game.World.Visibility.QuestGivers do
   @moduledoc """
-  Projects game-object activation and creature quest status for each viewer,
-  refreshing changed eligibility through the visibility tick.
+  Projects game-object activation and creature quest status for each viewer.
+
+  Nothing polls. The viewer re-evaluates its visible quest givers when its own
+  eligibility inputs change (level, quest state, skills, reputation, auras,
+  area, world, or inventory) and when a world fact it depends on is published:
+  game events on the aggregate key and scripted map events or instance data on
+  its world's key. Newly visible givers are answered through the client's own
+  status query.
   """
 
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.GameObject
+  alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.GameObjectTemplate
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Quest
@@ -21,13 +29,14 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
+  alias ThistleTea.Game.World.Topics
 
   def personalize(
         %UpdateObject{object: %{guid: guid}, game_object: %GameObject{} = object} = update,
         %Character{} = viewer
       ) do
     if quest_object?(guid) do
-      %{update | game_object: %{object | dyn_flags: flags(guid, viewer)}}
+      %{update | game_object: %{object | dyn_flags: flags(guid, viewer, nil)}}
     else
       update
     end
@@ -64,6 +73,33 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
 
   def forget(state, _guid), do: state
 
+  def enter(%State{character: %Character{internal: %Internal{world: world}}} = state) do
+    key = Topics.world_facts(world)
+    state = leave(state)
+    :ok = Topics.subscribe(Topics.game_events())
+    :ok = Topics.subscribe(key)
+    %{state | world_facts_key: key}
+  end
+
+  def enter(state), do: state
+
+  def leave(%State{world_facts_key: key} = state) when is_binary(key) do
+    Topics.unsubscribe(Topics.game_events())
+    Topics.unsubscribe(key)
+    %{state | world_facts_key: nil}
+  end
+
+  def leave(state), do: state
+
+  def sync(%State{character: %Character{player: %Player{}} = viewer, quest_eligibility: previous} = state) do
+    case eligibility(viewer) do
+      ^previous -> state
+      current -> %{refresh(state) | quest_eligibility: current}
+    end
+  end
+
+  def sync(state), do: state
+
   def refresh(%State{character: %Character{} = viewer} = state) do
     visible = MapSet.to_list(state.tracked_entities)
 
@@ -73,16 +109,22 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
         questgiver_statuses: Map.take(state.questgiver_statuses, visible)
     }
 
-    refresh_objects(state, viewer)
-    refresh_creatures(state, viewer)
+    quest_context = Quests.ctx(viewer)
+    refresh_objects(state, viewer, quest_context)
+    refresh_creatures(state, viewer, quest_context)
     state
   end
 
   def refresh(state), do: state
 
-  defp refresh_objects(state, viewer) do
+  defp eligibility(%Character{unit: unit, player: player, internal: internal}) do
+    {unit.level, player.quest_log, player.rewarded_quests, player.skills, player.skill_bonuses, player.reputation,
+     Enum.map(unit.auras || [], & &1.spell.id), internal.area, internal.world}
+  end
+
+  defp refresh_objects(state, viewer, quest_context) do
     for {guid, previous} <- state.quest_object_flags,
-        current = flags(guid, viewer),
+        current = flags(guid, viewer, quest_context),
         current != previous do
       update = %UpdateObject{
         update_type: :values,
@@ -94,17 +136,17 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
     end
   end
 
-  defp refresh_creatures(state, viewer) do
+  defp refresh_creatures(state, viewer, quest_context) do
     for guid <- state.tracked_entities,
         creature_questgiver?(guid) or Map.has_key?(state.questgiver_statuses, guid),
-        current = creature_status(guid, viewer),
+        current = creature_status(guid, viewer, quest_context),
         current != Map.get(state.questgiver_statuses, guid) do
       Outbound.send_packet(%SmsgQuestgiverStatus{guid: guid, status: current}, self(), source_guid: guid)
     end
   end
 
-  defp creature_status(guid, viewer) do
-    if creature_questgiver?(guid), do: Quests.dialog_status(guid, viewer), else: 0
+  defp creature_status(guid, viewer, quest_context) do
+    if creature_questgiver?(guid), do: Quests.dialog_status(guid, viewer, quest_context), else: 0
   end
 
   defp creature_questgiver?(guid) do
@@ -121,13 +163,13 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
     end
   end
 
-  defp flags(guid, %Character{} = viewer) do
+  defp flags(guid, %Character{} = viewer, quest_context) do
     case GameObjectTemplateLoader.cached(Guid.entry(guid)) do
       %GameObjectTemplate{type: 10, data: data} ->
         if goober_active?(viewer, Guid.entry(guid), Enum.at(data, 1, 0)), do: 1, else: 0
 
       _ ->
-        questgiver_flags(guid, viewer)
+        questgiver_flags(guid, viewer, quest_context)
     end
   end
 
@@ -151,7 +193,7 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
       end)
   end
 
-  defp questgiver_flags(guid, viewer) do
-    if Quests.quest_menu(guid, viewer) == [], do: 0, else: 1
+  defp questgiver_flags(guid, viewer, quest_context) do
+    if Quests.quest_menu(guid, viewer, quest_context) == [], do: 0, else: 1
   end
 end

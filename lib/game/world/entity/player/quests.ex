@@ -67,10 +67,10 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
     }
   end
 
-  def dialog_status(npc_guid, %Character{} = character) do
+  def dialog_status(npc_guid, %Character{} = character, quest_context \\ nil) do
     if QuestGiver.present?(character, npc_guid) do
       {giver_quests, ender_quests} = npc_quests(npc_guid)
-      availability = availability(character, giver_quests)
+      availability = availability(character, giver_quests, quest_context)
 
       QuestDialogStatus.for_npc(
         giver_quests,
@@ -579,9 +579,9 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   defp giver_ids(guid), do: QuestLoader.given_by(Guid.type_id(guid), World.entry(guid))
   defp ender_ids(guid), do: QuestLoader.ended_by(Guid.type_id(guid), World.entry(guid))
 
-  def quest_menu(npc_guid, %Character{} = character) do
+  def quest_menu(npc_guid, %Character{} = character, quest_context \\ nil) do
     {giver_quests, ender_quests} = npc_quests(npc_guid)
-    availability = availability(character, giver_quests)
+    availability = availability(character, giver_quests, quest_context)
 
     QuestDialogStatus.menu(
       giver_quests,
@@ -591,7 +591,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
     )
   end
 
-  def availability(%Character{} = character, quests) when is_list(quests) do
+  def availability(%Character{} = character, quests, quest_context \\ nil) when is_list(quests) do
     quests = quests |> Enum.flat_map(&QuestRequirements.condition_quests/1) |> Enum.uniq_by(& &1.id)
     conditions = quests |> Enum.map(& &1.required_condition) |> Enum.reject(&is_nil/1)
     context = ConditionContext.build(character, conditions, source: nil)
@@ -602,7 +602,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
       |> Map.new(fn quest -> {quest.id, ConditionEvaluator.evaluate(context, quest.required_condition)} end)
 
     %Availability{
-      quest_context: Map.put(ctx(character), :condition_results, condition_results),
+      quest_context: Map.put(quest_context || ctx(character), :condition_results, condition_results),
       condition_results: condition_results
     }
   end

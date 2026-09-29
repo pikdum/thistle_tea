@@ -172,6 +172,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   alias ThistleTea.Game.World.System.Party.Notifier, as: PartyNotifier
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Game.World.Visibility.QuestGivers
 
   require Logger
 
@@ -1792,6 +1793,14 @@ defmodule ThistleTea.Game.World.Entity.Player do
       {:noreply, state}
   end
 
+  def handle_info({fact, _value}, %State{} = state) when fact in [:game_events_changed, :world_facts_changed] do
+    {:noreply, QuestGivers.refresh(state)}
+  rescue
+    error ->
+      Logger.error("Quest giver refresh failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_info(:player_tick, %{character: %Character{}} = state) do
     now = Time.now()
     state = ServerMovement.advance(state, now)
@@ -1857,6 +1866,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
     |> Looting.close_unavailable()
     |> sync_equipment_requirements()
     |> sync_character_metadata()
+    |> QuestGivers.sync()
     |> then(fn state -> %{state | character: EventSink.emit_pending(state.character)} end)
     |> do_broadcast_update()
   end

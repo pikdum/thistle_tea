@@ -49,6 +49,7 @@ defmodule ThistleTea.Game.World.Visibility do
     |> Map.put(:visibility_cells, cells)
     |> sync_visible_entities(guid, cells)
     |> schedule_stealth_detection()
+    |> QuestGivers.enter()
   end
 
   def enter_player(state), do: state
@@ -124,12 +125,13 @@ defmodule ThistleTea.Game.World.Visibility do
     |> Map.put(:mob_guids, [])
     |> put_game_objects([])
     |> Map.put(:tracked_entities, MapSet.new())
+    |> QuestGivers.leave()
   end
 
   def leave_player(%{character: character} = state) do
     ChaseWatch.unwatch(self())
     state = cancel_stealth_detection(state)
-    %{state | character: leave_entity(character)}
+    QuestGivers.leave(%{state | character: leave_entity(character)})
   end
 
   def leave_player(state), do: state
@@ -288,7 +290,6 @@ defmodule ThistleTea.Game.World.Visibility do
     |> Enum.filter(&match?(%{stealthed?: true}, Metadata.get(&1)))
     |> Kernel.++(stealthed_traps(state))
     |> Enum.reduce(state, &reevaluate_entity(&2, &1))
-    |> QuestGivers.refresh()
     |> schedule_stealth_detection()
   end
 

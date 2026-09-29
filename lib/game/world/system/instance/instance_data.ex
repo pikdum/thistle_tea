@@ -1,12 +1,14 @@
 defmodule ThistleTea.Game.World.System.Instance.InstanceData do
   @moduledoc """
   Concurrent read projection of authoritative per-copy instance script data.
+  Each change is announced on the copy's `World.Topics` facts key.
   """
 
   alias ThistleTea.Game.Core.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Core.Instance.Copy
   alias ThistleTea.Game.Core.InstanceScript
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Topics
 
   @table_options [:named_table, :public, read_concurrency: true]
 
@@ -18,7 +20,13 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceData do
   end
 
   def publish(table \\ __MODULE__, %Copy{} = copy) do
-    true = :ets.insert(table, {copy.world, copy.script_name, copy.data})
+    row = {copy.world, copy.script_name, copy.data}
+
+    if :ets.lookup(table, copy.world) != [row] do
+      true = :ets.insert(table, row)
+      Topics.publish(Topics.world_facts(copy.world), {:world_facts_changed, copy.world})
+    end
+
     :ok
   end
 

@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
   alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
+  alias ThistleTea.Game.World.Topics
 
   setup do
     :sys.replace_state(ScriptedEventSystem, fn _events -> %{} end)
@@ -95,6 +96,19 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
 
     assert_receive {:"$gen_cast", {:start_script, [^success], target_guid}}
     assert target_guid == context.target_guid
+  end
+
+  test "starting and ending a map event announces its world's facts", context do
+    world = context.world
+    :ok = Topics.subscribe(Topics.world_facts(world))
+    on_exit(fn -> Topics.unsubscribe(Topics.world_facts(world)) end)
+
+    command(context, %ScriptStep{command: :start_map_event, datalong: 5_714, datalong2: 600})
+    assert_receive {:world_facts_changed, ^world}
+    command(context, %ScriptStep{command: :add_map_event_target, datalong: 5_714})
+    refute_receive {:world_facts_changed, ^world}, 50
+    command(context, %ScriptStep{command: :end_map_event, datalong: 5_714, datalong2: 1})
+    assert_receive {:world_facts_changed, ^world}
   end
 
   test "condition results expose map event and nearby game object state", context do
