@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   """
   use ThistleTea.Game.Network.Opcodes, [:SMSG_UPDATE_OBJECT]
 
+  import Bitwise, only: [|||: 2, <<<: 2]
+
   alias ThistleTea.Game.Core.Combat.Assistance
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -95,15 +97,7 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     struct(%__MODULE__{update_type: update_type, object_type: object_type}, Map.from_struct(entity))
   end
 
-  def mask_blocks_count(fields) do
-    fields
-    |> highest_bit()
-    |> Kernel.+(1)
-    |> Kernel./(32)
-    |> ceil()
-    |> trunc()
-    |> max(1)
-  end
+  def mask_blocks_count(fields), do: fields |> highest_bit() |> mask_count()
 
   def highest_bit(fields) do
     fields
@@ -111,31 +105,36 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     |> Enum.max(fn -> 0 end)
   end
 
-  # TODO: this still feels ugly
   def generate_mask(fields) do
-    mask_count = mask_blocks_count(fields)
-    mask_size = 32 * mask_count
-    mask = Bitmap.new(mask_size)
-
-    mask =
-      Enum.reduce(fields, mask, fn {_field, _value, {offset, size, _type}}, acc ->
-        start = offset
-        stop = start + size - 1
-
-        Enum.reduce(start..stop, acc, fn i, acc ->
-          Bitmap.set(acc, i)
-        end)
-      end)
-
-    <<mask.data::little-size(mask_size)>>
+    {mask_count, mask, _data} = encode_fields(fields)
+    mask_binary(mask_count, mask)
   end
 
   def generate_objects(fields) do
-    fields
-    |> Enum.sort(&by_offset/2)
-    |> Enum.map(&field/1)
-    |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
+    {_mask_count, _mask, data} = encode_fields(fields)
+    IO.iodata_to_binary(data)
   end
+
+  def encode_fields(fields) do
+    case encode_sorted(fields, 0, 0, 0, []) do
+      :unsorted -> fields |> Enum.sort(&by_offset/2) |> encode_fields()
+      {mask, highest_bit, data} -> {mask_count(highest_bit), mask, data}
+    end
+  end
+
+  defp encode_sorted([], mask, highest_bit, _previous, data), do: {mask, highest_bit, data}
+
+  defp encode_sorted([{_field, _value, {offset, _size, _type}} | _rest], _mask, _highest_bit, previous, _data)
+       when offset < previous, do: :unsorted
+
+  defp encode_sorted([{_field, _value, {offset, size, _type}} = entry | rest], mask, highest_bit, _previous, data) do
+    mask = mask ||| ((1 <<< size) - 1) <<< offset
+    encode_sorted(rest, mask, max(highest_bit, offset + size - 1), offset, [data | field(entry)])
+  end
+
+  defp mask_count(highest_bit), do: max(div(highest_bit + 32, 32), 1)
+
+  defp mask_binary(mask_count, mask), do: <<mask::little-size(32 * mask_count)>>
 
   def flatten_field_structs(obj_or_structs, target \\ :self)
 
@@ -174,18 +173,13 @@ defmodule ThistleTea.Game.Network.UpdateObject do
 
   defp packet_body(%__MODULE__{update_type: :out_of_range_objects, out_of_range_guids: guids}, _recipient_guid)
        when is_list(guids) do
-    <<@update_type_out_of_range_objects, length(guids)::little-size(32)>> <>
-      Enum.map_join(guids, &BinaryUtils.pack_guid/1)
+    [<<@update_type_out_of_range_objects, length(guids)::little-size(32)>> | Enum.map(guids, &BinaryUtils.pack_guid/1)]
   end
 
   defp packet_body(%__MODULE__{update_type: :values, object: object} = obj, recipient_guid) do
-    fields = recipient_fields(obj, recipient_guid)
-    packed_guid = BinaryUtils.pack_guid(object.guid)
-    mask_count = mask_blocks_count(fields)
-    mask = generate_mask(fields)
-    objects = generate_objects(fields)
+    {mask_count, mask, data} = obj |> recipient_fields(recipient_guid) |> encode_fields()
 
-    <<@update_type_values>> <> packed_guid <> <<mask_count>> <> mask <> objects
+    [<<@update_type_values>>, BinaryUtils.pack_guid(object.guid), mask_count, mask_binary(mask_count, mask) | data]
   end
 
   defp packet_body(
@@ -194,24 +188,21 @@ defmodule ThistleTea.Game.Network.UpdateObject do
        )
        when update_type in [:create_object, :create_object2] do
     obj = %{obj | object: %{object | type: object_type_flags(obj)}}
-    fields = recipient_fields(obj, recipient_guid)
-    packed_guid = BinaryUtils.pack_guid(object.guid)
-    mask_count = mask_blocks_count(fields)
-    mask = generate_mask(fields)
-    objects = generate_objects(fields)
+    {mask_count, mask, data} = obj |> recipient_fields(recipient_guid) |> encode_fields()
 
     movement_block =
       obj.movement_block
       |> MovementBlock.refresh_timestamp(Time.now())
       |> MovementBlock.to_binary()
 
-    <<update_type(update_type)>> <>
-      packed_guid <>
-      <<object_type(object_type)>> <>
-      movement_block <>
-      <<mask_count>> <>
-      mask <>
-      objects
+    [
+      update_type(update_type),
+      BinaryUtils.pack_guid(object.guid),
+      object_type(object_type),
+      movement_block,
+      mask_count,
+      mask_binary(mask_count, mask) | data
+    ]
   end
 
   defp recipient_fields(%__MODULE__{} = obj, nil), do: flatten_field_structs(obj, :self)
@@ -244,23 +235,18 @@ defmodule ThistleTea.Game.Network.UpdateObject do
 
   def to_packet(objects, recipient_guid) when is_list(objects) do
     objects = normalize(objects)
-    header = packet_header(objects)
-
-    payload =
-      Enum.reduce(objects, header, fn obj, acc ->
-        acc <> packet_body(obj, recipient_guid)
-      end)
+    bodies = Enum.map(objects, &packet_body(&1, recipient_guid))
 
     %Packet{
       opcode: @smsg_update_object,
-      payload: payload
+      payload: IO.iodata_to_binary([packet_header(objects) | bodies])
     }
   end
 
   def to_packet(%__MODULE__{} = obj, recipient_guid) do
     %Packet{
       opcode: @smsg_update_object,
-      payload: packet_header(obj) <> packet_body(obj, recipient_guid)
+      payload: IO.iodata_to_binary([packet_header(obj) | packet_body(obj, recipient_guid)])
     }
   end
 

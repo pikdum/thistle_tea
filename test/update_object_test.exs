@@ -230,9 +230,12 @@ defmodule ThistleTea.UpdateObjectTest do
         player: player
       }
 
-      # Without the bug fix this raises FunctionClauseError in Bitmap.Integer.set
       packet = UpdateObject.to_packet(obj, object.guid + 1)
-      assert byte_size(packet.payload) > 0
+      <<1::little-32, 0, _update_type, packed_mask, rest::binary>> = packet.payload
+      packed_size = packed_mask |> Integer.digits(2) |> Enum.sum()
+      <<_packed::binary-size(^packed_size), _object_type, _update_flag, mask_count, _rest::binary>> = rest
+
+      assert mask_count == 16
     end
 
     test "to_packet/2 emits internally consistent mask + data for non-owner recipient", %{create_object_update: obj} do
@@ -251,6 +254,46 @@ defmodule ThistleTea.UpdateObjectTest do
 
       assert byte_size(data) == set_bits * 4
     end
+  end
+
+  describe "encode_fields/1" do
+    setup [:object, :unit, :player_with_private_fields]
+
+    test "matches a bit-by-bit reference for fields in any order", %{object: object, unit: unit, player: player} do
+      fields = UpdateObject.flatten_field_structs([object, unit, %{player | visible_item_19_0: 12_345}])
+
+      for salt <- 0..5 do
+        shuffled = if salt == 0, do: fields, else: Enum.sort_by(fields, &:erlang.phash2({&1, salt}))
+
+        assert encoded(shuffled) == reference_encoding(fields)
+      end
+    end
+
+    test "encodes no fields as one empty mask block" do
+      assert encoded([]) == {1, <<0::32>>, <<>>}
+    end
+  end
+
+  defp encoded(fields) do
+    {mask_count, mask, data} = UpdateObject.encode_fields(fields)
+
+    assert mask_count == UpdateObject.mask_blocks_count(fields)
+    assert <<mask::little-size(32 * mask_count)>> == UpdateObject.generate_mask(fields)
+    assert IO.iodata_to_binary(data) == UpdateObject.generate_objects(fields)
+
+    {mask_count, <<mask::little-size(32 * mask_count)>>, IO.iodata_to_binary(data)}
+  end
+
+  defp reference_encoding(fields) do
+    sorted = Enum.sort_by(fields, fn {_field, _value, {offset, _size, _type}} -> offset end)
+
+    bits =
+      for {_field, _value, {offset, size, _type}} <- sorted, bit <- offset..(offset + size - 1), uniq: true, do: bit
+
+    mask_count = max(ceil((Enum.max(bits, fn -> 0 end) + 1) / 32), 1)
+    mask = bits |> Enum.map(&(2 ** &1)) |> Enum.sum()
+
+    {mask_count, <<mask::little-size(32 * mask_count)>>, Enum.map_join(sorted, &UpdateObject.field/1)}
   end
 
   defp values_update(context) do
