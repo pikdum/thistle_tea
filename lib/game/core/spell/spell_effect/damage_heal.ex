@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.DamageHeal do
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Environment.EnvironmentalDamage
   alias ThistleTea.Game.Core.Math
+  alias ThistleTea.Game.Core.Rolls
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.Core.Spell.Chain
@@ -222,8 +223,10 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.DamageHeal do
   defp leech_multiplier(%Effect{multiple_value: multiple}) when is_number(multiple) and multiple > 0, do: multiple
   defp leech_multiplier(_effect), do: 1.0
 
-  defp heal_crit?(%CastContext{spell_crit_chance: chance}, %Spell{} = spell) when is_number(chance) and chance > 0 do
-    not Spell.attribute?(spell, :cant_crit) and (chance >= 100 or :rand.uniform() * 100 <= chance)
+  defp heal_crit?(%CastContext{spell_crit_chance: chance} = context, %Spell{} = spell)
+       when is_number(chance) and chance > 0 do
+    not Spell.attribute?(spell, :cant_crit) and
+      (chance >= 100 or Rolls.uniform(context.rolls, :spell_crit) * 100 <= chance)
   end
 
   defp heal_crit?(_context, _spell), do: false
@@ -393,7 +396,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.DamageHeal do
       (not Keyword.get(opts, :periodic?, false) or Keyword.get(opts, :periodic_can_crit?, false)) and
       not Spell.attribute?(spell, :cant_crit) and
       not Spell.attribute?(spell, :ignore_caster_modifiers) and
-      spell.dmg_class in [1, 3] and (chance >= 100 or :rand.uniform() * 100 <= chance)
+      spell.dmg_class in [1, 3] and (chance >= 100 or Rolls.uniform(context.rolls, :spell_crit) * 100 <= chance)
   end
 
   defp direct_spell_crit?(_state, _context, _spell, _opts), do: false
@@ -502,9 +505,9 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.DamageHeal do
 
   defp normalized_weapon_roll(%CastContext{} = context), do: weapon_roll(context)
 
-  defp weapon_base_roll(%CastContext{weapon_base_min: min, weapon_base_max: max})
+  defp weapon_base_roll(%CastContext{weapon_base_min: min, weapon_base_max: max, rolls: rolls})
        when is_number(min) and is_number(max) do
-    Math.random_int(trunc(min), max(trunc(max), trunc(min)))
+    Rolls.integer(rolls, :weapon_damage, trunc(min), max(trunc(max), trunc(min)))
   end
 
   defp weapon_base_roll(_context), do: 0

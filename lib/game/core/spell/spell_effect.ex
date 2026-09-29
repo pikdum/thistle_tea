@@ -18,9 +18,9 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect do
   alias ThistleTea.Game.Core.Creature.Critter
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity
-  alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.Core.Pet.PetTraining
   alias ThistleTea.Game.Core.Pet.Totems
+  alias ThistleTea.Game.Core.Rolls
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.Core.Spell.Chain
@@ -196,7 +196,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect do
 
   defp prepare_melee(target, %Resolution{context: context} = resolution) do
     if melee_roll_required?(target, context, context.spell) do
-      result = AttackTable.roll_special(target, special_attack(context, context.spell))
+      result = AttackTable.roll_special(target, special_attack(context, context.spell), melee_rolls(context))
 
       result =
         if result.crit? and Spell.attribute?(context.spell, :ignore_caster_modifiers),
@@ -222,7 +222,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect do
     effects =
       Enum.reject(spell.effects, fn effect ->
         context.caster_guid != target.object.guid and Spell.harmful?(spell) and
-          MechanicResistance.effect_resisted?(resistance, spell, effect, Math.random_int(0, 99))
+          MechanicResistance.effect_resisted?(resistance, spell, effect, Rolls.integer(context.rolls, :mechanic, 0, 99))
       end)
 
     if effects == [] and spell.effects != [],
@@ -577,6 +577,8 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect do
         acc
     end)
   end
+
+  defp melee_rolls(%CastContext{rolls: rolls}), do: Rolls.pinned(rolls, melee: :roll, melee_crit: :crit_roll)
 
   defp special_attack(%CastContext{} = context, spell) do
     %{

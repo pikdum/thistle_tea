@@ -5,6 +5,8 @@ defmodule ThistleTea.Game.Core.Spell.CastContext do
   numbers — so effects apply consistently even after the caster's state
   changes. The receiving owner refreshes threat modifiers when the spell lands
   and recipient availability for damage sharing and periodic life drains.
+  Receipt-side hit, crit, and mechanic-resist rolls draw from `rolls`, which
+  tests pin with `Rolls.fixed/1`.
   """
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Class.Mage
@@ -18,6 +20,7 @@ defmodule ThistleTea.Game.Core.Spell.CastContext do
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Pet.ControlOwner
   alias ThistleTea.Game.Core.Pet.PetHappiness
+  alias ThistleTea.Game.Core.Rolls
   alias ThistleTea.Game.Core.Skills
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Critical
@@ -123,7 +126,8 @@ defmodule ThistleTea.Game.Core.Spell.CastContext do
     happiness_multiplier: 1.0,
     weapon_attack_power_included?: false,
     healing_done_multiplier: 1.0,
-    melee_crit?: false
+    melee_crit?: false,
+    rolls: %Rolls{}
   ]
 
   def from_caster(%{object: %{guid: guid}, unit: %{level: level}} = caster, spell, target_guid)

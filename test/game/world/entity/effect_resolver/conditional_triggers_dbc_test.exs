@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.ConditionalTriggersDbcTest
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Power.Regen
+  alias ThistleTea.Game.Core.Rolls
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.Core.Spell.SpellEffect
   alias ThistleTea.Game.Core.Stats
@@ -91,7 +92,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.ConditionalTriggersDbcTest
     deliveries = Spells.resolve(caster, trigger) |> Enum.filter(&is_struct(&1, Effects.DeliverSpell))
     assert [%Effects.DeliverSpell{cast_context: context, spell: spell, target_guid: guid}] = deliveries
     assert guid == target.object.guid
-    {target, _events} = SpellEffect.receive(target, context, spell, now)
+    {target, _events} = SpellEffect.receive(target, %{context | rolls: Rolls.fixed(melee: 9_999)}, spell, now)
     target
   end
 
