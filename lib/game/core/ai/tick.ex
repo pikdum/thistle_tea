@@ -4,12 +4,15 @@ defmodule ThistleTea.Game.Core.AI.Tick do
 
   Behavior status, aura upkeep, and regeneration each contribute a semantic
   deadline. Entity owners schedule the earliest deadline and use a default
-  cadence only when no subsystem needs a specific wake.
+  cadence only when no subsystem needs a specific wake. Players in combat also
+  wake for the next combat check, so an unrelated long deadline such as a
+  30-minute buff can never postpone leaving combat.
   """
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Blackboard.Combat
   alias ThistleTea.Game.Core.AI.TickPlan
   alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Combat.CombatTimer
   alias ThistleTea.Game.Core.Combat.ExtraAttacks
   alias ThistleTea.Game.Core.Combat.Reactive
   alias ThistleTea.Game.Core.Combat.ZoneCombat
@@ -171,7 +174,7 @@ defmodule ThistleTea.Game.Core.AI.Tick do
   def mob_delay(entity, status, now), do: entity |> plan(status, now) |> TickPlan.delay(@default_tick_ms)
 
   def player_delay(character, {:running, delay_ms}, now) when is_integer(delay_ms) and delay_ms > 0 do
-    character |> plan({:running, delay_ms}, now) |> TickPlan.delay(@default_tick_ms)
+    character |> player_plan({:running, delay_ms}, now) |> TickPlan.delay(@default_tick_ms)
   end
 
   def player_delay(character, {:running, delay_ms, _reason}, now) when is_integer(delay_ms) and delay_ms > 0 do
@@ -179,7 +182,16 @@ defmodule ThistleTea.Game.Core.AI.Tick do
   end
 
   def player_delay(character, _status, now) do
-    character |> plan(:running, now) |> TickPlan.delay(@default_tick_ms)
+    character |> player_plan(:running, now) |> TickPlan.delay(@default_tick_ms)
+  end
+
+  defp player_plan(character, status, now), do: character |> plan(status, now) |> schedule_combat_check(character)
+
+  defp schedule_combat_check(plan, entity) do
+    case CombatTimer.next_check_at(entity, plan.now) do
+      at when is_integer(at) -> TickPlan.schedule_at(plan, :combat, at)
+      _ -> plan
+    end
   end
 
   defp schedule_status(plan, {:running, delay_ms, reason}) when is_integer(delay_ms) and delay_ms >= 0 do

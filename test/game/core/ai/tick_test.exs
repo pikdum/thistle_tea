@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Core.AI.TickTest do
 
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.Tick
+  alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Combat.Reactive
   alias ThistleTea.Game.Core.Combat.ReactiveWindow
   alias ThistleTea.Game.Core.Effects
@@ -146,10 +147,24 @@ defmodule ThistleTea.Game.Core.AI.TickTest do
       assert Tick.player_delay(character, {:running, 2_000}, 1_000) == 200
     end
 
-    test "active combat falls back to the default cadence" do
+    test "active combat wakes for the next combat check" do
       character = fixture(in_combat: true, target: 42)
 
-      assert Tick.player_delay(character, :success, 1_000) == 100
+      assert Tick.player_delay(character, :success, 1_000) == 1_000
+      assert Tick.player_delay(character, :success, 1_250) == 750
+    end
+
+    test "a long aura deadline cannot postpone the combat check" do
+      buff = %Holder{expires_at: 1_801_000}
+
+      assert Tick.player_delay(fixture(in_combat: true, auras: [buff]), :running, 1_250) == 750
+      assert Tick.player_delay(fixture(auras: [buff]), :running, 1_250) == 1_799_750
+    end
+
+    test "a held combat window wakes at its expiry" do
+      character = fixture(in_combat: true, last_hostile_time: 1_000, combat_timeout_ms: 5_000)
+
+      assert Tick.player_delay(character, {:running, 30_000}, 1_250) == 4_750
     end
 
     test "passive regen sleeps until the next regen tick" do
@@ -179,6 +194,8 @@ defmodule ThistleTea.Game.Core.AI.TickTest do
         casting: Keyword.get(opts, :casting),
         auto_shot: Keyword.get(opts, :auto_shot),
         in_combat: Keyword.get(opts, :in_combat, false),
+        last_hostile_time: Keyword.get(opts, :last_hostile_time),
+        combat_timeout_ms: Keyword.get(opts, :combat_timeout_ms, 5_000),
         blackboard: Keyword.get(opts, :blackboard)
       }
     }

@@ -72,6 +72,15 @@ defmodule ThistleTea.Game.Core.Combat.CombatTimer do
 
   def remaining(_entity, _now), do: 0
 
+  def next_check_at(%{internal: %Internal{in_combat: true}} = entity, now) when is_integer(now) do
+    case remaining(entity, now) do
+      0 -> now + next_check(now)
+      remaining -> now + remaining
+    end
+  end
+
+  def next_check_at(_entity, _now), do: nil
+
   defp window(_current, remaining, duration, target, _now) when duration > remaining, do: {duration, target}
 
   defp window(target, remaining, 0, target, now) when is_integer(target) and remaining > @combat_check_ms,

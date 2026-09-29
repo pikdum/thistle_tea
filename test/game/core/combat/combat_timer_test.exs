@@ -74,6 +74,18 @@ defmodule ThistleTea.Game.Core.Combat.CombatTimerTest do
     end
   end
 
+  describe "next_check_at/2" do
+    test "held windows wake at expiry and expired combat on the next check", ctx do
+      assert CombatTimer.next_check_at(ctx.player, 1_250) == nil
+
+      held = CombatTimer.hold(ctx.player, 1_000, 5_000, ctx.mob)
+      assert CombatTimer.next_check_at(held, 1_250) == 6_000
+      assert CombatTimer.next_check_at(held, 6_250) == 7_000
+
+      assert CombatTimer.next_check_at(CombatTimer.clear(held), 1_250) == 2_000
+    end
+  end
+
   describe "uses_timer?/1" do
     test "classifies actual ownership and creature-template rules", ctx do
       assert CombatTimer.uses_timer?(ctx.player)
