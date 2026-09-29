@@ -7,8 +7,8 @@ defmodule ThistleTea.Game.World.Loader.Transport do
 
   alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Travel.Transport
+  alias ThistleTea.Game.World.Loader.GameObject, as: GameObjectLoader
 
   @client_build 5875
   @client_patch 10
@@ -143,7 +143,7 @@ defmodule ThistleTea.Game.World.Loader.Transport do
     animation_entries()
     |> Mangos.GameObject.query_entries()
     |> Mangos.Repo.all()
-    |> Enum.map(&GameObject.build/1)
+    |> Enum.map(&GameObjectLoader.build/1)
   end
 
   defp build_animation_routes(rows) do

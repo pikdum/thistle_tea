@@ -30,6 +30,21 @@ defmodule ThistleTea.Game.World.Loader.GameObjectTemplate do
     |> Enum.each(&cache(&1, Map.get(bounds, &1.display_id)))
   end
 
+  def build(%Mangos.GameObjectTemplate{} = row) do
+    %GameObjectTemplate{
+      entry: row.entry,
+      type: row.type,
+      display_id: row.display_id,
+      name: row.name,
+      size: row.size,
+      flags: row.flags,
+      faction: row.faction,
+      min_gold: row.mingold || 0,
+      max_gold: row.maxgold || 0,
+      data: Enum.map(0..23, &(Map.get(row, :"data#{&1}") || 0))
+    }
+  end
+
   def get(entry) when is_integer(entry) and entry > 0 do
     case :ets.lookup(__MODULE__, entry) do
       [{^entry, %GameObjectTemplate{} = template}] -> template
@@ -82,7 +97,7 @@ defmodule ThistleTea.Game.World.Loader.GameObjectTemplate do
 
   defp cache(%Mangos.GameObjectTemplate{} = row, bounds) do
     Faction.metadata(row.faction)
-    template = GameObjectTemplate.build(row)
+    template = build(row)
     template = %{template | bounds: bounds}
     put(template)
   end

@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.Entity.WildTrapDbcTest do
   alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Loader.Faction
+  alias ThistleTea.Game.World.Loader.GameObject, as: GameObjectLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellChain
   alias ThistleTea.Game.World.Metadata
@@ -107,7 +108,7 @@ defmodule ThistleTea.Game.World.Entity.WildTrapDbcTest do
       }
 
       trap =
-        GameObject.build(%Mangos.GameObject{
+        GameObjectLoader.build(%Mangos.GameObject{
           guid: System.unique_integer([:positive]),
           id: 2061,
           map: 999,

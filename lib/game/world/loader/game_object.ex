@@ -1,12 +1,14 @@
 defmodule ThistleTea.Game.World.Loader.GameObject do
   @moduledoc """
-  Loads the game-object spawns for a cell from Mangos into entity structs.
+  Loads the game-object spawns for a cell from Mangos and builds them into entity structs.
   """
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.Entity.GameObject
+  alias ThistleTea.Game.Core.Entity.GameObjectSpawn
   alias ThistleTea.Game.Core.SpatialGrid
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.SpawnPool
   alias ThistleTea.Game.World.System.SpawnPool.Catalog
@@ -25,13 +27,33 @@ defmodule ThistleTea.Game.World.Loader.GameObject do
   def blueprints(guids, events \\ GameEvent.get_events()) when is_list(guids) do
     Mangos.GameObject.query_guids(guids, events)
     |> Mangos.Repo.all()
-    |> Map.new(fn game_object -> {{:game_object, game_object.guid}, GameObject.build(game_object)} end)
+    |> Map.new(fn game_object -> {{:game_object, game_object.guid}, build(game_object)} end)
   end
 
   def all_blueprints(guids) when is_list(guids) do
     Mangos.GameObject.query_guids_all(guids)
     |> Mangos.Repo.all()
-    |> Map.new(&{&1.guid, GameObject.build(&1)})
+    |> Map.new(&{&1.guid, build(&1)})
+  end
+
+  def build(%Mangos.GameObject{game_object_template: %Mangos.GameObjectTemplate{} = template} = row) do
+    template
+    |> GameObjectTemplateLoader.build()
+    |> GameObject.build(game_object_spawn(row))
+  end
+
+  def game_object_spawn(%Mangos.GameObject{} = row) do
+    %GameObjectSpawn{
+      guid: row.guid,
+      entry: row.id,
+      map_id: row.map,
+      position: {row.position_x, row.position_y, row.position_z, row.orientation},
+      rotation: {row.rotation0, row.rotation1, row.rotation2, row.rotation3},
+      state: row.state,
+      anim_progress: row.animprogress,
+      respawn_seconds: row.spawntimesecsmin,
+      event: event(row.game_event_game_object)
+    }
   end
 
   def start_game_object(%GameObject{} = game_object), do: World.start_entity(game_object)
@@ -43,10 +65,13 @@ defmodule ThistleTea.Game.World.Loader.GameObject do
 
   def spawned_by_default?(%Mangos.GameObject{}), do: true
 
+  defp event(%Mangos.GameEventGameObject{event: event}), do: event
+  defp event(_row), do: nil
+
   defp activate(%Mangos.GameObject{spawntimesecsmin: seconds}, _cell) when is_integer(seconds) and seconds < 0, do: :ok
 
   defp activate(%Mangos.GameObject{} = game_object, cell) do
-    blueprint = GameObject.build(game_object)
+    blueprint = build(game_object)
 
     if not Transports.global_animation?(blueprint) do
       group = Catalog.group_for(:game_object, game_object.guid)

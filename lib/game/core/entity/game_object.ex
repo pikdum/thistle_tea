@@ -1,11 +1,10 @@
 defmodule ThistleTea.Game.Core.Entity.GameObject do
   @moduledoc """
-  Game object entity built from Mangos `gameobject` spawn rows and their
-  templates.
+  Game object entity built from a template and a placed spawn, summoned by
+  a spell or script, or placed as a moving transport.
   """
   import Bitwise, only: [|||: 2, &&&: 2]
 
-  alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.Entity.Component.GameObject
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Chair
@@ -15,6 +14,7 @@ defmodule ThistleTea.Game.Core.Entity.GameObject do
   alias ThistleTea.Game.Core.Entity.Component.Internal.Trap
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.GameObjectSpawn
   alias ThistleTea.Game.Core.Entity.GameObjectTemplate
   alias ThistleTea.Game.Core.GameObject.GameObjectActions
   alias ThistleTea.Game.Core.GameObject.Goober
@@ -184,56 +184,51 @@ defmodule ThistleTea.Game.Core.Entity.GameObject do
 
   defp spellcaster_party_only?(_template), do: false
 
-  def build(%Mangos.GameObject{game_object_template: %Mangos.GameObjectTemplate{} = ot} = o) do
-    template = GameObjectTemplate.build(ot)
-
-    event =
-      case o.game_event_game_object do
-        %Mangos.GameEventGameObject{event: event} -> event
-        _ -> nil
-      end
+  def build(%GameObjectTemplate{} = template, %GameObjectSpawn{} = spawn) do
+    {x, y, z, o} = spawn.position
+    {rotation0, rotation1, rotation2, rotation3} = spawn.rotation
 
     %__MODULE__{
       object: %Object{
-        guid: Guid.from_low_guid(guid_type(ot.type), o.id, o.guid),
-        entry: o.id,
-        scale_x: ot.size
+        guid: Guid.from_low_guid(guid_type(template.type), spawn.entry, spawn.guid),
+        entry: spawn.entry,
+        scale_x: template.size
       },
       game_object: %GameObject{
-        display_id: ot.display_id,
-        flags: transport_flags(ot),
-        rotation0: o.rotation0,
-        rotation1: o.rotation1,
-        rotation2: o.rotation2,
-        rotation3: o.rotation3,
-        state: transport_state(ot, o.state),
-        pos_x: o.position_x,
-        pos_y: o.position_y,
-        pos_z: o.position_z,
-        facing: o.orientation,
-        dyn_flags: chest_dyn_flags(ot),
-        faction: ot.faction,
-        type_id: ot.type,
-        level: transport_pause(ot),
-        anim_progress: o.animprogress
+        display_id: template.display_id,
+        flags: transport_flags(template),
+        rotation0: rotation0,
+        rotation1: rotation1,
+        rotation2: rotation2,
+        rotation3: rotation3,
+        state: transport_state(template, spawn.state),
+        pos_x: x,
+        pos_y: y,
+        pos_z: z,
+        facing: o,
+        dyn_flags: chest_dyn_flags(template),
+        faction: template.faction,
+        type_id: template.type,
+        level: transport_pause(template),
+        anim_progress: spawn.anim_progress
       },
       movement_block: %MovementBlock{
-        update_flag: transport_update_flag(ot.type),
-        position: {o.position_x, o.position_y, o.position_z, o.orientation},
-        stationary_position: transport_stationary_position(ot.type, o),
-        transport_progress_in_ms: transport_progress(ot.type)
+        update_flag: transport_update_flag(template.type),
+        position: spawn.position,
+        stationary_position: transport_stationary_position(template.type, spawn),
+        transport_progress_in_ms: transport_progress(template.type)
       },
       internal: %Internal{
-        world: WorldRef.open(o.map),
-        object_action: GameObjectActions.configuration(template, o.state),
+        world: WorldRef.open(spawn.map_id),
+        object_action: GameObjectActions.configuration(template, spawn.state),
         goober: Goober.configuration(template),
-        chair: chair(ot),
-        event: event,
-        fishing: fishing_hole(ot),
-        loot: chest_loot(ot),
+        chair: chair(template),
+        event: spawn.event,
+        fishing: fishing_hole(template),
+        loot: chest_loot(template),
         gathering: gathering(template),
         trap: trap(template, nil),
-        spawn: object_spawn(ot, o)
+        spawn: object_spawn(template, spawn)
       }
     }
   end
@@ -286,20 +281,20 @@ defmodule ThistleTea.Game.Core.Entity.GameObject do
   defp guid_type(@go_type_transport), do: :transport
   defp guid_type(_type), do: :game_object
 
-  defp transport_flags(%Mangos.GameObjectTemplate{type: @go_type_transport, flags: flags}) do
+  defp transport_flags(%GameObjectTemplate{type: @go_type_transport, flags: flags}) do
     flags ||| @go_flag_transport ||| @go_flag_nodespawn
   end
 
-  defp transport_flags(%Mangos.GameObjectTemplate{flags: flags}), do: flags
+  defp transport_flags(%GameObjectTemplate{flags: flags}), do: flags
 
-  defp transport_state(%Mangos.GameObjectTemplate{type: @go_type_transport, data1: start_open}, _state) do
-    if start_open == 0, do: @go_state_ready, else: @go_state_active
+  defp transport_state(%GameObjectTemplate{type: @go_type_transport, data: data}, _state) do
+    if Enum.at(data, 1, 0) == 0, do: @go_state_ready, else: @go_state_active
   end
 
-  defp transport_state(%Mangos.GameObjectTemplate{}, state), do: state
+  defp transport_state(%GameObjectTemplate{}, state), do: state
 
-  defp transport_pause(%Mangos.GameObjectTemplate{type: @go_type_transport, data0: pause}), do: pause
-  defp transport_pause(%Mangos.GameObjectTemplate{}), do: nil
+  defp transport_pause(%GameObjectTemplate{type: @go_type_transport, data: data}), do: Enum.at(data, 0, 0)
+  defp transport_pause(%GameObjectTemplate{}), do: nil
 
   defp transport_update_flag(@go_type_transport) do
     @update_flag_transport ||| @update_flag_all ||| @update_flag_has_position
@@ -307,11 +302,8 @@ defmodule ThistleTea.Game.Core.Entity.GameObject do
 
   defp transport_update_flag(_type), do: @update_flag_all ||| @update_flag_has_position
 
-  defp transport_stationary_position(@go_type_transport, %Mangos.GameObject{} = game_object) do
-    {game_object.position_x, game_object.position_y, game_object.position_z, game_object.orientation}
-  end
-
-  defp transport_stationary_position(_type, %Mangos.GameObject{}), do: nil
+  defp transport_stationary_position(@go_type_transport, %GameObjectSpawn{position: position}), do: position
+  defp transport_stationary_position(_type, %GameObjectSpawn{}), do: nil
 
   defp transport_progress(@go_type_transport), do: 0
   defp transport_progress(_type), do: nil
@@ -321,21 +313,12 @@ defmodule ThistleTea.Game.Core.Entity.GameObject do
   @go_flag_interact_cond 0x4
   @go_dyn_flag_activate 0x1
 
-  defp chest_dyn_flags(%Mangos.GameObjectTemplate{type: @go_type_chest, flags: flags})
-       when is_integer(flags) and (flags &&& @go_flag_interact_cond) != 0 do
-    @go_dyn_flag_activate
-  end
-
   defp chest_dyn_flags(%GameObjectTemplate{type: @go_type_chest, flags: flags})
        when is_integer(flags) and (flags &&& @go_flag_interact_cond) != 0 do
     @go_dyn_flag_activate
   end
 
   defp chest_dyn_flags(_template), do: 0
-
-  defp chair(%Mangos.GameObjectTemplate{type: @go_type_chair, data0: slots, data1: height}) do
-    %Chair{slots: positive_or_zero(slots), height: chair_height(height)}
-  end
 
   defp chair(%GameObjectTemplate{type: @go_type_chair, data: [slots, height | _rest]}) do
     %Chair{slots: positive_or_zero(slots), height: chair_height(height)}
@@ -348,16 +331,6 @@ defmodule ThistleTea.Game.Core.Entity.GameObject do
 
   defp chair_height(value) when value in 0..2, do: value
   defp chair_height(_value), do: 0
-
-  defp chest_loot(%Mangos.GameObjectTemplate{type: @go_type_chest} = ot) do
-    case ot.data1 do
-      loot_id when is_integer(loot_id) and loot_id > 0 ->
-        %Internal.Loot{id: loot_id, min_gold: ot.mingold || 0, max_gold: ot.maxgold || 0}
-
-      _no_loot ->
-        nil
-    end
-  end
 
   defp chest_loot(%GameObjectTemplate{type: @go_type_chest, data: [_lock, loot_id | _]} = template)
        when is_integer(loot_id) and loot_id > 0 do
@@ -383,18 +356,18 @@ defmodule ThistleTea.Game.Core.Entity.GameObject do
 
   @go_type_fishing_hole 25
 
-  defp fishing_hole(%Mangos.GameObjectTemplate{type: @go_type_fishing_hole} = ot) do
-    min_uses = max(ot.data2 || 1, 1)
-    max_uses = max(ot.data3 || min_uses, min_uses)
+  defp fishing_hole(%GameObjectTemplate{type: @go_type_fishing_hole, data: data}) do
+    min_uses = max(Enum.at(data, 2, 0), 1)
+    max_uses = max(Enum.at(data, 3, 0), min_uses)
 
-    %Fishing{loot_id: ot.data1, uses_left: Enum.random(min_uses..max_uses), ready?: true}
+    %Fishing{loot_id: Enum.at(data, 1, 0), uses_left: Enum.random(min_uses..max_uses), ready?: true}
   end
 
   defp fishing_hole(_template), do: nil
 
-  defp object_spawn(%Mangos.GameObjectTemplate{type: type}, %Mangos.GameObject{} = o)
+  defp object_spawn(%GameObjectTemplate{type: type}, %GameObjectSpawn{} = spawn)
        when type in [@go_type_chest, @go_type_fishing_hole, @go_type_trap, 10] do
-    case o.spawntimesecsmin do
+    case spawn.respawn_seconds do
       seconds when is_integer(seconds) and seconds > 0 -> %Internal.Spawn{respawn_delay_ms: seconds * 1000}
       _instant -> nil
     end

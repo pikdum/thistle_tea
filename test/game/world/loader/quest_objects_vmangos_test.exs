@@ -2,9 +2,9 @@ defmodule ThistleTea.Game.World.Loader.QuestObjectsVmangosTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Core.Entity.GameObjectTemplate
   alias ThistleTea.Game.Core.GameObject.Goober
   alias ThistleTea.Game.World.Loader.EventScript
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.PageText
 
   @moduletag :vmangos_db
@@ -28,7 +28,7 @@ defmodule ThistleTea.Game.World.Loader.QuestObjectsVmangosTest do
     test "decodes quest pages, timed animations and consumable spell objects" do
       page =
         Mangos.Repo.get_by!(Mangos.GameObjectTemplate, entry: 17_188)
-        |> GameObjectTemplate.build()
+        |> GameObjectTemplateLoader.build()
         |> Goober.configuration()
 
       assert page.quest_id == 953
@@ -36,7 +36,7 @@ defmodule ThistleTea.Game.World.Loader.QuestObjectsVmangosTest do
 
       relic =
         Mangos.Repo.get_by!(Mangos.GameObjectTemplate, entry: 153_556)
-        |> GameObjectTemplate.build()
+        |> GameObjectTemplateLoader.build()
         |> Goober.configuration()
 
       assert relic.auto_close_ms == 3_000
@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.World.Loader.QuestObjectsVmangosTest do
 
       geyser =
         Mangos.Repo.get_by!(Mangos.GameObjectTemplate, entry: 181_598)
-        |> GameObjectTemplate.build()
+        |> GameObjectTemplateLoader.build()
         |> Goober.configuration()
 
       assert geyser.spell_id == 29_518

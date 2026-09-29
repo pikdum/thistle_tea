@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Core.OutdoorPvp.TemplateTest do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.Entity.GameObjectTemplate
   alias ThistleTea.Game.Core.OutdoorPvp.CapturePoint.Template
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
 
   describe "from_game_object/1" do
     @tag :vmangos_db
@@ -14,7 +15,7 @@ defmodule ThistleTea.Game.Core.OutdoorPvp.TemplateTest do
       assert length(rows) == 4
 
       for row <- rows do
-        template = row |> GameObjectTemplate.build() |> Template.from_game_object()
+        template = row |> GameObjectTemplateLoader.build() |> Template.from_game_object()
         assert template.radius == 80
         assert template.neutral_percent == 20
         assert template.min_time == 480

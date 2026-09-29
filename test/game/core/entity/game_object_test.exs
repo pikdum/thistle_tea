@@ -1,13 +1,13 @@
 defmodule ThistleTea.Game.Core.Entity.GameObjectTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.Entity.GameObject
+  alias ThistleTea.Game.Core.Entity.GameObjectSpawn
   alias ThistleTea.Game.Core.Entity.GameObjectTemplate
   alias ThistleTea.Game.Core.Guid
 
   defp lightwell_template do
-    GameObjectTemplate.build(%Mangos.GameObjectTemplate{
+    %GameObjectTemplate{
       entry: 181_102,
       type: 22,
       display_id: 6671,
@@ -15,9 +15,8 @@ defmodule ThistleTea.Game.Core.Entity.GameObjectTest do
       faction: 0,
       flags: 0,
       size: 1.35,
-      data0: 7001,
-      data1: 5
-    })
+      data: data([7001, 5])
+    }
   end
 
   describe "build_summoned/4" do
@@ -165,64 +164,32 @@ defmodule ThistleTea.Game.Core.Entity.GameObjectTest do
     end
   end
 
-  describe "build/1" do
+  describe "build/2" do
     test "static traps retain their spawn's respawn delay and stealth flag" do
-      row = %Mangos.GameObject{
-        guid: 1,
-        id: 2,
-        map: 0,
-        spawntimesecsmin: 90,
-        orientation: 0.0,
-        position_x: 0.0,
-        position_y: 0.0,
-        position_z: 0.0,
-        game_object_template: %Mangos.GameObjectTemplate{entry: 2, type: 6, data0: 12, data9: 1}
-      }
+      template = %GameObjectTemplate{entry: 2, type: 6, size: 1.0, data: data([12, 0, 0, 0, 0, 0, 0, 0, 0, 1])}
+      object = GameObject.build(template, %GameObjectSpawn{guid: 1, entry: 2, map_id: 0, respawn_seconds: 90})
 
-      object = GameObject.build(row)
       assert object.internal.spawn.respawn_delay_ms == 90_000
       assert object.internal.trap.stealthed?
       assert object.internal.gathering.lock_id == 12
     end
+
+    test "places the object at its spawn pose and keeps its event gate" do
+      spawn = %{bucket_spawn() | event: 12}
+      go = GameObject.build(bucket_template(), spawn)
+
+      assert go.object.guid == Guid.from_low_guid(:game_object, 161_557, 5000)
+      assert go.movement_block.position == {1.0, 2.0, 3.0, 0.0}
+      assert {go.game_object.rotation2, go.game_object.rotation3} == {0.0, 1.0}
+      assert go.game_object.anim_progress == 100
+      assert go.internal.event == 12
+      assert go.internal.world.map_id == 0
+    end
   end
 
-  describe "build/1 chests" do
-    defp bucket_row do
-      %Mangos.GameObject{
-        guid: 5000,
-        id: 161_557,
-        map: 0,
-        position_x: 1.0,
-        position_y: 2.0,
-        position_z: 3.0,
-        orientation: 0.0,
-        rotation0: 0.0,
-        rotation1: 0.0,
-        rotation2: 0.0,
-        rotation3: 1.0,
-        state: 1,
-        animprogress: 100,
-        spawntimesecsmin: 180,
-        spawntimesecsmax: 180,
-        game_object_template: %Mangos.GameObjectTemplate{
-          entry: 161_557,
-          type: 3,
-          display_id: 3012,
-          name: "Milly's Harvest",
-          faction: 0,
-          flags: 4,
-          size: 1.0,
-          data0: 43,
-          data1: 10_119,
-          mingold: 0,
-          maxgold: 0
-        },
-        game_event_game_object: nil
-      }
-    end
-
+  describe "build/2 chests" do
     test "carries loot config, respawn delay, and the activate dynamic flag" do
-      go = GameObject.build(bucket_row())
+      go = GameObject.build(bucket_template(), bucket_spawn())
 
       assert go.internal.loot.id == 10_119
       assert go.internal.loot.min_gold == 0
@@ -231,9 +198,7 @@ defmodule ThistleTea.Game.Core.Entity.GameObjectTest do
     end
 
     test "non-chest game objects carry no loot" do
-      row = bucket_row()
-      row = %{row | game_object_template: %{row.game_object_template | type: 5}}
-      go = GameObject.build(row)
+      go = GameObject.build(%{bucket_template() | type: 5}, bucket_spawn())
 
       assert go.internal.loot == nil
       assert go.internal.spawn == nil
@@ -241,56 +206,37 @@ defmodule ThistleTea.Game.Core.Entity.GameObjectTest do
     end
 
     test "chair game objects carry their slot count and height" do
-      row = bucket_row()
-
-      row = %{
-        row
-        | game_object_template: %{
-            row.game_object_template
-            | type: 7,
-              data0: 3,
-              data1: 2
-          }
-      }
-
-      go = GameObject.build(row)
+      go = GameObject.build(%{bucket_template() | type: 7, data: data([3, 2])}, bucket_spawn())
 
       assert go.internal.chair.slots == 3
       assert go.internal.chair.height == 2
     end
   end
 
-  describe "build/1 transports" do
+  describe "build/2 transports" do
     test "builds an animated transport with its transport guid and stationary movement data" do
-      row = %Mangos.GameObject{
-        guid: 18_802,
-        id: 176_080,
-        map: 369,
-        position_x: -45.3934,
-        position_y: 2472.93,
-        position_z: 6.90526,
-        orientation: 1.5708,
-        rotation0: 0.0,
-        rotation1: 0.0,
-        rotation2: -0.707107,
-        rotation3: 0.707107,
-        state: 1,
-        animprogress: 0,
-        game_object_template: %Mangos.GameObjectTemplate{
-          entry: 176_080,
-          type: 11,
-          display_id: 3831,
-          name: "Subway",
-          faction: 0,
-          flags: 40,
-          size: 1.0,
-          data0: 7,
-          data1: 0
-        },
-        game_event_game_object: nil
+      template = %GameObjectTemplate{
+        entry: 176_080,
+        type: 11,
+        display_id: 3831,
+        name: "Subway",
+        faction: 0,
+        flags: 40,
+        size: 1.0,
+        data: data([7, 0])
       }
 
-      transport = GameObject.build(row)
+      spawn = %GameObjectSpawn{
+        guid: 18_802,
+        entry: 176_080,
+        map_id: 369,
+        position: {-45.3934, 2472.93, 6.90526, 1.5708},
+        rotation: {0.0, 0.0, -0.707107, 0.707107},
+        state: 1,
+        anim_progress: 0
+      }
+
+      transport = GameObject.build(template, spawn)
 
       assert Guid.transport?(transport.object.guid)
       assert transport.game_object.flags == 0x28
@@ -301,4 +247,32 @@ defmodule ThistleTea.Game.Core.Entity.GameObjectTest do
       assert transport.movement_block.transport_progress_in_ms == 0
     end
   end
+
+  defp bucket_template do
+    %GameObjectTemplate{
+      entry: 161_557,
+      type: 3,
+      display_id: 3012,
+      name: "Milly's Harvest",
+      faction: 0,
+      flags: 4,
+      size: 1.0,
+      data: data([43, 10_119])
+    }
+  end
+
+  defp bucket_spawn do
+    %GameObjectSpawn{
+      guid: 5000,
+      entry: 161_557,
+      map_id: 0,
+      position: {1.0, 2.0, 3.0, 0.0},
+      rotation: {0.0, 0.0, 0.0, 1.0},
+      state: 1,
+      anim_progress: 100,
+      respawn_seconds: 180
+    }
+  end
+
+  defp data(values), do: values ++ List.duplicate(0, 24 - length(values))
 end

@@ -13,10 +13,5 @@ defmodule ThistleTea.Game.Core do
   use Boundary,
     deps: [],
     exports: :all,
-    dirty_xrefs: [
-      ThistleTea.DB.Mangos.GameEventGameObject,
-      ThistleTea.DB.Mangos.GameObject,
-      ThistleTea.DB.Mangos.GameObjectTemplate,
-      ThistleTea.Game.World.Spell.SpellTargetResolver
-    ]
+    dirty_xrefs: [ThistleTea.Game.World.Spell.SpellTargetResolver]
 end

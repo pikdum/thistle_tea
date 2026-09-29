@@ -2,7 +2,6 @@ defmodule ThistleTea.Game.World.Loader.VMangosBoundaryTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.SpatialGrid
   alias ThistleTea.Game.World.Loader.GameObject, as: GameObjectLoader
   alias ThistleTea.Game.World.Loader.NpcText, as: NpcTextLoader
@@ -17,7 +16,7 @@ defmodule ThistleTea.Game.World.Loader.VMangosBoundaryTest do
         |> Mangos.GameObject.query_bounds(SpatialGrid.cell_bounds({0, 19, 13}), [])
         |> Mangos.Repo.all()
 
-      game_object = GameObject.build(row)
+      game_object = GameObjectLoader.build(row)
 
       assert game_object.object.entry == row.id
       assert game_object.game_object.display_id == row.game_object_template.display_id
