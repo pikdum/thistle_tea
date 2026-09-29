@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.World.Loader.SpellChainTest do
     test "trained ranks inherit the talent identity of their predecessor" do
       assert Talent.by_spell(@rank_2) == {@talent_id, @talent_tab_id, 0}
       assert Talent.by_spell(@rank_3) == {@talent_id, @talent_tab_id, 0}
-      assert Talents.spent_points([@rank_3]) == 1
+      assert Talents.spent_points([@rank_3], Talent) == 1
     end
 
     test "debug grants require an already known rank from the talent family" do

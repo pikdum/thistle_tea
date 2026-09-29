@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Talents do
   alias ThistleTea.Game.World.Outbound
 
   def learn(%{character: %Character{} = character} = state, talent_id, requested_rank) do
-    with {:ok, talent_spell_ids} <- LogicTalents.validate(character, talent_id, requested_rank),
+    with {:ok, talent_spell_ids} <- LogicTalents.validate(character, talent_id, requested_rank, TalentLoader),
          {:ok, character, _events} <- Spells.learn(character, with_dependent_spells(talent_spell_ids)) do
       character = sync_pet_aura_links(state.character, character, Time.now())
       commit(state, character)
@@ -34,7 +34,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Talents do
   def learn(state, _talent_id, _requested_rank), do: state
 
   def reset(%{character: %Character{} = character} = state) do
-    case LogicTalents.known_talent_spell_ids(character) do
+    case LogicTalents.known_talent_spell_ids(character, TalentLoader) do
       [] ->
         state
 
@@ -54,7 +54,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Talents do
   def reset(state), do: state
 
   def reset_if_overbudget(%{character: %Character{} = character} = state, level) when is_integer(level) do
-    if LogicTalents.spent_points(character) > LogicTalents.total_points(level) do
+    if LogicTalents.spent_points(character, TalentLoader) > LogicTalents.total_points(level) do
       reset(state)
     else
       state
@@ -67,7 +67,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Talents do
     character =
       character
       |> Spells.apply_passives(Time.now())
-      |> LogicTalents.sync_points()
+      |> LogicTalents.sync_points(TalentLoader)
 
     CharacterStore.put(character)
     Outbound.send_packet(UpdateObject.from_entity(character, :values))

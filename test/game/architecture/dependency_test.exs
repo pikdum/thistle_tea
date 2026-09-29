@@ -14,7 +14,6 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
                              {"lib/game/core/combat/threat.ex", "ThistleTea.Game.World.Metadata"},
                              {"lib/game/core/entity/game_object.ex", "ThistleTea.DB.Mangos"},
                              {"lib/game/core/entity/game_object_template.ex", "ThistleTea.DB.Mangos"},
-                             {"lib/game/core/player/talents.ex", "ThistleTea.Game.World.Loader.Talent"},
                              {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World"},
                              {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World.Metadata"},
                              {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World.Spell.SpellTargetResolver"}

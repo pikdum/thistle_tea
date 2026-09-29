@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Stats do
   alias ThistleTea.Game.Core.Stats.CombatRatings
   alias ThistleTea.Game.Core.Stats.SpellPower
   alias ThistleTea.Game.World.Entity.Player.Equipment
+  alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
 
   defstruct [
     :race,
@@ -108,7 +109,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Stats do
     %{character | unit: unit, player: player}
     |> CombatRatings.sync()
     |> SpellPower.recompute()
-    |> Talents.sync_points()
+    |> Talents.sync_points(TalentLoader)
     |> Rest.set_bonus(character.internal.rest_bonus)
   end
 

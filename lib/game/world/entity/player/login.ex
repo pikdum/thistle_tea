@@ -82,6 +82,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
   alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Presence
@@ -130,7 +131,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
       |> LiquidSpells.restore()
       |> PlayerSpells.apply_passives(Time.now())
       |> PlayerSpells.apply_default_auras(Time.now())
-      |> LogicTalents.sync_points()
+      |> LogicTalents.sync_points(TalentLoader)
       |> Enchantments.restore()
       |> PlayerRest.restore()
       |> evaluate_login_rest()

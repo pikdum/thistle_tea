@@ -125,8 +125,8 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentResetTest do
       trainer: trainer
     } do
       assert state.character.unit.stamina == 30
-      assert TalentLogic.spent_points(state.character) == 1
-      assert TalentLogic.unspent(state.character) == 40
+      assert TalentLogic.spent_points(state.character, TalentLoader) == 1
+      assert TalentLogic.unspent(state.character, TalentLoader) == 40
       completed = state |> TalentReset.confirm(trainer) |> TalentReset.complete(trainer)
       character = completed.character
       assert character.player.coinage == 90_000

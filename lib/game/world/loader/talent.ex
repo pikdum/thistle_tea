@@ -4,11 +4,14 @@ defmodule ThistleTea.Game.World.Loader.Talent do
   tab lists, per-talent tier/column/rank/prerequisite data, and a reverse
   spell-to-talent index so spent points can be derived from the spellbook.
   """
+  @behaviour ThistleTea.Game.Core.Player.TalentCatalog
+
   import Bitwise, only: [<<<: 2, &&&: 2]
   import Ecto.Query
 
   alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Player.Talent, as: TalentData
+  alias ThistleTea.Game.Core.Player.TalentCatalog
   alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
 
   @classes 1..11
@@ -75,6 +78,7 @@ defmodule ThistleTea.Game.World.Loader.Talent do
     :ets.insert(__MODULE__, {{:triggered_spells, spell_id}, Enum.uniq(triggered)})
   end
 
+  @impl TalentCatalog
   def get(talent_id) when is_integer(talent_id) and talent_id > 0 do
     case :ets.lookup(__MODULE__, {:talent, talent_id}) do
       [{_key, %TalentData{} = talent}] -> talent
@@ -86,6 +90,7 @@ defmodule ThistleTea.Game.World.Loader.Talent do
 
   def get(_talent_id), do: nil
 
+  @impl TalentCatalog
   def tab_ids(class) when is_integer(class) do
     case :ets.lookup(__MODULE__, {:tabs, class}) do
       [{_key, tab_ids}] -> tab_ids
@@ -97,6 +102,7 @@ defmodule ThistleTea.Game.World.Loader.Talent do
 
   def tab_ids(_class), do: []
 
+  @impl TalentCatalog
   def by_spell(spell_id) when is_integer(spell_id) and spell_id > 0 do
     cached_spell_identity(spell_id) || inherit_spell_identity(spell_id, MapSet.new())
   rescue

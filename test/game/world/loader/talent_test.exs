@@ -41,7 +41,7 @@ defmodule ThistleTea.Game.World.Loader.TalentTest do
              req_spell: nil
            }
 
-    assert Talents.known_talent_spell_ids([21_553]) == [21_553]
+    assert Talents.known_talent_spell_ids([21_553], TalentLoader) == [21_553]
   end
 
   test "talent ranks form a replacement chain" do
