@@ -142,7 +142,7 @@ defmodule ThistleTea.Game.Core.Condition.LocalFactsTest do
       context =
         context(
           level: 20,
-          spellbook: %{100 => :spell},
+          spell_ids: MapSet.new([100]),
           map_id: 1,
           explored_areas: MapSet.new([42])
         )

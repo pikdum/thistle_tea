@@ -30,7 +30,7 @@ defmodule ThistleTea.Game.Core.Condition.Subject do
             group?: nil,
             skills: nil,
             skill_bonuses: nil,
-            spellbook: nil,
+            spell_ids: nil,
             quest_log: nil,
             rewarded_quests: nil,
             reputation: nil,
@@ -51,4 +51,7 @@ defmodule ThistleTea.Game.Core.Condition.Subject do
             formation_dead?: nil
 
   def new(options \\ []) when is_list(options), do: struct!(__MODULE__, options)
+
+  def spell_ids(spellbook) when is_map(spellbook), do: spellbook |> Map.keys() |> MapSet.new()
+  def spell_ids(_spellbook), do: nil
 end

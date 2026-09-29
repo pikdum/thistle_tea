@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.Core.Condition.Requirements do
     argent_dawn_commission_aura: :auras,
     race_class: :race_class,
     level: :level,
-    spell: :spellbook,
+    spell: :spell_ids,
     quest_available: :quest_log,
     quest_none: :quest_log,
     item_with_bank: :item_counts_with_bank,

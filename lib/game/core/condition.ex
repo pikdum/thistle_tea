@@ -161,7 +161,7 @@ defmodule ThistleTea.Game.Core.Condition do
     argent_dawn_commission_aura: :argent_dawn_commission,
     race_class: :race_class,
     level: :level,
-    spell: :spellbook,
+    spell: :spell_ids,
     quest_available: :quest_availability,
     quest_none: :quest_log,
     gender: :gender,

@@ -79,11 +79,10 @@ defmodule ThistleTea.Game.Core.Condition.Leaf.Player do
       do: handled(mask_matches?(race_mask, race) and mask_matches?(class_mask, class))
 
   def evaluate(
-        %Context{target: %Subject{spellbook: spellbook}},
+        %Context{target: %Subject{spell_ids: %MapSet{} = spell_ids}},
         %Condition{type: :spell, value1: spell_id, value2: mode} = condition
-      )
-      when is_map(spellbook) or is_struct(spellbook, MapSet) do
-    known? = collection_member?(spellbook, spell_id)
+      ) do
+    known? = MapSet.member?(spell_ids, spell_id)
 
     result =
       case mode do
@@ -204,9 +203,6 @@ defmodule ThistleTea.Game.Core.Condition.Leaf.Player do
       _missing -> 0
     end
   end
-
-  defp collection_member?(%MapSet{} = collection, value), do: MapSet.member?(collection, value)
-  defp collection_member?(collection, value) when is_map(collection), do: Map.has_key?(collection, value)
 
   defp mask_matches?(0, _value), do: true
   defp mask_matches?(mask, value), do: (mask &&& 1 <<< (value - 1)) != 0

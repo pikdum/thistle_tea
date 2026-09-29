@@ -313,6 +313,13 @@ defmodule ThistleTea.Game.World.Entity.Player.ConditionContextTest do
       assert refreshed.level == 20
       assert refreshed.quest_log == %{}
     end
+
+    test "publishes known spell ids instead of spell definitions" do
+      character = character()
+      character = %{character | internal: %{character.internal | spellbook: %{133 => :fireball, 168 => :frost_armor}}}
+
+      assert ConditionContext.refresh_subject(character).spell_ids == MapSet.new([133, 168])
+    end
   end
 
   defp character do

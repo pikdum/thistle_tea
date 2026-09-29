@@ -151,7 +151,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ConditionContext do
       group?: group?(character.object.guid, requirements, options),
       skills: player.skills,
       skill_bonuses: player.skill_bonuses,
-      spellbook: internal.spellbook || %{},
+      spell_ids: Subject.spell_ids(internal.spellbook || %{}),
       quest_log: player.quest_log,
       rewarded_quests: player.rewarded_quests,
       reputation: standings(character, requirements, options),

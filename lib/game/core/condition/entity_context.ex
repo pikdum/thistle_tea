@@ -59,7 +59,7 @@ defmodule ThistleTea.Game.Core.Condition.EntityContext do
           honor_rank: Rank.visual_from_number(player.honor_rank || 0),
           skills: player.skills,
           skill_bonuses: player.skill_bonuses,
-          spellbook: internal.spellbook,
+          spell_ids: Subject.spell_ids(internal.spellbook),
           quest_log: player.quest_log,
           rewarded_quests: player.rewarded_quests,
           reputation_ranks: player.reputation.ranks,
@@ -80,7 +80,7 @@ defmodule ThistleTea.Game.Core.Condition.EntityContext do
         now
       ) do
     subject = common_subject(object, unit, internal, movement, now)
-    %{subject | kind: :creature, db_guid: db_guid, spellbook: internal.spellbook}
+    %{subject | kind: :creature, db_guid: db_guid, spell_ids: Subject.spell_ids(internal.spellbook)}
   end
 
   def subject(%GameObject{object: object, game_object: game_object, internal: internal, movement_block: movement}, _now) do
