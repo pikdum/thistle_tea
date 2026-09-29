@@ -177,6 +177,7 @@ defmodule ThistleTea.Application do
     children =
       [
         {Phoenix.PubSub, name: ThistleTea.PubSub},
+        {Group, name: Groups, log: false},
         ThistleTea.Telemetry,
         PartySystem,
         GuildSystem,
@@ -186,7 +187,6 @@ defmodule ThistleTea.Application do
         CombatLeashes,
         InstanceSystem,
         DuelSystem,
-        {Group, name: Groups, log: false},
         EntityRegistry,
         Sessions,
         HonorSystem,

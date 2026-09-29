@@ -7,9 +7,10 @@ defmodule ThistleTea.Game.World.Entity.Mob.CreatureEventEnvironment do
   alias ThistleTea.Game.Core.GameEvent.CreatureData
   alias ThistleTea.Game.World.Loader.CreatureEvent, as: CreatureEventLoader
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.World.Topics
 
   def initialize(%Mob{} = mob, now) do
-    for data <- definitions(mob), do: Phoenix.PubSub.subscribe(ThistleTea.PubSub, "creature_event:#{data.event}")
+    for data <- definitions(mob), do: Topics.subscribe(Topics.creature_event(data.event))
     reconcile(mob, now)
   end
 

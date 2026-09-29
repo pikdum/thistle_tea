@@ -1,7 +1,8 @@
 defmodule ThistleTea.Game.World.System.GameEvent do
   @moduledoc """
-  Tracks which seasonal/world game events are active and notifies subscribed
-  event-gated spawns when their event starts or stops.
+  Tracks which seasonal/world game events are active and publishes each change
+  through `World.Topics`: starts and stops to the spawns gated on that event,
+  and the new active set to subscribers of the aggregate game-events key.
   """
   use GenServer
 
@@ -10,6 +11,7 @@ defmodule ThistleTea.Game.World.System.GameEvent do
   alias ThistleTea.Game.World.Loader.GameEvent, as: GameEventLoader
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.SpawnPool
+  alias ThistleTea.Game.World.Topics
 
   @max_timer_ms 2_147_483_647
   @tick :scheduled_game_event_transition
@@ -52,7 +54,7 @@ defmodule ThistleTea.Game.World.System.GameEvent do
   def subscribe(%{internal: %Internal{event: event}}), do: subscribe(event)
 
   def subscribe(event) when is_integer(event) do
-    :ok = Phoenix.PubSub.subscribe(ThistleTea.PubSub, "game_event:#{event}")
+    :ok = Topics.subscribe(Topics.game_event(event))
   end
 
   def subscribe(_), do: :ok
@@ -185,10 +187,11 @@ defmodule ThistleTea.Game.World.System.GameEvent do
     changed = MapSet.union(MapSet.difference(new_events, old_events), MapSet.difference(old_events, new_events))
 
     Enum.each(changed, fn event ->
-      Phoenix.PubSub.broadcast(ThistleTea.PubSub, "creature_event:#{event}", :creature_events_changed)
+      Topics.publish(Topics.creature_event(event), :creature_events_changed)
     end)
 
     notify(new_events, old_events)
+    Topics.publish(Topics.game_events(), {:game_events_changed, Enum.sort(new_events)})
     SpawnPool.refresh_all(MapSet.to_list(new_events))
   end
 
@@ -208,6 +211,6 @@ defmodule ThistleTea.Game.World.System.GameEvent do
   end
 
   defp notify(event, message) do
-    Phoenix.PubSub.broadcast(ThistleTea.PubSub, "game_event:#{event}", message)
+    Topics.publish(Topics.game_event(event), message)
   end
 end
