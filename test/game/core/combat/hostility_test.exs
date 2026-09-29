@@ -11,8 +11,8 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
 
   describe "hostile?/2" do
     test "uses faction template enemy masks" do
-      assert Hostility.hostile?(%{faction_template: defias()}, %{faction_template: alliance()})
-      refute Hostility.hostile?(%{faction_template: wolf()}, %{faction_template: alliance()})
+      assert Hostility.hostile?(%{guid: nil, faction_template: defias()}, %{guid: nil, faction_template: alliance()})
+      refute Hostility.hostile?(%{guid: nil, faction_template: wolf()}, %{guid: nil, faction_template: alliance()})
     end
 
     test "treats started duel opponents as hostile" do
@@ -141,7 +141,7 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
       protected = mob(defias()) |> Map.put(:unit_flags, 0x100)
       player = player(alliance())
       npc = mob(alliance())
-      controlled = Map.put(npc, :owner_guid, player.object.guid)
+      controlled = Map.put(npc, :owner_guid, player.guid)
       refute Hostility.valid_attack_target?(player, protected)
       refute Hostility.valid_attack_target?(controlled, protected)
       assert Hostility.valid_attack_target?(npc, protected)
@@ -272,7 +272,7 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
     test "player immunity also blocks helpful spells while NPC immunity does not" do
       player = player(alliance())
       npc = mob(alliance())
-      controlled = Map.put(npc, :owner_guid, player.object.guid)
+      controlled = Map.put(npc, :owner_guid, player.guid)
       protected = Map.put(npc, :unit_flags, 0x300)
       refute Hostility.can_assist?(player, protected)
       refute Hostility.can_assist?(controlled, protected)
@@ -290,17 +290,28 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
     end
   end
 
+  describe "reaction actors" do
+    test "raise on entity structs and on maps without a guid" do
+      target = %{guid: nil, faction_template: alliance()}
+
+      assert_raise ArgumentError, ~r/reaction actors/, fn -> Hostility.hostile?(%Character{}, target) end
+      assert_raise ArgumentError, ~r/need a :guid/, fn -> Hostility.hostile?(%{faction_template: defias()}, target) end
+      assert_raise ArgumentError, ~r/need a :guid/, fn -> Hostility.can_initiate_attack?(%{alive?: true}) end
+    end
+  end
+
   describe "can_initiate_attack?/1" do
     test "returns false for neutral factions" do
-      refute Hostility.can_initiate_attack?(%{faction_template: neutral_creature()})
+      refute Hostility.can_initiate_attack?(%{guid: nil, faction_template: neutral_creature()})
     end
 
     test "returns false for non-attackable units" do
-      refute Hostility.can_initiate_attack?(%{faction_template: defias(), unit_flags: 0x00000002})
+      refute Hostility.can_initiate_attack?(%{guid: nil, faction_template: defias(), unit_flags: 0x00000002})
     end
 
     test "returns false when VMangos disables proximity aggro" do
       refute Hostility.can_initiate_attack?(%{
+               guid: nil,
                faction_template: defias(),
                unit_flags: 0,
                proximity_aggro?: false
@@ -374,7 +385,7 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
 
   defp player(faction_template, low_guid \\ 1, reputation \\ nil) do
     %{
-      object: %{guid: Guid.from_low_guid(:player, low_guid)},
+      guid: Guid.from_low_guid(:player, low_guid),
       faction_template: faction_template,
       reputation: reputation,
       unit_flags: 0,
@@ -394,7 +405,7 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
       faction_template: alliance(),
       unit_flags: 0,
       alive?: true,
-      duel_opponent_guid: caster.object.guid,
+      duel_opponent_guid: caster.guid,
       duel_started?: true
     }
 

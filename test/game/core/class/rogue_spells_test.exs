@@ -207,6 +207,7 @@ defmodule ThistleTea.Game.Core.Class.RogueSpellsTest do
       }
 
       target_info = %{
+        guid: 2,
         alive?: true,
         hostile?: true,
         attackable?: true,

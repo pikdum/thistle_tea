@@ -51,7 +51,7 @@ defmodule ThistleTea.Game.World.Reaction do
   end
 
   def actor(%{} = actor), do: with_owner(actor)
-  def actor(_other), do: %{}
+  def actor(_other), do: %{guid: nil}
 
   def owner_projection(guid, metadata) when is_map(metadata) do
     metadata

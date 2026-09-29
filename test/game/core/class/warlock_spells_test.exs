@@ -551,7 +551,7 @@ defmodule ThistleTea.Game.Core.Class.WarlockSpellsTest do
         family_flags_0: 0x00000200
       }
 
-      target_info = %{alive?: true, hostile?: true, attackable?: true, aura_sources: MapSet.new()}
+      target_info = %{guid: 2, alive?: true, hostile?: true, attackable?: true, aura_sources: MapSet.new()}
 
       assert CastValidation.validate(caster, spell, Target.unit(2), target_info, 1_000) ==
                {:error, :target_aurastate}

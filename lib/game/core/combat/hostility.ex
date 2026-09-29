@@ -74,7 +74,7 @@ defmodule ThistleTea.Game.Core.Combat.Hostility do
   end
 
   def neutral_to_all?(source) do
-    ensure_actors!(source, nil)
+    ensure_actor!(source)
 
     source
     |> faction_template()
@@ -82,7 +82,7 @@ defmodule ThistleTea.Game.Core.Combat.Hostility do
   end
 
   def can_initiate_attack?(source) do
-    ensure_actors!(source, nil)
+    ensure_actor!(source)
 
     alive?(source) and targetable?(source) and proximity_aggro?(source) and not neutral_to_all?(source)
   end
@@ -227,7 +227,6 @@ defmodule ThistleTea.Game.Core.Combat.Hostility do
   defp player_guid?(_guid), do: false
 
   defp guid(%{guid: guid}) when is_integer(guid), do: guid
-  defp guid(%{object: %{guid: guid}}) when is_integer(guid), do: guid
   defp guid(_entity), do: nil
 
   defp faction_can_have_reputation?(%{faction_can_have_reputation?: can_have_reputation?})
@@ -405,11 +404,21 @@ defmodule ThistleTea.Game.Core.Combat.Hostility do
   defp character_projection(_entity), do: %{}
 
   defp ensure_actors!(source, target) do
-    for %{__struct__: module} <- [source, target] do
-      raise ArgumentError,
-            "Hostility expects reaction actors, got %#{inspect(module)}{}; build one with actor/2 or World.Reaction"
-    end
-
-    :ok
+    ensure_actor!(source)
+    ensure_actor!(target)
   end
+
+  defp ensure_actor!(%{__struct__: module}) do
+    raise ArgumentError,
+          "Hostility expects reaction actors, got %#{inspect(module)}{}; build one with actor/2 or World.Reaction"
+  end
+
+  defp ensure_actor!(%{guid: _guid}), do: :ok
+
+  defp ensure_actor!(actor) when is_map(actor) do
+    raise ArgumentError,
+          "Hostility actors need a :guid, got keys #{inspect(Map.keys(actor))}; build one with actor/2, Perception.actor/2, or World.Reaction"
+  end
+
+  defp ensure_actor!(actor), do: raise(ArgumentError, "Hostility expects a reaction actor map, got #{inspect(actor)}")
 end

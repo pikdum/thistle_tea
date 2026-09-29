@@ -217,6 +217,6 @@ defmodule ThistleTea.Game.Core.Spell.StealthCastingTest do
       effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_stun, implicit_target_a: :target_enemy}]
     }
 
-    %{caster: caster, sap: sap, target: %{alive?: true, friendly?: false, hostile?: true, unit_flags: 0}}
+    %{caster: caster, sap: sap, target: %{guid: 2, alive?: true, friendly?: false, hostile?: true, unit_flags: 0}}
   end
 end

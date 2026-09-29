@@ -364,10 +364,22 @@ defmodule ThistleTea.Game.Core.Class.WarriorSpellsTest do
       caster = warrior_fixture()
 
       assert {:error, :target_aurastate} =
-               CastValidation.validate(caster, execute_like(), Target.none(), %{alive?: true, health_pct: 50}, 1_000)
+               CastValidation.validate(
+                 caster,
+                 execute_like(),
+                 Target.none(),
+                 %{guid: 1, alive?: true, health_pct: 50},
+                 1_000
+               )
 
       assert :ok =
-               CastValidation.validate(caster, execute_like(), Target.none(), %{alive?: true, health_pct: 15}, 1_000)
+               CastValidation.validate(
+                 caster,
+                 execute_like(),
+                 Target.none(),
+                 %{guid: 1, alive?: true, health_pct: 15},
+                 1_000
+               )
     end
   end
 

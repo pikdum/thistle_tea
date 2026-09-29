@@ -334,7 +334,7 @@ defmodule ThistleTea.Game.World.Spell.SpellUnitsTest do
     end
 
     test "does not validate unrelated selection for scripted-only effects", %{caster: caster, spell: spell} do
-      info = %{alive?: false, visible?: false, position: {WorldRef.instance(999, 602), 1_000.0, 0.0, 0.0}}
+      info = %{guid: 123, alive?: false, visible?: false, position: {WorldRef.instance(999, 602), 1_000.0, 0.0, 0.0}}
       assert :ok = CastValidation.validate_target(caster, spell, Target.unit(123), info)
       spell = %{spell | effects: spell.effects ++ [%Effect{index: 1, type: :heal, implicit_target_a: :target_ally}]}
       assert {:error, :bad_targets} = CastValidation.validate_target(caster, spell, Target.unit(123), info)

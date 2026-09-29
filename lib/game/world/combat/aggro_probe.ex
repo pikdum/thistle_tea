@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.World.Combat.AggroProbe do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Reaction
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
   @movement_threshold 2.0
@@ -72,51 +73,32 @@ defmodule ThistleTea.Game.World.Combat.AggroProbe do
   end
 
   defp probe_player(player_guid) do
-    case Metadata.query(player_guid, [
-           :alive?,
-           :faction_template,
-           :faction_can_have_reputation?,
-           :unit_flags,
-           :level,
-           :stealthed?,
-           :stealth_skill,
-           :undetectable_until,
-           :invisibility
-         ]) do
-      %{alive?: true} = player -> player
+    case Metadata.get(player_guid) do
+      %{alive?: true} = player -> Reaction.actor(Map.put(player, :guid, player_guid))
       _ -> nil
     end
   end
 
   defp maybe_probe(mob_guid, distance, player_guid, player) do
-    mob =
-      Metadata.query(mob_guid, [
-        :alive?,
-        :faction_template,
-        :unit_flags,
-        :level,
-        :detection_range,
-        :detect_range_modifier,
-        :proximity_aggro?,
-        :invisibility,
-        :invisibility_detection,
-        :detects_all_invisibility?,
-        :stealth_detection_bonus,
-        :stunned?
-      ])
-
-    if eligible?(mob, player, distance) do
+    if eligible?(mob_guid, Metadata.get(mob_guid), player, distance) do
       Entity.aggro_probe(mob_guid, player_guid)
     end
   end
 
-  defp eligible?(%{faction_template: %FactionTemplate{}, level: level} = mob, %{level: player_level} = player, distance)
+  defp eligible?(
+         mob_guid,
+         %{faction_template: %FactionTemplate{}, level: level} = mob,
+         %{level: player_level} = player,
+         distance
+       )
        when is_integer(level) and is_integer(player_level) do
+    mob = Reaction.actor(Map.put(mob, :guid, mob_guid))
+
     Hostility.can_initiate_attack?(mob) and
       Hostility.valid_hostile_target?(mob, player) and
       distance <= Aggro.radius(mob, player_level) and
       StealthDetection.detectable?(mob, player, distance, Time.now())
   end
 
-  defp eligible?(_mob, _player, _distance), do: false
+  defp eligible?(_mob_guid, _mob, _player, _distance), do: false
 end

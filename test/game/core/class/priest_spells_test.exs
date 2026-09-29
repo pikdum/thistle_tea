@@ -497,12 +497,12 @@ defmodule ThistleTea.Game.Core.Class.PriestSpellsTest do
       targets = Target.unit(5)
 
       assert {:error, :target_not_dead} =
-               CastValidation.validate(caster, spell, targets, %{alive?: true, friendly?: true}, 1_000)
+               CastValidation.validate(caster, spell, targets, %{guid: 5, alive?: true, friendly?: true}, 1_000)
 
       assert {:error, :target_enemy} =
-               CastValidation.validate(caster, spell, targets, %{alive?: false, hostile?: true}, 1_000)
+               CastValidation.validate(caster, spell, targets, %{guid: 5, alive?: false, hostile?: true}, 1_000)
 
-      assert :ok = CastValidation.validate(caster, spell, targets, %{alive?: false, friendly?: true}, 1_000)
+      assert :ok = CastValidation.validate(caster, spell, targets, %{guid: 5, alive?: false, friendly?: true}, 1_000)
     end
   end
 

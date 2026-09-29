@@ -108,6 +108,32 @@ defmodule ThistleTea.Game.World.Combat.AggroProbeTest do
       refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
     end
 
+    test "probes a reputation faction's creatures that hate the player" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+
+      put_player(player_guid, reputation: %{29 => %{rank: :hostile, at_war?: true}})
+      put_mob(mob_guid, {10.0, 0.0, 0.0}, faction_template: wolf(), faction_can_have_reputation?: true)
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+
+      assert_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
+    test "does not probe hostile-template mobs forced friendly to the player" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+
+      put_player(player_guid, reputation: %{15 => %{rank: :hostile, at_war?: true, forced_rank: :friendly}})
+      put_mob(mob_guid, {10.0, 0.0, 0.0})
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+
+      refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
     test "does not probe mobs with proximity aggro disabled" do
       table = table()
       player_guid = player_guid()
@@ -207,7 +233,8 @@ defmodule ThistleTea.Game.World.Combat.AggroProbeTest do
       level: 5,
       stealthed?: Keyword.get(opts, :stealthed?, false),
       stealth_skill: Keyword.get(opts, :stealth_skill, 0),
-      undetectable_until: Keyword.get(opts, :undetectable_until)
+      undetectable_until: Keyword.get(opts, :undetectable_until),
+      reputation: Keyword.get(opts, :reputation, %{})
     })
 
     on_exit(fn -> Metadata.delete(player_guid) end)
@@ -222,7 +249,8 @@ defmodule ThistleTea.Game.World.Combat.AggroProbeTest do
       faction_template: Keyword.get(opts, :faction_template, defias()),
       unit_flags: 0,
       level: 5,
-      proximity_aggro?: Keyword.get(opts, :proximity_aggro?, true)
+      proximity_aggro?: Keyword.get(opts, :proximity_aggro?, true),
+      faction_can_have_reputation?: Keyword.get(opts, :faction_can_have_reputation?, false)
     })
 
     on_exit(fn ->
