@@ -81,9 +81,12 @@ defmodule ThistleTea.Game.Core.AI.BT.Context.Perception do
   end
 
   def actor(%__MODULE__{} = perception, guid) when is_integer(guid) do
-    case metadata(perception, guid) do
-      metadata when is_map(metadata) -> Map.put(metadata, :guid, guid)
-      nil -> %{guid: guid}
+    case observation(perception, guid) do
+      %Observation{metadata: metadata, owner: owner} when is_map(metadata) ->
+        metadata |> Map.put(:guid, guid) |> put_owner(owner)
+
+      _missing ->
+        %{guid: guid}
     end
   end
 
@@ -104,6 +107,9 @@ defmodule ThistleTea.Game.Core.AI.BT.Context.Perception do
   end
 
   defp observation(%__MODULE__{entities: entities}, guid), do: Map.get(entities, guid)
+
+  defp put_owner(actor, owner) when is_map(owner), do: Map.put(actor, :owner, owner)
+  defp put_owner(actor, _owner), do: actor
 
   defp project(
          %Observation{

@@ -7,7 +7,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Training do
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Core.Aura
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Entity, as: EntityCore
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Guid
@@ -25,6 +24,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Training do
   alias ThistleTea.Game.World.Loader.Trainer, as: TrainerLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
+  alias ThistleTea.Game.World.Reaction
 
   def send_list(%{character: %Character{} = character} = state, trainer_guid) do
     if valid_trainer?(character, trainer_guid) do
@@ -59,7 +59,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Training do
          true <- Entity.online?(guid),
          true <- interactable_trainer?(guid),
          true <- Reputation.can_interact?(character, guid),
-         false <- Hostility.hostile?(character, guid),
+         false <- Reaction.hostile?(character, guid),
          true <-
            GossipLoader.trainer_of?(
              World.entry(guid),

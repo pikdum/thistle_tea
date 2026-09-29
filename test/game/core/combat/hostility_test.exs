@@ -4,17 +4,18 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
   alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Guid
-  alias ThistleTea.Game.World.System.Duel, as: DuelSystem
 
   describe "hostile?/2" do
     test "uses faction template enemy masks" do
-      assert Hostility.hostile?(defias(), alliance())
-      refute Hostility.hostile?(wolf(), alliance())
+      assert Hostility.hostile?(%{faction_template: defias()}, %{faction_template: alliance()})
+      refute Hostility.hostile?(%{faction_template: wolf()}, %{faction_template: alliance()})
     end
 
-    test "treats duel opponents as hostile when target metadata carries a guid" do
+    test "treats started duel opponents as hostile" do
       {caster, target_metadata} = start_duel()
 
       assert Hostility.hostile?(caster, target_metadata)
@@ -232,9 +233,12 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
       assert Hostility.targetable_by?(creature, flying, true)
 
       character = %Character{
-        unit: %Unit{health: 100, flags: 0x00100000}
+        object: %Object{guid: Guid.from_low_guid(:player, 3)},
+        unit: %Unit{health: 100, flags: 0x00100000},
+        internal: %Internal{}
       }
 
+      character = Hostility.actor(character, %{})
       refute Hostility.targetable_by?(creature, character)
       assert Hostility.targetable_by?(creature, character, true)
     end
@@ -382,22 +386,16 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
     caster_low = System.unique_integer([:positive])
     target_low = System.unique_integer([:positive])
     caster = player(alliance(), caster_low)
-    caster_guid = caster.object.guid
     target_guid = Guid.from_low_guid(:player, target_low)
-
-    :ets.insert(DuelSystem, {caster_guid, %{opponent_guid: target_guid, state: :started}})
-    :ets.insert(DuelSystem, {target_guid, %{opponent_guid: caster_guid, state: :started}})
-
-    on_exit(fn ->
-      :ets.delete(DuelSystem, caster_guid)
-      :ets.delete(DuelSystem, target_guid)
-    end)
+    caster = Map.merge(caster, %{duel_opponent_guid: target_guid, duel_started?: true})
 
     target_metadata = %{
       guid: target_guid,
       faction_template: alliance(),
       unit_flags: 0,
-      alive?: true
+      alive?: true,
+      duel_opponent_guid: caster.object.guid,
+      duel_started?: true
     }
 
     {caster, target_metadata}

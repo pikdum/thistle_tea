@@ -8,7 +8,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
 
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Combat.FactionTemplate
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Quest
   alias ThistleTea.Game.Core.Reputation, as: ReputationLogic
@@ -25,6 +24,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Game.World.Reaction
 
   @alliance_races [1, 3, 4, 7]
   @horde_races [2, 5, 6, 8]
@@ -244,7 +244,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
 
     with %{faction_can_have_reputation?: true, faction_template: %FactionTemplate{faction: faction_id}} <-
            target,
-         false <- Hostility.hostile?(character, target) do
+         false <- Reaction.hostile?(character, target) do
       set_visible(state, faction_id)
     else
       _ -> state

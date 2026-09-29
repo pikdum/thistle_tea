@@ -4,7 +4,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Looting do
   sessions, transfers reserved items, and projects the resulting packets.
   """
 
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Entity, as: EntityCore
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Guid
@@ -28,6 +27,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Looting do
   alias ThistleTea.Game.World.Loot.ActorFactory
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
+  alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
@@ -47,7 +47,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Looting do
     target =
       metadata
       |> Map.put(:guid, guid)
-      |> Map.put(:friendly?, Hostility.friendly?(character, Map.put(metadata, :guid, guid)))
+      |> Map.put(:friendly?, Reaction.friendly?(character, Map.put(metadata, :guid, guid)))
 
     with false <- EntityCore.dead?(character) or ControlMovement.active?(character),
          :ok <- Pickpocket.validate_target(character, target) do

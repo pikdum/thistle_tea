@@ -4,7 +4,6 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolverTest do
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Combat.FactionTemplate
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -23,9 +22,9 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolverTest do
   alias ThistleTea.Game.World.Entity.EffectResolver.Spells
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
+  alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Spell.SpellTargetResolver
-  alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   describe "resolve/3" do
@@ -649,8 +648,8 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolverTest do
 
       for caster <- [owner, pet] do
         refute Spell.harmful?(dispel)
-        refute Hostility.can_assist?(caster, target)
-        assert Hostility.valid_attack_target?(caster, target)
+        refute Reaction.can_assist?(caster, target)
+        assert Reaction.valid_attack_target?(caster, target)
         assert SpellTargetResolver.resolve(caster, dispel, Target.unit(target)) == [target]
         assert SpellTargetResolver.resolve_query(caster, dispel, {:unit, target}) == [target]
       end
@@ -718,9 +717,7 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolverTest do
     Metadata.update(pet, %{owner_guid: owner})
 
     for {guid, opponent} <- [{owner, target}, {target, owner}] do
-      Metadata.update(guid, %{duel_started?: true})
-      :ets.insert(DuelSystem, {guid, %{opponent_guid: opponent, state: :started}})
-      on_exit(fn -> :ets.delete(DuelSystem, guid) end)
+      Metadata.update(guid, %{duel_started?: true, duel_opponent_guid: opponent})
     end
 
     pet_caster = caster(pet, {0.0, 0.0, 0.0})

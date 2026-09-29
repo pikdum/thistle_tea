@@ -1,7 +1,6 @@
 defmodule ThistleTea.Game.World.Spell.SpellRequirements do
   @moduledoc "Resolves nearby cast requirements from live presence and cached metadata."
 
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.Core.Spell
@@ -12,6 +11,7 @@ defmodule ThistleTea.Game.World.Spell.SpellRequirements do
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.Spell.SpellAreas
   alias ThistleTea.Game.World.Spell.SpellEnvironment
   alias ThistleTea.Game.World.Spell.SpellFocus
@@ -88,11 +88,9 @@ defmodule ThistleTea.Game.World.Spell.SpellRequirements do
          {world, x, y, z} = position <- World.position(guid),
          true <- world == caster.internal.world,
          true <- within_range?(caster, {x, y, z}, range, metadata) do
-      reaction_target = Map.put(metadata, :guid, Map.get(metadata, :owner, guid))
-
       metadata =
         metadata
-        |> Map.put(:friendly?, Hostility.friendly?(caster, reaction_target))
+        |> Map.put(:friendly?, Reaction.friendly?(caster, reaction_target(guid, metadata)))
         |> Map.put(:visible?, Visibility.can_see?(%{guid: caster.object.guid, character: caster}, guid))
 
       if CorpseTarget.eligible?(kind, metadata), do: %CorpseTarget{guid: guid, kind: kind, position: position}
@@ -100,6 +98,11 @@ defmodule ThistleTea.Game.World.Spell.SpellRequirements do
       _missing -> nil
     end
   end
+
+  defp reaction_target(_guid, %{owner: owner} = corpse) when is_integer(owner),
+    do: owner |> Reaction.actor() |> Map.merge(Map.take(corpse, [:faction_template, :faction_can_have_reputation?]))
+
+  defp reaction_target(guid, metadata), do: Map.put(metadata, :guid, guid)
 
   defp within_range?(%{unit: unit, movement_block: %{position: {x, y, z, _}}}, position, range, metadata),
     do:

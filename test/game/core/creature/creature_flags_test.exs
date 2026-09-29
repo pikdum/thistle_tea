@@ -48,10 +48,10 @@ defmodule ThistleTea.Game.Core.Creature.CreatureFlagsTest do
       player = %{guid: 1, alive?: true, unit_flags: 0}
       npc = %{player | guid: Guid.from_low_guid(:mob, 3, 3)}
       pet = Map.put(npc, :owner_guid, 1)
-      ordinary = build(creature, 0)
-      player_immune = build(creature, 0x20)
-      npc_immune = build(creature, 0x40)
-      unselectable = build(creature, 0x200)
+      ordinary = creature |> build(0) |> Hostility.actor(%{})
+      player_immune = creature |> build(0x20) |> Hostility.actor(%{})
+      npc_immune = creature |> build(0x40) |> Hostility.actor(%{})
+      unselectable = creature |> build(0x200) |> Hostility.actor(%{})
 
       assert Hostility.valid_attack_target?(player, ordinary)
       refute Hostility.valid_attack_target?(player, player_immune)

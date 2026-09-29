@@ -1,7 +1,6 @@
 defmodule ThistleTea.Game.World.Entity.Player.PetActions do
   @moduledoc "Validates and dispatches commands to owned creatures and possessed players."
 
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Pet.Companion
@@ -10,6 +9,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetActions do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Outbound
+  alias ThistleTea.Game.World.Reaction
 
   @act_command 0x07
   @act_reaction 0x06
@@ -136,7 +136,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetActions do
       not (is_integer(target_guid) and target_guid > 0) ->
         reject_attack(:nothing_to_attack)
 
-      not Hostility.valid_attack_target?(character, target_guid) ->
+      not Reaction.valid_attack_target?(character, target_guid) ->
         reject_attack(:cant_attack_target)
 
       true ->

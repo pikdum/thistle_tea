@@ -60,7 +60,7 @@ defmodule ThistleTea.Game.Core.Combat.FeignDeathTest do
       character = Aura.break_on_damage(character, 2_000)
       assert character.unit.dynamic_flags == 0x20
       assert length(character.unit.auras) == 1
-      assert Hostility.targetable_by?(%{guid: ctx.mob}, character)
+      assert Hostility.targetable_by?(%{guid: ctx.mob}, Hostility.actor(character, %{}))
     end
 
     test "success alone removes auras interrupted by stealth or invisibility", ctx do
@@ -113,12 +113,13 @@ defmodule ThistleTea.Game.Core.Combat.FeignDeathTest do
       npc = %{guid: ctx.mob}
       player = %{guid: 7}
       pet = %{guid: ctx.mob, owner_guid: 7}
+      target = Hostility.actor(character, %{})
 
-      refute Hostility.targetable_by?(npc, character)
-      assert Hostility.targetable_by?(player, character)
-      assert Hostility.targetable_by?(pet, character)
-      assert Hostility.targetable_by?(npc, character, true)
-      assert Hostility.targetable_by?(npc, character, false, area?: true)
+      refute Hostility.targetable_by?(npc, target)
+      assert Hostility.targetable_by?(player, target)
+      assert Hostility.targetable_by?(pet, target)
+      assert Hostility.targetable_by?(npc, target, true)
+      assert Hostility.targetable_by?(npc, target, false, area?: true)
       assert character.unit.health == 100
     end
   end

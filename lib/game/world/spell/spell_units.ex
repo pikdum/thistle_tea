@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.World.Spell.SpellUnits do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.System.ScriptedEvent
 
   def resolve(caster, %Spell{} = spell, %Target{} = targets) do
@@ -67,12 +68,13 @@ defmodule ThistleTea.Game.World.Spell.SpellUnits do
     origin = area_origin(caster, effect, targets, mode)
     radius = Radius.effect(effect, Modifiers.snapshot(caster, spell), spell.range_yards || 0)
     selectors = UnitTargets.selectors(spell, effect)
+    source = Reaction.actor(caster)
 
     area_candidates(caster, origin, radius)
     |> Enum.uniq()
     |> Enum.flat_map(&area_candidate(caster, &1, origin, radius, mode, spell.cone))
     |> Enum.filter(fn {guid, metadata, _distance} ->
-      area_recipient?(caster, spell, effect, mode, guid, metadata, selectors) and
+      area_recipient?(caster, source, spell, effect, mode, guid, metadata, selectors) and
         line_of_sight?(caster, spell, guid)
     end)
     |> Enum.sort_by(fn {guid, _metadata, distance} -> {distance, guid} end)
@@ -146,26 +148,28 @@ defmodule ThistleTea.Game.World.Spell.SpellUnits do
       else: reach(Map.get(metadata, :combat_reach))
   end
 
-  defp area_recipient?(caster, spell, effect, mode, guid, metadata, selectors) do
+  defp area_recipient?(caster, source, spell, effect, mode, guid, metadata, selectors) do
     cond do
       spell.unit_targets != [] or spell.object_targets != [] ->
         Enum.any?(selectors, &matches?(caster, guid, metadata, &1))
 
       mode == :script_units_in_cone and effect.type != :script_effect ->
-        Hostility.valid_attack_target?(caster, metadata, area?: true) and
-          Hostility.can_attack_without_flagging?(caster, metadata)
+        target = Reaction.actor(metadata)
+
+        Hostility.valid_attack_target?(source, target, area?: true) and
+          Hostility.can_attack_without_flagging?(source, target)
 
       mode == :script_units_at_destination ->
-        unrestricted_destination_target?(caster, spell, metadata)
+        unrestricted_destination_target?(source, spell, metadata)
 
       true ->
         true
     end
   end
 
-  defp unrestricted_destination_target?(caster, spell, metadata) do
+  defp unrestricted_destination_target?(source, spell, metadata) do
     (metadata.alive? or Spell.attribute?(spell, :allow_dead_target)) and
-      Hostility.targetable_by?(caster, metadata, not Spell.harmful?(spell), area?: true)
+      Hostility.targetable_by?(source, Reaction.actor(metadata), not Spell.harmful?(spell), area?: true)
   end
 
   defp line_of_sight?(%{object: %{guid: guid}}, _spell, guid), do: true

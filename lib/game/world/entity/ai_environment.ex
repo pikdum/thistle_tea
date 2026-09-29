@@ -56,6 +56,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Pathfinding.Aquatic
+  alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.Spell.SpellAreas
   alias ThistleTea.Game.World.Spell.SpellReception
@@ -524,6 +525,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
   defp observe(entity, guid, now, line_of_sight_guids) do
     position = World.position(guid, now)
     metadata = Metadata.get(guid)
+    owner = Reaction.owner_projection(guid, metadata)
 
     %Observation{
       guid: guid,
@@ -531,16 +533,17 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
       grounded_position: World.grounded_target_position(guid, now),
       distance: distance(origin(entity), position),
       metadata: metadata,
-      controller_level: controller_level(metadata),
+      controller_level: controller_level(metadata, owner),
+      owner: owner,
       swimmable?: swimmable_target?(entity, position),
       moving?: World.moving?(guid, now),
       line_of_sight?: line_of_sight?(entity, guid, line_of_sight_guids)
     }
   end
 
-  defp controller_level(%{charmed_by: guid}) when is_integer(guid) and guid > 0, do: player_level(guid)
-  defp controller_level(%{owner_guid: guid}) when is_integer(guid) and guid > 0, do: player_level(guid)
-  defp controller_level(_metadata), do: nil
+  defp controller_level(%{charmed_by: guid}, _owner) when is_integer(guid) and guid > 0, do: player_level(guid)
+  defp controller_level(_metadata, %{level: level}) when is_integer(level), do: level
+  defp controller_level(_metadata, _owner), do: nil
 
   defp player_level(guid) do
     if Guid.entity_type(guid) == :player do

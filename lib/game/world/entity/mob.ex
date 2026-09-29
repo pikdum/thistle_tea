@@ -33,7 +33,6 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   alias ThistleTea.Game.Core.Combat.Engagement
   alias ThistleTea.Game.Core.Combat.Engagement.Tap
   alias ThistleTea.Game.Core.Combat.FeignDeath
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Combat.KillCredit
   alias ThistleTea.Game.Core.Combat.KillFeedback
   alias ThistleTea.Game.Core.Combat.Threat
@@ -121,6 +120,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
+  alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.Spell.SpellReception
   alias ThistleTea.Game.World.System.CreatureGroups
   alias ThistleTea.Game.World.System.GameEvent
@@ -427,7 +427,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
         %Mob{internal: %Internal{in_combat: false, pet: nil, totem: nil}} = state
       )
       when is_integer(target_guid) do
-    if Assistance.available?(state) and Hostility.valid_attack_target?(state, target_guid) do
+    if Assistance.available?(state) and Reaction.valid_attack_target?(state, target_guid) do
       state =
         state
         |> engage_combat(target_guid, call_assistance: false, leash_source: source)
@@ -446,7 +446,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   def handle_cast({:flee_from_help, caller_guid, target_guid}, %Mob{} = state) do
     now = Time.now()
 
-    if Assistance.flee_available?(state) and Hostility.valid_attack_target?(state, target_guid) do
+    if Assistance.flee_available?(state) and Reaction.valid_attack_target?(state, target_guid) do
       context = AIEnvironment.context(state, now, %ObservationRequest{actors: [caller_guid, target_guid]})
 
       state =
@@ -643,7 +643,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   end
 
   def handle_cast({:add_threat, %Effects.AddThreat{} = effect}, %Mob{internal: %Internal{in_combat: true}} = state) do
-    if Hostility.valid_hostile_target?(state, effect.source_guid) do
+    if Reaction.valid_hostile_target?(state, effect.source_guid) do
       state =
         state
         |> Threat.add(effect.source_guid, effect.amount)
@@ -665,7 +665,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   @impl GenServer
   def handle_cast({:heal_threat, healer_guid, healed_guid, amount}, %Mob{internal: %Internal{in_combat: true}} = state)
       when is_integer(healer_guid) and is_number(amount) and amount > 0 do
-    if Threat.tracking?(state, healed_guid) and Hostility.valid_hostile_target?(state, healer_guid) do
+    if Threat.tracking?(state, healed_guid) and Reaction.valid_hostile_target?(state, healer_guid) do
       state =
         state
         |> Threat.add(healer_guid, amount / attacker_count(healed_guid))
@@ -1359,7 +1359,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
     world = state.internal.world
 
     if TargetRef.active?(target, metadata) and
-         match?({^world, _, _, _}, World.position(guid)) and Hostility.attackable?(state, guid) do
+         match?({^world, _, _, _}, World.position(guid)) and Reaction.attackable?(state, guid) do
       handle_info({:force_attack, guid}, state)
     else
       {:noreply, state}
@@ -1997,7 +1997,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
     do: apply_creature_group_command(state, {:attack, target, nil})
 
   defp apply_creature_group_command(%Mob{internal: %Internal{in_combat: false}} = state, {:attack, target, source}) do
-    if not EntityCore.dead?(state) and not Corpse.removed?(state) and Hostility.valid_attack_target?(state, target) do
+    if not EntityCore.dead?(state) and not Corpse.removed?(state) and Reaction.valid_attack_target?(state, target) do
       state |> engage_combat(target, call_assistance: false, leash_source: source) |> wake_ai_tick()
     else
       state

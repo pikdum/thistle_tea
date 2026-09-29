@@ -9,7 +9,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Auction do
   alias ThistleTea.Game.Core.Auction.House
   alias ThistleTea.Game.Core.Auction.Receipt
   alias ThistleTea.Game.Core.Aura
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Death
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
@@ -27,6 +26,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Auction do
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.Loader.AuctionHouse
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.System.Auction, as: AuctionSystem
 
   @auctioneer_flag 0x00001000
@@ -77,7 +77,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Auction do
            Metadata.query(guid, [:alive?, :npc_flags, :faction_template]),
          true <- band(flags, @auctioneer_flag) != 0,
          true <- Reputation.can_interact?(character, guid),
-         false <- Hostility.hostile?(character, guid),
+         false <- Reaction.hostile?(character, guid),
          world = character.internal.world,
          {^world, _x, _y, _z} <- World.position(guid),
          distance when is_number(distance) and distance <= @interaction_distance <-

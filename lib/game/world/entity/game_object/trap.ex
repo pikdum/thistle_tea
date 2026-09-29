@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject.Trap do
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Reaction
 
   def publish_range(%GameObject{internal: %{trap: %Trap{spell_id: spell_id}}} = object) do
     range =
@@ -67,7 +68,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject.Trap do
         internal: %{world: world, trap: %Trap{owner_guid: owner_guid, radius: radius}},
         movement_block: %{position: {x, y, z, _o}}
       }) do
-    source = %{object: %{guid: owner_guid}}
+    source = Reaction.actor(owner_guid)
 
     ((:mobs |> World.nearby_units_exact(world, {x, y, z}, radius)) ++
        (:players |> World.nearby_units_exact(world, {x, y, z}, radius)))
@@ -79,10 +80,11 @@ defmodule ThistleTea.Game.World.Entity.GameObject.Trap do
   def target(_state), do: nil
 
   defp eligible_target?(source, guid) do
-    in_combat? = match?(%{in_combat: true}, Metadata.query(guid, [:in_combat]))
+    metadata = Metadata.get(guid) || %{}
+    target = Reaction.actor(Map.put(metadata, :guid, guid))
 
-    Hostility.valid_attack_target?(source, guid) and Hostility.can_attack_without_flagging?(source, guid) and
-      (in_combat? or Hostility.hostile?(source, guid))
+    Hostility.valid_attack_target?(source, target) and Hostility.can_attack_without_flagging?(source, target) and
+      (metadata[:in_combat] == true or Hostility.hostile?(source, target))
   end
 
   def consume(%Trap{charges: 1}), do: :depleted

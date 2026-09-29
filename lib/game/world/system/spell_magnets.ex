@@ -9,13 +9,13 @@ defmodule ThistleTea.Game.World.System.SpellMagnets do
 
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.SpellMagnet
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Reaction
 
   require Logger
 
@@ -130,7 +130,7 @@ defmodule ThistleTea.Game.World.System.SpellMagnets do
     with %{alive?: true} = metadata <- Metadata.get(guid),
          true <- ((Map.get(metadata, :unit_flags) || 0) &&& 0x02010002) == 0,
          true <- creature_type_allowed?(spell, metadata),
-         true <- Hostility.valid_attack_target?(caster, target_guid),
+         true <- Reaction.valid_attack_target?(caster, target_guid),
          {world, _, _, _} <- World.position(caster),
          {^world, x, y, z} <- World.position(guid),
          {^world, tx, ty, tz} <- World.position(target_guid) do

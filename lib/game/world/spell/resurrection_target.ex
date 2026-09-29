@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.Spell.ResurrectionTarget do
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.Visibility
 
   def info(caster, %Target{} = targets, spell \\ nil) do
@@ -25,18 +26,20 @@ defmodule ThistleTea.Game.World.Spell.ResurrectionTarget do
              :combat_reach,
              :owner_guid,
              :pet_kind
+             | Reaction.actor_keys()
            ]),
          true <- eligible?(guid, metadata, spell),
          body when is_integer(body) <- body_guid(targets, guid, metadata),
          {world, _x, _y, _z} = position <- World.position(body),
          true <- world == caster.internal.world do
-      metadata = Map.put(metadata, :guid, guid)
+      source = Reaction.actor(caster)
+      metadata = Reaction.actor(Map.put(metadata, :guid, guid))
 
       %{
         guid: guid,
         alive?: Map.get(metadata, :alive?, true),
-        hostile?: Hostility.hostile?(caster, metadata),
-        friendly?: Hostility.friendly?(caster, metadata),
+        hostile?: Hostility.hostile?(source, metadata),
+        friendly?: Hostility.friendly?(source, metadata),
         visible?: Visibility.can_see?(%{guid: caster.object.guid, character: caster}, body),
         unit_flags: Map.get(metadata, :unit_flags, 0),
         creature_type: Map.get(metadata, :creature_type),

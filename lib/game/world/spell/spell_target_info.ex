@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetInfo do
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.Spell.InsigniaTarget
   alias ThistleTea.Game.World.Spell.ResurrectionTarget
   alias ThistleTea.Game.World.Visibility
@@ -86,12 +87,13 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetInfo do
   defp selected_target(_character), do: nil
 
   def build(caster, guid, %Spell{} = spell) do
-    case Metadata.query(guid, @target_fields) do
+    case Metadata.query(guid, @target_fields ++ Reaction.actor_keys()) do
       nil ->
         :unknown
 
       metadata ->
-        metadata = Map.put(metadata, :guid, guid)
+        source = Reaction.actor(caster)
+        metadata = Reaction.actor(Map.put(metadata, :guid, guid))
 
         %{
           guid: guid,
@@ -100,11 +102,11 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetInfo do
           charmed_by: Map.get(metadata, :charmed_by),
           feigning_death?: Map.get(metadata, :feigning_death?, false),
           alive?: Map.get(metadata, :alive?, true),
-          hostile?: Hostility.hostile?(caster, metadata),
-          friendly?: Hostility.friendly?(caster, metadata),
+          hostile?: Hostility.hostile?(source, metadata),
+          friendly?: Hostility.friendly?(source, metadata),
           attackable?:
-            Hostility.valid_attack_target?(caster, guid, allow_dead?: Spell.attribute?(spell, :allow_dead_target)),
-          helpful?: Hostility.can_assist?(caster, guid),
+            Hostility.valid_attack_target?(source, metadata, allow_dead?: Spell.attribute?(spell, :allow_dead_target)),
+          helpful?: Hostility.can_assist?(source, metadata),
           health_pct: Map.get(metadata, :health_pct),
           power_type: Map.get(metadata, :power_type),
           shapeshift_form: Map.get(metadata, :shapeshift_form, 0),

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Context.Perception.Observation do
     :distance,
     :metadata,
     :controller_level,
+    :owner,
     :swimmable?,
     moving?: false,
     line_of_sight?: true

@@ -99,7 +99,9 @@ defmodule ThistleTea.Game.Core.Pet.ControlledCombat do
 
   defp apply_contact(character, %Effects.ControlledCombatContact{} = contact, perception) do
     opponent = Perception.actor(perception, contact.opponent_guid)
-    targetable? = not FeignDeath.successful?(character) and Hostility.targetable_by?(opponent, character)
+
+    targetable? =
+      not FeignDeath.successful?(character) and Hostility.targetable_by?(opponent, Hostility.actor(character, %{}))
 
     case contact.role do
       :attacked when targetable? ->

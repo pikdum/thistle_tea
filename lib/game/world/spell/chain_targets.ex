@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Spell.ChainTargets do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   @jump_radius 10.0
@@ -38,13 +39,14 @@ defmodule ThistleTea.Game.World.Spell.ChainTargets do
       {world, x, y, z} ->
         now = Time.now()
         los? = Keyword.get(opts, :line_of_sight?, &line_of_sight?/2)
+        source = Reaction.actor(caster)
 
         candidates =
           for table <- [:players, :mobs],
               {guid, distance} <- World.nearby_units_exact(table, world, {x, y, z}, @jump_radius, now),
               guid not in selected,
               metadata = Metadata.get(guid),
-              valid?(caster, spell, guid, metadata),
+              valid?(source, spell, guid, metadata),
               visible?(caster, guid, metadata, now),
               Spell.attribute?(spell, :ignore_line_of_sight) or los?.(previous, guid),
               do: {guid, distance, metadata}
@@ -58,23 +60,24 @@ defmodule ThistleTea.Game.World.Spell.ChainTargets do
     end
   end
 
-  defp valid?(caster, spell, guid, %{alive?: true} = metadata) do
-    creature_type_allowed?(spell, metadata) and allegiance_allowed?(caster, spell, guid, metadata)
+  defp valid?(source, spell, guid, %{alive?: true} = metadata) do
+    creature_type_allowed?(spell, metadata) and
+      allegiance_allowed?(source, spell, Reaction.actor(Map.put(metadata, :guid, guid)))
   end
 
-  defp valid?(_caster, _spell, _guid, _metadata), do: false
+  defp valid?(_source, _spell, _guid, _metadata), do: false
 
   defp creature_type_allowed?(spell, metadata) do
     Spell.creature_type_mask_ignored?(spell) or
       Spell.creature_type_allowed?(spell, Map.get(metadata, :creature_type))
   end
 
-  defp allegiance_allowed?(caster, spell, guid, metadata) do
+  defp allegiance_allowed?(source, spell, target) do
     if Spell.requires_hostile_target?(spell) do
-      Hostility.valid_attack_target?(caster, guid) and Hostility.can_attack_without_flagging?(caster, guid)
+      Hostility.valid_attack_target?(source, target) and Hostility.can_attack_without_flagging?(source, target)
     else
-      Hostility.friendly?(caster, Map.put(metadata, :guid, guid)) and Hostility.can_assist?(caster, guid) and
-        (not Chain.healing?(spell) or Map.get(metadata, :health_deficit, 0) > 0)
+      Hostility.friendly?(source, target) and Hostility.can_assist?(source, target) and
+        (not Chain.healing?(spell) or Map.get(target, :health_deficit, 0) > 0)
     end
   end
 

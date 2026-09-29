@@ -700,15 +700,14 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
 
     state
     |> friendly_candidates(perception, normalize_radius(radius))
-    |> Enum.find_value(fn {guid, metadata} ->
-      target = Map.put(metadata, :guid, guid)
-
-      if friendly_candidate?(source, target) and predicate.(metadata), do: guid
+    |> Enum.find_value(fn {guid, target} ->
+      if friendly_candidate?(source, target) and predicate.(target), do: guid
     end)
   end
 
   defp friendly_candidates(state, perception, radius) do
     self_metadata = %{
+      guid: state.object.guid,
       alive?: not Entity.dead?(state),
       in_combat: in_combat?(state),
       unit_flags: state.unit.flags,
@@ -721,7 +720,7 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
       |> nearby_units(radius)
       |> Enum.flat_map(fn {guid, _distance} ->
         case Perception.metadata(perception, guid) do
-          metadata when is_map(metadata) -> [{guid, metadata}]
+          metadata when is_map(metadata) -> [{guid, Perception.actor(perception, guid)}]
           _missing -> []
         end
       end)

@@ -6,7 +6,6 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestGiver do
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Core.Aura
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Death
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.GameObjectTemplate
@@ -18,6 +17,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestGiver do
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Reaction
 
   def present?(%Character{internal: %{world: world}} = character, guid) do
     Guid.type_id(guid) in [:unit, :game_object] and Entity.online?(guid) and
@@ -40,7 +40,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestGiver do
 
   defp source_allowed?(character, guid) do
     case Guid.type_id(guid) do
-      :unit -> Reputation.can_interact?(character, guid) and not Hostility.hostile?(character, guid)
+      :unit -> Reputation.can_interact?(character, guid) and not Reaction.hostile?(character, guid)
       :game_object -> match?(%{go_type: 2, go_spawned?: true}, Metadata.get(guid))
     end
   end

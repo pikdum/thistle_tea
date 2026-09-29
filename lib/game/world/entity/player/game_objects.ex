@@ -6,7 +6,6 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjects do
   """
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.GameObjectTemplate
@@ -32,6 +31,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjects do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
@@ -67,7 +67,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjects do
            object_in_range?(character, guid, template, metadata)
 
   defp interactable_template?(character, guid, %GameObjectTemplate{type: 22} = template, metadata),
-    do: object_in_range?(character, guid, template, metadata) and not Hostility.hostile?(guid, character)
+    do: object_in_range?(character, guid, template, metadata) and not Reaction.hostile?(guid, character)
 
   defp interactable_template?(character, guid, %GameObjectTemplate{type: type} = template, metadata)
        when type in [0, 1, 9, 10, 23], do: object_in_range?(character, guid, template, metadata)

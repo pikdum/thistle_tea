@@ -1,6 +1,5 @@
 defmodule ThistleTea.Game.World.Entity.Player.Attacking do
   @moduledoc "Validates player melee targets and starts the shared attack behavior."
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Combat.PlayerCombat
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
@@ -14,6 +13,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Attacking do
   alias ThistleTea.Game.World.Entity.Player.TickScheduler
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
+  alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.Visibility
 
   require Logger
@@ -76,7 +76,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Attacking do
       match?({^world, _x, _y, _z}, World.position(target_guid)) and
       unit_target?(target_guid) and
       Visibility.can_see?(state, target_guid) and
-      Hostility.attackable?(character, target_guid)
+      Reaction.attackable?(character, target_guid)
   end
 
   defp valid_attack_target?(_state, _target_guid), do: false

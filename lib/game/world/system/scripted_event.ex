@@ -10,7 +10,6 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
 
   alias ThistleTea.Game.Core.AI.Script.Request
   alias ThistleTea.Game.Core.AI.ScriptStep
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Condition.Context
   alias ThistleTea.Game.Core.Condition.Leaf
@@ -26,6 +25,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.System.CreatureGroups
 
@@ -537,7 +537,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
          target
        ) do
     if reaction_available?(source, target) do
-      rank = target |> Hostility.reaction_rank(source) |> Reputation.rank_value()
+      rank = target |> Reaction.reaction_rank(source) |> Reputation.rank_value()
       Result.compare_result(rank, expected, comparison, condition)
     else
       Result.unknown(condition, {:missing_fact, :source_or_target, :reaction})
@@ -759,8 +759,8 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
     if reaction_available?(target, player_guid) do
       matches? =
         case mode do
-          1 -> Hostility.hostile?(target, player_guid)
-          2 -> Hostility.friendly?(target, player_guid)
+          1 -> Reaction.hostile?(target, player_guid)
+          2 -> Reaction.friendly?(target, player_guid)
         end
 
       Result.truth(matches?)

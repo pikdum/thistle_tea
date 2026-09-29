@@ -3,7 +3,6 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSpellCastTest do
 
   alias ThistleTea.Game.Core.Combat.Engagement
   alias ThistleTea.Game.Core.Combat.FactionTemplate
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
@@ -28,6 +27,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSpellCastTest do
   alias ThistleTea.Game.World.Entity.GameObject.SpellCast
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Reaction
 
   setup [:object]
 
@@ -120,9 +120,9 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSpellCastTest do
       faction = %FactionTemplate{id: 1, faction: 1, faction_group: 1, friend_group: 1, enemy_group: 2}
       Metadata.update(owner.object.guid, %{faction_template: faction})
       object = %{object | game_object: %{object.game_object | created_by: owner.object.guid}}
-      assert Hostility.faction_template(object) == faction
-      assert Hostility.friendly?(object, owner)
-      refute Hostility.valid_attack_target?(object, owner)
+      assert Reaction.actor(object).faction_template == faction
+      assert Reaction.friendly?(object, owner)
+      refute Reaction.valid_attack_target?(object, owner)
     end
 
     test "object actions retain object hits without a unit delivery", %{object: object, spell: spell} do

@@ -414,7 +414,8 @@ defmodule ThistleTea.Game.Core.Spell.CastValidation do
   defp check_target_flags(%{object: %{guid: guid}}, _spell, %{guid: guid}), do: :ok
 
   defp check_target_flags(caster, spell, target_info) when is_map(target_info) do
-    if Hostility.targetable_by?(caster, target_info, not Spell.harmful?(spell)), do: :ok, else: {:error, :bad_targets}
+    source = Hostility.actor(caster, %{})
+    if Hostility.targetable_by?(source, target_info, not Spell.harmful?(spell)), do: :ok, else: {:error, :bad_targets}
   end
 
   defp check_target_flags(_caster, _spell, _target_info), do: :ok

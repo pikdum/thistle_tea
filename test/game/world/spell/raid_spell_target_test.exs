@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.Spell.RaidSpellTargetTest do
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Duel
   alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Object
@@ -26,7 +27,6 @@ defmodule ThistleTea.Game.World.Spell.RaidSpellTargetTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Spell.SpellTargetResolver
-  alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   setup [:raid]
@@ -57,11 +57,11 @@ defmodule ThistleTea.Game.World.Spell.RaidSpellTargetTest do
       assert guid in [member.object.guid, pet.object.guid]
 
       for {source, target} <- [{carrier, member}, {member, carrier}] do
-        guid = source.object.guid
-        :ets.insert(DuelSystem, {guid, %{opponent_guid: target.object.guid, state: :started}})
-        Metadata.update(guid, %{duel_started?: true})
-        on_exit(fn -> :ets.delete(DuelSystem, guid) end)
+        Metadata.update(source.object.guid, %{duel_started?: true, duel_opponent_guid: target.object.guid})
       end
+
+      duel = %Duel{opponent_guid: member.object.guid, state: :started}
+      carrier = %{carrier | internal: %{carrier.internal | duel: duel}}
 
       assert recipients(carrier, spell, outsider) == []
     end

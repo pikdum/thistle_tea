@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolver do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.Spell.ChainTargets
   alias ThistleTea.Game.World.Spell.InsigniaTarget
   alias ThistleTea.Game.World.Spell.ResurrectionTarget
@@ -104,8 +105,10 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolver do
   ]
 
   def hit_defense(caster, target_guid) when is_integer(target_guid) do
-    if Hostility.valid_attack_target?(caster, target_guid, area?: true),
-      do: Metadata.query(target_guid, @hit_defense_keys) || %{},
+    metadata = Metadata.get(target_guid) || %{}
+
+    if Reaction.valid_attack_target?(caster, Map.put(metadata, :guid, target_guid), area?: true),
+      do: Map.take(metadata, @hit_defense_keys),
       else: :unattackable
   end
 
@@ -137,7 +140,8 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolver do
     redirected = redirect_initial(caster, spell, query, initial)
     targets = if redirected == initial, do: ChainTargets.expand(caster, spell, initial), else: redirected
     targets = Enum.filter(targets, &buff_level_allowed?(caster, spell, &1, opts))
-    targets = Enum.filter(targets, &recipient_allowed?(caster, spell, &1))
+    source = Reaction.actor(caster)
+    targets = Enum.filter(targets, &recipient_allowed?(source, spell, &1))
     append_caster_execution_target(targets, spell, caster_guid)
   end
 
@@ -187,21 +191,26 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolver do
 
   def resolve_query(caster, %Spell{} = spell, query, opts \\ []) do
     excluded = Keyword.get(opts, :exclude_guids, [])
+    source = Reaction.actor(caster)
 
     caster
     |> resolve_query(query)
     |> Enum.reject(&(&1 in excluded))
     |> Enum.filter(fn guid ->
       creature_type_allowed?(spell, guid) and buff_level_allowed?(caster, spell, guid, opts) and
-        recipient_allowed?(caster, spell, guid)
+        recipient_allowed?(source, spell, guid)
     end)
     |> limit_targets(spell, Keyword.get(opts, :selected_guid))
   end
 
-  defp recipient_allowed?(caster, spell, guid) do
-    Spell.harmful?(spell) or Hostility.can_assist?(caster, guid) or
+  defp recipient_allowed?(source, spell, guid) do
+    Spell.harmful?(spell) or reaction_recipient?(source, spell, Reaction.actor(guid))
+  end
+
+  defp reaction_recipient?(source, spell, target) do
+    Hostility.can_assist?(source, target) or
       (any_unit_target?(spell) and
-         Hostility.valid_attack_target?(caster, guid, allow_dead?: Spell.attribute?(spell, :allow_dead_target)))
+         Hostility.valid_attack_target?(source, target, allow_dead?: Spell.attribute?(spell, :allow_dead_target)))
   end
 
   defp any_unit_target?(%Spell{effects: effects}) do
@@ -336,11 +345,13 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolver do
 
   defp nearby_friendly_guids_at(%{internal: %{world: world}} = caster, position, radius)
        when is_number(radius) and radius > 0 do
+    source = Reaction.actor(caster)
+
     world
     |> nearby_units_at(position, radius)
     |> Enum.filter(fn {guid, _distance} ->
       case Metadata.get(guid) do
-        %{alive?: true} = metadata -> Hostility.friendly?(caster, Map.put(metadata, :guid, guid))
+        %{alive?: true} = metadata -> Hostility.friendly?(source, Reaction.actor(Map.put(metadata, :guid, guid)))
         _ -> false
       end
     end)
@@ -375,10 +386,15 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolver do
   defp caster_position(_caster, _now), do: nil
 
   defp hostile_living_guids(results, caster, caster_guid) do
+    source = Reaction.actor(caster)
+
     results
     |> Enum.reject(fn {guid, _distance} -> guid == caster_guid end)
     |> Enum.filter(fn {guid, _distance} ->
-      Hostility.valid_attack_target?(caster, guid, area?: true) and Hostility.can_attack_without_flagging?(caster, guid)
+      target = Reaction.actor(guid)
+
+      Hostility.valid_attack_target?(source, target, area?: true) and
+        Hostility.can_attack_without_flagging?(source, target)
     end)
     |> Enum.map(fn {guid, _distance} -> guid end)
   end
@@ -411,12 +427,13 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolver do
 
   defp nearby_raid_guids(caster, radius, spell_level) when is_number(radius) and radius > 0 do
     owner_guid = ControlOwner.guid(caster)
+    source = Reaction.actor(caster)
 
     members =
       case PartySystem.group_of(owner_guid) do
         %Party.Group{members: members} ->
           members
-          |> Enum.filter(&raid_member_eligible?(caster, &1.guid, spell_level))
+          |> Enum.filter(&raid_member_eligible?(source, &1.guid, spell_level))
           |> MapSet.new(& &1.guid)
 
         _ ->
@@ -431,10 +448,13 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolver do
 
   defp nearby_raid_guids(_caster, _radius, _spell_level), do: []
 
-  defp raid_member_eligible?(caster, guid, spell_level) do
-    case Metadata.query(guid, [:level]) do
-      %{level: level} when is_integer(level) -> level + 10 >= spell_level and not Hostility.hostile?(caster, guid)
-      _ -> false
+  defp raid_member_eligible?(source, guid, spell_level) do
+    case Metadata.get(guid) do
+      %{level: level} = metadata when is_integer(level) ->
+        level + 10 >= spell_level and not Hostility.hostile?(source, Reaction.actor(Map.put(metadata, :guid, guid)))
+
+      _ ->
+        false
     end
   end
 

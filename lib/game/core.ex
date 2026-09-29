@@ -17,8 +17,6 @@ defmodule ThistleTea.Game.Core do
       ThistleTea.DB.Mangos.GameEventGameObject,
       ThistleTea.DB.Mangos.GameObject,
       ThistleTea.DB.Mangos.GameObjectTemplate,
-      ThistleTea.Game.World.Metadata,
-      ThistleTea.Game.World.Spell.SpellTargetResolver,
-      ThistleTea.Game.World.System.Duel
+      ThistleTea.Game.World.Spell.SpellTargetResolver
     ]
 end

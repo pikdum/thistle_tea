@@ -488,8 +488,8 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.Spells do
   end
 
   defp injured_friendly_missing_pct(%Mob{} = state, candidate_guid, threshold, perception) do
-    with %{alive?: true} = metadata <- Perception.metadata(perception, candidate_guid),
-         metadata = Map.put(metadata, :guid, candidate_guid),
+    with %{alive?: true} <- Perception.metadata(perception, candidate_guid),
+         metadata = Perception.actor(perception, candidate_guid),
          true <- injured_candidate_flags_allow?(metadata),
          true <- Hostility.friendly?(Perception.actor(perception, state.object.guid), metadata),
          missing_pct when is_number(missing_pct) and missing_pct > threshold <- missing_health_pct(metadata) do
@@ -591,8 +591,8 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.Spells do
       nil ->
         :unknown
 
-      metadata ->
-        metadata = Map.put(metadata, :guid, target_guid)
+      _metadata ->
+        metadata = Perception.actor(perception, target_guid)
         source = Perception.actor(perception, state.object.guid)
 
         %{

@@ -7,7 +7,6 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Core.Class.Warrior
   alias ThistleTea.Game.Core.Combat.CombatTimer
   alias ThistleTea.Game.Core.Combat.ExtraAttacks
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Guid
@@ -35,6 +34,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.Spell.SpellAreas
   alias ThistleTea.Game.World.Spell.SpellFocus
   alias ThistleTea.Game.World.Spell.SpellObjects
@@ -196,7 +196,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
   defp target_hostility(entity, %Effects.DeliverSpell{hostility_check: opts, target_guid: target, cast_context: context})
        when is_list(opts) do
     source = if context.caster_guid == entity.object.guid, do: entity, else: context.caster_guid
-    %{context | target_hostile?: Hostility.valid_attack_target?(source, target, opts)}
+    %{context | target_hostile?: Reaction.valid_attack_target?(source, target, opts)}
   end
 
   defp target_hostility(_entity, %Effects.DeliverSpell{cast_context: context}), do: context
