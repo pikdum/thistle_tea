@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.Combat.ThreatSelection do
   attack targets; melee range combines both combat reaches.
   """
   alias ThistleTea.Game.Core.Combat
+  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.Mob
@@ -13,11 +14,14 @@ defmodule ThistleTea.Game.World.Combat.ThreatSelection do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Reaction
 
-  def opts(%Mob{} = mob), do: [valid?: &valid_target?(mob, &1), in_melee?: &in_melee_range?(mob, &1)]
+  def opts(%Mob{} = mob) do
+    source = Reaction.actor(mob)
+    [valid?: &valid_target?(mob, source, &1), in_melee?: &in_melee_range?(mob, &1)]
+  end
 
-  defp valid_target?(%Mob{internal: %Internal{world: world}} = mob, guid) do
+  defp valid_target?(%Mob{internal: %Internal{world: world}}, source, guid) do
     case World.position(guid) do
-      {^world, _x, _y, _z} -> Reaction.valid_attack_target?(mob, guid)
+      {^world, _x, _y, _z} -> Hostility.valid_attack_target?(source, Reaction.actor(guid))
       _ -> false
     end
   end
