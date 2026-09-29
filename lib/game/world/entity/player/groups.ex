@@ -1,7 +1,9 @@
 defmodule ThistleTea.Game.World.Entity.Player.Groups do
   @moduledoc """
-  Player-owner requests for raid management, target markers, and ready checks.
-  Membership mutations are serialized by the party system before projection.
+  Player-owner party requests: invitations and their answers, leaving and
+  removing members, leader, loot, and raid management, member stats, target
+  markers, minimap pings, ready checks, and random rolls. Membership
+  mutations are serialized by the party system before projection.
   """
 
   alias ThistleTea.Game.Core.Entity.Character
@@ -9,9 +11,11 @@ defmodule ThistleTea.Game.World.Entity.Player.Groups do
   alias ThistleTea.Game.Core.Party
   alias ThistleTea.Game.Core.Party.Group
   alias ThistleTea.Game.Core.Party.Member
+  alias ThistleTea.Game.Core.Party.MemberStats
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgPartyCommandResult, as: Result
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
@@ -37,6 +41,121 @@ defmodule ThistleTea.Game.World.Entity.Player.Groups do
   end
 
   def random_roll(state, _minimum, _maximum), do: state
+
+  def accept(%{ready: true, guid: guid, character: %Character{} = character} = state) do
+    case PartySystem.accept(guid, character.internal.name) do
+      {:ok, group} -> Notifier.send_group_list(group)
+      {:error, _reason} -> :ok
+    end
+
+    state
+  end
+
+  def accept(state), do: state
+
+  def decline(%{ready: true, guid: guid, character: %Character{} = character} = state) do
+    case PartySystem.decline(guid) do
+      {:ok, inviter_guid} ->
+        Outbound.send_packet(%Message.SmsgGroupDecline{name: character.internal.name}, inviter_guid)
+
+      {:error, _reason} ->
+        :ok
+    end
+
+    state
+  end
+
+  def decline(state), do: state
+
+  def leave(%{ready: true, guid: guid, character: %Character{} = character} = state) do
+    case PartySystem.leave(guid) do
+      {:ok, outcome} ->
+        Outbound.send_packet(%Result{
+          operation: Result.op_leave(),
+          name: character.internal.name,
+          result: Result.code(:ok)
+        })
+
+        Notifier.notify_removal(outcome, guid, false)
+
+      {:error, _reason} ->
+        :ok
+    end
+
+    state
+  end
+
+  def leave(state), do: state
+
+  def set_leader(%{ready: true, guid: guid} = state, new_leader_guid) do
+    case PartySystem.set_leader(guid, new_leader_guid) do
+      {:ok, group} ->
+        Notifier.broadcast(group, %Message.SmsgGroupSetLeader{name: Notifier.leader_name(group)})
+        Notifier.send_group_list(group)
+
+      {:error, _reason} ->
+        :ok
+    end
+
+    state
+  end
+
+  def set_leader(state, _new_leader_guid), do: state
+
+  def uninvite_name(%{ready: true, guid: guid} = state, name) do
+    case member_guid(guid, name) do
+      nil -> send_leave_result(name, :target_not_in_group)
+      target_guid -> uninvite(guid, target_guid, name)
+    end
+
+    state
+  end
+
+  def uninvite_name(state, _name), do: state
+
+  def uninvite_guid(%{ready: true, guid: guid} = state, target_guid) do
+    uninvite(guid, target_guid, member_name(guid, target_guid))
+    state
+  end
+
+  def uninvite_guid(state, _target_guid), do: state
+
+  def set_loot(%{ready: true, guid: guid} = state, method, master_looter, threshold)
+      when method in 0..4 and threshold in 0..6 do
+    case PartySystem.set_loot(guid, method, master_looter, threshold) do
+      {:ok, group} -> Notifier.send_group_list(group)
+      {:error, _reason} -> :ok
+    end
+
+    state
+  end
+
+  def set_loot(state, _method, _master_looter, _threshold), do: state
+
+  def request_member_stats(%{ready: true, guid: guid} = state, target_guid) do
+    with %Group{} = group <- PartySystem.group_of(guid),
+         %Member{} <- Party.member(group, target_guid) do
+      send_member_stats(guid, target_guid)
+    end
+
+    state
+  end
+
+  def request_member_stats(state, _target_guid), do: state
+
+  def minimap_ping(%{ready: true, guid: guid} = state, x, y) do
+    case PartySystem.group_of(guid) do
+      %Group{} = group ->
+        Notifier.broadcast(group, %Message.MsgMinimapPingResponse{guid: guid, x: x, y: y}, except: guid)
+
+      _ ->
+        :ok
+    end
+
+    state
+  end
+
+  def minimap_ping(state, _x, _y), do: state
 
   def invite(%{ready: true, guid: guid, character: %Character{} = character} = state, name) do
     name = String.capitalize(name)
@@ -157,6 +276,41 @@ defmodule ThistleTea.Game.World.Entity.Player.Groups do
   defp report_offline_member(%Member{guid: guid}, leader) do
     if !Entity.online?(guid) do
       Outbound.send_packet(%Message.MsgRaidReadyCheckResponse{guid: guid, ready?: false}, leader)
+    end
+  end
+
+  defp member_guid(guid, name) do
+    case named_member(guid, name) do
+      %Member{guid: target_guid} -> target_guid
+      _ -> Metadata.find_guid_by(:name, name)
+    end
+  end
+
+  defp member_name(guid, target_guid) do
+    with %Group{} = group <- PartySystem.group_of(guid),
+         %Member{name: name} <- Party.member(group, target_guid) do
+      name
+    else
+      _ -> ""
+    end
+  end
+
+  defp uninvite(remover_guid, target_guid, name) do
+    case PartySystem.uninvite(remover_guid, target_guid) do
+      {:ok, :invite_cancelled} -> :ok
+      {:ok, outcome} -> Notifier.notify_removal(outcome, target_guid, true)
+      {:error, reason} -> send_leave_result(name, reason)
+    end
+  end
+
+  defp send_leave_result(name, reason) do
+    Outbound.send_packet(%Result{operation: Result.op_leave(), name: name, result: Result.code(reason)})
+  end
+
+  defp send_member_stats(requester_guid, target_guid) do
+    case EntityRegistry.whereis(target_guid) do
+      pid when is_pid(pid) -> GenServer.cast(pid, {:request_party_stats, requester_guid})
+      _ -> Outbound.send_packet(struct(Message.SmsgPartyMemberStatsFull, MemberStats.offline(target_guid)))
     end
   end
 
