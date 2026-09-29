@@ -34,7 +34,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
   alias ThistleTea.Game.Core.AI.Script.PetCommand
   alias ThistleTea.Game.Core.AI.Script.Run
   alias ThistleTea.Game.Core.AI.ScriptStep
-  alias ThistleTea.Game.Core.Aura, as: AuraLogic
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Combat.Assistance
   alias ThistleTea.Game.Core.Combat.Engagement
   alias ThistleTea.Game.Core.Combat.Hostility
@@ -1088,7 +1088,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :remove_aura, datalong: spell_id}, _target_guid, now)
        when is_integer(spell_id) and spell_id > 0 do
-    {state, events} = AuraLogic.remove_spells(state, [spell_id], now)
+    {state, events} = AuraCore.remove_spells(state, [spell_id], now)
     {Effects.enqueue(state, events), blackboard}
   end
 

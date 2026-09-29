@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.World.System.OutdoorPvp.CaptureRewardsTest do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Graveyards
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.System.OutdoorPvp.CaptureRewards
 
   describe "reconcile/2" do
@@ -51,15 +51,15 @@ defmodule ThistleTea.Game.World.System.OutdoorPvp.CaptureRewardsTest do
 
   defp templates(_context) do
     entries = [181_682, 180_100]
-    original = Enum.flat_map(entries, &:ets.lookup(TemplateLoader, &1))
+    original = Enum.flat_map(entries, &:ets.lookup(GameObjectTemplateLoader, &1))
     controls = :ets.lookup(Graveyards, 927)
 
     for entry <- entries,
-        do: TemplateLoader.put(%GameObjectTemplate{entry: entry, type: 5, size: 1.0, flags: 0, data: []})
+        do: GameObjectTemplateLoader.put(%GameObjectTemplate{entry: entry, type: 5, size: 1.0, flags: 0, data: []})
 
     on_exit(fn ->
-      Enum.each(entries, &:ets.delete(TemplateLoader, &1))
-      :ets.insert(TemplateLoader, original)
+      Enum.each(entries, &:ets.delete(GameObjectTemplateLoader, &1))
+      :ets.insert(GameObjectTemplateLoader, original)
       :ets.delete(Graveyards, 927)
       :ets.insert(Graveyards, controls)
     end)

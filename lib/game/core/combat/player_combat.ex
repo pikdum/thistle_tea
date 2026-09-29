@@ -20,7 +20,7 @@ defmodule ThistleTea.Game.Core.Combat.PlayerCombat do
   alias ThistleTea.Game.Core.AI.BT.Context
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
   alias ThistleTea.Game.Core.Aura
-  alias ThistleTea.Game.Core.Combat, as: CombatLogic
+  alias ThistleTea.Game.Core.Combat, as: CombatCore
   alias ThistleTea.Game.Core.Combat.CombatReferences
   alias ThistleTea.Game.Core.Combat.CombatState
   alias ThistleTea.Game.Core.Combat.CombatTimer
@@ -62,7 +62,7 @@ defmodule ThistleTea.Game.Core.Combat.PlayerCombat do
   def mark_attacked(%Character{} = character, now, faction_id, opponent) when is_integer(now) do
     character
     |> CombatTimer.attacked(opponent, now)
-    |> CombatLogic.sync_combat_flag()
+    |> CombatCore.sync_combat_flag()
     |> mark_temporary_at_war(faction_id)
   end
 
@@ -70,13 +70,13 @@ defmodule ThistleTea.Game.Core.Combat.PlayerCombat do
 
   def hold_combat(%Character{} = character, now, duration, opponent \\ nil)
       when is_integer(now) and is_integer(duration) and duration >= 0 do
-    character |> CombatTimer.hold(now, duration, opponent) |> CombatLogic.sync_combat_flag()
+    character |> CombatTimer.hold(now, duration, opponent) |> CombatCore.sync_combat_flag()
   end
 
   def mark_initiated(character, now, opponent, timed? \\ nil)
 
   def mark_initiated(%Character{} = character, now, opponent, timed?) do
-    character |> CombatTimer.attack(opponent, now, timed?) |> CombatLogic.sync_combat_flag()
+    character |> CombatTimer.attack(opponent, now, timed?) |> CombatCore.sync_combat_flag()
   end
 
   def mark_initiated(entity, _now, _opponent, _timed?), do: entity
@@ -169,7 +169,7 @@ defmodule ThistleTea.Game.Core.Combat.PlayerCombat do
           }
       }
       |> CombatTimer.clear()
-      |> CombatLogic.sync_combat_flag()
+      |> CombatCore.sync_combat_flag()
 
     effects =
       attack_effects ++
@@ -198,7 +198,7 @@ defmodule ThistleTea.Game.Core.Combat.PlayerCombat do
           }
       }
       |> CombatTimer.clear()
-      |> CombatLogic.sync_combat_flag()
+      |> CombatCore.sync_combat_flag()
 
     {character, temporary_war_effects} = clear_temporary_at_war(character)
     character = Effects.enqueue(character, temporary_war_effects)
@@ -262,7 +262,7 @@ defmodule ThistleTea.Game.Core.Combat.PlayerCombat do
 
     if threat_refs?(character) or ControlledCombat.holds_combat?(character, context) or
          CombatTimer.remaining(character, now) > 0 or Aura.has_aura?(character, :interrupt_regen) do
-      {CombatLogic.sync_combat_flag(character), blackboard}
+      {CombatCore.sync_combat_flag(character), blackboard}
     else
       {clear(character), blackboard}
     end
@@ -294,7 +294,7 @@ defmodule ThistleTea.Game.Core.Combat.PlayerCombat do
     character =
       %{character | internal: %{internal | in_combat: false}}
       |> CombatTimer.clear()
-      |> CombatLogic.sync_combat_flag()
+      |> CombatCore.sync_combat_flag()
 
     {character, effects} = clear_temporary_at_war(character)
     Effects.enqueue(character, effects)

@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.World.Entity.Player.LogoutTest do
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
-  alias ThistleTea.Game.Core.Player.Logout, as: LogoutLogic
+  alias ThistleTea.Game.Core.Player.Logout, as: LogoutCore
   alias ThistleTea.Game.Core.Player.Rest
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Network.ConnectionState
@@ -31,31 +31,31 @@ defmodule ThistleTea.Game.World.Entity.Player.LogoutTest do
   describe "admission/1" do
     test "uses immediate logout in rest areas and on flights", %{state: state} do
       for location <- [:city, {:tavern, 71}] do
-        assert LogoutLogic.admission(Rest.start(state.character, location, 0)) == {:ok, :instant}
+        assert LogoutCore.admission(Rest.start(state.character, location, 0)) == {:ok, :instant}
       end
 
       flying = %{state.character | internal: %{state.character.internal | taxi_flight: %{}}}
-      assert LogoutLogic.admission(flying) == {:ok, :instant}
-      assert LogoutLogic.admission(state.character) == {:ok, :delayed}
+      assert LogoutCore.admission(flying) == {:ok, :instant}
+      assert LogoutCore.admission(state.character) == {:ok, :delayed}
     end
 
     test "rejects combat, airborne movement, and GM freeze before instant logout", %{state: state} do
       resting = Rest.start(state.character, :city, 0)
-      assert LogoutLogic.admission(put_in(resting.internal.in_combat, true)) == {:error, :failure_in_combat}
+      assert LogoutCore.admission(put_in(resting.internal.in_combat, true)) == {:error, :failure_in_combat}
 
       for flags <- [0x2000, 0x4000] do
-        assert LogoutLogic.admission(put_in(resting.movement_block.movement_flags, flags)) ==
+        assert LogoutCore.admission(put_in(resting.movement_block.movement_flags, flags)) ==
                  {:error, :failure_jumping_or_falling}
       end
 
       frozen = put_in(resting.unit.auras, [%Holder{spell: %Spell{id: 9454}}])
-      assert LogoutLogic.admission(frozen) == {:error, :failure_frozen_by_gm}
+      assert LogoutCore.admission(frozen) == {:error, :failure_frozen_by_gm}
     end
   end
 
   describe "start/2 and cancel/2" do
     test "sits and immobilizes the player and restores movement on cancellation", %{state: state} do
-      waiting = LogoutLogic.start(state.character, 0)
+      waiting = LogoutCore.start(state.character, 0)
       assert waiting.unit.stand_state == 1
       assert waiting.internal.logout == :rooted
       assert waiting.internal.rooted?
@@ -65,7 +65,7 @@ defmodule ThistleTea.Game.World.Entity.Player.LogoutTest do
       EventSink.emit_pending(waiting, Context.new(self()))
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgForceMoveRoot{}}}
 
-      cancelled = LogoutLogic.cancel(%{waiting | internal: %{waiting.internal | events: []}}, 10_000)
+      cancelled = LogoutCore.cancel(%{waiting | internal: %{waiting.internal | events: []}}, 10_000)
       assert cancelled.unit.stand_state == 0
       assert cancelled.internal.logout == nil
       refute cancelled.internal.rooted?
@@ -76,7 +76,7 @@ defmodule ThistleTea.Game.World.Entity.Player.LogoutTest do
     end
 
     test "aura recomputation preserves the logout restriction", %{state: state} do
-      waiting = LogoutLogic.start(state.character, 0)
+      waiting = LogoutCore.start(state.character, 0)
       {changed, events} = MovementSync.sync_movement_state(waiting, 1_000)
       assert changed.internal.rooted?
       assert band(changed.unit.flags, 0x40000) != 0
@@ -85,10 +85,10 @@ defmodule ThistleTea.Game.World.Entity.Player.LogoutTest do
 
     test "cancel retains roots and stuns applied during the countdown", %{state: state} do
       for type <- [:mod_root, :mod_stun] do
-        waiting = LogoutLogic.start(state.character, 0)
+        waiting = LogoutCore.start(state.character, 0)
         aura = %Holder{spell: %Spell{id: 1}, auras: [%Aura{type: type}]}
         waiting = %{waiting | unit: %{waiting.unit | auras: [aura]}, internal: %{waiting.internal | events: []}}
-        cancelled = LogoutLogic.cancel(waiting, 1_000)
+        cancelled = LogoutCore.cancel(waiting, 1_000)
         assert cancelled.internal.rooted?
         refute %Effects.MovementRootChanged{rooted?: false} in cancelled.internal.events
         assert band(cancelled.unit.flags, 0x40000) != 0 == (type == :mod_stun)
@@ -96,9 +96,9 @@ defmodule ThistleTea.Game.World.Entity.Player.LogoutTest do
     end
 
     test "cancel does not release the death root", %{state: state} do
-      waiting = LogoutLogic.start(state.character, 0)
+      waiting = LogoutCore.start(state.character, 0)
       dead = %{waiting | unit: %{waiting.unit | health: 0}, internal: %{waiting.internal | events: []}}
-      cancelled = LogoutLogic.cancel(dead, 1_000)
+      cancelled = LogoutCore.cancel(dead, 1_000)
       assert cancelled.internal.rooted?
       refute %Effects.MovementRootChanged{rooted?: false} in cancelled.internal.events
     end
@@ -108,7 +108,7 @@ defmodule ThistleTea.Game.World.Entity.Player.LogoutTest do
       swimming = %{state.character | movement_block: %{state.character.movement_block | movement_flags: 0x200000}}
 
       for character <- [mounted, swimming] do
-        assert LogoutLogic.start(character, 0).unit.stand_state == 0
+        assert LogoutCore.start(character, 0).unit.stand_state == 0
       end
     end
   end

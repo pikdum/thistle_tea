@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Core.Travel.TaxiTest do
 
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.Game.Core.Aura, as: AuraData
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Combat.ExtraAttacks
   alias ThistleTea.Game.Core.Effects
@@ -28,8 +28,8 @@ defmodule ThistleTea.Game.Core.Travel.TaxiTest do
 
   describe "start/6" do
     test "removes stealth and animal form through the aura lifecycle" do
-      shape = %Holder{spell: %Spell{id: 768}, caster_guid: 1, auras: [%AuraData{type: :mod_shapeshift, misc_value: 1}]}
-      stealth = %Holder{spell: %Spell{id: 5215}, caster_guid: 1, auras: [%AuraData{type: :mod_stealth}]}
+      shape = %Holder{spell: %Spell{id: 768}, caster_guid: 1, auras: [%AuraCore{type: :mod_shapeshift, misc_value: 1}]}
+      stealth = %Holder{spell: %Spell{id: 5215}, caster_guid: 1, auras: [%AuraCore{type: :mod_stealth}]}
       character = character()
       character = %{character | unit: %{character.unit | auras: [shape, stealth], shapeshift_form: 1}}
       {flying, _effects} = Taxi.start(character, itinerary(), node(4, {64.0, 0.0, 0.0}), 6852, make_ref(), 1_000)
@@ -43,7 +43,7 @@ defmodule ThistleTea.Game.Core.Travel.TaxiTest do
       stance = %Holder{
         spell: %Spell{id: 2457},
         caster_guid: 1,
-        auras: [%AuraData{type: :mod_shapeshift, misc_value: 17}]
+        auras: [%AuraCore{type: :mod_shapeshift, misc_value: 17}]
       }
 
       character = character()

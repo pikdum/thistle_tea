@@ -41,7 +41,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetLifecycleTest do
   alias ThistleTea.Game.World.Entity.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.World.Entity.Player.PetTraining
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Loader.PetTraining, as: TrainingLoader
+  alias ThistleTea.Game.World.Loader.PetTraining, as: PetTrainingLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.Spell.SpellRequirements
@@ -358,10 +358,10 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetLifecycleTest do
 
     Presence.enter(character, %{alive?: true, faction_template: 1})
     on_exit(fn -> Presence.leave(character) end)
-    previous = TrainingLoader.abilities()
+    previous = PetTrainingLoader.abilities()
     spell = %Spell{id: 900}
-    :ets.insert(TrainingLoader, {:abilities, %{900 => %PetAbility{spell: spell, cost: 0, skills: [270]}}})
-    on_exit(fn -> :ets.insert(TrainingLoader, {:abilities, previous}) end)
+    :ets.insert(PetTrainingLoader, {:abilities, %{900 => %PetAbility{spell: spell, cost: 0, skills: [270]}}})
+    on_exit(fn -> :ets.insert(PetTrainingLoader, {:abilities, previous}) end)
     %{teaching: %Spell{id: 901, effects: [%Effect{type: :learn_spell, implicit_target_a: :pet, trigger_spell_id: 900}]}}
   end
 

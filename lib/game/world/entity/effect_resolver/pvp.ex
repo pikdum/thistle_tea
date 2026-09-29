@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Pvp do
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Guid
-  alias ThistleTea.Game.Core.Pvp, as: PvpLogic
+  alias ThistleTea.Game.Core.Pvp, as: PvpCore
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.Core.Spell.Combat, as: SpellCombat
@@ -123,10 +123,10 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Pvp do
       guid: guid,
       uses_timer?: true,
       player_guid: guid,
-      pvp?: PvpLogic.active?(entity),
-      pvp_combat?: PvpLogic.combat?(entity),
-      free_for_all?: PvpLogic.free_for_all?(entity),
-      contested_pvp?: PvpLogic.contested?(entity),
+      pvp?: PvpCore.active?(entity),
+      pvp_combat?: PvpCore.combat?(entity),
+      free_for_all?: PvpCore.free_for_all?(entity),
+      contested_pvp?: PvpCore.contested?(entity),
       in_combat: entity.internal.in_combat == true
     }
   end
@@ -140,7 +140,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Pvp do
       guid: guid,
       uses_timer?: CombatTimer.uses_timer?(Map.put(metadata, :guid, guid)),
       player_guid: player,
-      pvp?: Map.get(owner, :pvp?) == true or PvpLogic.active?(owner),
+      pvp?: Map.get(owner, :pvp?) == true or PvpCore.active?(owner),
       pvp_combat?: Map.get(owner, :pvp_combat?) == true,
       free_for_all?: Map.get(owner, :free_for_all?) == true,
       contested_pvp?: Map.get(owner, :contested_pvp?) == true,

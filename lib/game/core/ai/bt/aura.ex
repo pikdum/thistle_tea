@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Aura do
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Context
-  alias ThistleTea.Game.Core.Aura, as: AuraLogic
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Unit
@@ -21,7 +21,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Aura do
 
   def tick(%{unit: %Unit{auras: [_ | _]}} = entity, %Blackboard{} = blackboard, %Context{} = context) do
     entity = put_blackboard(entity, blackboard)
-    {entity, events} = AuraLogic.tick(entity, context.now, context.aura_contexts)
+    {entity, events} = AuraCore.tick(entity, context.now, context.aura_contexts)
     {:failure, Effects.enqueue(entity, events), updated_blackboard(entity, blackboard)}
   end
 

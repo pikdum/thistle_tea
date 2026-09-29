@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
   """
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.Game.Core.Aura, as: AuraLogic
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Combat.Engagement
   alias ThistleTea.Game.Core.Combat.Reactive
   alias ThistleTea.Game.Core.Creature.CreatureEntry
@@ -34,7 +34,7 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
   def apply_addon_auras(%__MODULE__{internal: %Internal{creature: %Creature{addon_auras: [_ | _] = spells}}} = mob, now)
       when is_integer(now) do
     Enum.reduce(spells, mob, fn spell, acc ->
-      {acc, _events} = AuraLogic.apply_spell(acc, acc.object.guid, acc.unit.level, spell, now)
+      {acc, _events} = AuraCore.apply_spell(acc, acc.object.guid, acc.unit.level, spell, now)
       acc
     end)
   end

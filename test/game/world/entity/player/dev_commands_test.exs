@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Instance.Copy
   alias ThistleTea.Game.Core.Movement.SafePosition
-  alias ThistleTea.Game.Core.Reputation, as: ReputationLogic
+  alias ThistleTea.Game.Core.Reputation, as: ReputationCore
   alias ThistleTea.Game.Core.Reputation.Catalog
   alias ThistleTea.Game.Core.Reputation.Definition
   alias ThistleTea.Game.Core.Reputation.Variant
@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
   alias ThistleTea.Game.Core.Spell.Cooldowns.Entry, as: CooldownEntry
   alias ThistleTea.Game.Core.Travel.Taxi.Network
   alias ThistleTea.Game.Core.Travel.Taxi.Node
-  alias ThistleTea.Game.Core.Travel.Transport, as: TransportLogic
+  alias ThistleTea.Game.Core.Travel.Transport, as: TransportCore
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.CharacterStore
@@ -237,8 +237,8 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
   describe ".debug transport" do
     test "shows and advances the attached transport" do
       entry = System.unique_integer([:positive, :monotonic])
-      route = TransportLogic.build_ship(entry, "Debug Ship", 10, ship_nodes(), 10, 1, 20_000)
-      entity = GameObject.build_transport(transport_template(entry), TransportLogic.pose_at(route, 0))
+      route = TransportCore.build_ship(entry, "Debug Ship", 10, ship_nodes(), 10, 1, 20_000)
+      entity = GameObject.build_transport(transport_template(entry), TransportCore.pose_at(route, 0))
       {:ok, pid} = TransportServer.start_link({entity, route, schedule: false, clock: fn -> 1_000 end})
       on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid) end)
 
@@ -356,7 +356,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
         id: id,
         object: %Object{guid: guid},
         unit: %Unit{race: 1, class: 1, level: 60, auras: []},
-        player: %Player{reputation: ReputationLogic.initialize(catalog, 1, 1)},
+        player: %Player{reputation: ReputationCore.initialize(catalog, 1, 1)},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         internal: %Internal{world: WorldRef.open(0)}
       }

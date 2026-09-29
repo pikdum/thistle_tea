@@ -24,7 +24,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemTransformationTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
-  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
+  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @entry 998_310
@@ -145,7 +145,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemTransformationTest do
     :ets.insert(SpellLoader, {{:spell, @spell}, nil})
 
     :ets.insert(
-      EnchantmentLoader,
+      ItemEnchantmentLoader,
       {{:enchantment, @enchant}, %ItemEnchantment{id: @enchant, effects: [%{type: 5, spell_id: 1, amount: 5}]}}
     )
 
@@ -176,7 +176,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemTransformationTest do
       :ets.delete(ItemLoader, @entry)
       :ets.delete(ItemLoader, source.entry)
       :ets.delete(SpellLoader, {:spell, @spell})
-      :ets.delete(EnchantmentLoader, {:enchantment, @enchant})
+      :ets.delete(ItemEnchantmentLoader, {:enchantment, @enchant})
       :ets.delete(CharacterStore, guid)
     end)
 

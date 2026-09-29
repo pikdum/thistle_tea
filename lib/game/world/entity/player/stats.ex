@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Stats do
   alias ThistleTea.Game.Core.Player.Rest
   alias ThistleTea.Game.Core.Player.Talents
   alias ThistleTea.Game.Core.Skills
-  alias ThistleTea.Game.Core.Stats, as: LogicStats
+  alias ThistleTea.Game.Core.Stats, as: StatsCore
   alias ThistleTea.Game.Core.Stats.CombatRatings
   alias ThistleTea.Game.Core.Stats.SpellPower
   alias ThistleTea.Game.World.Entity.Player.Equipment
@@ -98,7 +98,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Stats do
         base_mana: stats.base_mana,
         base_health: stats.base_health
       })
-      |> LogicStats.recompute()
+      |> StatsCore.recompute()
 
     player = %{
       player
@@ -180,10 +180,10 @@ defmodule ThistleTea.Game.World.Entity.Player.Stats do
 
   defp max_mana(%__MODULE__{}), do: 0
 
-  defdelegate melee_attack_power(class, level, strength, agility), to: LogicStats
-  defdelegate ranged_attack_power(class, level, agility), to: LogicStats
-  defdelegate stamina_health_bonus(stamina), to: LogicStats
-  defdelegate mana_bonus(intellect), to: LogicStats
+  defdelegate melee_attack_power(class, level, strength, agility), to: StatsCore
+  defdelegate ranged_attack_power(class, level, agility), to: StatsCore
+  defdelegate stamina_health_bonus(stamina), to: StatsCore
+  defdelegate mana_bonus(intellect), to: StatsCore
 
   defp power_fields(class) do
     %{

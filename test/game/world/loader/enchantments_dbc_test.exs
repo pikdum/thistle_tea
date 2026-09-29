@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.World.Loader.EnchantmentsDbcTest do
   alias ThistleTea.Game.Core.Item.ItemEnchantment
   alias ThistleTea.Game.World.Entity.Player.Enchantments
   alias ThistleTea.Game.World.ItemStore
-  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
+  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride
 
@@ -25,14 +25,14 @@ defmodule ThistleTea.Game.World.Loader.EnchantmentsDbcTest do
     test "uses only the striking hand and excludes feral weapon procs" do
       id = 998_207
       definition = %ItemEnchantment{id: id, effects: [%{type: 1, amount: 0, spell_id: 20_007}]}
-      :ets.insert(EnchantmentLoader, {{:enchantment, id}, definition})
+      :ets.insert(ItemEnchantmentLoader, {{:enchantment, id}, definition})
       weapon = ItemStore.create(%ItemTemplate{entry: 998_208, class: 2, delay: 3000})
       weapon = weapon |> Item.put_permanent_enchantment(id) |> ItemStore.put()
       character = %Character{player: %Player{mainhand: weapon.object.guid}, unit: %Unit{class: 11, auras: []}}
 
       on_exit(fn ->
         ItemStore.delete(weapon.object.guid)
-        :ets.delete(EnchantmentLoader, {:enchantment, id})
+        :ets.delete(ItemEnchantmentLoader, {:enchantment, id})
       end)
 
       assert [%{proc_spell: %{id: 20_007}, attack_time_ms: 3000}] = Enchantments.weapon_procs(character, :mainhand)
@@ -78,7 +78,7 @@ defmodule ThistleTea.Game.World.Loader.EnchantmentsDbcTest do
       assert spell.equipped_item_class == 4
       assert spell.equipped_item_inventory_type_mask == Bitwise.bsl(1, 9)
       assert Enum.any?(spell.effects, &(&1.type == :enchant_item and &1.misc_value == 41))
-      assert EnchantmentLoader.recipe(7418) == %{skill_id: 333, yellow: 70, gray: 110}
+      assert ItemEnchantmentLoader.recipe(7418) == %{skill_id: 333, yellow: 70, gray: 110}
     end
 
     test "real Minor Health and Greater Intellect equip spells derive player stats" do

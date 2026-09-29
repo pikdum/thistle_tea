@@ -27,7 +27,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestTurnInTest do
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Loader.BroadcastText
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
-  alias ThistleTea.Game.World.Loader.ItemProperty, as: PropertyLoader
+  alias ThistleTea.Game.World.Loader.ItemProperty, as: ItemPropertyLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
@@ -111,7 +111,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestTurnInTest do
   test "commits required-item removal and every reward together", context do
     property = %ItemProperty{id: 59_004, suffix: "of Stamina"}
 
-    :ets.insert(PropertyLoader, [
+    :ets.insert(ItemPropertyLoader, [
       {{:property, property.id}, property},
       {{:table, @reward1_entry}, [{property.id, 100.0}]}
     ])
@@ -122,8 +122,8 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestTurnInTest do
     )
 
     on_exit(fn ->
-      :ets.delete(PropertyLoader, {:property, property.id})
-      :ets.delete(PropertyLoader, {:table, @reward1_entry})
+      :ets.delete(ItemPropertyLoader, {:property, property.id})
+      :ets.delete(ItemPropertyLoader, {:table, @reward1_entry})
     end)
 
     required1 = ItemStore.create(@required_entry, owner: context.player_guid)

@@ -8,18 +8,18 @@ defmodule ThistleTea.Game.World.Spell.SpellFocus do
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Focus
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
 
   def find(%Character{} = entity, %Spell{required_focus_id: id}) when is_integer(id) and id > 0 do
     caster_radius = caster_radius(entity)
-    search_range = Focus.range(TemplateLoader.focus_radius(id), caster_radius)
+    search_range = Focus.range(GameObjectTemplateLoader.focus_radius(id), caster_radius)
 
     entity
     |> World.nearby_game_objects(search_range)
     |> Enum.sort_by(fn {guid, distance} -> {distance, guid} end)
     |> Enum.find_value(fn {guid, distance} ->
-      template = TemplateLoader.cached(Guid.entry(guid))
+      template = GameObjectTemplateLoader.cached(Guid.entry(guid))
 
       with {^id, radius} <- Focus.definition(template),
            true <- distance < Focus.range(radius, caster_radius),

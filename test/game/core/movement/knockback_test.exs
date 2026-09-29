@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Core.Movement.KnockbackTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Core.Aura, as: AuraData
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
@@ -170,7 +170,7 @@ defmodule ThistleTea.Game.Core.Movement.KnockbackTest do
       assert Enum.any?(events, &match?(%Effects.Knockback{horizontal_speed: 30.0, cos_angle: -1.0}, &1))
 
       for {type, launches?} <- [{:player_pull, false}, {:knockback, true}] do
-        immunity = %Holder{spell: %Spell{id: 10}, auras: [%AuraData{type: :effect_immunity, misc_value: type}]}
+        immunity = %Holder{spell: %Spell{id: 10}, auras: [%AuraCore{type: :effect_immunity, misc_value: type}]}
         protected = put_in(character.unit.auras, [immunity])
         {_, events} = SpellEffect.receive(protected, context, spell, 100)
         assert Enum.any?(events, &is_struct(&1, Effects.Knockback)) == launches?
@@ -193,7 +193,7 @@ defmodule ThistleTea.Game.Core.Movement.KnockbackTest do
       {_, events} = SpellEffect.receive(character, context, spell, 100)
       assert Enum.any?(events, &match?(%Effects.Knockback{horizontal_speed: 12.0, vertical_speed: 7.0}, &1))
 
-      immunity = %Holder{spell: %Spell{id: 10}, auras: [%AuraData{type: :effect_immunity, misc_value: :knockback}]}
+      immunity = %Holder{spell: %Spell{id: 10}, auras: [%AuraCore{type: :effect_immunity, misc_value: :knockback}]}
       protected = put_in(character.unit.auras, [immunity])
       {_, events} = SpellEffect.receive(protected, context, spell, 100)
       refute Enum.any?(events, &is_struct(&1, Effects.Knockback))
@@ -213,5 +213,5 @@ defmodule ThistleTea.Game.Core.Movement.KnockbackTest do
     }
   end
 
-  defp holder(id, type), do: %Holder{spell: %Spell{id: id}, caster_guid: 2, auras: [%AuraData{type: type}]}
+  defp holder(id, type), do: %Holder{spell: %Spell{id: id}, caster_guid: 2, auras: [%AuraCore{type: type}]}
 end

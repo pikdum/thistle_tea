@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Core.Spell.CastValidationTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Core.Aura, as: AuraData
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Combat.Reactive
   alias ThistleTea.Game.Core.Entity.Character
@@ -250,7 +250,7 @@ defmodule ThistleTea.Game.Core.Spell.CastValidationTest do
     %Holder{
       spell: %Spell{id: 5_000},
       caster_guid: 9,
-      auras: [%AuraData{index: 0, type: type}]
+      auras: [%AuraCore{index: 0, type: type}]
     }
   end
 

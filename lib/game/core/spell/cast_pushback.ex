@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Core.Spell.CastPushback do
   the pushback via talents/auras. Only player casters are affected; DoT
   ticks never push back.
   """
-  alias ThistleTea.Game.Core.Aura, as: AuraLogic
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -105,7 +105,7 @@ defmodule ThistleTea.Game.Core.Spell.CastPushback do
     entity = Effects.enqueue(entity, Effects.delay_area_effects(spell_id, reduction))
 
     cond do
-      target_guid in [0, nil, guid] -> AuraLogic.delay_source_spell(entity, spell_id, guid, reduction, now)
+      target_guid in [0, nil, guid] -> AuraCore.delay_source_spell(entity, spell_id, guid, reduction, now)
       is_integer(target_guid) -> Effects.enqueue(entity, Effects.delay_aura(guid, target_guid, spell_id, reduction))
       true -> entity
     end
@@ -117,7 +117,7 @@ defmodule ThistleTea.Game.Core.Spell.CastPushback do
     chance =
       entity
       |> Modifiers.value(spell, :not_lose_casting_time, 100)
-      |> Kernel.+(AuraLogic.flat_amount(entity, :reduce_pushback))
+      |> Kernel.+(AuraCore.flat_amount(entity, :reduce_pushback))
       |> Kernel.-(100)
       |> round()
 

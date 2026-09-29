@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.Player.TalentsTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Core.Aura, as: AuraLogic
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentsTest do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Pet.Companion.EntityRef
-  alias ThistleTea.Game.Core.Player.Talent, as: TalentData
+  alias ThistleTea.Game.Core.Player.Talent, as: TalentCore
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.Core.WorldRef
@@ -31,7 +31,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentsTest do
     spell_id = talent_id + 100_000
     rank_two_spell_id = spell_id + 1
     dependent_spell_id = rank_two_spell_id + 1
-    talent = %TalentData{id: talent_id, tab_id: 1, tier: 0, rank_spell_ids: [spell_id, rank_two_spell_id]}
+    talent = %TalentCore{id: talent_id, tab_id: 1, tier: 0, rank_spell_ids: [spell_id, rank_two_spell_id]}
     previous_tabs = :ets.lookup(TalentLoader, {:tabs, 1})
 
     :ets.insert(TalentLoader, {{:talent, talent_id}, talent})
@@ -94,7 +94,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentsTest do
         |> with_pet(pet_guid)
         |> then(fn state ->
           {character, _events} =
-            AuraLogic.apply_spell(state.character, pet_guid, state.character.unit.level, rank_one_aura, 1_000)
+            AuraCore.apply_spell(state.character, pet_guid, state.character.unit.level, rank_one_aura, 1_000)
 
           %{state | character: character}
         end)
@@ -103,7 +103,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentsTest do
 
       refute context.spell_id in learned.character.internal.spells
       assert context.rank_two_spell_id in learned.character.internal.spells
-      refute AuraLogic.has_spell?(learned.character, @spirit_bond_rank_one_aura)
+      refute AuraCore.has_spell?(learned.character, @spirit_bond_rank_one_aura)
 
       assert_receive {:"$gen_cast", {:remove_aura, @spirit_bond_rank_one_aura, ^pet_guid}}
 

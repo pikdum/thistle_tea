@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MailTest do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
-  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
+  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Mail, as: MailLoader
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.System.PostOffice
@@ -53,7 +53,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MailTest do
       Position.put(mailbox, :game_objects)
       item = ItemStore.create(%ItemTemplate{entry: id, inventory_type: 5, bonding: 2}, owner: sender)
       item = item |> Item.bind_on_equip() |> ItemStore.put()
-      :ets.insert(EnchantmentLoader, {{:enchantment, id}, %ItemEnchantment{id: id, flags: 1}})
+      :ets.insert(ItemEnchantmentLoader, {{:enchantment, id}, %ItemEnchantment{id: id, flags: 1}})
 
       character = %Character{
         object: %Object{guid: sender},
@@ -77,7 +77,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MailTest do
         ItemStore.delete(item.object.guid)
         :ets.delete(CharacterStore, id)
         :ets.delete(GameObjectTemplateLoader, id)
-        :ets.delete(EnchantmentLoader, {:enchantment, id})
+        :ets.delete(ItemEnchantmentLoader, {:enchantment, id})
         Position.remove(mailbox, :game_objects)
       end)
 

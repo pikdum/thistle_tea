@@ -9,12 +9,12 @@ defmodule ThistleTea.Game.World.System.OutdoorPvp.CaptureEnvironment do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
 
   def templates do
     Map.new(Plaguelands.towers(), fn {_id, definition} ->
-      %Template{} = template = Template.from_game_object(TemplateLoader.cached(definition.entry))
+      %Template{} = template = Template.from_game_object(GameObjectTemplateLoader.cached(definition.entry))
       {definition.entry, template}
     end)
   end
@@ -57,7 +57,7 @@ defmodule ThistleTea.Game.World.System.OutdoorPvp.CaptureEnvironment do
   end
 
   defp spawn_object(entry, position, rotation) do
-    %GameObjectTemplate{} = template = TemplateLoader.cached(entry)
+    %GameObjectTemplate{} = template = GameObjectTemplateLoader.cached(entry)
     entity = GameObject.build_summoned(template, WorldRef.open(0), position)
     object = %{entity.game_object | art_kit: Plaguelands.art_kit(nil)}
     object = rotate(object, rotation)

@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Movement do
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.TargetRef
   alias ThistleTea.Game.Core.Math
-  alias ThistleTea.Game.Core.Movement, as: MovementLogic
+  alias ThistleTea.Game.Core.Movement, as: MovementCore
   alias ThistleTea.Game.Core.Movement.Charge
   alias ThistleTea.Game.Core.Travel.HomeBind
   alias ThistleTea.Game.World
@@ -27,7 +27,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Movement do
         } = entity,
         %Effects.Charge{target_guid: target_guid} = effect
       ) do
-    with false <- Entity.dead?(entity) or MovementLogic.blocked?(entity) or target_guid == entity.object.guid,
+    with false <- Entity.dead?(entity) or MovementCore.blocked?(entity) or target_guid == entity.object.guid,
          {^world, tx, ty, tz} <- World.position(target_guid),
          speed when speed > 0 <- min((entity.movement_block.run_speed || 7.0) * 4, 24.0),
          path when is_list(path) and path != [] <-

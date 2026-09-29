@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.World.Combat.FeignDeathTest do
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Combat.Engagement
-  alias ThistleTea.Game.Core.Combat.FeignDeath, as: FeignLogic
+  alias ThistleTea.Game.Core.Combat.FeignDeath, as: FeignDeathCore
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.World.Combat.FeignDeathTest do
 
       Metadata.update(ctx.mob, %{no_spell_defense?: true})
       {character, _events} = SpellReception.receive(character, context, spell, 1_000)
-      assert FeignLogic.successful?(character)
+      assert FeignDeathCore.successful?(character)
       refute character.internal.in_combat
     end
 
@@ -54,7 +54,7 @@ defmodule ThistleTea.Game.World.Combat.FeignDeathTest do
       context = prepare(ctx, 9_800)
       assert context.feign_death.resisted?
       {character, events} = SpellEffect.receive(ctx.character, context, ctx.spell, 1_000)
-      refute FeignLogic.successful?(character)
+      refute FeignDeathCore.successful?(character)
       assert character.internal.threat_refs == ctx.character.internal.threat_refs
       assert Enum.any?(events, &is_struct(&1, Effects.FeignDeathResisted))
       assert [%Holder{cast_context: %{feign_death: attempt}}] = character.unit.auras

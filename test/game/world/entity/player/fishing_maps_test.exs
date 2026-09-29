@@ -21,7 +21,7 @@ defmodule ThistleTea.Game.World.Entity.Player.FishingMapsTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Player.Fishing
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
 
   @moduletag :namigator_maps
   @bobber_entry 35_591
@@ -103,11 +103,13 @@ defmodule ThistleTea.Game.World.Entity.Player.FishingMapsTest do
   end
 
   defp bobber_template(_context) do
-    previous = TemplateLoader.cached(@bobber_entry)
-    TemplateLoader.put(%GameObjectTemplate{entry: @bobber_entry, type: 17, size: 1.0, flags: 0, faction: 0})
+    previous = GameObjectTemplateLoader.cached(@bobber_entry)
+    GameObjectTemplateLoader.put(%GameObjectTemplate{entry: @bobber_entry, type: 17, size: 1.0, flags: 0, faction: 0})
 
     on_exit(fn ->
-      if previous, do: TemplateLoader.put(previous), else: :ets.delete(TemplateLoader, @bobber_entry)
+      if previous,
+        do: GameObjectTemplateLoader.put(previous),
+        else: :ets.delete(GameObjectTemplateLoader, @bobber_entry)
     end)
   end
 end

@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Enchantments do
   alias ThistleTea.Game.Core.Inventory
   alias ThistleTea.Game.Core.Inventory.Batch
   alias ThistleTea.Game.Core.Inventory.ChangeSet
-  alias ThistleTea.Game.Core.Item.Enchantments, as: EnchantmentLogic
+  alias ThistleTea.Game.Core.Item.Enchantments, as: EnchantmentsCore
   alias ThistleTea.Game.Core.Item.ItemUse
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Time
@@ -34,7 +34,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Enchantments do
       ) do
     with {bag, slot} <- Inventory.find_position(character.player, guid, &ItemStore.get/1),
          %Item{} = item <- ItemStore.get(guid),
-         :ok <- EnchantmentLogic.validate_item(character, spell, item),
+         :ok <- EnchantmentsCore.validate_item(character, spell, item),
          true <- not is_nil(ItemEnchantmentLoader.get(enchantment_id)),
          true <- tools_present?(character, spell),
          {:ok, changes} <- plan_costs(character, spell, cast_item_guid),
@@ -94,7 +94,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Enchantments do
   end
 
   defp advance_skill(character, spell, nil) do
-    EnchantmentLogic.skill_up(character, ItemEnchantmentLoader.recipe(spell.id), :rand.uniform(100) - 1)
+    EnchantmentsCore.skill_up(character, ItemEnchantmentLoader.recipe(spell.id), :rand.uniform(100) - 1)
   end
 
   defp advance_skill(character, _spell, _cast_item_guid), do: character
@@ -114,7 +114,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Enchantments do
       ) do
     with %Item{} = item <- ItemStore.get(item_guid),
          {_bag, _slot} = position <- Inventory.find_position(character.player, item_guid, &ItemStore.get/1),
-         :ok <- EnchantmentLogic.validate_item(character, spell, item),
+         :ok <- EnchantmentsCore.validate_item(character, spell, item),
          true <- not is_nil(ItemEnchantmentLoader.get(enchantment_id)),
          true <- tools_present?(character, spell),
          {:ok, changes} <- plan_costs(character, spell, cast_item_guid),

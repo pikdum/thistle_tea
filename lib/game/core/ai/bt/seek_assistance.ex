@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Core.AI.BT.SeekAssistance do
 
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Blackboard
-  alias ThistleTea.Game.Core.AI.BT.Blackboard.Assistance, as: Memory
+  alias ThistleTea.Game.Core.AI.BT.Blackboard.Assistance, as: AssistanceMemory
   alias ThistleTea.Game.Core.AI.BT.Context
   alias ThistleTea.Game.Core.AI.BT.Navigation
   alias ThistleTea.Game.Core.Combat.Assistance
@@ -13,7 +13,10 @@ defmodule ThistleTea.Game.Core.AI.BT.SeekAssistance do
   alias ThistleTea.Game.Core.Movement.ControlMovement
   alias ThistleTea.Game.Core.Movement.Fear
 
-  def maintain(%Mob{internal: %{blackboard: %Blackboard{assistance: %Memory{} = memory} = blackboard}} = mob, context) do
+  def maintain(
+        %Mob{internal: %{blackboard: %Blackboard{assistance: %AssistanceMemory{} = memory} = blackboard}} = mob,
+        context
+      ) do
     cond do
       mob.internal.in_combat != true or mob.unit.target != memory.enemy_guid or
         not Navigation.target_alive_same_map?(mob, memory.enemy_guid, context) or ControlMovement.active?(mob) ->
@@ -33,7 +36,11 @@ defmodule ThistleTea.Game.Core.AI.BT.SeekAssistance do
 
   def maintain(entity, _context), do: entity
 
-  def tick(%Mob{} = mob, %Blackboard{assistance: %Memory{} = memory} = blackboard, %Context{now: now} = context) do
+  def tick(
+        %Mob{} = mob,
+        %Blackboard{assistance: %AssistanceMemory{} = memory} = blackboard,
+        %Context{now: now} = context
+      ) do
     cond do
       Fear.blocked?(mob) ->
         {BT.running(500, :assistance), mob, blackboard}

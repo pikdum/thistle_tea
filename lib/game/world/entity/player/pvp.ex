@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Pvp do
 
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Honor.Protection
-  alias ThistleTea.Game.Core.Pvp, as: PvpLogic
+  alias ThistleTea.Game.Core.Pvp, as: PvpCore
   alias ThistleTea.Game.Core.Realm
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World.CharacterStore
@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Pvp do
 
   def toggle(%{ready: true, character: %Character{} = character} = state, desired)
       when desired in [true, false, :toggle] do
-    apply_transition(state, PvpLogic.toggle(character, desired, Time.now()))
+    apply_transition(state, PvpCore.toggle(character, desired, Time.now()))
   end
 
   def toggle(state, _desired), do: state
@@ -39,7 +39,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Pvp do
     area = Exploration.area(area_id)
 
     if zone != nil or battleground?(character) do
-      character = PvpLogic.territory(character, zone, area, Realm.pvp_rules(), battleground?(character), Time.now())
+      character = PvpCore.territory(character, zone, area, Realm.pvp_rules(), battleground?(character), Time.now())
       apply_transition(state, character)
     else
       state

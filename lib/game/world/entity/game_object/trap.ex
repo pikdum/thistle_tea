@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject.Trap do
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Focus
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Reaction
@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject.Trap do
   end
 
   def linked_guid(%GameObject{} = object) do
-    case TemplateLoader.cached(object.object.entry) do
+    case GameObjectTemplateLoader.cached(object.object.entry) do
       %GameObjectTemplate{} = template -> find_linked(object, GameObjectTemplate.linked_entry(template))
       _ -> nil
     end

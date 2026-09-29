@@ -3,12 +3,12 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellEnvironment do
 
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
-  alias ThistleTea.Game.Core.Environment.SpellEnvironment, as: EnvironmentLogic
+  alias ThistleTea.Game.Core.Environment.SpellEnvironment, as: SpellEnvironmentCore
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Spell.SpellEnvironment, as: TerrainEnvironment
 
-  def restore(%Character{} = character), do: character |> refresh() |> EnvironmentLogic.reconcile(Time.now())
+  def restore(%Character{} = character), do: character |> refresh() |> SpellEnvironmentCore.reconcile(Time.now())
 
   def reconcile(state, options \\ [])
 
@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellEnvironment do
         refresh(character, options)
       end
 
-    character = EnvironmentLogic.reconcile(character, Keyword.get_lazy(options, :now, &Time.now/0))
+    character = SpellEnvironmentCore.reconcile(character, Keyword.get_lazy(options, :now, &Time.now/0))
     %{state | character: character, spell_environment_position: position}
   end
 

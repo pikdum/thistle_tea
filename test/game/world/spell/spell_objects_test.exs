@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.World.Spell.SpellObjectsTest do
   alias ThistleTea.Game.World.Entity.EffectResolver
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.EventSink.Context
-  alias ThistleTea.Game.World.Entity.GameObject, as: ObjectServer
+  alias ThistleTea.Game.World.Entity.GameObject, as: GameObjectServer
   alias ThistleTea.Game.World.Loader.SpellObjectTarget
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Spell.SpellObjects
@@ -265,7 +265,7 @@ defmodule ThistleTea.Game.World.Spell.SpellObjectsTest do
   defp spawn_object(entry, world, {x, y, z}) do
     template = %GameObjectTemplate{entry: entry, type: 0, size: 1.0, flags: 0, display_id: 1, faction: 0}
     object = GameObject.build_summoned(template, world, {x, y, z, 0.0})
-    start_supervised!({ObjectServer, object}, id: object.object.guid)
+    start_supervised!({GameObjectServer, object}, id: object.object.guid)
     object.object.guid
   end
 end

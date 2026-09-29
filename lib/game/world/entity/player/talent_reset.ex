@@ -19,7 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentReset do
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Pet.Companion.EntityRef
   alias ThistleTea.Game.Core.Player.TalentReset, as: ResetPrice
-  alias ThistleTea.Game.Core.Player.Talents, as: TalentLogic
+  alias ThistleTea.Game.Core.Player.Talents, as: TalentsCore
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Network.Message
@@ -80,7 +80,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentReset do
   def complete(%State{} = state, _trainer), do: %{state | talent_reset_offer: nil}
 
   defp reset(%State{character: character} = state, trainer, now) do
-    with [_ | _] <- TalentLogic.known_talent_spell_ids(character, TalentLoader),
+    with [_ | _] <- TalentsCore.known_talent_spell_ids(character, TalentLoader),
          {:ok, history, money} <- ResetPrice.purchase(character.internal.talent_reset, character.player.coinage, now) do
       {character, events} = Aura.remove_aura_types(character, [:feign_death], now)
 

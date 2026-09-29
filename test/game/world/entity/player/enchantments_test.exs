@@ -21,7 +21,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EnchantmentsTest do
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
-  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
+  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
 
   @enchant 998_201
   @spell 998_202
@@ -111,11 +111,11 @@ defmodule ThistleTea.Game.World.Entity.Player.EnchantmentsTest do
       )
 
     :ets.insert(
-      EnchantmentLoader,
+      ItemEnchantmentLoader,
       {{:enchantment, @enchant}, %ItemEnchantment{id: @enchant, effects: [%{type: 5, spell_id: 1, amount: 5}]}}
     )
 
-    :ets.insert(EnchantmentLoader, {{:recipe, @spell}, %{skill_id: 333, yellow: 70, gray: 110}})
+    :ets.insert(ItemEnchantmentLoader, {{:recipe, @spell}, %{skill_id: 333, yellow: 70, gray: 110}})
     player = Inventory.equip(%Player{inv1: dust.object.guid, skills: %{333 => %{value: 1, max: 75}}}, :chest, item)
 
     character = %Character{
@@ -136,8 +136,8 @@ defmodule ThistleTea.Game.World.Entity.Player.EnchantmentsTest do
 
     on_exit(fn ->
       Enum.each([item.object.guid, dust.object.guid], &ItemStore.delete/1)
-      :ets.delete(EnchantmentLoader, {:enchantment, @enchant})
-      :ets.delete(EnchantmentLoader, {:recipe, @spell})
+      :ets.delete(ItemEnchantmentLoader, {:enchantment, @enchant})
+      :ets.delete(ItemEnchantmentLoader, {:recipe, @spell})
       :ets.delete(CharacterStore, guid)
     end)
 

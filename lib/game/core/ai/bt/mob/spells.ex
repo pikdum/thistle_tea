@@ -17,8 +17,8 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.Spells do
   alias ThistleTea.Game.Core.AI.BT.Pet.Autocast
   alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.AI.CreatureSpellList
-  alias ThistleTea.Game.Core.Aura, as: AuraLogic
-  alias ThistleTea.Game.Core.Combat, as: CombatLogic
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
+  alias ThistleTea.Game.Core.Combat, as: CombatCore
   alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity
@@ -442,7 +442,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.Spells do
         _spell,
         %Context{}
       ) do
-    if !AuraLogic.has_spell?(state, missing_buff_spell_id(entry)), do: guid
+    if !AuraCore.has_spell?(state, missing_buff_spell_id(entry)), do: guid
   end
 
   def resolve_target(_state, _entry, _spell, %Context{}), do: nil
@@ -548,7 +548,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.Spells do
         false
 
       CreatureSpell.flag?(entry, :aura_not_present) and target_guid == guid ->
-        not AuraLogic.has_spell?(state, entry.spell_id)
+        not AuraCore.has_spell?(state, entry.spell_id)
 
       CreatureSpell.flag?(entry, :only_in_melee) ->
         in_melee_range?(state, target_guid, context)
@@ -566,7 +566,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.Spells do
   defp in_melee_range?(state, target_guid, %Context{perception: perception}) do
     case Perception.distance(perception, target_guid) do
       distance when is_number(distance) ->
-        distance <= CombatLogic.melee_reach(own_combat_reach(state), target_combat_reach(target_guid, perception))
+        distance <= CombatCore.melee_reach(own_combat_reach(state), target_combat_reach(target_guid, perception))
 
       _ ->
         false

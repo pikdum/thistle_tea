@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.AuraCapacityDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Core.Aura, as: AuraData
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Aura.Priority
   alias ThistleTea.Game.Core.Aura.UnitSync
@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.World.Loader.AuraCapacityDbcTest do
             {6136, 4}
           ] do
         spell = SpellLoader.load(id)
-        auras = Enum.map(spell.effects, &%AuraData{type: &1.aura})
+        auras = Enum.map(spell.effects, &%AuraCore{type: &1.aura})
         assert Priority.value(%Holder{spell: spell, auras: auras, negative?: true}, 1) == priority
       end
     end

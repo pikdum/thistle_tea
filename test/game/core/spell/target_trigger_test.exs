@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Core.Spell.TargetTriggerTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Core.Aura, as: AuraData
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Combat.ComboPoints
   alias ThistleTea.Game.Core.Effects
@@ -100,7 +100,7 @@ defmodule ThistleTea.Game.Core.Spell.TargetTriggerTest do
       {_, events} = SpellEffect.receive(victim, %{context | hit_outcome: :resist}, spell, 1_000)
       assert triggers(events) == []
 
-      immunity = %Holder{spell: %Spell{id: 642}, auras: [%AuraData{type: :school_immunity, misc_value: 127}]}
+      immunity = %Holder{spell: %Spell{id: 642}, auras: [%AuraCore{type: :school_immunity, misc_value: 127}]}
       immune = %{victim | unit: %{victim.unit | auras: [immunity]}}
       {_, events} = SpellEffect.receive(immune, context, spell, 1_000)
       assert triggers(events) == []
@@ -118,7 +118,7 @@ defmodule ThistleTea.Game.Core.Spell.TargetTriggerTest do
     end
 
     test "a reflected spell triggers only after its reflected impact succeeds", %{caster: caster, victim: victim} do
-      reflection = %Holder{spell: %Spell{id: 123}, auras: [%AuraData{type: :reflect_spells, amount: 100}]}
+      reflection = %Holder{spell: %Spell{id: 123}, auras: [%AuraCore{type: :reflect_spells, amount: 100}]}
       victim = %{victim | unit: %{victim.unit | auras: [reflection]}}
       spell = %{strike() | dmg_class: 1}
       context = CastContext.from_caster(caster, spell, 2)
@@ -186,7 +186,7 @@ defmodule ThistleTea.Game.Core.Spell.TargetTriggerTest do
     %Holder{
       spell: %Spell{id: 14_179, spell_family: 8, effects: [%Effect{index: 0, points_per_combo: points}]},
       auras: [
-        %AuraData{index: 0, type: :add_target_trigger, amount: amount, class_mask: mask, trigger_spell_id: 14_181}
+        %AuraCore{index: 0, type: :add_target_trigger, amount: amount, class_mask: mask, trigger_spell_id: 14_181}
       ]
     }
   end

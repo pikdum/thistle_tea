@@ -19,7 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentResetTest do
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Pet.Companion.EntityRef
   alias ThistleTea.Game.Core.Player.Talent
-  alias ThistleTea.Game.Core.Player.Talents, as: TalentLogic
+  alias ThistleTea.Game.Core.Player.Talents, as: TalentsCore
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Spell.Effect
@@ -125,8 +125,8 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentResetTest do
       trainer: trainer
     } do
       assert state.character.unit.stamina == 30
-      assert TalentLogic.spent_points(state.character, TalentLoader) == 1
-      assert TalentLogic.unspent(state.character, TalentLoader) == 40
+      assert TalentsCore.spent_points(state.character, TalentLoader) == 1
+      assert TalentsCore.unspent(state.character, TalentLoader) == 40
       completed = state |> TalentReset.confirm(trainer) |> TalentReset.complete(trainer)
       character = completed.character
       assert character.player.coinage == 90_000

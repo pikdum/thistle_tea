@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Spellcasting do
   alias ThistleTea.Game.Core.Combat.WeaponDamage
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
-  alias ThistleTea.Game.Core.Entity.Item, as: DataItem
+  alias ThistleTea.Game.Core.Entity.Item, as: ItemCore
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Inventory
   alias ThistleTea.Game.Core.Item.Enchantments
@@ -355,7 +355,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Spellcasting do
 
   defp cast_item_id(guid) when is_integer(guid) do
     case ItemStore.get(guid) do
-      %DataItem{object: %{entry: entry}} -> entry
+      %ItemCore{object: %{entry: entry}} -> entry
       _ -> 0
     end
   end
@@ -491,8 +491,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Spellcasting do
 
   defp owned_item_template(%Character{player: player}, item_guid) when is_integer(item_guid) do
     with {_bag, _slot} <- Inventory.find_position(player, item_guid, &ItemStore.get/1),
-         %DataItem{} = item <- ItemStore.get(item_guid) do
-      DataItem.template(item)
+         %ItemCore{} = item <- ItemStore.get(item_guid) do
+      ItemCore.template(item)
     else
       _ -> nil
     end

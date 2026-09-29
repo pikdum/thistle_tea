@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
   alias ThistleTea.Game.Core.AI.BT.Detection
   alias ThistleTea.Game.Core.AI.BT.Navigation
   alias ThistleTea.Game.Core.Aura
-  alias ThistleTea.Game.Core.Combat, as: CombatLogic
+  alias ThistleTea.Game.Core.Combat, as: CombatCore
   alias ThistleTea.Game.Core.Combat.AttackSchool
   alias ThistleTea.Game.Core.Combat.AttackTable
   alias ThistleTea.Game.Core.Combat.CombatControl
@@ -120,10 +120,10 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
   end
 
   defp perform_main_hand(state, target, blackboard, true, now) do
-    speed = CombatLogic.attack_speed_ms(state)
+    speed = CombatCore.attack_speed_ms(state)
 
     blackboard =
-      if CombatLogic.offhand_damage_range(state),
+      if CombatCore.offhand_damage_range(state),
         do: delay_nearby_attack(blackboard, :next_offhand_attack_at, now),
         else: blackboard
 
@@ -133,7 +133,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
   defp perform_main_hand(state, _target, blackboard, false, _now), do: {state, blackboard}
 
   defp perform_offhand(state, target, blackboard, true, now) do
-    speed = CombatLogic.offhand_attack_speed_ms(state)
+    speed = CombatCore.offhand_attack_speed_ms(state)
     blackboard = delay_nearby_attack(blackboard, :next_attack_at, now)
 
     {send_offhand_attack(state, target), Blackboard.put_next_at(blackboard, :next_offhand_attack_at, speed, now)}
@@ -151,7 +151,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
     delays = [Blackboard.delay_until(blackboard, :next_attack_at, now)]
 
     delays =
-      if CombatLogic.offhand_damage_range(state) do
+      if CombatCore.offhand_damage_range(state) do
         [Blackboard.delay_until(blackboard, :next_offhand_attack_at, now) | delays]
       else
         delays
@@ -171,7 +171,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
 
   defp maybe_start_melee_attack(%{object: %{guid: guid}} = state, target, %Blackboard{} = blackboard)
        when is_integer(target) do
-    state = Effects.enqueue(state, CombatLogic.attack_start(guid, target))
+    state = Effects.enqueue(state, CombatCore.attack_start(guid, target))
     combat = %{blackboard.combat | attack_started: true}
     {state, %{blackboard | combat: combat}}
   end
@@ -187,7 +187,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
     blackboard = delay_ready_attack(blackboard, :next_attack_at, now)
 
     blackboard =
-      if CombatLogic.offhand_damage_range(state),
+      if CombatCore.offhand_damage_range(state),
         do: delay_ready_attack(blackboard, :next_offhand_attack_at, now),
         else: blackboard
 
@@ -243,7 +243,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
       target = melee_target(state, blackboard)
       state = Enum.reduce(1..count, state, fn _attack, entity -> send_white_swing(entity, target, true) end)
       blackboard = %{blackboard | combat: %{blackboard.combat | extra_attacks: 0}}
-      blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, CombatLogic.attack_speed_ms(state), context.now)
+      blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, CombatCore.attack_speed_ms(state), context.now)
       {:failure, state, blackboard}
     else
       {:failure, state, blackboard}
@@ -303,25 +303,25 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
   defp melee_target(_entity, _blackboard), do: nil
 
   defp send_white_swing(state, target, extra_attack? \\ false) do
-    attack = state |> melee_attack_payload() |> Map.put(:extra_attack?, extra_attack?) |> CombatLogic.finalize_attack()
+    attack = state |> melee_attack_payload() |> Map.put(:extra_attack?, extra_attack?) |> CombatCore.finalize_attack()
 
     Effects.enqueue(state, Effects.deliver_attack(target, attack))
   end
 
   defp send_offhand_attack(state, target) do
-    {min_damage, max_damage} = CombatLogic.offhand_damage_range(state)
+    {min_damage, max_damage} = CombatCore.offhand_damage_range(state)
 
     attack =
       state
       |> melee_attack_payload(:offhand)
       |> Map.merge(%{min_damage: min_damage, max_damage: max_damage, offhand?: true})
-      |> CombatLogic.finalize_attack()
+      |> CombatCore.finalize_attack()
 
     Effects.enqueue(state, Effects.deliver_attack(target, attack))
   end
 
   defp offhand_ready?(state, blackboard, now) do
-    not is_nil(CombatLogic.offhand_damage_range(state)) and
+    not is_nil(CombatCore.offhand_damage_range(state)) and
       Blackboard.ready_for?(blackboard, :next_offhand_attack_at, now)
   end
 
@@ -374,7 +374,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
   end
 
   defp melee_attack_payload(%{object: %{guid: guid}} = state, hand \\ :mainhand) do
-    {min_damage, max_damage} = CombatLogic.damage_range(state)
+    {min_damage, max_damage} = CombatCore.damage_range(state)
 
     %{
       caster: guid,
@@ -397,7 +397,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
   defp queue_queued_spell_go(state, _queued_spell, _target, _targets), do: state
 
   defp combat_reach(%{unit: unit}, target, perception) do
-    CombatLogic.melee_reach(combat_reach_value(unit), perceived_target_combat_reach(target, perception))
+    CombatCore.melee_reach(combat_reach_value(unit), perceived_target_combat_reach(target, perception))
   end
 
   defp combat_reach_value(%Unit{combat_reach: combat_reach}) when is_number(combat_reach) and combat_reach > 0 do

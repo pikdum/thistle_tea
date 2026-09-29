@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.World.Entity.Player.RestTest do
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
-  alias ThistleTea.Game.Core.Player.Rest, as: RestLogic
+  alias ThistleTea.Game.Core.Player.Rest, as: RestCore
   alias ThistleTea.Game.World.Entity.Player.Rest
 
   @moduletag :dbc_db
@@ -15,17 +15,17 @@ defmodule ThistleTea.Game.World.Entity.Player.RestTest do
       human = character(1)
       orc = character(2)
 
-      assert RestLogic.rest_type(Rest.evaluate_zone(human, 1519)) == :city
-      assert RestLogic.rest_type(Rest.evaluate_zone(orc, 1637)) == :city
-      refute RestLogic.resting?(Rest.evaluate_zone(human, 1637))
-      refute RestLogic.resting?(Rest.evaluate_zone(orc, 1519))
+      assert RestCore.rest_type(Rest.evaluate_zone(human, 1519)) == :city
+      assert RestCore.rest_type(Rest.evaluate_zone(orc, 1637)) == :city
+      refute RestCore.resting?(Rest.evaluate_zone(human, 1637))
+      refute RestCore.resting?(Rest.evaluate_zone(orc, 1519))
     end
 
     test "clears city rest when the destination zone is unknown or not a capital" do
-      rested = RestLogic.start(character(1), :city, 1_000)
+      rested = RestCore.start(character(1), :city, 1_000)
 
-      refute RestLogic.resting?(Rest.evaluate_zone(rested, 1977))
-      refute RestLogic.resting?(Rest.evaluate_zone(rested, nil))
+      refute RestCore.resting?(Rest.evaluate_zone(rested, 1977))
+      refute RestCore.resting?(Rest.evaluate_zone(rested, nil))
     end
   end
 

@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.Loader.CreatureGroupTest do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.Creature.CreatureGroup
-  alias ThistleTea.Game.World.Loader.CreatureGroup, as: Loader
+  alias ThistleTea.Game.World.Loader.CreatureGroup, as: CreatureGroupLoader
 
   describe "build/1" do
     test "indexes leaders and followers without applying the leader's own row flags" do
@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.World.Loader.CreatureGroupTest do
         {0, %Mangos.CreatureGroup{leader_guid: 1, member_guid: 2, dist: 4.0, angle: 1.5, flags: 2}}
       ]
 
-      catalog = Loader.build(rows)
+      catalog = CreatureGroupLoader.build(rows)
       assert catalog[{0, 1}] == catalog[{0, 2}]
       assert %CreatureGroup{flags: 2, members: %{2 => %{distance: 4.0, angle: 1.5}}} = catalog[{0, 1}]
       assert catalog[{1, 1}] == nil
@@ -22,15 +22,15 @@ defmodule ThistleTea.Game.World.Loader.CreatureGroupTest do
   describe "load_all/0" do
     @tag :vmangos_db
     test "loads the Den Mother and Thistle Cubs as one shared-evade group" do
-      assert :ok = Loader.load_all()
-      group = Loader.get(1, 37_523)
+      assert :ok = CreatureGroupLoader.load_all()
+      group = CreatureGroupLoader.get(1, 37_523)
       assert group.leader == 37_523
       assert group.flags == 6
-      assert group == Loader.get(1, 37_567)
+      assert group == CreatureGroupLoader.get(1, 37_567)
       assert CreatureGroup.member_ids(group) |> length() > 2
-      assert Loader.get(0, 37_523) == nil
-      assert Loader.formation_members(1, [37_523]) == []
-      assert Enum.sort(Loader.formation_members(0, [4_479])) == [4_479, 4_480, 4_481]
+      assert CreatureGroupLoader.get(0, 37_523) == nil
+      assert CreatureGroupLoader.formation_members(1, [37_523]) == []
+      assert Enum.sort(CreatureGroupLoader.formation_members(0, [4_479])) == [4_479, 4_480, 4_481]
     end
   end
 end

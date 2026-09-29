@@ -4,12 +4,12 @@ defmodule ThistleTea.Game.World.Entity.Player.Talents do
   through the pure talent rules, teaches the rank spell, applies any new
   passive auras, and resyncs the unspent-points field on the client.
   """
-  alias ThistleTea.Game.Core.Aura, as: AuraLogic
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Pet.Companion
-  alias ThistleTea.Game.Core.Player.Talents, as: LogicTalents
+  alias ThistleTea.Game.Core.Player.Talents, as: TalentsCore
   alias ThistleTea.Game.Core.Spell.Casting
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Network.UpdateObject
@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Talents do
   alias ThistleTea.Game.World.Outbound
 
   def learn(%{character: %Character{} = character} = state, talent_id, requested_rank) do
-    with {:ok, talent_spell_ids} <- LogicTalents.validate(character, talent_id, requested_rank, TalentLoader),
+    with {:ok, talent_spell_ids} <- TalentsCore.validate(character, talent_id, requested_rank, TalentLoader),
          {:ok, character, _events} <- Spells.learn(character, with_dependent_spells(talent_spell_ids)) do
       character = sync_pet_aura_links(state.character, character, Time.now())
       commit(state, character)
@@ -34,7 +34,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Talents do
   def learn(state, _talent_id, _requested_rank), do: state
 
   def reset(%{character: %Character{} = character} = state) do
-    case LogicTalents.known_talent_spell_ids(character, TalentLoader) do
+    case TalentsCore.known_talent_spell_ids(character, TalentLoader) do
       [] ->
         state
 
@@ -54,7 +54,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Talents do
   def reset(state), do: state
 
   def reset_if_overbudget(%{character: %Character{} = character} = state, level) when is_integer(level) do
-    if LogicTalents.spent_points(character, TalentLoader) > LogicTalents.total_points(level) do
+    if TalentsCore.spent_points(character, TalentLoader) > TalentsCore.total_points(level) do
       reset(state)
     else
       state
@@ -67,7 +67,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Talents do
     character =
       character
       |> Spells.apply_passives(Time.now())
-      |> LogicTalents.sync_points(TalentLoader)
+      |> TalentsCore.sync_points(TalentLoader)
 
     CharacterStore.put(character)
     Outbound.send_packet(UpdateObject.from_entity(character, :values))
@@ -80,7 +80,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Talents do
 
   defp remove_triggered_auras(character, spell_ids, now) do
     triggered_ids = Enum.flat_map(spell_ids, &TalentLoader.triggered_spell_ids/1)
-    {character, events} = AuraLogic.remove_spells(character, triggered_ids, now)
+    {character, events} = AuraCore.remove_spells(character, triggered_ids, now)
     Effects.enqueue(character, events)
   end
 
@@ -96,7 +96,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Talents do
 
         {character, local_events} =
           Enum.reduce(removed_ids, {character, []}, fn aura_id, {current, events} ->
-            {current, aura_events} = AuraLogic.remove_source_spell(current, aura_id, pet_guid, now)
+            {current, aura_events} = AuraCore.remove_source_spell(current, aura_id, pet_guid, now)
             {current, events ++ aura_events}
           end)
 

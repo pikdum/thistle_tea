@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.SpellFocusDbcTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.EffectResolver.Spells
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
 
   @moduletag :dbc_db
 
@@ -28,10 +28,10 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.SpellFocusDbcTest do
       assert [%Effects.SpellCastFailed{spell_id: 18, reason: :requires_spell_focus, required_focus_id: 1}] =
                Spells.resolve(caster, effect)
 
-      old_radius = :ets.lookup(TemplateLoader, {:focus_radius, 1})
+      old_radius = :ets.lookup(GameObjectTemplateLoader, {:focus_radius, 1})
 
       template =
-        TemplateLoader.put(%GameObjectTemplate{
+        GameObjectTemplateLoader.put(%GameObjectTemplate{
           entry: 951_020,
           type: 8,
           size: 1.0,
@@ -45,9 +45,9 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.SpellFocusDbcTest do
 
       on_exit(fn ->
         if Process.alive?(pid), do: World.stop_entity(pid)
-        :ets.delete(TemplateLoader, template.entry)
-        :ets.delete(TemplateLoader, {:focus_radius, 1})
-        :ets.insert(TemplateLoader, old_radius)
+        :ets.delete(GameObjectTemplateLoader, template.entry)
+        :ets.delete(GameObjectTemplateLoader, {:focus_radius, 1})
+        :ets.insert(GameObjectTemplateLoader, old_radius)
       end)
 
       assert Enum.any?(Spells.resolve(caster, effect), &is_struct(&1, Effects.DeliverSpell))

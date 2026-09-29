@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Distancing do
 
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Blackboard
-  alias ThistleTea.Game.Core.AI.BT.Blackboard.Distancing, as: Memory
+  alias ThistleTea.Game.Core.AI.BT.Blackboard.Distancing, as: DistancingMemory
   alias ThistleTea.Game.Core.AI.BT.Context
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
   alias ThistleTea.Game.Core.AI.BT.Navigation
@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Distancing do
       radius = distance + bounding_radius(Perception.metadata(perception, target_guid))
       destination = {tx + radius * :math.cos(angle), ty + radius * :math.sin(angle), tz}
 
-      memory = %Memory{
+      memory = %DistancingMemory{
         target_guid: target_guid,
         target_position: {tx, ty, tz},
         destination: destination,
@@ -70,16 +70,16 @@ defmodule ThistleTea.Game.Core.AI.BT.Distancing do
   def reject(%Mob{internal: %{blackboard: %Blackboard{} = blackboard}} = mob),
     do: %{mob | internal: %{mob.internal | blackboard: %{blackboard | distancing: nil}}}
 
-  def maintain(%Mob{internal: %{blackboard: %Blackboard{distancing: %Memory{} = memory}}} = mob, context) do
+  def maintain(%Mob{internal: %{blackboard: %Blackboard{distancing: %DistancingMemory{} = memory}}} = mob, context) do
     if interrupted?(mob, memory, context), do: cancel(mob, context.now), else: mob
   end
 
   def maintain(entity, _context), do: entity
 
-  def tick(%Mob{} = mob, %Blackboard{distancing: %Memory{started?: false}} = blackboard, _context),
+  def tick(%Mob{} = mob, %Blackboard{distancing: %DistancingMemory{started?: false}} = blackboard, _context),
     do: {BT.running(0, :navigation), mob, blackboard}
 
-  def tick(%Mob{} = mob, %Blackboard{distancing: %Memory{}} = blackboard, %Context{now: now}) do
+  def tick(%Mob{} = mob, %Blackboard{distancing: %DistancingMemory{}} = blackboard, %Context{now: now}) do
     if Movement.moving?(mob, now) do
       {BT.running(min(Movement.next_spatial_update_delay(mob, now), 500), :distancing), mob, blackboard}
     else
@@ -90,7 +90,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Distancing do
 
   def tick(entity, blackboard, _context), do: {:failure, entity, blackboard}
 
-  def target_guid(%{internal: %{blackboard: %Blackboard{distancing: %Memory{target_guid: guid}}}}), do: guid
+  def target_guid(%{internal: %{blackboard: %Blackboard{distancing: %DistancingMemory{target_guid: guid}}}}), do: guid
   def target_guid(_entity), do: nil
 
   def active?(entity), do: not is_nil(target_guid(entity))

@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.World.System.CreatureGroups do
   alias ThistleTea.Game.Core.Entity.Component.Internal.WaypointRoute
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.World.Loader.CreatureGroup, as: Catalog
+  alias ThistleTea.Game.World.Loader.CreatureGroup, as: CreatureGroupLoader
 
   require Logger
 
@@ -94,7 +94,7 @@ defmodule ThistleTea.Game.World.System.CreatureGroups do
        guids: %{},
        monitors: %{},
        formation_table: create_formation_table(opts),
-       catalog: Keyword.get(opts, :catalog, &Catalog.get/2)
+       catalog: Keyword.get(opts, :catalog, &CreatureGroupLoader.get/2)
      }}
   end
 

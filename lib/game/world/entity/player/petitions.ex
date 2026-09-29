@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
   alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Guild
-  alias ThistleTea.Game.Core.Guild.Petitions, as: PetitionLogic
+  alias ThistleTea.Game.Core.Guild.Petitions, as: PetitionsCore
   alias ThistleTea.Game.Core.Guild.Petitions.Petition
   alias ThistleTea.Game.Core.Inventory
   alias ThistleTea.Game.Core.Inventory.Batch
@@ -294,7 +294,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
   defp turn_in_owned(state, petition) do
     cond do
       GuildSystem.group_of(state.guid) != nil -> turn_in_result(state, :already_in_guild)
-      not PetitionLogic.complete?(petition) -> turn_in_result(state, :need_more)
+      not PetitionsCore.complete?(petition) -> turn_in_result(state, :need_more)
       true -> create_guild_from_petition(state, petition)
     end
   end
@@ -306,7 +306,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
          {:ok, group} <-
            GuildSystem.create_from_petition(
              Guilds.member(state.character),
-             PetitionLogic.signers(petition),
+             PetitionsCore.signers(petition),
              petition.name
            ) do
       state = InventoryUpdate.apply(state, {:ok, changes})

@@ -29,7 +29,7 @@ defmodule ThistleTea.Game.World.Spell.SpellLocationsTest do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EffectResolver
-  alias ThistleTea.Game.World.Entity.GameObject, as: ObjectServer
+  alias ThistleTea.Game.World.Entity.GameObject, as: GameObjectServer
   alias ThistleTea.Game.World.Entity.Player.Spellcasting
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Metadata
@@ -348,7 +348,7 @@ defmodule ThistleTea.Game.World.Spell.SpellLocationsTest do
   defp spawn_object(caster, entry, {x, y, z}) do
     template = %GameObjectTemplate{entry: entry, type: 0, size: 1.0, flags: 0, display_id: 1, faction: 0}
     object = GameObject.build_summoned(template, caster.internal.world, {x, y, z, +0.0})
-    start_supervised!({ObjectServer, object}, id: object.object.guid)
+    start_supervised!({GameObjectServer, object}, id: object.object.guid)
     object.object.guid
   end
 

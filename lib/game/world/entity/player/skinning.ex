@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Skinning do
   alias ThistleTea.Game.Core.Entity, as: EntityCore
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Inventory
-  alias ThistleTea.Game.Core.Profession.Skinning, as: SkinningLogic
+  alias ThistleTea.Game.Core.Profession.Skinning, as: SkinningCore
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.CharacterStore
@@ -25,10 +25,10 @@ defmodule ThistleTea.Game.World.Entity.Player.Skinning do
 
     with false <- EntityCore.dead?(character),
          true <- Visibility.can_see?(state, guid),
-         :ok <- SkinningLogic.validate(character, spell, target, count_item: count_item) do
+         :ok <- SkinningCore.validate(character, spell, target, count_item: count_item) do
       state = Looting.release(state)
 
-      case Entity.call(guid, {:skin_corpse, Looting.actor(state, guid), SkinningLogic.skill(character)}) do
+      case Entity.call(guid, {:skin_corpse, Looting.actor(state, guid), SkinningCore.skill(character)}) do
         {:ok, loot, level, rank} ->
           character = advance_skill(character, level, rank)
           Outbound.send_packet(%Message.SmsgLootResponse{guid: guid, loot: loot, loot_type: 2})
@@ -47,7 +47,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Skinning do
   end
 
   defp advance_skill(%Character{} = character, level, rank) do
-    case SkinningLogic.skill_up(character.player.skills, level, rank, :rand.uniform() * 100) do
+    case SkinningCore.skill_up(character.player.skills, level, rank, :rand.uniform() * 100) do
       {:gained, skills} ->
         character = %{character | player: %{character.player | skills: skills}}
         CharacterStore.put(character)

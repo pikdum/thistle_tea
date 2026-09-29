@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.World.Entity.Player.LiquidSpellsDbcTest do
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
-  alias ThistleTea.Game.Core.Environment.LiquidSpells, as: LiquidSpellLogic
+  alias ThistleTea.Game.Core.Environment.LiquidSpells, as: LiquidSpellsCore
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.Core.Terrain.Liquid
@@ -31,7 +31,7 @@ defmodule ThistleTea.Game.World.Entity.Player.LiquidSpellsDbcTest do
                context =
                LiquidSpells.context(character, liquid)
 
-      entered = LiquidSpellLogic.reconcile(character, context, 1000)
+      entered = LiquidSpellsCore.reconcile(character, context, 1000)
       assert entered.unit.strength == 10
       assert [holder] = entered.unit.auras
       assert holder.negative?

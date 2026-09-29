@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Core.GameObject.GameObjectActionsTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Core.Effects
-  alias ThistleTea.Game.Core.Entity.Component.GameObject, as: ObjectComponent
+  alias ThistleTea.Game.Core.Entity.Component.GameObject, as: GameObjectComponent
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.ObjectAction
   alias ThistleTea.Game.Core.Entity.GameObject
@@ -92,7 +92,7 @@ defmodule ThistleTea.Game.Core.GameObject.GameObjectActionsTest do
   defp door(_context) do
     %{
       door: %GameObject{
-        game_object: %ObjectComponent{type_id: 0, state: 1, flags: 0x20},
+        game_object: %GameObjectComponent{type_id: 0, state: 1, flags: 0x20},
         internal: %Internal{object_action: %ObjectAction{auto_close_ms: 3_000}}
       }
     }

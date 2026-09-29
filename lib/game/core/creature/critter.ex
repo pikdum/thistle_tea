@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.Core.Creature.Critter do
   """
 
   alias ThistleTea.Game.Core.AI.BT.Blackboard
-  alias ThistleTea.Game.Core.AI.BT.Blackboard.Critter, as: Memory
+  alias ThistleTea.Game.Core.AI.BT.Blackboard.Critter, as: CritterMemory
   alias ThistleTea.Game.Core.Combat.Engagement
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Mob
@@ -49,7 +49,7 @@ defmodule ThistleTea.Game.Core.Creature.Critter do
   defp start_escape(mob, source_guid, now) do
     %Engagement.Result{entity: mob} = Engagement.enter(mob, source_guid, now, selection: :preserve)
     blackboard = Blackboard.ensure(mob.internal.blackboard)
-    memory = blackboard.critter || %Memory{escape_at: now + @escape_ms, previous_running: mob.internal.running}
+    memory = blackboard.critter || %CritterMemory{escape_at: now + @escape_ms, previous_running: mob.internal.running}
     blackboard = %{blackboard | critter: %{memory | escape_at: now + @escape_ms}}
 
     {mob, blackboard} =

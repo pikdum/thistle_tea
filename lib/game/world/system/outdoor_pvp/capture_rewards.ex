@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.World.System.OutdoorPvp.CaptureRewards do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Graveyards
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon
 
@@ -58,7 +58,7 @@ defmodule ThistleTea.Game.World.System.OutdoorPvp.CaptureRewards do
   end
 
   defp build(%Spawn{kind: :game_object, entry: entry, position: position}) do
-    %GameObjectTemplate{} = template = TemplateLoader.cached(entry)
+    %GameObjectTemplate{} = template = GameObjectTemplateLoader.cached(entry)
     GameObject.build_summoned(template, WorldRef.open(0), position)
   end
 

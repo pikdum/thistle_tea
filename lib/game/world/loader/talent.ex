@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.World.Loader.Talent do
   import Ecto.Query
 
   alias ThistleTea.DB.DBC
-  alias ThistleTea.Game.Core.Player.Talent, as: TalentData
+  alias ThistleTea.Game.Core.Player.Talent, as: TalentCore
   alias ThistleTea.Game.Core.Player.TalentCatalog
   alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
 
@@ -81,7 +81,7 @@ defmodule ThistleTea.Game.World.Loader.Talent do
   @impl TalentCatalog
   def get(talent_id) when is_integer(talent_id) and talent_id > 0 do
     case :ets.lookup(__MODULE__, {:talent, talent_id}) do
-      [{_key, %TalentData{} = talent}] -> talent
+      [{_key, %TalentCore{} = talent}] -> talent
       _ -> nil
     end
   rescue
@@ -189,7 +189,7 @@ defmodule ThistleTea.Game.World.Loader.Talent do
   def dependent_spell_ids(_spell_id), do: []
 
   defp build(row) do
-    %TalentData{
+    %TalentCore{
       id: row.id,
       tab_id: row.tab,
       tier: row.tier || 0,
@@ -213,7 +213,7 @@ defmodule ThistleTea.Game.World.Loader.Talent do
     case by_spell(spell_id) do
       {talent_id, _tab, _rank} ->
         case get(talent_id) do
-          %TalentData{rank_spell_ids: ids} -> Enum.flat_map(ids, &cached_triggered_spell_ids/1) |> Enum.uniq()
+          %TalentCore{rank_spell_ids: ids} -> Enum.flat_map(ids, &cached_triggered_spell_ids/1) |> Enum.uniq()
           _ -> []
         end
 
@@ -248,7 +248,7 @@ defmodule ThistleTea.Game.World.Loader.Talent do
     |> Map.new(&{&1.id, &1.effects})
   end
 
-  defp rank_spell_variants(%TalentData{rank_spell_ids: rank_spell_ids}, successor_by_spell) do
+  defp rank_spell_variants(%TalentCore{rank_spell_ids: rank_spell_ids}, successor_by_spell) do
     canonical_ids = MapSet.new(rank_spell_ids)
 
     Enum.map(rank_spell_ids, fn spell_id ->
@@ -273,7 +273,7 @@ defmodule ThistleTea.Game.World.Loader.Talent do
     end
   end
 
-  defp cache_spell_lineage(rank_variants, %TalentData{} = talent) do
+  defp cache_spell_lineage(rank_variants, %TalentCore{} = talent) do
     Enum.with_index(rank_variants)
     |> Enum.each(fn {spell_ids, rank_index} ->
       Enum.each(spell_ids, fn spell_id ->

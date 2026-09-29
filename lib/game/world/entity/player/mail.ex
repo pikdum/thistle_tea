@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Inventory
   alias ThistleTea.Game.Core.Item.Enchantments
-  alias ThistleTea.Game.Core.Mail, as: DataMail
+  alias ThistleTea.Game.Core.Mail, as: MailCore
   alias ThistleTea.Game.Core.Party
   alias ThistleTea.Game.Core.Quest
   alias ThistleTea.Game.Core.Time
@@ -21,7 +21,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
   alias ThistleTea.Game.World.Entity.Player.Mail.ClientProjection
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
-  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
+  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Mail, as: MailLoader
   alias ThistleTea.Game.World.System.PostOffice
 
@@ -32,7 +32,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
 
   def open_session(%Character{internal: internal} = character, guid) when is_integer(guid) do
     {token, pending} = PostOffice.open(guid)
-    mailbox = DataMail.merge(internal.mailbox, pending)
+    mailbox = MailCore.merge(internal.mailbox, pending)
     character = CharacterStore.put(%{character | internal: %{internal | mailbox: mailbox}})
     PostOffice.acknowledge(guid, token, Enum.map(pending, & &1.id))
     {character, token}
@@ -73,7 +73,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
   def schedule_delivery(%{character: %Character{internal: %{mailbox: mailbox}}} = state) do
     if is_reference(state.mail_delivery_ref), do: Process.cancel_timer(state.mail_delivery_ref)
 
-    case DataMail.next_delivery(mailbox, Time.now()) do
+    case MailCore.next_delivery(mailbox, Time.now()) do
       nil ->
         %{state | mail_delivery_ref: nil}
 
@@ -89,26 +89,26 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
   def receive_delivery(
         %{guid: guid, mail_session_token: token, character: %Character{internal: internal} = character} = state,
         token,
-        %DataMail{} = mail
+        %MailCore{} = mail
       ) do
     if PostOffice.pending?(guid, token, mail.id) do
-      mailbox = DataMail.add(internal.mailbox, mail)
+      mailbox = MailCore.add(internal.mailbox, mail)
       character = CharacterStore.put(%{character | internal: %{internal | mailbox: mailbox}})
       PostOffice.acknowledge(guid, token, [mail.id])
       state = %{state | character: character}
-      if DataMail.visible?(mail, Time.now()), do: ClientProjection.received()
+      if MailCore.visible?(mail, Time.now()), do: ClientProjection.received()
       schedule_delivery(state)
     else
       state
     end
   end
 
-  def receive_delivery(state, _token, %DataMail{}), do: state
+  def receive_delivery(state, _token, %MailCore{}), do: state
 
   def delivery_ready(%{character: %Character{internal: %{mailbox: mailbox}}} = state, deliver_at) do
     now = Time.now()
 
-    if Enum.any?(mailbox, &(&1.deliver_at == deliver_at and DataMail.unread?(&1, now))) do
+    if Enum.any?(mailbox, &(&1.deliver_at == deliver_at and MailCore.unread?(&1, now))) do
       ClientProjection.received()
     end
 
@@ -123,7 +123,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
          :ok <- validate_cod(message),
          {:ok, inventory_result, item} <- detach_item(character, message.item_guid),
          :ok <- validate_item(item),
-         cost = DataMail.postage() + message.money,
+         cost = MailCore.postage() + message.money,
          true <- character.player.coinage >= cost do
       transfer_sent_item(item, recipient.object.guid)
 
@@ -158,7 +158,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
 
       mails =
         mailbox
-        |> DataMail.visible(now)
+        |> MailCore.visible(now)
         |> Enum.map(fn mail -> {mail, ItemStore.get(mail.item_guid)} end)
 
       ClientProjection.list(mails, now)
@@ -171,8 +171,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
 
   def take_money(%{ready: true, character: %Character{} = character} = state, message) do
     with :ok <- validate_mailbox(character, message.mailbox),
-         %DataMail{} = mail <- visible_mail(character, message.mail_id),
-         {:ok, money, mail} <- DataMail.take_money(mail),
+         %MailCore{} = mail <- visible_mail(character, message.mail_id),
+         {:ok, money, mail} <- MailCore.take_money(mail),
          true <- character.player.coinage <= @max_coinage - money do
       player = %{character.player | coinage: character.player.coinage + money}
       state = put_mail(state, mail)
@@ -193,8 +193,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
 
   def take_item(%{ready: true, character: %Character{} = character} = state, message) do
     with :ok <- validate_mailbox(character, message.mailbox),
-         %DataMail{} = mail <- visible_mail(character, message.mail_id),
-         {:ok, item_guid, cod, updated_mail} <- DataMail.take_item(mail),
+         %MailCore{} = mail <- visible_mail(character, message.mail_id),
+         {:ok, item_guid, cod, updated_mail} <- MailCore.take_item(mail),
          %Item{} = item <- ItemStore.get(item_guid),
          true <- character.player.coinage >= cod,
          {:ok, result, placement} <- Inventory.store(character.player, state.guid, item, &ItemStore.get/1) do
@@ -227,8 +227,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
 
   def mark_read(%{ready: true, character: %Character{} = character} = state, message) do
     with :ok <- validate_mailbox(character, message.mailbox),
-         %DataMail{} = mail <- visible_mail(character, message.mail_id) do
-      put_mail(state, DataMail.mark_read(mail, Time.now()))
+         %MailCore{} = mail <- visible_mail(character, message.mail_id) do
+      put_mail(state, MailCore.mark_read(mail, Time.now()))
     else
       _ -> state
     end
@@ -238,8 +238,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
 
   def return_to_sender(%{ready: true, guid: guid, character: %Character{} = character} = state, message) do
     with :ok <- validate_mailbox(character, message.mailbox),
-         %DataMail{} = mail <- visible_mail(character, message.mail_id),
-         {:ok, attrs} <- DataMail.return_attrs(mail, guid, Time.now()) do
+         %MailCore{} = mail <- visible_mail(character, message.mail_id),
+         {:ok, attrs} <- MailCore.return_attrs(mail, guid, Time.now()) do
       attrs = apply_return_delay(attrs, character, mail)
       transfer_returned_item(mail)
 
@@ -262,8 +262,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
 
   def delete(%{ready: true, character: %Character{} = character} = state, message) do
     with :ok <- validate_mailbox(character, message.mailbox),
-         %DataMail{} = mail <- visible_mail(character, message.mail_id),
-         true <- DataMail.deletable?(mail) do
+         %MailCore{} = mail <- visible_mail(character, message.mail_id),
+         true <- MailCore.deletable?(mail) do
       if mail.item_guid > 0, do: ItemStore.delete(mail.item_guid)
       state = remove_mail(state, mail.id)
       ClientProjection.result(mail.id, :deleted, :ok)
@@ -276,11 +276,11 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
   def delete(state, _message), do: state
 
   def query_text(%{character: %Character{} = character} = state, message) do
-    mail = DataMail.find(character.internal.mailbox, message.mail_id)
+    mail = MailCore.find(character.internal.mailbox, message.mail_id)
 
     text =
       case mail do
-        %DataMail{id: id, body: body} when id == message.item_text_id -> body
+        %MailCore{id: id, body: body} when id == message.item_text_id -> body
         _ -> ""
       end
 
@@ -292,7 +292,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
 
   def create_text_item(%{ready: true, character: %Character{} = character} = state, message) do
     with :ok <- validate_mailbox(character, message.mailbox),
-         %DataMail{body: body} = mail when body != "" <- visible_mail(character, message.mail_id) do
+         %MailCore{body: body} = mail when body != "" <- visible_mail(character, message.mail_id) do
       store_text_item(state, mail)
     else
       _ -> state
@@ -302,7 +302,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
   def create_text_item(state, _message), do: state
 
   def query_next_time(%{character: %Character{internal: %{mailbox: mailbox}}} = state) do
-    unread_mails = if DataMail.has_unread?(mailbox, Time.now()), do: 0.0, else: -1.0
+    unread_mails = if MailCore.has_unread?(mailbox, Time.now()), do: 0.0, else: -1.0
     ClientProjection.next_delivery(unread_mails)
     state
   end
@@ -372,7 +372,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
   defp validate_item(%Item{} = item) do
     if Bitwise.band(Item.template(item).flags || 0, 0x02) == 0 and
          not Item.loot_generated?(item) and
-         not Enchantments.bound?(item, Time.now(), &EnchantmentLoader.get/1),
+         not Enchantments.bound?(item, Time.now(), &ItemEnchantmentLoader.get/1),
        do: :ok,
        else: {:error, :invalid_item}
   end
@@ -388,7 +388,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
       item_guid: if(item, do: item.object.guid, else: 0),
       money: message.money,
       cod: message.cod,
-      checked: if(message.body == "", do: DataMail.checked_copied(), else: 0)
+      checked: if(message.body == "", do: MailCore.checked_copied(), else: 0)
     }
   end
 
@@ -401,11 +401,11 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
   defp restore_sent_item(nil), do: :ok
   defp restore_sent_item(%Item{} = item), do: ItemStore.put(item)
 
-  defp transfer_returned_item(%DataMail{item_guid: item_guid, sender: sender}) when item_guid > 0 do
+  defp transfer_returned_item(%MailCore{item_guid: item_guid, sender: sender}) when item_guid > 0 do
     transfer_item_owner(item_guid, sender)
   end
 
-  defp transfer_returned_item(%DataMail{}), do: :ok
+  defp transfer_returned_item(%MailCore{}), do: :ok
 
   defp transfer_item_owner(item_guid, owner) when is_integer(item_guid) and item_guid > 0 do
     case ItemStore.get(item_guid) do
@@ -416,49 +416,49 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
 
   defp transfer_item_owner(_item_guid, _owner), do: :ok
 
-  defp apply_return_delay(attrs, %Character{} = receiver, %DataMail{sender: sender, item_guid: item_guid})
+  defp apply_return_delay(attrs, %Character{} = receiver, %MailCore{sender: sender, item_guid: item_guid})
        when item_guid > 0 do
     case CharacterStore.get(Guid.low_guid(sender)) do
       %Character{account_id: account_id} when account_id == receiver.account_id -> attrs
-      %Character{} -> %{attrs | deliver_at: Time.now() + DataMail.delivery_delay_ms()}
+      %Character{} -> %{attrs | deliver_at: Time.now() + MailCore.delivery_delay_ms()}
       nil -> attrs
     end
   end
 
-  defp apply_return_delay(attrs, %Character{}, %DataMail{}), do: attrs
+  defp apply_return_delay(attrs, %Character{}, %MailCore{}), do: attrs
 
   defp visible_mail(%Character{internal: %{mailbox: mailbox}}, id) do
-    case DataMail.find(mailbox, id) do
-      %DataMail{} = mail -> if DataMail.visible?(mail, Time.now()), do: mail
+    case MailCore.find(mailbox, id) do
+      %MailCore{} = mail -> if MailCore.visible?(mail, Time.now()), do: mail
       nil -> nil
     end
   end
 
-  defp put_mail(%{character: %Character{internal: internal} = character} = state, %DataMail{} = mail) do
-    mailbox = DataMail.replace(internal.mailbox, mail)
+  defp put_mail(%{character: %Character{internal: internal} = character} = state, %MailCore{} = mail) do
+    mailbox = MailCore.replace(internal.mailbox, mail)
     %{state | character: %{character | internal: %{internal | mailbox: mailbox}}}
   end
 
   defp remove_mail(%{character: %Character{internal: internal} = character} = state, id) do
-    mailbox = DataMail.remove(internal.mailbox, id)
+    mailbox = MailCore.remove(internal.mailbox, id)
     %{state | character: %{character | internal: %{internal | mailbox: mailbox}}}
   end
 
-  defp store_text_item(state, %DataMail{} = mail) do
+  defp store_text_item(state, %MailCore{} = mail) do
     case ItemStore.create(@body_item_entry, owner: state.guid) do
       %Item{} = item -> store_created_text_item(state, mail, item)
       nil -> state
     end
   end
 
-  defp store_created_text_item(state, %DataMail{} = mail, %Item{} = item) do
+  defp store_created_text_item(state, %MailCore{} = mail, %Item{} = item) do
     item = %{item | item: %{item.item | item_text_id: mail.id}}
 
     case Inventory.store(state.character.player, state.guid, item, &ItemStore.get/1) do
       {:ok, result, placement} ->
         InventoryUpdate.commit_placement(item, placement)
         state = InventoryUpdate.apply(state, {:ok, result}, placement)
-        mail = %{mail | checked: Bitwise.bor(mail.checked, DataMail.checked_copied())}
+        mail = %{mail | checked: Bitwise.bor(mail.checked, MailCore.checked_copied())}
         state = put_mail(state, mail)
         ClientProjection.result(mail.id, :made_permanent, :ok)
         state
@@ -471,19 +471,19 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
 
   defp pay_cod(_mail, _buyer, 0), do: :ok
 
-  defp pay_cod(%DataMail{sender_type: :normal, sender: sender, subject: subject}, buyer, cod) do
+  defp pay_cod(%MailCore{sender_type: :normal, sender: sender, subject: subject}, buyer, cod) do
     PostOffice.post(%{
       sender: buyer,
       receiver: sender,
       sender_type: :normal,
       subject: subject,
       money: cod,
-      checked: DataMail.checked_cod_payment(),
+      checked: MailCore.checked_cod_payment(),
       deliver_at: Time.now()
     })
   end
 
-  defp pay_cod(%DataMail{}, _buyer, _cod), do: :ok
+  defp pay_cod(%MailCore{}, _buyer, _cod), do: :ok
 
   defp send_error(state, result) do
     ClientProjection.result(0, :send, result)

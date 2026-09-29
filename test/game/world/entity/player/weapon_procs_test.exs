@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.World.Entity.Player.WeaponProcsTest do
   alias ThistleTea.Game.World.Entity.Player.WeaponProcs
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
-  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
+  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
 
@@ -152,12 +152,12 @@ defmodule ThistleTea.Game.World.Entity.Player.WeaponProcsTest do
     :ets.insert(SpellLoader, {{:spell, @enchant_spell}, %Spell{id: @enchant_spell}})
 
     :ets.insert(
-      EnchantmentLoader,
+      ItemEnchantmentLoader,
       {{:enchantment, @enchant},
        %ItemEnchantment{id: @enchant, effects: [%{type: 1, spell_id: @enchant_spell, amount: 100}]}}
     )
 
-    :ets.insert(EnchantmentLoader, {{:proc_ppm, @enchant_spell}, 0.0})
+    :ets.insert(ItemEnchantmentLoader, {{:proc_ppm, @enchant_spell}, 0.0})
     Metadata.put(target, %{alive?: true})
 
     item =
@@ -178,8 +178,8 @@ defmodule ThistleTea.Game.World.Entity.Player.WeaponProcsTest do
       ItemStore.delete(item.object.guid)
       :ets.delete(ItemLoader, @entry)
       Enum.each([@innate, @enchant_spell], &:ets.delete(SpellLoader, {:spell, &1}))
-      :ets.delete(EnchantmentLoader, {:enchantment, @enchant})
-      :ets.delete(EnchantmentLoader, {:proc_ppm, @enchant_spell})
+      :ets.delete(ItemEnchantmentLoader, {:enchantment, @enchant})
+      :ets.delete(ItemEnchantmentLoader, {:proc_ppm, @enchant_spell})
       Metadata.delete(target)
     end)
 

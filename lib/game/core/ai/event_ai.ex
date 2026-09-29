@@ -18,14 +18,14 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
   """
   alias ThistleTea.Game.Core.AI.AIEvent
   alias ThistleTea.Game.Core.AI.BT.Blackboard
-  alias ThistleTea.Game.Core.AI.BT.Blackboard.EventAI, as: EventMemory
+  alias ThistleTea.Game.Core.AI.BT.Blackboard.EventAI, as: EventAIMemory
   alias ThistleTea.Game.Core.AI.BT.Context
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
   alias ThistleTea.Game.Core.AI.BT.Context.Random
   alias ThistleTea.Game.Core.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.AI.Script
-  alias ThistleTea.Game.Core.Aura, as: AuraLogic
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Combat.Engagement.Tap
   alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Condition, as: ConditionEvaluator
@@ -451,7 +451,7 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
     target_guid = invoker_guid || victim(state)
     token = blackboard.event_ai.sequence + 1
     blackboard = %{blackboard | event_ai: %{blackboard.event_ai | sequence: token}}
-    pending = %EventMemory.Actions{token: token, event_id: event.id}
+    pending = %EventAIMemory.Actions{token: token, event_id: event.id}
 
     {state, blackboard, pending} =
       Enum.reduce(actions, {state, blackboard, pending}, fn steps, {state, blackboard, pending} ->
@@ -477,7 +477,7 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
 
   def complete_script(state, blackboard, %Effects.ScriptCompleted{completion: {:event_ai, index, token}} = effect, now) do
     case {Map.get(blackboard.event_ai.pending, index), Enum.at(events(state), index)} do
-      {%EventMemory.Actions{token: ^token, event_id: event_id} = pending, %AIEvent{id: event_id} = event} ->
+      {%EventAIMemory.Actions{token: ^token, event_id: event_id} = pending, %AIEvent{id: event_id} = event} ->
         if MapSet.member?(pending.runs, effect.run_id) do
           pending = %{
             pending
@@ -711,8 +711,8 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
       alive?: not Entity.dead?(state),
       in_combat: in_combat?(state),
       unit_flags: state.unit.flags,
-      aura_stacks: AuraLogic.spell_stacks(state),
-      crowd_controlled?: AuraLogic.crowd_controlled?(state)
+      aura_stacks: AuraCore.spell_stacks(state),
+      crowd_controlled?: AuraCore.crowd_controlled?(state)
     }
 
     nearby =
@@ -742,7 +742,7 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
   defp reaction_allows?(2, source, target), do: not Hostility.hostile?(source, target)
   defp reaction_allows?(_reaction, _source, _target), do: false
 
-  defp aura_stacks(state, spell_id), do: state |> AuraLogic.spell_stacks() |> Map.get(spell_id, 0)
+  defp aura_stacks(state, spell_id), do: state |> AuraCore.spell_stacks() |> Map.get(spell_id, 0)
 
   defp perceived_aura_stacks(perception, guid, spell_id) do
     case Perception.metadata(perception, guid) do
@@ -817,7 +817,7 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
   defp casting_allows?(state, %AIEvent{not_casting?: true}), do: is_nil(state.internal.casting)
   defp casting_allows?(_state, %AIEvent{}), do: true
 
-  defp ensure_init(%Blackboard{event_ai: %EventMemory{timers: timers}} = blackboard, _events, _now, %Context{})
+  defp ensure_init(%Blackboard{event_ai: %EventAIMemory{timers: timers}} = blackboard, _events, _now, %Context{})
        when is_map(timers) do
     blackboard
   end
@@ -842,7 +842,9 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
     end)
   end
 
-  defp reset_ooc(%Blackboard{event_ai: %EventMemory{timers: timers}} = blackboard, events, now, %Context{random: random})
+  defp reset_ooc(%Blackboard{event_ai: %EventAIMemory{timers: timers}} = blackboard, events, now, %Context{
+         random: random
+       })
        when is_map(timers) do
     events
     |> Enum.with_index()
@@ -859,13 +861,13 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
 
   defp reset_ooc(%Blackboard{} = blackboard, _events, _now, %Context{}), do: blackboard
 
-  defp enabled?(%Blackboard{event_ai: %EventMemory{disabled: %MapSet{} = disabled}} = blackboard, index) do
+  defp enabled?(%Blackboard{event_ai: %EventAIMemory{disabled: %MapSet{} = disabled}} = blackboard, index) do
     not MapSet.member?(disabled, index) and not Map.has_key?(blackboard.event_ai.pending, index)
   end
 
   defp enabled?(%Blackboard{}, _index), do: true
 
-  defp disable(%Blackboard{event_ai: %EventMemory{disabled: %MapSet{} = disabled}} = blackboard, index) do
+  defp disable(%Blackboard{event_ai: %EventAIMemory{disabled: %MapSet{} = disabled}} = blackboard, index) do
     %{blackboard | event_ai: %{blackboard.event_ai | disabled: MapSet.put(disabled, index)}}
   end
 
@@ -873,13 +875,13 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
     %{blackboard | event_ai: %{blackboard.event_ai | disabled: MapSet.new([index])}}
   end
 
-  defp enable(%Blackboard{event_ai: %EventMemory{disabled: %MapSet{} = disabled}} = blackboard, index) do
+  defp enable(%Blackboard{event_ai: %EventAIMemory{disabled: %MapSet{} = disabled}} = blackboard, index) do
     %{blackboard | event_ai: %{blackboard.event_ai | disabled: MapSet.delete(disabled, index)}}
   end
 
   defp enable(%Blackboard{} = blackboard, _index), do: blackboard
 
-  defp put_timer(%Blackboard{event_ai: %EventMemory{timers: timers}} = blackboard, index, ready_at) do
+  defp put_timer(%Blackboard{event_ai: %EventAIMemory{timers: timers}} = blackboard, index, ready_at) do
     %{blackboard | event_ai: %{blackboard.event_ai | timers: Map.put(timers || %{}, index, ready_at)}}
   end
 
@@ -890,7 +892,7 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
     end
   end
 
-  defp timer_at(%Blackboard{event_ai: %EventMemory{timers: timers}}, index) when is_map(timers) do
+  defp timer_at(%Blackboard{event_ai: %EventAIMemory{timers: timers}}, index) when is_map(timers) do
     Map.get(timers, index)
   end
 

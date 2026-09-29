@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Durability do
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Inventory.ChangeSet
-  alias ThistleTea.Game.Core.Item.Durability, as: DurabilityLogic
+  alias ThistleTea.Game.Core.Item.Durability, as: DurabilityCore
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Durability do
         %{character: %Character{object: %{guid: guid}} = character} = state,
         %Effects.DurabilityLoss{target_guid: guid} = effect
       ) do
-    case DurabilityLogic.loss(character.player, effect.mode, effect.amount, effect.scope, &ItemStore.get/1) do
+    case DurabilityCore.loss(character.player, effect.mode, effect.amount, effect.scope, &ItemStore.get/1) do
       {:ok, %ChangeSet{}} = result ->
         state = commit(state, result)
         if effect.death?, do: Outbound.send_packet(%Message.SmsgDurabilityDamageDeath{})
@@ -55,7 +55,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Durability do
       discount = Reputation.price(character, vendor_guid, 100) / 100
 
       result =
-        DurabilityLogic.repair(character.player, item_guid, &ItemStore.get/1, &DurabilityLoader.cost(&1, discount))
+        DurabilityCore.repair(character.player, item_guid, &ItemStore.get/1, &DurabilityLoader.cost(&1, discount))
 
       commit(state, result)
     else
@@ -86,7 +86,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Durability do
 
   defp spell_log(character, %Effects.DurabilityLoss{mode: :points, caster_guid: caster, spell_id: spell_id} = effect)
        when is_integer(caster) and is_integer(spell_id) do
-    entry = DurabilityLogic.spell_log_entry(character.player, effect.scope, &ItemStore.get/1)
+    entry = DurabilityCore.spell_log_entry(character.player, effect.scope, &ItemStore.get/1)
 
     if is_integer(entry) do
       %Message.SmsgSpelllogexecute{

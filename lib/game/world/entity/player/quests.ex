@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   alias ThistleTea.Game.Core.Death
   alias ThistleTea.Game.Core.Entity, as: EntityCore
   alias ThistleTea.Game.Core.Entity.Character
-  alias ThistleTea.Game.Core.Entity.Item, as: DataItem
+  alias ThistleTea.Game.Core.Entity.Item, as: ItemCore
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Inventory
   alias ThistleTea.Game.Core.Inventory.Batch
@@ -130,7 +130,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   end
 
   defp query_item_quest(state, guid, quest_id) do
-    with %DataItem{} <- QuestItems.starter(state.character, guid, quest_id, &ItemStore.get/1),
+    with %ItemCore{} <- QuestItems.starter(state.character, guid, quest_id, &ItemStore.get/1),
          %Quest{} = quest <- QuestLoader.get(quest_id) do
       send_details(guid, quest)
     else
@@ -171,7 +171,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
 
     state =
       with true <- Death.alive?(state.character),
-           %DataItem{} = item <- QuestItems.starter(state.character, guid, quest_id, &ItemStore.get/1),
+           %ItemCore{} = item <- QuestItems.starter(state.character, guid, quest_id, &ItemStore.get/1),
            %Quest{} = quest <- QuestLoader.get(quest_id),
            :ok <- takeability(state.character, quest) do
         accepted = force_accept(state, quest_id, nil, starter_item: item)
@@ -494,7 +494,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
           Batch.remove(batch, item_id, count)
         end)
 
-      batch = Enum.reduce(rewards, batch, fn {%DataItem{} = item, _count}, batch -> Batch.add(batch, item) end)
+      batch = Enum.reduce(rewards, batch, fn {%ItemCore{} = item, _count}, batch -> Batch.add(batch, item) end)
 
       case Inventory.plan(batch, &ItemStore.get/1) do
         {:ok, change_set} -> {:ok, change_set, rewards}
@@ -506,7 +506,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   defp prepare_rewards(rewards, owner) do
     Enum.reduce_while(rewards, {:ok, []}, fn {item_id, count}, {:ok, prepared} ->
       case ItemStore.prepare(item_id, owner: owner, stack_count: count) do
-        %DataItem{} = item -> {:cont, {:ok, [{item, count} | prepared]}}
+        %ItemCore{} = item -> {:cont, {:ok, [{item, count} | prepared]}}
         nil -> {:halt, {:error, :invalid_reward}}
       end
     end)
@@ -517,7 +517,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   end
 
   defp send_reward_pushes(state, %ChangeSet{} = change_set, rewards) do
-    Enum.each(rewards, fn {%DataItem{} = item, count} ->
+    Enum.each(rewards, fn {%ItemCore{} = item, count} ->
       placed_at =
         case ChangeSet.placement(change_set, item.object.guid) do
           %Placement{status: :placed, position: position} -> position
@@ -1061,7 +1061,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
 
   defp source_capacity(_player, _rewards, nil), do: :ok
 
-  defp source_capacity(player, rewards, %DataItem{}) do
+  defp source_capacity(player, rewards, %ItemCore{}) do
     batch = Enum.reduce(rewards, Batch.new(player), fn {item, _count}, acc -> Batch.add(acc, item) end)
 
     case Inventory.plan(batch, &ItemStore.get/1) do
@@ -1070,7 +1070,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
     end
   end
 
-  defp send_item_push(state, %DataItem{} = item, {bag_slot, item_slot}, count) do
+  defp send_item_push(state, %ItemCore{} = item, {bag_slot, item_slot}, count) do
     Outbound.send_packet(%Message.SmsgItemPushResult{
       player_guid: state.guid,
       item_id: item.object.entry,

@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   alias ThistleTea.Game.Core.Player.Rest
   alias ThistleTea.Game.Core.Quest
   alias ThistleTea.Game.Core.Quest.QuestLog
-  alias ThistleTea.Game.Core.Reputation, as: ReputationLogic
+  alias ThistleTea.Game.Core.Reputation, as: ReputationCore
   alias ThistleTea.Game.Core.Reputation.Definition
   alias ThistleTea.Game.Core.Reputation.State, as: ReputationState
   alias ThistleTea.Game.Core.Skills
@@ -812,9 +812,9 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
 
   defp reputation_status(%{character: %Character{} = character} = state, faction_id) do
     definition = ReputationLoader.faction(faction_id)
-    reputation_state = ReputationLogic.state(character.player.reputation, faction_id)
+    reputation_state = ReputationCore.state(character.player.reputation, faction_id)
     standing = PlayerReputation.standing(character, faction_id)
-    rank = ReputationLogic.rank(standing)
+    rank = ReputationCore.rank(standing)
 
     system_message(
       state,

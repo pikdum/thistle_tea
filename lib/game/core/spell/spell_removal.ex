@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Core.Spell.SpellRemoval do
   @moduledoc "Removes known spells, their auras, and lost skills as one pure transition."
 
-  alias ThistleTea.Game.Core.Aura, as: AuraLogic
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Chat.Language
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity
@@ -28,7 +28,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellRemoval do
         }
     }
 
-    {character, aura_events} = AuraLogic.remove_spells(character, removed_ids, now)
+    {character, aura_events} = AuraCore.remove_spells(character, removed_ids, now)
     character = Effects.enqueue(character, aura_events)
 
     current_skills = granted_skills(character)

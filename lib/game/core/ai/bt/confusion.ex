@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Confusion do
 
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Blackboard
-  alias ThistleTea.Game.Core.AI.BT.Blackboard.Confusion, as: Memory
+  alias ThistleTea.Game.Core.AI.BT.Blackboard.Confusion, as: ConfusionMemory
   alias ThistleTea.Game.Core.AI.BT.Context
   alias ThistleTea.Game.Core.AI.BT.Context.Random
   alias ThistleTea.Game.Core.AI.BT.Navigation
@@ -88,10 +88,10 @@ defmodule ThistleTea.Game.Core.AI.BT.Confusion do
     internal.rooted? or Enum.any?(unit.auras, &Holder.has_any_type?(&1, [:mod_root, :mod_stun]))
   end
 
-  defp memory(_entity, %Blackboard{confusion: %Memory{} = memory}, _now), do: memory
+  defp memory(_entity, %Blackboard{confusion: %ConfusionMemory{} = memory}, _now), do: memory
 
   defp memory(entity, _blackboard, now) do
     {x, y, z, _} = entity.movement_block.position
-    %Memory{anchor: {x, y, z}, next_move_at: now, previous_running: entity.internal.running}
+    %ConfusionMemory{anchor: {x, y, z}, next_move_at: now, previous_running: entity.internal.running}
   end
 end

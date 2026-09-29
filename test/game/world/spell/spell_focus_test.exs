@@ -24,7 +24,7 @@ defmodule ThistleTea.Game.World.Spell.SpellFocusTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.EventSink.Context
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Spell.SpellFocus
 
@@ -160,15 +160,15 @@ defmodule ThistleTea.Game.World.Spell.SpellFocusTest do
     }
 
     on_exit(fn ->
-      for entry <- 951_001..951_004, do: :ets.delete(TemplateLoader, entry)
-      for id <- [50_001, 50_002], do: :ets.delete(TemplateLoader, {:focus_radius, id})
+      for entry <- 951_001..951_004, do: :ets.delete(GameObjectTemplateLoader, entry)
+      for id <- [50_001, 50_002], do: :ets.delete(GameObjectTemplateLoader, {:focus_radius, id})
     end)
 
     %{caster: caster, spell: spell, focus: focus}
   end
 
   defp spawn_object(template, world, position) do
-    TemplateLoader.put(template)
+    GameObjectTemplateLoader.put(template)
     object = GameObject.build_summoned(template, world, position)
     {:ok, _pid} = World.start_entity(object)
 

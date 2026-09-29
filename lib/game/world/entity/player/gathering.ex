@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gathering do
   alias ThistleTea.Game.Core.Inventory.ChangeSet
   alias ThistleTea.Game.Core.Item.ItemOpening
   alias ThistleTea.Game.Core.Item.ItemUse
-  alias ThistleTea.Game.Core.Profession.Gathering, as: GatheringLogic
+  alias ThistleTea.Game.Core.Profession.Gathering, as: GatheringCore
   alias ThistleTea.Game.Core.Profession.Lock
   alias ThistleTea.Game.Core.Profession.OpenLock
   alias ThistleTea.Game.Core.Spell
@@ -32,7 +32,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gathering do
   alias ThistleTea.Game.World.Entity.Player.ObjectTarget
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.ItemStore
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
@@ -54,7 +54,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gathering do
   end
 
   def authorize_use(%{character: %Character{} = character}, guid) do
-    template = TemplateLoader.cached(Guid.entry(guid))
+    template = GameObjectTemplateLoader.cached(Guid.entry(guid))
     id = GameObjectTemplate.lock_id(template)
 
     unlocked? = match?(%{go_lock_override: false}, Metadata.get(guid))
@@ -130,7 +130,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gathering do
   end
 
   defp successful_attempt?(%OpenLock{skill_id: id, value: value, required: required}) when id in [182, 186, 633] do
-    GatheringLogic.attempt?(id, value, required, value - 26 + :rand.uniform(63))
+    GatheringCore.attempt?(id, value, required, value - 26 + :rand.uniform(63))
   end
 
   defp successful_attempt?(_opened), do: true
@@ -179,7 +179,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gathering do
   end
 
   defp skill_gain(character, %OpenLock{gain?: true, skill_id: id, required: required}) do
-    GatheringLogic.skill_up(character.player.skills, id, required, :rand.uniform() * 100)
+    GatheringCore.skill_up(character.player.skills, id, required, :rand.uniform() * 100)
   end
 
   defp skill_gain(_character, _opened), do: :unchanged

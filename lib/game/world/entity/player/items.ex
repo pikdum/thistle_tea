@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Items do
   command.
   """
   alias ThistleTea.Game.Core.Entity.Character
-  alias ThistleTea.Game.Core.Entity.Item, as: DataItem
+  alias ThistleTea.Game.Core.Entity.Item, as: ItemCore
   alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Inventory
   alias ThistleTea.Game.Core.Inventory.Batch
@@ -203,7 +203,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Items do
   defp placement_position(%Placement{status: :merged}), do: {Inventory.bag_0(), 0xFFFFFFFF}
 
   def consume(state, item_guid) when is_integer(item_guid) do
-    with %DataItem{} = item <- ItemStore.get(item_guid),
+    with %ItemCore{} = item <- ItemStore.get(item_guid),
          {_bag, _slot} = pos <- Inventory.find_position(state.character.player, item_guid, &ItemStore.get/1) do
       consume_at(state, item, pos)
     else
@@ -214,7 +214,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Items do
   def consume(state, _item_guid), do: state
 
   def consume_cast_item(state, item_guid) do
-    with %DataItem{} = item <- ItemStore.get(item_guid),
+    with %ItemCore{} = item <- ItemStore.get(item_guid),
          {_bag, _slot} <- Inventory.find_position(state.character.player, item_guid, &ItemStore.get/1),
          {:ok, _spell_id, index, _commit?} <- ItemUse.on_use_spell(item),
          {:ok, batch} <- ItemUse.plan(Batch.new(state.character.player), item, index),
@@ -225,7 +225,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Items do
     end
   end
 
-  defp consume_at(state, %DataItem{} = item, pos) do
+  defp consume_at(state, %ItemCore{} = item, pos) do
     get_item = &ItemStore.get/1
 
     if (item.item.stack_count || 1) > 1 do
@@ -248,8 +248,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Items do
 
   def send_push_result(state, item, count, position, created \\ 0)
 
-  def send_push_result(state, %DataItem{} = item, count, position, created) do
-    reward = %Loot.Item{item_id: item.object.entry, random_property: DataItem.random_property(item)}
+  def send_push_result(state, %ItemCore{} = item, count, position, created) do
+    reward = %Loot.Item{item_id: item.object.entry, random_property: ItemCore.random_property(item)}
     send_push_result(state, reward, count, position, created)
   end
 
@@ -267,7 +267,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Items do
 
   def send_push_result(state, item_id, count, position, created) do
     item = state.character.player |> Inventory.item_guid_at(position, &ItemStore.get/1) |> ItemStore.get()
-    reward = if match?(%DataItem{object: %{entry: ^item_id}}, item), do: item, else: %Loot.Item{item_id: item_id}
+    reward = if match?(%ItemCore{object: %{entry: ^item_id}}, item), do: item, else: %Loot.Item{item_id: item_id}
     send_push_result(state, reward, count, position, created)
   end
 

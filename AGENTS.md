@@ -31,6 +31,7 @@
 - Pattern match on structs in function heads for type safety: `def foo(%Struct{field: val} = entity, ...)`
 - Use struct-update syntax and dot access on structs (`%{s | f: v}`, `s.field`), never `Map.put`/`Map.get` — struct-update raises on an unknown field (type-safe) while `Map.put` silently adds bogus keys. `Map.*` is only for genuine plain maps (`Metadata`/ETS rows, DB rows, ad-hoc maps, or a value that may be a struct *or* a map)
 - Entities are composed of component structs (Object, Unit, Player, GameObject, etc.)
+- Module names keep their domain prefix when the bare name would be ambiguous once aliased (`Core.Combat.CombatTimer`, `Core.Pet.PetStable`). When a core module collides with a world module in the same file, alias the core one as `<Name>Core` (`alias ThistleTea.Game.Core.Aura, as: AuraCore`). World modules and behavior trees are aliased by role (`SpellLoader`, `PartySystem`, `PlayerServer`, `MobBT`)
 
 ### Network Messages
 - Server messages: `use ServerMessage, :SMSG_FOO`, implement `to_binary/1`
@@ -42,7 +43,7 @@
 - `lib/game/world/` (`ThistleTea.Game.World`): everything effectful. `world/entity/` holds the entity owner processes (player, mob, game object, ...) with their event sinks and effect resolvers; `world/system/` holds shared-owner GenServers (party, guild, battleground, instance, ...); `world/loader/` translates seed rows into core structs and caches them; `world/inbound/` handles decoded client messages; root modules are shared infrastructure (Metadata, SpatialHash, stores, Pathfinding, Visibility)
 - `lib/game/network/` (`ThistleTea.Game.Network`): the connection handler, header crypto, opcodes, and message codecs. It reaches the world only through the `Network.Session` behaviour, whose implementation (`World.Session`) the application passes in at startup
 - Module names follow their paths: `lib/game/core/combat/threat.ex` is `ThistleTea.Game.Core.Combat.Threat`
-- The `boundary` compiler enforces the layering: Core depends on nothing, Network on Core, and World on Core, Network, DB, Auth, and Native. `ThistleTea.DB` (VMangos and DBC schemas) depends on nothing. A forbidden reference is a compiler warning, so `--warnings-as-errors` rejects it. Core's `dirty_xrefs` in `lib/game/core.ex` is the remaining debt into World and DB: never add to it (pass the data in instead), and remove entries as the compiler reports them unneeded
+- The `boundary` compiler enforces the layering: Core depends on nothing, Network on Core, and World on Core, Network, DB, Auth, and Native. `ThistleTea.DB` (VMangos and DBC schemas) depends on nothing. A forbidden reference is a compiler warning, so `--warnings-as-errors` rejects it. Core's `dirty_xrefs` in `lib/game/core.ex` is the remaining debt into World (only `World.Spell.SpellTargetResolver`, the launch-time target queries from `Casting` and queued melee): never add to it (pass the data in instead), and remove entries as the compiler reports them unneeded
 
 ### Architecture Patterns
 - Functional core / boundary layer split (à la "Designing Elixir Systems with OTP"): the core handles data + logic and stays pure; the boundary handles process orchestration (GenServers, Registries, ETS tables)

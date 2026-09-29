@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BankTest do
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Guid
-  alias ThistleTea.Game.Core.Reputation, as: ReputationLogic
+  alias ThistleTea.Game.Core.Reputation, as: ReputationCore
   alias ThistleTea.Game.Core.Reputation.Catalog
   alias ThistleTea.Game.Core.Reputation.Definition
   alias ThistleTea.Game.Core.Reputation.Variant
@@ -89,8 +89,8 @@ defmodule ThistleTea.Game.World.Entity.Player.BankTest do
       ReputationLoader.put_catalog(catalog)
       on_exit(fn -> ReputationLoader.put_catalog(previous_catalog) end)
 
-      reputation = ReputationLogic.initialize(catalog, 1, 1)
-      {reputation, _changes} = ReputationLogic.set(reputation, catalog, 72, -6_000, %{race: 1, class: 1})
+      reputation = ReputationCore.initialize(catalog, 1, 1)
+      {reputation, _changes} = ReputationCore.set(reputation, catalog, 72, -6_000, %{race: 1, class: 1})
       character = %{state.character | player: %{state.character.player | reputation: reputation}}
       Metadata.update(banker_guid, %{faction_template: %FactionTemplate{faction: 72}})
 

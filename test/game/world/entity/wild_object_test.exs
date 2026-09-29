@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.World.Entity.WildObjectTest do
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.GameObject.Chest
   alias ThistleTea.Game.World.Entity.GameObject.Trap, as: TrapServer
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
 
   setup [:templates]
@@ -65,7 +65,7 @@ defmodule ThistleTea.Game.World.Entity.WildObjectTest do
 
   describe "release/2" do
     test "consumed summoned chests disappear without scheduling a respawn", %{caster: caster} do
-      template = TemplateLoader.cached(950_001)
+      template = GameObjectTemplateLoader.cached(950_001)
       chest = GameObject.build_summoned(template, caster.internal.world, {0.0, 0.0, 0.0, 0.0})
       loot = %{chest.internal.loot | session: LootSession.new(%Loot{}, nil)}
       chest = %{chest | internal: %{chest.internal | loot: loot}}
@@ -168,7 +168,7 @@ defmodule ThistleTea.Game.World.Entity.WildObjectTest do
 
     trap = %GameObjectTemplate{entry: 950_002, type: 6, size: 1.0, flags: 0, faction: 0, data: [0, 0, 0, 0, 1, 0, 0, 0]}
     plain = %GameObjectTemplate{entry: 950_003, type: 5, size: 1.0, flags: 0, faction: 0}
-    for template <- [chest, trap, plain], do: :ets.insert(TemplateLoader, {template.entry, template})
+    for template <- [chest, trap, plain], do: :ets.insert(GameObjectTemplateLoader, {template.entry, template})
 
     caster = %Character{
       object: %Object{guid: 42},
@@ -179,7 +179,7 @@ defmodule ThistleTea.Game.World.Entity.WildObjectTest do
 
     on_exit(fn ->
       Enum.each(World.nearby_game_objects(caster, 100), fn {guid, _} -> World.stop_entity(guid) end)
-      for template <- [chest, trap, plain], do: :ets.delete(TemplateLoader, template.entry)
+      for template <- [chest, trap, plain], do: :ets.delete(GameObjectTemplateLoader, template.entry)
     end)
 
     %{caster: caster}

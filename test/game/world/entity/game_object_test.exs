@@ -17,7 +17,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectTest do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.GameObject, as: GameObjectServer
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
   alias ThistleTea.Game.World.Metadata
 
@@ -83,8 +83,8 @@ defmodule ThistleTea.Game.World.Entity.GameObjectTest do
       entry = 9_000_000 + rem(System.unique_integer([:positive]), 1_000_000)
       world = WorldRef.instance(999, entry)
       button_template = %GameObjectTemplate{entry: entry, type: 1, flags: 0, size: 1.0, data: [0, 0, 0, entry + 1]}
-      TemplateLoader.put(button_template)
-      on_exit(fn -> :ets.delete(TemplateLoader, entry) end)
+      GameObjectTemplateLoader.put(button_template)
+      on_exit(fn -> :ets.delete(GameObjectTemplateLoader, entry) end)
       button = GameObject.build_summoned(button_template, world, {0.0, 0.0, 0.0, 0.0})
       trap_template = %GameObjectTemplate{entry: entry + 1, type: 6, flags: 0, size: 1.0, data: [0, 0, 0, 0]}
 

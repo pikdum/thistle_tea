@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SelfResurrection do
   """
 
   alias ThistleTea.Game.Core.Death
-  alias ThistleTea.Game.Core.Death.SelfResurrection, as: SelfResurrectionLogic
+  alias ThistleTea.Game.Core.Death.SelfResurrection, as: SelfResurrectionCore
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Player
@@ -22,11 +22,11 @@ defmodule ThistleTea.Game.World.Entity.Player.SelfResurrection do
   def prepare(character, now, get_spell \\ &SpellLoader.load/1, get_item \\ &ItemStore.get/1)
 
   def prepare(%Character{player: %Player{}} = character, now, get_spell, get_item) do
-    spell_id = SelfResurrectionLogic.candidate_spell_id(character)
+    spell_id = SelfResurrectionCore.candidate_spell_id(character)
     spell = get_spell.(spell_id)
 
     available? =
-      SelfResurrectionLogic.available?(character, spell, now) and
+      SelfResurrectionCore.available?(character, spell, now) and
         Enum.all?(spell.reagents, fn {entry, count} ->
           Inventory.count_entry(character.player, entry, get_item) >= count
         end)
@@ -41,7 +41,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SelfResurrection do
 
     with true <- Entity.dead?(character) and not Death.ghost?(character),
          spell when not is_nil(spell) <- SpellLoader.load(character.player.self_res_spell || 0),
-         {:ok, character, events} <- SelfResurrectionLogic.resurrect(character, spell, now),
+         {:ok, character, events} <- SelfResurrectionCore.resurrect(character, spell, now),
          {:ok, change_set} <- plan_reagents(character, spell) do
       state = InventoryUpdate.apply(%{state | character: character}, {:ok, change_set})
       character = state.character |> EventSink.emit(events) |> EventSink.emit_pending()

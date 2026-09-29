@@ -30,9 +30,9 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestObjectsTest do
   alias ThistleTea.Game.World.Entity.Player.Gossip
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Loader.EventScript, as: EventLoader
-  alias ThistleTea.Game.World.Loader.GameObjectScript, as: ObjectScriptLoader
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.EventScript, as: EventScriptLoader
+  alias ThistleTea.Game.World.Loader.GameObjectScript, as: GameObjectScriptLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -44,9 +44,9 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestObjectsTest do
   describe "use_object/2" do
     test "linked traps wait for quest admission after Opening", context do
       {guid, pid, quest} = spawn_object(context, %{0 => 99, 1 => 1})
-      template = TemplateLoader.cached(quest.id)
+      template = GameObjectTemplateLoader.cached(quest.id)
       trap_template = %GameObjectTemplate{entry: quest.id + 1, type: 6, flags: 0, size: 1.0, data: [0, 0, 0, 0]}
-      TemplateLoader.put(%{template | data: List.replace_at(template.data, 12, trap_template.entry)})
+      GameObjectTemplateLoader.put(%{template | data: List.replace_at(template.data, 12, trap_template.entry)})
       trap = GameObject.build_summoned(trap_template, context.world, {1.1, 0.0, 0.0, 0.0})
       trap_pid = start_supervised!({GameObjectServer, trap}, id: trap.object.guid)
       ready_at = :sys.get_state(trap_pid).internal.trap.ready_at
@@ -63,8 +63,8 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestObjectsTest do
     test "reads a plain world text object", context do
       {guid, pid, _quest} = spawn_object(context, %{})
       object = :sys.get_state(pid)
-      template = %{TemplateLoader.cached(Guid.entry(guid)) | type: 9, data: [731, 7, 2, 1]}
-      TemplateLoader.put(template)
+      template = %{GameObjectTemplateLoader.cached(Guid.entry(guid)) | type: 9, data: [731, 7, 2, 1]}
+      GameObjectTemplateLoader.put(template)
       assert GameObjects.use_object(context.state, guid) == context.state
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgGameobjectPagetext{guid: ^guid}}}
       assert :sys.get_state(pid).internal.object_action == object.internal.object_action
@@ -83,8 +83,8 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestObjectsTest do
     test "credits admitted use once and restores the object", context do
       {guid, pid, quest} = spawn_object(context, %{1 => 1, 2 => 1, 7 => 12})
       steps = [%ScriptStep{command: :emote, datalong: 1}]
-      :ets.insert(EventLoader, {quest.id, steps})
-      on_exit(fn -> :ets.delete(EventLoader, quest.id) end)
+      :ets.insert(EventScriptLoader, {quest.id, steps})
+      on_exit(fn -> :ets.delete(EventScriptLoader, quest.id) end)
       state = accept(context.state, quest)
       updated = GameObjects.use_object(state, guid)
       assert QuestLog.get(updated.character.player.quest_log, quest.id).counts == %{0 => 1}
@@ -201,8 +201,8 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestObjectsTest do
       {_guid, pid, quest} = spawn_object(context, %{})
       object = :sys.get_state(pid)
       steps = [%ScriptStep{command: :emote, datalong: 1}]
-      :ets.insert(ObjectScriptLoader, {quest.id, steps})
-      on_exit(fn -> :ets.delete(ObjectScriptLoader, quest.id) end)
+      :ets.insert(GameObjectScriptLoader, {quest.id, steps})
+      on_exit(fn -> :ets.delete(GameObjectScriptLoader, quest.id) end)
 
       pooled = %{
         object
@@ -264,14 +264,14 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestObjectsTest do
 
     data = Enum.map(0..23, &Map.get(data, &1, 0)) |> List.replace_at(3, 10 * 65_536)
     template = %GameObjectTemplate{entry: entry, type: 10, size: 1.0, flags: 4, faction: 0, data: data}
-    TemplateLoader.put(template)
+    GameObjectTemplateLoader.put(template)
     quest = %Quest{id: entry, required_entity_objectives: [{0, :game_object, entry, 0, 2}]}
     :ets.insert(QuestLoader, {{:quest, entry}, quest})
     object = GameObject.build_summoned(template, context.world, {1.0, 0.0, 0.0, 0.0})
     pid = start_supervised!({GameObjectServer, object}, id: entry)
 
     on_exit(fn ->
-      :ets.delete(TemplateLoader, entry)
+      :ets.delete(GameObjectTemplateLoader, entry)
       :ets.delete(QuestLoader, {:quest, entry})
     end)
 

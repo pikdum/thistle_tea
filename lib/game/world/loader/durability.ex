@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.World.Loader.Durability do
 
   alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Entity.Item
-  alias ThistleTea.Game.Core.Item.Durability, as: DurabilityLogic
+  alias ThistleTea.Game.Core.Item.Durability, as: DurabilityCore
 
   def init(table \\ __MODULE__) do
     case :ets.whereis(table) do
@@ -27,10 +27,10 @@ defmodule ThistleTea.Game.World.Loader.Durability do
   end
 
   def cost(%Item{} = item, discount \\ 1.0, table \\ __MODULE__) do
-    with {level, class, subclass, quality_id} <- DurabilityLogic.cost_key(Item.template(item)),
+    with {level, class, subclass, quality_id} <- DurabilityCore.cost_key(Item.template(item)),
          [{_key, multiplier}] <- :ets.lookup(table, {level, class, subclass}),
          [{_key, quality}] <- :ets.lookup(table, {:quality, quality_id}) do
-      DurabilityLogic.repair_cost(item, multiplier, quality, discount)
+      DurabilityCore.repair_cost(item, multiplier, quality, discount)
     else
       _missing -> nil
     end

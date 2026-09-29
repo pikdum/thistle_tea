@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Buyback do
   alias ThistleTea.Game.Core.Inventory.ChangeSet
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Core.Vendor.Buyback, as: BuybackLogic
+  alias ThistleTea.Game.Core.Vendor.Buyback, as: BuybackCore
   alias ThistleTea.Game.Core.Vendor.Buyback.Change
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.Enchantments
@@ -47,13 +47,13 @@ defmodule ThistleTea.Game.World.Entity.Player.Buyback do
   def restore(state, _vendor, _slot), do: state
 
   def reset(%Character{} = character, now \\ Time.now()) do
-    change = BuybackLogic.clear(character, now, &ItemStore.get/1)
+    change = BuybackCore.clear(character, now, &ItemStore.get/1)
     Enum.each(ChangeSet.destroyed_items(change.inventory), &ItemStore.delete(&1.object.guid))
     %{character | player: change.inventory.player, internal: %{character.internal | buyback: change.buyback}}
   end
 
   def logout(%State{character: %Character{} = character} = state) do
-    case BuybackLogic.clear(character, Time.now(), &ItemStore.get/1) do
+    case BuybackCore.clear(character, Time.now(), &ItemStore.get/1) do
       %Change{inventory: %{destroyed: destroyed}} = change when map_size(destroyed) > 0 ->
         commit(state, change)
 
@@ -84,7 +84,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Buyback do
           item_guid
       end
 
-    case BuybackLogic.sell(
+    case BuybackCore.sell(
            state.character,
            item_guid,
            count,
@@ -99,7 +99,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Buyback do
   end
 
   defp restore_authorized(state, vendor, slot) do
-    case BuybackLogic.restore(state.character, slot, Time.now(), &ItemStore.get/1) do
+    case BuybackCore.restore(state.character, slot, Time.now(), &ItemStore.get/1) do
       {:ok, change} ->
         state = commit(state, change)
         Enum.each(ChangeSet.placed_items(change.inventory), &Enchantments.schedule_item_expiry/1)

@@ -33,7 +33,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectQuestsTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Gossip.Menu
   alias ThistleTea.Game.World.Loader.Gossip.Option
@@ -192,7 +192,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectQuestsTest do
 
     test "uses expanded display bounds beyond origin distance", context do
       template = %{context.template | bounds: {{-1.0, -1.0, -1.0}, {10.0, 1.0, 1.0}}}
-      :ets.insert(TemplateLoader, {template.entry, template})
+      :ets.insert(GameObjectTemplateLoader, {template.entry, template})
       state = position(context.state, {12.0, 0.0, 0.0, 0.0})
       accepted = Quests.accept(state, context.object_guid, context.quest.id)
       assert QuestLog.active?(accepted.character.player.quest_log, context.quest.id)
@@ -317,7 +317,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectQuestsTest do
       refute Aura.has_spell?(dismounted.character, 1)
 
       template = %{context.template | data: [0, 0, 0, 0, 0, 0, 0, 0, 1]}
-      :ets.insert(TemplateLoader, {template.entry, template})
+      :ets.insert(GameObjectTemplateLoader, {template.entry, template})
       assert Gossip.hello_game_object(state, context.object_guid).character.unit.mount_display_id == 2404
     end
 
@@ -370,7 +370,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectQuestsTest do
 
   defp put_menu(context, menu) do
     template = %{context.template | data: [0, 0, 0, menu.menu_id]}
-    :ets.insert(TemplateLoader, {template.entry, template})
+    :ets.insert(GameObjectTemplateLoader, {template.entry, template})
     :ets.insert(GossipLoader, {{:menu, menu.menu_id}, menu})
   end
 
@@ -398,7 +398,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectQuestsTest do
     object_guid = Guid.from_low_guid(:game_object, entry, 1)
     source = %ItemTemplate{entry: entry + 3, name: "Source"}
     reward = %ItemTemplate{entry: entry + 4, name: "Reward"}
-    :ets.insert(TemplateLoader, {entry, template})
+    :ets.insert(GameObjectTemplateLoader, {entry, template})
     Enum.each([source, reward], &:ets.insert(ItemLoader, {&1.entry, &1}))
 
     quest =
@@ -439,7 +439,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectQuestsTest do
     CharacterStore.put(character)
 
     on_exit(fn ->
-      :ets.delete(TemplateLoader, entry)
+      :ets.delete(GameObjectTemplateLoader, entry)
       :ets.delete(GossipLoader, {:menu, entry})
       Enum.each([source, reward], &:ets.delete(ItemLoader, &1.entry))
       Enum.each([entry, entry + 1], &:ets.delete(QuestLoader, {:quest, &1}))

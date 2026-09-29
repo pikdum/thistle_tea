@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestGiver do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.Reputation
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Reaction
 
@@ -70,7 +70,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestGiver do
   end
 
   defp object_in_range?(character, guid) do
-    with %GameObjectTemplate{type: 2} = template <- TemplateLoader.cached(Guid.entry(guid)),
+    with %GameObjectTemplate{type: 2} = template <- GameObjectTemplateLoader.cached(Guid.entry(guid)),
          %{go_rotation: rotation, go_scale: scale} <- Metadata.get(guid),
          {world, x, y, z} <- World.position(character),
          {^world, ox, oy, oz} <- World.position(guid) do

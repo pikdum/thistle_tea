@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Charm do
 
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Blackboard
-  alias ThistleTea.Game.Core.AI.BT.Blackboard.Charm, as: Memory
+  alias ThistleTea.Game.Core.AI.BT.Blackboard.Charm, as: CharmMemory
   alias ThistleTea.Game.Core.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Core.AI.BT.Context
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
@@ -44,7 +44,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Charm do
   def maintain(entity, blackboard, _context), do: {:failure, entity, blackboard}
 
   def tick(%Character{internal: %{possession: %Possession{kind: :charm}}} = entity, blackboard, context) do
-    blackboard = %{blackboard | charm: blackboard.charm || %Memory{}}
+    blackboard = %{blackboard | charm: blackboard.charm || %CharmMemory{}}
 
     if Aura.has_aura?(entity, :mod_stun) do
       {BT.running(200, :charm), entity, blackboard}

@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Movement do
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.Mob
-  alias ThistleTea.Game.Core.Movement, as: MovementLogic
+  alias ThistleTea.Game.Core.Movement, as: MovementCore
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
@@ -198,7 +198,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Movement do
 
   def emit(%Mob{} = entity, %Effects.MovementSpeedChanged{movement_type: type, speed: speed}, context) do
     controlled_speed(entity, type, speed)
-    {entity, events} = MovementLogic.retime(entity, type, Time.now())
+    {entity, events} = MovementCore.retime(entity, type, Time.now())
     Enum.reduce(events, entity, &emit(&2, &1, context))
   end
 
@@ -273,7 +273,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Movement do
         context
       ) do
     orientation = orientation || elem(entity.movement_block.position, 3)
-    {entity, transition} = MovementLogic.teleport(entity, {x, y, z, orientation}, Time.now())
+    {entity, transition} = MovementCore.teleport(entity, {x, y, z, orientation}, Time.now())
 
     entity = %{
       entity

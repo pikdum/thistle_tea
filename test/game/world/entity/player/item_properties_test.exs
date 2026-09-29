@@ -20,8 +20,8 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemPropertiesTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
-  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
-  alias ThistleTea.Game.World.Loader.ItemProperty, as: PropertyLoader
+  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
+  alias ThistleTea.Game.World.Loader.ItemProperty, as: ItemPropertyLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
 
   @entry 998_360
@@ -33,7 +33,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemPropertiesTest do
   describe "give/3" do
     test "rolls each equipment instance and reports its selected property", %{state: state, template: template} do
       :rand.seed(:exsss, {1, 2, 3})
-      expected = Enum.map(1..3, fn _ -> PropertyLoader.roll(template).id end)
+      expected = Enum.map(1..3, fn _ -> ItemPropertyLoader.roll(template).id end)
       :rand.seed(:exsss, {1, 2, 3})
       granted = Items.give(state, @entry, 3)
       items = Inventory.owned_items(granted.character.player, &ItemStore.get/1)
@@ -54,7 +54,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemPropertiesTest do
       full = fill_inventory(state)
       assert {:error, :inventory_full, ^full} = Items.store(full, reward, 1)
 
-      :ets.insert(PropertyLoader, {{:table, @entry}, []})
+      :ets.insert(ItemPropertyLoader, {{:table, @entry}, []})
       assert {:ok, stored, _position} = Items.store(state, reward, 1)
       [item] = Inventory.owned_items(stored.character.player, &ItemStore.get/1)
       assert Item.random_property(item) == reward.random_property
@@ -116,12 +116,12 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemPropertiesTest do
       {{:table, @entry}, [{property.id, 1.0}, {other.id, 1.0}]}
     ]
 
-    :ets.insert(PropertyLoader, rows)
+    :ets.insert(ItemPropertyLoader, rows)
     :ets.insert(ItemLoader, {@entry, template})
 
     for {id, stat, amount} <- [{@entry + 1, 4, 3}, {@entry + 2, 7, 5}] do
       enchantment = %ItemEnchantment{id: id, effects: [%{type: 5, amount: amount, spell_id: stat}]}
-      :ets.insert(EnchantmentLoader, {{:enchantment, id}, enchantment})
+      :ets.insert(ItemEnchantmentLoader, {{:enchantment, id}, enchantment})
     end
 
     character =
@@ -145,10 +145,10 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemPropertiesTest do
       })
 
     on_exit(fn ->
-      Enum.each(rows, fn {key, _value} -> :ets.delete(PropertyLoader, key) end)
+      Enum.each(rows, fn {key, _value} -> :ets.delete(ItemPropertyLoader, key) end)
       :ets.delete(ItemLoader, @entry)
-      :ets.delete(EnchantmentLoader, {:enchantment, @entry + 1})
-      :ets.delete(EnchantmentLoader, {:enchantment, @entry + 2})
+      :ets.delete(ItemEnchantmentLoader, {:enchantment, @entry + 1})
+      :ets.delete(ItemEnchantmentLoader, {:enchantment, @entry + 2})
       :ets.delete(CharacterStore, character.id)
 
       :ets.select_delete(ItemStore, [

@@ -17,7 +17,7 @@ defmodule ThistleTea.Game.World.System.Battleground do
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.System.Battleground.Graveyard
   alias ThistleTea.Game.World.System.Battleground.Match
-  alias ThistleTea.Game.World.System.Battleground.Supervisor, as: MatchSupervisor
+  alias ThistleTea.Game.World.System.Battleground.Supervisor, as: BattlegroundSupervisor
 
   require Logger
 
@@ -148,7 +148,7 @@ defmodule ThistleTea.Game.World.System.Battleground do
        worlds: %{},
        next_instance_id: Keyword.get(opts, :next_instance_id, 1),
        catalog: Keyword.get(opts, :catalog, BattlegroundLoader),
-       match_supervisor: Keyword.get(opts, :match_supervisor, MatchSupervisor),
+       match_supervisor: Keyword.get(opts, :match_supervisor, BattlegroundSupervisor),
        match_options: Keyword.get(opts, :match_options, []),
        effect_sink: Keyword.get(opts, :effect_sink)
      }}
@@ -673,7 +673,7 @@ defmodule ThistleTea.Game.World.System.Battleground do
       effect_sink: state.effect_sink
     ]
 
-    {:ok, pid} = MatchSupervisor.start_match(opts, state.match_supervisor)
+    {:ok, pid} = BattlegroundSupervisor.start_match(opts, state.match_supervisor)
     monitor = Process.monitor(pid)
     info = %{world: world, client_instance_id: instance_id, bracket: bracket, template: template, monitor: monitor}
 

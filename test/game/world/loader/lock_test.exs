@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Loader.LockTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.DB.DBC
-  alias ThistleTea.Game.Core.Profession.Lock, as: LockData
+  alias ThistleTea.Game.Core.Profession.Lock, as: LockCore
   alias ThistleTea.Game.Core.Profession.Lock.Requirement
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
 
@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.World.Loader.LockTest do
         table
       )
 
-      assert LockLoader.get(36, table) == %LockData{
+      assert LockLoader.get(36, table) == %LockCore{
                id: 36,
                requirements: [%Requirement{type: :item, index: 3467}, %Requirement{type: :skill, index: 1, skill: 100}]
              }

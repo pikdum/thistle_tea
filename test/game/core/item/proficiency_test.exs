@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Core.Item.ProficiencyTest do
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Item.Proficiency
-  alias ThistleTea.Game.Core.Spell, as: SpellData
+  alias ThistleTea.Game.Core.Spell, as: SpellCore
   alias ThistleTea.Game.Core.Spell.Effect
 
   @staves 1 <<< 10
@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.Core.Item.ProficiencyTest do
   @cloth 1 <<< 1
 
   defp proficiency_spell(id, item_class, mask) do
-    %SpellData{
+    %SpellCore{
       id: id,
       equipped_item_class: item_class,
       equipped_item_subclass_mask: mask,
@@ -28,8 +28,8 @@ defmodule ThistleTea.Game.Core.Item.ProficiencyTest do
 
   describe "from_spellbook/1" do
     test "derives defensive capabilities from every learned source" do
-      parry = %SpellData{id: 3127, effects: [%Effect{type: :parry}]}
-      block = %SpellData{id: 107, effects: [%Effect{type: :block}]}
+      parry = %SpellCore{id: 3127, effects: [%Effect{type: :parry}]}
+      block = %SpellCore{id: 107, effects: [%Effect{type: :block}]}
       alternate = %{parry | id: 999}
       book = spellbook([parry, block, alternate])
       assert %Proficiency{parry?: true, block?: true} = Proficiency.from_spellbook(book)
@@ -52,13 +52,13 @@ defmodule ThistleTea.Game.Core.Item.ProficiencyTest do
     end
 
     test "grants dual wield from a dual wield effect" do
-      dual_wield = %SpellData{id: 674, effects: [%Effect{index: 0, type: :dual_wield}]}
+      dual_wield = %SpellCore{id: 674, effects: [%Effect{index: 0, type: :dual_wield}]}
 
       assert %Proficiency{dual_wield?: true} = Proficiency.from_spellbook(spellbook([dual_wield]))
     end
 
     test "ignores non-proficiency effects and handles nil" do
-      fireball = %SpellData{id: 133, effects: [%Effect{index: 0, type: :school_damage}]}
+      fireball = %SpellCore{id: 133, effects: [%Effect{index: 0, type: :school_damage}]}
 
       assert Proficiency.from_spellbook(spellbook([fireball])) == %Proficiency{known_spell_ids: MapSet.new([133])}
       assert Proficiency.from_spellbook(nil) == %Proficiency{}
@@ -103,7 +103,7 @@ defmodule ThistleTea.Game.Core.Item.ProficiencyTest do
     end
 
     test "requires specialization spells for recipes and equipment" do
-      book = spellbook([%SpellData{id: 9788}])
+      book = spellbook([%SpellCore{id: 9788}])
       qualified = Proficiency.from_spellbook(book)
       removed = Proficiency.from_spellbook(Map.delete(book, 9788))
 

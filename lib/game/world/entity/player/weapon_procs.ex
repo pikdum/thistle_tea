@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Entity.Player.WeaponProcs do
   @moduledoc "Resolves an accepted weapon hit against current usable equipment and cached spell data."
 
   alias ThistleTea.Game.Core.Combat.CombatWeapon
-  alias ThistleTea.Game.Core.Combat.WeaponProcs, as: ProcLogic
+  alias ThistleTea.Game.Core.Combat.WeaponProcs, as: WeaponProcsCore
   alias ThistleTea.Game.Core.Death
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
@@ -21,8 +21,8 @@ defmodule ThistleTea.Game.World.Entity.Player.WeaponProcs do
          %Item{} = item <- ItemStore.get(item_guid(character.player, hit.hand)),
          false <- Item.broken?(item),
          %{class: 2} = template <- Item.template(item) do
-      spells = Map.new(ProcLogic.spells(template), fn {id, _ppm} -> {id, SpellLoader.cached(id)} end)
-      {events, enchantments?} = ProcLogic.innate_events(character, hit, item, spells, now, roll)
+      spells = Map.new(WeaponProcsCore.spells(template), fn {id, _ppm} -> {id, SpellLoader.cached(id)} end)
+      {events, enchantments?} = WeaponProcsCore.innate_events(character, hit, item, spells, now, roll)
       character = Effects.enqueue(character, events)
 
       if enchantments? do

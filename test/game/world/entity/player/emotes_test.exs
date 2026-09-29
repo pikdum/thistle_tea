@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EmotesTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Player.Emotes
-  alias ThistleTea.Game.World.Loader.Emote, as: Loader
+  alias ThistleTea.Game.World.Loader.Emote, as: EmoteLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.Presence
@@ -87,16 +87,16 @@ defmodule ThistleTea.Game.World.Entity.Player.EmotesTest do
   end
 
   defp catalog(_context) do
-    saved = :ets.tab2list(Loader)
+    saved = :ets.tab2list(EmoteLoader)
 
-    Loader.load([%{id: 0, spec_proc: 0}, %{id: 3, spec_proc: 0}, %{id: 10, spec_proc: 2}], [
+    EmoteLoader.load([%{id: 0, spec_proc: 0}, %{id: 3, spec_proc: 0}, %{id: 10, spec_proc: 2}], [
       %{id: 34, emote: 10},
       %{id: 101, emote: 3}
     ])
 
     on_exit(fn ->
-      :ets.delete_all_objects(Loader)
-      :ets.insert(Loader, saved)
+      :ets.delete_all_objects(EmoteLoader)
+      :ets.insert(EmoteLoader, saved)
     end)
   end
 

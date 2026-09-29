@@ -24,7 +24,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TrapDisarmingTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.Gathering
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
   alias ThistleTea.Game.World.Metadata
 
@@ -95,7 +95,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TrapDisarmingTest do
       data: [@lock, 0, 0, 0, 1, 0, 0, 0, 0, 1]
     }
 
-    TemplateLoader.put(template)
+    GameObjectTemplateLoader.put(template)
     :ets.insert(LockLoader, {@lock, %Lock{id: @lock, requirements: [%Requirement{type: :skill, index: 4}]}})
     world = WorldRef.open(451)
     object = GameObject.build_summoned(template, world, {16_303.2, 16_254.1, 69.44, 0.0})
@@ -113,7 +113,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TrapDisarmingTest do
 
     on_exit(fn ->
       World.stop_entity(object.object.guid)
-      :ets.delete(TemplateLoader, @entry)
+      :ets.delete(GameObjectTemplateLoader, @entry)
       :ets.delete(LockLoader, @lock)
       :ets.delete(CharacterStore, id)
       Metadata.delete(id)

@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Core.AI.EventAITest do
   alias ThistleTea.Game.Core.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Core.AI.EventAI
   alias ThistleTea.Game.Core.AI.ScriptStep
-  alias ThistleTea.Game.Core.Aura, as: AuraData
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Effects
@@ -414,7 +414,7 @@ defmodule ThistleTea.Game.Core.AI.EventAITest do
       crowd_control = event(:friendly_is_cc, param2: 30)
       missing_buff = event(:friendly_missing_buff, param1: 27_995, param2: 30)
       mob = mob(events: [crowd_control, missing_buff], in_combat: true)
-      holder = %Holder{spell: %Spell{id: 12}, auras: [%AuraData{type: :mod_stun}]}
+      holder = %Holder{spell: %Spell{id: 12}, auras: [%AuraCore{type: :mod_stun}]}
       mob = %{mob | unit: %{mob.unit | auras: [holder]}}
 
       {mob, _blackboard} = EventAI.tick(mob, Blackboard.new(), 1_000)

@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.World.Entity.FormationEnvironment do
   import Bitwise
 
   alias ThistleTea.Game.Core.AI.BT.Context.Formation, as: Snapshot
-  alias ThistleTea.Game.Core.AI.BT.Formation, as: FormationLogic
+  alias ThistleTea.Game.Core.AI.BT.Formation, as: FormationBT
   alias ThistleTea.Game.Core.Creature.CreatureGroup.Member
   alias ThistleTea.Game.Core.Creature.Formation
   alias ThistleTea.Game.Core.Entity.Mob
@@ -64,7 +64,7 @@ defmodule ThistleTea.Game.World.Entity.FormationEnvironment do
   end
 
   defp respawn_offset(map, {x, y, z}, orientation, member) do
-    position = FormationLogic.offset({x, y, z}, orientation, member)
+    position = FormationBT.offset({x, y, z}, orientation, member)
     {px, py, pz} = Pathfinding.snap_to_ground(map, position)
     {px, py, pz, :math.atan2(y - py, x - px)}
   end

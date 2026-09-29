@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ObjectTarget do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Visibility
 
@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ObjectTarget do
          distance when is_number(distance) and distance <= range <- World.distance_between(character, guid),
          {cx, cy, cz, _orientation} <- character.movement_block.position,
          true <- Pathfinding.line_of_sight?(world, {cx, cy, cz}, {x, y, z}),
-         %GameObjectTemplate{} = template <- TemplateLoader.cached(Guid.entry(guid)) do
+         %GameObjectTemplate{} = template <- GameObjectTemplateLoader.cached(Guid.entry(guid)) do
       {:ok, template}
     else
       distance when is_number(distance) -> {:error, :out_of_range}

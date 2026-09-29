@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Core.Power.RegenTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Core.Aura, as: AuraEffect
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -39,7 +39,7 @@ defmodule ThistleTea.Game.Core.Power.RegenTest do
   end
 
   defp with_aura(entity, type, amount, opts \\ []) do
-    aura = %AuraEffect{
+    aura = %AuraCore{
       index: 0,
       type: type,
       amount: amount,
@@ -60,7 +60,7 @@ defmodule ThistleTea.Game.Core.Power.RegenTest do
         effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_confuse}]
       },
       negative?: true,
-      auras: [%AuraEffect{index: 1, type: :transform, misc_value: 856}]
+      auras: [%AuraCore{index: 1, type: :transform, misc_value: 856}]
     }
 
     %{entity | unit: %{entity.unit | auras: (entity.unit.auras || []) ++ [holder]}}

@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Core.Power.ResourcesTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Core.Aura, as: AuraData
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Unit
@@ -222,7 +222,7 @@ defmodule ThistleTea.Game.Core.Power.ResourcesTest do
     test "school power-cost auras make Spirit of Redemption heals free" do
       free_holy = %Holder{
         spell: %Spell{id: 27_792},
-        auras: [%AuraData{type: :mod_power_cost_school_pct, amount: -100, misc_value: 0x2}]
+        auras: [%AuraCore{type: :mod_power_cost_school_pct, amount: -100, misc_value: 0x2}]
       }
 
       entity = %Mob{

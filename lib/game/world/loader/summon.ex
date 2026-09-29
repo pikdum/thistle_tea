@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.Game.Core.Pet.PetProgression
   alias ThistleTea.Game.Core.Pet.PetSpellModifiers
   alias ThistleTea.Game.Core.Pet.PetTraining
-  alias ThistleTea.Game.Core.Spell, as: GameSpell
+  alias ThistleTea.Game.Core.Spell, as: SpellCore
   alias ThistleTea.Game.Core.Spell.Modifiers
   alias ThistleTea.Game.Core.Stats
   alias ThistleTea.Game.Core.Time
@@ -185,7 +185,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
 
     spells
     |> Map.values()
-    |> Enum.filter(&GameSpell.attribute?(&1, :passive))
+    |> Enum.filter(&SpellCore.attribute?(&1, :passive))
     |> Enum.reduce(mob, &PetSpellModifiers.apply_passive(&2, &1, Time.now()))
   end
 

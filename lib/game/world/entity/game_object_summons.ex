@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSummons do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.EventSink.Context
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Pathfinding
 
   defmodule Entry do
@@ -57,7 +57,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSummons do
   end
 
   def start(%{object: %{guid: owner_guid}, internal: %Internal{world: world}} = entity, effect, context) do
-    case TemplateLoader.cached(effect.entry) do
+    case GameObjectTemplateLoader.cached(effect.entry) do
       %GameObjectTemplate{} = template ->
         options = [
           summoned_by: if(effect.owned?, do: owner_guid),
@@ -132,7 +132,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSummons do
 
   defp linked_objects(template, world, position, options) do
     with entry when is_integer(entry) and entry > 0 <- GameObjectTemplate.linked_entry(template),
-         %GameObjectTemplate{} = linked <- TemplateLoader.cached(entry),
+         %GameObjectTemplate{} = linked <- GameObjectTemplateLoader.cached(entry),
          game_object = GameObject.build_summoned(linked, world, position, options),
          {:ok, _pid} <- World.start_incarnation(game_object) do
       [game_object.object.guid]

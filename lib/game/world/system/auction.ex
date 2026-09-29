@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.World.System.Auction do
   """
   use GenServer
 
-  alias ThistleTea.Game.Core.Auction, as: AuctionLogic
+  alias ThistleTea.Game.Core.Auction, as: AuctionCore
   alias ThistleTea.Game.Core.Auction.Actor
   alias ThistleTea.Game.Core.Auction.Inventory, as: AuctionInventory
   alias ThistleTea.Game.Core.Auction.Query
@@ -114,7 +114,7 @@ defmodule ThistleTea.Game.World.System.Auction do
       now = state.now.()
       auction = %{auction | expires_at: now}
       book = %{book | auctions: Map.put(book.auctions, id, auction)}
-      change = AuctionLogic.expire(book, now)
+      change = AuctionCore.expire(book, now)
       AuctionStore.commit(change, nil, state.table)
       Enum.each(change.notices, state.notify)
       {:reply, :ok, finish(state)}
@@ -143,8 +143,8 @@ defmodule ThistleTea.Game.World.System.Auction do
 
     case request do
       {:sell, guid, terms} -> sell(state, character, book, actor, house, guid, terms, now)
-      {:bid, id, amount} -> AuctionLogic.bid(book, actor, house, id, amount, now)
-      {:cancel, id} -> AuctionLogic.cancel(book, actor, house, id, now)
+      {:bid, id, amount} -> AuctionCore.bid(book, actor, house, id, amount, now)
+      {:cancel, id} -> AuctionCore.cancel(book, actor, house, id, now)
     end
   end
 
@@ -152,7 +152,7 @@ defmodule ThistleTea.Game.World.System.Auction do
     with %Item{} = item <- AuctionStore.item(guid, state.table),
          :ok <-
            AuctionInventory.validate_sale(character, item, now, &AuctionStore.item(&1, state.table), state.enchantment) do
-      AuctionLogic.sell(book, actor, house, item, terms, now)
+      AuctionCore.sell(book, actor, house, item, terms, now)
     else
       nil -> {:error, :item_not_found}
       error -> error
@@ -165,7 +165,7 @@ defmodule ThistleTea.Game.World.System.Auction do
 
   defp advance(state) do
     book = AuctionStore.book(state.table)
-    change = AuctionLogic.expire(book, state.now.())
+    change = AuctionCore.expire(book, state.now.())
 
     if change.book != book do
       AuctionStore.commit(change, nil, state.table)
@@ -196,7 +196,7 @@ defmodule ThistleTea.Game.World.System.Auction do
 
   defp schedule(state) do
     if state.timer, do: Process.cancel_timer(state.timer)
-    deadline = AuctionLogic.next_expiration(AuctionStore.book(state.table))
+    deadline = AuctionCore.next_expiration(AuctionStore.book(state.table))
     delay = if deadline, do: max(deadline - state.now.(), 0)
     delay = if AuctionStore.deliveries(state.table) == [], do: delay, else: min(delay || 1_000, 1_000)
     timer = if delay, do: Process.send_after(self(), :settle, delay)

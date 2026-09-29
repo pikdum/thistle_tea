@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.World.Entity.TransportTest do
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Entity.GameObjectTemplate
-  alias ThistleTea.Game.Core.Travel.Transport, as: TransportLogic
+  alias ThistleTea.Game.Core.Travel.Transport, as: TransportCore
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
@@ -17,8 +17,8 @@ defmodule ThistleTea.Game.World.Entity.TransportTest do
   describe "route ownership" do
     test "publishes and advances an authoritative ship pose" do
       entry = :erlang.unique_integer([:positive])
-      route = TransportLogic.build_ship(entry, "Test Ship", 10, ship_nodes(), 10, 1, 20_000)
-      entity = GameObject.build_transport(template(entry), TransportLogic.pose_at(route, 0))
+      route = TransportCore.build_ship(entry, "Test Ship", 10, ship_nodes(), 10, 1, 20_000)
+      entity = GameObject.build_transport(template(entry), TransportCore.pose_at(route, 0))
       clock = fn -> 1_000 end
 
       {:ok, pid} = TransportServer.start_link({entity, route, schedule: false, clock: clock})
@@ -48,8 +48,8 @@ defmodule ThistleTea.Game.World.Entity.TransportTest do
 
     test "moves global ship visibility between maps" do
       entry = :erlang.unique_integer([:positive])
-      route = TransportLogic.build_ship(entry, "Test Ship", 10, cross_map_nodes(), 10, 1, 60_000)
-      entity = GameObject.build_transport(template(entry), TransportLogic.pose_at(route, 0))
+      route = TransportCore.build_ship(entry, "Test Ship", 10, cross_map_nodes(), 10, 1, 60_000)
+      entity = GameObject.build_transport(template(entry), TransportCore.pose_at(route, 0))
       {:ok, pid} = TransportServer.start_link({entity, route, schedule: false, clock: fn -> 1_000 end})
       on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid) end)
 
@@ -105,7 +105,7 @@ defmodule ThistleTea.Game.World.Entity.TransportTest do
 
       assert {:ok, attached} = Transports.reconcile(character, movement_block)
 
-      expected = TransportLogic.passenger_world_position(local_position, route_pose(route, 0))
+      expected = TransportCore.passenger_world_position(local_position, route_pose(route, 0))
       assert_tuple_in_delta(attached.position, expected)
       assert {:ok, %{passenger_count: 1}} = Entity.call(entity.object.guid, :transport_info)
       assert Transports.get(entity.object.guid).passenger_count == 1
@@ -140,8 +140,8 @@ defmodule ThistleTea.Game.World.Entity.TransportTest do
 
     test "moves attached players with the transport across maps" do
       entry = :erlang.unique_integer([:positive])
-      route = TransportLogic.build_ship(entry, "Test Ship", 10, cross_map_nodes(), 10, 1, 60_000)
-      entity = GameObject.build_transport(template(entry), TransportLogic.pose_at(route, 0))
+      route = TransportCore.build_ship(entry, "Test Ship", 10, cross_map_nodes(), 10, 1, 60_000)
+      entity = GameObject.build_transport(template(entry), TransportCore.pose_at(route, 0))
       {:ok, pid} = TransportServer.start_link({entity, route, schedule: false, clock: fn -> 1_000 end})
       on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid) end)
 
@@ -161,8 +161,8 @@ defmodule ThistleTea.Game.World.Entity.TransportTest do
 
   defp start_transport do
     entry = :erlang.unique_integer([:positive])
-    route = TransportLogic.build_ship(entry, "Test Ship", 10, ship_nodes(), 10, 1, 20_000)
-    entity = GameObject.build_transport(template(entry), TransportLogic.pose_at(route, 0))
+    route = TransportCore.build_ship(entry, "Test Ship", 10, ship_nodes(), 10, 1, 20_000)
+    entity = GameObject.build_transport(template(entry), TransportCore.pose_at(route, 0))
     clock = fn -> 1_000 end
     {:ok, pid} = TransportServer.start_link({entity, route, schedule: false, clock: clock})
     on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid) end)
@@ -187,7 +187,7 @@ defmodule ThistleTea.Game.World.Entity.TransportTest do
   end
 
   defp route_pose(route, elapsed_ms) do
-    TransportLogic.pose_at(route, elapsed_ms).position
+    TransportCore.pose_at(route, elapsed_ms).position
   end
 
   defp template(entry) do

@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Core.Spell.SpellRefundsTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Core.Aura, as: AuraData
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
@@ -129,7 +129,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellRefundsTest do
 
     immunity = %Holder{
       spell: %Spell{id: 642},
-      auras: [%AuraData{type: :school_immunity, misc_value: 1}]
+      auras: [%AuraCore{type: :school_immunity, misc_value: 1}]
     }
 
     target = %Mob{
@@ -162,7 +162,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellRefundsTest do
       spell: %Spell{id: 90_001, spell_family: 8},
       charges: 1,
       slot: 0,
-      auras: [%AuraData{type: type, amount: amount, misc_value: 14, class_mask: 1}]
+      auras: [%AuraCore{type: type, amount: amount, misc_value: 14, class_mask: 1}]
     }
 
     %{caster | unit: %{caster.unit | auras: [modifier]}}

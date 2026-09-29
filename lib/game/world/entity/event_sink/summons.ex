@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Summons do
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Commands
   alias ThistleTea.Game.Core.Entity.Component.Internal
-  alias ThistleTea.Game.Core.Entity.DynamicObject, as: DataDynamicObject
+  alias ThistleTea.Game.Core.Entity.DynamicObject, as: DynamicObjectCore
   alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
@@ -43,7 +43,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Summons do
       ) do
     radius = effect.radius_yards || Radius.effect(effect.effect, Modifiers.snapshot(entity, effect.spell), 8.0)
 
-    dynamic_object = DataDynamicObject.build(caster_guid, world, effect.spell, effect.position, radius)
+    dynamic_object = DynamicObjectCore.build(caster_guid, world, effect.spell, effect.position, radius)
 
     World.start_entity(%{
       entity: dynamic_object,
@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Summons do
         %Effects.SpawnFarsight{spell: %Spell{} = spell, position: position, duration_ms: duration_ms},
         context
       ) do
-    dynamic_object = DataDynamicObject.build(caster_guid, world, spell, position, 0.0)
+    dynamic_object = DynamicObjectCore.build(caster_guid, world, spell, position, 0.0)
 
     World.start_entity(%{
       entity: dynamic_object,

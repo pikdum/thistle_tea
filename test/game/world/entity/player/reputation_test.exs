@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.Player.ReputationTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Core.Aura, as: AuraData
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Entity.Character
@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ReputationTest do
   alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Quest
-  alias ThistleTea.Game.Core.Reputation, as: ReputationLogic
+  alias ThistleTea.Game.Core.Reputation, as: ReputationCore
   alias ThistleTea.Game.Core.Reputation.Catalog
   alias ThistleTea.Game.Core.Reputation.Definition
   alias ThistleTea.Game.Core.Reputation.KillReward
@@ -156,8 +156,8 @@ defmodule ThistleTea.Game.World.Entity.Player.ReputationTest do
       holder = %Holder{
         spell: %Spell{id: 1},
         auras: [
-          %AuraData{type: :mod_reputation_gain, amount: 10},
-          %AuraData{type: :mod_faction_reputation_gain, misc_value: 529, amount: 20}
+          %AuraCore{type: :mod_reputation_gain, amount: 10},
+          %AuraCore{type: :mod_faction_reputation_gain, misc_value: 529, amount: 20}
         ]
       }
 
@@ -272,7 +272,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ReputationTest do
       catalog = catalog([definition(529, 13)])
       character = state(id, catalog).character
       ReputationLoader.put_catalog(catalog)
-      {reputation, _changes} = ReputationLogic.modify(character.player.reputation, catalog, 529, 250, context())
+      {reputation, _changes} = ReputationCore.modify(character.player.reputation, catalog, 529, 250, context())
       character = %{character | player: %{character.player | reputation: reputation}}
 
       Reputation.send_initial(character)
@@ -291,7 +291,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ReputationTest do
 
       holder = %Holder{
         spell: %Spell{id: 6405},
-        auras: [%AuraData{type: :force_reaction, misc_value: 575, amount: 3}]
+        auras: [%AuraCore{type: :force_reaction, misc_value: 575, amount: 3}]
       }
 
       character = %{character | unit: %{character.unit | auras: [holder]}}
@@ -315,7 +315,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ReputationTest do
       id: id,
       object: %Object{guid: guid},
       unit: %Unit{race: 1, class: 1, level: 10, auras: []},
-      player: %Player{reputation: ReputationLogic.initialize(catalog, 1, 1)},
+      player: %Player{reputation: ReputationCore.initialize(catalog, 1, 1)},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{world: WorldRef.open(0)}
     }
@@ -339,7 +339,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ReputationTest do
 
   defp put_standing(%Character{} = character, catalog, faction_id, standing) do
     {reputation, _changes} =
-      ReputationLogic.set(character.player.reputation, catalog, faction_id, standing, context())
+      ReputationCore.set(character.player.reputation, catalog, faction_id, standing, context())
 
     %{character | player: %{character.player | reputation: reputation}}
   end

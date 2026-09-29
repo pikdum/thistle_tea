@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Entity.Player.LiquidSpells do
   @moduledoc "Loads the spell associated with the player's sampled liquid at the owner boundary."
 
   alias ThistleTea.Game.Core.Entity.Character
-  alias ThistleTea.Game.Core.Environment.LiquidSpells, as: LiquidSpellLogic
+  alias ThistleTea.Game.Core.Environment.LiquidSpells, as: LiquidSpellsCore
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.Core.Terrain.Liquid
@@ -26,6 +26,6 @@ defmodule ThistleTea.Game.World.Entity.Player.LiquidSpells do
 
   def restore(%Character{} = character) do
     context = context(character, Movement.terrain_liquid(character))
-    LiquidSpellLogic.reconcile(character, context, Time.now())
+    LiquidSpellsCore.reconcile(character, context, Time.now())
   end
 end

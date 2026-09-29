@@ -42,7 +42,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
-  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
+  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -380,7 +380,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
       effects: [%{type: 5, spell_id: 1, amount: 20}, %{type: 1, spell_id: 0, amount: 10}]
     }
 
-    :ets.insert(EnchantmentLoader, {{:enchantment, @enchant}, enchant})
+    :ets.insert(ItemEnchantmentLoader, {{:enchantment, @enchant}, enchant})
     item = ItemStore.create(template, owner: guid) |> Item.put_permanent_enchantment(@enchant)
     ItemStore.put(item)
     player = Inventory.equip(%Player{coinage: 1000}, :mainhand, item)
@@ -409,7 +409,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
     on_exit(fn ->
       ItemStore.delete(item.object.guid)
       :ets.delete(ItemLoader, @entry)
-      :ets.delete(EnchantmentLoader, {:enchantment, @enchant})
+      :ets.delete(ItemEnchantmentLoader, {:enchantment, @enchant})
       :ets.delete(DurabilityLoader, {@level, 2, 7})
       :ets.delete(DurabilityLoader, {:quality, 4})
       :ets.delete(CharacterStore, guid)

@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerGroupRewardTest do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Quest
   alias ThistleTea.Game.Core.Quest.QuestLog
-  alias ThistleTea.Game.Core.Reputation, as: ReputationLogic
+  alias ThistleTea.Game.Core.Reputation, as: ReputationCore
   alias ThistleTea.Game.Core.Reputation.Catalog
   alias ThistleTea.Game.Core.Reputation.Definition
   alias ThistleTea.Game.Core.Reputation.KillReward
@@ -131,7 +131,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerGroupRewardTest do
         quest_log: log,
         xp: 10,
         next_level_xp: 10_000,
-        reputation: ReputationLogic.initialize(catalog, 1, 1)
+        reputation: ReputationCore.initialize(catalog, 1, 1)
       },
       internal: %Internal{world: WorldRef.open(0), rest_bonus: 1_000.0},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}

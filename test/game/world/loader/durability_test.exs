@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.Loader.DurabilityTest do
 
   alias ThistleTea.Game.Core.Entity.Item
   alias ThistleTea.Game.Core.Entity.ItemTemplate
-  alias ThistleTea.Game.Core.Item.Durability, as: DurabilityLogic
+  alias ThistleTea.Game.Core.Item.Durability, as: DurabilityCore
   alias ThistleTea.Game.Core.Vendor.Buyback
   alias ThistleTea.Game.World.Loader.Durability
 
@@ -24,7 +24,7 @@ defmodule ThistleTea.Game.World.Loader.DurabilityTest do
         sell_price: 7
       }
 
-      item = Item.build(template, 1) |> DurabilityLogic.lose(:points, 2)
+      item = Item.build(template, 1) |> DurabilityCore.lose(:points, 2)
       assert item.item.durability == 18
       assert Durability.sale_penalty(item, table) == 2
       assert {:ok, 5} = Buyback.sale_price(item, 1, &Durability.sale_penalty(&1, table))
@@ -41,7 +41,7 @@ defmodule ThistleTea.Game.World.Loader.DurabilityTest do
             1
           )
 
-        damaged = DurabilityLogic.lose(item, :percent, 10)
+        damaged = DurabilityCore.lose(item, :percent, 10)
         assert Durability.cost(item, 1.0, table) == 0
         cost = Durability.cost(damaged, 1.0, table)
         assert is_integer(cost) and cost > 0

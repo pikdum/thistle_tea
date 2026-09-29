@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Honor do
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Mob
-  alias ThistleTea.Game.Core.Honor, as: HonorLogic
+  alias ThistleTea.Game.Core.Honor, as: HonorCore
   alias ThistleTea.Game.Core.Honor.Contribution
   alias ThistleTea.Game.Core.Honor.Damage
   alias ThistleTea.Game.Core.Honor.Participant
@@ -50,14 +50,14 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Honor do
 
         %Participant{
           guid: guid,
-          team: HonorLogic.team(Map.get(row, :race)),
+          team: HonorCore.team(Map.get(row, :race)),
           group_id: group_id,
           alive?: Map.get(row, :alive?) == true,
           in_range?: KillReward.in_range?(entity, position.(guid))
         }
       end)
 
-    Contribution.shares(history, participants, HonorLogic.team(entity.unit.race), now)
+    Contribution.shares(history, participants, HonorCore.team(entity.unit.race), now)
   end
 
   def creature_kill(%Mob{} = victim, %Effects.HonorCreatureKill{} = effect, opts \\ []) do
@@ -71,7 +71,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Honor do
       end
 
     Enum.flat_map(recipients, fn %{guid: guid, level: level} ->
-      case HonorLogic.creature_award(victim, level) do
+      case HonorCore.creature_award(victim, level) do
         nil -> []
         award -> [%Effects.HonorAward{target_guid: guid, award: award}]
       end

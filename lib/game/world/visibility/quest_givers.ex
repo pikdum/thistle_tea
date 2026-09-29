@@ -17,7 +17,7 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
@@ -122,7 +122,7 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
   end
 
   defp flags(guid, %Character{} = viewer) do
-    case TemplateLoader.cached(Guid.entry(guid)) do
+    case GameObjectTemplateLoader.cached(Guid.entry(guid)) do
       %GameObjectTemplate{type: 10, data: data} ->
         if goober_active?(viewer, Guid.entry(guid), Enum.at(data, 1, 0)), do: 1, else: 0
 

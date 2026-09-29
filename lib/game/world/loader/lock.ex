@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.Loader.Lock do
   Startup lock catalog. Gameplay reads immutable requirements from ETS.
   """
   alias ThistleTea.DB.DBC
-  alias ThistleTea.Game.Core.Profession.Lock, as: LockData
+  alias ThistleTea.Game.Core.Profession.Lock, as: LockCore
   alias ThistleTea.Game.Core.Profession.Lock.Requirement
 
   def init(table \\ __MODULE__) do
@@ -28,7 +28,7 @@ defmodule ThistleTea.Game.World.Loader.Lock do
           }
         end
 
-      :ets.insert(table, {row.id, %LockData{id: row.id, requirements: requirements}})
+      :ets.insert(table, {row.id, %LockCore{id: row.id, requirements: requirements}})
     end)
   end
 

@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.Core.Spell.CastValidation do
   """
   import Bitwise, only: [&&&: 2, <<<: 2]
 
-  alias ThistleTea.Game.Core.Aura, as: AuraLogic
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Dispel
   alias ThistleTea.Game.Core.Aura.EffectImmunity
   alias ThistleTea.Game.Core.Aura.Invulnerability
@@ -202,7 +202,7 @@ defmodule ThistleTea.Game.Core.Spell.CastValidation do
   end
 
   defp check_spirit_of_redemption(caster, %Spell{} = spell) do
-    if AuraLogic.has_spell?(caster, 27_827) and not Spell.healing?(spell) do
+    if AuraCore.has_spell?(caster, 27_827) and not Spell.healing?(spell) do
       {:error, :not_shapeshift}
     else
       :ok
@@ -281,7 +281,7 @@ defmodule ThistleTea.Game.Core.Spell.CastValidation do
   defp check_stronger_rank(caster, %Spell{} = spell, %Target{} = targets) do
     unit_guid = Target.unit_guid(targets)
 
-    if self_target?(caster, unit_guid) and AuraLogic.blocked_by_stronger_rank?(caster, spell) do
+    if self_target?(caster, unit_guid) and AuraCore.blocked_by_stronger_rank?(caster, spell) do
       {:error, :aura_bounced}
     else
       :ok
@@ -291,7 +291,7 @@ defmodule ThistleTea.Game.Core.Spell.CastValidation do
   defp check_stronger_group(caster, spell, targets, target_info) do
     sources =
       cond do
-        self_target?(caster, Target.unit_guid(targets)) -> AuraLogic.source_spells(caster)
+        self_target?(caster, Target.unit_guid(targets)) -> AuraCore.source_spells(caster)
         is_map(target_info) -> Map.get(target_info, :aura_sources, MapSet.new())
         true -> MapSet.new()
       end
@@ -304,7 +304,7 @@ defmodule ThistleTea.Game.Core.Spell.CastValidation do
 
     immune? =
       if self_target?(caster, unit_guid),
-        do: AuraLogic.mechanic_immune?(caster, spell),
+        do: AuraCore.mechanic_immune?(caster, spell),
         else: target_mechanic_immune?(target_info, spell)
 
     if immune? do
@@ -322,7 +322,7 @@ defmodule ThistleTea.Game.Core.Spell.CastValidation do
   defp check_dispel_immunity(caster, %Spell{} = spell, %Target{} = targets) do
     unit_guid = Target.unit_guid(targets)
 
-    if self_target?(caster, unit_guid) and AuraLogic.dispel_immune?(caster, spell) do
+    if self_target?(caster, unit_guid) and AuraCore.dispel_immune?(caster, spell) do
       {:error, :immune}
     else
       :ok
@@ -489,7 +489,7 @@ defmodule ThistleTea.Game.Core.Spell.CastValidation do
   defp validate_target_power_type(_spell, _target_info), do: :ok
 
   defp target_dispel_options(caster, unit_guid, target_info) do
-    if self_target?(caster, unit_guid), do: AuraLogic.dispel_options(caster), else: dispel_options(target_info)
+    if self_target?(caster, unit_guid), do: AuraCore.dispel_options(caster), else: dispel_options(target_info)
   end
 
   defp check_dispel_options(options, dispel_types, polarity) do

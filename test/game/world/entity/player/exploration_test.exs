@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ExplorationTest do
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
-  alias ThistleTea.Game.Core.Player.Exploration, as: ExplorationLogic
+  alias ThistleTea.Game.Core.Player.Exploration, as: ExplorationCore
   alias ThistleTea.Game.Network.Message.SmsgExplorationExperience
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.CharacterStore
@@ -63,12 +63,12 @@ defmodule ThistleTea.Game.World.Entity.Player.ExplorationTest do
       for character <- [dead, ghost] do
         state = %{guid: @character_id, character: character}
         assert Exploration.discover_area(state, area_id) == state
-        refute ExplorationLogic.explored?(state.character, 126)
+        refute ExplorationCore.explored?(state.character, 126)
         refute_received {:"$gen_cast", _packet}
       end
 
       state = Exploration.discover_area(%{guid: @character_id, character: alive}, area_id)
-      assert ExplorationLogic.explored?(state.character, 126)
+      assert ExplorationCore.explored?(state.character, 126)
       assert_receive {:"$gen_cast", {:send_packet, %SmsgExplorationExperience{area_id: ^area_id}}}
     end
   end

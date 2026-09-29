@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.World.Entity.Player.HonorTest do
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Guid
-  alias ThistleTea.Game.Core.Honor, as: HonorData
+  alias ThistleTea.Game.Core.Honor, as: HonorCore
   alias ThistleTea.Game.Core.Honor.Award
   alias ThistleTea.Game.Core.Honor.Damage
   alias ThistleTea.Game.Core.Honor.Snapshot
@@ -56,7 +56,7 @@ defmodule ThistleTea.Game.World.Entity.Player.HonorTest do
     test "rejects distant, hostile, offline, and other-instance targets" do
       character = character(1)
       world = character.internal.world
-      snapshot = %Snapshot{honor: %HonorData{}, day: 5, week_start: 5}
+      snapshot = %Snapshot{honor: %HonorCore{}, day: 5, week_start: 5}
 
       opts = [
         online?: fn _guid -> true end,

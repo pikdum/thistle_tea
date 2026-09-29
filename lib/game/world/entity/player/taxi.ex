@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
   alias ThistleTea.Game.Core.Movement
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Core.Travel.Taxi, as: TaxiLogic
+  alias ThistleTea.Game.Core.Travel.Taxi, as: TaxiCore
   alias ThistleTea.Game.Core.Travel.Taxi.Flight
   alias ThistleTea.Game.Core.Travel.Taxi.Network, as: TaxiNetwork
   alias ThistleTea.Game.Core.Travel.Taxi.Node
@@ -158,7 +158,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
   def arrive(%{character: %Character{internal: %{taxi_flight: %{token: token}}}} = state, token)
       when is_reference(token) do
     cancel_arrival(state)
-    character = TaxiLogic.finish(state.character, Time.now())
+    character = TaxiCore.finish(state.character, Time.now())
     World.update_position(character)
 
     state =
@@ -211,9 +211,9 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
   def resume(%{ready: true, character: %Character{internal: %{taxi_flight: %Flight{remaining_nodes: [_ | _]}}}} = state) do
     token = make_ref()
     now = Time.now()
-    {character, effects} = TaxiLogic.resume(state.character, token, now)
+    {character, effects} = TaxiCore.resume(state.character, token, now)
 
-    if TaxiLogic.active?(character) do
+    if TaxiCore.active?(character) do
       publish_flight(state, character, effects, token, now)
     else
       World.update_position(character)
@@ -227,8 +227,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
   def disconnect(%{character: %Character{} = character} = state) do
     cancel_arrival(state)
 
-    if TaxiLogic.active?(character) do
-      character = TaxiLogic.pause(character, Time.now())
+    if TaxiCore.active?(character) do
+      character = TaxiCore.pause(character, Time.now())
       World.update_position(character)
       %{state | character: character, taxi_arrival_ref: nil}
     else
@@ -240,7 +240,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
 
   def cancel(%{character: %Character{internal: %{taxi_flight: %Flight{}}} = character} = state) do
     cancel_arrival(state)
-    character = TaxiLogic.cancel(character, Time.now())
+    character = TaxiCore.cancel(character, Time.now())
     World.update_position(character)
     %{state | character: character, taxi_arrival_ref: nil}
   end
@@ -276,7 +276,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
   defp validate_activation(_character, _node_ids, _source_node_id), do: {:error, :no_such_path}
 
   defp validate_player_available(character) do
-    if Death.alive?(character) and not TaxiLogic.active?(character) and character.internal.in_combat != true and
+    if Death.alive?(character) and not TaxiCore.active?(character) and character.internal.in_combat != true and
          is_nil(character.internal.casting) do
       :ok
     else
@@ -285,7 +285,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
   end
 
   defp validate_start_state(%{character: %Character{} = character} = state) do
-    if Death.alive?(character) and not TaxiLogic.active?(character) and character.internal.in_combat != true and
+    if Death.alive?(character) and not TaxiCore.active?(character) and character.internal.in_combat != true and
          ((character.unit.flags || 0) &&& 0x00000004) == 0 and not logging_out?(state) do
       :ok
     else
@@ -299,7 +299,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
   defp validate_mount_state(character) do
     cond do
       (character.unit.mount_display_id || 0) != 0 -> {:error, :already_mounted}
-      TaxiLogic.disallowed_form?(character) -> {:error, :shapeshifted}
+      TaxiCore.disallowed_form?(character) -> {:error, :shapeshifted}
       (character.unit.stand_state || 0) != 0 -> {:error, :not_standing}
       true -> :ok
     end
@@ -387,7 +387,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
     destination = TaxiNetwork.node(network, destination_node_id)
     token = make_ref()
     now = Time.now()
-    {character, effects} = TaxiLogic.start(state.character, itinerary, destination, mount_display_id, token, now)
+    {character, effects} = TaxiCore.start(state.character, itinerary, destination, mount_display_id, token, now)
 
     publish_flight(state, character, effects, token, now)
   end

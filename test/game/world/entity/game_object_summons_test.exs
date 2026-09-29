@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSummonsTest do
   alias ThistleTea.Game.World.Entity.Mob.Corpse
   alias ThistleTea.Game.World.Entity.Player
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
 
   setup [:templates]
@@ -307,7 +307,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSummonsTest do
     trap = %GameObjectTemplate{entry: 950_103, type: 6, size: 1.0, flags: 0, faction: 0, data: [0, 0, 0, 0, 1, 0, 0, 0]}
     ritual = %GameObjectTemplate{entry: 950_104, type: 18, size: 1.0, flags: 0, faction: 0, data: [2, 0, 0, 1]}
     hidden = %{trap | entry: 950_105, data: [12, 0, 0, 0, 1, 0, 0, 0, 0, 1]}
-    for template <- [plain, chest, trap, ritual, hidden], do: TemplateLoader.put(template)
+    for template <- [plain, chest, trap, ritual, hidden], do: GameObjectTemplateLoader.put(template)
 
     caster = %Character{
       object: %Object{guid: 42},
@@ -319,7 +319,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSummonsTest do
 
     on_exit(fn ->
       for {guid, _} <- World.nearby_game_objects(caster, 100), do: World.stop_entity(guid)
-      for template <- [plain, chest, trap, ritual, hidden], do: :ets.delete(TemplateLoader, template.entry)
+      for template <- [plain, chest, trap, ritual, hidden], do: :ets.delete(GameObjectTemplateLoader, template.entry)
       Metadata.delete(caster.object.guid)
     end)
 

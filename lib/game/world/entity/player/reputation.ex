@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
   alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Quest
-  alias ThistleTea.Game.Core.Reputation, as: ReputationLogic
+  alias ThistleTea.Game.Core.Reputation, as: ReputationCore
   alias ThistleTea.Game.Core.Reputation.Change
   alias ThistleTea.Game.Core.Reputation.Definition
   alias ThistleTea.Game.Core.Reputation.KillReward
@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
   end
 
   def standing(%Character{} = character, faction_id) do
-    ReputationLogic.standing(
+    ReputationCore.standing(
       character.player.reputation,
       ReputationLoader.catalog(),
       faction_id,
@@ -68,11 +68,11 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
       character
       |> standings()
       |> Map.new(fn {faction_id, standing} ->
-        state = ReputationLogic.state(character.player.reputation, faction_id)
+        state = ReputationCore.state(character.player.reputation, faction_id)
 
         entry = %{
-          rank: ReputationLogic.rank(standing),
-          at_war?: state != nil and ReputationLogic.at_war?(character.player.reputation, faction_id)
+          rank: ReputationCore.rank(standing),
+          at_war?: state != nil and ReputationCore.at_war?(character.player.reputation, faction_id)
         }
 
         {faction_id, entry}
@@ -104,7 +104,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
   def rank(%Character{} = character, faction_id) do
     character
     |> standing(faction_id)
-    |> ReputationLogic.rank()
+    |> ReputationCore.rank()
   end
 
   def faction_id(guid) when is_integer(guid) and guid > 0 do
@@ -119,10 +119,10 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
   def can_interact?(%Character{} = character, target_guid) do
     case faction_id(target_guid) do
       faction_id when is_integer(faction_id) ->
-        case ReputationLogic.state(character.player.reputation, faction_id) do
+        case ReputationCore.state(character.player.reputation, faction_id) do
           %State{} ->
-            ReputationLogic.rank_value(rank(character, faction_id)) >
-              ReputationLogic.rank_value(:unfriendly)
+            ReputationCore.rank_value(rank(character, faction_id)) >
+              ReputationCore.rank_value(:unfriendly)
 
           nil ->
             true
@@ -143,7 +143,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
   def price(%Character{} = character, target_guid, amount) when is_integer(amount) and amount >= 0 do
     case faction_id(target_guid) do
       faction_id when is_integer(faction_id) ->
-        if ReputationLogic.rank_value(rank(character, faction_id)) >= ReputationLogic.rank_value(:honored),
+        if ReputationCore.rank_value(rank(character, faction_id)) >= ReputationCore.rank_value(:honored),
           do: div(amount * 9 + 5, 10),
           else: amount
 
@@ -153,7 +153,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
   end
 
   def item_requirement_met?(%Character{} = character, target_guid, template) do
-    required_rank = ReputationLogic.rank_value(template.required_reputation_rank)
+    required_rank = ReputationCore.rank_value(template.required_reputation_rank)
 
     required_faction =
       case template.required_reputation_faction do
@@ -164,7 +164,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
 
     case required_faction do
       faction_id when is_integer(faction_id) ->
-        ReputationLogic.meets_requirement?(
+        ReputationCore.meets_requirement?(
           character.player.reputation,
           ReputationLoader.catalog(),
           faction_id,
@@ -210,7 +210,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
     previous = character.player.reputation
 
     {reputation, changes} =
-      ReputationLogic.modify(previous, catalog, faction_id, delta, context(character),
+      ReputationCore.modify(previous, catalog, faction_id, delta, context(character),
         spillover?: Keyword.get(opts, :spillover?, true)
       )
 
@@ -220,12 +220,12 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
   def set(%{character: %Character{} = character} = state, faction_id, value) do
     catalog = ReputationLoader.catalog()
     previous = character.player.reputation
-    {reputation, changes} = ReputationLogic.set(previous, catalog, faction_id, value, context(character))
+    {reputation, changes} = ReputationCore.set(previous, catalog, faction_id, value, context(character))
     apply_transition(state, previous, reputation, changes)
   end
 
   def set_visible(%{character: %Character{} = character} = state, faction_id) do
-    case ReputationLogic.set_visible(character.player.reputation, faction_id) do
+    case ReputationCore.set_visible(character.player.reputation, faction_id) do
       {:ok, reputation, change} ->
         Outbound.send_packet(%Message.SmsgSetFactionVisible{index: change.index})
         store_reputation(state, reputation, false)
@@ -255,7 +255,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
     catalog = ReputationLoader.catalog()
     previous = character.player.reputation
 
-    case ReputationLogic.set_at_war(previous, catalog, index, enabled, context(character)) do
+    case ReputationCore.set_at_war(previous, catalog, index, enabled, context(character)) do
       {:ok, reputation, _change} ->
         if Keyword.get(opts, :notify?, false) do
           Outbound.send_packet(%Message.SmsgSetFactionAtwar{index: index, enabled: enabled})
@@ -271,7 +271,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
   def set_inactive(%{character: %Character{} = character} = state, index, enabled) do
     previous = character.player.reputation
 
-    case ReputationLogic.set_inactive(previous, index, enabled) do
+    case ReputationCore.set_inactive(previous, index, enabled) do
       {:ok, reputation, _change} -> store_reputation(state, reputation, false)
       {:error, :not_allowed} -> state
     end
@@ -316,7 +316,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
     delta = reputation_gain(state.character, :kill, reward.value, reward.faction_id, creature_level)
 
     state =
-      if ReputationLogic.rank_value(rank(state.character, reward.faction_id)) <= reward.max_rank do
+      if ReputationCore.rank_value(rank(state.character, reward.faction_id)) <= reward.max_rank do
         modify(state, reward.faction_id, delta)
       else
         state
@@ -339,8 +339,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
       0
     else
       bonus = if value > 0, do: reputation_bonus(character, source, faction_id), else: 0
-      level_rate = ReputationLogic.level_rate(source, value, character.unit.level, content_level)
-      ReputationLogic.calculate_gain(value, rate, level_rate, bonus)
+      level_rate = ReputationCore.level_rate(source, value, character.unit.level, content_level)
+      ReputationCore.calculate_gain(value, rate, level_rate, bonus)
     end
   end
 
@@ -416,7 +416,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
   defp context(%Character{} = character), do: %{race: character.unit.race, class: character.unit.class}
 
   defp rank_name(rank) do
-    ReputationLogic.ranks()
+    ReputationCore.ranks()
     |> Enum.at(rank)
   end
 

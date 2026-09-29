@@ -5,14 +5,14 @@ defmodule ThistleTea.Game.World.Loader.CreatureSpellListVmangosTest do
   alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.AI.CreatureSpellList
   alias ThistleTea.Game.Core.AI.ScriptStep
-  alias ThistleTea.Game.World.Loader.CreatureSpellList, as: ListLoader
+  alias ThistleTea.Game.World.Loader.CreatureSpellList, as: CreatureSpellListLoader
   alias ThistleTea.Game.World.Loader.Script
 
   @moduletag :vmangos_db
 
   describe "load/1" do
     test "loads initial and repeat timing with cast flags" do
-      assert %{40_520 => default, 40_521 => cat} = ListLoader.load([40_520, 40_521])
+      assert %{40_520 => default, 40_521 => cat} = CreatureSpellListLoader.load([40_520, 40_521])
       assert %CreatureSpellList{id: 40_520, spells: [%CreatureSpell{spell_id: 9739} = wrath]} = default
       assert CreatureSpell.flag?(wrath, :main_ranged)
       assert wrath.delay_repeat_min_ms == 2_000
@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.World.Loader.CreatureSpellListVmangosTest do
       assert fury.delay_initial_max_ms == 16_000
       assert fury.delay_repeat_min_ms == 30_000
       assert fury.delay_repeat_max_ms == 35_000
-      assert ListLoader.load([0, 0xFFFFFFFF]) == %{}
+      assert CreatureSpellListLoader.load([0, 0xFFFFFFFF]) == %{}
     end
   end
 

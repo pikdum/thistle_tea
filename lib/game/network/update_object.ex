@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   alias ThistleTea.Game.Core.Entity.Corpse
   alias ThistleTea.Game.Core.Entity.DynamicObject
   alias ThistleTea.Game.Core.Entity.GameObject
-  alias ThistleTea.Game.Core.Entity.Item, as: DataItem
+  alias ThistleTea.Game.Core.Entity.Item, as: ItemCore
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Pet.Empathy
@@ -330,10 +330,10 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     end)
   end
 
-  def from_item(%DataItem{object: object, item: item, container: container} = data_item) do
+  def from_item(%ItemCore{object: object, item: item, container: container} = data_item) do
     %__MODULE__{
       update_type: :create_object2,
-      object_type: if(DataItem.container?(data_item), do: :container, else: :item),
+      object_type: if(ItemCore.container?(data_item), do: :container, else: :item),
       object: object,
       item: item,
       container: container,
@@ -343,10 +343,10 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     }
   end
 
-  def item_values_update(%DataItem{object: object, item: item, container: container} = data_item) do
+  def item_values_update(%ItemCore{object: object, item: item, container: container} = data_item) do
     %__MODULE__{
       update_type: :values,
-      object_type: if(DataItem.container?(data_item), do: :container, else: :item),
+      object_type: if(ItemCore.container?(data_item), do: :container, else: :item),
       object: object,
       item: item,
       container: container

@@ -28,7 +28,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.SpellLaunchTest do
   alias ThistleTea.Game.World.Entity.EffectResolver.SpellLaunch
   alias ThistleTea.Game.World.Entity.EffectResolver.Spells
   alias ThistleTea.Game.World.Entity.EventSink
-  alias ThistleTea.Game.World.Entity.EventSink.Context, as: OwnerContext
+  alias ThistleTea.Game.World.Entity.EventSink.Context, as: SinkContext
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
 
@@ -40,7 +40,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.SpellLaunchTest do
       assert {:waiting, preparing, 1} = Casting.advance(preparing, -9_001)
       refute preparing.internal.in_combat
       refute Enum.any?(preparing.internal.events, &is_struct(&1, Effects.SpellLaunched))
-      launched = preparing |> Casting.complete(-9_000) |> EventSink.emit_pending(OwnerContext.new(self()))
+      launched = preparing |> Casting.complete(-9_000) |> EventSink.emit_pending(SinkContext.new(self()))
       assert launched.internal.in_combat
       assert launched.unit.flags == 0x80000
       assert CombatTimer.remaining(launched, -9_000) == 1_500

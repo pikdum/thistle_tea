@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MeetingStonesTest do
   alias ThistleTea.Game.World.Entity.Player.MeetingStones
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Registry
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
@@ -133,13 +133,13 @@ defmodule ThistleTea.Game.World.Entity.Player.MeetingStonesTest do
 
   defp stone(_context) do
     template = %GameObjectTemplate{entry: @entry, type: 23, size: 1.0, flags: 0, faction: 0, data: [17, 26, 1581]}
-    TemplateLoader.put(template)
+    GameObjectTemplateLoader.put(template)
     object = GameObject.build_summoned(template, WorldRef.open(0), {1.0, 0.0, 0.0, 0.0})
     {:ok, _pid} = World.start_incarnation(object)
 
     on_exit(fn ->
       World.stop_entity(object.object.guid)
-      :ets.delete(TemplateLoader, @entry)
+      :ets.delete(GameObjectTemplateLoader, @entry)
     end)
 
     %{stone: object.object.guid}

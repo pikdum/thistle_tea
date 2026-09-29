@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.SpellEffectMod
   alias ThistleTea.Game.Core.Entity.CreatureTemplate
-  alias ThistleTea.Game.Core.Spell, as: SpellData
+  alias ThistleTea.Game.Core.Spell, as: SpellCore
   alias ThistleTea.Game.Core.Spell.AuraRank
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.Spell.Scripts
@@ -62,18 +62,18 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   def cached(_spell_id), do: nil
 
-  def aura_rank(%SpellData{} = spell, level) do
+  def aura_rank(%SpellCore{} = spell, level) do
     if AuraRank.eligible?(spell, level), do: spell, else: AuraRank.select(spell, level, aura_ancestors(spell))
   end
 
   defp aura_ancestors(spell), do: aura_ancestors(spell, MapSet.new([spell.id]))
 
-  defp aura_ancestors(%SpellData{previous_in_chain: previous}, seen) when is_integer(previous) and previous > 0 do
+  defp aura_ancestors(%SpellCore{previous_in_chain: previous}, seen) when is_integer(previous) and previous > 0 do
     if MapSet.member?(seen, previous) do
       []
     else
       case cached(previous) do
-        %SpellData{} = spell -> [spell | aura_ancestors(spell, MapSet.put(seen, previous))]
+        %SpellCore{} = spell -> [spell | aura_ancestors(spell, MapSet.put(seen, previous))]
         nil -> []
       end
     end
@@ -141,7 +141,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     rows
     |> Enum.map(&build_preloaded(&1, radius_lookup))
     |> Enum.map(&put_chain(&1, Map.get(chain_map, &1.id)))
-    |> Map.new(fn %SpellData{id: id} = spell -> {id, spell} end)
+    |> Map.new(fn %SpellCore{id: id} = spell -> {id, spell} end)
   end
 
   def build_spellbook(_), do: %{}
@@ -216,7 +216,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defp build_preloaded(row, radius_lookup, ancestors \\ MapSet.new()) do
-    %SpellData{
+    %SpellCore{
       id: row.id,
       name: row.name_en_gb,
       spell_icon: row.spell_icon,
@@ -286,7 +286,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> Semantics.compile()
   end
 
-  defp load_triggered_immunity(%SpellData{} = spell) do
+  defp load_triggered_immunity(%SpellCore{} = spell) do
     %{spell | triggers_school_immunity?: Enum.any?(spell.effects, &triggers_school_immunity?/1)}
   end
 
@@ -299,7 +299,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   defp triggers_school_immunity?(_effect), do: false
 
-  defp load_boost_auras(%SpellData{} = spell, ancestors) do
+  defp load_boost_auras(%SpellCore{} = spell, ancestors) do
     auras =
       for id <- Scripts.boost_aura_ids(spell),
           not MapSet.member?(ancestors, id),
@@ -310,7 +310,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     %{spell | boost_auras: auras}
   end
 
-  defp load_script_spells(%SpellData{} = spell, ancestors) do
+  defp load_script_spells(%SpellCore{} = spell, ancestors) do
     spells =
       for id <- Scripts.script_spell_ids(spell),
           not MapSet.member?(ancestors, id),
@@ -321,7 +321,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     %{spell | script_spells: spells}
   end
 
-  defp load_form_auras(%SpellData{} = spell, ancestors) do
+  defp load_form_auras(%SpellCore{} = spell, ancestors) do
     auras =
       for id <- Scripts.form_aura_ids(spell),
           not MapSet.member?(ancestors, id),
@@ -332,7 +332,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     %{spell | form_auras: auras}
   end
 
-  defp load_passive_dependencies(%SpellData{} = spell, ancestors) do
+  defp load_passive_dependencies(%SpellCore{} = spell, ancestors) do
     dependencies =
       for id <- PassiveSpellLoader.get(spell.id),
           not MapSet.member?(ancestors, id),
@@ -343,7 +343,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     %{spell | passive_dependencies: dependencies}
   end
 
-  defp load_linked_auras(%SpellData{effects: effects} = spell, ancestors) do
+  defp load_linked_auras(%SpellCore{effects: effects} = spell, ancestors) do
     linked =
       for %Effect{aura: :linked_aura, trigger_spell_id: id} <- effects,
           is_integer(id) and id > 0,
@@ -402,7 +402,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp unsigned32(value) when is_integer(value), do: value
   defp unsigned32(_value), do: 0
 
-  defp append_shapeshift_passives(%SpellData{effects: effects} = spell, radius_lookup) do
+  defp append_shapeshift_passives(%SpellCore{effects: effects} = spell, radius_lookup) do
     case shapeshift_form_value(effects) do
       form when is_integer(form) ->
         passive_effects =
@@ -449,7 +449,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> Map.reject(fn {_id, chain} -> is_nil(chain) end)
   end
 
-  defp put_chain(%SpellData{} = spell, %{first_spell: first_spell, rank: rank} = chain) do
+  defp put_chain(%SpellCore{} = spell, %{first_spell: first_spell, rank: rank} = chain) do
     %{
       spell
       | first_in_chain: first_spell,

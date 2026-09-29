@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.System.Battleground.Spawns do
 
   alias ThistleTea.Game.Core.Battleground.Rules
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.World.Loader.Battleground, as: Catalog
+  alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.System.SpawnPool
 
   def init do
@@ -24,14 +24,14 @@ defmodule ThistleTea.Game.World.System.Battleground.Spawns do
     select_event(world, event, nil)
   end
 
-  def allowed?(%WorldRef{map_id: map_id} = world, {kind, db_guid}, catalog \\ Catalog) do
+  def allowed?(%WorldRef{map_id: map_id} = world, {kind, db_guid}, catalog \\ BattlegroundLoader) do
     case catalog.bindings(map_id, kind, db_guid) do
       [] -> true
       bindings -> Enum.any?(bindings, &(Map.get(events(world), &1.event1) == &1.event2))
     end
   end
 
-  def set_event(%WorldRef{} = world, event, state, catalog \\ Catalog, pool \\ SpawnPool) do
+  def set_event(%WorldRef{} = world, event, state, catalog \\ BattlegroundLoader, pool \\ SpawnPool) do
     select_event(world, event, state)
 
     world.map_id

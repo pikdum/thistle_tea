@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.DeathItemTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Core.Aura
-  alias ThistleTea.Game.Core.Aura.DeathItem, as: DeathItemLogic
+  alias ThistleTea.Game.Core.Aura.DeathItem, as: DeathItemCore
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Combat.DamageOrigin
   alias ThistleTea.Game.Core.Combat.Engagement.Tap
@@ -68,7 +68,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.DeathItemTest do
 
     test "allows non-gray player victims without a creature tap", %{opts: opts} do
       player = %Character{unit: %Unit{level: 10, auras: [holder()]}, player: %Player{}}
-      [reward] = DeathItemLogic.reward_events(player)
+      [reward] = DeathItemCore.reward_events(player)
       assert [_reward] = DeathItem.resolve(reward, opts)
       assert [] = DeathItem.resolve(reward, Keyword.put(opts, :metadata, fn 7 -> %{level: 60} end))
     end
@@ -79,7 +79,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.DeathItemTest do
       no_xp = %{mob | internal: %{mob.internal | creature: %Creature{experience_multiplier: 0.0}}}
 
       for victim <- [pet, totem, no_xp] do
-        [reward] = DeathItemLogic.reward_events(victim)
+        [reward] = DeathItemCore.reward_events(victim)
         assert [] = DeathItem.resolve(reward, opts)
         assert [_reward] = DeathItem.resolve(%{reward | item_id: 6435}, opts)
       end
@@ -107,13 +107,13 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.DeathItemTest do
       mob = %{mob | unit: %{mob.unit | auras: [first, first, second, second, capture, capture]}}
 
       assert [{7, 6265, 1}, {8, 6265, 1}, {7, 6435, 2}, {7, 6435, 2}] ==
-               Enum.map(DeathItemLogic.reward_events(mob), &{&1.target_guid, &1.item_id, &1.count})
+               Enum.map(DeathItemCore.reward_events(mob), &{&1.target_guid, &1.item_id, &1.count})
     end
 
     test "ignores missing items and nonpositive quantities", %{mob: mob} do
       for {item, count} <- [{0, 1}, {nil, 1}, {6265, 0}, {6265, -1}, {6265, nil}] do
         holder = %{holder() | auras: [%Aura{type: :channel_death_item, item_type: item, amount: count}]}
-        assert [] = DeathItemLogic.reward_events(%{mob | unit: %{mob.unit | auras: [holder]}})
+        assert [] = DeathItemCore.reward_events(%{mob | unit: %{mob.unit | auras: [holder]}})
       end
     end
   end
@@ -127,7 +127,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.DeathItemTest do
         internal: %{mob.internal | loot: %Loot{tapped_by: %Tap{player: 7}}, damage_origin: %DamageOrigin{player: 100}}
     }
 
-    [reward] = DeathItemLogic.reward_events(mob)
+    [reward] = DeathItemCore.reward_events(mob)
     opts = [metadata: fn 7 -> %{level: 10} end, group_of: fn _guid -> nil end, position: fn _guid -> nil end]
     %{mob: mob, reward: reward, opts: opts}
   end

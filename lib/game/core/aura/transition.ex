@@ -42,7 +42,7 @@ defmodule ThistleTea.Game.Core.Aura.Transition do
   alias ThistleTea.Game.Core.Movement.Fear
   alias ThistleTea.Game.Core.OutdoorPvp.Silithyst
   alias ThistleTea.Game.Core.Pet.Companion
-  alias ThistleTea.Game.Core.Reputation, as: ReputationLogic
+  alias ThistleTea.Game.Core.Reputation, as: ReputationCore
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Spell.Casting
@@ -189,10 +189,10 @@ defmodule ThistleTea.Game.Core.Aura.Transition do
     rank =
       case Map.fetch(current_reactions, faction_id) do
         {:ok, forced_rank} -> forced_rank
-        :error -> character.player.reputation.ranks |> Map.get(faction_id) |> ReputationLogic.rank_value()
+        :error -> character.player.reputation.ranks |> Map.get(faction_id) |> ReputationCore.rank_value()
       end
 
-    is_integer(rank) and rank >= ReputationLogic.rank_value(:friendly)
+    is_integer(rank) and rank >= ReputationCore.rank_value(:friendly)
   end
 
   defp put_holders(%{unit: %Unit{} = unit} = entity, holders) do

@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Trade do
   alias ThistleTea.Game.Core.Spell.Cooldowns
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Core.Trade, as: TradeLogic
+  alias ThistleTea.Game.Core.Trade, as: TradeCore
   alias ThistleTea.Game.Core.Trade.Cast, as: TradeCast
   alias ThistleTea.Game.Core.Trade.Decision
   alias ThistleTea.Game.Core.Trade.Prepare
@@ -171,7 +171,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Trade do
 
     with %Item{} = item <- ItemStore.get(guid),
          :ok <-
-           TradeLogic.validate_item(state.character, item, slot, Time.now(), &ItemStore.get/1, &ItemEnchantment.get/1) do
+           TradeCore.validate_item(state.character, item, slot, Time.now(), &ItemStore.get/1, &ItemEnchantment.get/1) do
       {:ok, {:item, slot, item}}
     else
       {:error, reason} -> {:inventory, reason, guid || 0}

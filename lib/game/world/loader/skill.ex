@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.World.Loader.Skill do
   alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Skills
   alias ThistleTea.Game.Core.Skills.SpellSkills
-  alias ThistleTea.Game.Core.Spell, as: SpellData
+  alias ThistleTea.Game.Core.Spell, as: SpellCore
   alias ThistleTea.Game.Core.Spell.Effect
 
   @skill_fields [:id] ++
@@ -49,7 +49,7 @@ defmodule ThistleTea.Game.World.Loader.Skill do
           }
         end
 
-      :ets.insert(table, {{:spell_grants, row.id}, SpellSkills.grants(%SpellData{id: row.id, effects: effects})})
+      :ets.insert(table, {{:spell_grants, row.id}, SpellSkills.grants(%SpellCore{id: row.id, effects: effects})})
     end)
   end
 

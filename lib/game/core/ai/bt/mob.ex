@@ -29,9 +29,9 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   alias ThistleTea.Game.Core.AI.EventAI
   alias ThistleTea.Game.Core.AI.NavigationIntent
   alias ThistleTea.Game.Core.AI.Script
-  alias ThistleTea.Game.Core.Aura, as: AuraLogic
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Invisibility
-  alias ThistleTea.Game.Core.Combat, as: CombatLogic
+  alias ThistleTea.Game.Core.Combat, as: CombatCore
   alias ThistleTea.Game.Core.Combat.Aggro
   alias ThistleTea.Game.Core.Combat.Engagement
   alias ThistleTea.Game.Core.Combat.Hostility
@@ -243,7 +243,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   end
 
   defp stunned?(%Mob{} = state, _blackboard) do
-    AuraLogic.has_aura?(state, :mod_stun)
+    AuraCore.has_aura?(state, :mod_stun)
   end
 
   defp stunned?(_state, _blackboard), do: false
@@ -571,7 +571,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
 
   defp clear_combat(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
     %Engagement.Result{entity: state} = Engagement.leave(state, :evade, blackboard: blackboard)
-    {state, events} = AuraLogic.remove_on_evade(state, now)
+    {state, events} = AuraCore.remove_on_evade(state, now)
     state = Effects.enqueue(state, events)
     {:success, state, state.internal.blackboard}
   end
@@ -990,7 +990,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
          %Context{now: now, perception: perception, random: random}
        ) do
     base_angle = base_chase_angle({mx, my}, {tx, ty}, random)
-    chase_distance = CombatLogic.chase_target_distance(melee_reach_to(state, target_guid, perception))
+    chase_distance = CombatCore.chase_target_distance(melee_reach_to(state, target_guid, perception))
     angle = base_angle + approach_angle_offset(state, target_guid, now, perception, random)
 
     {
@@ -1075,11 +1075,11 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   end
 
   def chase_repath_distance(%Mob{} = state, target) when is_map(target) do
-    CombatLogic.chase_rechase_distance(melee_reach_to(state, target), target_bounding_radius(target))
+    CombatCore.chase_rechase_distance(melee_reach_to(state, target), target_bounding_radius(target))
   end
 
   defp chase_repath_distance(%Mob{} = state, target_guid, perception) do
-    CombatLogic.chase_rechase_distance(
+    CombatCore.chase_rechase_distance(
       melee_reach_to(state, target_guid, perception),
       target_bounding_radius(target_guid, perception)
     )
@@ -1092,11 +1092,11 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   end
 
   defp melee_reach_to(%Mob{} = state, target) when is_map(target) do
-    CombatLogic.melee_reach(own_combat_reach(state), target_combat_reach(target))
+    CombatCore.melee_reach(own_combat_reach(state), target_combat_reach(target))
   end
 
   defp melee_reach_to(%Mob{} = state, target_guid, perception) do
-    CombatLogic.melee_reach(own_combat_reach(state), target_combat_reach(target_guid, perception))
+    CombatCore.melee_reach(own_combat_reach(state), target_combat_reach(target_guid, perception))
   end
 
   defp own_combat_reach(%Mob{unit: %Unit{combat_reach: reach}}) when is_number(reach) and reach > 0, do: reach

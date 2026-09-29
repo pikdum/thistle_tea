@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Honor do
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Player
-  alias ThistleTea.Game.Core.Honor, as: HonorLogic
+  alias ThistleTea.Game.Core.Honor, as: HonorCore
   alias ThistleTea.Game.Core.Honor.Award
   alias ThistleTea.Game.Core.Honor.Snapshot
   alias ThistleTea.Game.Network.Message.MsgInspectHonorStats
@@ -18,13 +18,13 @@ defmodule ThistleTea.Game.World.Entity.Player.Honor do
 
   def sync(%Character{} = character, server \\ HonorSystem) do
     snapshot =
-      HonorSystem.register(character.object.guid, HonorLogic.team(character.unit.race), character.unit.level, server)
+      HonorSystem.register(character.object.guid, HonorCore.team(character.unit.race), character.unit.level, server)
 
     apply_snapshot(character, snapshot)
   end
 
   def apply_snapshot(%Character{} = character, %Snapshot{} = snapshot) do
-    player = HonorLogic.project(snapshot.honor, character.player, snapshot.day, snapshot.week_start)
+    player = HonorCore.project(snapshot.honor, character.player, snapshot.day, snapshot.week_start)
 
     %{character | player: player}
     |> Entity.mark_broadcast_update()
@@ -55,7 +55,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Honor do
 
     with true <- Inspection.available?(character, guid, opts),
          %Snapshot{} = snapshot <- snapshot.(guid) do
-      player = HonorLogic.project(snapshot.honor, %Player{}, snapshot.day, snapshot.week_start)
+      player = HonorCore.project(snapshot.honor, %Player{}, snapshot.day, snapshot.week_start)
       %MsgInspectHonorStats{guid: guid, player: player}
     else
       _unavailable -> nil

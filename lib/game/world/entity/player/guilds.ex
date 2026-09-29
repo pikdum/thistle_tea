@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
 
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.Game.Core.Chat.ChatStatus, as: StatusLogic
+  alias ThistleTea.Game.Core.Chat.ChatStatus, as: ChatStatusCore
   alias ThistleTea.Game.Core.Entity, as: EntityCore
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Guid
@@ -487,7 +487,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
         message: message,
         channel_name: nil,
         player_rank: 0,
-        tag: StatusLogic.tag(character)
+        tag: ChatStatusCore.tag(character)
       }
 
       permission = if(type == 3, do: :guild_listen, else: :officer_listen)

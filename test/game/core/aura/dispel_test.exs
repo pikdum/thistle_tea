@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Core.Aura.DispelTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Core.Aura, as: AuraData
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Dispel
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Aura.Periodic
@@ -123,7 +123,7 @@ defmodule ThistleTea.Game.Core.Aura.DispelTest do
   describe "tick/2" do
     test "stacked poison damage decreases after a partial cure and stops on expiry", %{entity: entity} do
       [holder] = entity.unit.auras
-      aura = %AuraData{type: :periodic_damage, amount: 10, amplitude_ms: 3_000, next_tick_at: 3_000}
+      aura = %AuraCore{type: :periodic_damage, amount: 10, amplitude_ms: 3_000, next_tick_at: 3_000}
       holder = %{holder | spell: %{holder.spell | dispel_type: 4}, auras: [aura]}
       entity = %{entity | unit: %{entity.unit | auras: [holder]}}
 
@@ -148,7 +148,7 @@ defmodule ThistleTea.Game.Core.Aura.DispelTest do
 
     test "Ignite's accumulated damage is not multiplied again", %{entity: entity} do
       [holder] = entity.unit.auras
-      aura = %AuraData{type: :periodic_damage, amount: 10, amplitude_ms: 2_000, next_tick_at: 2_000}
+      aura = %AuraCore{type: :periodic_damage, amount: 10, amplitude_ms: 2_000, next_tick_at: 2_000}
       holder = %{holder | spell: %{holder.spell | id: 12_654}, auras: [aura]}
       entity = %{entity | unit: %{entity.unit | auras: [holder]}}
       {entity, events} = Periodic.tick(entity, 2_000)
@@ -202,7 +202,7 @@ defmodule ThistleTea.Game.Core.Aura.DispelTest do
       slot: 32,
       negative?: true,
       expires_at: 10_000,
-      auras: [%AuraData{type: :mod_stat, misc_value: 0, amount: -10, next_tick_at: 3_000}]
+      auras: [%AuraCore{type: :mod_stat, misc_value: 0, amount: -10, next_tick_at: 3_000}]
     }
 
     entity = %Mob{

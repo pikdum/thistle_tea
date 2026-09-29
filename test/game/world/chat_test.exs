@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.ChatTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Game.Core.Aura, as: AuraData
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Chat.ChatStatus
   alias ThistleTea.Game.Core.Entity.Character
@@ -154,7 +154,7 @@ defmodule ThistleTea.Game.World.ChatTest do
         on_exit(fn -> Presence.leave(character) end)
       end
 
-      holder = %Holder{spell: %Spell{id: 1714}, auras: [%AuraData{type: :mod_language, misc_value: 8}]}
+      holder = %Holder{spell: %Spell{id: 1714}, auras: [%AuraCore{type: :mod_language, misc_value: 8}]}
       character = %{sender.character | unit: %{sender.character.unit | auras: [holder]}}
       sender = %{sender | character: character}
 

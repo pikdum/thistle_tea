@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Battleground do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Combat.KillReward
-  alias ThistleTea.Game.World.Loader.Battleground, as: Catalog
+  alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
 
@@ -51,7 +51,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Battleground do
         opts
       )
       when is_integer(instance_id) and is_integer(db_guid) and is_integer(incarnation_id) do
-    bindings = Keyword.get(opts, :bindings, &Catalog.bindings/3)
+    bindings = Keyword.get(opts, :bindings, &BattlegroundLoader.bindings/3)
     participants = Keyword.get(opts, :participants, &BattlegroundSystem.participants/1)
     metadata = Keyword.get(opts, :metadata, &Metadata.query(&1, [:owner_guid]))
 

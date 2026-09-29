@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.World.Loader.PetTraining do
   alias ThistleTea.DB.DBC
   alias ThistleTea.DB.DBC.CreatureFamily
   alias ThistleTea.Game.Core.Pet.PetAbility
-  alias ThistleTea.Game.Core.Spell, as: SpellData
+  alias ThistleTea.Game.Core.Spell, as: SpellCore
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   def init(table \\ __MODULE__) do
@@ -39,7 +39,7 @@ defmodule ThistleTea.Game.World.Loader.PetTraining do
 
   def family_passives(rows, spells, skills) do
     ids = for row <- rows, row.skill_line in skills and row.acquire_method == 2, do: row.spell
-    spells |> Map.take(ids) |> Map.filter(fn {_id, spell} -> SpellData.attribute?(spell, :passive) end)
+    spells |> Map.take(ids) |> Map.filter(fn {_id, spell} -> SpellCore.attribute?(spell, :passive) end)
   end
 
   def family_passives(family, table \\ __MODULE__), do: lookup(table, {:family_passives, family})

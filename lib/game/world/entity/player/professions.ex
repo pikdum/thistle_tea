@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Professions do
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Inventory.ChangeSet
-  alias ThistleTea.Game.Core.Profession.Professions, as: LogicProfessions
+  alias ThistleTea.Game.Core.Profession.Professions, as: ProfessionsCore
   alias ThistleTea.Game.Core.Quest.QuestLog
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Spell.SpellRemoval
@@ -24,7 +24,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Professions do
   def unlearn(%{character: %Character{} = character} = state, skill_id) do
     with true <- SkillLoader.unlearnable?(skill_id, character.unit.race, character.unit.class),
          {:ok, changes} <-
-           LogicProfessions.plan(
+           ProfessionsCore.plan(
              character.player,
              skill_id,
              known_quests(character),

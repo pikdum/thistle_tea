@@ -4,9 +4,9 @@ defmodule ThistleTea.Game.World.System.Battleground.Buffs do
 
   alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.System.Battleground.BuffRegistry
-  alias ThistleTea.Game.World.System.Battleground.Supervisor, as: MatchSupervisor
+  alias ThistleTea.Game.World.System.Battleground.Supervisor, as: BattlegroundSupervisor
 
   require Logger
 
@@ -15,7 +15,10 @@ defmodule ThistleTea.Game.World.System.Battleground.Buffs do
   @respawn_ms 180_000
 
   def start(world, owner, positions) do
-    DynamicSupervisor.start_child(MatchSupervisor, {__MODULE__, world: world, owner: owner, positions: positions})
+    DynamicSupervisor.start_child(
+      BattlegroundSupervisor,
+      {__MODULE__, world: world, owner: owner, positions: positions}
+    )
   end
 
   def stop(world) do
@@ -101,7 +104,7 @@ defmodule ThistleTea.Game.World.System.Battleground.Buffs do
   end
 
   defp spawn_pickup(world, entry, position) do
-    case TemplateLoader.cached(entry) do
+    case GameObjectTemplateLoader.cached(entry) do
       nil ->
         {:error, :missing_template}
 

@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PvpTest do
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
-  alias ThistleTea.Game.Core.Pvp, as: PvpData
+  alias ThistleTea.Game.Core.Pvp, as: PvpCore
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.WorldRef
@@ -28,7 +28,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PvpTest do
         unit: %Unit{race: 1, class: 1, level: 60, health: 100, max_health: 100, power1: 0, max_power1: 0, auras: []},
         player: %Player{flags: 0},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-        internal: %Internal{world: WorldRef.open(0), pvp: %PvpData{enforced?: true}}
+        internal: %Internal{world: WorldRef.open(0), pvp: %PvpCore{enforced?: true}}
       }
 
       on_exit(fn ->
@@ -58,7 +58,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PvpTest do
       loading = %State{}
       assert Pvp.arrive(loading, lookup) == loading
 
-      safe = %State{ready: true, character: %Character{internal: %Internal{pvp: %PvpData{}}}}
+      safe = %State{ready: true, character: %Character{internal: %Internal{pvp: %PvpCore{}}}}
       assert Pvp.arrive(safe, lookup) == safe
     end
   end

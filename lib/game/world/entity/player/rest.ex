@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Rest do
   alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
-  alias ThistleTea.Game.Core.Player.Rest, as: RestLogic
+  alias ThistleTea.Game.Core.Player.Rest, as: RestCore
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
@@ -24,18 +24,18 @@ defmodule ThistleTea.Game.World.Entity.Player.Rest do
   @horde_races [2, 5, 6, 8]
 
   def restore(%Character{} = character, now \\ Time.now()) do
-    character |> RestLogic.restore(now) |> CharacterStore.put()
+    character |> RestCore.restore(now) |> CharacterStore.put()
   end
 
   def logout(%{character: %Character{} = character} = state, now \\ Time.now()) do
-    %{state | character: RestLogic.logout(character, now)}
+    %{state | character: RestCore.logout(character, now)}
   end
 
   def enter_tavern(%{character: %Character{} = character} = state, trigger_id) do
-    case RestLogic.rest_type(character) do
+    case RestCore.rest_type(character) do
       :city -> state
       {:tavern, ^trigger_id} -> state
-      _other -> apply_transition(state, RestLogic.start(character, {:tavern, trigger_id}, Time.now()))
+      _other -> apply_transition(state, RestCore.start(character, {:tavern, trigger_id}, Time.now()))
     end
   end
 
@@ -50,11 +50,11 @@ defmodule ThistleTea.Game.World.Entity.Player.Rest do
     rest_capital? = friendly_capital?(character, zone_id)
 
     cond do
-      rest_capital? and RestLogic.rest_type(character) != :city ->
-        RestLogic.start(character, :city, Time.now())
+      rest_capital? and RestCore.rest_type(character) != :city ->
+        RestCore.start(character, :city, Time.now())
 
-      not rest_capital? and RestLogic.rest_type(character) == :city ->
-        RestLogic.stop(character, Time.now())
+      not rest_capital? and RestCore.rest_type(character) == :city ->
+        RestCore.stop(character, Time.now())
 
       true ->
         character
@@ -71,9 +71,9 @@ defmodule ThistleTea.Game.World.Entity.Player.Rest do
   def default_zone(_map_id), do: nil
 
   def check_tavern_exit(%{character: %Character{} = character} = state) do
-    with {:tavern, trigger_id} <- RestLogic.rest_type(character),
+    with {:tavern, trigger_id} <- RestCore.rest_type(character),
          false <- inside_trigger?(character, trigger_id) do
-      apply_transition(state, RestLogic.stop(character, Time.now()))
+      apply_transition(state, RestCore.stop(character, Time.now()))
     else
       _still_resting -> state
     end

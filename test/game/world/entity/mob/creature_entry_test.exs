@@ -18,7 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CreatureEntryTest do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
-  alias ThistleTea.Game.World.Loader.CreatureArchetype, as: ArchetypeLoader
+  alias ThistleTea.Game.World.Loader.CreatureArchetype, as: CreatureArchetypeLoader
   alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Test.FactionFixtures
@@ -169,12 +169,12 @@ defmodule ThistleTea.Game.World.Entity.Mob.CreatureEntryTest do
     mob = build(990_511, "Original", 101, 20, 0)
     target = build(990_512, "Changed", 102, 40, 3)
     template = CreatureArchetype.from_mob(target)
-    :ets.insert(ArchetypeLoader, {template.entry, [{1, template}]})
+    :ets.insert(CreatureArchetypeLoader, {template.entry, [{1, template}]})
 
     on_exit(fn ->
       World.stop_entity(mob.object.guid)
       Metadata.delete(mob.object.guid)
-      :ets.delete(ArchetypeLoader, template.entry)
+      :ets.delete(CreatureArchetypeLoader, template.entry)
     end)
 
     %{mob: mob, template: template}

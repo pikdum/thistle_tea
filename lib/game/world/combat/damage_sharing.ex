@@ -4,14 +4,14 @@ defmodule ThistleTea.Game.World.Combat.DamageSharing do
   transfers only in the recipient's current world.
   """
 
-  alias ThistleTea.Game.Core.Combat.DamageSharing, as: Logic
+  alias ThistleTea.Game.Core.Combat.DamageSharing, as: DamageSharingCore
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
 
   def targets(%{internal: %{world: world}} = entity) do
     entity
-    |> Logic.casters()
+    |> DamageSharingCore.casters()
     |> Enum.filter(fn guid ->
       match?(%{alive?: true}, Metadata.query(guid, [:alive?])) and
         match?({^world, _, _, _}, World.position(guid))
@@ -20,7 +20,7 @@ defmodule ThistleTea.Game.World.Combat.DamageSharing do
   end
 
   def receive(%{internal: %{world: world}} = entity, %Effects.SharedDamage{world: world} = transfer, now),
-    do: Logic.receive(entity, transfer, now)
+    do: DamageSharingCore.receive(entity, transfer, now)
 
   def receive(entity, %Effects.SharedDamage{}, _now), do: entity
 end

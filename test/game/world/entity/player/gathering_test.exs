@@ -41,7 +41,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GatheringTest do
   alias ThistleTea.Game.World.Entity.Player.Spellcasting
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
   alias ThistleTea.Game.World.Metadata
@@ -310,7 +310,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GatheringTest do
     guid = Guid.from_low_guid(:game_object, @entry, low)
     position = {-8949.95, -132.493, 83.53, 0.0}
     tool = ItemStore.create(%ItemTemplate{entry: @tool}, owner: low)
-    :ets.insert(TemplateLoader, {@entry, %GameObjectTemplate{entry: @entry, type: 3, data: [@lock]}})
+    :ets.insert(GameObjectTemplateLoader, {@entry, %GameObjectTemplate{entry: @entry, type: 3, data: [@lock]}})
     :ets.insert(LockLoader, {@lock, lock()})
     :ets.insert(ItemLoader, {@ore, %ItemTemplate{entry: @ore, stackable: 20}})
 
@@ -344,7 +344,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GatheringTest do
     CharacterStore.put(character)
 
     on_exit(fn ->
-      :ets.delete(TemplateLoader, @entry)
+      :ets.delete(GameObjectTemplateLoader, @entry)
       :ets.delete(LockLoader, @lock)
       :ets.delete(ItemLoader, @ore)
       :ets.delete(CharacterStore, low)

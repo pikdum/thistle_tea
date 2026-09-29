@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Core.Combat.DefensiveCapabilitiesTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Core.Aura, as: AuraData
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Combat
   alias ThistleTea.Game.Core.Combat.AttackTable
@@ -169,7 +169,7 @@ defmodule ThistleTea.Game.Core.Combat.DefensiveCapabilitiesTest do
 
   defp attack, do: %{caster: 2, caster_level: 60, caster_attack_skill: 300, caster_player?: false, crit_chance: 0}
 
-  defp holder(type, amount, misc \\ 0), do: %Holder{auras: [%AuraData{type: type, amount: amount, misc_value: misc}]}
+  defp holder(type, amount, misc \\ 0), do: %Holder{auras: [%AuraCore{type: type, amount: amount, misc_value: misc}]}
 
   defp with_defense(character, value) do
     skills = %{95 => %{value: value, max: 300, range: :level, always_max?: false}}

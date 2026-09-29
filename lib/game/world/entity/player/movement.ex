@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Movement do
   """
   use ThistleTea.Game.Network.Opcodes, [:MSG_MOVE_FALL_LAND, :MSG_MOVE_START_SWIM]
 
-  alias ThistleTea.Game.Core.Aura, as: AuraLogic
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Chat.Emote
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity, as: EntityCore
@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Movement do
   alias ThistleTea.Game.Core.Environment.Breathing
   alias ThistleTea.Game.Core.Environment.Fatigue
   alias ThistleTea.Game.Core.Environment.LavaExposure
-  alias ThistleTea.Game.Core.Environment.LiquidSpells, as: LiquidSpellLogic
+  alias ThistleTea.Game.Core.Environment.LiquidSpells, as: LiquidSpellsCore
   alias ThistleTea.Game.Core.Movement.ControlMovement
   alias ThistleTea.Game.Core.Movement.Falling
   alias ThistleTea.Game.Core.Movement.MovementHandoff
@@ -161,7 +161,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Movement do
     )
     |> Fatigue.update(liquid, now, :rand.uniform(max(character.unit.level || 1, 1)) - 1)
     |> LavaExposure.update(liquid, now, 604 + :rand.uniform(6), :rand.uniform(100) - 1)
-    |> then(&LiquidSpellLogic.reconcile(&1, LiquidSpells.context(&1, liquid), now))
+    |> then(&LiquidSpellsCore.reconcile(&1, LiquidSpells.context(&1, liquid), now))
   end
 
   def synchronize_environment(%State{character: %Character{} = character} = state) do
@@ -293,9 +293,9 @@ defmodule ThistleTea.Game.World.Entity.Player.Movement do
   end
 
   defp interrupt_auras(character, position_changed?) do
-    mask = if position_changed?, do: AuraLogic.interrupt_mask(:move), else: AuraLogic.interrupt_mask(:turn)
+    mask = if position_changed?, do: AuraCore.interrupt_mask(:move), else: AuraCore.interrupt_mask(:turn)
     auras_before = character.unit.auras
-    {character, events} = AuraLogic.remove_with_interrupt_flags(character, mask, Time.now())
+    {character, events} = AuraCore.remove_with_interrupt_flags(character, mask, Time.now())
 
     character =
       character
@@ -318,7 +318,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Movement do
       action = if MovementBlock.swimming?(current), do: :under_water, else: :above_water
 
       {character, events} =
-        AuraLogic.remove_with_interrupt_flags(character, AuraLogic.interrupt_mask(action), Time.now())
+        AuraCore.remove_with_interrupt_flags(character, AuraCore.interrupt_mask(action), Time.now())
 
       character |> Effects.enqueue(events) |> EventSink.emit_pending()
     end

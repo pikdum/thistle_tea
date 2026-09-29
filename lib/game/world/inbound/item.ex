@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Inbound.Item do
   @moduledoc "Handles decoded inventory, bank, and item use client messages."
 
   alias ThistleTea.Game.Core.Entity.Character
-  alias ThistleTea.Game.Core.Inventory, as: InventoryLogic
+  alias ThistleTea.Game.Core.Inventory, as: InventoryCore
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.Ammunition
   alias ThistleTea.Game.World.Entity.Player.Bank
@@ -97,7 +97,7 @@ defmodule ThistleTea.Game.World.Inbound.Item do
         %Message.CmsgSwapInvItem{src_slot: src_slot, dst_slot: dst_slot},
         %{ready: true, character: %Character{}} = state
       ) do
-    bag_0 = InventoryLogic.bag_0()
+    bag_0 = InventoryCore.bag_0()
     Inventory.swap(state, {bag_0, src_slot}, {bag_0, dst_slot})
   end
 

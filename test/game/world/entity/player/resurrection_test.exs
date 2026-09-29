@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ResurrectionTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.Core.Death
-  alias ThistleTea.Game.Core.Death.Resurrection, as: ResurrectionLogic
+  alias ThistleTea.Game.Core.Death.Resurrection, as: ResurrectionCore
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -169,7 +169,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ResurrectionTest do
       :ets.insert(AreaTrigger, {{:instance_map, @dungeon}, true})
       :ets.insert(MapTemplate, {@dungeon, 2, nil})
       offer = %{offer | phase: :accepted, position: {WorldRef.instance(@dungeon, 999_999), 100.0, 200.0, 300.0}}
-      state = %{state | character: ResurrectionLogic.put(state.character, offer)}
+      state = %{state | character: ResurrectionCore.put(state.character, offer)}
 
       assert {:finished, restored} = Resurrection.start(state, offer)
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgRaidGroupOnly{}}}
@@ -187,7 +187,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ResurrectionTest do
       ])
 
       offer = %{offer | phase: :accepted, position: {WorldRef.instance(@dungeon, 999_999), 100.0, 200.0, 300.0}}
-      state = %{state | character: ResurrectionLogic.put(state.character, offer)}
+      state = %{state | character: ResurrectionCore.put(state.character, offer)}
 
       assert {:teleport, {%WorldRef{map_id: @dungeon} = world, 5.0, 6.0, 7.0, 0.5}, _} =
                Resurrection.start(state, offer)
@@ -246,7 +246,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ResurrectionTest do
       effects: [%Effect{type: :resurrect_new, implicit_target_a: :target_ally, base_points: 70, misc_value: 135}]
     }
 
-    {character, _} = ResurrectionLogic.offer(character, context, spell, 70, 135)
+    {character, _} = ResurrectionCore.offer(character, context, spell, 70, 135)
     character = %{character | internal: %{character.internal | world: WorldRef.open(@map + 10)}}
 
     on_exit(fn ->

@@ -10,14 +10,15 @@ defmodule ThistleTea.Game.World.Entity.Player.MeetingStones do
   alias ThistleTea.Game.Core.Pet.PlayerPossession
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.GameObjects
-  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
 
   def join(%{ready: true} = state, guid) do
     with true <- can_interact?(state.character),
          :game_object <- Guid.entity_type(guid),
-         %GameObjectTemplate{type: 23, data: [_min, _max, area | _]} <- TemplateLoader.cached(Guid.entry(guid)),
+         %GameObjectTemplate{type: 23, data: [_min, _max, area | _]} <-
+           GameObjectTemplateLoader.cached(Guid.entry(guid)),
          true <- Entity.online?(guid) and Visibility.can_see?(state, guid),
          true <- GameObjects.interactable?(state.character, guid) do
       queue(state, area)

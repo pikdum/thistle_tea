@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.Corpse
-  alias ThistleTea.Game.Core.Entity.Item, as: DataItem
+  alias ThistleTea.Game.Core.Entity.Item, as: ItemCore
   alias ThistleTea.Game.Core.Entity.TargetRef
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Inventory
@@ -79,7 +79,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.Trade.Decision
   alias ThistleTea.Game.Core.Trade.Prepare
-  alias ThistleTea.Game.Core.Travel.Transport, as: TransportLogic
+  alias ThistleTea.Game.Core.Travel.Transport, as: TransportCore
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
@@ -92,7 +92,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.AIEnvironment
   alias ThistleTea.Game.World.Entity.EventSink
-  alias ThistleTea.Game.World.Entity.EventSink.Context, as: EventContext
+  alias ThistleTea.Game.World.Entity.EventSink.Context, as: SinkContext
   alias ThistleTea.Game.World.Entity.GameObjectSummons
   alias ThistleTea.Game.World.Entity.GuardianOwner
   alias ThistleTea.Game.World.Entity.NavigationResolver
@@ -394,7 +394,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
 
   def handle_cast({:grant_power, %Effects.GrantPower{} = grant}, %{character: %Character{} = character} = state) do
     {character, events} = PowerRestoration.apply(character, grant, Time.now())
-    character = character |> Effects.enqueue(events) |> EventSink.emit_pending(EventContext.new(self()))
+    character = character |> Effects.enqueue(events) |> EventSink.emit_pending(SinkContext.new(self()))
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   rescue
     error ->
@@ -404,7 +404,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
 
   def handle_cast({:leech_power, %Effects.LeechPower{} = leech}, %{character: %Character{} = character} = state) do
     {character, events} = PowerLeech.restore(character, leech, :rand.uniform())
-    character = character |> Effects.enqueue(events) |> EventSink.emit_pending(EventContext.new(self()))
+    character = character |> Effects.enqueue(events) |> EventSink.emit_pending(SinkContext.new(self()))
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   rescue
     error ->
@@ -519,7 +519,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
     context = AIEnvironment.context(character, Time.now(), request)
 
     character =
-      character |> ControlledCombat.receive(contact, context) |> EventSink.emit_pending(EventContext.new(self()))
+      character |> ControlledCombat.receive(contact, context) |> EventSink.emit_pending(SinkContext.new(self()))
 
     state = TickScheduler.ensure_scheduled(%{state | character: character})
     {:noreply, state, {:continue, :maybe_broadcast_update}}
@@ -1045,7 +1045,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   end
 
   def handle_info(%Effects.SummonGameObject{} = effect, %State{character: %Character{}} = state) do
-    monitors = GameObjectSummons.summon(state.character, state.game_object_monitors, effect, EventContext.new(self()))
+    monitors = GameObjectSummons.summon(state.character, state.game_object_monitors, effect, SinkContext.new(self()))
     {:noreply, %{state | game_object_monitors: monitors}}
   rescue
     error ->
@@ -1072,7 +1072,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
         } = state
       )
       when is_tuple(local_position) do
-    position = TransportLogic.passenger_world_position(local_position, transport_position)
+    position = TransportCore.passenger_world_position(local_position, transport_position)
 
     if state.character.internal.world == world do
       movement_block = %{state.character.movement_block | position: position, timestamp: 0}
@@ -2027,10 +2027,10 @@ defmodule ThistleTea.Game.World.Entity.Player do
   defp spellbook_spell(_character, _spell_id), do: nil
 
   defp feed_pet(state, character, item_guid, pet_guid, trigger_spell_id, range_yards) do
-    with %DataItem{} = item <- owned_item(character, item_guid),
+    with %ItemCore{} = item <- owned_item(character, item_guid),
          {:ok, pet} <- Entity.call(pet_guid, :feed_info),
          :ok <- feed_pet_in_range(character, pet_guid, range_yards),
-         {:ok, benefit} <- Hunter.feed_benefit(%{item: DataItem.template(item), pet: pet}),
+         {:ok, benefit} <- Hunter.feed_benefit(%{item: ItemCore.template(item), pet: pet}),
          %Spell{} = spell <- SpellLoader.load(trigger_spell_id) do
       state = Items.consume(state, item_guid)
       spell = Hunter.apply_food_benefit(spell, benefit)
@@ -2278,7 +2278,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
     character =
       state.character
       |> Casting.interrupt(Time.now())
-      |> EventSink.emit_pending(EventContext.new(self()))
+      |> EventSink.emit_pending(SinkContext.new(self()))
 
     {character, effects} = PlayerCombat.disengage(character)
     %{state | character: EventSink.emit(character, effects)}

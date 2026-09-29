@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Core.Player.Talents do
   """
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
-  alias ThistleTea.Game.Core.Player.Talent, as: TalentData
+  alias ThistleTea.Game.Core.Player.Talent, as: TalentCore
 
   @points_per_tier 5
 
@@ -79,7 +79,7 @@ defmodule ThistleTea.Game.Core.Player.Talents do
       when is_integer(talent_id) and is_integer(requested_rank) do
     spell_ids = spell_ids || []
 
-    with %TalentData{} = talent <- catalog.get(talent_id),
+    with %TalentCore{} = talent <- catalog.get(talent_id),
          true <- talent.tab_id in catalog.tab_ids(class),
          spell_id when is_integer(spell_id) <- Enum.at(talent.rank_spell_ids, requested_rank),
          current when current <= requested_rank <- known_rank(spell_ids, talent, catalog),
@@ -95,7 +95,7 @@ defmodule ThistleTea.Game.Core.Player.Talents do
 
   def validate(_character, _talent_id, _requested_rank, _catalog), do: :error
 
-  defp known_rank(spell_ids, %TalentData{id: talent_id}, catalog) do
+  defp known_rank(spell_ids, %TalentCore{id: talent_id}, catalog) do
     Enum.reduce(spell_ids, 0, fn spell_id, known ->
       case catalog.by_spell(spell_id) do
         {^talent_id, _tab_id, rank_index} -> max(known, rank_index + 1)
@@ -104,10 +104,10 @@ defmodule ThistleTea.Game.Core.Player.Talents do
     end)
   end
 
-  defp prerequisite_met?(spell_ids, %TalentData{depends_on: depends_on, depends_on_rank: depends_on_rank}, catalog)
+  defp prerequisite_met?(spell_ids, %TalentCore{depends_on: depends_on, depends_on_rank: depends_on_rank}, catalog)
        when is_integer(depends_on) do
     case catalog.get(depends_on) do
-      %TalentData{} = prerequisite ->
+      %TalentCore{} = prerequisite ->
         known_rank(spell_ids, prerequisite, catalog) > depends_on_rank
 
       _missing ->
@@ -117,7 +117,7 @@ defmodule ThistleTea.Game.Core.Player.Talents do
 
   defp prerequisite_met?(_spell_ids, _talent, _catalog), do: true
 
-  defp required_spell_known?(spell_ids, %TalentData{required_spell_id: required}) when is_integer(required) do
+  defp required_spell_known?(spell_ids, %TalentCore{required_spell_id: required}) when is_integer(required) do
     required in spell_ids
   end
 

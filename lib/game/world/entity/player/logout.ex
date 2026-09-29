@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Logout do
   @moduledoc "Owner-local logout countdowns and cancellation, with stale timer rejection."
 
   alias ThistleTea.Game.Core.Entity.Character
-  alias ThistleTea.Game.Core.Player.Logout, as: LogoutLogic
+  alias ThistleTea.Game.Core.Player.Logout, as: LogoutCore
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.Looting
@@ -15,11 +15,11 @@ defmodule ThistleTea.Game.World.Entity.Player.Logout do
   def request(%State{character: %Character{}} = state) do
     state = state |> clear() |> Looting.release()
 
-    case LogoutLogic.admission(state.character) do
+    case LogoutCore.admission(state.character) do
       {:ok, speed} ->
         Trade.cancel(state.guid)
         Outbound.send_packet(%Message.SmsgLogoutResponse{result: 0, speed: Message.SmsgLogoutResponse.speed(speed)})
-        character = if speed == :delayed, do: LogoutLogic.start(state.character, Time.now()), else: state.character
+        character = if speed == :delayed, do: LogoutCore.start(state.character, Time.now()), else: state.character
         token = make_ref()
         delay = if speed == :instant, do: 0, else: @logout_delay_ms
         ref = Process.send_after(self(), {:logout_complete, token}, delay)
@@ -47,7 +47,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Logout do
       _ -> :ok
     end
 
-    character = if state.character, do: LogoutLogic.cancel(state.character, Time.now())
+    character = if state.character, do: LogoutCore.cancel(state.character, Time.now())
     %{state | character: character, logout_timer: nil}
   end
 end

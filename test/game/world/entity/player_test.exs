@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
   alias ThistleTea.Game.Core.Movement.Falling
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Pet.Companion.EntityRef
-  alias ThistleTea.Game.Core.Player.Rest, as: RestLogic
+  alias ThistleTea.Game.Core.Player.Rest, as: RestCore
   alias ThistleTea.Game.Core.Power.Regen
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Cast
@@ -160,7 +160,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
       assert saved.internal.rest_logout_at >= before_logout
       assert saved.internal.rest_type == nil
 
-      assert RestLogic.restore(saved, saved.internal.rest_logout_at + 28_800_000).internal.rest_bonus ==
+      assert RestCore.restore(saved, saved.internal.rest_logout_at + 28_800_000).internal.rest_bonus ==
                saved.player.next_level_xp / 160
     end
 
@@ -419,7 +419,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
 
       character =
         %{character(guid, health: 100, max_health: 100) | player: %Player{flags: 0, next_level_xp: 100_000}}
-        |> RestLogic.start(:city, 1_000)
+        |> RestCore.start(:city, 1_000)
 
       state = %State{connection_pid: self(), guid: guid, character: character, ready: true}
 
@@ -434,7 +434,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
                  state
                )
 
-      refute RestLogic.resting?(teleported)
+      refute RestCore.resting?(teleported)
       assert teleported.internal.area == 1977
     end
 

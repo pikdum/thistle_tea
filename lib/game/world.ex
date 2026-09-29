@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Corpse
-  alias ThistleTea.Game.Core.Entity.DynamicObject, as: DataDynamicObject
+  alias ThistleTea.Game.Core.Entity.DynamicObject, as: DynamicObjectCore
   alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
@@ -136,7 +136,7 @@ defmodule ThistleTea.Game.World do
   def update_position(%Mob{} = entity), do: update_position(entity, :mobs)
   def update_position(%GameObject{} = entity), do: update_position(entity, :game_objects)
   def update_position(%Corpse{} = entity), do: update_position(entity, :corpses)
-  def update_position(%DataDynamicObject{} = entity), do: update_position(entity, :dynamic_objects)
+  def update_position(%DynamicObjectCore{} = entity), do: update_position(entity, :dynamic_objects)
   def update_position(_entity), do: :ok
 
   def update_position(
@@ -150,7 +150,7 @@ defmodule ThistleTea.Game.World do
   def remove_position(%Mob{} = entity), do: remove_position(entity, :mobs)
   def remove_position(%GameObject{} = entity), do: remove_position(entity, :game_objects)
   def remove_position(%Corpse{} = entity), do: remove_position(entity, :corpses)
-  def remove_position(%DataDynamicObject{} = entity), do: remove_position(entity, :dynamic_objects)
+  def remove_position(%DynamicObjectCore{} = entity), do: remove_position(entity, :dynamic_objects)
   def remove_position(_entity), do: :ok
 
   def remove_position(%{object: %{guid: _guid}} = entity, table), do: Position.remove(entity, table)
@@ -203,7 +203,7 @@ defmodule ThistleTea.Game.World do
   def start_entity(%Mob{} = entity), do: start_entity(entity, MobServer)
   def start_entity(%Corpse{} = entity), do: start_entity(entity, CorpseServer)
 
-  def start_entity(%{entity: %DataDynamicObject{object: %{guid: guid}}} = opts) do
+  def start_entity(%{entity: %DynamicObjectCore{object: %{guid: guid}}} = opts) do
     case SpatialHash.get_entity(guid) do
       nil -> EntitySupervisor.start_child(guid, {DynamicObjectServer, opts})
       _ -> :ok

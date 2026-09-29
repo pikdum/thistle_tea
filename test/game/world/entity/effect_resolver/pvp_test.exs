@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.PvpTest do
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Pet.Possession
-  alias ThistleTea.Game.Core.Pvp, as: PvpLogic
+  alias ThistleTea.Game.Core.Pvp, as: PvpCore
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.World.Entity.EffectResolver.Pvp
@@ -23,8 +23,8 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.PvpTest do
       effects = Pvp.launch_contacts(character(3), pet, 2, metadata: &Map.get(rows, &1), now: 0)
       assert [%Effects.PvpContact{target_guid: 1, role: :attack, engage?: false} = effect] = effects
       owner = EventSink.emit(character(1), effect)
-      assert PvpLogic.active?(owner)
-      assert PvpLogic.contested?(owner)
+      assert PvpCore.active?(owner)
+      assert PvpCore.contested?(owner)
       refute owner.internal.in_combat
       assert owner.internal.pvp.combat?
     end
@@ -66,14 +66,14 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.PvpTest do
       assert [%Effects.PvpContact{combat?: false} = attack, %Effects.PvpContact{combat?: false} = attacked] = effects
       caster = EventSink.emit(character(1), attack)
       victim = EventSink.emit(character(2), attacked)
-      assert PvpLogic.active?(caster)
-      assert PvpLogic.contested?(caster)
-      assert PvpLogic.active?(victim)
-      refute PvpLogic.contested?(victim)
+      assert PvpCore.active?(caster)
+      assert PvpCore.contested?(caster)
+      assert PvpCore.active?(victim)
+      refute PvpCore.contested?(victim)
       refute caster.internal.in_combat
       refute victim.internal.in_combat
-      refute PvpLogic.combat?(caster)
-      refute PvpLogic.contested?(PvpLogic.tick(caster, 30_000))
+      refute PvpCore.combat?(caster)
+      refute PvpCore.contested?(PvpCore.tick(caster, 30_000))
     end
 
     test "threat-on-miss spells flag and enter combat only on a miss" do
@@ -99,9 +99,9 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.PvpTest do
       rows = %{2 => %{pvp?: true, in_combat: true, pvp_combat?: true, contested_pvp?: true}}
       [effect] = Pvp.spell_contacts(character(1), 1, 2, spell, :hit, metadata: &Map.get(rows, &1), now: 0)
       caster = EventSink.emit(character(1), effect)
-      assert PvpLogic.active?(caster)
+      assert PvpCore.active?(caster)
       refute caster.internal.in_combat
-      refute PvpLogic.contested?(caster)
+      refute PvpCore.contested?(caster)
     end
 
     test "party assistance in the second implicit target slot flags a PvP caster" do
@@ -126,7 +126,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.PvpTest do
 
       rows = %{mob => %{unit_flags: 0x1000, in_combat: true}}
       effects = Pvp.spell_contacts(character(1), 1, mob, spell, :hit, metadata: &Map.get(rows, &1), now: 0)
-      refute character(1) |> EventSink.emit(effects) |> PvpLogic.active?()
+      refute character(1) |> EventSink.emit(effects) |> PvpCore.active?()
     end
   end
 
@@ -152,12 +152,12 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.PvpTest do
       assert attacked.other.player_guid == 1
       assert attacked.other.pvp?
       owner = EventSink.emit(character(1), attack)
-      assert PvpLogic.active?(owner)
-      assert PvpLogic.contested?(owner)
+      assert PvpCore.active?(owner)
+      assert PvpCore.contested?(owner)
       assert owner.internal.in_combat
       victim = EventSink.emit(character(2), attacked)
-      assert PvpLogic.active?(victim)
-      refute PvpLogic.contested?(victim)
+      assert PvpCore.active?(victim)
+      refute PvpCore.contested?(victim)
     end
 
     test "helping another player's totem resolves its owner's PvP state" do
@@ -166,7 +166,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.PvpTest do
       effects = Pvp.contacts(character(1), 1, totem, :assist, metadata: &Map.get(rows, &1), now: 0)
       assert [%Effects.PvpContact{target_guid: 1, role: :assist} = effect] = effects
       caster = EventSink.emit(character(1), effect)
-      assert PvpLogic.contested?(caster)
+      assert PvpCore.contested?(caster)
       assert caster.internal.in_combat
     end
 
@@ -174,7 +174,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.PvpTest do
       mob = Guid.from_low_guid(:mob, 1, 1)
       rows = %{mob => %{unit_flags: 0}}
       assert Pvp.contacts(character(1), 1, mob, :attack, metadata: &Map.get(rows, &1), now: 0) == []
-      flagged = PvpLogic.toggle(character(1), true, 0)
+      flagged = PvpCore.toggle(character(1), true, 0)
       assert Pvp.contacts(flagged, 1, 1, :assist, metadata: fn _ -> nil end, now: 0) == []
     end
 
@@ -183,8 +183,8 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.PvpTest do
       rows = %{mob => %{unit_flags: 0x1000}}
       [effect] = Pvp.contacts(character(1), 1, mob, :attack, metadata: &Map.get(rows, &1), now: 0)
       caster = EventSink.emit(character(1), effect)
-      assert PvpLogic.active?(caster)
-      refute PvpLogic.contested?(caster)
+      assert PvpCore.active?(caster)
+      refute PvpCore.contested?(caster)
     end
   end
 

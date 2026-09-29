@@ -10,14 +10,14 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Player, as: PlayerBT
-  alias ThistleTea.Game.Core.Aura, as: AuraLogic
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.DispelResistance
   alias ThistleTea.Game.Core.Aura.ModifierSync
   alias ThistleTea.Game.Core.Aura.SingleTarget
   alias ThistleTea.Game.Core.Aura.StealthDetection
   alias ThistleTea.Game.Core.Chat.ChatStatus
   alias ThistleTea.Game.Core.Chat.Emote
-  alias ThistleTea.Game.Core.Combat, as: CombatLogic
+  alias ThistleTea.Game.Core.Combat, as: CombatCore
   alias ThistleTea.Game.Core.Combat.Reactive
   alias ThistleTea.Game.Core.Death
   alias ThistleTea.Game.Core.Duel.Dueling
@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   alias ThistleTea.Game.Core.Pet.Companion.EntityRef
   alias ThistleTea.Game.Core.Player.Logout
   alias ThistleTea.Game.Core.Player.PlayerFlags
-  alias ThistleTea.Game.Core.Player.Talents, as: LogicTalents
+  alias ThistleTea.Game.Core.Player.Talents, as: TalentsCore
   alias ThistleTea.Game.Core.Pvp
   alias ThistleTea.Game.Core.Reputation
   alias ThistleTea.Game.Core.Spell
@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   alias ThistleTea.Game.Core.Stats.MovementStats
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.Travel.Taxi.Flight
-  alias ThistleTea.Game.Core.Travel.Transport, as: TransportLogic
+  alias ThistleTea.Game.Core.Travel.Transport, as: TransportCore
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.CooldownSpell
@@ -131,7 +131,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
       |> LiquidSpells.restore()
       |> PlayerSpells.apply_passives(Time.now())
       |> PlayerSpells.apply_default_auras(Time.now())
-      |> LogicTalents.sync_points(TalentLoader)
+      |> TalentsCore.sync_points(TalentLoader)
       |> Enchantments.restore()
       |> PlayerRest.restore()
       |> evaluate_login_rest()
@@ -161,7 +161,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
         ghost?: Death.ghost?(c),
         in_combat: c.internal.in_combat == true,
         rooted?: c.internal.rooted? == true,
-        root_aura?: AuraLogic.has_aura?(c, :mod_root),
+        root_aura?: AuraCore.has_aura?(c, :mod_root),
         health_pct: EntityCore.health_pct(c),
         mana_pct: EntityCore.mana_pct(c),
         shapeshift_form: c.unit.shapeshift_form,
@@ -169,15 +169,15 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
         duel_opponent_guid: Dueling.opponent_guid(c),
         duel_started?: Dueling.active?(c),
         reputation: PlayerReputation.projection(c),
-        aura_stacks: AuraLogic.spell_stacks(c),
-        aura_effects: AuraLogic.effect_keys(c),
-        crowd_controlled?: AuraLogic.crowd_controlled?(c),
-        breakable_crowd_control?: AuraLogic.breakable_crowd_control?(c),
-        mechanic_resistance: AuraLogic.misc_amounts(c, :mechanic_resistance),
+        aura_stacks: AuraCore.spell_stacks(c),
+        aura_effects: AuraCore.effect_keys(c),
+        crowd_controlled?: AuraCore.crowd_controlled?(c),
+        breakable_crowd_control?: AuraCore.breakable_crowd_control?(c),
+        mechanic_resistance: AuraCore.misc_amounts(c, :mechanic_resistance),
         school_resistances: SpellResist.school_resistances(c),
         spell_threat: SpellThreat.projection(c),
         dispel_resistance: DispelResistance.projection(c),
-        attacker_spell_hit_chance: AuraLogic.attacker_spell_hit_chance(c),
+        attacker_spell_hit_chance: AuraCore.attacker_spell_hit_chance(c),
         needed_quest_items: Quests.needed_items(c),
         condition_subject: ConditionContext.snapshot(c).target
       }
@@ -396,7 +396,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
 
     if Keyword.get(opts, :send_self?, true), do: Outbound.send_packet(self_update(c))
 
-    EventSink.emit(c, AuraLogic.self_duration_events(c, Time.now()))
+    EventSink.emit(c, AuraCore.self_duration_events(c, Time.now()))
   end
 
   def send_worldport_packets(%Character{} = character) do
@@ -452,7 +452,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
          %UpdateObject{movement_block: %MovementBlock{position: transport_position}}
        )
        when is_tuple(local_position) and is_tuple(transport_position) do
-    position = TransportLogic.passenger_world_position(local_position, transport_position)
+    position = TransportCore.passenger_world_position(local_position, transport_position)
     %{character | movement_block: %{movement_block | position: position, timestamp: 0}}
   end
 
@@ -510,7 +510,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
     internal = %{character.internal | in_combat: false, threat_refs: nil}
 
     %{character | unit: unit, internal: internal}
-    |> CombatLogic.sync_combat_flag()
+    |> CombatCore.sync_combat_flag()
   end
 
   defp normalize_base_stats(%Character{unit: %Unit{} = unit} = character) do

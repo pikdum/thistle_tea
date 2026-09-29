@@ -95,7 +95,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.AIEnvironment
   alias ThistleTea.Game.World.Entity.EventSink
-  alias ThistleTea.Game.World.Entity.EventSink.Context, as: EventContext
+  alias ThistleTea.Game.World.Entity.EventSink.Context, as: SinkContext
   alias ThistleTea.Game.World.Entity.GameObjectSummons
   alias ThistleTea.Game.World.Entity.GuardianOwner
   alias ThistleTea.Game.World.Entity.Mob.Corpse
@@ -624,7 +624,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
 
   def handle_cast({:grant_power, %Effects.GrantPower{} = grant}, %Mob{} = state) do
     {state, events} = PowerRestoration.apply(state, grant, Time.now())
-    state = state |> Effects.enqueue(events) |> EventSink.emit_pending(EventContext.new(self()))
+    state = state |> Effects.enqueue(events) |> EventSink.emit_pending(SinkContext.new(self()))
     {:noreply, state, {:continue, :maybe_broadcast}}
   rescue
     error ->
@@ -634,7 +634,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
 
   def handle_cast({:leech_power, %Effects.LeechPower{} = leech}, %Mob{} = state) do
     {state, events} = PowerLeech.restore(state, leech, :rand.uniform())
-    state = state |> Effects.enqueue(events) |> EventSink.emit_pending(EventContext.new(self()))
+    state = state |> Effects.enqueue(events) |> EventSink.emit_pending(SinkContext.new(self()))
     {:noreply, state, {:continue, :maybe_broadcast}}
   rescue
     error ->
@@ -647,7 +647,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       state =
         state
         |> Threat.add(effect.source_guid, effect.amount)
-        |> EventSink.emit_pending(EventContext.new(self()))
+        |> EventSink.emit_pending(SinkContext.new(self()))
         |> wake_ai_tick()
 
       {:noreply, state}
@@ -1111,7 +1111,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   end
 
   def handle_info(%Effects.SummonGameObject{} = effect, %Mob{} = state) do
-    monitors = GameObjectSummons.summon(state, state.internal.game_object_monitors, effect, EventContext.new(self()))
+    monitors = GameObjectSummons.summon(state, state.internal.game_object_monitors, effect, SinkContext.new(self()))
     {:noreply, %{state | internal: %{state.internal | game_object_monitors: monitors}}}
   rescue
     error ->

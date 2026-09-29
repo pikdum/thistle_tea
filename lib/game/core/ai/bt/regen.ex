@@ -8,16 +8,16 @@ defmodule ThistleTea.Game.Core.AI.BT.Regen do
   alias ThistleTea.Game.Core.AI.BT.Context
   alias ThistleTea.Game.Core.Pet.PetHappiness
   alias ThistleTea.Game.Core.Pet.PetLoyalty
-  alias ThistleTea.Game.Core.Power.Regen, as: RegenLogic
+  alias ThistleTea.Game.Core.Power.Regen, as: RegenCore
 
   def tick_step do
     BT.action(&tick_with_context/3)
   end
 
   def initialize(entity, %Blackboard{} = blackboard, now) when is_integer(now) do
-    blackboard = Blackboard.put_next_at(blackboard, :next_regen_at, RegenLogic.tick_ms(entity), now)
+    blackboard = Blackboard.put_next_at(blackboard, :next_regen_at, RegenCore.tick_ms(entity), now)
 
-    case RegenLogic.focus_tick_ms(entity) do
+    case RegenCore.focus_tick_ms(entity) do
       tick_ms when is_integer(tick_ms) -> Blackboard.put_next_at(blackboard, :next_focus_regen_at, tick_ms, now)
       _ -> blackboard
     end
@@ -36,8 +36,8 @@ defmodule ThistleTea.Game.Core.AI.BT.Regen do
 
   defp tick_resources(entity, blackboard, now) do
     if Blackboard.ready_for?(blackboard, :next_regen_at, now) do
-      entity = if RegenLogic.needs_resource_regen?(entity), do: RegenLogic.tick(entity, now), else: entity
-      blackboard = Blackboard.put_next_at(blackboard, :next_regen_at, RegenLogic.tick_ms(entity), now)
+      entity = if RegenCore.needs_resource_regen?(entity), do: RegenCore.tick(entity, now), else: entity
+      blackboard = Blackboard.put_next_at(blackboard, :next_regen_at, RegenCore.tick_ms(entity), now)
       {entity, blackboard}
     else
       {entity, blackboard}
@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Regen do
   end
 
   defp tick_focus(entity, blackboard, now) do
-    case RegenLogic.focus_tick_ms(entity) do
+    case RegenCore.focus_tick_ms(entity) do
       tick_ms when is_integer(tick_ms) ->
         tick_focus(entity, blackboard, now, tick_ms)
 
@@ -56,7 +56,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Regen do
 
   defp tick_focus(entity, blackboard, now, tick_ms) do
     if Blackboard.ready_for?(blackboard, :next_focus_regen_at, now) do
-      entity = if RegenLogic.needs_focus_regen?(entity), do: RegenLogic.tick_focus(entity), else: entity
+      entity = if RegenCore.needs_focus_regen?(entity), do: RegenCore.tick_focus(entity), else: entity
       blackboard = Blackboard.put_next_at(blackboard, :next_focus_regen_at, tick_ms, now)
       {entity, blackboard}
     else

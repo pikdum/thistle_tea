@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Core.Item.Proficiency do
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Skills
-  alias ThistleTea.Game.Core.Spell, as: SpellData
+  alias ThistleTea.Game.Core.Spell, as: SpellCore
   alias ThistleTea.Game.Core.Spell.Effect
 
   defstruct weapon_mask: 0,
@@ -63,14 +63,14 @@ defmodule ThistleTea.Game.Core.Item.Proficiency do
   def from_spellbook(spellbook) when is_map(spellbook) do
     initial = %__MODULE__{known_spell_ids: MapSet.new(Map.keys(spellbook))}
 
-    Enum.reduce(spellbook, initial, fn {_id, %SpellData{} = spell}, acc ->
+    Enum.reduce(spellbook, initial, fn {_id, %SpellCore{} = spell}, acc ->
       Enum.reduce(spell.effects, acc, &apply_effect(&2, &1, spell))
     end)
   end
 
   def from_spellbook(_spellbook), do: %__MODULE__{}
 
-  defp apply_effect(%__MODULE__{} = prof, %Effect{type: :proficiency}, %SpellData{} = spell) do
+  defp apply_effect(%__MODULE__{} = prof, %Effect{type: :proficiency}, %SpellCore{} = spell) do
     mask = spell.equipped_item_subclass_mask
 
     case spell.equipped_item_class do

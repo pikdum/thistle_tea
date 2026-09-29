@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Spells do
   learned or superseded spell. Aura cancellation uses the owning player's
   publication path so derived metadata and visibility change with the aura.
   """
-  alias ThistleTea.Game.Core.Aura, as: AuraLogic
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Spells do
 
   def cancel_aura(%{character: %Character{} = character} = state, spell_id) do
     character = maybe_cancel_channel(character, spell_id)
-    {character, events} = AuraLogic.cancel_spell(character, spell_id, Time.now())
+    {character, events} = AuraCore.cancel_spell(character, spell_id, Time.now())
     character = Effects.enqueue(character, events)
     PlayerServer.maybe_broadcast_update(%{state | character: character})
   end
@@ -94,7 +94,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Spells do
           %{character | internal: %{internal | spells: all_ids, spellbook: spellbook}}
           |> learn_skills(all_ids -- existing_ids)
 
-        {character, aura_events} = AuraLogic.remove_spells(character, removed_ids, Time.now())
+        {character, aura_events} = AuraCore.remove_spells(character, removed_ids, Time.now())
         character = Effects.enqueue(character, aura_events)
 
         {character, reward_events} = learn_spells(character, skill_rewards(character), attempted)
@@ -152,7 +152,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Spells do
         now
       )
       when is_map(spellbook) and is_integer(now) do
-    if AuraLogic.has_aura?(character, :mod_shapeshift) do
+    if AuraCore.has_aura?(character, :mod_shapeshift) do
       character
     else
       case Map.get(spellbook, @battle_stance_spell_id) do
@@ -166,7 +166,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Spells do
 
   defp apply_aura_spell(%Character{} = character, %Spell{} = spell, now) do
     {character, events} =
-      AuraLogic.apply_spell(character, character.object.guid, character.unit.level || 1, spell, now)
+      AuraCore.apply_spell(character, character.object.guid, character.unit.level || 1, spell, now)
 
     Effects.enqueue(character, events)
   end

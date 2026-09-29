@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.World.Loader.TargetDamageDbcTest do
   alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
-  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
+  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db
@@ -91,12 +91,12 @@ defmodule ThistleTea.Game.World.Loader.TargetDamageDbcTest do
       row = DBC.get(DBC.SpellItemEnchantment, id)
       assert row.enchantment_type_0 == 3
       enchantment = %ItemEnchantment{id: id, effects: [%{type: 3, spell_id: row.effect_arg_0}]}
-      previous = :ets.lookup(EnchantmentLoader, {:enchantment, id})
-      :ets.insert(EnchantmentLoader, {{:enchantment, id}, enchantment})
+      previous = :ets.lookup(ItemEnchantmentLoader, {:enchantment, id})
+      :ets.insert(ItemEnchantmentLoader, {{:enchantment, id}, enchantment})
 
       on_exit(fn ->
-        :ets.delete(EnchantmentLoader, {:enchantment, id})
-        :ets.insert(EnchantmentLoader, previous)
+        :ets.delete(ItemEnchantmentLoader, {:enchantment, id})
+        :ets.insert(ItemEnchantmentLoader, previous)
       end)
     end
 

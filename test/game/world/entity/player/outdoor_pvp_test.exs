@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.World.Entity.Player.OutdoorPvpTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Entity.Player.OutdoorPvp
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.System.OutdoorPvp, as: OutdoorSystem
+  alias ThistleTea.Game.World.System.OutdoorPvp, as: OutdoorPvpSystem
 
   setup [:character]
 
@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.World.Entity.Player.OutdoorPvpTest do
 
   describe "update_zone/3" do
     test "applies and removes Silithus favor while walking across zones", %{state: state, options: options} do
-      server = start_supervised!({OutdoorSystem, name: nil, race: %ResourceRace{controller: :alliance}})
+      server = start_supervised!({OutdoorPvpSystem, name: nil, race: %ResourceRace{controller: :alliance}})
       options = Keyword.put(options, :server, server)
       state = %{state | character: %{state.character | internal: %{state.character.internal | world: WorldRef.open(1)}}}
       inside = OutdoorPvp.update_zone(state, 1377, options)

@@ -32,7 +32,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TemporaryEnchantmentsTest do
   alias ThistleTea.Game.World.Entity.Player.UsableItems
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
-  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
+  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Metadata
 
   @entry 998_301
@@ -144,15 +144,15 @@ defmodule ThistleTea.Game.World.Entity.Player.TemporaryEnchantmentsTest do
     end
 
     test "depletion suppresses later effects from the same enchantment snapshot", context do
-      definition = EnchantmentLoader.get(@enchant)
+      definition = ItemEnchantmentLoader.get(@enchant)
 
       :ets.insert(
-        EnchantmentLoader,
+        ItemEnchantmentLoader,
         {{:enchantment, @enchant},
          %{definition | effects: definition.effects ++ [%{type: 1, spell_id: 0, amount: 100}]}}
       )
 
-      :ets.insert(EnchantmentLoader, {{:charges, @spell}, 1})
+      :ets.insert(ItemEnchantmentLoader, {{:charges, @spell}, 1})
       character = apply_coating(context).character
       character = Enchantments.trigger_weapon_procs(character, %{outcome: :normal, victim_guid: 2}, fn -> 0.1 end)
       assert length(Enum.filter(character.internal.events, &is_struct(&1, Effects.TriggerSpell))) == 1
@@ -224,7 +224,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TemporaryEnchantmentsTest do
     template = %ItemTemplate{entry: @entry, class: 2, subclass: 15, inventory_type: 13, item_level: 1}
     :ets.insert(ItemLoader, {@entry, template})
 
-    :ets.insert(EnchantmentLoader, [
+    :ets.insert(ItemEnchantmentLoader, [
       {{:enchantment, @enchant},
        %ItemEnchantment{
          id: @enchant,
@@ -268,7 +268,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TemporaryEnchantmentsTest do
 
       Enum.each(
         [{:enchantment, @enchant}, {:enchantment, @permanent}, {:charges, @spell}],
-        &:ets.delete(EnchantmentLoader, &1)
+        &:ets.delete(ItemEnchantmentLoader, &1)
       )
 
       :ets.delete(CharacterStore, guid)

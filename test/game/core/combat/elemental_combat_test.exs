@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Core.Combat.ElementalCombatTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Core.Aura, as: AuraData
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Combat
   alias ThistleTea.Game.Core.Combat.AttackSchool
@@ -81,7 +81,7 @@ defmodule ThistleTea.Game.Core.Combat.ElementalCombatTest do
       {damaged, events} = Combat.receive_attack(target, attack, 1_000, roll: 9_999, resist_roll: 99)
       assert damaged.unit.health == 900
       assert hit(events).attack.absorb == 0
-      assert [%Holder{auras: [%AuraData{amount: 500}]}] = damaged.unit.auras
+      assert [%Holder{auras: [%AuraCore{amount: 500}]}] = damaged.unit.auras
     end
 
     test "Dampen Magic cannot reduce an elemental swing below half", %{target: target, attack: attack} do
@@ -111,7 +111,7 @@ defmodule ThistleTea.Game.Core.Combat.ElementalCombatTest do
   defp aura(entity, type, amount, mask) do
     holder = %Holder{
       spell: %Spell{id: System.unique_integer([:positive])},
-      auras: [%AuraData{type: type, amount: amount, misc_value: mask}]
+      auras: [%AuraCore{type: type, amount: amount, misc_value: mask}]
     }
 
     %{entity | unit: %{entity.unit | auras: [holder | entity.unit.auras]}}

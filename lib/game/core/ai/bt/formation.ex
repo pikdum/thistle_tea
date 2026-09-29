@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Formation do
   """
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Blackboard
-  alias ThistleTea.Game.Core.AI.BT.Blackboard.Formation, as: Memory
+  alias ThistleTea.Game.Core.AI.BT.Blackboard.Formation, as: FormationMemory
   alias ThistleTea.Game.Core.AI.BT.Context
   alias ThistleTea.Game.Core.AI.BT.Context.Formation, as: Snapshot
   alias ThistleTea.Game.Core.AI.BT.Navigation
@@ -95,7 +95,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Formation do
 
   defp identity(%Membership{token: token, leader_guid: leader, role: role}), do: {token, leader, role}
   defp identity(nil), do: nil
-  defp memory_identity(%Memory{identity: identity}), do: identity
+  defp memory_identity(%FormationMemory{identity: identity}), do: identity
   defp memory_identity(nil), do: nil
   defp follower?(%Membership{role: :follower}), do: true
   defp follower?(_membership), do: false
@@ -107,7 +107,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Formation do
 
   defp memory(%Membership{} = membership) do
     route = if membership.route, do: WaypointRoute.start(membership.route, membership.last_waypoint, true)
-    %Memory{identity: identity(membership), role: membership.role, route: route}
+    %FormationMemory{identity: identity(membership), role: membership.role, route: route}
   end
 
   defp memory(nil), do: nil

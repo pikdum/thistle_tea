@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
   launch, impact, channel ticks, and finish.
   """
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
-  alias ThistleTea.Game.Core.Aura, as: AuraLogic
+  alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Heartbeat
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Battleground.Insignia
@@ -601,7 +601,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
          %Cast{resolution: %CastResolution{costs: %Costs{modifier_holder_ids: [_ | _] = spell_ids}}},
          now
        ) do
-    {character, events} = AuraLogic.spend_spell_charges(character, spell_ids, now)
+    {character, events} = AuraCore.spend_spell_charges(character, spell_ids, now)
     Effects.enqueue(character, events)
   end
 
@@ -613,7 +613,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
     context = %{context | triggered?: cast.triggered?, cast_item_guid: cast.cast_item_guid}
 
     {character, events} =
-      AuraLogic.reactions(character, :spell_cast_completed, %{
+      AuraCore.reactions(character, :spell_cast_completed, %{
         spell: spell,
         proc_type: Proc.cast_type(spell),
         proc_origin: ProcOrigin.classify(spell, context),
@@ -796,12 +796,12 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
     {character, events} =
       cond do
         failure_breaks_stealth?(casting) ->
-          AuraLogic.remove_aura_types(character, [:mod_stealth], now)
+          AuraCore.remove_aura_types(character, [:mod_stealth], now)
 
         Spell.harmful?(spell) and not preserves_stealth?(casting) ->
-          AuraLogic.remove_with_interrupt_flags(
+          AuraCore.remove_with_interrupt_flags(
             character,
-            AuraLogic.interrupt_mask(:cast),
+            AuraCore.interrupt_mask(:cast),
             now,
             preserved_aura_types(spell, false)
           )
@@ -831,7 +831,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
     preserved_types = preserved_aura_types(spell, preserve_stealth?)
 
     {entity, events} =
-      AuraLogic.remove_with_interrupt_flags(entity, action_interrupt_mask(action, spell), now, preserved_types)
+      AuraCore.remove_with_interrupt_flags(entity, action_interrupt_mask(action, spell), now, preserved_types)
 
     Effects.enqueue(entity, events)
   end
@@ -842,11 +842,11 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
   end
 
   defp action_interrupt_mask(:action_complete, spell) do
-    mask = AuraLogic.interrupt_mask(:action_complete)
-    if Spell.targets_hostile_units?(spell), do: Bitwise.bor(mask, AuraLogic.interrupt_mask(:attack)), else: mask
+    mask = AuraCore.interrupt_mask(:action_complete)
+    if Spell.targets_hostile_units?(spell), do: Bitwise.bor(mask, AuraCore.interrupt_mask(:attack)), else: mask
   end
 
-  defp action_interrupt_mask(action, _spell), do: AuraLogic.interrupt_mask(action)
+  defp action_interrupt_mask(action, _spell), do: AuraCore.interrupt_mask(action)
 
   def cancel(character), do: cancel(character, Time.now())
 
@@ -1098,7 +1098,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
 
   defp remove_channel_auras(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{id: spell_id}} = casting, now) do
     target_guid = channel_cleanup_target_guid(character, casting)
-    {character, events} = AuraLogic.remove_source_spell(character, spell_id, guid, now)
+    {character, events} = AuraCore.remove_source_spell(character, spell_id, guid, now)
 
     remote_events =
       if target_guid > 0 and target_guid != guid do

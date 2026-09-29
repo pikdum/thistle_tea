@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Resurrection do
   @moduledoc "Accepts spell resurrection offers, admits their travel, and revives after arrival."
 
   alias ThistleTea.Game.Core.Death
-  alias ThistleTea.Game.Core.Death.Resurrection, as: ResurrectionLogic
+  alias ThistleTea.Game.Core.Death.Resurrection, as: ResurrectionCore
   alias ThistleTea.Game.Core.Death.ResurrectionOffer
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Corpse
@@ -18,7 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Resurrection do
   alias ThistleTea.Game.World.Visibility
 
   def respond(%{ready: true, character: %Character{} = character} = state, guid, status) do
-    updated = ResurrectionLogic.respond(character, guid, status)
+    updated = ResurrectionCore.respond(character, guid, status)
 
     if updated != character and match?(%ResurrectionOffer{phase: :accepted}, updated.internal.pending_resurrect) do
       GenServer.cast(self(), {:accept_resurrection, updated.internal.pending_resurrect})
@@ -40,7 +40,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Resurrection do
   def start(state, _offer), do: {:finished, state}
 
   def transferring(%{character: character} = state, %ResurrectionOffer{} = offer) do
-    %{state | character: ResurrectionLogic.put(character, %{offer | phase: :transferring, arrival: nil})}
+    %{state | character: ResurrectionCore.put(character, %{offer | phase: :transferring, arrival: nil})}
   end
 
   def arrive(
@@ -57,13 +57,12 @@ defmodule ThistleTea.Game.World.Entity.Player.Resurrection do
   def arrive(state, _arrival), do: state
 
   def cancel_transfer(%{character: %Character{} = character} = state) do
-    %{state | character: ResurrectionLogic.cancel_transfer(character)}
+    %{state | character: ResurrectionCore.cancel_transfer(character)}
   end
 
   def cancel_transfer(state), do: state
 
-  def clear(%{character: %Character{} = character} = state),
-    do: %{state | character: ResurrectionLogic.clear(character)}
+  def clear(%{character: %Character{} = character} = state), do: %{state | character: ResurrectionCore.clear(character)}
 
   def clear(state), do: state
 
