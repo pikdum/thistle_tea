@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Loader.ItemSetDbcTest do
   alias ThistleTea.Game.Network.Message.CmsgMessagechat
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemSet, as: ItemSetLoader
@@ -44,17 +45,17 @@ defmodule ThistleTea.Game.World.Loader.ItemSetDbcTest do
     test "applies real bonuses through equipment and reconnect resync", %{character: character, set_id: set_id} do
       set = %ItemSet{id: set_id, bonuses: [{2, 9761}, {3, 7514}]}
       :ets.insert(ItemSetLoader, {set_id, set})
-      equipped = Character.sync_equipment_stats(character)
+      equipped = Equipment.sync_stats(character)
       assert equipped.unit.normal_resistance == 20
       assert equipped.player.skill_bonuses == %{95 => {2, 0}}
       assert length(equipped.unit.auras) == 2
-      assert Character.sync_equipment_stats(equipped).unit.auras == equipped.unit.auras
+      assert Equipment.sync_stats(equipped).unit.auras == equipped.unit.auras
 
       character = %{equipped | player: %{equipped.player | head: nil}}
-      removed = Character.sync_equipment_stats(character)
+      removed = Equipment.sync_stats(character)
       assert removed.unit.normal_resistance == 20
       assert removed.player.skill_bonuses == %{}
-      removed = Character.sync_equipment_stats(%{removed | player: %{removed.player | chest: nil}})
+      removed = Equipment.sync_stats(%{removed | player: %{removed.player | chest: nil}})
       assert removed.unit.normal_resistance == 0
       assert removed.unit.auras == []
     end
@@ -62,7 +63,7 @@ defmodule ThistleTea.Game.World.Loader.ItemSetDbcTest do
     test "rechecks profession gains and loss at the owner publication boundary", %{character: character, set_id: set_id} do
       set = %ItemSet{id: set_id, required_skill: 197, required_skill_rank: 300, bonuses: [{3, 18_382}]}
       :ets.insert(ItemSetLoader, {set_id, set})
-      character = Character.sync_equipment_stats(character)
+      character = Equipment.sync_stats(character)
       state = PlayerServer.maybe_broadcast_update(%State{guid: character.object.guid, character: character})
       assert state.character.unit.auras == []
       fireball = SpellLoader.load(133)
@@ -79,7 +80,7 @@ defmodule ThistleTea.Game.World.Loader.ItemSetDbcTest do
 
     test "rechecks the real feral speed bonus on form entry and exit", %{character: character, set_id: set_id} do
       :ets.insert(ItemSetLoader, {set_id, %ItemSet{id: set_id, bonuses: [{3, 23_218}]}})
-      character = Character.sync_equipment_stats(character)
+      character = Equipment.sync_stats(character)
       state = PlayerServer.maybe_broadcast_update(%State{guid: character.object.guid, character: character})
       assert state.character.movement_block.run_speed == 7.0
       {shifted, _} = Application.apply_spell(character, character.object.guid, 60, SpellLoader.load(768), 100)

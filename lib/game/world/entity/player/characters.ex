@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Characters do
   alias ThistleTea.Game.Core.Inventory
   alias ThistleTea.Game.Core.Item.Proficiency
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.Items
   alias ThistleTea.Game.World.ItemStore
@@ -52,7 +53,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Characters do
     items
     |> Enum.reduce(character, fn item, char -> assign_item(item, char, get_template) end)
     |> equip_stored_items()
-    |> Character.sync_equipment_stats()
+    |> Equipment.sync_stats()
   end
 
   def clear_equipment(%Character{player: player} = character) do
@@ -65,7 +66,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Characters do
         |> Map.put(Inventory.visible_entry_field(slot), 0)
       end)
 
-    Character.sync_equipment_stats(%{character | player: player})
+    Equipment.sync_stats(%{character | player: player})
   end
 
   defp at_character_limit?(account_id) do

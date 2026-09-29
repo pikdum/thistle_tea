@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BuybackTest do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player.Buyback
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Player.Vendor
@@ -88,7 +89,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BuybackTest do
       on_exit(fn -> :ets.delete(QuestLoader, {:quest, quest.id}) end)
       {:ok, log} = QuestLog.add(%{}, quest.id)
       player = Inventory.equip(%{state.character.player | inv1: 0, quest_log: log}, :mainhand, item)
-      character = Character.sync_equipment_stats(%{state.character | player: player})
+      character = Equipment.sync_stats(%{state.character | player: player})
       assert character.unit.base_min_damage == 30
       assert character.unit.max_health == 120
       assert Quests.needed_items(character) == MapSet.new()

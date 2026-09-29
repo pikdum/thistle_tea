@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Stats do
   alias ThistleTea.Game.Core.Stats, as: LogicStats
   alias ThistleTea.Game.Core.Stats.CombatRatings
   alias ThistleTea.Game.Core.Stats.SpellPower
+  alias ThistleTea.Game.World.Entity.Player.Equipment
 
   defstruct [
     :race,
@@ -76,7 +77,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Stats do
     character =
       character
       |> __MODULE__.apply(new_stats)
-      |> Character.sync_equipment_stats()
+      |> Equipment.sync_stats()
       |> Character.restore_health_and_mana()
 
     {character, level_delta(old_stats, new_stats)}

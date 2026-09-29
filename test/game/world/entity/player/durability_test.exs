@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
   alias ThistleTea.Game.World.Entity.Player.DevCommands
   alias ThistleTea.Game.World.Entity.Player.Durability
   alias ThistleTea.Game.World.Entity.Player.Enchantments
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.SpiritHealer
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Inbound
@@ -109,7 +110,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
       }
 
       character = %{state.character | unit: %{state.character.unit | auras: [talent]}}
-      character = Character.sync_equipment_stats(character)
+      character = Equipment.sync_stats(character)
       assert character.unit.mainhand_weapon.entry == @entry
       assert character.player.crit_percentage == 5.0
       assert AttackTable.attacker_context(character).hit_chance_bonus == 3
@@ -148,7 +149,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
       assert broken.character.player.parry_percentage == 0.0
       assert broken.character.player.visible_item_16_0 == initial.player.visible_item_16_0
       assert Enchantments.weapon_procs(broken.character, :mainhand) == []
-      assert Character.sync_equipment_stats(broken.character).unit.max_health == 120
+      assert Equipment.sync_stats(broken.character).unit.max_health == 120
       assert CharacterStore.get(state.guid).player.broken_equipment == [:mainhand]
 
       repaired = Durability.repair(broken, vendor, item.object.guid)
@@ -186,7 +187,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
       end)
 
       character = %{state.character | player: Inventory.equip(state.character.player, :offhand, item)}
-      character = Character.sync_equipment_stats(character)
+      character = Equipment.sync_stats(character)
       assert character.player.block_percentage == 5.0
       refute AttackTable.attacker_context(character).dual_wield_penalty?
       assert character.unit.equipment_bonuses.armor == 100
@@ -202,7 +203,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
       item = ItemStore.create(mainhand.internal.template, owner: state.guid)
       on_exit(fn -> ItemStore.delete(item.object.guid) end)
       character = %{state.character | player: Inventory.equip(state.character.player, :offhand, item)}
-      character = Character.sync_equipment_stats(character)
+      character = Equipment.sync_stats(character)
       assert AttackTable.attacker_context(character).dual_wield_penalty?
 
       broken = Durability.lose(%{state | character: character}, :percent, 100, :offhand)
@@ -216,7 +217,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
     test "item passives follow committed durability changes", %{state: state, item: item, vendor: vendor} do
       template = %{item.internal.template | spellid_1: 7598, spelltrigger_1: 1}
       ItemStore.put(%{item | internal: %{item.internal | template: template}})
-      equipped = Character.sync_equipment_stats(state.character)
+      equipped = Equipment.sync_stats(state.character)
       assert equipped.player.crit_percentage == 2.0
       broken = Durability.lose(%{state | character: equipped}, :percent, 100, :equipped)
       assert broken.character.player.crit_percentage == 0.0
@@ -398,7 +399,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         unit: %Unit{health: 100, max_health: 100, base_health: 100, base_stamina: 20, level: 10, class: 1, auras: []}
       }
-      |> Character.sync_equipment_stats()
+      |> Equipment.sync_stats()
 
     {:ok, _} = Entity.register(guid)
     Metadata.put(vendor, %{alive?: true, npc_flags: 0x4004})

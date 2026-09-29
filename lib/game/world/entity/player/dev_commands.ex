@@ -44,6 +44,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   alias ThistleTea.Game.World.Entity.Player.Battlegrounds, as: PlayerBattlegrounds
   alias ThistleTea.Game.World.Entity.Player.Characters
   alias ThistleTea.Game.World.Entity.Player.Durability
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.World.Entity.Player.Honor, as: PlayerHonor
   alias ThistleTea.Game.World.Entity.Player.ItemDurations
@@ -1330,7 +1331,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
         character =
           character
           |> Stats.apply(new_stats)
-          |> Character.sync_equipment_stats()
+          |> Equipment.sync_stats()
           |> Character.restore_health_and_mana()
           |> put_player_xp(0)
 

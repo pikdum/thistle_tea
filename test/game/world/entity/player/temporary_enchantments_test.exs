@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TemporaryEnchantmentsTest do
   alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThistleTea.Game.World.Entity.Player.Enchantments
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
@@ -252,7 +253,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TemporaryEnchantmentsTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         unit: %Unit{health: 100, max_health: 100, base_health: 100, level: 50, class: 4, race: 1, auras: []}
       }
-      |> Character.sync_equipment_stats()
+      |> Equipment.sync_stats()
 
     spell = %Spell{
       id: @spell,

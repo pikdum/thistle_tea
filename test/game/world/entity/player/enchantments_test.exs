@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EnchantmentsTest do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player.Enchantments
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
@@ -55,7 +56,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EnchantmentsTest do
       assert second.character.unit.max_health == 105
       assert second.character.player.skills[333].value == 3
       bagged = %{second.character | player: %{second.character.player | chest: nil, inv2: item.object.guid}}
-      assert Character.sync_equipment_stats(bagged).unit.max_health == 100
+      assert Equipment.sync_stats(bagged).unit.max_health == 100
       restored = Enchantments.restore(second.character)
       assert restored.unit.max_health == 105
       assert restored.player.skills[333].value == 3

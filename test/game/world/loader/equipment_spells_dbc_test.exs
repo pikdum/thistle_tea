@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.Loader.EquipmentSpellsDbcTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -56,16 +57,16 @@ defmodule ThistleTea.Game.World.Loader.EquipmentSpellsDbcTest do
       end
 
       assert Enum.any?(SpellLoader.load(29_414).effects, &(&1.aura == :mod_ranged_ammo_haste))
-      equipped = character |> equip(:bag1, quiver) |> equip(:ranged, bow) |> Character.sync_equipment_stats()
+      equipped = character |> equip(:bag1, quiver) |> equip(:ranged, bow) |> Equipment.sync_stats()
       assert equipped.unit.equipment_bonuses.ranged_ammo_haste == 15
       assert equipped.unit.ranged_attack_time == 2_608
       assert equipped.unit.auras == []
-      assert Character.sync_equipment_stats(equipped).unit == equipped.unit
-      swapped = equipped |> equip(:ranged, wand) |> Character.sync_equipment_stats()
+      assert Equipment.sync_stats(equipped).unit == equipped.unit
+      swapped = equipped |> equip(:ranged, wand) |> Equipment.sync_stats()
       assert swapped.unit.ranged_attack_time == 1_500
-      restored = swapped |> equip(:ranged, bow) |> Character.sync_equipment_stats()
+      restored = swapped |> equip(:ranged, bow) |> Equipment.sync_stats()
       assert restored.unit.ranged_attack_time == 2_608
-      removed = Character.sync_equipment_stats(%{restored | player: %{restored.player | bag1: 0}})
+      removed = Equipment.sync_stats(%{restored | player: %{restored.player | bag1: 0}})
       assert removed.unit.ranged_attack_time == 3_000
       assert removed.unit.equipment_bonuses.ranged_ammo_haste == 0
     end
@@ -76,17 +77,17 @@ defmodule ThistleTea.Game.World.Loader.EquipmentSpellsDbcTest do
         |> equip(:chest, %ItemTemplate{entry: 11_726, spellid_1: 7598, spelltrigger_1: 1})
         |> equip(:trinket1, %ItemTemplate{entry: 13_965, spellid_1: 7598, spelltrigger_1: 1})
         |> equip(:neck, %ItemTemplate{entry: 11_755, spellid_1: 13_669, spelltrigger_1: 1})
-        |> Character.sync_equipment_stats()
+        |> Equipment.sync_stats()
 
       assert character.player.crit_percentage == 9.0
       assert character.player.dodge_percentage == 6.0
       assert length(character.unit.auras) == 3
       assert Enum.all?(character.unit.auras, &is_nil(&1.slot))
-      restored = Character.sync_equipment_stats(%{character | unit: %{character.unit | auras: []}})
+      restored = Equipment.sync_stats(%{character | unit: %{character.unit | auras: []}})
       assert restored.player.crit_percentage == 9.0
       assert restored.player.dodge_percentage == 6.0
       assert length(restored.unit.auras) == 3
-      removed = Character.sync_equipment_stats(%{restored | player: %Player{}})
+      removed = Equipment.sync_stats(%{restored | player: %Player{}})
       assert removed.player.crit_percentage == 5.0
       assert removed.player.dodge_percentage == 5.0
       assert removed.unit.auras == []
@@ -98,10 +99,10 @@ defmodule ThistleTea.Game.World.Loader.EquipmentSpellsDbcTest do
       equipped =
         character
         |> equip(:neck, %ItemTemplate{entry: 13_141, spellid_1: 21_361, spelltrigger_1: 1})
-        |> Character.sync_equipment_stats()
+        |> Equipment.sync_stats()
 
       assert Regen.tick(equipped, 2_000).unit.power1 == 1
-      removed = Character.sync_equipment_stats(%{equipped | player: %Player{}})
+      removed = Equipment.sync_stats(%{equipped | player: %Player{}})
       assert Regen.tick(removed, 2_000).unit.power1 == 0
     end
 
@@ -115,7 +116,7 @@ defmodule ThistleTea.Game.World.Loader.EquipmentSpellsDbcTest do
           spellid_2: 15_600,
           spelltrigger_2: 1
         })
-        |> Character.sync_equipment_stats()
+        |> Equipment.sync_stats()
 
       assert character.unit.attack_power == 380
       assert character.unit.ranged_attack_power == 170
@@ -123,14 +124,14 @@ defmodule ThistleTea.Game.World.Loader.EquipmentSpellsDbcTest do
       assert [%{spell: %{id: 15_600}, auras: [%{type: :proc_trigger_spell, trigger_spell_id: 15_601}]}] =
                character.unit.auras
 
-      assert Character.sync_equipment_stats(character).unit == character.unit
+      assert Equipment.sync_stats(character).unit == character.unit
     end
 
     test "Briarwood Reed never doubles spell power", %{character: character} do
       character =
         character
         |> equip(:trinket1, %ItemTemplate{entry: 12_930, spellid_1: 13_881, spelltrigger_1: 1})
-        |> Character.sync_equipment_stats()
+        |> Equipment.sync_stats()
 
       assert character.unit.equipment_bonuses.spell_fire == 29
       assert character.unit.equipment_bonuses.healing == 29
@@ -142,7 +143,7 @@ defmodule ThistleTea.Game.World.Loader.EquipmentSpellsDbcTest do
       equipped =
         character
         |> equip(:trinket1, %ItemTemplate{entry: 22_321, spellid_1: 27_656, spelltrigger_1: 1})
-        |> Character.sync_equipment_stats()
+        |> Equipment.sync_stats()
 
       assert [%{spell: spell, auras: [%{type: :proc_trigger_spell, trigger_spell_id: 27_655}]}] = equipped.unit.auras
       spell = %{spell | proc_rule: %ProcRule{school_mask: 1, ppm_rate: 1.0}}
@@ -157,7 +158,7 @@ defmodule ThistleTea.Game.World.Loader.EquipmentSpellsDbcTest do
       character =
         character
         |> equip(:mainhand, %ItemTemplate{entry: 20_580, spellid_1: 24_994, spelltrigger_1: 1})
-        |> Character.sync_equipment_stats()
+        |> Equipment.sync_stats()
 
       state = PlayerServer.maybe_broadcast_update(%State{guid: character.object.guid, character: character})
       assert state.character.unit.equipment_bonuses.attack_power == 0

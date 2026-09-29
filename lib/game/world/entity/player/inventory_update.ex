@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InventoryUpdate do
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.Entity.Player.ConditionContext
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.ItemDurations
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.ItemStore
@@ -129,7 +130,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InventoryUpdate do
     now = Time.now()
 
     %{character | player: player}
-    |> Character.sync_equipment_stats()
+    |> Equipment.sync_stats()
     |> EquipmentTransitions.apply(character.player, &ItemStore.get/1, &SpellLoader.cached/1, now)
     |> AttackTimers.equipment_changed(character, now)
   end

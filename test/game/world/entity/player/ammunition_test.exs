@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AmmunitionTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Player.Ammunition
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
@@ -101,7 +102,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AmmunitionTest do
       previous = %{state.character | internal: %{state.character.internal | in_combat: true}}
 
       character =
-        %{previous | player: Inventory.equip(previous.player, :ranged, replacement)} |> Character.sync_equipment_stats()
+        %{previous | player: Inventory.equip(previous.player, :ranged, replacement)} |> Equipment.sync_stats()
 
       character = AttackTimers.equipment_changed(character, previous, 2_000)
       replaced = %{state | character: character}
@@ -320,7 +321,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AmmunitionTest do
 
     thrown = create_item(template, state.guid)
     character = %{state.character | player: Inventory.equip(state.character.player, :ranged, thrown)}
-    {%{state | character: Character.sync_equipment_stats(character)}, thrown}
+    {%{state | character: Equipment.sync_stats(character)}, thrown}
   end
 
   defp wand_weapon(state) do
@@ -338,7 +339,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AmmunitionTest do
 
     wand = create_item(template, state.guid)
     player = state.character.player |> Inventory.equip(:ranged, wand) |> then(&%{&1 | skills: %{228 => %{value: 217}}})
-    character = Character.sync_equipment_stats(%{state.character | player: player})
+    character = Equipment.sync_stats(%{state.character | player: player})
 
     spell = %Spell{
       id: 5019,
@@ -421,7 +422,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AmmunitionTest do
         internal: %Internal{spellbook: %{75 => spell}},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
-      |> Character.sync_equipment_stats()
+      |> Equipment.sync_stats()
 
     SpatialHash.update(:players, guid, WorldRef.open(0), 0.0, 0.0, 0.0)
     SpatialHash.update(:players, guid + 1, WorldRef.open(0), 10.0, 0.0, 0.0)

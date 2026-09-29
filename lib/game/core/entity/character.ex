@@ -7,21 +7,8 @@ defmodule ThistleTea.Game.Core.Entity.Character do
   """
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
-  alias ThistleTea.Game.Core.Entity.Item
   alias ThistleTea.Game.Core.Entity.ItemTemplate
-  alias ThistleTea.Game.Core.Inventory
-  alias ThistleTea.Game.Core.Item.EquipmentAuras
-  alias ThistleTea.Game.Core.Item.EquipmentSets
-  alias ThistleTea.Game.Core.Item.EquipmentSpells
   alias ThistleTea.Game.Core.Pet.Companion
-  alias ThistleTea.Game.Core.Stats.CombatRatings
-  alias ThistleTea.Game.Core.Stats.EquipmentStats
-  alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.World.ItemStore
-  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
-  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
-  alias ThistleTea.Game.World.Loader.ItemSet, as: ItemSetLoader
-  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   defstruct [:id, :account_id, :object, :unit, :player, :movement_block, :internal]
 
@@ -34,34 +21,6 @@ defmodule ThistleTea.Game.Core.Entity.Character do
 
   def creature_type(%__MODULE__{}), do: 7
 
-  def sync_equipment_stats(%__MODULE__{} = character) do
-    character = %{character | player: Inventory.sync_broken_equipment(character.player, &ItemStore.get/1)}
-    now = Time.now()
-    enchantments = equipment_enchantments(character, now)
-    templates = Inventory.equipped_templates(character.player, &ItemStore.get/1)
-    set_sources = EquipmentSets.sources(character, templates, &ItemSetLoader.get/1)
-    equip_sources = character.player |> Inventory.usable_equipped_items(&ItemStore.get/1) |> EquipmentSpells.sources()
-
-    character
-    |> sync_mainhand_inputs()
-    |> sync_offhand_inputs()
-    |> sync_ranged_inputs()
-    |> EquipmentStats.resync(&ItemStore.get/1, &SpellLoader.load/1, enchantments)
-    |> EquipmentAuras.sync(enchantments, &SpellLoader.load/1, now, set_sources ++ equip_sources)
-    |> CombatRatings.sync()
-  end
-
-  def equipment_enchantments(%__MODULE__{player: player}, now) do
-    for slot <- Inventory.slots(),
-        guid = Map.get(player, slot),
-        %Item{} = item <- [ItemStore.get(guid)],
-        not Item.broken?(item),
-        {enchant_slot, id} <- Item.active_enchantments(item, now),
-        enchantment = ItemEnchantmentLoader.get(id),
-        not is_nil(enchantment),
-        do: {slot, item, enchant_slot, enchantment}
-  end
-
   def restore_health_and_mana(%__MODULE__{unit: %Unit{} = unit} = character) do
     %{character | unit: %{unit | health: unit.max_health, power1: unit.max_power1}}
   end
@@ -70,9 +29,17 @@ defmodule ThistleTea.Game.Core.Entity.Character do
 
   def controls?(%__MODULE__{} = character, guid), do: Companion.controls?(character, guid)
 
-  defp sync_mainhand_inputs(%__MODULE__{unit: %Unit{} = unit} = character) do
-    weapon = weapon_template(character, :mainhand)
+  def sync_weapon_inputs(%__MODULE__{} = character, weapons) when is_map(weapons) do
+    character
+    |> sync_mainhand_inputs(weapon(weapons[:mainhand]))
+    |> sync_offhand_inputs(weapon(weapons[:offhand]))
+    |> sync_ranged_inputs(weapon(weapons[:ranged]), weapons[:ammo])
+  end
 
+  defp weapon(%ItemTemplate{class: @item_class_weapon} = template), do: template
+  defp weapon(_template), do: nil
+
+  defp sync_mainhand_inputs(%__MODULE__{unit: %Unit{} = unit} = character, weapon) do
     {delay, weapon_min, weapon_max} =
       case usable_weapon(character, :mainhand, weapon) do
         %ItemTemplate{} = weapon ->
@@ -95,9 +62,7 @@ defmodule ThistleTea.Game.Core.Entity.Character do
     %{character | unit: unit}
   end
 
-  defp sync_offhand_inputs(%__MODULE__{unit: %Unit{} = unit} = character) do
-    weapon = weapon_template(character, :offhand)
-
+  defp sync_offhand_inputs(%__MODULE__{unit: %Unit{} = unit} = character, weapon) do
     unit =
       if usable_weapon(character, :offhand, weapon) do
         %{
@@ -122,21 +87,12 @@ defmodule ThistleTea.Game.Core.Entity.Character do
     %{character | unit: unit}
   end
 
-  defp weapon_template(%__MODULE__{player: %Player{} = player}, slot) do
-    case ItemLoader.get_template(Inventory.equipment_entry(player, slot, include_broken: true)) do
-      %ItemTemplate{class: @item_class_weapon} = template -> template
-      _ -> nil
-    end
-  end
-
   defp usable_weapon(%__MODULE__{player: %Player{broken_equipment: broken}}, slot, weapon) do
     if slot not in (broken || []), do: weapon
   end
 
-  defp sync_ranged_inputs(%__MODULE__{unit: %Unit{} = unit, player: %Player{ammo_id: ammo_id}} = character) do
-    weapon = weapon_template(character, :ranged)
-
-    ammo_dps = ammo_dps(ammo_id, weapon)
+  defp sync_ranged_inputs(%__MODULE__{unit: %Unit{} = unit} = character, weapon, ammo) do
+    ammo_dps = ammo_dps(ammo, weapon)
 
     unit =
       if usable_weapon(character, :ranged, weapon) do
@@ -165,18 +121,12 @@ defmodule ThistleTea.Game.Core.Entity.Character do
     %{character | unit: unit}
   end
 
-  defp ammo_dps(ammo_id, %ItemTemplate{ammo_type: ammo_type}) when is_integer(ammo_id) and ammo_id > 0 do
-    case ItemLoader.get_template(ammo_id) do
-      %ItemTemplate{class: 6, subclass: ^ammo_type, dmg_min1: min, dmg_max1: max}
-      when is_number(min) and is_number(max) ->
-        (min + max) / 2
+  defp ammo_dps(%ItemTemplate{class: 6, subclass: ammo_type, dmg_min1: min, dmg_max1: max}, %ItemTemplate{
+         ammo_type: ammo_type
+       })
+       when is_number(min) and is_number(max), do: (min + max) / 2
 
-      _ ->
-        0.0
-    end
-  end
-
-  defp ammo_dps(_ammo_id, _weapon), do: 0.0
+  defp ammo_dps(_ammo, _weapon), do: 0.0
 
   defp positive_or(value, default) do
     case value do

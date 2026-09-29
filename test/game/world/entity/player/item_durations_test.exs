@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemDurationsTest do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThistleTea.Game.World.Entity.Player.DevCommands
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.ItemDurations
   alias ThistleTea.Game.World.Entity.Player.Quests
@@ -81,7 +82,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemDurationsTest do
 
     test "the owner callback expires equipment and recomputes its bonuses", %{state: state, item: item} do
       player = Inventory.equip(%{state.character.player | inv1: 0}, :mainhand, item)
-      character = Character.sync_equipment_stats(%{state.character | player: player})
+      character = Equipment.sync_stats(%{state.character | player: player})
       assert character.unit.base_min_damage == 30
       assert character.unit.max_health == 150
       item |> ItemLifetime.set_remaining(1, Time.now() - 2_000) |> ItemStore.put()

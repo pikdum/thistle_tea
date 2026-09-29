@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Loader.TargetDamageDbcTest do
   alias ThistleTea.Game.Core.Item.ItemEnchantment
   alias ThistleTea.Game.Core.Stats.EquipmentStats
   alias ThistleTea.Game.World.Entity.Player.Enchantments
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
@@ -60,24 +61,24 @@ defmodule ThistleTea.Game.World.Loader.TargetDamageDbcTest do
       mainhand: mainhand,
       offhand: offhand
     } do
-      equipped = Character.sync_equipment_stats(character)
+      equipped = Equipment.sync_stats(character)
       assert Enum.sort(TargetDamage.snapshot(equipped)) == [{1, 6}, {1, 6}]
       assert equipped.unit.min_damage == 100
       assert equipped.unit.min_offhand_damage == 100
-      assert Character.sync_equipment_stats(equipped) == equipped
+      assert Equipment.sync_stats(equipped) == equipped
 
       bagged = %{equipped | player: %{equipped.player | offhand: nil, inv1: offhand.object.guid}}
-      assert TargetDamage.snapshot(Character.sync_equipment_stats(bagged)) == [{1, 6}]
+      assert TargetDamage.snapshot(Equipment.sync_stats(bagged)) == [{1, 6}]
 
       ItemStore.put(%{mainhand | item: %{mainhand.item | durability: 0}})
-      broken = Character.sync_equipment_stats(equipped)
+      broken = Equipment.sync_stats(equipped)
       assert TargetDamage.snapshot(broken) == [{1, 6}]
       assert broken.player.broken_equipment == [:mainhand]
       ItemStore.put(mainhand)
-      assert length(TargetDamage.snapshot(Character.sync_equipment_stats(broken))) == 2
+      assert length(TargetDamage.snapshot(Equipment.sync_stats(broken))) == 2
 
       ItemStore.put(Item.put_permanent_enchantment(mainhand, 854))
-      replaced = Character.sync_equipment_stats(equipped)
+      replaced = Equipment.sync_stats(equipped)
       assert Enum.sort(TargetDamage.snapshot(replaced)) == [{1, 6}, {8, 6}]
       assert Enum.sort(TargetDamage.snapshot(Enchantments.restore(replaced))) == [{1, 6}, {8, 6}]
       dead = Entity.take_damage(replaced, 1_000, 100)

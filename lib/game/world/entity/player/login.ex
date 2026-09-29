@@ -59,6 +59,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   alias ThistleTea.Game.World.Entity.Player.ConditionContext
   alias ThistleTea.Game.World.Entity.Player.Corpses
   alias ThistleTea.Game.World.Entity.Player.Enchantments
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.Guilds
   alias ThistleTea.Game.World.Entity.Player.HomeBind
   alias ThistleTea.Game.World.Entity.Player.Honor
@@ -495,7 +496,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
     character =
       character
       |> normalize_base_stats()
-      |> Character.sync_equipment_stats()
+      |> Equipment.sync_stats()
 
     unit =
       character.unit

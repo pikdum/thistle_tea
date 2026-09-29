@@ -108,6 +108,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   alias ThistleTea.Game.World.Entity.Player.Corpses
   alias ThistleTea.Game.World.Entity.Player.Durability
   alias ThistleTea.Game.World.Entity.Player.Enchantments
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.World.Entity.Player.GameObjects, as: PlayerGameObjects
   alias ThistleTea.Game.World.Entity.Player.Guilds
@@ -1867,7 +1868,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
 
     character =
       if state.equipment_requirements != nil and state.equipment_requirements != requirements do
-        Character.sync_equipment_stats(character)
+        Equipment.sync_stats(character)
       else
         character
       end

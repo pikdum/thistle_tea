@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Enchantments do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
@@ -140,7 +141,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Enchantments do
          {_bag, _slot} = position <- Inventory.find_position(character.player, item_guid, &ItemStore.get/1) do
       item = Item.clear_temporary_enchantment(item)
       ItemStore.put(item)
-      character = character |> sync_visible_item(position, item) |> Character.sync_equipment_stats()
+      character = character |> sync_visible_item(position, item) |> Equipment.sync_stats()
       send_updates(character, item, 0)
       %{state | character: character}
     else
@@ -154,12 +155,12 @@ defmodule ThistleTea.Game.World.Entity.Player.Enchantments do
     character.player
     |> Inventory.owned_items(&ItemStore.get/1)
     |> Enum.reduce(character, fn item, character -> restore_item(character, item, now) end)
-    |> Character.sync_equipment_stats()
+    |> Equipment.sync_stats()
   end
 
   def skill_bonus(%Character{} = character, skill_id) do
     character
-    |> Character.equipment_enchantments(Time.now())
+    |> Equipment.enchantments(Time.now())
     |> Enum.reduce(0, fn {_slot, _item, _enchant_slot, enchantment}, total ->
       total + Map.get(enchantment.skill_bonuses, skill_id, 0)
     end)
@@ -212,7 +213,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Enchantments do
       true ->
         ItemStore.put(updated)
         position = Inventory.find_position(character.player, guid, &ItemStore.get/1)
-        character = character |> sync_visible_item(position, updated) |> Character.sync_equipment_stats()
+        character = character |> sync_visible_item(position, updated) |> Equipment.sync_stats()
         send_updates(character, updated, 0)
         character
     end
@@ -221,7 +222,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Enchantments do
   defp spend_proc_charge(character, _proc), do: character
 
   def weapon_procs(%Character{} = character, hand) do
-    for {^hand, item, enchant_slot, enchantment} <- Character.equipment_enchantments(character, Time.now()),
+    for {^hand, item, enchant_slot, enchantment} <- Equipment.enchantments(character, Time.now()),
         weapon_available?(character, hand),
         effect <- enchantment.effects,
         effect.type == 1 do

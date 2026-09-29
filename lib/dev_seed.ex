@@ -68,6 +68,7 @@ defmodule ThistleTea.DevSeed do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player.Characters
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.Stats
   alias ThistleTea.Game.World.Loader.Character, as: CharacterLoader
   alias ThistleTea.Game.World.Loader.ClassSpell
@@ -230,7 +231,7 @@ defmodule ThistleTea.DevSeed do
       {:ok, stats} ->
         character
         |> Stats.apply(stats)
-        |> Character.sync_equipment_stats()
+        |> Equipment.sync_stats()
         |> Character.restore_health_and_mana()
 
       _ ->

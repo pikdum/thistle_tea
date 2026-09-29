@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Core.Spell.CastContextTest do
   alias ThistleTea.Game.Core.Skills
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.CastContext
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Loader.Item
 
   describe "from_caster/3" do
@@ -84,13 +85,13 @@ defmodule ThistleTea.Game.Core.Spell.CastContextTest do
         }
 
         spell = %Spell{id: 900_002, dmg_class: 2, school: :physical}
-        plain = character |> Character.sync_equipment_stats() |> CastContext.from_caster(spell, 7)
+        plain = character |> Equipment.sync_stats() |> CastContext.from_caster(spell, 7)
         assert plain.normalized_speed == speed
         assert plain.damage_done_multiplier == 1.25
 
         for enchantments <- [Bitwise.bsl(1900, 32), Bitwise.bsl(263, 64), Bitwise.bsl(1900, 32) + Bitwise.bsl(263, 64)] do
           character = %{character | player: %{character.player | visible_item_16_0: template.entry + enchantments}}
-          assert character |> Character.sync_equipment_stats() |> CastContext.from_caster(spell, 7) == plain
+          assert character |> Equipment.sync_stats() |> CastContext.from_caster(spell, 7) == plain
         end
       end
     end

@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemPropertiesTest do
   alias ThistleTea.Game.Core.Loot
   alias ThistleTea.Game.Network.Message.SmsgItemPushResult
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.Items
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
@@ -77,20 +78,20 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemPropertiesTest do
     } do
       item = ItemStore.create(@entry, owner: state.guid, random_property: property)
       character = %{state.character | player: Inventory.equip(state.character.player, 15, item)}
-      equipped = Character.sync_equipment_stats(character)
+      equipped = Equipment.sync_stats(character)
       assert equipped.unit.strength == 23
       assert equipped.unit.stamina == 25
-      assert Character.sync_equipment_stats(equipped).unit.strength == 23
+      assert Equipment.sync_stats(equipped).unit.strength == 23
 
       ItemStore.put(%{item | item: %{item.item | durability: 0}})
-      broken = Character.sync_equipment_stats(equipped)
+      broken = Equipment.sync_stats(equipped)
       assert broken.unit.strength == 20
       assert broken.unit.stamina == 20
 
       ItemStore.put(item)
-      repaired = Character.sync_equipment_stats(broken)
+      repaired = Equipment.sync_stats(broken)
       assert repaired.unit.strength == 23
-      unequipped = Character.sync_equipment_stats(%{repaired | player: %{repaired.player | mainhand: 0}})
+      unequipped = Equipment.sync_stats(%{repaired | player: %{repaired.player | mainhand: 0}})
       assert unequipped.unit.strength == 20
       assert unequipped.unit.stamina == 20
     end
