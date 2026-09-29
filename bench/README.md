@@ -51,7 +51,7 @@ Cell size should be selected from the complete profile, not query throughput alo
 
 This harness times the per-tick and per-recipient work that scales with population, using synthetic fixtures so it needs no generated database:
 
-- `update_object`: SMSG_UPDATE_OBJECT encoding for mob and player values/create blocks, for the owner and for another player, plus zlib compression of the resulting payloads;
+- `update_object`: SMSG_UPDATE_OBJECT encoding for mob and player values/create blocks, for the owner and for another player, plus `Network.Send.compress/1` on the resulting packets;
 - `movement`: `Math.distance/2`, `Math.movement_duration/2`, and `Movement.position_at/4` on active and finished splines;
 - `spatial`: `World.position/2` across every mob and exact 30-yard `World.nearby_units_exact/5` queries over a populated `SpatialHash`.
 

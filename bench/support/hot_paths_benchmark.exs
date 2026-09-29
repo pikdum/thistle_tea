@@ -11,6 +11,7 @@ defmodule ThistleTea.Bench.HotPathsBenchmark do
   alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.Core.Movement
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Network.Send
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Position.Spline
@@ -55,11 +56,11 @@ defmodule ThistleTea.Bench.HotPathsBenchmark do
     player = player_update(player_guid)
     observer = Guid.from_low_guid(:player, 2)
 
-    mob_payload = payload(%{mob | update_type: :values}, observer)
-    self_payload = payload(%{player | update_type: :values}, player_guid)
+    mob_packet = UpdateObject.to_packet(%{mob | update_type: :values}, observer)
+    self_packet = UpdateObject.to_packet(%{player | update_type: :values}, player_guid)
 
-    IO.puts("mob values payload: #{byte_size(mob_payload)} bytes")
-    IO.puts("player self values payload: #{byte_size(self_payload)} bytes")
+    IO.puts("mob values payload: #{byte_size(mob_packet.payload)} bytes")
+    IO.puts("player self values payload: #{byte_size(self_packet.payload)} bytes")
     IO.puts("player other values payload: #{byte_size(payload(%{player | update_type: :values}, observer))} bytes")
 
     benchee(
@@ -71,8 +72,8 @@ defmodule ThistleTea.Bench.HotPathsBenchmark do
           UpdateObject.to_packet(%{player | update_type: :values}, observer)
         end,
         "player create for self" => fn -> UpdateObject.to_packet(player, player_guid) end,
-        "zlib mob values payload" => fn -> :zlib.compress(mob_payload) end,
-        "zlib player self values payload" => fn -> :zlib.compress(self_payload) end
+        "compress mob values packet" => fn -> Send.compress(mob_packet) end,
+        "compress player self values packet" => fn -> Send.compress(self_packet) end
       },
       config
     )
