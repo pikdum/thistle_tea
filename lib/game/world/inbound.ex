@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.Inbound do
   alias ThistleTea.Game.World.Inbound.Instance
   alias ThistleTea.Game.World.Inbound.Interaction
   alias ThistleTea.Game.World.Inbound.Item
+  alias ThistleTea.Game.World.Inbound.Login
   alias ThistleTea.Game.World.Inbound.Loot
   alias ThistleTea.Game.World.Inbound.Mail
   alias ThistleTea.Game.World.Inbound.Movement
@@ -23,7 +24,6 @@ defmodule ThistleTea.Game.World.Inbound do
   alias ThistleTea.Game.World.Inbound.Pvp
   alias ThistleTea.Game.World.Inbound.Query
   alias ThistleTea.Game.World.Inbound.Quest
-  alias ThistleTea.Game.World.Inbound.Session
   alias ThistleTea.Game.World.Inbound.Social
   alias ThistleTea.Game.World.Inbound.Spell
   alias ThistleTea.Game.World.Inbound.Trade
@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.World.Inbound do
     Instance,
     Interaction,
     Item,
+    Login,
     Loot,
     Mail,
     Movement,
@@ -48,7 +49,6 @@ defmodule ThistleTea.Game.World.Inbound do
     Pvp,
     Query,
     Quest,
-    Session,
     Social,
     Spell,
     Trade,

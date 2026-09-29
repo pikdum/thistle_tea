@@ -1,5 +1,8 @@
-defmodule ThistleTea.Game.World.Inbound.Session do
-  @moduledoc "Handles decoded authentication, character screen, login, and logout client messages."
+defmodule ThistleTea.Game.World.Inbound.Login do
+  @moduledoc """
+  Handles decoded login-flow client messages: authentication, the character
+  screen, entering the world, logout, and pings.
+  """
 
   alias ThistleTea.Auth.Account
   alias ThistleTea.Auth.SessionKey
