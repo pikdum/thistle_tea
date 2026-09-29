@@ -188,14 +188,20 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
 
     observations = Map.new(guids, &{&1, observe(entity, &1, now)})
     line_of_sight_guids = line_of_sight_guids(entity, now, observed_guids, nearby, observations)
-    observations = Map.new(observations, &put_line_of_sight(entity, &1, line_of_sight_guids))
+    water = water_scope(entity, now, observed_guids, nearby, observations)
+    observations = Map.new(observations, &put_target_terrain(entity, &1, line_of_sight_guids, water))
     nearby = Map.new(nearby, fn {kind, entries} -> {kind, observed_distances(entries, observations)} end)
 
     Perception.new(now, origin(entity), observations, nearby)
   end
 
-  defp put_line_of_sight(entity, {guid, %Observation{} = observation}, line_of_sight_guids) do
-    {guid, %{observation | line_of_sight?: line_of_sight?(entity, guid, line_of_sight_guids)}}
+  defp put_target_terrain(entity, {guid, %Observation{} = observation}, line_of_sight_guids, water) do
+    {guid,
+     %{
+       observation
+       | line_of_sight?: line_of_sight?(entity, guid, line_of_sight_guids),
+         swimmable?: swimmable_target?(water, observation)
+     }}
   end
 
   defp observation_radius(%Character{}), do: 0.0
@@ -546,7 +552,6 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
       metadata: metadata,
       controller_level: controller_level(metadata, owner),
       owner: owner,
-      swimmable?: swimmable_target?(entity, position),
       moving?: World.moving?(guid, now)
     }
   end
@@ -564,14 +569,31 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
     end
   end
 
-  defp swimmable_target?(%Mob{} = entity, {%{map_id: map_id}, x, y, z}) do
+  defp water_scope(%Mob{} = entity, now, observed_guids, nearby, observations) do
     case NavigationResolver.path_options(entity) do
-      [] -> nil
-      opts -> Aquatic.water(map_id, {x, y, z}, opts[:minimum_depth]) != nil
+      [] ->
+        nil
+
+      opts ->
+        nearby_guids = Enum.flat_map(nearby, fn {_kind, entries} -> Enum.map(entries, &elem(&1, 0)) end)
+
+        guids =
+          observed_guids
+          |> Enum.concat(direct_guids(entity))
+          |> Enum.concat(aggro_target_candidates(entity, now, nearby_guids, observations))
+          |> MapSet.new()
+
+        {guids, opts[:minimum_depth]}
     end
   end
 
-  defp swimmable_target?(_entity, _position), do: nil
+  defp water_scope(_entity, _now, _observed_guids, _nearby, _observations), do: nil
+
+  defp swimmable_target?({guids, minimum_depth}, %Observation{guid: guid, position: {%{map_id: map_id}, x, y, z}}) do
+    if MapSet.member?(guids, guid), do: Aquatic.water(map_id, {x, y, z}, minimum_depth) != nil
+  end
+
+  defp swimmable_target?(_water, _observation), do: nil
 
   defp line_of_sight?(entity, guid, line_of_sight_guids) do
     guid == own_guid(entity) or

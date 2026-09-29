@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironmentTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Entity.AIEnvironment
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Pathfinding.Aquatic
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.ScriptedEvent
   alias ThistleTea.Game.World.System.ScriptedEvent.Event
@@ -115,7 +116,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironmentTest do
       target_guid = Guid.from_low_guid(:mob, 1, 98_200)
       put_actor(:mobs, target_guid, world, 30.0)
       on_exit(fn -> remove_actor(:mobs, target_guid) end)
-      tracer = start_line_of_sight_trace()
+      tracer = start_call_trace({Namigator, :line_of_sight, 7})
       entity = mob(world)
 
       entity = %{
@@ -129,7 +130,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironmentTest do
 
       perception = AIEnvironment.context(entity, 1_000).perception
       assert Perception.nearby(perception, :mobs, 45.0) == [{target_guid, 30.0}]
-      assert line_of_sight_call_count(tracer) == 1
+      assert call_count(tracer) == 1
     end
 
     test "snapshots the current player controller level without replacing creature level" do
@@ -336,14 +337,14 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironmentTest do
         Enum.each(nearby_guids, &remove_actor(:mobs, &1))
       end)
 
-      tracer = start_line_of_sight_trace()
+      tracer = start_call_trace({Namigator, :line_of_sight, 7})
 
       mob = mob(world)
       mob = %{mob | unit: %{mob.unit | target: target_guid}, internal: %{mob.internal | in_combat: true}}
       perception = AIEnvironment.context(mob, 1_000).perception
 
       assert length(Perception.nearby(perception, :mobs, 2.0)) == 20
-      assert line_of_sight_call_count(tracer) == 1
+      assert call_count(tracer) == 1
     end
 
     test "an idle aggro check sights only nearby units it could attack" do
@@ -369,12 +370,51 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironmentTest do
         Enum.each(kin_guids, &remove_actor(:mobs, &1))
       end)
 
-      tracer = start_line_of_sight_trace()
+      tracer = start_call_trace({Namigator, :line_of_sight, 7})
       perception = AIEnvironment.context(mob, 1_000).perception
 
       assert length(Perception.nearby(perception, :mobs, 10.0)) == 5
       assert Perception.nearby(perception, :players, 10.0) == [{player_guid, 10.0}]
-      assert line_of_sight_call_count(tracer) == 1
+      assert call_count(tracer) == 1
+    end
+
+    test "a swimming creature samples water only under units it could attack" do
+      world = %WorldRef{map_id: 999}
+      creature = %FactionTemplate{id: 98_015, faction_group: 8, enemy_group: 1}
+      mob = mob(world)
+
+      mob = %{
+        mob
+        | unit: %{mob.unit | display_id: 1},
+          object: %{mob.object | scale_x: 1.0},
+          internal: %{mob.internal | in_combat: false, creature: %Creature{inhabit_type: 3}}
+      }
+
+      player_guid = Guid.from_low_guid(:player, 98_050)
+      kin_guids = Enum.map(1..5, &Guid.from_low_guid(:mob, 1, 98_050 + &1))
+
+      Metadata.put(mob.object.guid, %{alive?: true, level: 10, faction_template: creature})
+      put_actor(:players, player_guid, world, 10.0)
+      Metadata.put(player_guid, %{alive?: true, level: 10, faction_template: %FactionTemplate{id: 1, faction_group: 3}})
+
+      for {guid, offset} <- Enum.with_index(kin_guids, 1) do
+        put_actor(:mobs, guid, world, offset * 1.0)
+        Metadata.put(guid, %{alive?: true, level: 10, faction_template: creature})
+      end
+
+      on_exit(fn ->
+        Metadata.delete(mob.object.guid)
+        remove_actor(:players, player_guid)
+        Enum.each(kin_guids, &remove_actor(:mobs, &1))
+      end)
+
+      tracer = start_call_trace({Aquatic, :water, 3})
+      perception = AIEnvironment.context(mob, 1_000).perception
+
+      assert length(Perception.nearby(perception, :mobs, 10.0)) == 5
+      assert Perception.swimmable?(perception, player_guid) == false
+      assert Enum.all?(kin_guids, &(Perception.swimmable?(perception, &1) == nil))
+      assert call_count(tracer) == 1
     end
 
     test "reads the local clock only for local-time conditions" do
@@ -605,37 +645,38 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironmentTest do
     Metadata.delete(guid)
   end
 
-  defp start_line_of_sight_trace do
+  defp start_call_trace({module, _function, _arity} = mfa) do
+    Code.ensure_loaded!(module)
     test_pid = self()
-    tracer = spawn_link(fn -> line_of_sight_tracer(0) end)
+    tracer = spawn_link(fn -> call_tracer(0) end)
     :erlang.trace(test_pid, true, [:call, {:tracer, tracer}])
-    :erlang.trace_pattern({Namigator, :line_of_sight, 7}, true, [])
+    :erlang.trace_pattern(mfa, true, [])
 
     on_exit(fn ->
-      :erlang.trace_pattern({Namigator, :line_of_sight, 7}, false, [])
+      :erlang.trace_pattern(mfa, false, [])
     end)
 
     tracer
   end
 
-  defp line_of_sight_call_count(tracer) do
+  defp call_count(tracer) do
     send(tracer, {:count, self()})
 
     receive do
-      {:line_of_sight_call_count, count} ->
+      {:call_count, count} ->
         send(tracer, :stop)
         count
     end
   end
 
-  defp line_of_sight_tracer(count) do
+  defp call_tracer(count) do
     receive do
-      {:trace, _pid, :call, {Namigator, :line_of_sight, _args}} ->
-        line_of_sight_tracer(count + 1)
+      {:trace, _pid, :call, _mfa} ->
+        call_tracer(count + 1)
 
       {:count, caller} ->
-        send(caller, {:line_of_sight_call_count, count})
-        line_of_sight_tracer(count)
+        send(caller, {:call_count, count})
+        call_tracer(count)
 
       :stop ->
         :ok
