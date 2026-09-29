@@ -62,8 +62,33 @@ defmodule ThistleTea.Game.Entity.Logic.OpenLockTest do
       assert {:error, :bad_targets} = OpenLock.key(lock, fn _ -> 0 end)
     end
 
+    test "item-opening spells accept only a matching key item" do
+      lock = %Lock{id: 83, requirements: [%Requirement{type: :item, index: 5_397}]}
+      fire = %Spell{id: 6_250, effects: [%Effect{type: :open_lock_item, misc_value: 0}]}
+      character = character(633, 1)
+
+      assert {:ok, %OpenLock{lock_id: 83}} = OpenLock.resolve(character, fire, lock, 5_397)
+      assert {:error, :bad_targets} = OpenLock.resolve(character, fire, lock, 1_234)
+      assert {:error, :bad_targets} = OpenLock.resolve(character, fire, lock)
+    end
+
     test "ordinary opening has no profession requirement or gain" do
       assert {:ok, %OpenLock{skill_id: nil, gain?: false}} = OpenLock.resolve(character(186, 1), spell(5), lock(5, 100))
+    end
+  end
+
+  describe "validate/3" do
+    test "checks item-opening spells against the target lock context" do
+      lock = %Lock{id: 83, requirements: [%Requirement{type: :item, index: 5_397}]}
+      fire = %Spell{id: 6_250, effects: [%Effect{type: :open_lock_item, misc_value: 0}]}
+      character = character(633, 1)
+
+      assert OpenLock.lock_spell?(fire)
+      refute OpenLock.spell?(fire)
+      assert OpenLock.validate(character, fire, {:ok, lock, 5_397}) == :ok
+      assert OpenLock.validate(character, fire, {:ok, lock, nil}) == {:error, :bad_targets}
+      assert OpenLock.validate(character, fire, {:error, :already_open}) == {:error, :already_open}
+      assert OpenLock.validate(character, %Spell{id: 1, effects: []}, nil) == :ok
     end
   end
 

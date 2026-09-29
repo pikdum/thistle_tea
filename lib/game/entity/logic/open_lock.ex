@@ -12,10 +12,14 @@ defmodule ThistleTea.Game.Entity.Logic.OpenLock do
 
   defstruct [:lock_id, :lock_type, :skill_id, required: 0, value: 0, gain?: false]
 
+  @lock_effects [:open_lock, :open_lock_item]
+
   def spell?(%Spell{effects: effects}), do: Enum.any?(effects, &(&1.type == :open_lock))
 
+  def lock_spell?(%Spell{effects: effects}), do: Enum.any?(effects, &(&1.type in @lock_effects))
+
   def validate(character, %Spell{} = spell, context) do
-    if spell?(spell), do: validate_context(character, spell, context), else: :ok
+    if lock_spell?(spell), do: validate_context(character, spell, context), else: :ok
   end
 
   defp validate_context(character, spell, {:ok, %Lock{} = lock, entry}) do
@@ -29,7 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.OpenLock do
   defp validate_context(_character, _spell, _missing), do: {:error, :bad_targets}
 
   def resolve(%Character{} = character, %Spell{} = spell, %Lock{} = lock, cast_item_entry \\ nil) do
-    effects = Enum.filter(spell.effects, &(&1.type == :open_lock))
+    effects = Enum.filter(spell.effects, &(&1.type in @lock_effects))
 
     Enum.reduce_while(effects, {:error, :bad_targets}, fn effect, _error ->
       case resolve_effect(character, effect, lock, cast_item_entry) do

@@ -19,7 +19,6 @@ defmodule ThistleTea.Game.Player.GameObjects do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgGameobjectPagetext
   alias ThistleTea.Game.Network.UpdateObject
-  alias ThistleTea.Game.Player.Deadmines
   alias ThistleTea.Game.Player.Fishing
   alias ThistleTea.Game.Player.Gathering
   alias ThistleTea.Game.Player.Gossip
@@ -184,9 +183,6 @@ defmodule ThistleTea.Game.Player.GameObjects do
     Logger.info("CMSG_GAMEOBJ_USE: entry #{Guid.entry(guid)} chest?=#{chest?(guid)}")
 
     cond do
-      Deadmines.cannon?(guid) ->
-        Deadmines.fire(state, guid)
-
       fishing_bobber?(guid) ->
         Fishing.catch_fish(state, guid)
 
@@ -272,13 +268,10 @@ defmodule ThistleTea.Game.Player.GameObjects do
 
   def activate_object(state, guid, spell_id, range_yards) do
     case ObjectTarget.resolve(state, guid, range_yards) do
-      {:ok, _template} -> state |> activate_valid_object(guid, spell_id) |> Quests.credit_cast([guid], spell_id)
+      {:ok, _template} -> state |> open_object(guid) |> Quests.credit_cast([guid], spell_id)
       {:error, _reason} -> state
     end
   end
-
-  defp activate_valid_object(state, guid, 6_250), do: Deadmines.fire(state, guid, false)
-  defp activate_valid_object(state, guid, _spell_id), do: open_object(state, guid)
 
   def chest?(guid) do
     Guid.entity_type(guid) == :game_object and

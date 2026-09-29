@@ -39,7 +39,7 @@ defmodule ThistleTea.Game.Player.Gathering do
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
   def context(state, spell, targets, cast_item_guid) do
-    if OpenLock.spell?(spell) do
+    if OpenLock.lock_spell?(spell) do
       with {:ok, id} <- target_lock(state, Target.object_guid(targets) || Target.item_guid(targets)),
            true <- id > 0,
            %Lock{} = lock <- LockLoader.get(id),

@@ -88,9 +88,13 @@ defmodule ThistleTea.Game.Player.GatheringTest do
       node: node
     } do
       spell = %Spell{id: 3366, range_yards: 5.0, effects: [%Effect{type: :open_lock_item}]}
+      key = state.character.player.inv1
+      :ets.insert(LockLoader, {@lock, %Lock{id: @lock, requirements: [%Requirement{type: :item, index: @tool}]}})
 
       assert {:ok, %GameObjectTemplate{entry: @entry}} = ObjectTarget.resolve(state, node, 5.0)
-      assert :ok = Spellcasting.validate_repeat(state, spell, Target.object(node))
+      assert {:ok, %Lock{}, @tool} = context = Gathering.context(state, spell, Target.object(node), key)
+      assert CastValidation.validate(state.character, spell, Target.object(node), nil, 0, lock_context: context) == :ok
+      assert {:error, :bad_targets} = Spellcasting.validate_repeat(state, spell, Target.object(node))
       assert {:error, :bad_targets} = Spellcasting.validate_repeat(state, spell, Target.none())
 
       moved = %{state.character | movement_block: %MovementBlock{position: {-8940.0, -132.493, 83.53, 0.0}}}

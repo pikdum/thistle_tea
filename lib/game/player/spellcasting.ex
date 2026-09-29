@@ -31,7 +31,6 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Player.Deadmines
   alias ThistleTea.Game.Player.Disenchant
   alias ThistleTea.Game.Player.Fishing
   alias ThistleTea.Game.Player.Gathering
@@ -195,7 +194,6 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     spell = WeaponDamage.prepare_spell(state.character, spell)
 
     with :ok <- validate_item_target(cast_item_guid, targets),
-         :ok <- Deadmines.validate_cast(state, spell, targets, cast_item_guid),
          :ok <- validate_cast(state, spell, targets, cast_item_guid),
          :ok <- Teaching.validate(state.character, spell, cast_item_guid),
          :ok <- PetTraining.validate(state.character, spell),
