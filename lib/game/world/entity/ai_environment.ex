@@ -233,7 +233,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
   defp base_observation_radius(%Mob{internal: %Internal{pet: %Pet{}}}), do: @pet_observation_radius
   defp base_observation_radius(%Mob{internal: %Internal{totem: %Totem{}}}), do: @totem_observation_radius
   defp base_observation_radius(%Mob{internal: %Internal{in_combat: true}}), do: MobBT.combat_observation_radius()
-  defp base_observation_radius(%Mob{} = entity), do: max(MobBT.max_aggro_radius(), Aggro.search_radius(entity))
+  defp base_observation_radius(%Mob{} = entity), do: max(Aggro.max_radius(), Aggro.search_radius(entity))
 
   defp waypoint_observation_radius(%Mob{} = entity) do
     entity

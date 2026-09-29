@@ -12,12 +12,12 @@ defmodule ThistleTea.Game.World.Entity.Player.ServerMovement do
   alias ThistleTea.Game.Core.Pet.PlayerPossession
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Combat.AggroProbe
   alias ThistleTea.Game.World.Combat.ChaseWatch
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Player.Exploration
   alias ThistleTea.Game.World.Entity.Player.Rest
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Proximity
   alias ThistleTea.Game.World.Visibility
 
   @enforce_keys [:token, :timer_ref]
@@ -39,16 +39,14 @@ defmodule ThistleTea.Game.World.Entity.Player.ServerMovement do
     previous_position = character.movement_block.position
     character = Movement.sync_position(character, now)
     World.update_position(character)
-    state = %{state | character: character}
 
     if previous_position == character.movement_block.position do
-      state
+      %{state | character: character}
     else
       {x, y, z, _} = character.movement_block.position
-      AggroProbe.notify_player_moved(character.object.guid, character.internal.world, {x, y, z})
       ChaseWatch.notify_moved(character.object.guid, {x, y, z})
 
-      state
+      %{state | character: Proximity.sync(character, now)}
       |> Rest.check_tavern_exit()
       |> Exploration.check_movement(now)
       |> Visibility.refresh_player()

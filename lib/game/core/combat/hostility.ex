@@ -87,6 +87,12 @@ defmodule ThistleTea.Game.Core.Combat.Hostility do
     alive?(source) and targetable?(source) and proximity_aggro?(source) and not neutral_to_all?(source)
   end
 
+  def proximity_target?(target) do
+    ensure_actor!(target)
+
+    alive?(target) and targetable?(target)
+  end
+
   def valid_hostile_target?(source, target) do
     alive?(target) and targetable_by?(source, target) and hostile?(source, target) and
       pvp_attack_allowed?(source, target)

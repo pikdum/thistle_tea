@@ -76,6 +76,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal do
     :ai_tick_ref,
     :ai_tick_token,
     :visibility_cell,
+    :proximity,
     :movement_start_time,
     :movement_start_position,
     :safe_position,

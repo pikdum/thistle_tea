@@ -30,7 +30,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Movement do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Combat.AggroProbe
   alias ThistleTea.Game.World.Combat.ChaseWatch
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink
@@ -44,6 +43,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Movement do
   alias ThistleTea.Game.World.Loader.ModelGeometry
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Game.World.Proximity
   alias ThistleTea.Game.World.Terrain
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility
@@ -219,7 +219,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Movement do
        ) do
     character = MovementHandoff.clear(state.character)
     character = %{character | movement_block: movement_block} |> remember_safe_position()
-    %{internal: %{world: world}} = character
     %MovementBlock{position: {x1, y1, z1, orientation}} = movement_block
     now = Time.now()
     movement_velocity = MovementBlock.client_velocity(movement_block)
@@ -254,10 +253,9 @@ defmodule ThistleTea.Game.World.Entity.Player.Movement do
 
     new_state =
       if moved? do
-        AggroProbe.notify_player_moved(state.guid, world, {x1, y1, z1})
         ChaseWatch.notify_moved(state.guid, {x1, y1, z1})
 
-        %{state | character: character}
+        %{state | character: Proximity.sync(character, now)}
         |> PlayerRest.check_tavern_exit()
         |> PlayerExploration.check_movement(now)
       else

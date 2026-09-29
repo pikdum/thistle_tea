@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.World.Visibility do
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
+  alias ThistleTea.Game.World.Proximity
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Transports
@@ -163,7 +164,10 @@ defmodule ThistleTea.Game.World.Visibility do
     else
       entity = leave_entity(entity)
       :ok = Group.join(@group, cell_key(cell), entity_meta(entity))
-      put_visibility_cell(entity, cell)
+
+      entity
+      |> Proximity.join(cell)
+      |> put_visibility_cell(cell)
     end
   end
 
@@ -187,7 +191,10 @@ defmodule ThistleTea.Game.World.Visibility do
 
   def leave_entity(%{internal: %Internal{visibility_cell: cell}} = entity) do
     Group.leave(@group, cell_key(cell))
-    put_visibility_cell(entity, nil)
+
+    entity
+    |> Proximity.leave(cell)
+    |> put_visibility_cell(nil)
   end
 
   def leave_entity(entity), do: entity

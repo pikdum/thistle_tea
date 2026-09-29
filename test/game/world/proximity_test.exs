@@ -1,0 +1,334 @@
+defmodule ThistleTea.Game.World.ProximityTest do
+  use ExUnit.Case, async: false
+
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
+  alias ThistleTea.Game.Core.Combat.Proximity.Aggressor
+  alias ThistleTea.Game.Core.Combat.Proximity.Announcement
+  alias ThistleTea.Game.Core.Combat.Proximity.Path
+  alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.SpatialGrid
+  alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Proximity
+  alias ThistleTea.Game.World.SpatialHash
+
+  describe "hear/3" do
+    test "asks a hostile idle creature to notice a listener inside its radius" do
+      {player, mob_guid} = hostile_pair({10.0, 0.0, 0.0})
+
+      assert Proximity.hear(player, creature_announcement(mob_guid, {10.0, 0.0, 0.0}), Time.now()) == :ignore
+      assert_receive {:"$gen_cast", {:aggro_probe, guid}}
+      assert guid == player.object.guid
+    end
+
+    test "uses the creature's published detect range modifier" do
+      {player, mob_guid} = hostile_pair({15.0, 0.0, 0.0})
+      Metadata.update(mob_guid, %{detect_range_modifier: -10})
+
+      Proximity.hear(player, creature_announcement(mob_guid, {15.0, 0.0, 0.0}), Time.now())
+      refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
+
+      Metadata.update(mob_guid, %{detect_range_modifier: 0})
+      Proximity.hear(player, creature_announcement(mob_guid, {15.0, 0.0, 0.0}), Time.now())
+      assert_receive {:"$gen_cast", {:aggro_probe, _guid}}
+    end
+
+    test "taxi passengers do not attract creatures until they land" do
+      {player, mob_guid} = hostile_pair({10.0, 0.0, 0.0})
+      Metadata.update(player.object.guid, %{unit_flags: 0x00100000})
+
+      Proximity.hear(player, creature_announcement(mob_guid, {10.0, 0.0, 0.0}), Time.now())
+      refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
+
+      Metadata.update(player.object.guid, %{unit_flags: 0})
+      Proximity.hear(player, creature_announcement(mob_guid, {10.0, 0.0, 0.0}), Time.now())
+      assert_receive {:"$gen_cast", {:aggro_probe, _guid}}
+    end
+
+    test "invisibility blocks aggro until the creature has matching detection" do
+      {player, mob_guid} = hostile_pair({1.0, 0.0, 0.0})
+      Metadata.update(player.object.guid, %{invisibility: %{0 => 200}})
+
+      Proximity.hear(player, creature_announcement(mob_guid, {1.0, 0.0, 0.0}), Time.now())
+      refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
+
+      Metadata.update(mob_guid, %{invisibility_detection: %{0 => 200}})
+      Proximity.hear(player, creature_announcement(mob_guid, {1.0, 0.0, 0.0}), Time.now())
+      assert_receive {:"$gen_cast", {:aggro_probe, _guid}}
+    end
+
+    test "friendly, neutral, and forced-friendly creatures are not asked" do
+      player = player(put_player(player_guid()))
+      wolf = put_mob(mob_guid(), {10.0, 0.0, 0.0}, faction_template: wolf())
+      Proximity.hear(player, creature_announcement(wolf, {10.0, 0.0, 0.0}), Time.now())
+      refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
+
+      forced =
+        player(put_player(player_guid(), reputation: %{15 => %{rank: :hostile, at_war?: true, forced_rank: :friendly}}))
+
+      defias = put_mob(mob_guid(), {10.0, 0.0, 0.0})
+      Proximity.hear(forced, creature_announcement(defias, {10.0, 0.0, 0.0}), Time.now())
+      refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
+    end
+
+    test "a reputation faction's creatures that hate the player are asked" do
+      player = player(put_player(player_guid(), reputation: %{29 => %{rank: :hostile, at_war?: true}}))
+      mob_guid = put_mob(mob_guid(), {10.0, 0.0, 0.0}, faction_template: wolf(), faction_can_have_reputation?: true)
+
+      Proximity.hear(player, creature_announcement(mob_guid, {10.0, 0.0, 0.0}), Time.now())
+      assert_receive {:"$gen_cast", {:aggro_probe, _guid}}
+    end
+
+    test "creatures that no longer aggro on sight are not asked" do
+      player = player(put_player(player_guid()))
+      passive = put_mob(mob_guid(), {10.0, 0.0, 0.0}, proximity_aggro?: false)
+      fighting = put_mob(mob_guid(), {10.0, 0.0, 0.0}, in_combat: true)
+      dead = put_mob(mob_guid(), {10.0, 0.0, 0.0}, alive?: false)
+
+      for guid <- [passive, fighting, dead] do
+        Proximity.hear(player, creature_announcement(guid, {10.0, 0.0, 0.0}), Time.now())
+      end
+
+      refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
+    end
+
+    test "listeners beyond the level-scaled radius or dead are not offered" do
+      {player, mob_guid} = hostile_pair({30.0, 0.0, 0.0})
+      Proximity.hear(player, creature_announcement(mob_guid, {30.0, 0.0, 0.0}), Time.now())
+      refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
+
+      ghost = player(put_player(player_guid(), alive?: false))
+      Proximity.hear(ghost, creature_announcement(mob_guid, {10.0, 0.0, 0.0}), Time.now())
+      refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
+    end
+
+    test "stealth uses detection distance and the creature's detection bonus" do
+      stealthed = player(put_player(player_guid(), stealthed?: true, stealth_skill: 25))
+      mob_guid = put_mob(mob_guid(), {5.0, 0.0, 0.0})
+
+      Proximity.hear(stealthed, creature_announcement(mob_guid, {5.0, 0.0, 0.0}), Time.now())
+      refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
+
+      Metadata.update(mob_guid, %{stealth_detection_bonus: 30})
+      Proximity.hear(stealthed, creature_announcement(mob_guid, {5.0, 0.0, 0.0}), Time.now())
+      assert_receive {:"$gen_cast", {:aggro_probe, _guid}}
+
+      vanished = player(put_player(player_guid(), undetectable_until: Time.now() + 1_000))
+      Proximity.hear(vanished, creature_announcement(mob_guid, {0.5, 0.0, 0.0}), Time.now())
+      refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
+    end
+
+    test "an idle creature notices a hostile announcer inside its radius" do
+      player_guid = put_player(player_guid())
+      mob = mob(put_mob(mob_guid(), {0.0, 0.0, 0.0}))
+
+      assert Proximity.hear(mob, player_announcement(player_guid, {10.0, 0.0, 0.0}), Time.now()) == :notice
+      assert Proximity.hear(mob, player_announcement(player_guid, {30.0, 0.0, 0.0}), Time.now()) == :ignore
+
+      wolf = mob(put_mob(mob_guid(), {0.0, 0.0, 0.0}, faction_template: wolf()))
+      assert Proximity.hear(wolf, player_announcement(player_guid, {10.0, 0.0, 0.0}), Time.now()) == :ignore
+
+      fighting = %{mob | internal: %{mob.internal | in_combat: true}}
+      assert Proximity.hear(fighting, player_announcement(player_guid, {10.0, 0.0, 0.0}), Time.now()) == :ignore
+      assert Proximity.hear(mob, creature_announcement(mob.object.guid, {0.0, 0.0, 0.0}), Time.now()) == :ignore
+    end
+
+    test "a walking announcer schedules one check for the moment of contact" do
+      player_guid = put_player(player_guid())
+      mob = mob(put_mob(mob_guid(), {0.0, 0.0, 0.0}))
+      now = Time.now()
+      path = %Path{origin: {100.0, 0.0, 0.0}, nodes: [{0.0, 0.0, 0.0}], started_at: now, duration_ms: 1_000}
+      announcement = %{player_announcement(player_guid, {100.0, 0.0, 0.0}) | path: path}
+
+      assert Proximity.hear(mob, announcement, now) == :ignore
+      refute_received {:proximity_due, _guid, _role}
+      assert_receive {:proximity_due, ^player_guid, :notice}, 1_000
+    end
+  end
+
+  describe "due/4" do
+    test "rechecks the authoritative position before noticing" do
+      player_guid = put_player(player_guid())
+      mob = mob(put_mob(mob_guid(), {0.0, 0.0, 0.0}))
+
+      SpatialHash.update(:players, player_guid, WorldRef.open(0), 40.0, 0.0, 0.0)
+      assert Proximity.due(mob, player_guid, :notice, Time.now()) == :ignore
+
+      SpatialHash.update(:players, player_guid, WorldRef.open(0), 8.0, 0.0, 0.0)
+      assert Proximity.due(mob, player_guid, :notice, Time.now()) == :notice
+    end
+
+    test "asks the creature to notice a listener it has reached" do
+      {player, mob_guid} = hostile_pair({8.0, 0.0, 0.0})
+
+      assert Proximity.due(player, mob_guid, :alert, Time.now()) == :ignore
+      assert_receive {:"$gen_cast", {:aggro_probe, guid}}
+      assert guid == player.object.guid
+    end
+  end
+
+  describe "sync/2" do
+    test "announces a unit when it moves two yards or changes how others react to it" do
+      player = player_guid() |> put_player() |> player() |> join()
+
+      player = Proximity.sync(player, Time.now())
+      guid = player.object.guid
+      assert_receive {:proximity, %Announcement{guid: ^guid, position: {+0.0, +0.0, +0.0}, level: 5}}
+
+      player = player |> move({1.5, 0.0, 0.0}) |> Proximity.sync(Time.now())
+      refute_receive {:proximity, %Announcement{}}
+
+      player = player |> move({2.5, 0.0, 0.0}) |> Proximity.sync(Time.now())
+      assert_receive {:proximity, %Announcement{guid: ^guid, position: {2.5, +0.0, +0.0}}}
+
+      Metadata.update(guid, %{alive?: false})
+      player = Proximity.sync(player, Time.now())
+      assert_receive {:proximity, %Announcement{guid: ^guid}}
+
+      assert Proximity.sync(player, Time.now()) == player
+      refute_receive {:proximity, %Announcement{}}
+    end
+
+    test "a unit nobody can target stays quiet while it moves" do
+      guid = put_player(player_guid())
+      Metadata.update(guid, %{unit_flags: 0x00100000})
+      player = guid |> player() |> join() |> Proximity.sync(Time.now())
+      assert_receive {:proximity, %Announcement{guid: ^guid}}
+
+      player = player |> move({30.0, 0.0, 0.0}) |> Proximity.sync(Time.now())
+      refute_receive {:proximity, %Announcement{}}
+
+      Metadata.update(guid, %{unit_flags: 0})
+      Proximity.sync(player, Time.now())
+      assert_receive {:proximity, %Announcement{guid: ^guid, position: {30.0, +0.0, +0.0}}}
+    end
+
+    test "leaving forgets the last announcement so the next entry announces again" do
+      player = player_guid() |> put_player() |> player() |> join()
+      player = Proximity.sync(player, Time.now())
+      assert_receive {:proximity, %Announcement{}}
+
+      cell = player.internal.visibility_cell
+      left = Proximity.leave(player, cell)
+      assert left.internal.proximity == nil
+      Proximity.sync(player, Time.now())
+      refute_receive {:proximity, %Announcement{}}
+
+      left |> Proximity.join(cell) |> Proximity.sync(Time.now())
+      assert_receive {:proximity, %Announcement{}}
+    end
+  end
+
+  defp hostile_pair(mob_position) do
+    {player(put_player(player_guid())), put_mob(mob_guid(), mob_position)}
+  end
+
+  defp join(%Character{internal: internal} = character) do
+    cell = SpatialGrid.cell(internal.world, 0.0, 0.0, 0.0)
+    Proximity.join(%{character | internal: %{internal | visibility_cell: cell}}, cell)
+  end
+
+  defp move(%Character{movement_block: movement_block} = character, {x, y, z}) do
+    %{character | movement_block: %{movement_block | position: {x, y, z, 0.0}}}
+  end
+
+  defp creature_announcement(guid, position) do
+    %Announcement{
+      guid: guid,
+      world: WorldRef.open(0),
+      position: position,
+      level: 5,
+      aggressor: %Aggressor{detection_range: 20.0, level: 5, modifier: 0}
+    }
+  end
+
+  defp player_announcement(guid, position) do
+    %Announcement{guid: guid, world: WorldRef.open(0), position: position, level: 5}
+  end
+
+  defp player(guid) do
+    %Character{
+      object: %Object{guid: guid},
+      unit: %Unit{level: 5, health: 100, max_health: 100},
+      internal: %Internal{world: WorldRef.open(0)},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+    }
+  end
+
+  defp mob(guid) do
+    %Mob{
+      object: %Object{guid: guid},
+      unit: %Unit{level: 5, health: 100, max_health: 100, faction_template: 17, flags: 0},
+      internal: %Internal{world: WorldRef.open(0), in_combat: false, creature: %Creature{detection_range: 20.0}},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+    }
+  end
+
+  defp put_player(guid, opts \\ []) do
+    Metadata.put(guid, %{
+      alive?: Keyword.get(opts, :alive?, true),
+      faction_template: alliance(),
+      unit_flags: 0,
+      level: 5,
+      stealthed?: Keyword.get(opts, :stealthed?, false),
+      stealth_skill: Keyword.get(opts, :stealth_skill, 0),
+      undetectable_until: Keyword.get(opts, :undetectable_until),
+      reputation: Keyword.get(opts, :reputation, %{})
+    })
+
+    on_exit(fn ->
+      SpatialHash.remove(:players, guid)
+      Metadata.delete(guid)
+    end)
+
+    guid
+  end
+
+  defp put_mob(guid, {x, y, z}, opts \\ []) do
+    Entity.register(guid)
+    SpatialHash.update(:mobs, guid, WorldRef.open(0), x, y, z)
+
+    Metadata.put(guid, %{
+      alive?: Keyword.get(opts, :alive?, true),
+      in_combat: Keyword.get(opts, :in_combat, false),
+      faction_template: Keyword.get(opts, :faction_template, defias()),
+      unit_flags: 0,
+      level: 5,
+      proximity_aggro?: Keyword.get(opts, :proximity_aggro?, true),
+      faction_can_have_reputation?: Keyword.get(opts, :faction_can_have_reputation?, false)
+    })
+
+    on_exit(fn ->
+      Entity.unregister(guid)
+      SpatialHash.remove(:mobs, guid)
+      Metadata.delete(guid)
+    end)
+
+    guid
+  end
+
+  defp player_guid, do: Guid.from_low_guid(:player, System.unique_integer([:positive]))
+
+  defp mob_guid, do: Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+
+  defp alliance do
+    %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+  end
+
+  defp defias do
+    %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, friend_group: 0, enemy_group: 1, friends_0: 15}
+  end
+
+  defp wolf do
+    %FactionTemplate{id: 32, faction: 29, flags: 16, faction_group: 0, friend_group: 0, enemy_group: 0, enemies_0: 28}
+  end
+end

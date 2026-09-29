@@ -74,16 +74,12 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   @deep_bounds_factor 0.5
   @distance_sqr_size_factor 1.0
 
-  @max_db_detection_range 45.0
-  @max_level_aggro_bonus 25
-  @max_aggro_radius @max_db_detection_range + @max_level_aggro_bonus
   @aggro_check_delay 5_000
   @dead_idle_delay 1_000
   @blocked_retry_delay 1_000
   @call_for_help_delay 1_000
   @call_for_help_spawn_distance 10.0
 
-  def max_aggro_radius, do: @max_aggro_radius
   def combat_observation_radius, do: @spread_detect_radius
 
   def tree do

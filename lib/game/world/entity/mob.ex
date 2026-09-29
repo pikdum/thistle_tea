@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   alias ThistleTea.Game.Core.Combat.FeignDeath
   alias ThistleTea.Game.Core.Combat.KillCredit
   alias ThistleTea.Game.Core.Combat.KillFeedback
+  alias ThistleTea.Game.Core.Combat.Proximity.Announcement
   alias ThistleTea.Game.Core.Combat.Threat
   alias ThistleTea.Game.Core.Creature.CreatureFlags
   alias ThistleTea.Game.Core.Effects
@@ -120,6 +121,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
+  alias ThistleTea.Game.World.Proximity
   alias ThistleTea.Game.World.Reaction
   alias ThistleTea.Game.World.Spell.SpellReception
   alias ThistleTea.Game.World.System.CreatureGroups
@@ -407,10 +409,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   @impl GenServer
   def handle_cast({:aggro_probe, target}, %Mob{internal: %Internal{in_combat: false}} = state)
       when is_integer(target) do
-    state
-    |> mark_aggro_ready()
-    |> cancel_ai_tick()
-    |> run_ai_tick()
+    notice_nearby(state)
   end
 
   def handle_cast({:aggro_probe, _target}, state) do
@@ -1554,6 +1553,28 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       {:noreply, state}
   end
 
+  def handle_info({:proximity, %Announcement{} = announcement}, %Mob{} = state) do
+    case Proximity.hear(state, announcement, Time.now()) do
+      :notice -> notice_nearby(state)
+      :ignore -> {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Proximity announcement failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:proximity_due, guid, role}, %Mob{} = state) do
+    case Proximity.due(state, guid, role, Time.now()) do
+      :notice -> notice_nearby(state)
+      :ignore -> {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Proximity check failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_info({:event_start, _event}, state) do
     {:noreply, state}
   end
@@ -1635,6 +1656,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       |> broadcast_if_pending()
       |> sync_perception_metadata()
       |> schedule_movement_completion()
+      |> Proximity.sync()
 
     {:noreply, state}
   end
@@ -1976,6 +1998,15 @@ defmodule ThistleTea.Game.World.Entity.Mob do
     blackboard = blackboard |> Blackboard.ensure() |> Blackboard.reset_deadline(:next_chase_at)
     %{state | internal: %{internal | blackboard: blackboard}}
   end
+
+  defp notice_nearby(%Mob{internal: %Internal{in_combat: false}} = state) do
+    state
+    |> mark_aggro_ready()
+    |> cancel_ai_tick()
+    |> run_ai_tick()
+  end
+
+  defp notice_nearby(state), do: {:noreply, state}
 
   defp mark_aggro_ready(%Mob{internal: %Internal{blackboard: blackboard} = internal} = state) do
     blackboard = blackboard |> Blackboard.ensure() |> Blackboard.reset_deadline(:next_aggro_at)

@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   alias ThistleTea.Game.Core.Combat.GroupReward.Award
   alias ThistleTea.Game.Core.Combat.KillFeedback
   alias ThistleTea.Game.Core.Combat.PlayerCombat
+  alias ThistleTea.Game.Core.Combat.Proximity.Announcement
   alias ThistleTea.Game.Core.Combat.Reactive
   alias ThistleTea.Game.Core.Death
   alias ThistleTea.Game.Core.Duel.Dueling
@@ -85,7 +86,6 @@ defmodule ThistleTea.Game.World.Entity.Player do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
-  alias ThistleTea.Game.World.Combat.AggroProbe
   alias ThistleTea.Game.World.Combat.ChaseWatch
   alias ThistleTea.Game.World.Combat.DamageSharing
   alias ThistleTea.Game.World.Combat.KillReward
@@ -165,6 +165,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Game.World.Proximity
   alias ThistleTea.Game.World.Spell.SpellReception
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
@@ -1081,11 +1082,10 @@ defmodule ThistleTea.Game.World.Entity.Player do
       Presence.relocate(character)
 
       {x, y, z, _orientation} = position
-      AggroProbe.notify_player_moved(state.guid, world, {x, y, z})
       ChaseWatch.notify_moved(state.guid, {x, y, z})
 
       state =
-        %{state | character: character}
+        %{state | character: Proximity.sync(character)}
         |> PlayerRest.check_tavern_exit()
         |> PlayerExploration.check_movement()
         |> Visibility.refresh_player()
@@ -1099,6 +1099,27 @@ defmodule ThistleTea.Game.World.Entity.Player do
   def handle_info({:transport_pose, _transport}, state) do
     {:noreply, state}
   end
+
+  def handle_info({:proximity, %Announcement{} = announcement}, %State{character: %Character{} = character} = state) do
+    Proximity.hear(character, announcement, Time.now())
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("Proximity announcement failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:proximity_due, guid, role}, %State{character: %Character{} = character} = state) do
+    Proximity.due(character, guid, role, Time.now())
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("Proximity check failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:proximity, _announcement}, state), do: {:noreply, state}
+  def handle_info({:proximity_due, _guid, _role}, state), do: {:noreply, state}
 
   def handle_info({:transport_lost, transport_guid}, %State{character: %Character{} = character} = state) do
     if character.movement_block.transport_guid == transport_guid do
@@ -1867,6 +1888,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
     |> sync_equipment_requirements()
     |> sync_character_metadata()
     |> QuestGivers.sync()
+    |> sync_proximity()
     |> then(fn state -> %{state | character: EventSink.emit_pending(state.character)} end)
     |> do_broadcast_update()
   end
@@ -1950,6 +1972,11 @@ defmodule ThistleTea.Game.World.Entity.Player do
   end
 
   defp do_broadcast_update(state), do: state
+
+  defp sync_proximity(%State{character: %Character{} = character} = state),
+    do: %{state | character: Proximity.sync(character)}
+
+  defp sync_proximity(state), do: state
 
   defp sync_character_metadata(%State{guid: guid, character: %Character{} = character} = state) when is_integer(guid) do
     character =

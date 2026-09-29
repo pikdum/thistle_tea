@@ -319,6 +319,15 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
     end
   end
 
+  describe "proximity_target?/1" do
+    test "only living, targetable units can be noticed by proximity" do
+      assert Hostility.proximity_target?(%{guid: 1, alive?: true, unit_flags: 0})
+      refute Hostility.proximity_target?(%{guid: 1, alive?: false, unit_flags: 0})
+      refute Hostility.proximity_target?(%{guid: 1, alive?: true, unit_flags: 0x00100000})
+      refute Hostility.proximity_target?(%{guid: 1, alive?: true, unit_flags: 0x02000000})
+    end
+  end
+
   defp alliance do
     %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
   end

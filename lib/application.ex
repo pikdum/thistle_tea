@@ -30,7 +30,6 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.CharacterStore
-  alias ThistleTea.Game.World.Combat.AggroProbe
   alias ThistleTea.Game.World.Combat.ChaseWatch
   alias ThistleTea.Game.World.Entity.EntitySupervisor
   alias ThistleTea.Game.World.Entity.PlayerSupervisor
@@ -299,7 +298,6 @@ defmodule ThistleTea.Application do
     :ets.insert(:spline_counters, {:spline_id, 0})
     setup_database()
     World.setup_spatial_index()
-    AggroProbe.init()
     ChaseWatch.init()
     SpawnPool.CellIndex.init()
 

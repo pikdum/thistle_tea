@@ -21,6 +21,14 @@ defmodule ThistleTea.Game.Core.SpatialGrid do
     {WorldRef.coerce(world), Integer.floor_div(round(x), @cell_size), Integer.floor_div(round(y), @cell_size)}
   end
 
+  def cells_overlapping(world, {min_x, min_y, max_x, max_y}) do
+    world = WorldRef.coerce(world)
+
+    for cx <- index(min_x)..index(max_x)//1, cy <- index(min_y)..index(max_y)//1 do
+      {world, cx, cy}
+    end
+  end
+
   def cells_in_range(world, x, y, _z, range) do
     world = WorldRef.coerce(world)
     cell_range = div(round(range), @cell_size) + 1
@@ -37,4 +45,6 @@ defmodule ThistleTea.Game.Core.SpatialGrid do
     end
     |> Enum.uniq()
   end
+
+  defp index(coordinate), do: Integer.floor_div(round(coordinate), @cell_size)
 end

@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position.Spline
+  alias ThistleTea.Game.World.Proximity
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.Transports
@@ -109,6 +110,36 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       state = Visibility.handle_events(state, [event])
       assert Visibility.tracked?(state, transport_guid)
       refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{}, _opts}}
+    end
+  end
+
+  describe "join_entity/1" do
+    test "units also join and leave their cell's proximity key" do
+      cell = {WorldRef.open(0), 0, 0}
+      key = Proximity.key(cell)
+      guid = Guid.from_low_guid(:player, unique_low())
+
+      character = %Character{
+        object: %Object{guid: guid},
+        internal: %Internal{world: WorldRef.open(0)},
+        movement_block: %MovementBlock{position: {1.0, 1.0, 0.0, 0.0}}
+      }
+
+      joined = Visibility.join_entity(character)
+      assert {self(), %{}} in Group.members(Visibility.group_name(), key)
+
+      left = Visibility.leave_entity(%{joined | internal: %{joined.internal | proximity: :announced}})
+      assert left.internal.proximity == nil
+      refute Enum.any?(Group.members(Visibility.group_name(), key), &match?({pid, _meta} when pid == self(), &1))
+
+      game_object = %GameObject{
+        object: %Object{guid: Guid.from_low_guid(:game_object, 1, unique_low())},
+        internal: %Internal{world: WorldRef.open(0)},
+        movement_block: %MovementBlock{position: {1.0, 1.0, 0.0, 0.0}}
+      }
+
+      Visibility.join_entity(game_object)
+      refute Enum.any?(Group.members(Visibility.group_name(), key), &match?({pid, _meta} when pid == self(), &1))
     end
   end
 

@@ -19,7 +19,6 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.CharacterStore
-  alias ThistleTea.Game.World.Combat.AggroProbe
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.GameObjectSummons
@@ -268,7 +267,6 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
   defp leave_world_presence(%__MODULE__{} = state) do
     InstanceSystem.leave(state.guid, state.character.internal.world)
     ChatChannels.leave_all(state.guid)
-    AggroProbe.forget(state.guid)
     Presence.leave(state.character)
     state = Visibility.leave_player(state)
 

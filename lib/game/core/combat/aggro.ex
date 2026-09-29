@@ -8,13 +8,18 @@ defmodule ThistleTea.Game.Core.Combat.Aggro do
   alias ThistleTea.Game.Core.Entity.Mob
 
   @max_level_bonus 25
+  @max_detection_range 50.0
 
   def detection_range(%Mob{internal: %{creature: %Creature{detection_range: range}}}) when is_number(range), do: range
 
   def detection_range(%{detection_range: range}) when is_number(range), do: range
   def detection_range(_entity), do: 20.0
 
-  def search_radius(entity), do: radius_for(detection_range(entity), @max_level_bonus, 0, modifier(entity))
+  def search_radius(entity), do: reach(detection_range(entity), modifier(entity))
+
+  def reach(detection_range, modifier), do: radius_for(detection_range, @max_level_bonus, 0, modifier)
+
+  def max_radius, do: @max_detection_range + @max_level_bonus
 
   def modifier(entity), do: Aura.flat_amount(entity, :mod_detect_range)
 
