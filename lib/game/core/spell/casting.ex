@@ -63,9 +63,9 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
   alias ThistleTea.Game.Core.Spell.SpellResist
   alias ThistleTea.Game.Core.Spell.Stealth
   alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Game.Core.Spell.TargetResolver
   alias ThistleTea.Game.Core.Spell.UnitTargets
   alias ThistleTea.Game.Core.Stats.CastSpeed
-  alias ThistleTea.Game.World.Spell.SpellTargetResolver
 
   def start(entity, spell, targets, now, cast_item_guid \\ nil, cast_item_id \\ 0, opts \\ [])
 
@@ -1339,13 +1339,13 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
   defp validate_cast_target(character, %Cast{spell: spell, targets: targets} = casting) do
     cond do
       Insignia.spell?(spell) ->
-        case SpellTargetResolver.insignia_target(character, spell, targets) do
+        case TargetResolver.insignia_target(character, spell, targets) do
           {:ok, _guid} -> :ok
           error -> error
         end
 
       Spell.resurrect_spell?(spell) ->
-        case SpellTargetResolver.resurrection_target(character, spell, targets) do
+        case TargetResolver.resurrection_target(character, spell, targets) do
           {:ok, _guid} -> :ok
           error -> error
         end
@@ -1362,7 +1362,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
     unit_guid = Target.unit_guid(targets)
 
     if is_integer(unit_guid) and unit_guid > 0 and unit_guid != self_guid do
-      Spell.attribute?(spell, :ignore_line_of_sight) or SpellTargetResolver.line_of_sight?(character, unit_guid)
+      Spell.attribute?(spell, :ignore_line_of_sight) or TargetResolver.line_of_sight?(character, unit_guid)
     else
       true
     end
@@ -1425,7 +1425,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
   defp roll_spell_hits(_caster, _spell, targets), do: {targets, []}
 
   defp spell_hits_target?(caster, target_guid, %Spell{} = spell) do
-    case SpellTargetResolver.hit_defense(caster, target_guid) do
+    case TargetResolver.hit_defense(caster, target_guid) do
       :unattackable -> true
       defense -> SpellResist.spell_hit?(caster, spell, defense, Guid.type_id(target_guid) == :player)
     end
@@ -1539,10 +1539,10 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
 
     if UnitTargets.required?(spell) or LocationTargets.required?(spell) or SharedDamage.required?(spell) do
       units = cast.requirements.units || %UnitTargets{}
-      plan = SpellTargetResolver.resolve_plan(caster, spell, targets, units, opts)
+      plan = TargetResolver.resolve_plan(caster, spell, targets, units, opts)
       {UnitTargets.guids(plan), plan}
     else
-      {SpellTargetResolver.resolve(caster, spell, targets, opts), nil}
+      {TargetResolver.resolve(caster, spell, targets, opts), nil}
     end
   end
 end

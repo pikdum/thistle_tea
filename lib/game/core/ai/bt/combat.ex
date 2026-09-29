@@ -33,7 +33,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
   alias ThistleTea.Game.Core.Spell.CastResolution.PowerCost
   alias ThistleTea.Game.Core.Spell.MeleeSpell
   alias ThistleTea.Game.Core.Spell.Target
-  alias ThistleTea.Game.World.Spell.SpellTargetResolver
+  alias ThistleTea.Game.Core.Spell.TargetResolver
 
   @attack_retry_delay_ms 100
   @attack_display_delay_ms 200
@@ -355,7 +355,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
   end
 
   defp queued_spell_targets(state, %Spell{} = spell, target) do
-    case SpellTargetResolver.resolve(state, spell, Target.unit(target)) do
+    case TargetResolver.resolve(state, spell, Target.unit(target)) do
       [] -> [target]
       targets -> targets
     end

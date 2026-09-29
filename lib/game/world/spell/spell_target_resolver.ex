@@ -1,8 +1,12 @@
 defmodule ThistleTea.Game.World.Spell.SpellTargetResolver do
   @moduledoc """
   Boundary that resolves a spell's target query into concrete guids using
-  spatial lookups and hostility checks.
+  spatial lookups and hostility checks. It implements the core
+  `Spell.TargetResolver` port that Casting calls at launch.
   """
+
+  @behaviour ThistleTea.Game.Core.Spell.TargetResolver
+
   alias ThistleTea.Game.Core.Battleground.Insignia
   alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Entity.Character
@@ -19,6 +23,7 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolver do
   alias ThistleTea.Game.Core.Spell.SpellTarget
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.Spell.TargetLimit
+  alias ThistleTea.Game.Core.Spell.TargetResolver
   alias ThistleTea.Game.Core.Spell.UnitTargets
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World
@@ -30,6 +35,7 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolver do
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.System.SpellMagnets
 
+  @impl TargetResolver
   def resolve(caster, spell, targets, opts \\ [])
 
   def resolve(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, %Target{} = targets, opts) do
@@ -53,6 +59,7 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolver do
 
   def resolve(_caster, _spell, _targets, _opts), do: []
 
+  @impl TargetResolver
   def resolve_plan(caster, spell, targets, %UnitTargets{} = units, opts) do
     by_effect =
       Map.new(spell.effects, fn effect ->
@@ -104,6 +111,7 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolver do
     :no_spell_defense?
   ]
 
+  @impl TargetResolver
   def hit_defense(caster, target_guid) when is_integer(target_guid) do
     metadata = Metadata.get(target_guid) || %{}
 
@@ -112,13 +120,16 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolver do
       else: :unattackable
   end
 
+  @impl TargetResolver
   def line_of_sight?(caster, target_guid), do: World.line_of_sight?(caster, target_guid)
 
+  @impl TargetResolver
   def insignia_target(caster, spell, targets) do
     info = InsigniaTarget.info(caster, targets)
     with :ok <- CastValidation.validate_target(caster, spell, targets, info), do: {:ok, info.body_guid}
   end
 
+  @impl TargetResolver
   def resurrection_target(caster, spell, targets) do
     info = ResurrectionTarget.info(caster, targets, spell)
     with :ok <- CastValidation.validate_target(caster, spell, targets, info), do: {:ok, info.guid}

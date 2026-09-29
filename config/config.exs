@@ -2,6 +2,7 @@ import Config
 
 alias ThistleTea.DB.DBC
 alias ThistleTea.DB.Mangos.Repo
+alias ThistleTea.Game.World.Spell.SpellTargetResolver
 
 config :esbuild,
   version: "0.17.11",
@@ -63,6 +64,7 @@ config :thistle_tea, ThistleTeaWeb.Endpoint,
   live_view: [signing_salt: "TDSztxLy"]
 
 config :thistle_tea, :map_dir, "maps"
+config :thistle_tea, :spell_target_resolver, SpellTargetResolver
 config :thistle_tea, ecto_repos: [DBC, Repo]
 
 import_config "#{config_env()}.exs"

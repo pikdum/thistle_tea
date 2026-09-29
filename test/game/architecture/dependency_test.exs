@@ -3,11 +3,6 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
 
   @root Path.expand("../../..", __DIR__)
 
-  @allowed_core_references MapSet.new([
-                             {"lib/game/core/ai/bt/combat.ex", "ThistleTea.Game.World.Spell.SpellTargetResolver"},
-                             {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World.Spell.SpellTargetResolver"}
-                           ])
-
   @random_sources MapSet.new([
                     "lib/game/core/math.ex",
                     "lib/game/core/rolls.ex"
@@ -45,8 +40,8 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
                               "lib/game/world/spatial_hash.ex"
                             ])
 
-  test "core files do not gain new references to the world or seed databases" do
-    assert core_outer_references() == @allowed_core_references
+  test "core files never reference the world, network, or seed databases" do
+    assert core_outer_references() == MapSet.new()
   end
 
   test "core never reads the clock" do
