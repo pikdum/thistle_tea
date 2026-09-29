@@ -2,13 +2,16 @@ defmodule ThistleTea.Game.Core.Item.ItemUse do
   @moduledoc """
   Plans on-use charge consumption and binding. Negative charges destroy one
   item only when exhausted; positive charges leave an empty item behind.
-  Checks explicit creature targets against an item's allowed entries and life states.
+  Checks explicit creature targets against an item's allowed entries and life states,
+  and applies an item spell slot's category and cooldown overrides to its spell.
   """
   alias ThistleTea.Game.Core.Entity.Item
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Inventory.Batch
   alias ThistleTea.Game.Core.Item.Enchantments
   alias ThistleTea.Game.Core.Profession.OpenLock
   alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Spell.SpellTeaching
 
   def validate_target([], _target), do: :ok
@@ -46,6 +49,24 @@ defmodule ThistleTea.Game.Core.Item.ItemUse do
     end
   end
 
+  def with_cooldowns(%Spell{} = spell, %ItemTemplate{} = template, index) do
+    category = Map.fetch!(template, :"spellcategory_#{index}")
+    cooldown = Map.fetch!(template, :"spellcooldown_#{index}")
+    category_cooldown = Map.fetch!(template, :"spellcategorycooldown_#{index}")
+
+    %{
+      spell
+      | category: if(positive?(category), do: category, else: spell.category),
+        recovery_time_ms: if(non_negative?(cooldown), do: cooldown, else: spell.recovery_time_ms),
+        category_recovery_time_ms:
+          if(non_negative?(category_cooldown), do: category_cooldown, else: spell.category_recovery_time_ms)
+    }
+  end
+
+  def defer_consumption?(%Cast{cast_time_ms: cast_time_ms} = casting) do
+    is_integer(cast_time_ms) and cast_time_ms > 0 and not Cast.channeled?(casting)
+  end
+
   def plan(%Batch{} = batch, %Item{} = item, index) do
     with :ok <- available(item, index) do
       {updated, expendable?, exhausted?} = Enum.reduce(1..5, {item, false, false}, &spend_charge/2)
@@ -58,6 +79,9 @@ defmodule ThistleTea.Game.Core.Item.ItemUse do
       end
     end
   end
+
+  defp positive?(value), do: is_integer(value) and value > 0
+  defp non_negative?(value), do: is_integer(value) and value >= 0
 
   defp available(item, index) do
     if Map.fetch!(Item.template(item), :"spellcharges_#{index}") != 0 and Item.spell_charge(item, index) == 0,

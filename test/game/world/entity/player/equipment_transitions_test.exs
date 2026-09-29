@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EquipmentTransitionsTest do
   alias ThistleTea.Game.World.Entity.Player.Inventory
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Entity.Player.UsableItems
   alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -48,7 +49,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EquipmentTransitionsTest do
       assert Cooldowns.ready_at(equipped.character, spell) in (before + 30_000)..(Time.now() + 30_000)
 
       rejected =
-        Inbound.Item.use_item(
+        use_item(
           %Message.CmsgUseItem{bag: 255, slot: 12, targets: <<0::little-size(16)>>},
           equipped,
           fn ^id -> spell end
@@ -302,4 +303,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EquipmentTransitionsTest do
       :ets.insert(SpellLoader, previous)
     end)
   end
+
+  defp use_item(%{bag: bag, slot: slot, targets: targets}, state, load_spell),
+    do: UsableItems.use(state, {bag, slot}, targets, load_spell)
 end

@@ -19,7 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Player.FirstAidTest do
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Inbound
+  alias ThistleTea.Game.World.Entity.Player.UsableItems
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Metadata
 
@@ -49,7 +49,7 @@ defmodule ThistleTea.Game.World.Entity.Player.FirstAidTest do
       targets: TargetCodec.encode(Target.unit(target_guid))
     }
 
-    done = Inbound.Item.use_item(message, state, fn _id -> context.spell end)
+    done = use_item(message, state, fn _id -> context.spell end)
     assert done.character.internal.casting == nil
     assert done.character.internal.cooldowns == state.character.internal.cooldowns
     assert ItemStore.get(context.item.object.guid).item.stack_count == 3
@@ -97,4 +97,7 @@ defmodule ThistleTea.Game.World.Entity.Player.FirstAidTest do
       effects: [%Effect{index: 0, type: :apply_aura, aura: :mechanic_immunity, misc_value: 16}]
     }
   end
+
+  defp use_item(%{bag: bag, slot: slot, targets: targets}, state, load_spell),
+    do: UsableItems.use(state, {bag, slot}, targets, load_spell)
 end

@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ContainersTest do
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.Looting
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Entity.Player.UsableItems
   alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -190,7 +191,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ContainersTest do
         targets: TargetCodec.encode(Target.item(source.object.guid))
       }
 
-      cast = Inbound.Item.use_item(message, state, fn @spell -> spell end)
+      cast = use_item(message, state, fn @spell -> spell end)
       assert ItemStore.get(key.object.guid) == key
       assert_receive {:open_lock, _guid, ^spell, _key, _events} = command
       assert {:noreply, opened} = PlayerServer.handle_info(command, cast)
@@ -264,4 +265,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ContainersTest do
       spell: %Spell{id: @spell, effects: [%Effect{type: :open_lock, misc_value: 1, base_points: 24}]}
     }
   end
+
+  defp use_item(%{bag: bag, slot: slot, targets: targets}, state, load_spell),
+    do: UsableItems.use(state, {bag, slot}, targets, load_spell)
 end
