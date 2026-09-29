@@ -12,7 +12,6 @@ defmodule ThistleTea.Game.World.Entity.Player.VendorPurchase do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.Vendor.VendorItem
   alias ThistleTea.Game.Core.Vendor.VendorStock.Receipt
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
@@ -20,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Player.VendorPurchase do
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.VendorStock
   alias ThistleTea.Game.World.VendorStockStore
 
@@ -134,7 +134,7 @@ defmodule ThistleTea.Game.World.Entity.Player.VendorPurchase do
   end
 
   defp success(receipt) do
-    Network.send_packet(%Message.SmsgBuyItem{
+    Outbound.send_packet(%Message.SmsgBuyItem{
       vendor_guid: receipt.vendor_guid,
       vendor_slot: receipt.vendor_item.index,
       new_count: receipt.available,
@@ -152,7 +152,7 @@ defmodule ThistleTea.Game.World.Entity.Player.VendorPurchase do
   end
 
   defp send_item_push(receipt, {bag_slot, item_slot}, count, property_id) do
-    Network.send_packet(%Message.SmsgItemPushResult{
+    Outbound.send_packet(%Message.SmsgItemPushResult{
       player_guid: receipt.guid,
       item_id: receipt.vendor_item.template.entry,
       random_property_id: property_id,
@@ -165,7 +165,7 @@ defmodule ThistleTea.Game.World.Entity.Player.VendorPurchase do
 
   defp failure(state, vendor, item, {:error, reason}) do
     reason = if reason in [:item_already_sold, :cant_carry_more], do: reason, else: :cant_find_item
-    Network.send_packet(%Message.SmsgBuyFailed{vendor_guid: vendor, item_id: item, error: reason})
+    Outbound.send_packet(%Message.SmsgBuyFailed{vendor_guid: vendor, item_id: item, error: reason})
     state
   end
 
@@ -174,7 +174,7 @@ defmodule ThistleTea.Game.World.Entity.Player.VendorPurchase do
   end
 
   defp placement_failure(state, _vendor, template, _destination, reason) do
-    Network.send_packet(%Message.SmsgInventoryChangeFailure{
+    Outbound.send_packet(%Message.SmsgInventoryChangeFailure{
       code: Inventory.error_code(reason),
       required_level: template.required_level
     })

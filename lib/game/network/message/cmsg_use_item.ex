@@ -2,86 +2,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_USE_ITEM
 
-  alias ThistleTea.Game.Core.Entity.Component.Internal
-  alias ThistleTea.Game.Core.Entity.Item, as: DataItem
-  alias ThistleTea.Game.Core.Entity.ItemTemplate
-  alias ThistleTea.Game.Core.Inventory
-  alias ThistleTea.Game.Core.Item.ItemUse
-  alias ThistleTea.Game.Core.Item.Proficiency
-  alias ThistleTea.Game.Core.Spell
-  alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.World.Entity.Player.Bank
-  alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
-  alias ThistleTea.Game.World.Entity.Player.Items
-  alias ThistleTea.Game.World.Entity.Player.Reputation
-  alias ThistleTea.Game.World.Entity.Player.Spellcasting
-  alias ThistleTea.Game.World.ItemStore
-  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
-
-  require Logger
-
-  @invtype_non_equip 0
 
   defstruct [:bag, :slot, :spell_count, :targets]
-
-  @impl ClientMessage
-  def handle(%__MODULE__{} = message, %{ready: true, character: %Character{}} = state) do
-    handle(message, state, &SpellLoader.load/1)
-  end
-
-  def handle(_message, state), do: state
-
-  def handle(%__MODULE__{} = message, %{ready: true, character: %Character{} = c} = state, load_spell)
-      when is_function(load_spell, 1) do
-    pos = {message.bag, message.slot}
-
-    case Bank.authorize_positions(state, [pos]) do
-      {:ok, state} -> use_item(message, state, c, pos, load_spell)
-      {:error, state} -> reject_remote_bank(state)
-    end
-  end
-
-  defp use_item(message, state, c, pos, load_spell) do
-    get_item = &ItemStore.get/1
-
-    with guid when is_integer(guid) <- Inventory.item_guid_at(c.player, pos, get_item),
-         %DataItem{} = item <- ItemStore.get(guid),
-         template = DataItem.template(item),
-         :ok <- validate_usable(c, template, pos),
-         {:ok, spell_id, spell_index, consumable?} <- ItemUse.on_use_spell(item),
-         %Spell{} = spell <- load_spell.(spell_id) do
-      spell = apply_item_cooldowns(spell, template, spell_index)
-
-      Logger.info("CMSG_USE_ITEM: #{template.name} casting #{spell.name}")
-
-      case Spellcasting.cast_result(state, spell, message.targets, guid) do
-        {:ok, state} ->
-          handle_consumption(state, guid, consumable? and not ItemUse.deferred_costs?(spell, guid))
-
-        {:error, state} ->
-          Network.send_packet(%Message.SmsgInventoryChangeFailure{})
-          state
-      end
-    else
-      {:cast_error, spell_id, reason} ->
-        Network.send_packet(Message.SmsgCastResult.failure(spell_id, reason))
-        state
-
-      {:error, error} ->
-        InventoryUpdate.send_failure(error, Inventory.item_guid_at(c.player, pos, get_item) || 0, 0)
-        state
-
-      _ ->
-        InventoryUpdate.send_failure(:item_not_found, 0, 0)
-        state
-    end
-  end
-
-  defp reject_remote_bank(state) do
-    InventoryUpdate.send_failure(:too_far_away_from_bank, 0, 0)
-    state
-  end
 
   @impl ClientMessage
   def from_binary(payload) do
@@ -93,59 +16,5 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
       spell_count: spell_count,
       targets: targets
     }
-  end
-
-  defp validate_usable(%Character{unit: unit} = character, %ItemTemplate{} = template, {bag, slot}) do
-    if template.inventory_type != @invtype_non_equip and
-         not (bag == Inventory.bag_0() and Inventory.equipment_slot?(slot)) do
-      {:error, :item_not_found}
-    else
-      with :ok <- Inventory.can_use(unit, Proficiency.from_character(character), template, character.player) do
-        Reputation.validate_item_requirement(character, template)
-      end
-    end
-  end
-
-  defp apply_item_cooldowns(%Spell{} = spell, %ItemTemplate{} = template, index) do
-    spell
-    |> maybe_put_positive(:category, Map.get(template, :"spellcategory_#{index}"))
-    |> maybe_put_non_negative(:recovery_time_ms, Map.get(template, :"spellcooldown_#{index}"))
-    |> maybe_put_non_negative(:category_recovery_time_ms, Map.get(template, :"spellcategorycooldown_#{index}"))
-  end
-
-  defp maybe_put_positive(%Spell{} = spell, field, value) when is_integer(value) and value > 0 do
-    Map.put(spell, field, value)
-  end
-
-  defp maybe_put_positive(%Spell{} = spell, _field, _value), do: spell
-
-  defp maybe_put_non_negative(%Spell{} = spell, field, value) when is_integer(value) and value >= 0 do
-    Map.put(spell, field, value)
-  end
-
-  defp maybe_put_non_negative(%Spell{} = spell, _field, _value), do: spell
-
-  defp handle_consumption(state, _item_guid, false), do: state
-
-  defp handle_consumption(
-         %{
-           character:
-             %Character{internal: %Internal{casting: %Cast{cast_item_guid: item_guid} = casting} = internal} = c
-         } = state,
-         item_guid,
-         true
-       ) do
-    if defer_consumption?(casting) do
-      casting = %{casting | consume_item: true}
-      %{state | character: %{c | internal: %{internal | casting: casting}}}
-    else
-      Items.consume_cast_item(state, item_guid)
-    end
-  end
-
-  defp handle_consumption(state, item_guid, true), do: Items.consume_cast_item(state, item_guid)
-
-  defp defer_consumption?(%Cast{cast_time_ms: cast_time_ms} = casting) do
-    is_integer(cast_time_ms) and cast_time_ms > 0 and not Cast.channeled?(casting)
   end
 end

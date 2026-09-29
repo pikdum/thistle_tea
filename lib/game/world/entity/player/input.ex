@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Input do
 
   alias ThistleTea.Game.Core.Pet.PlayerPossession
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.Inbound
 
   @uncontrolled_messages [
     Message.CmsgPing,
@@ -35,7 +36,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Input do
   ]
 
   def handle(message, state) do
-    if allowed?(message, state), do: Message.handle(message, state), else: state
+    if allowed?(message, state), do: Inbound.handle(message, state), else: state
   end
 
   def allowed?(%module{}, %{character: character}) do

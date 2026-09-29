@@ -16,12 +16,12 @@ defmodule ThistleTea.Game.World.Entity.Player.Items do
   alias ThistleTea.Game.Core.Item.ItemUse
   alias ThistleTea.Game.Core.Loot
   alias ThistleTea.Game.Core.Profession.Crafting
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
+  alias ThistleTea.Game.World.Outbound
 
   def create(state, item_id, count, spell_id \\ nil) do
     case ItemLoader.get_template(item_id) do
@@ -237,7 +237,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Items do
       case Inventory.destroy(state.character.player, pos, get_item) do
         {:ok, result, _item} ->
           ItemStore.delete(item.object.guid)
-          Network.send_packet(%Message.SmsgDestroyObject{guid: item.object.guid})
+          Outbound.send_packet(%Message.SmsgDestroyObject{guid: item.object.guid})
           InventoryUpdate.apply(state, {:ok, result})
 
         _ ->
@@ -254,7 +254,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Items do
   end
 
   def send_push_result(state, %Loot.Item{} = reward, count, {bag_slot, item_slot}, created) do
-    Network.send_packet(%Message.SmsgItemPushResult{
+    Outbound.send_packet(%Message.SmsgItemPushResult{
       player_guid: state.guid,
       item_id: reward.item_id,
       random_property_id: ItemProperty.id(reward.random_property),
@@ -272,7 +272,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Items do
   end
 
   defp system_message(state, message) do
-    Network.send_packet(Message.SmsgMessagechat.system(message, state.guid))
+    Outbound.send_packet(Message.SmsgMessagechat.system(message, state.guid))
     state
   end
 end

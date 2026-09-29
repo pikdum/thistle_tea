@@ -6,7 +6,4 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelGrowthAura do
 
   @impl ClientMessage
   def from_binary(<<>>), do: %__MODULE__{}
-
-  @impl ClientMessage
-  def handle(%__MODULE__{}, state), do: state
 end

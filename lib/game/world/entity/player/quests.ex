@@ -23,7 +23,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   alias ThistleTea.Game.Core.Quest.QuestRequirements
   alias ThistleTea.Game.Core.Quest.QuestSharing, as: Sharing
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
@@ -40,9 +39,11 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   alias ThistleTea.Game.World.Entity.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.World.Entity.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -133,7 +134,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
          %Quest{} = quest <- QuestLoader.get(quest_id) do
       send_details(guid, quest)
     else
-      _invalid -> Network.send_packet(%Message.SmsgGossipComplete{})
+      _invalid -> Outbound.send_packet(%Message.SmsgGossipComplete{})
     end
 
     state
@@ -146,7 +147,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
            quest_id in giver_ids(npc_guid) or quest_id in ender_ids(npc_guid) do
       send_details(npc_guid, quest)
     else
-      _invalid -> Network.send_packet(%Message.SmsgGossipComplete{})
+      _invalid -> Outbound.send_packet(%Message.SmsgGossipComplete{})
     end
 
     state
@@ -161,7 +162,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   end
 
   def cancel_dialog(state) do
-    Network.send_packet(%Message.SmsgGossipComplete{})
+    Outbound.send_packet(%Message.SmsgGossipComplete{})
     state
   end
 
@@ -200,7 +201,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
         _requirement -> 0
       end
 
-    Network.send_packet(%Message.SmsgQuestgiverQuestInvalid{reason: code})
+    Outbound.send_packet(%Message.SmsgQuestgiverQuestInvalid{reason: code})
   end
 
   defp accept_from_questgiver(state, npc_guid, quest_id) do
@@ -250,7 +251,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
         )
 
       if event == :completed do
-        Network.send_packet(%Message.SmsgQuestupdateComplete{quest_id: quest.id})
+        Outbound.send_packet(%Message.SmsgQuestupdateComplete{quest_id: quest.id})
       end
 
       character = state.character
@@ -269,7 +270,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
       |> run_quest_script(source_guid, quest.start_script_steps)
     else
       {:error, :log_full} ->
-        Network.send_packet(%Message.SmsgQuestlogFull{})
+        Outbound.send_packet(%Message.SmsgQuestlogFull{})
         state
 
       {:error, {:inventory, reason}} ->
@@ -292,7 +293,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
       %Entry{expires_at_ms: ^expected_expires_at} ->
         case QuestLog.fail_timed(player.quest_log, quest_id, Time.now()) do
           {:ok, quest_log} ->
-            Network.send_packet(%Message.SmsgQuestupdateFailedtimer{quest_id: quest_id})
+            Outbound.send_packet(%Message.SmsgQuestupdateFailedtimer{quest_id: quest_id})
             put_character(state, %{character | player: %{player | quest_log: quest_log}})
 
           {:error, :not_expired} ->
@@ -404,9 +405,9 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
     send_reward_pushes(state, change_set, rewards)
 
     {character, level_ups} = PlayerStats.gain_xp(state.character, xp)
-    Enum.each(level_ups, fn level_up -> Network.send_packet(struct(Message.SmsgLevelupInfo, level_up)) end)
+    Enum.each(level_ups, fn level_up -> Outbound.send_packet(struct(Message.SmsgLevelupInfo, level_up)) end)
 
-    if announce?, do: Network.send_packet(%Message.SmsgQuestgiverQuestComplete{quest: quest, xp: xp, money: money})
+    if announce?, do: Outbound.send_packet(%Message.SmsgQuestgiverQuestComplete{quest: quest, xp: xp, money: money})
     state = put_character(state, character)
     state = Battlegrounds.quest_rewarded(state, quest.id)
     state = PlayerReputation.reward_quest(state, quest)
@@ -449,20 +450,22 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
     if quest.request_items_text == "" or (quest.required_items == [] and completable) do
       send_offer_reward(npc_guid, quest)
     else
-      Network.send_packet(%Message.SmsgQuestgiverRequestItems{
+      Outbound.send_packet(%Message.SmsgQuestgiverRequestItems{
         npc_guid: npc_guid,
         quest: quest,
         completable: completable,
-        close_on_cancel: false
+        close_on_cancel: false,
+        item_display_ids: item_display_ids(quest)
       })
     end
   end
 
   defp send_offer_reward(npc_guid, %Quest{} = quest) do
-    Network.send_packet(%Message.SmsgQuestgiverOfferReward{
+    Outbound.send_packet(%Message.SmsgQuestgiverOfferReward{
       npc_guid: npc_guid,
       quest: quest,
-      enable_next: true
+      enable_next: true,
+      item_display_ids: item_display_ids(quest)
     })
   end
 
@@ -604,11 +607,19 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
     }
   end
 
+  def item_display_ids(%Quest{} = quest) do
+    (quest.reward_choice_items ++ quest.reward_items)
+    |> Enum.map(fn {item_id, _count} -> item_id end)
+    |> Enum.concat(Enum.map(quest.required_items, fn {_index, item_id, _count} -> item_id end))
+    |> ItemLoader.display_ids()
+  end
+
   def send_details(npc_guid, %Quest{} = quest) do
-    Network.send_packet(%Message.SmsgQuestgiverQuestDetails{
+    Outbound.send_packet(%Message.SmsgQuestgiverQuestDetails{
       npc_guid: npc_guid,
       quest: quest,
-      activate_accept: true
+      activate_accept: true,
+      item_display_ids: item_display_ids(quest)
     })
   end
 
@@ -619,7 +630,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   end
 
   defp send_quest_list(npc_guid, entries) do
-    Network.send_packet(%Message.SmsgQuestgiverQuestList{
+    Outbound.send_packet(%Message.SmsgQuestgiverQuestList{
       npc_guid: npc_guid,
       title: "",
       entries: entries
@@ -652,7 +663,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
       Enum.reduce(quests, {player.quest_log, false}, fn quest, {quest_log, credited?} ->
         case QuestLog.increment_kill(quest_log, quest, creature_entry) do
           {:ok, quest_log, credit} ->
-            Network.send_packet(%Message.SmsgQuestupdateAddKill{
+            Outbound.send_packet(%Message.SmsgQuestupdateAddKill{
               quest_id: quest.id,
               creature_entry: creature_entry,
               count: credit.count,
@@ -814,7 +825,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
             %Message.SmsgQuestupdateFailed{quest_id: quest_id}
           end
 
-        Network.send_packet(message)
+        Outbound.send_packet(message)
         put_character(state, %{character | player: %{player | quest_log: quest_log}})
 
       _error ->
@@ -903,7 +914,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   defp send_entity_credit(quest, target_guid, target_entry, credit) do
     entry = if Guid.type_id(target_guid) == :game_object, do: Bitwise.bor(target_entry, 0x80000000), else: target_entry
 
-    Network.send_packet(%Message.SmsgQuestupdateAddKill{
+    Outbound.send_packet(%Message.SmsgQuestupdateAddKill{
       quest_id: quest.id,
       creature_entry: entry,
       count: credit.count,
@@ -991,7 +1002,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
       delta = Inventory.count_entry(player, item_id, &ItemStore.get/1) - Map.get(old_counts, item_id, 0)
 
       if delta > 0 do
-        Network.send_packet(%Message.SmsgQuestupdateAddItem{item_id: item_id, count: delta})
+        Outbound.send_packet(%Message.SmsgQuestupdateAddItem{item_id: item_id, count: delta})
       end
     end)
   end
@@ -1004,7 +1015,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
            &PlayerReputation.standing(character, &1)
          ) do
       {quest_log, :completed} ->
-        Network.send_packet(%Message.SmsgQuestupdateComplete{quest_id: quest.id})
+        Outbound.send_packet(%Message.SmsgQuestupdateComplete{quest_id: quest.id})
         {quest_log, :completed}
 
       result ->
@@ -1060,7 +1071,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   end
 
   defp send_item_push(state, %DataItem{} = item, {bag_slot, item_slot}, count) do
-    Network.send_packet(%Message.SmsgItemPushResult{
+    Outbound.send_packet(%Message.SmsgItemPushResult{
       player_guid: state.guid,
       item_id: item.object.entry,
       random_property_id: item.item.random_properties_id || 0,

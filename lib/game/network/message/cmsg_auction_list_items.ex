@@ -3,7 +3,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgAuctionListItems do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_AUCTION_LIST_ITEMS
 
   alias ThistleTea.Game.Core.Auction.Query
-  alias ThistleTea.Game.World.Entity.Player.Auction
 
   defstruct [:auctioneer, :query]
   @impl ClientMessage
@@ -28,7 +27,4 @@ defmodule ThistleTea.Game.Network.Message.CmsgAuctionListItems do
       }
     }
   end
-
-  @impl ClientMessage
-  def handle(%__MODULE__{} = message, state), do: Auction.search(state, message)
 end

@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TemporaryEnchantmentsTest do
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThistleTea.Game.World.Entity.Player.Enchantments
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
@@ -96,7 +97,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TemporaryEnchantmentsTest do
         targets: TargetCodec.encode(Target.item(context.weapon.object.guid))
       }
 
-      state = CmsgUseItem.handle(message, context.state, fn @spell -> context.spell end)
+      state = Inbound.Item.use_item(message, context.state, fn @spell -> context.spell end)
       assert ItemStore.get(context.coating.object.guid).item.stack_count == 3
       assert_receive {:enchant_item, guid, spell, @enchant, duration, source}
       assert guid == context.weapon.object.guid

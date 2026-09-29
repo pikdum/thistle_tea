@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Network.Message.ActionButtonsTest do
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Message.SmsgActionButtons
   alias ThistleTea.Game.Network.Opcodes
+  alias ThistleTea.Game.World.Inbound
 
   defp state_with_buttons(action_buttons) do
     %{character: %Character{internal: %Internal{action_buttons: action_buttons}}}
@@ -41,7 +42,7 @@ defmodule ThistleTea.Game.Network.Message.ActionButtonsTest do
   describe "CmsgSetActionButton.handle/2" do
     test "sets a button" do
       state =
-        CmsgSetActionButton.handle(
+        Inbound.handle(
           %CmsgSetActionButton{button: 3, packed_data: 6603},
           state_with_buttons(%{})
         )
@@ -51,7 +52,7 @@ defmodule ThistleTea.Game.Network.Message.ActionButtonsTest do
 
     test "clears a button when packed data is zero" do
       state =
-        CmsgSetActionButton.handle(
+        Inbound.handle(
           %CmsgSetActionButton{button: 3, packed_data: 0},
           state_with_buttons(%{3 => 6603, 4 => 78})
         )
@@ -61,7 +62,7 @@ defmodule ThistleTea.Game.Network.Message.ActionButtonsTest do
 
     test "ignores out-of-range buttons" do
       state =
-        CmsgSetActionButton.handle(
+        Inbound.handle(
           %CmsgSetActionButton{button: 120, packed_data: 6603},
           state_with_buttons(%{})
         )
@@ -86,7 +87,7 @@ defmodule ThistleTea.Game.Network.Message.ActionButtonsTest do
       state = %{character: %Character{player: %Player{}}}
 
       state =
-        CmsgSetActionbarToggles.handle(
+        Inbound.handle(
           %CmsgSetActionbarToggles{action_bar: 0x0F},
           state
         )
@@ -98,7 +99,7 @@ defmodule ThistleTea.Game.Network.Message.ActionButtonsTest do
       state = %{character: %Character{player: %Player{action_bars: 0x0F}}}
 
       state =
-        CmsgSetActionbarToggles.handle(
+        Inbound.handle(
           %CmsgSetActionbarToggles{action_bar: 0},
           state
         )
@@ -109,7 +110,7 @@ defmodule ThistleTea.Game.Network.Message.ActionButtonsTest do
     test "ignores toggles before character login" do
       state = %{character: nil}
 
-      assert CmsgSetActionbarToggles.handle(
+      assert Inbound.handle(
                %CmsgSetActionbarToggles{action_bar: 0x0F},
                state
              ) == state

@@ -22,7 +22,6 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentReset do
   alias ThistleTea.Game.Core.Player.Talents, as: TalentLogic
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
@@ -37,6 +36,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentReset do
   alias ThistleTea.Game.World.Loader.Gossip
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
 
   @visual_spell 14_867
 
@@ -48,8 +48,8 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentReset do
   def confirm(%State{ready: true, character: %Character{} = character} = state, trainer) do
     if valid_trainer?(character, trainer) do
       cost = ResetPrice.cost(character.internal.talent_reset, Time.now())
-      Network.send_packet(%Message.SmsgGossipComplete{})
-      Network.send_packet(%Message.MsgTalentWipeConfirm{trainer_guid: trainer, cost: cost})
+      Outbound.send_packet(%Message.SmsgGossipComplete{})
+      Outbound.send_packet(%Message.MsgTalentWipeConfirm{trainer_guid: trainer, cost: cost})
       %{state | talent_reset_offer: %Offer{trainer_guid: trainer, cost: cost}, gossip_menu_options: []}
     else
       %{state | talent_reset_offer: nil}
@@ -98,11 +98,11 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentReset do
       %{state | character: character}
     else
       [] ->
-        Network.send_packet(%Message.MsgTalentWipeConfirm{})
+        Outbound.send_packet(%Message.MsgTalentWipeConfirm{})
         state
 
       {:error, :not_enough_money} ->
-        Network.send_packet(%Message.SmsgBuyFailed{vendor_guid: 0, item_id: 0, error: :not_enough_money})
+        Outbound.send_packet(%Message.SmsgBuyFailed{vendor_guid: 0, item_id: 0, error: :not_enough_money})
         state
     end
   end

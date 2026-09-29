@@ -2,9 +2,11 @@ defmodule ThistleTea.Game.Network.Server do
   @moduledoc """
   ThousandIsland transport for a world client connection.
 
-  Authentication and character-selection messages run on the connection until
-  login starts a player entity process. Once logged in, inbound messages are
-  dispatched to that process and outbound packets arrive here already encoded.
+  Decoded messages go to the `ThistleTea.Game.Network.Session` implementation
+  given in the handler options. Authentication and character-selection
+  messages run on the connection until login starts a player entity process;
+  once logged in, inbound messages are forwarded to that process and outbound
+  packets arrive here already encoded.
   """
   use ThousandIsland.Handler
   use ThistleTea.Game.Network.Opcodes, [:SMSG_AUTH_CHALLENGE]
@@ -16,7 +18,6 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.Send
-  alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThousandIsland.Socket
 
   require Logger
@@ -98,7 +99,7 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl ThousandIsland.Handler
-  def handle_connection(socket, _) do
+  def handle_connection(socket, %{session: session}) do
     conn = %Connection{}
 
     Socket.send(
@@ -106,13 +107,13 @@ defmodule ThistleTea.Game.Network.Server do
       <<6::big-size(16), @smsg_auth_challenge::little-size(16)>> <> conn.seed
     )
 
-    {:continue, %ConnectionState{conn: conn}}
+    {:continue, %ConnectionState{conn: conn, session: session}}
   end
 
   @impl ThousandIsland.Handler
-  def handle_close(_socket, %ConnectionState{player_pid: player_pid}) when is_pid(player_pid) do
+  def handle_close(_socket, %ConnectionState{player_pid: player_pid, session: session}) when is_pid(player_pid) do
     Logger.info("CLIENT DISCONNECTED")
-    PlayerServer.disconnect(player_pid)
+    session.disconnect(player_pid)
   end
 
   def handle_close(_socket, _state) do
@@ -120,12 +121,13 @@ defmodule ThistleTea.Game.Network.Server do
     :ok
   end
 
-  defp dispatch_message(%Message.CmsgPing{} = message, %ConnectionState{} = state) do
-    Message.handle(message, state)
+  defp dispatch_message(%Message.CmsgPing{} = message, %ConnectionState{session: session} = state) do
+    session.handle_message(message, state)
   end
 
-  defp dispatch_message(message, %ConnectionState{player_pid: player_pid} = state) when is_pid(player_pid) do
-    :ok = PlayerServer.handle_message(player_pid, message)
+  defp dispatch_message(message, %ConnectionState{player_pid: player_pid, session: session} = state)
+       when is_pid(player_pid) do
+    :ok = session.forward(player_pid, message)
     state
   catch
     :exit, {reason, {GenServer, :call, [^player_pid | _args]}}
@@ -133,5 +135,5 @@ defmodule ThistleTea.Game.Network.Server do
       state
   end
 
-  defp dispatch_message(message, state), do: Message.handle(message, state)
+  defp dispatch_message(message, %ConnectionState{session: session} = state), do: session.handle_message(message, state)
 end

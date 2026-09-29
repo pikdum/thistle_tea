@@ -6,9 +6,9 @@ defmodule ThistleTea.Game.World.System.Party.Notifier do
   alias ThistleTea.Game.Core.Party
   alias ThistleTea.Game.Core.Party.Group
   alias ThistleTea.Game.Core.Party.MemberStats
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   def send_group_list(%Group{} = group) do
@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.World.System.Party.Notifier do
         %{name: member.name, guid: member.guid, online?: online?(member.guid), flags: Party.member_flags(member)}
       end
 
-    Network.send_packet(
+    Outbound.send_packet(
       %Message.SmsgGroupList{
         group_type: if(group.raid?, do: 1, else: 0),
         own_flags: own_flags(group, guid),
@@ -37,13 +37,13 @@ defmodule ThistleTea.Game.World.System.Party.Notifier do
     )
 
     if map_size(group.icons) > 0 do
-      Network.send_packet(%Message.MsgRaidTargetUpdateResponse{icons: Enum.sort(group.icons)}, guid)
+      Outbound.send_packet(%Message.MsgRaidTargetUpdateResponse{icons: Enum.sort(group.icons)}, guid)
     end
   end
 
   def send_empty_group_list(guid) do
     notify_leader_status(guid, false)
-    Network.send_packet(%Message.SmsgGroupList{}, guid)
+    Outbound.send_packet(%Message.SmsgGroupList{}, guid)
   end
 
   def broadcast(%Group{} = group, packet, opts \\ []) do
@@ -52,21 +52,21 @@ defmodule ThistleTea.Game.World.System.Party.Notifier do
 
     Enum.each(group.members, fn member ->
       if member.guid != except and (subgroup == nil or member.subgroup == subgroup) do
-        Network.send_packet(packet, member.guid)
+        Outbound.send_packet(packet, member.guid)
       end
     end)
   end
 
   def notify_removal({:disbanded, %Group{} = group}, _removed_guid, _kicked?) do
     Enum.each(group.members, fn member ->
-      Network.send_packet(%Message.SmsgGroupDestroyed{}, member.guid)
+      Outbound.send_packet(%Message.SmsgGroupDestroyed{}, member.guid)
       send_empty_group_list(member.guid)
     end)
   end
 
   def notify_removal({:removed, %Group{} = group, leader_changed?}, removed_guid, kicked?) do
     if kicked? do
-      Network.send_packet(%Message.SmsgGroupUninvite{}, removed_guid)
+      Outbound.send_packet(%Message.SmsgGroupUninvite{}, removed_guid)
     end
 
     send_empty_group_list(removed_guid)

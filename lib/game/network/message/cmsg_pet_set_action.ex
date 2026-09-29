@@ -2,14 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetSetAction do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PET_SET_ACTION
 
-  alias ThistleTea.Game.World.Entity.Player.PetActions
-
   defstruct [:pet_guid, actions: []]
-
-  @impl ClientMessage
-  def handle(%__MODULE__{pet_guid: guid, actions: actions}, state) do
-    PetActions.controls(state, guid, {:actions, actions})
-  end
 
   @impl ClientMessage
   def from_binary(

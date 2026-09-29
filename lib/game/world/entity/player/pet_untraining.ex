@@ -15,7 +15,6 @@ defmodule ThistleTea.Game.World.Entity.Player.PetUntraining do
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Pet.Companion
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
@@ -25,6 +24,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetUntraining do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.Gossip
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
 
   def available?(%Character{unit: %{class: 3}} = character, trainer_guid) do
     Gossip.pet_trainer?(World.entry(trainer_guid)) and match?({:ok, _cost}, current_price(character))
@@ -36,8 +36,8 @@ defmodule ThistleTea.Game.World.Entity.Player.PetUntraining do
     with true <- valid_trainer?(character, trainer_guid),
          {:ok, cost} <- current_price(character) do
       guid = Companion.summon_guid(character)
-      Network.send_packet(%Message.SmsgGossipComplete{})
-      Network.send_packet(%Message.SmsgPetUnlearnConfirm{pet_guid: guid, cost: cost})
+      Outbound.send_packet(%Message.SmsgGossipComplete{})
+      Outbound.send_packet(%Message.SmsgPetUnlearnConfirm{pet_guid: guid, cost: cost})
       %{state | pet_unlearn_offer: %Offer{pet_guid: guid, cost: cost}, gossip_menu_options: []}
     else
       _ -> %{state | pet_unlearn_offer: nil}
@@ -69,11 +69,11 @@ defmodule ThistleTea.Game.World.Entity.Player.PetUntraining do
 
           character = EntityCore.mark_broadcast_update(character)
           CharacterStore.put(character)
-          Network.send_packet(Message.SmsgPetSpells.for_pet(guid, spells, control))
+          Outbound.send_packet(Message.SmsgPetSpells.for_pet(guid, spells, control))
           %{state | character: character}
 
         {:error, :not_enough_money} ->
-          Network.send_packet(%Message.SmsgBuyFailed{vendor_guid: 0, item_id: 0, error: :not_enough_money})
+          Outbound.send_packet(%Message.SmsgBuyFailed{vendor_guid: 0, item_id: 0, error: :not_enough_money})
           state
 
         _ ->

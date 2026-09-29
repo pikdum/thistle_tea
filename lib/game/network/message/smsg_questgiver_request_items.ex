@@ -2,11 +2,9 @@ defmodule ThistleTea.Game.Network.Message.SmsgQuestgiverRequestItems do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_QUESTGIVER_REQUEST_ITEMS
 
-  alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Quest
-  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
-  defstruct [:npc_guid, :quest, completable: false, close_on_cancel: true]
+  defstruct [:npc_guid, :quest, completable: false, close_on_cancel: true, item_display_ids: %{}]
 
   @impl ServerMessage
   def to_binary(%__MODULE__{npc_guid: npc_guid, quest: %Quest{} = q} = message) do
@@ -17,7 +15,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgQuestgiverRequestItems do
       <<0, 0::little-size(32), emote(message)::little-size(32), close_on_cancel(message)::little-size(32),
         required_money(q)::little-size(32), length(q.required_items)::little-size(32)>> <>
       Enum.map_join(q.required_items, fn {_index, item_id, count} ->
-        <<item_id::little-size(32), count::little-size(32), display_id(item_id)::little-size(32)>>
+        <<item_id::little-size(32), count::little-size(32),
+          Map.get(message.item_display_ids, item_id, 0)::little-size(32)>>
       end) <>
       <<2::little-size(32), completable_flag(message)::little-size(32), 4::little-size(32), 8::little-size(32)>>
   end
@@ -33,11 +32,4 @@ defmodule ThistleTea.Game.Network.Message.SmsgQuestgiverRequestItems do
 
   defp required_money(%Quest{reward_money: money}) when money < 0, do: -money
   defp required_money(%Quest{}), do: 0
-
-  defp display_id(item_id) do
-    case ItemLoader.get_template(item_id) do
-      %ItemTemplate{display_id: display_id} -> display_id
-      _template -> 0
-    end
-  end
 end

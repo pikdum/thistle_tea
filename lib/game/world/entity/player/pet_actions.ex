@@ -7,9 +7,9 @@ defmodule ThistleTea.Game.World.Entity.Player.PetActions do
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.Spell.TargetCodec
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Outbound
 
   @act_command 0x07
   @act_reaction 0x06
@@ -147,7 +147,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetActions do
   defp valid_action?(_character, _message), do: true
 
   defp reject_attack(feedback) do
-    Network.send_packet(Message.SmsgPetActionFeedback.new(feedback))
+    Outbound.send_packet(Message.SmsgPetActionFeedback.new(feedback))
     false
   end
 

@@ -2,18 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveFeatherFallAck do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MOVE_FEATHER_FALL_ACK
 
-  alias ThistleTea.Game.World.Entity.Player.MovementControl
-  alias ThistleTea.Game.World.Entity.Player.State
-
   defstruct [:guid, :counter, :movement_payload, :apply]
-
-  @impl ClientMessage
-  def handle(%__MODULE__{} = message, %State{} = state) do
-    case MovementControl.acknowledge(state, message.guid, message.counter, {:feather_fall, message.apply != 0}) do
-      {:ok, state} -> MovementControl.maybe_finish_repop(state)
-      {:error, state} -> state
-    end
-  end
 
   @impl ClientMessage
   def from_binary(<<guid::little-size(64), counter::little-size(32), rest::binary>>) do

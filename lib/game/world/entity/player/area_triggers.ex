@@ -7,7 +7,6 @@ defmodule ThistleTea.Game.World.Entity.Player.AreaTriggers do
   alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Death
   alias ThistleTea.Game.Core.Entity.Character
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.ConditionContext
   alias ThistleTea.Game.World.Entity.Player.Corpses
@@ -16,6 +15,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AreaTriggers do
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.Entity.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
@@ -99,7 +99,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AreaTriggers do
   end
 
   defp reject_teleport(state, %{message: message}) when is_binary(message) and message != "" do
-    Network.send_packet(%Message.SmsgAreaTriggerMessage{message: message})
+    Outbound.send_packet(%Message.SmsgAreaTriggerMessage{message: message})
     state
   end
 

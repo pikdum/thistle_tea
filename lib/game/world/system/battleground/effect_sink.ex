@@ -9,7 +9,6 @@ defmodule ThistleTea.Game.World.System.Battleground.EffectSink do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Honor.Award
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
@@ -17,6 +16,7 @@ defmodule ThistleTea.Game.World.System.Battleground.EffectSink do
   alias ThistleTea.Game.World.Loader.BroadcastText, as: BroadcastTextLoader
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.Battleground.Buffs
   alias ThistleTea.Game.World.System.Battleground.Graveyard
   alias ThistleTea.Game.World.System.Battleground.Spawns
@@ -250,7 +250,7 @@ defmodule ThistleTea.Game.World.System.Battleground.EffectSink do
     match.players
     |> Map.values()
     |> Enum.filter(&(&1.status == :inside and audience?(&1.team, audience) and &1.guid != except))
-    |> Enum.each(&Network.send_packet(packets, &1.guid))
+    |> Enum.each(&Outbound.send_packet(packets, &1.guid))
   end
 
   defp audience?(_team, :all), do: true

@@ -5,12 +5,8 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
 
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
-  alias ThistleTea.Game.World.Entity.Player.Movement
 
   defstruct [:opcode, :payload]
-
-  @impl ClientMessage
-  def handle(%__MODULE__{} = message, state), do: Movement.handle(message, state)
 
   @impl ClientMessage
   def from_binary(payload), do: %__MODULE__{payload: payload}

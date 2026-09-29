@@ -13,7 +13,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
   alias ThistleTea.Game.Core.Guild
   alias ThistleTea.Game.Core.Guild.Group
   alias ThistleTea.Game.Core.Guild.Member
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgGuildCommandResult, as: CommandResult
   alias ThistleTea.Game.Network.Message.SmsgGuildRoster.Entry
@@ -24,6 +23,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.World.System.Guild, as: GuildSystem
   alias ThistleTea.Game.World.System.Petition, as: PetitionSystem
@@ -49,7 +49,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
 
   def activate_tabard(%{ready: true, character: %Character{} = character} = state, vendor_guid) do
     if tabard_vendor?(character, vendor_guid) do
-      Network.send_packet(%Message.MsgTabardvendorActivate{vendor_guid: vendor_guid})
+      Outbound.send_packet(%Message.MsgTabardvendorActivate{vendor_guid: vendor_guid})
     end
 
     state
@@ -77,7 +77,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
         player = %{state.character.player | coinage: state.character.player.coinage - @tabard_cost}
         state = InventoryUpdate.apply(state, {:ok, player})
         emblem_result(state, :ok)
-        Network.send_packet(%Message.SmsgGuildQueryResponse{guild: group})
+        Outbound.send_packet(%Message.SmsgGuildQueryResponse{guild: group})
         state
 
       {:error, reason} ->
@@ -93,7 +93,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
   end
 
   defp emblem_result(state, result) do
-    Network.send_packet(%Message.MsgSaveGuildEmblem{result: result})
+    Outbound.send_packet(%Message.MsgSaveGuildEmblem{result: result})
     state
   end
 
@@ -126,7 +126,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
 
     case result do
       {:ok, group} ->
-        Network.send_packet(
+        Outbound.send_packet(
           %Message.SmsgGuildInvite{inviter_name: character.internal.name, guild_name: group.name},
           target.object.guid
         )
@@ -146,7 +146,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
     case GuildSystem.accept(member(character)) do
       {:ok, group} ->
         PetitionSystem.revoke_signer(character.object.guid)
-        Network.send_packet(%Message.SmsgGuildEvent{event: :motd, descriptions: [group.motd]})
+        Outbound.send_packet(%Message.SmsgGuildEvent{event: :motd, descriptions: [group.motd]})
         state |> sync_membership() |> notify(group, :joined, [character.internal.name])
 
       {:error, reason} ->
@@ -166,7 +166,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
 
   def query(state, guild_id) do
     case GuildSystem.group(guild_id) do
-      %Group{} = group -> Network.send_packet(%Message.SmsgGuildQueryResponse{guild: group})
+      %Group{} = group -> Outbound.send_packet(%Message.SmsgGuildQueryResponse{guild: group})
       nil -> send_result(:create, "", :not_in_guild)
     end
 
@@ -198,7 +198,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
           |> Enum.uniq()
           |> length()
 
-        Network.send_packet(%Message.SmsgGuildInfo{
+        Outbound.send_packet(%Message.SmsgGuildInfo{
           name: group.name,
           created_date: group.created_date,
           members: map_size(group.members),
@@ -357,7 +357,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
   defp rank_result(state, {:ok, group}, sync_members?) do
     if sync_members?, do: notify_rank_members(group, state.guid)
 
-    Network.send_packet(%Message.SmsgGuildQueryResponse{guild: group})
+    Outbound.send_packet(%Message.SmsgGuildQueryResponse{guild: group})
 
     Enum.each(group.members, fn {guid, _member} ->
       if Entity.online?(guid), do: send_roster(group, guid)
@@ -453,7 +453,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
   def signed_on(%Character{} = character) do
     case GuildSystem.group_of(character.object.guid) do
       %Group{} = group ->
-        Network.send_packet(%Message.SmsgGuildEvent{event: :motd, descriptions: [group.motd]})
+        Outbound.send_packet(%Message.SmsgGuildEvent{event: :motd, descriptions: [group.motd]})
         notify_event(group, :signed_on, [character.internal.name])
 
       nil ->
@@ -499,7 +499,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
 
   defp deliver_chat(group, permission, packet) do
     Enum.each(group.members, fn {guid, _member} ->
-      if Guild.right?(group, guid, permission), do: Network.send_packet(packet, guid)
+      if Guild.right?(group, guid, permission), do: Outbound.send_packet(packet, guid)
     end)
   end
 
@@ -519,7 +519,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
       |> Enum.map(fn {_guid, member} -> roster_entry(member, officer_notes?) end)
       |> Enum.sort_by(&{&1.rank, &1.name})
 
-    Network.send_packet(%Message.SmsgGuildRoster{guild: group, entries: entries}, viewer_guid)
+    Outbound.send_packet(%Message.SmsgGuildRoster{guild: group, entries: entries}, viewer_guid)
   end
 
   defp roster_entry(%Member{} = member, officer_notes?) do
@@ -559,7 +559,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
 
   defp notify_event(group, event, descriptions) do
     packet = %Message.SmsgGuildEvent{event: event, descriptions: descriptions}
-    Enum.each(group.members, fn {guid, _member} -> Network.send_packet(packet, guid) end)
+    Enum.each(group.members, fn {guid, _member} -> Outbound.send_packet(packet, guid) end)
   end
 
   defp notify_member(guid) do
@@ -592,6 +592,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
   end
 
   defp send_result(command, name, reason) do
-    Network.send_packet(%CommandResult{command: command, name: name, result: reason})
+    Outbound.send_packet(%CommandResult{command: command, name: name, result: reason})
   end
 end

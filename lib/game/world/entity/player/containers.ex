@@ -15,7 +15,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Containers do
   alias ThistleTea.Game.Core.Item.ItemOpening
   alias ThistleTea.Game.Core.Item.ItemWrapping
   alias ThistleTea.Game.Core.Loot
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.Bank
   alias ThistleTea.Game.World.Entity.Player.ConditionContext
@@ -26,6 +25,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Containers do
   alias ThistleTea.Game.World.Entity.Player.Spellcasting
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
+  alias ThistleTea.Game.World.Outbound
 
   def open(%{character: %Character{} = character} = state, position) do
     guid = Inventory.item_guid_at(character.player, position, &ItemStore.get/1)
@@ -66,7 +66,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Containers do
          {:ok, changes} <-
            state.character.player |> Batch.new() |> Batch.update(item) |> Inventory.plan(&ItemStore.get/1) do
       state = InventoryUpdate.apply(state, {:ok, changes})
-      Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: Item.loot(item), loot_type: loot_type})
+      Outbound.send_packet(%Message.SmsgLootResponse{guid: guid, loot: Item.loot(item), loot_type: loot_type})
       state = %{state | loot_guid: guid, loot_type: :container}
       if Loot.empty?(Item.loot(item)), do: Looting.release(state), else: state
     else
@@ -86,7 +86,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Containers do
            ),
          {:ok, changes} <- ItemOpening.claim(state.character, source, slot, item, &ItemStore.get/1) do
       state = InventoryUpdate.apply(state, {:ok, changes})
-      Network.send_packet(%Message.SmsgLootRemoved{slot: slot})
+      Outbound.send_packet(%Message.SmsgLootRemoved{slot: slot})
       Items.send_push_result(state, reward, reward.count, position(changes, item.object.guid))
       state
     else
@@ -101,8 +101,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Containers do
     with {:ok, state, source} <- authorize(state, guid),
          {:ok, gold, changes} <- ItemOpening.take_gold(state.character, source, &ItemStore.get/1) do
       state = InventoryUpdate.apply(state, {:ok, changes})
-      Network.send_packet(%Message.SmsgLootMoneyNotify{money: gold})
-      Network.send_packet(%Message.SmsgLootClearMoney{})
+      Outbound.send_packet(%Message.SmsgLootMoneyNotify{money: gold})
+      Outbound.send_packet(%Message.SmsgLootClearMoney{})
       state
     else
       {:error, reason} -> failure(state, reason, guid)

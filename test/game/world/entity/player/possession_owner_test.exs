@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PossessionOwnerTest do
   alias ThistleTea.Game.World.Entity.Player.PossessionOwner
   alias ThistleTea.Game.World.Entity.Player.Spellcasting
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Presence
 
   setup [:possessed_player]
@@ -227,10 +228,10 @@ defmodule ThistleTea.Game.World.Entity.Player.PossessionOwnerTest do
         movement_payload: MovementBlock.movement_info_to_binary(movement)
       }
 
-      settled = Message.CmsgForceMoveRootAck.handle(ack, state)
+      settled = Inbound.handle(ack, state)
       assert settled.pending_movement_acks == %{}
       assert settled.character.movement_block.position == character.movement_block.position
-      assert Message.CmsgForceMoveRootAck.handle(ack, settled) == settled
+      assert Inbound.handle(ack, settled) == settled
     end
   end
 

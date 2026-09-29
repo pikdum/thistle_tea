@@ -6,11 +6,11 @@ defmodule ThistleTea.Game.World.Social.Notifier do
 
   alias ThistleTea.Game.Core.Chat.ChatStatus
   alias ThistleTea.Game.Core.Social.Friend
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgFriendStatus
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Loader.Exploration
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.SocialStore
 
   def friend(guid) do
@@ -28,7 +28,7 @@ defmodule ThistleTea.Game.World.Social.Notifier do
     guid
     |> SocialStore.followers()
     |> Enum.filter(&Entity.online?/1)
-    |> Enum.each(&Network.send_packet(packet, &1))
+    |> Enum.each(&Outbound.send_packet(packet, &1))
   end
 
   defp from_metadata(guid, %{area: area, level: level, class: class} = metadata) do

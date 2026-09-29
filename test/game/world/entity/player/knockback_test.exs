@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Player.KnockbackTest do
   alias ThistleTea.Game.World.Entity.Player.Knockback
   alias ThistleTea.Game.World.Entity.Player.MovementControl
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
 
@@ -46,7 +47,7 @@ defmodule ThistleTea.Game.World.Entity.Player.KnockbackTest do
       landing = %{movement | position: {10.0, 0.0, 0.0, 0.0}, movement_flags: 0, fall_time: 1000}
 
       updated =
-        Message.MsgMove.handle(
+        Inbound.handle(
           %Message.MsgMove{opcode: 0xC9, payload: MovementBlock.movement_info_to_binary(landing)},
           updated
         )

@@ -52,7 +52,9 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
   alias ThistleTea.Game.World.Entity.Player.Stats
   alias ThistleTea.Game.World.Entity.PlayerSupervisor
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Test.PetControlOwner
@@ -98,7 +100,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
       connection = %ConnectionState{account: account}
       message = %Message.CmsgPlayerLogin{character_guid: guid}
 
-      assert ^connection = Message.CmsgPlayerLogin.handle(message, connection)
+      assert ^connection = Inbound.handle(message, connection)
 
       assert_receive {:"$gen_cast",
                       {:send_packet,
@@ -1174,7 +1176,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     test "includes source guid metadata in casts" do
       packet = %Packet{opcode: 0x123, payload: <<>>}
 
-      assert :ok = Network.send_packet(packet, self(), source_guid: 1)
+      assert :ok = Outbound.send_packet(packet, self(), source_guid: 1)
 
       assert_receive {:"$gen_cast", {:send_packet, ^packet, [source_guid: 1]}}
     end

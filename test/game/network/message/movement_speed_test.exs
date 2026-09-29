@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Network.Message.MovementSpeedTest do
   alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.Entity.Player.MovementControl
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
 
   @modes [
     {:run_speed, Message.SmsgForceRunSpeedChange, Message.CmsgForceRunSpeedChangeAck, 0xE3},
@@ -78,12 +79,12 @@ defmodule ThistleTea.Game.Network.Message.MovementSpeedTest do
         state = %State{guid: 42}
         {packet, state} = MovementControl.prepare(struct!(server, guid: 99, speed: 3.25), state)
         ack = struct!(client, guid: 99, counter: packet.move_event, new_speed: 3.25)
-        assert client.handle(%{ack | guid: 42}, state) == state
-        assert client.handle(%{ack | guid: 100}, state) == state
-        assert client.handle(%{ack | new_speed: 7.0}, state) == state
-        assert client.handle(%{ack | counter: packet.move_event + 1}, state) == state
+        assert Inbound.handle(%{ack | guid: 42}, state) == state
+        assert Inbound.handle(%{ack | guid: 100}, state) == state
+        assert Inbound.handle(%{ack | new_speed: 7.0}, state) == state
+        assert Inbound.handle(%{ack | counter: packet.move_event + 1}, state) == state
         assert MovementControl.acknowledge_speed(state, 99, packet.move_event, :wrong_speed, 3.25) == state
-        updated = client.handle(ack, state)
+        updated = Inbound.handle(ack, state)
         assert updated.pending_movement_acks == %{}
         assert updated.character == state.character
         assert state.pending_movement_acks[packet.move_event] == {:controlled_speed, 99, type, 3.25}
@@ -108,7 +109,7 @@ defmodule ThistleTea.Game.Network.Message.MovementSpeedTest do
         |> Enum.with_index()
         |> Enum.reverse()
         |> Enum.reduce(state, fn {{_type, _server, client, _opcode}, counter}, state ->
-          state = client.handle(struct!(client, guid: 42, counter: counter, new_speed: 3.25), state)
+          state = Inbound.handle(struct!(client, guid: 42, counter: counter, new_speed: 3.25), state)
           assert state.character == character
           state
         end)
@@ -121,11 +122,11 @@ defmodule ThistleTea.Game.Network.Message.MovementSpeedTest do
         state = %State{guid: 42, pending_movement_acks: %{7 => {type, 3.25}}}
 
         for {guid, counter, speed} <- [{41, 7, 3.25}, {42, 8, 3.25}, {42, 7, 7.0}] do
-          assert client.handle(struct!(client, guid: guid, counter: counter, new_speed: speed), state) == state
+          assert Inbound.handle(struct!(client, guid: guid, counter: counter, new_speed: speed), state) == state
         end
 
         wrong_mode = %{state | pending_movement_acks: %{7 => {:wrong_speed, 3.25}}}
-        assert client.handle(struct!(client, guid: 42, counter: 7, new_speed: 3.25), wrong_mode) == wrong_mode
+        assert Inbound.handle(struct!(client, guid: 42, counter: 7, new_speed: 3.25), wrong_mode) == wrong_mode
       end
     end
 
@@ -135,7 +136,7 @@ defmodule ThistleTea.Game.Network.Message.MovementSpeedTest do
       token = state.pending_repop.token
       assert_receive {:"$gen_cast", {:finish_repop, ^token}}
       message = %Message.CmsgForceSwimSpeedChangeAck{guid: 42, counter: 7, new_speed: 4.72222185}
-      state = Message.CmsgForceSwimSpeedChangeAck.handle(message, state)
+      state = Inbound.handle(message, state)
       assert state.pending_movement_acks == %{}
       assert state.pending_repop == nil
       assert_receive {:"$gen_cast", {:start_teleport, 10.0, 20.0, 30.0, 1}}

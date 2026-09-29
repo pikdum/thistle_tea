@@ -12,19 +12,19 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemLoot do
   alias ThistleTea.Game.Core.Inventory.ChangeSet.Placement
   alias ThistleTea.Game.Core.Loot
   alias ThistleTea.Game.Core.Loot.ItemLoot, as: PendingLoot
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.Items
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Outbound
 
   def open(%{character: %Character{internal: %{item_loot: %PendingLoot{} = pending}} = character} = state) do
     if Entity.dead?(character) do
       state
     else
-      if state.loot_guid != pending.guid, do: Network.send_packet(UpdateObject.from_item(pending.source))
-      Network.send_packet(%Message.SmsgLootResponse{guid: pending.guid, loot: pending.loot, loot_type: 2})
+      if state.loot_guid != pending.guid, do: Outbound.send_packet(UpdateObject.from_item(pending.source))
+      Outbound.send_packet(%Message.SmsgLootResponse{guid: pending.guid, loot: pending.loot, loot_type: 2})
       %{state | loot_guid: pending.guid, loot_type: :item}
     end
   end
@@ -65,7 +65,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemLoot do
            ),
          {:ok, character, changes} <- PendingLoot.claim(state.character, slot, item, &ItemStore.get/1) do
       state = InventoryUpdate.apply(%{state | character: character}, {:ok, changes})
-      Network.send_packet(%Message.SmsgLootRemoved{slot: slot})
+      Outbound.send_packet(%Message.SmsgLootRemoved{slot: slot})
       Items.send_push_result(state, reward, reward.count, position(changes, item.object.guid))
       if is_nil(character.internal.item_loot), do: destroy_source(pending.guid)
       state
@@ -75,7 +75,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemLoot do
     end
   end
 
-  defp destroy_source(guid), do: Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
+  defp destroy_source(guid), do: Outbound.send_packet(%Message.SmsgDestroyObject{guid: guid})
 
   defp position(changes, guid) do
     case ChangeSet.placement(changes, guid) do

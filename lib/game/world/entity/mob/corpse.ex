@@ -27,7 +27,6 @@ defmodule ThistleTea.Game.World.Entity.Mob.Corpse do
   alias ThistleTea.Game.Core.Player.Experience
   alias ThistleTea.Game.Core.Profession.Skinning
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
@@ -40,6 +39,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Corpse do
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
   alias ThistleTea.Game.World.Loot.ActorFactory
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
 
@@ -282,7 +282,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Corpse do
     case session(state) do
       %LootSession{} = session ->
         packet = %Message.SmsgLootReleaseResponse{guid: state.object.guid}
-        session |> LootSession.viewers() |> Enum.each(&Network.send_packet(packet, &1))
+        session |> LootSession.viewers() |> Enum.each(&Outbound.send_packet(packet, &1))
 
       _ ->
         :ok
@@ -497,7 +497,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Corpse do
   end
 
   defp broadcast_roll_packet(%LootRoll{eligible: eligible}, packet) do
-    Enum.each(eligible, &Network.send_packet(packet, &1))
+    Enum.each(eligible, &Outbound.send_packet(packet, &1))
   end
 
   defp reserve(%Mob{} = state, owner_pid, reserve_item) do
@@ -521,7 +521,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Corpse do
 
   defp notify_removed(%LootSession{} = session, slot) do
     packet = %Message.SmsgLootRemoved{slot: slot}
-    session |> LootSession.viewers() |> Enum.each(&Network.send_packet(packet, &1))
+    session |> LootSession.viewers() |> Enum.each(&Outbound.send_packet(packet, &1))
   end
 
   defp finish_if_done(%Mob{} = state) do

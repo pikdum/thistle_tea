@@ -12,11 +12,11 @@ defmodule ThistleTea.Game.World.Entity.Transport do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.Travel.Transport, as: TransportRoute
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility
 
@@ -74,7 +74,7 @@ defmodule ThistleTea.Game.World.Entity.Transport do
   def handle_cast({:send_update_to, pid}, %State{entity: entity} = state) do
     entity
     |> UpdateObject.from_entity()
-    |> Network.send_packet(pid)
+    |> Outbound.send_packet(pid)
 
     {:noreply, state}
   end
@@ -287,7 +287,7 @@ defmodule ThistleTea.Game.World.Entity.Transport do
     world
     |> player_guids()
     |> Enum.reject(&(&1 in excluded_guids))
-    |> Enum.each(&Network.send_packet(packet, &1))
+    |> Enum.each(&Outbound.send_packet(packet, &1))
   end
 
   defp create_for_world_players(%GameObject{} = entity, world, excluded_guids) do
@@ -296,7 +296,7 @@ defmodule ThistleTea.Game.World.Entity.Transport do
     world
     |> player_guids()
     |> Enum.reject(&(&1 in excluded_guids))
-    |> Enum.each(&Network.send_packet(update, &1))
+    |> Enum.each(&Outbound.send_packet(update, &1))
   end
 
   defp player_guids(world) do

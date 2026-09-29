@@ -14,12 +14,12 @@ defmodule ThistleTea.Game.World.Entity.Corpse do
   alias ThistleTea.Game.Core.Loot
   alias ThistleTea.Game.Core.Loot.Actor
   alias ThistleTea.Game.Core.Loot.LootSession
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Spell.InsigniaTarget
   alias ThistleTea.Game.World.Visibility
 
@@ -113,7 +113,7 @@ defmodule ThistleTea.Game.World.Entity.Corpse do
   @impl GenServer
   def handle_cast({:send_update_to, pid}, state) do
     UpdateObject.from_entity(state)
-    |> Network.send_packet(pid)
+    |> Outbound.send_packet(pid)
 
     {:noreply, state}
   end
@@ -124,7 +124,7 @@ defmodule ThistleTea.Game.World.Entity.Corpse do
       %LootSession{} = session ->
         Enum.each(
           LootSession.viewers(session),
-          &Network.send_packet(%Message.SmsgLootReleaseResponse{guid: state.object.guid}, &1)
+          &Outbound.send_packet(%Message.SmsgLootReleaseResponse{guid: state.object.guid}, &1)
         )
 
       _missing ->
@@ -158,7 +158,7 @@ defmodule ThistleTea.Game.World.Entity.Corpse do
         session
         |> LootSession.viewers()
         |> Enum.reject(&(&1 == actor.guid))
-        |> Enum.each(&Network.send_packet(%Message.SmsgLootClearMoney{}, &1))
+        |> Enum.each(&Outbound.send_packet(%Message.SmsgLootClearMoney{}, &1))
 
         {{:ok, gold}, put_session(state, session)}
 

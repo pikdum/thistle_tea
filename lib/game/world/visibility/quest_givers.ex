@@ -13,7 +13,6 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Quest
   alias ThistleTea.Game.Core.Quest.QuestLog
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgQuestgiverStatus
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.Entity.Player.Quests
@@ -21,6 +20,7 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
 
   def personalize(
         %UpdateObject{object: %{guid: guid}, game_object: %GameObject{} = object} = update,
@@ -90,7 +90,7 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
         game_object: %GameObject{dyn_flags: current}
       }
 
-      Network.send_packet(update, self(), source_guid: guid)
+      Outbound.send_packet(update, self(), source_guid: guid)
     end
   end
 
@@ -99,7 +99,7 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
         creature_questgiver?(guid) or Map.has_key?(state.questgiver_statuses, guid),
         current = creature_status(guid, viewer),
         current != Map.get(state.questgiver_statuses, guid) do
-      Network.send_packet(%SmsgQuestgiverStatus{guid: guid, status: current}, self(), source_guid: guid)
+      Outbound.send_packet(%SmsgQuestgiverStatus{guid: guid, status: current}, self(), source_guid: guid)
     end
   end
 

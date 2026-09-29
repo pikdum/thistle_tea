@@ -2,14 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBattlemasterJoin do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_BATTLEMASTER_JOIN
 
-  alias ThistleTea.Game.World.Entity.Player.Battlegrounds
-
   defstruct [:guid, :map, :instance_id, :join_as_group]
-
-  @impl ClientMessage
-  def handle(%__MODULE__{map: map, instance_id: instance_id, join_as_group: join_as_group}, state) do
-    Battlegrounds.join(state, map, join_as_group, instance_id)
-  end
 
   @impl ClientMessage
   def from_binary(payload) do

@@ -11,7 +11,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Buyback do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.Vendor.Buyback, as: BuybackLogic
   alias ThistleTea.Game.Core.Vendor.Buyback.Change
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.Enchantments
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
@@ -22,6 +21,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Buyback do
   alias ThistleTea.Game.World.Entity.Player.Vendor
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
+  alias ThistleTea.Game.World.Outbound
 
   def sell(%State{ready: true, active_mover_guid: mover, guid: guid} = state, vendor, item_guid, count)
       when mover in [nil, 0, guid] do
@@ -107,7 +107,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Buyback do
         state
 
       {:error, reason} when reason in [:cant_find_item, :not_enough_money] ->
-        Network.send_packet(%Message.SmsgBuyFailed{vendor_guid: vendor, item_id: entry_id(state, slot), error: reason})
+        Outbound.send_packet(%Message.SmsgBuyFailed{vendor_guid: vendor, item_id: entry_id(state, slot), error: reason})
         state
 
       {:error, reason} ->
@@ -136,7 +136,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Buyback do
   defp cancel_sold_cast(state, _change), do: state
 
   defp sell_error(state, vendor, item, error) do
-    Network.send_packet(%Message.SmsgSellItem{vendor_guid: vendor, item_guid: item, error: error})
+    Outbound.send_packet(%Message.SmsgSellItem{vendor_guid: vendor, item_guid: item, error: error})
     state
   end
 end

@@ -17,7 +17,6 @@ defmodule ThistleTea.Game.World.Visibility do
   alias ThistleTea.Game.Core.SpatialGrid
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Combat.ChaseWatch
@@ -25,6 +24,7 @@ defmodule ThistleTea.Game.World.Visibility do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Transports
@@ -487,7 +487,7 @@ defmodule ThistleTea.Game.World.Visibility do
   end
 
   defp send_destroy(guid) do
-    Network.send_packet(%Message.SmsgDestroyObject{guid: guid}, self(), force: true)
+    Outbound.send_packet(%Message.SmsgDestroyObject{guid: guid}, self(), force: true)
   end
 
   defp currently_visible?(%{visibility_cells: cells}, guid) do

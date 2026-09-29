@@ -23,12 +23,12 @@ defmodule ThistleTea.Game.World.Entity.Player.Spells do
   alias ThistleTea.Game.Core.Spell.SpellRemoval
   alias ThistleTea.Game.Core.Stats.CombatRatings
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Outbound
 
   @battle_stance_spell_id 2457
   @warrior_class 1
@@ -136,7 +136,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Spells do
   end
 
   def notify_unlearned(%Character{} = character, spell_ids) do
-    Enum.each(spell_ids, &Network.send_packet(%Message.SmsgRemovedSpell{spell_id: &1}))
+    Enum.each(spell_ids, &Outbound.send_packet(%Message.SmsgRemovedSpell{spell_id: &1}))
     send_proficiencies(character)
   end
 
@@ -174,26 +174,26 @@ defmodule ThistleTea.Game.World.Entity.Player.Spells do
   def send_proficiencies(%Character{} = character) do
     prof = Proficiency.from_character(character)
 
-    Network.send_packet(%Message.SmsgSetProficiency{
+    Outbound.send_packet(%Message.SmsgSetProficiency{
       item_class: Proficiency.item_class_weapon(),
       subclass_mask: prof.weapon_mask
     })
 
-    Network.send_packet(%Message.SmsgSetProficiency{
+    Outbound.send_packet(%Message.SmsgSetProficiency{
       item_class: Proficiency.item_class_armor(),
       subclass_mask: prof.armor_mask
     })
   end
 
   defp send_event_packet({:learned, spell_id}) do
-    Network.send_packet(%Message.SmsgLearnedSpell{spell_id: spell_id})
+    Outbound.send_packet(%Message.SmsgLearnedSpell{spell_id: spell_id})
   end
 
   defp send_event_packet({:superseded, old_id, new_id}) do
-    Network.send_packet(%Message.SmsgSupercededSpell{old_spell_id: old_id, new_spell_id: new_id})
+    Outbound.send_packet(%Message.SmsgSupercededSpell{old_spell_id: old_id, new_spell_id: new_id})
   end
 
   defp send_event_packet({:removed, spell_id}) do
-    Network.send_packet(%Message.SmsgRemovedSpell{spell_id: spell_id})
+    Outbound.send_packet(%Message.SmsgRemovedSpell{spell_id: spell_id})
   end
 end

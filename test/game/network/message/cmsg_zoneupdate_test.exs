@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgZoneupdateTest do
   alias ThistleTea.Game.Network.Message.CmsgZoneupdate
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
+  alias ThistleTea.Game.World.Inbound
 
   describe "from_binary/1" do
     test "parses the client-reported area" do
@@ -19,7 +20,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgZoneupdateTest do
     test "is a no-op before the player is in the world" do
       state = %{ready: false, character: nil}
 
-      assert CmsgZoneupdate.handle(%CmsgZoneupdate{area: 14}, state) == state
+      assert Inbound.handle(%CmsgZoneupdate{area: 14}, state) == state
     end
   end
 

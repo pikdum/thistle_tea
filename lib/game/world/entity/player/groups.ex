@@ -9,12 +9,12 @@ defmodule ThistleTea.Game.World.Entity.Player.Groups do
   alias ThistleTea.Game.Core.Party
   alias ThistleTea.Game.Core.Party.Group
   alias ThistleTea.Game.Core.Party.Member
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgPartyCommandResult, as: Result
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.System.Party.Notifier
@@ -30,7 +30,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Groups do
 
     case PartySystem.group_of(guid) do
       %Group{} = group -> Notifier.broadcast(group, packet)
-      nil -> Network.send_packet(packet, guid)
+      nil -> Outbound.send_packet(packet, guid)
     end
 
     state
@@ -53,14 +53,14 @@ defmodule ThistleTea.Game.World.Entity.Player.Groups do
     reason =
       case result do
         :ok ->
-          Network.send_packet(%Message.SmsgGroupInvite{name: character.internal.name}, invitee_guid)
+          Outbound.send_packet(%Message.SmsgGroupInvite{name: character.internal.name}, invitee_guid)
           :ok
 
         {:error, reason} ->
           reason
       end
 
-    Network.send_packet(%Result{operation: Result.op_invite(), name: name, result: Result.code(reason)}, guid)
+    Outbound.send_packet(%Result{operation: Result.op_invite(), name: name, result: Result.code(reason)}, guid)
     state
   end
 
@@ -69,7 +69,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Groups do
   def convert_raid(%{ready: true, guid: guid, character: %Character{} = character} = state) do
     if !MapTemplate.battleground?(character.internal.world.map_id) do
       with {:ok, group} <- PartySystem.convert_raid(guid) do
-        Network.send_packet(%Result{operation: Result.op_invite(), name: "", result: Result.code(:ok)}, guid)
+        Outbound.send_packet(%Result{operation: Result.op_invite(), name: "", result: Result.code(:ok)}, guid)
         Notifier.send_group_list(group)
       end
     end
@@ -115,7 +115,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Groups do
 
   def target_icon(%{ready: true, guid: guid} = state, 0xFF, _target) do
     with %Group{} = group <- PartySystem.group_of(guid) do
-      Network.send_packet(%Message.MsgRaidTargetUpdateResponse{icons: Enum.sort(group.icons)}, guid)
+      Outbound.send_packet(%Message.MsgRaidTargetUpdateResponse{icons: Enum.sort(group.icons)}, guid)
     end
 
     state
@@ -146,7 +146,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Groups do
 
   def ready_check(%{ready: true, guid: guid} = state, ready?) when is_boolean(ready?) do
     with %Group{} = group <- PartySystem.group_of(guid) do
-      Network.send_packet(%Message.MsgRaidReadyCheckResponse{guid: guid, ready?: ready?}, group.leader)
+      Outbound.send_packet(%Message.MsgRaidReadyCheckResponse{guid: guid, ready?: ready?}, group.leader)
     end
 
     state
@@ -156,7 +156,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Groups do
 
   defp report_offline_member(%Member{guid: guid}, leader) do
     if !Entity.online?(guid) do
-      Network.send_packet(%Message.MsgRaidReadyCheckResponse{guid: guid, ready?: false}, leader)
+      Outbound.send_packet(%Message.MsgRaidReadyCheckResponse{guid: guid, ready?: false}, leader)
     end
   end
 

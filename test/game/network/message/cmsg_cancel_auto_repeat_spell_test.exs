@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelAutoRepeatSpellTest do
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Network.Message.CmsgCancelAutoRepeatSpell
+  alias ThistleTea.Game.World.Inbound
 
   test "decodes the empty Vanilla payload" do
     assert CmsgCancelAutoRepeatSpell.from_binary(<<>>) == %CmsgCancelAutoRepeatSpell{}
@@ -17,7 +18,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelAutoRepeatSpellTest do
     }
 
     state =
-      CmsgCancelAutoRepeatSpell.handle(%CmsgCancelAutoRepeatSpell{}, %{
+      Inbound.handle(%CmsgCancelAutoRepeatSpell{}, %{
         character: character,
         player_tick_ref: nil
       })

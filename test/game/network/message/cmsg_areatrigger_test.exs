@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAreatriggerTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message.CmsgAreatrigger
   alias ThistleTea.Game.Network.Message.SmsgAreaTriggerMessage
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
@@ -22,7 +23,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAreatriggerTest do
     test "rejects players below Ragefire Chasm's minimum level" do
       state = state(7, WorldRef.open(1), @entrance_position)
 
-      assert CmsgAreatrigger.handle(%CmsgAreatrigger{trigger_id: @entrance_id}, state) == state
+      assert Inbound.handle(%CmsgAreatrigger{trigger_id: @entrance_id}, state) == state
 
       assert_receive {:"$gen_cast", {:send_packet, %SmsgAreaTriggerMessage{message: message}}}
       assert message == "You must be at least level 8 to enter."
@@ -39,8 +40,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgAreatriggerTest do
       first_state = state(8, WorldRef.open(1), @entrance_position, first_guid)
       second_state = state(8, WorldRef.open(1), @entrance_position, second_guid)
 
-      CmsgAreatrigger.handle(%CmsgAreatrigger{trigger_id: @entrance_id}, first_state)
-      CmsgAreatrigger.handle(%CmsgAreatrigger{trigger_id: @entrance_id}, second_state)
+      Inbound.handle(%CmsgAreatrigger{trigger_id: @entrance_id}, first_state)
+      Inbound.handle(%CmsgAreatrigger{trigger_id: @entrance_id}, second_state)
 
       assert_receive {:"$gen_cast", {:start_teleport, 0.797643, -8.23429, -15.5288, 4.71239, first_world}}
       assert_receive {:"$gen_cast", {:start_teleport, 0.797643, -8.23429, -15.5288, 4.71239, second_world}}
@@ -57,8 +58,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgAreatriggerTest do
       first_state = state(8, WorldRef.open(1), @entrance_position)
       second_state = state(8, WorldRef.open(1), @entrance_position)
 
-      CmsgAreatrigger.handle(%CmsgAreatrigger{trigger_id: @entrance_id}, first_state)
-      CmsgAreatrigger.handle(%CmsgAreatrigger{trigger_id: @entrance_id}, second_state)
+      Inbound.handle(%CmsgAreatrigger{trigger_id: @entrance_id}, first_state)
+      Inbound.handle(%CmsgAreatrigger{trigger_id: @entrance_id}, second_state)
 
       assert_receive {:"$gen_cast", {:start_teleport, _, _, _, _, first_world}}
       assert_receive {:"$gen_cast", {:start_teleport, _, _, _, _, second_world}}
@@ -73,7 +74,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAreatriggerTest do
       {:ok, instance_world} = InstanceSystem.enter(389, guid)
       state = state(8, instance_world, @exit_position, guid)
 
-      CmsgAreatrigger.handle(%CmsgAreatrigger{trigger_id: @exit_id}, state)
+      Inbound.handle(%CmsgAreatrigger{trigger_id: @exit_id}, state)
 
       assert_receive {:"$gen_cast", {:start_teleport, 1814.99, -4419.23, -18.8151, 1.91986, destination_world}}
 

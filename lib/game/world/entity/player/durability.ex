@@ -11,7 +11,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Durability do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Inventory.ChangeSet
   alias ThistleTea.Game.Core.Item.Durability, as: DurabilityLogic
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
@@ -19,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Durability do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
 
   @repair_flag 0x00004000
 
@@ -29,7 +29,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Durability do
     case DurabilityLogic.loss(character.player, effect.mode, effect.amount, effect.scope, &ItemStore.get/1) do
       {:ok, %ChangeSet{}} = result ->
         state = commit(state, result)
-        if effect.death?, do: Network.send_packet(%Message.SmsgDurabilityDamageDeath{})
+        if effect.death?, do: Outbound.send_packet(%Message.SmsgDurabilityDamageDeath{})
         spell_log(state.character, effect)
         state
 

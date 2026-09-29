@@ -19,7 +19,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
   alias ThistleTea.Game.Core.Inventory.ChangeSet
   alias ThistleTea.Game.Core.Inventory.ChangeSet.Placement
   alias ThistleTea.Game.Core.Party
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgGuildCommandResult
   alias ThistleTea.Game.World
@@ -32,6 +31,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.Guild, as: GuildSystem
   alias ThistleTea.Game.World.System.Petition, as: PetitionSystem
 
@@ -42,7 +42,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
 
   def show_list(%{ready: true, character: %Character{} = character} = state, npc_guid) do
     if petitioner?(character, npc_guid) do
-      Network.send_packet(%Message.SmsgPetitionShowlist{npc_guid: npc_guid})
+      Outbound.send_packet(%Message.SmsgPetitionShowlist{npc_guid: npc_guid})
     end
 
     state
@@ -128,7 +128,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
     case PetitionSystem.by_item(item_guid) do
       %Petition{} = petition ->
         if owns_charter?(state.character, item_guid) do
-          Network.send_packet(%Message.SmsgPetitionShowSignatures{petition: petition})
+          Outbound.send_packet(%Message.SmsgPetitionShowSignatures{petition: petition})
         end
 
       nil ->
@@ -143,7 +143,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
   def query(state, petition_id, item_guid) do
     case PetitionSystem.by_id(petition_id) do
       %Petition{item_guid: ^item_guid} = petition ->
-        Network.send_packet(%Message.SmsgPetitionQueryResponse{petition: petition})
+        Outbound.send_packet(%Message.SmsgPetitionQueryResponse{petition: petition})
 
       _ ->
         :ok
@@ -160,7 +160,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
          true <- Party.same_team?(character.unit.race, target.unit.race),
          nil <- GuildSystem.group_of(target_guid),
          false <- GuildSystem.invited?(target_guid) do
-      Network.send_packet(%Message.SmsgPetitionShowSignatures{petition: petition}, target_guid)
+      Outbound.send_packet(%Message.SmsgPetitionShowSignatures{petition: petition}, target_guid)
     end
 
     state
@@ -190,7 +190,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
         sign_result(state, petition.item_guid, guid, :already_in_guild)
 
       GuildSystem.invited?(guid) ->
-        Network.send_packet(%SmsgGuildCommandResult{
+        Outbound.send_packet(%SmsgGuildCommandResult{
           command: :invite,
           name: character.internal.name,
           result: :already_invited
@@ -208,7 +208,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
 
     case PetitionSystem.sign(petition.item_guid, Guilds.member(character), account_id) do
       {:ok, _petition} ->
-        Network.send_packet(
+        Outbound.send_packet(
           %Message.SmsgPetitionSignResults{item_guid: petition.item_guid, signer_guid: guid, result: :ok},
           petition.owner.guid
         )
@@ -230,7 +230,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
   end
 
   defp sign_result(state, item_guid, signer_guid, result) do
-    Network.send_packet(%Message.SmsgPetitionSignResults{
+    Outbound.send_packet(%Message.SmsgPetitionSignResults{
       item_guid: item_guid,
       signer_guid: signer_guid,
       result: result
@@ -242,7 +242,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
   def decline(%{ready: true, guid: guid} = state, item_guid) do
     case PetitionSystem.by_item(item_guid) do
       %Petition{} = petition ->
-        Network.send_packet(%Message.MsgPetitionDecline{signer_guid: guid}, petition.owner.guid)
+        Outbound.send_packet(%Message.MsgPetitionDecline{signer_guid: guid}, petition.owner.guid)
 
       nil ->
         :ok
@@ -269,7 +269,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
   defp rename_available(state, item_guid, guid, name) do
     case PetitionSystem.rename(item_guid, guid, name) do
       {:ok, petition} ->
-        Network.send_packet(%Message.MsgPetitionRename{item_guid: item_guid, name: petition.name})
+        Outbound.send_packet(%Message.MsgPetitionRename{item_guid: item_guid, name: petition.name})
         state
 
       {:error, :invalid_name} ->
@@ -322,7 +322,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
   end
 
   defp turn_in_result(state, result) do
-    Network.send_packet(%Message.SmsgTurnInPetitionResults{result: result})
+    Outbound.send_packet(%Message.SmsgTurnInPetitionResults{result: result})
     state
   end
 
@@ -359,12 +359,12 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
   end
 
   defp guild_error(name, reason, state) do
-    Network.send_packet(%SmsgGuildCommandResult{command: :create, name: name, result: reason})
+    Outbound.send_packet(%SmsgGuildCommandResult{command: :create, name: name, result: reason})
     state
   end
 
   defp buy_error(npc_guid, reason, state) do
-    Network.send_packet(%Message.SmsgBuyFailed{vendor_guid: npc_guid, item_id: @charter_entry, error: reason})
+    Outbound.send_packet(%Message.SmsgBuyFailed{vendor_guid: npc_guid, item_id: @charter_entry, error: reason})
     state
   end
 end

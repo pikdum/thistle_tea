@@ -13,7 +13,6 @@ defmodule ThistleTea.Game.World.Entity.Player.PetStable do
   alias ThistleTea.Game.Core.Pet.Companion.EntityRef
   alias ThistleTea.Game.Core.Pet.PetProgression
   alias ThistleTea.Game.Core.Pet.PetStable, as: Stable
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
@@ -27,6 +26,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetStable do
   alias ThistleTea.Game.World.Loader.StableSlotPrice
   alias ThistleTea.Game.World.Loader.Summon
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
 
   @stablemaster_flag 0x00002000
 
@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetStable do
       state = CompanionOwner.refresh(state)
       pets = Enum.map(Stable.entries(state.character), &listing/1)
 
-      Network.send_packet(%Message.MsgListStabledPets{
+      Outbound.send_packet(%Message.MsgListStabledPets{
         guid: guid,
         slots: state.character.internal.pet_stable.slots,
         pets: pets
@@ -167,7 +167,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetStable do
 
   defp result(state, reason) do
     code = %{money: 1, stable: 6, stored: 8, retrieved: 9, bought: 10}
-    Network.send_packet(%Message.SmsgStableResult{result: Map.fetch!(code, reason)})
+    Outbound.send_packet(%Message.SmsgStableResult{result: Map.fetch!(code, reason)})
     state
   end
 end

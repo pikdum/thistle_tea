@@ -8,17 +8,17 @@ defmodule ThistleTea.Game.World.Entity.Player.Social do
   alias ThistleTea.Game.Core.Party
   alias ThistleTea.Game.Core.Social
   alias ThistleTea.Game.Core.Social.Friend
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgFriendStatus
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Social.Notifier
   alias ThistleTea.Game.World.SocialStore
 
   def send_lists(%Character{object: %{guid: guid}}) do
     social = SocialStore.get(guid)
     send_friends(social)
-    Network.send_packet(%Message.SmsgIgnoreList{guids: Enum.sort(social.ignored)}, guid)
+    Outbound.send_packet(%Message.SmsgIgnoreList{guids: Enum.sort(social.ignored)}, guid)
   end
 
   def list(%{ready: true, character: %Character{} = character} = state) do
@@ -59,7 +59,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Social do
 
   def ignored(%{ready: true, guid: guid, character: %Character{} = character} = state, sender) do
     if SocialStore.ignores?(guid, sender) do
-      Network.send_packet(
+      Outbound.send_packet(
         %Message.SmsgMessagechat{
           chat_type: 0x16,
           language: 0,
@@ -78,11 +78,11 @@ defmodule ThistleTea.Game.World.Entity.Player.Social do
 
   defp send_friends(%Social{owner_guid: guid, friends: guids}) do
     friends = guids |> Enum.sort() |> Enum.map(&Notifier.friend/1)
-    Network.send_packet(%Message.SmsgFriendList{friends: friends}, guid)
+    Outbound.send_packet(%Message.SmsgFriendList{friends: friends}, guid)
   end
 
   defp send_result(guid, kind, result, friend) do
-    Network.send_packet(%SmsgFriendStatus{result: SmsgFriendStatus.code(kind, result), friend: friend}, guid)
+    Outbound.send_packet(%SmsgFriendStatus{result: SmsgFriendStatus.code(kind, result), friend: friend}, guid)
   end
 
   defp same_team(:friend, %Character{unit: %{race: race}}, %Character{unit: %{race: target_race}}) do

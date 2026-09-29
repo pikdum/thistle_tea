@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TaxiTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Player.Taxi
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
@@ -383,7 +384,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TaxiTest do
       assert_receive {:"$gen_cast", {:send_packet, %SmsgMonsterMove{}}}
 
       message = %CmsgSetActiveMover{guid: flying.guid}
-      resumed = CmsgSetActiveMover.handle(message, loading)
+      resumed = Inbound.handle(message, loading)
       new_token = resumed.character.internal.taxi_flight.token
 
       assert new_token != old_token
@@ -395,7 +396,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TaxiTest do
       assert Position.projection(resumed.guid)
       assert CharacterStore.get(resumed.character.id).internal.taxi_flight.token == new_token
       assert_receive {:"$gen_cast", {:send_packet, %SmsgMonsterMove{}}}
-      assert CmsgSetActiveMover.handle(message, resumed) == resumed
+      assert Inbound.handle(message, resumed) == resumed
       assert Taxi.arrive(resumed, old_token) == resumed
       assert Taxi.progress(resumed, old_token) == resumed
       assert Taxi.spline_done(resumed, old_spline_id) == resumed

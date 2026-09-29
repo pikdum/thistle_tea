@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBindTest do
   alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.Entity.Player.HomeBind
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Loader.Gossip.Option
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Metadata
@@ -35,7 +36,7 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBindTest do
     test "gossip requests confirmation without changing the home", %{state: state, guid: guid} do
       state = %{state | gossip_menu_options: [%Option{id: 2, option_id: 8}], gossip_menu_guid: guid}
       message = %Message.CmsgGossipSelectOption{guid: guid, gossip_list_id: 2}
-      result = Message.CmsgGossipSelectOption.handle(message, state)
+      result = Inbound.handle(message, state)
 
       assert result.character == state.character
       assert result.gossip_menu_options == []
@@ -51,7 +52,7 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBindTest do
     test "dispatches the client confirmation to the innkeeper's bind spell", %{state: state, guid: guid} do
       message = Dispatch.to_message(Packet.build(<<guid::little-size(64)>>, 0x1B5))
       assert message == %Message.CmsgBinderActivate{guid: guid}
-      assert Message.CmsgBinderActivate.handle(message, state).character == state.character
+      assert Inbound.handle(message, state).character == state.character
       player_guid = state.guid
       assert_receive {:"$gen_cast", {:trigger_spell, 3286, ^player_guid, []}}
     end

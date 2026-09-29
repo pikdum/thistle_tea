@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EquipmentTransitionsTest do
   alias ThistleTea.Game.World.Entity.Player.Inventory
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -47,7 +48,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EquipmentTransitionsTest do
       assert Cooldowns.ready_at(equipped.character, spell) in (before + 30_000)..(Time.now() + 30_000)
 
       rejected =
-        Message.CmsgUseItem.handle(
+        Inbound.Item.use_item(
           %Message.CmsgUseItem{bag: 255, slot: 12, targets: <<0::little-size(16)>>},
           equipped,
           fn ^id -> spell end
@@ -93,12 +94,12 @@ defmodule ThistleTea.Game.World.Entity.Player.EquipmentTransitionsTest do
 
     test "same-slot requests leave the equip cooldown and packets untouched", %{state: state, item: item, spell: spell} do
       message = %Message.CmsgAutoequipItemSlot{item_guid: item.object.guid, destination_slot: 13}
-      equipped = Message.CmsgAutoequipItemSlot.handle(message, state)
+      equipped = Inbound.handle(message, state)
       deadline = Cooldowns.ready_at(equipped.character, spell)
       assert is_integer(deadline)
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgItemCooldown{}}}
 
-      assert Message.CmsgAutoequipItemSlot.handle(message, equipped) == equipped
+      assert Inbound.handle(message, equipped) == equipped
       assert Cooldowns.ready_at(CharacterStore.get(state.guid), spell) == deadline
       refute_received {:"$gen_cast", {:send_packet, %Message.SmsgItemCooldown{}}}
     end

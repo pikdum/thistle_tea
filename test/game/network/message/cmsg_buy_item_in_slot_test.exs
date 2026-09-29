@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemInSlotTest do
   alias ThistleTea.Game.Network.Message.CmsgBuyItemInSlot
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.World.Inbound
 
   describe "from_binary/1" do
     test "dispatches the build-5875 vendor, item, bag, slot and bundle count" do
@@ -22,7 +23,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemInSlotTest do
 
   describe "handle/2" do
     test "ignores purchases before world entry" do
-      assert CmsgBuyItemInSlot.handle(%CmsgBuyItemInSlot{}, %{ready: false}) == %{ready: false}
+      assert Inbound.handle(%CmsgBuyItemInSlot{}, %{ready: false}) == %{ready: false}
     end
   end
 end

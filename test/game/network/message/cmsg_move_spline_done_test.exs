@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveSplineDoneTest do
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
 
   describe "from_binary/1" do
     test "decodes movement, the spline identifier, and the vanilla trailing float" do
@@ -40,7 +41,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveSplineDoneTest do
       state = %State{}
       message = %CmsgMoveSplineDone{spline_id: 1, movement_block: %MovementBlock{position: {900.0, 0.0, 0.0, 0.0}}}
 
-      assert CmsgMoveSplineDone.handle(message, state) == state
+      assert Inbound.handle(message, state) == state
     end
   end
 

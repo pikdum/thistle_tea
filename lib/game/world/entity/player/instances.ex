@@ -6,29 +6,29 @@ defmodule ThistleTea.Game.World.Entity.Player.Instances do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.Travel.HomeBind
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.MapTemplate
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
-  def reject(:raid_group_required), do: Network.send_packet(%Message.SmsgRaidGroupOnly{})
-  def reject(reason), do: Network.send_packet(%Message.SmsgTransferAborted{reason: reason})
+  def reject(:raid_group_required), do: Outbound.send_packet(%Message.SmsgRaidGroupOnly{})
+  def reject(reason), do: Outbound.send_packet(%Message.SmsgTransferAborted{reason: reason})
 
   def send_raid_info(guid) do
-    Network.send_packet(%Message.SmsgRaidInstanceInfo{raids: InstanceSystem.saved_raids(guid)})
+    Outbound.send_packet(%Message.SmsgRaidInstanceInfo{raids: InstanceSystem.saved_raids(guid)})
   end
 
   def send_saved_instances(guid) do
     raids = InstanceSystem.saved_raids(guid)
-    Network.send_packet(%Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: raids != []})
-    Enum.each(raids, &Network.send_packet(%Message.SmsgUpdateLastInstance{map: &1.map_id}))
+    Outbound.send_packet(%Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: raids != []})
+    Enum.each(raids, &Outbound.send_packet(%Message.SmsgUpdateLastInstance{map: &1.map_id}))
   end
 
   def lockout_changed(guid, reason) do
-    if reason == :created, do: Network.send_packet(%Message.SmsgInstanceSaveCreated{})
+    if reason == :created, do: Outbound.send_packet(%Message.SmsgInstanceSaveCreated{})
     send_saved_instances(guid)
     send_raid_info(guid)
   end
@@ -102,7 +102,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Instances do
 
   def clear(%State{instance_eviction: %{ref: ref}} = state) do
     Process.cancel_timer(ref)
-    Network.send_packet(%Message.SmsgRaidGroupOnly{delay_ms: 0})
+    Outbound.send_packet(%Message.SmsgRaidGroupOnly{delay_ms: 0})
     %{state | instance_eviction: nil}
   end
 
@@ -111,7 +111,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Instances do
   defp start(state, %Eviction{} = countdown) do
     token = make_ref()
     ref = Process.send_after(self(), {:instance_eviction, token}, Eviction.delay_ms())
-    Network.send_packet(%Message.SmsgRaidGroupOnly{delay_ms: Eviction.delay_ms()})
+    Outbound.send_packet(%Message.SmsgRaidGroupOnly{delay_ms: Eviction.delay_ms()})
     %{state | instance_eviction: %{ref: ref, token: token, countdown: countdown}}
   end
 

@@ -14,7 +14,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Training do
   alias ThistleTea.Game.Core.Player.Trainer
   alias ThistleTea.Game.Core.Player.TrainerSpell
   alias ThistleTea.Game.Core.Skills
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgTrainerList
   alias ThistleTea.Game.World
@@ -25,12 +24,13 @@ defmodule ThistleTea.Game.World.Entity.Player.Training do
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Trainer, as: TrainerLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
 
   def send_list(%{character: %Character{} = character} = state, trainer_guid) do
     if valid_trainer?(character, trainer_guid) do
       %{trainer_type: type, spells: spells} = TrainerLoader.trainer_info(World.entry(trainer_guid))
 
-      Network.send_packet(%SmsgTrainerList{
+      Outbound.send_packet(%SmsgTrainerList{
         guid: trainer_guid,
         trainer_type: type,
         spells: list_spells(spells, character, trainer_guid)
@@ -121,7 +121,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Training do
 
     case Spells.learn_training(character, spell) do
       {:ok, character, _events} ->
-        Network.send_packet(%Message.SmsgTrainerBuySucceeded{
+        Outbound.send_packet(%Message.SmsgTrainerBuySucceeded{
           trainer_guid: trainer_guid,
           spell_id: spell.teach_spell_id
         })

@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswingTest do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message.CmsgAttackswing
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
 
@@ -38,7 +39,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswingTest do
       end)
 
       state =
-        CmsgAttackswing.handle(%CmsgAttackswing{target_guid: target_guid}, %{
+        Inbound.handle(%CmsgAttackswing{target_guid: target_guid}, %{
           guid: player_guid,
           character: character(player_guid),
           player_tick_ref: nil

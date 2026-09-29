@@ -4,11 +4,11 @@ defmodule ThistleTea.Game.World.System.OutdoorPvp.CaptureAnnouncements do
   alias ThistleTea.Game.Core.OutdoorPvp.Plaguelands
   alias ThistleTea.Game.Core.OutdoorPvp.Towers
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgDefenseMessage
   alias ThistleTea.Game.Network.Message.SmsgPlaySound
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.BroadcastText
+  alias ThistleTea.Game.World.Outbound
 
   def publish(previous, current) do
     Enum.each(Towers.ownership_changes(previous, current), fn
@@ -33,7 +33,7 @@ defmodule ThistleTea.Game.World.System.OutdoorPvp.CaptureAnnouncements do
 
       WorldRef.open(0)
       |> World.players_in()
-      |> Enum.each(&Network.send_packet(packet, &1))
+      |> Enum.each(&Outbound.send_packet(packet, &1))
     end
   end
 
@@ -44,6 +44,6 @@ defmodule ThistleTea.Game.World.System.OutdoorPvp.CaptureAnnouncements do
 
     WorldRef.open(0)
     |> World.nearby_players_at({x, y, z}, 250)
-    |> Enum.each(fn {guid, _distance} -> Network.send_packet(%SmsgPlaySound{sound_id: sound_id}, guid) end)
+    |> Enum.each(fn {guid, _distance} -> Outbound.send_packet(%SmsgPlaySound{sound_id: sound_id}, guid) end)
   end
 end

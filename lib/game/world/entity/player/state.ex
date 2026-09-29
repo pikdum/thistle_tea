@@ -17,7 +17,6 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
   alias ThistleTea.Game.Core.Spell.Casting
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Combat.AggroProbe
@@ -42,6 +41,7 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
   alias ThistleTea.Game.World.Entity.Player.ServerMovement
   alias ThistleTea.Game.World.Entity.Player.Taxi
   alias ThistleTea.Game.World.Entity.Player.Weather
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.CellActivator
@@ -144,7 +144,7 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
   end
 
   def complete_worldport(%__MODULE__{pending_last_instance_map: map_id} = state) when is_integer(map_id) do
-    Network.send_packet(%Message.SmsgUpdateLastInstance{map: map_id})
+    Outbound.send_packet(%Message.SmsgUpdateLastInstance{map: map_id})
     %{state | pending_last_instance_map: nil, pending_worldport?: false}
   end
 

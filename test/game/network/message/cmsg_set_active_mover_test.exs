@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMoverTest do
   alias ThistleTea.Game.Network.Message.SmsgLootResponse
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
 
   describe "from_binary/1" do
     test "parses mover guid" do
@@ -36,17 +37,17 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMoverTest do
       session = %State{guid: 23, character: character, visibility_cells: MapSet.new()}
       message = %CmsgSetActiveMover{guid: 23}
 
-      state = CmsgSetActiveMover.handle(message, session)
+      state = Inbound.handle(message, session)
       assert state.loot_guid == 42
       assert state.loot_type == :item
       assert_receive {:"$gen_cast", {:send_packet, %UpdateObject{object: %Object{guid: 42}}}}
       assert_receive {:"$gen_cast", {:send_packet, %SmsgLootResponse{guid: 42, loot_type: 2}}}
-      assert CmsgSetActiveMover.handle(message, state) == state
+      assert Inbound.handle(message, state) == state
       refute_receive {:"$gen_cast", {:send_packet, %SmsgLootResponse{}}}
     end
 
     test "marks matching player ready" do
-      state = CmsgSetActiveMover.handle(%CmsgSetActiveMover{guid: 23}, %State{guid: 23})
+      state = Inbound.handle(%CmsgSetActiveMover{guid: 23}, %State{guid: 23})
 
       assert state.ready
       assert state.active_mover_guid == 23
@@ -54,7 +55,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMoverTest do
     end
 
     test "ignores mismatched mover" do
-      state = CmsgSetActiveMover.handle(%CmsgSetActiveMover{guid: 24}, %State{guid: 23})
+      state = Inbound.handle(%CmsgSetActiveMover{guid: 24}, %State{guid: 23})
 
       refute state.ready
       assert state.active_mover_guid == nil
@@ -68,7 +69,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMoverTest do
 
       session = %State{guid: 23, ready: true, character: character}
 
-      state = CmsgSetActiveMover.handle(%CmsgSetActiveMover{guid: 24}, session)
+      state = Inbound.handle(%CmsgSetActiveMover{guid: 24}, session)
 
       assert state.active_mover_guid == 24
     end

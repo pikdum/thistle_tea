@@ -14,7 +14,6 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjects do
   alias ThistleTea.Game.Core.GameObject.Goober
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgGameobjectPagetext
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
@@ -31,6 +30,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjects do
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
@@ -126,7 +126,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjects do
   end
 
   defp use_prepared_readable(state, character, guid, %GameObjectTemplate{type: 9, data: data}) do
-    if Enum.at(data, 0, 0) > 0, do: Network.send_packet(%SmsgGameobjectPagetext{guid: guid})
+    if Enum.at(data, 0, 0) > 0, do: Outbound.send_packet(%SmsgGameobjectPagetext{guid: guid})
     put_user(state, character)
   end
 
@@ -153,7 +153,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjects do
   end
 
   defp show_readable(state, guid, %{page_id: page_id}) when page_id > 0 do
-    Network.send_packet(%SmsgGameobjectPagetext{guid: guid})
+    Outbound.send_packet(%SmsgGameobjectPagetext{guid: guid})
     state
   end
 

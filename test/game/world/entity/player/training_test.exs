@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TrainingTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Player.Training
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Loader.Gossip
   alias ThistleTea.Game.World.Loader.Trainer
   alias ThistleTea.Game.World.Metadata
@@ -34,7 +35,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TrainingTest do
       assert spell.profession_slots == 0
       assert spell.profession_slots_required == 1
       message = %CmsgTrainerBuySpell{trainer_guid: guid, spell_id: 2275}
-      assert CmsgTrainerBuySpell.handle(message, state) == state
+      assert Inbound.handle(message, state) == state
       assert state.character.player.coinage == 100
       refute_received {:"$gen_cast", {:send_packet, _message}}
 

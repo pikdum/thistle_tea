@@ -2,12 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAddIgnore do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ADD_IGNORE
 
-  alias ThistleTea.Game.World.Entity.Player.Social
-
   defstruct [:name]
-
-  @impl ClientMessage
-  def handle(%__MODULE__{name: name}, state), do: Social.add(state, :ignore, name)
 
   @impl ClientMessage
   def from_binary(payload) do

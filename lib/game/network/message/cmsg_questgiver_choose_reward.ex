@@ -2,16 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgQuestgiverChooseReward do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_QUESTGIVER_CHOOSE_REWARD
 
-  alias ThistleTea.Game.World.Entity.Player.Quests
-
   defstruct [:guid, :quest_id, :reward_index]
-
-  @impl ClientMessage
-  def handle(%__MODULE__{} = message, %{ready: true, character: %Character{}} = state) do
-    Quests.choose_reward(state, message.guid, message.quest_id, message.reward_index)
-  end
-
-  def handle(_message, state), do: state
 
   @impl ClientMessage
   def from_binary(payload) do

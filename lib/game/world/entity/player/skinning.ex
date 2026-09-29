@@ -7,7 +7,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Skinning do
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Inventory
   alias ThistleTea.Game.Core.Profession.Skinning, as: SkinningLogic
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.CharacterStore
@@ -16,6 +15,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Skinning do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Visibility
 
   def complete(%{character: %Character{} = character} = state, guid, spell_id) do
@@ -31,7 +31,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Skinning do
       case Entity.call(guid, {:skin_corpse, Looting.actor(state, guid), SkinningLogic.skill(character)}) do
         {:ok, loot, level, rank} ->
           character = advance_skill(character, level, rank)
-          Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: loot, loot_type: 2})
+          Outbound.send_packet(%Message.SmsgLootResponse{guid: guid, loot: loot, loot_type: 2})
           %{state | character: character, loot_guid: guid, loot_type: :skinning}
 
         {:error, reason} ->
@@ -51,7 +51,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Skinning do
       {:gained, skills} ->
         character = %{character | player: %{character.player | skills: skills}}
         CharacterStore.put(character)
-        Network.send_packet(UpdateObject.from_entity(character, :values))
+        Outbound.send_packet(UpdateObject.from_entity(character, :values))
         character
 
       :unchanged ->
@@ -60,7 +60,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Skinning do
   end
 
   defp fail(state, spell_id, reason) do
-    Network.send_packet(Message.SmsgCastResult.failure(spell_id, reason))
+    Outbound.send_packet(Message.SmsgCastResult.failure(spell_id, reason))
     state
   end
 end

@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.CmsgUseItem
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemTarget
   alias ThistleTea.Game.World.Metadata
@@ -78,7 +79,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
 
       for metadata <- [%{entry: 7978, alive?: true}, %{entry: 7977, alive?: false}] do
         Metadata.update(target, metadata)
-        rejected = CmsgUseItem.handle(message, state, fn @spell_id -> spell end)
+        rejected = Inbound.Item.use_item(message, state, fn @spell_id -> spell end)
         assert rejected.character.internal.casting == nil
         assert rejected.character.internal.cooldowns == %{}
         assert ItemStore.get(item.object.guid) == item
@@ -87,7 +88,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
       end
 
       Metadata.update(target, %{alive?: true})
-      accepted = CmsgUseItem.handle(message, state, fn @spell_id -> spell end)
+      accepted = Inbound.Item.use_item(message, state, fn @spell_id -> spell end)
       assert %Cast{consume_item: true} = accepted.character.internal.casting
       assert ItemStore.get(item.object.guid) == item
     end
@@ -106,7 +107,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
       on_exit(fn -> ItemStore.delete(item.object.guid) end)
 
       state =
-        CmsgUseItem.handle(
+        Inbound.Item.use_item(
           %CmsgUseItem{bag: Inventory.bag_0(), slot: @backpack_start, spell_count: 1, targets: <<0::little-size(16)>>},
           %{
             ready: true,
@@ -134,7 +135,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
       on_exit(fn -> ItemStore.delete(item.object.guid) end)
 
       state =
-        CmsgUseItem.handle(
+        Inbound.Item.use_item(
           %CmsgUseItem{bag: Inventory.bag_0(), slot: @backpack_start, spell_count: 1, targets: <<0::little-size(16)>>},
           %{
             ready: true,
@@ -161,7 +162,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
       on_exit(fn -> ItemStore.delete(item.object.guid) end)
 
       state =
-        CmsgUseItem.handle(
+        Inbound.Item.use_item(
           %CmsgUseItem{bag: Inventory.bag_0(), slot: @backpack_start, spell_count: 1, targets: <<0::little-size(16)>>},
           %{
             ready: true,
@@ -198,7 +199,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
         |> Cooldowns.start(%Spell{id: @spell_id, category: 59, category_recovery_time_ms: 1_000}, Time.now())
 
       state =
-        CmsgUseItem.handle(
+        Inbound.Item.use_item(
           %CmsgUseItem{bag: Inventory.bag_0(), slot: @backpack_start, spell_count: 1, targets: <<0::little-size(16)>>},
           %{
             ready: true,

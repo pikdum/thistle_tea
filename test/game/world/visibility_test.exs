@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position.Spline
   alias ThistleTea.Game.World.SpatialHash
@@ -148,7 +149,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
         tracked_entities: MapSet.new([target])
       }
 
-      state = Message.CmsgCancelAura.handle(%Message.CmsgCancelAura{spell_id: 11_743}, state)
+      state = Inbound.handle(%Message.CmsgCancelAura{spell_id: 11_743}, state)
       assert Metadata.get(guid).invisibility_detection[0] == 100
       refute Visibility.tracked?(state, target)
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{guid: ^target}, force: true}}
@@ -284,12 +285,12 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       on_exit(fn -> SpatialHash.remove(:mobs, viewpoint) end)
 
       state = %State{guid: guid, ready: true, character: character, visibility_cells: local_cells, cell_activator: nil}
-      remote = Message.CmsgFarSight.handle(%Message.CmsgFarSight{operation: 1}, state)
+      remote = Inbound.handle(%Message.CmsgFarSight{operation: 1}, state)
       assert remote.viewpoint_guid == viewpoint
       refute remote.visibility_cells == local_cells
       assert Visibility.refresh_player(remote).visibility_cells == remote.visibility_cells
 
-      local = Message.CmsgFarSight.handle(%Message.CmsgFarSight{operation: 0}, remote)
+      local = Inbound.handle(%Message.CmsgFarSight{operation: 0}, remote)
       assert local.viewpoint_guid == nil
       assert local.character.player.farsight == viewpoint
       assert local.visibility_cells == local_cells

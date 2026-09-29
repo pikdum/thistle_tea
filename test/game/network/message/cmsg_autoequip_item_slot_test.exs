@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAutoequipItemSlotTest do
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
 
   describe "from_binary/1" do
     test "dispatches the vanilla item GUID and destination slot" do
@@ -25,7 +26,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAutoequipItemSlotTest do
   describe "handle/2" do
     test "ignores requests outside the world" do
       state = %State{}
-      assert CmsgAutoequipItemSlot.handle(%CmsgAutoequipItemSlot{item_guid: 1, destination_slot: 0}, state) == state
+      assert Inbound.handle(%CmsgAutoequipItemSlot{item_guid: 1, destination_slot: 0}, state) == state
     end
   end
 end

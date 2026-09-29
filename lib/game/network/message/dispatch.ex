@@ -291,6 +291,8 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
     |> struct(opcode: opcode)
   end
 
+  def messages, do: @messages |> Map.values() |> Enum.uniq()
+
   def implemented?(opcode) when is_number(opcode) do
     Map.has_key?(@messages, opcode)
   end

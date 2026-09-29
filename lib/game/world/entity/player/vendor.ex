@@ -13,7 +13,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Vendor do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Honor.ItemRequirements
   alias ThistleTea.Game.Core.Inventory
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.Player.ConditionContext
@@ -24,11 +23,12 @@ defmodule ThistleTea.Game.World.Entity.Player.Vendor do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.VendorStock
 
   def list(%{ready: true, character: %Character{} = character} = state, vendor_guid) do
     if valid_vendor?(character, vendor_guid) do
-      Network.send_packet(%Message.SmsgListInventory{
+      Outbound.send_packet(%Message.SmsgListInventory{
         vendor_guid: vendor_guid,
         items: visible_items(character, vendor_guid)
       })
@@ -167,7 +167,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Vendor do
   end
 
   defp send_buy_failed(vendor_guid, item_id, error) do
-    Network.send_packet(%Message.SmsgBuyFailed{
+    Outbound.send_packet(%Message.SmsgBuyFailed{
       vendor_guid: vendor_guid,
       item_id: item_id,
       error: error

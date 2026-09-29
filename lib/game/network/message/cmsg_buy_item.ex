@@ -2,14 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_BUY_ITEM
 
-  alias ThistleTea.Game.World.Entity.Player.Vendor
-
   defstruct [:vendor_guid, :item_id, :count]
-
-  @impl ClientMessage
-  def handle(%__MODULE__{} = message, state) do
-    Vendor.buy(state, message.vendor_guid, message.item_id, message.count)
-  end
 
   @impl ClientMessage
   def from_binary(payload) do

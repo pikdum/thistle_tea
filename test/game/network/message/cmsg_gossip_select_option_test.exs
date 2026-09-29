@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
   alias ThistleTea.Game.Network.Message.SmsgShowtaxinodes
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Loader.Gossip.Option
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
@@ -49,7 +50,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
       state = %{character: character, gossip_menu_options: [option], gossip_menu_guid: 1}
       message = %CmsgGossipSelectOption{guid: 1, gossip_list_id: 0}
 
-      assert %{gossip_menu_options: []} = CmsgGossipSelectOption.handle(message, state)
+      assert %{gossip_menu_options: []} = Inbound.handle(message, state)
       assert_receive %SendTaxiPath{path_id: 315}
       assert_receive {:"$gen_cast", {:send_packet, %SmsgGossipComplete{}}}
     end
@@ -80,7 +81,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
       state = %{character: character, gossip_menu_options: [option], gossip_menu_guid: creature_guid}
       message = %CmsgGossipSelectOption{guid: creature_guid, gossip_list_id: 0}
 
-      assert %{gossip_menu_options: []} = CmsgGossipSelectOption.handle(message, state)
+      assert %{gossip_menu_options: []} = Inbound.handle(message, state)
       assert_receive {:"$gen_cast", {:send_packet, %SmsgGossipComplete{}}}
       assert_receive {:"$gen_cast", {:start_script, ^steps, ^player_guid}}
     end
@@ -141,7 +142,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
       state = %{character: character, gossip_menu_options: [option], gossip_menu_guid: flightmaster_guid}
       message = %CmsgGossipSelectOption{guid: flightmaster_guid, gossip_list_id: 0}
 
-      assert CmsgGossipSelectOption.handle(message, state) == state
+      assert Inbound.handle(message, state) == state
 
       assert_receive {:"$gen_cast", {:send_packet, %SmsgShowtaxinodes{guid: ^flightmaster_guid, nearest_node: 2}}}
     end
@@ -181,7 +182,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
 
       message = %CmsgGossipSelectOption{guid: banker_guid, gossip_list_id: 0}
 
-      assert %State{active_banker_guid: ^banker_guid} = CmsgGossipSelectOption.handle(message, state)
+      assert %State{active_banker_guid: ^banker_guid} = Inbound.handle(message, state)
       assert_receive {:"$gen_cast", {:send_packet, %SmsgShowBank{banker_guid: ^banker_guid}}}
     end
 
@@ -218,7 +219,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
       state = %{character: character, gossip_menu_options: [option], gossip_menu_guid: 2}
       message = %CmsgGossipSelectOption{guid: 2, gossip_list_id: 0}
 
-      assert CmsgGossipSelectOption.handle(message, state) == state
+      assert Inbound.handle(message, state) == state
       refute_receive %SendTaxiPath{path_id: 315}
       refute_receive {:"$gen_cast", {:send_packet, _packet}}
     end

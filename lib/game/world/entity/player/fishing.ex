@@ -12,7 +12,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Fishing do
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Spell.Casting
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
@@ -22,6 +21,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Fishing do
   alias ThistleTea.Game.World.Entity.Player.Enchantments
   alias ThistleTea.Game.World.Entity.Player.Looting
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Pathfinding
 
   @bobber_entry 35_591
@@ -75,12 +75,12 @@ defmodule ThistleTea.Game.World.Entity.Player.Fishing do
 
       {:error, :not_hooked} ->
         character = character |> Casting.cancel() |> EventSink.emit_pending()
-        Network.send_packet(%Message.SmsgFishNotHooked{})
+        Outbound.send_packet(%Message.SmsgFishNotHooked{})
         %{state | character: character}
 
       {:error, :escaped} ->
         character = character |> Casting.cancel() |> EventSink.emit_pending()
-        Network.send_packet(%Message.SmsgFishEscaped{})
+        Outbound.send_packet(%Message.SmsgFishEscaped{})
         %{state | character: character}
 
       _ ->
@@ -172,7 +172,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Fishing do
       {:gained, skills} ->
         character = %{character | player: %{character.player | skills: skills}}
         CharacterStore.put(character)
-        Network.send_packet(UpdateObject.from_entity(character, :values))
+        Outbound.send_packet(UpdateObject.from_entity(character, :values))
         character
 
       :unchanged ->

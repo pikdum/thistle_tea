@@ -5,11 +5,11 @@ defmodule ThistleTea.Game.World.System.Party.MeetingStones do
   alias ThistleTea.Game.Core.MeetingStone
   alias ThistleTea.Game.Core.MeetingStone.Applicant
   alias ThistleTea.Game.Core.Party
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Outbound
 
   def request(queue, party, :join, guid, area, now) do
     case MeetingStone.join(queue, party, applicant(guid), area, now) do
@@ -64,7 +64,7 @@ defmodule ThistleTea.Game.World.System.Party.MeetingStones do
   def deliver({:complete, recipients}), do: send_to(recipients, %Message.SmsgMeetingstoneComplete{})
   def deliver({:progress, recipients}), do: send_to(recipients, %Message.SmsgMeetingstoneInProgress{})
 
-  defp send_to(recipients, packet), do: Enum.each(recipients, &Network.send_packet(packet, &1))
+  defp send_to(recipients, packet), do: Enum.each(recipients, &Outbound.send_packet(packet, &1))
   defp failure(:not_leader), do: 1
   defp failure(:full_group), do: 2
   defp failure(:raid_group), do: 3

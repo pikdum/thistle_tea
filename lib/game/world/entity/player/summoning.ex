@@ -7,8 +7,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Summoning do
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.Outbound
 
   def request(%{character: %Character{} = character} = state, summoner_guid, zone_id, world, position) do
     if Aura.has_spell?(character, 23_445) do
@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Summoning do
         expires_at: Time.now() + auto_decline_ms
       }
 
-      Network.send_packet(%Message.SmsgSummonRequest{
+      Outbound.send_packet(%Message.SmsgSummonRequest{
         summoner_guid: summoner_guid,
         zone_id: zone_id || 0,
         auto_decline_ms: auto_decline_ms

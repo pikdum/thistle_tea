@@ -2,8 +2,6 @@ defmodule ThistleTea.Game.Network.Message.MsgSaveGuildEmblemClient do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_SAVE_GUILD_EMBLEM
 
-  alias ThistleTea.Game.World.Entity.Player.Guilds
-
   defstruct [:vendor_guid, :emblem]
 
   @impl ClientMessage
@@ -13,8 +11,4 @@ defmodule ThistleTea.Game.Network.Message.MsgSaveGuildEmblemClient do
       ) do
     %__MODULE__{vendor_guid: vendor_guid, emblem: {style, color, border, border_color, background}}
   end
-
-  @impl ClientMessage
-  def handle(%__MODULE__{vendor_guid: vendor_guid, emblem: emblem}, state),
-    do: Guilds.save_emblem(state, vendor_guid, emblem)
 end

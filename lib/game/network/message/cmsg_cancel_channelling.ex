@@ -2,12 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelChannelling do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CANCEL_CHANNELLING
 
-  alias ThistleTea.Game.World.Entity.Player.Spellcasting
-
   defstruct [:spell_id]
-
-  @impl ClientMessage
-  def handle(%__MODULE__{}, state), do: Spellcasting.cancel_cast_request(state)
 
   @impl ClientMessage
   def from_binary(<<spell_id::little-size(32), _rest::binary>>) do

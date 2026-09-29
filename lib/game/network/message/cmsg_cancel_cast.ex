@@ -2,17 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelCast do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CANCEL_CAST
 
-  alias ThistleTea.Game.World.Entity.Player.Spellcasting
-
-  require Logger
-
   defstruct []
-
-  @impl ClientMessage
-  def handle(%__MODULE__{}, state) do
-    Logger.info("CMSG_CANCEL_CAST")
-    Spellcasting.cancel_cast_request(state)
-  end
 
   @impl ClientMessage
   def from_binary(_payload) do

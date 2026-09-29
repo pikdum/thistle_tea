@@ -8,13 +8,13 @@ defmodule ThistleTea.Game.World.Chat do
   alias ThistleTea.Game.Core.Chat.Language
   alias ThistleTea.Game.Core.Party
   alias ThistleTea.Game.Core.Party.Group
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.Player.ChatStatus, as: PlayerStatus
   alias ThistleTea.Game.World.Entity.Player.DevCommands
   alias ThistleTea.Game.World.Entity.Player.Guilds
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.ChatChannels
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.System.Party.Notifier, as: PartyNotifier
@@ -56,7 +56,7 @@ defmodule ThistleTea.Game.World.Chat do
         route(state, chat_type, language, message, target_name)
 
       {:error, :not_learned} ->
-        Network.send_packet(%Message.SmsgNotification{message: "You have not learned that language."})
+        Outbound.send_packet(%Message.SmsgNotification{message: "You have not learned that language."})
         state
 
       {:error, :invalid_language} ->
@@ -87,13 +87,13 @@ defmodule ThistleTea.Game.World.Chat do
       guid when is_integer(guid) ->
         packet = chat_packet(@whisper, language, state.guid, message, ChatStatus.tag(state.character))
 
-        case Network.send_packet(packet, guid) do
+        case Outbound.send_packet(packet, guid) do
           :ok -> whisper_reply(state.guid, guid, language, message)
-          _ -> Network.send_packet(%Message.SmsgChatPlayerNotFound{name: target_name})
+          _ -> Outbound.send_packet(%Message.SmsgChatPlayerNotFound{name: target_name})
         end
 
       _ ->
-        Network.send_packet(%Message.SmsgChatPlayerNotFound{name: target_name})
+        Outbound.send_packet(%Message.SmsgChatPlayerNotFound{name: target_name})
     end
 
     state
@@ -148,13 +148,13 @@ defmodule ThistleTea.Game.World.Chat do
       end
 
     if language != 0xFFFFFFFF do
-      Network.send_packet(chat_packet(0x07, 0, target_guid, message, ChatStatus.tag(status)), sender_guid)
+      Outbound.send_packet(chat_packet(0x07, 0, target_guid, message, ChatStatus.tag(status)), sender_guid)
     end
 
     case status do
       %ChatStatus{mode: mode, message: reply} when mode in [:afk, :dnd] ->
         type = if mode == :afk, do: @afk, else: @dnd
-        Network.send_packet(chat_packet(type, 0, target_guid, reply, 0), sender_guid)
+        Outbound.send_packet(chat_packet(type, 0, target_guid, reply, 0), sender_guid)
 
       _ ->
         :ok

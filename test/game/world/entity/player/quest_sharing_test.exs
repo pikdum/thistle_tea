@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestSharingTest do
   alias ThistleTea.Game.World.Entity.Player.QuestSharing
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Registry
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
@@ -301,7 +302,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestSharingTest do
       refute_receive {:"$gen_cast", {:send_packet, %Message.MsgQuestPushResult{result: 2}}}
 
       declined =
-        Message.MsgQuestPushResultClient.handle(
+        Inbound.handle(
           %Message.MsgQuestPushResultClient{guid: context.other.guid, result: 3},
           state
         )

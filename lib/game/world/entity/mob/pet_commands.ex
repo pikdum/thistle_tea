@@ -8,10 +8,10 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetCommands do
   alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
 
   def stop_attack(%Mob{} = creature, controller) do
     if controlled?(creature, controller) and not Entity.dead?(creature) do
@@ -28,7 +28,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetCommands do
         creature
 
       Entity.dead?(creature) ->
-        Network.send_packet(Message.SmsgPetActionFeedback.new(:pet_dead), controller)
+        Outbound.send_packet(Message.SmsgPetActionFeedback.new(:pet_dead), controller)
         creature
 
       true ->

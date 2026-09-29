@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BuybackTest do
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Player.Vendor
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -47,7 +48,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BuybackTest do
           payload: <<vendor::little-size(64), item.object.guid::little-size(64), 0>>
         })
 
-      sold = Message.CmsgSellItem.handle(sell, state)
+      sold = Inbound.handle(sell, state)
       assert sold.character.player.coinage == 1_050
       assert sold.character.player.inv1 == 0
       assert sold.character.player.buyback1 == item.object.guid
@@ -61,12 +62,12 @@ defmodule ThistleTea.Game.World.Entity.Player.BuybackTest do
       assert CharacterStore.get(state.guid).internal.buyback.entries[69].guid == guid
       buy = Dispatch.to_message(%Packet{opcode: 0x290, payload: <<vendor::little-size(64), 69::little-size(32)>>})
       assert %Message.CmsgBuybackItem{vendor_guid: ^vendor, slot: 69} = buy
-      restored = Message.CmsgBuybackItem.handle(buy, sold)
+      restored = Inbound.handle(buy, sold)
       assert restored.character.player.coinage == 1_000
       assert restored.character.player.inv1 == guid
       assert restored.character.player.buyback1 == 0
       assert ItemStore.get(guid) == item
-      assert Message.CmsgBuybackItem.handle(buy, restored) == restored
+      assert Inbound.handle(buy, restored) == restored
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgBuyFailed{error: :cant_find_item}}}
     end
 

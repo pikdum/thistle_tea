@@ -21,7 +21,6 @@ defmodule ThistleTea.Game.World.Entity.Player.InventoryUpdate do
   alias ThistleTea.Game.Core.Inventory.ChangeSet.Placement
   alias ThistleTea.Game.Core.Item.EquipmentTransitions
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgInventoryChangeFailure
   alias ThistleTea.Game.Network.UpdateObject
@@ -34,6 +33,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InventoryUpdate do
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Presence
 
   def apply(state, result, placement \\ nil)
@@ -69,7 +69,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InventoryUpdate do
       |> Quests.on_inventory_changed(old_counts)
 
     Enum.each(destroyed, fn item ->
-      Network.send_packet(%Message.SmsgDestroyObject{guid: item.object.guid})
+      Outbound.send_packet(%Message.SmsgDestroyObject{guid: item.object.guid})
     end)
 
     send_created(placement)
@@ -77,7 +77,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InventoryUpdate do
     Enum.each(items, fn item ->
       item
       |> UpdateObject.item_values_update()
-      |> Network.send_packet()
+      |> Outbound.send_packet()
     end)
 
     finish_update(state)
@@ -105,12 +105,12 @@ defmodule ThistleTea.Game.World.Entity.Player.InventoryUpdate do
       |> Quests.on_inventory_changed(old_counts)
 
     Enum.each(Enum.uniq(outgoing ++ Enum.map(destroyed, & &1.object.guid)), fn guid ->
-      Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
+      Outbound.send_packet(%Message.SmsgDestroyObject{guid: guid})
     end)
 
     Enum.each(change_set.placements, fn
       %Placement{status: :placed, item: %Item{} = item} ->
-        Network.send_packet(UpdateObject.from_item(item))
+        Outbound.send_packet(UpdateObject.from_item(item))
 
       %Placement{} ->
         :ok
@@ -119,7 +119,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InventoryUpdate do
     Enum.each(changed, fn item ->
       item
       |> UpdateObject.item_values_update()
-      |> Network.send_packet()
+      |> Outbound.send_packet()
     end)
 
     finish_update(state)
@@ -154,7 +154,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InventoryUpdate do
   end
 
   defp send_created({:placed, _pos, placed}) do
-    Network.send_packet(UpdateObject.from_item(placed))
+    Outbound.send_packet(UpdateObject.from_item(placed))
   end
 
   defp send_created(_placement), do: :ok
@@ -174,7 +174,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InventoryUpdate do
   end
 
   def send_failure(error, item1_guid, item2_guid) do
-    Network.send_packet(%SmsgInventoryChangeFailure{
+    Outbound.send_packet(%SmsgInventoryChangeFailure{
       code: Inventory.error_code(error),
       required_level: required_level(error, item1_guid),
       item1_guid: item1_guid,

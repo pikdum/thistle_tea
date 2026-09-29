@@ -4,10 +4,10 @@ defmodule ThistleTea.Game.World.Entity.Player.Logout do
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Player.Logout, as: LogoutLogic
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.Looting
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.Trade
 
   @logout_delay_ms 20_000
@@ -18,7 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Logout do
     case LogoutLogic.admission(state.character) do
       {:ok, speed} ->
         Trade.cancel(state.guid)
-        Network.send_packet(%Message.SmsgLogoutResponse{result: 0, speed: Message.SmsgLogoutResponse.speed(speed)})
+        Outbound.send_packet(%Message.SmsgLogoutResponse{result: 0, speed: Message.SmsgLogoutResponse.speed(speed)})
         character = if speed == :delayed, do: LogoutLogic.start(state.character, Time.now()), else: state.character
         token = make_ref()
         delay = if speed == :instant, do: 0, else: @logout_delay_ms
@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Logout do
         %{state | character: character, logout_timer: %{token: token, ref: ref}}
 
       {:error, reason} ->
-        Network.send_packet(%Message.SmsgLogoutResponse{result: Message.SmsgLogoutResponse.result(reason), speed: 0})
+        Outbound.send_packet(%Message.SmsgLogoutResponse{result: Message.SmsgLogoutResponse.result(reason), speed: 0})
         state
     end
   end
@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Logout do
 
   def cancel(%State{} = state) do
     state = clear(state)
-    Network.send_packet(%Message.SmsgLogoutCancelAck{})
+    Outbound.send_packet(%Message.SmsgLogoutCancelAck{})
     state
   end
 

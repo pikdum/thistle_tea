@@ -9,13 +9,13 @@ defmodule ThistleTea.Game.World.Entity.Player.OutdoorPvp do
   alias ThistleTea.Game.Core.OutdoorPvp.Silithyst
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.Entity.Player.Rest
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.System.OutdoorPvp, as: OutdoorPvpSystem
 
@@ -152,6 +152,6 @@ defmodule ThistleTea.Game.World.Entity.Player.OutdoorPvp do
   defp project(states),
     do:
       Enum.each(states, fn {id, value} ->
-        Network.send_packet(%Message.SmsgUpdateWorldState{state: id, value: value})
+        Outbound.send_packet(%Message.SmsgUpdateWorldState{state: id, value: value})
       end)
 end

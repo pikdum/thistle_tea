@@ -19,10 +19,10 @@ defmodule ThistleTea.Game.World.Entity.GameObject.Chest do
   alias ThistleTea.Game.Core.Loot.Reservation
   alias ThistleTea.Game.Core.Profession.Gathering
   alias ThistleTea.Game.Core.Profession.OpenLock
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Visibility
 
   @default_respawn_ms 300_000
@@ -129,7 +129,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject.Chest do
          {:ok, %Loot.Item{slot: slot}, session} <- LootSession.commit(session, command) do
       Process.demonitor(command.token, [:flush])
       packet = %Message.SmsgLootRemoved{slot: slot}
-      session |> LootSession.viewers() |> Enum.each(&Network.send_packet(packet, &1))
+      session |> LootSession.viewers() |> Enum.each(&Outbound.send_packet(packet, &1))
       {:ok, put_session(state, session)}
     else
       _ -> {{:error, :invalid_reservation}, state}

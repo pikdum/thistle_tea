@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPageTextQueryTest do
 
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.CmsgPageTextQuery
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Loader.PageText, as: PageTextLoader
 
   setup do
@@ -24,7 +25,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPageTextQueryTest do
       seed_page(9101, %{text: "Page one.", next_page: 9102})
       seed_page(9102, %{text: "Page two.", next_page: 0})
 
-      CmsgPageTextQuery.handle(%CmsgPageTextQuery{page_id: 9101}, %{})
+      Inbound.handle(%CmsgPageTextQuery{page_id: 9101}, %{})
 
       assert_received {:"$gen_cast",
                        {:send_packet,
@@ -38,7 +39,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPageTextQueryTest do
     test "sends a placeholder for missing pages" do
       :ets.delete(PageTextLoader, 9103)
 
-      CmsgPageTextQuery.handle(%CmsgPageTextQuery{page_id: 9103}, %{})
+      Inbound.handle(%CmsgPageTextQuery{page_id: 9103}, %{})
 
       assert_received {:"$gen_cast",
                        {:send_packet,
@@ -48,7 +49,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPageTextQueryTest do
     test "stops on page cycles" do
       seed_page(9104, %{text: "Loop.", next_page: 9104})
 
-      CmsgPageTextQuery.handle(%CmsgPageTextQuery{page_id: 9104}, %{})
+      Inbound.handle(%CmsgPageTextQuery{page_id: 9104}, %{})
 
       assert_received {:"$gen_cast", {:send_packet, %Message.SmsgPageTextQueryResponse{page_id: 9104}}}
       refute_received {:"$gen_cast", {:send_packet, %Message.SmsgPageTextQueryResponse{page_id: 9104}}}

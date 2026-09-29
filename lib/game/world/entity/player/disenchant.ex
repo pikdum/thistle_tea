@@ -11,13 +11,13 @@ defmodule ThistleTea.Game.World.Entity.Player.Disenchant do
   alias ThistleTea.Game.Core.Loot
   alias ThistleTea.Game.Core.Loot.ItemLoot, as: PendingLoot
   alias ThistleTea.Game.Core.Profession.Disenchant, as: DisenchantLogic
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.ItemLoot
   alias ThistleTea.Game.World.Entity.Player.Looting
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
+  alias ThistleTea.Game.World.Outbound
 
   def owned_item(%Character{} = character, guid) when is_integer(guid) do
     if Inventory.find_position(character.player, guid, &ItemStore.get/1), do: ItemStore.get(guid)
@@ -48,7 +48,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Disenchant do
   end
 
   defp fail(state, spell_id, reason) do
-    Network.send_packet(Message.SmsgCastResult.failure(spell_id, reason))
+    Outbound.send_packet(Message.SmsgCastResult.failure(spell_id, reason))
     if reason == :already_open, do: ItemLoot.open(state), else: state
   end
 end

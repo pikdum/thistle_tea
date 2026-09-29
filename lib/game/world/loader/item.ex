@@ -17,6 +17,15 @@ defmodule ThistleTea.Game.World.Loader.Item do
     end
   end
 
+  def display_ids(item_ids) when is_list(item_ids) do
+    Map.new(item_ids, fn item_id ->
+      case get_template(item_id) do
+        %ItemTemplate{display_id: display_id} -> {item_id, display_id}
+        _template -> {item_id, 0}
+      end
+    end)
+  end
+
   def get_template(entry) when is_integer(entry) and entry > 0 do
     case get_cached_template(entry) do
       %ItemTemplate{} = template -> template

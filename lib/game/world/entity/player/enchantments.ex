@@ -15,7 +15,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Enchantments do
   alias ThistleTea.Game.Core.Item.ItemUse
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
@@ -23,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Enchantments do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Outbound
 
   def apply_permanent(
         %{character: %Character{} = character} = state,
@@ -99,7 +99,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Enchantments do
   defp advance_skill(character, _spell, _cast_item_guid), do: character
 
   defp fail(state, spell, reason) do
-    Network.send_packet(Message.SmsgCastResult.failure(spell.id, reason))
+    Outbound.send_packet(Message.SmsgCastResult.failure(spell.id, reason))
     state
   end
 
@@ -206,7 +206,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Enchantments do
 
       Item.temporary_enchantment(updated) != nil ->
         ItemStore.put(updated)
-        Network.send_packet(UpdateObject.item_values_update(updated))
+        Outbound.send_packet(UpdateObject.item_values_update(updated))
         character
 
       true ->
@@ -280,7 +280,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Enchantments do
   defp sync_visible_item(character, _position, _item), do: character
 
   defp send_updates(character, item, duration_ms) do
-    Network.send_packet(UpdateObject.item_values_update(item))
+    Outbound.send_packet(UpdateObject.item_values_update(item))
     send_enchant_time(character, item, duration_ms)
 
     %UpdateObject{update_type: :values, object_type: :player}
@@ -289,7 +289,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Enchantments do
   end
 
   defp send_enchant_time(character, item, duration_ms) do
-    Network.send_packet(%Message.SmsgItemEnchantTimeUpdate{
+    Outbound.send_packet(%Message.SmsgItemEnchantTimeUpdate{
       item_guid: item.object.guid,
       slot: Item.temporary_enchantment_slot(),
       duration_seconds: div(duration_ms, 1_000),

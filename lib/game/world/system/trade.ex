@@ -13,7 +13,6 @@ defmodule ThistleTea.Game.World.System.Trade do
   alias ThistleTea.Game.Core.Trade
   alias ThistleTea.Game.Core.Trade.Decision
   alias ThistleTea.Game.Core.Trade.Prepare
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgAreaTriggerMessage
   alias ThistleTea.Game.Network.Message.SmsgCastResult
   alias ThistleTea.Game.Network.Message.SmsgTradeStatus
@@ -23,6 +22,7 @@ defmodule ThistleTea.Game.World.System.Trade do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemEnchantment
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
 
   require Logger
 
@@ -48,7 +48,7 @@ defmodule ThistleTea.Game.World.System.Trade do
        position: Keyword.get(opts, :position, &World.position/1),
        metadata: Keyword.get(opts, :metadata, &Metadata.query(&1, [:race, :alive?, :unit_flags])),
        owner: Keyword.get(opts, :owner, &Entity.pid/1),
-       packet: Keyword.get(opts, :packet, &Network.send_packet/2),
+       packet: Keyword.get(opts, :packet, &Outbound.send_packet/2),
        now: Keyword.get(opts, :now, &Time.now/0),
        get_item: Keyword.get(opts, :get_item, &ItemStore.get/1),
        get_enchantment: Keyword.get(opts, :get_enchantment, &ItemEnchantment.get/1)

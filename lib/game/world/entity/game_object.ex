@@ -30,7 +30,6 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgFishNotHooked
   alias ThistleTea.Game.Network.Message.SmsgGameobjectCustomAnim
   alias ThistleTea.Game.Network.Message.SmsgGameobjectResetState
@@ -56,6 +55,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.GameEvent
@@ -98,7 +98,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   @impl GenServer
   def handle_cast({:send_update_to, pid}, state) do
     UpdateObject.from_entity(state)
-    |> Network.send_packet(pid)
+    |> Outbound.send_packet(pid)
 
     reset_banner_interaction(state, pid)
     {:noreply, state}
@@ -515,7 +515,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   end
 
   def handle_info(:fishing_expire, %GameObject{internal: %Internal{fishing: fishing}} = state) do
-    Network.send_packet(%SmsgFishNotHooked{}, fishing.owner_guid)
+    Outbound.send_packet(%SmsgFishNotHooked{}, fishing.owner_guid)
     despawn(state)
   end
 
@@ -822,7 +822,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
     case LockLoader.get(lock_id) do
       %Lock{requirements: requirements} ->
         if Enum.any?(requirements, &match?(%Requirement{type: :skill, index: 17}, &1)) do
-          Network.send_packet(%SmsgGameobjectResetState{guid: state.object.guid}, pid)
+          Outbound.send_packet(%SmsgGameobjectResetState{guid: state.object.guid}, pid)
         end
 
       _missing ->

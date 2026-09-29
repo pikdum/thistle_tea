@@ -9,11 +9,11 @@ defmodule ThistleTea.Game.World.Entity.Player.Honor do
   alias ThistleTea.Game.Core.Honor, as: HonorLogic
   alias ThistleTea.Game.Core.Honor.Award
   alias ThistleTea.Game.Core.Honor.Snapshot
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.MsgInspectHonorStats
   alias ThistleTea.Game.Network.Message.SmsgPvpCredit
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player.Inspection
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.Honor, as: HonorSystem
 
   def sync(%Character{} = character, server \\ HonorSystem) do
@@ -43,7 +43,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Honor do
 
   def inspect(%{character: %Character{} = character} = state, guid) do
     case inspect_reply(character, guid) do
-      %MsgInspectHonorStats{} = message -> Network.send_packet(message)
+      %MsgInspectHonorStats{} = message -> Outbound.send_packet(message)
       nil -> :ok
     end
 

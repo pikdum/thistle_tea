@@ -20,7 +20,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Gathering do
   alias ThistleTea.Game.Core.Profession.OpenLock
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Target
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink
@@ -36,6 +35,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gathering do
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: TemplateLoader
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
   def context(state, spell, targets, cast_item_guid) do
@@ -174,7 +174,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gathering do
   defp project(state, guid, loot) do
     state = Quests.credit_entity_interaction(state, guid)
     InstanceSystem.game_object_used(state.character.internal.world, Guid.entry(guid))
-    Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: loot, loot_type: 2})
+    Outbound.send_packet(%Message.SmsgLootResponse{guid: guid, loot: loot, loot_type: 2})
     %{state | loot_guid: guid, loot_type: :corpse}
   end
 

@@ -13,7 +13,6 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemTransformation do
   alias ThistleTea.Game.Core.Item.Proficiency
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.Enchantments
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
@@ -21,6 +20,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemTransformation do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Outbound
 
   def complete(%State{guid: owner, character: character} = state, guid, %Spell{id: spell_id} = spell, entry) do
     with %Item{item: %{owner: ^owner}} = original <- ItemStore.get(guid),
@@ -53,7 +53,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemTransformation do
   end
 
   defp fail(state, spell_id, _reason) do
-    Network.send_packet(%Message.SmsgCastResult{spell: spell_id, result: :failed, reason: :item_not_ready})
+    Outbound.send_packet(%Message.SmsgCastResult{spell: spell_id, result: :failed, reason: :item_not_ready})
     state
   end
 end

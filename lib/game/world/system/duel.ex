@@ -16,13 +16,13 @@ defmodule ThistleTea.Game.World.System.Duel do
   alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.SocialStore
 
   @countdown_ms 3_000
@@ -107,7 +107,7 @@ defmodule ThistleTea.Game.World.System.Duel do
        bounds_refs: %{},
        spawn_flag: Keyword.get(opts, :spawn_flag, &spawn_flag/1),
        despawn_flag: Keyword.get(opts, :despawn_flag, &World.stop_entity/1),
-       send_packet: Keyword.get(opts, :send_packet, &Network.send_packet/2),
+       send_packet: Keyword.get(opts, :send_packet, &Outbound.send_packet/2),
        broadcast_winner: Keyword.get(opts, :broadcast_winner, &broadcast_winner/2),
        sync_player: Keyword.get(opts, :sync_player, &Entity.duel_update/2),
        stop_pet: Keyword.get(opts, :stop_pet, &stop_pet/2),
@@ -567,10 +567,10 @@ defmodule ThistleTea.Game.World.System.Duel do
       {world, x, y, z} ->
         world
         |> World.nearby_players_at({x, y, z}, @winner_range)
-        |> Enum.each(fn {guid, _distance} -> Network.send_packet(packet, guid) end)
+        |> Enum.each(fn {guid, _distance} -> Outbound.send_packet(packet, guid) end)
 
       _position ->
-        Network.send_packet(packet, anchor_guid)
+        Outbound.send_packet(packet, anchor_guid)
     end
   end
 end

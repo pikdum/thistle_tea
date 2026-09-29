@@ -10,10 +10,10 @@ defmodule ThistleTea.Game.World.Entity.Player.EquipmentEligibility do
   alias ThistleTea.Game.Core.Item.Proficiency
   alias ThistleTea.Game.Core.Mail
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.PostOffice
 
   def reconcile(%{character: character} = state, previous) do
@@ -39,7 +39,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EquipmentEligibility do
     {:ok, changes} = Inventory.plan(batch, &ItemStore.get/1)
     Enum.each(mailed, &return_by_mail(state, &1))
     state = InventoryUpdate.apply(state, {:ok, changes})
-    Enum.each(mailed, &Network.send_packet(%Message.SmsgDestroyObject{guid: &1.object.guid}))
+    Enum.each(mailed, &Outbound.send_packet(%Message.SmsgDestroyObject{guid: &1.object.guid}))
     state
   end
 

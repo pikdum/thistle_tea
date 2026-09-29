@@ -2,14 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceSwimSpeedChangeAck do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_FORCE_SWIM_SPEED_CHANGE_ACK
 
-  alias ThistleTea.Game.World.Entity.Player.MovementControl
-
   defstruct [:guid, :counter, :new_speed]
-
-  @impl ClientMessage
-  def handle(%__MODULE__{guid: guid, counter: counter, new_speed: speed}, state) do
-    MovementControl.acknowledge_speed(state, guid, counter, :swim_speed, speed)
-  end
 
   @impl ClientMessage
   def from_binary(<<guid::little-size(64), counter::little-size(32), rest::binary>>) do

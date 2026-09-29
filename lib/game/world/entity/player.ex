@@ -81,7 +81,6 @@ defmodule ThistleTea.Game.World.Entity.Player do
   alias ThistleTea.Game.Core.Trade.Prepare
   alias ThistleTea.Game.Core.Travel.Transport, as: TransportLogic
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
@@ -162,6 +161,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.Spell.SpellReception
@@ -318,7 +318,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
     }
     |> struct(Map.from_struct(character))
     |> Map.put(:movement_block, movement_block)
-    |> Network.send_packet(pid)
+    |> Outbound.send_packet(pid)
 
     {:noreply, state}
   end
@@ -688,7 +688,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   def handle_cast({:receive_money, amount}, %{character: %Character{} = character} = state)
       when is_integer(amount) and amount > 0 do
     player = %{character.player | coinage: character.player.coinage + amount}
-    Network.send_packet(%Message.SmsgLootMoneyNotify{money: amount})
+    Outbound.send_packet(%Message.SmsgLootMoneyNotify{money: amount})
     state = InventoryUpdate.apply(state, {:ok, player})
     {:noreply, state}
   end
@@ -697,7 +697,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   def handle_cast({:request_party_stats, requester_guid}, %{character: %Character{} = character} = state) do
     Message.SmsgPartyMemberStatsFull
     |> struct(MemberStats.from_character(character))
-    |> Network.send_packet(requester_guid)
+    |> Outbound.send_packet(requester_guid)
 
     {:noreply, state}
   end
@@ -745,7 +745,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
 
   @impl GenServer
   def handle_cast({:destroy_object, guid}, state) do
-    Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
+    Outbound.send_packet(%Message.SmsgDestroyObject{guid: guid})
     {:noreply, state}
   end
 
@@ -922,12 +922,12 @@ defmodule ThistleTea.Game.World.Entity.Player do
     InstanceSystem.leave(state.guid, previous_world)
 
     # Send player's client to loading screen to load the new map
-    Network.send_packet(%Message.SmsgTransferPending{map: world.map_id, has_transport: false})
+    Outbound.send_packet(%Message.SmsgTransferPending{map: world.map_id, has_transport: false})
 
     state = State.prepare_worldport(%{state | ready: false}, previous_world, world)
 
     # Send player's client the new location
-    Network.send_packet(%Message.SmsgNewWorld{
+    Outbound.send_packet(%Message.SmsgNewWorld{
       map: world.map_id,
       position: %{x: x, y: y, z: z},
       orientation: orientation
@@ -1591,7 +1591,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
     case CompanionOwner.detach(state, guid, :broken) do
       {:ok, entity_ref, state} ->
         World.stop_entity(guid)
-        Network.send_packet(%Message.SmsgPetBroken{})
+        Outbound.send_packet(%Message.SmsgPetBroken{})
         {:noreply, project_companion_detachment(state, entity_ref), {:continue, :maybe_broadcast_update}}
 
       :stale ->
@@ -2091,10 +2091,10 @@ defmodule ThistleTea.Game.World.Entity.Player do
         do: MovementHandoff.offer(character, state.guid, Time.now()),
         else: character
 
-    Network.send_packet(%Message.SmsgClientControlUpdate{guid: guid, allow_movement?: true})
+    Outbound.send_packet(%Message.SmsgClientControlUpdate{guid: guid, allow_movement?: true})
 
     if match?(%{rooted?: true}, Metadata.query(guid, [:rooted?])) do
-      Network.send_packet(%Message.SmsgForceMoveRoot{guid: guid})
+      Outbound.send_packet(%Message.SmsgForceMoveRoot{guid: guid})
     end
 
     %{state | character: character, active_mover_guid: guid}
@@ -2150,7 +2150,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
         {character, rested_bonus} = Rest.spend(state.character, xp, Time.now())
         total_xp = xp + rested_bonus
 
-        Network.send_packet(%Message.SmsgLogXpgain{
+        Outbound.send_packet(%Message.SmsgLogXpgain{
           target: victim.object.guid,
           total_exp: total_xp,
           exp_type: :kill,
@@ -2197,7 +2197,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
 
   defp send_level_ups(level_ups) do
     Enum.each(level_ups, fn level_up ->
-      Network.send_packet(struct(Message.SmsgLevelupInfo, level_up))
+      Outbound.send_packet(struct(Message.SmsgLevelupInfo, level_up))
     end)
   end
 
@@ -2319,7 +2319,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
 
     Presence.relocate(character)
 
-    Network.send_packet(%Message.MsgMoveTeleportAck{
+    Outbound.send_packet(%Message.MsgMoveTeleportAck{
       guid: state.guid,
       position: {x, y, z, orientation},
       timestamp: character.movement_block.timestamp || 0,
@@ -2397,7 +2397,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
     state = Visibility.leave_player(%{state | character: character})
     InstanceSystem.leave(state.guid, previous_world)
 
-    Network.send_packet(%Message.SmsgTransferPending{
+    Outbound.send_packet(%Message.SmsgTransferPending{
       map: world.map_id,
       has_transport: true,
       transport: entry,
@@ -2406,7 +2406,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
 
     state = State.prepare_worldport(%{state | ready: false}, previous_world, world)
 
-    Network.send_packet(%Message.SmsgNewWorld{
+    Outbound.send_packet(%Message.SmsgNewWorld{
       map: world.map_id,
       position: %{x: transport_x, y: transport_y, z: transport_z},
       orientation: transport_orientation

@@ -2,23 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAck do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_FORCE_MOVE_ROOT_ACK
 
-  alias ThistleTea.Game.World.Entity.Player.MovementControl
-  alias ThistleTea.Game.World.Entity.Player.State
-
   defstruct [:guid, :counter, :movement_payload]
-
-  @impl ClientMessage
-  def handle(%__MODULE__{guid: guid, counter: counter, movement_payload: movement_payload}, %State{} = state) do
-    case MovementControl.acknowledge(state, guid, counter, :root) do
-      {:ok, state} ->
-        state
-        |> MovementControl.reconcile_movement(movement_payload, guid)
-        |> MovementControl.maybe_finish_repop()
-
-      {:error, state} ->
-        state
-    end
-  end
 
   @impl ClientMessage
   def from_binary(payload) do

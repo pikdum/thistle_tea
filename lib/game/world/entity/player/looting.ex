@@ -17,7 +17,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Looting do
   alias ThistleTea.Game.Core.Movement.ControlMovement
   alias ThistleTea.Game.Core.Party
   alias ThistleTea.Game.Core.Player.Experience
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
@@ -28,6 +27,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Looting do
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loot.ActorFactory
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
@@ -55,16 +55,16 @@ defmodule ThistleTea.Game.World.Entity.Player.Looting do
 
       case Entity.call(guid, {:pickpocket, actor(state, guid), character.unit.level}) do
         {:ok, %Loot{} = loot} ->
-          Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: loot, loot_type: 2})
+          Outbound.send_packet(%Message.SmsgLootResponse{guid: guid, loot: loot, loot_type: 2})
           %{state | loot_guid: guid, loot_type: :pickpocket}
 
         _ ->
-          Network.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
+          Outbound.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
           state
       end
     else
       {:error, reason} ->
-        Network.send_packet(Message.SmsgCastResult.failure(spell_id, reason))
+        Outbound.send_packet(Message.SmsgCastResult.failure(spell_id, reason))
         state
 
       _ ->
@@ -76,7 +76,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Looting do
 
   def open(%{character: %Character{} = character} = state, guid, opts) do
     if ControlMovement.active?(character) do
-      Network.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
+      Outbound.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
       release(state)
     else
       open_available(state, guid, opts)
@@ -84,7 +84,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Looting do
   end
 
   def open(state, guid, _opts) do
-    Network.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
+    Outbound.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
     state
   end
 
@@ -117,7 +117,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Looting do
 
       skinned? = match?(%{skinned?: true}, Metadata.query(guid, [:skinned?]))
 
-      Network.send_packet(%Message.SmsgLootResponse{
+      Outbound.send_packet(%Message.SmsgLootResponse{
         guid: guid,
         loot: loot,
         loot_type: if(skinned?, do: 2, else: Keyword.get(opts, :loot_type, 1))
@@ -128,35 +128,35 @@ defmodule ThistleTea.Game.World.Entity.Player.Looting do
     else
       {:error, :nothing_to_take} ->
         Entity.call(guid, {:loot_release, actor})
-        Network.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
+        Outbound.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
         state
 
       {:error, :no_permission} ->
-        Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: %Loot{}})
+        Outbound.send_packet(%Message.SmsgLootResponse{guid: guid, loot: %Loot{}})
         state
 
       _ ->
-        Network.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
+        Outbound.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
         state
     end
   end
 
   def release(%{loot_type: :container} = state) do
     state = Containers.release(state)
-    Network.send_packet(%Message.SmsgLootReleaseResponse{guid: state.loot_guid})
+    Outbound.send_packet(%Message.SmsgLootReleaseResponse{guid: state.loot_guid})
     %{state | loot_guid: nil, loot_type: nil}
   end
 
   def release(%{loot_type: :item} = state) do
     state = ItemLoot.release(state)
-    Network.send_packet(%Message.SmsgLootReleaseResponse{guid: state.loot_guid})
+    Outbound.send_packet(%Message.SmsgLootReleaseResponse{guid: state.loot_guid})
     %{state | loot_guid: nil, loot_type: nil}
   end
 
   def release(%{character: %Character{}} = state) when is_integer(state.loot_guid) do
     actor = actor(state, state.loot_guid)
     loot_call(state, actor, :release)
-    Network.send_packet(%Message.SmsgLootReleaseResponse{guid: state.loot_guid})
+    Outbound.send_packet(%Message.SmsgLootReleaseResponse{guid: state.loot_guid})
     %{state | loot_guid: nil, loot_type: nil}
   end
 
@@ -242,8 +242,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Looting do
       {:ok, gold} ->
         share = if Map.get(state, :loot_type) == :pickpocket, do: gold, else: split_gold(state.guid, character, gold)
         player = %{character.player | coinage: character.player.coinage + share}
-        Network.send_packet(%Message.SmsgLootMoneyNotify{money: share})
-        Network.send_packet(%Message.SmsgLootClearMoney{})
+        Outbound.send_packet(%Message.SmsgLootMoneyNotify{money: share})
+        Outbound.send_packet(%Message.SmsgLootClearMoney{})
         InventoryUpdate.apply(state, {:ok, player})
 
       _ ->
@@ -318,7 +318,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Looting do
         |> Enum.filter(&MapSet.member?(member_guids, &1))
 
       packet = %Message.SmsgLootMasterList{looters: looters}
-      Enum.each(looters, &Network.send_packet(packet, &1))
+      Enum.each(looters, &Outbound.send_packet(packet, &1))
     else
       _ -> :ok
     end

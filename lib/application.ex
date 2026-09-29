@@ -103,6 +103,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.MailStore
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.ServerVariables
+  alias ThistleTea.Game.World.Session
   alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.World.System.Auction, as: AuctionSystem
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
@@ -206,7 +207,8 @@ defmodule ThistleTea.Application do
         !test &&
           {ThousandIsland, port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
         !test &&
-          {ThousandIsland, port: @game_port, handler_module: GameServer, handler_options: @handler_options},
+          {ThousandIsland,
+           port: @game_port, handler_module: GameServer, handler_options: Map.put(@handler_options, :session, Session)},
         ThistleTeaWeb.Telemetry,
         !test && ThistleTeaWeb.Endpoint,
         {DynamicSupervisor, strategy: :one_for_one, name: PlayerSupervisor},

@@ -12,7 +12,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Talents do
   alias ThistleTea.Game.Core.Player.Talents, as: LogicTalents
   alias ThistleTea.Game.Core.Spell.Casting
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.EventSink
@@ -20,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Talents do
   alias ThistleTea.Game.World.Entity.Player.Spells
   alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
+  alias ThistleTea.Game.World.Outbound
 
   def learn(%{character: %Character{} = character} = state, talent_id, requested_rank) do
     with {:ok, talent_spell_ids} <- LogicTalents.validate(character, talent_id, requested_rank),
@@ -70,7 +70,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Talents do
       |> LogicTalents.sync_points()
 
     CharacterStore.put(character)
-    Network.send_packet(UpdateObject.from_entity(character, :values))
+    Outbound.send_packet(UpdateObject.from_entity(character, :values))
     %{state | character: character}
   end
 

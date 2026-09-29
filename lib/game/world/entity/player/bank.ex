@@ -12,7 +12,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Bank do
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Inventory
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
@@ -21,13 +20,14 @@ defmodule ThistleTea.Game.World.Entity.Player.Bank do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.BankBagSlotPrice
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
 
   @banker_flag 0x00000100
   @interaction_distance 5.0
 
   def activate(%State{ready: true, character: %Character{} = character} = state, banker_guid) do
     if valid_banker?(character, banker_guid) do
-      Network.send_packet(%Message.SmsgShowBank{banker_guid: banker_guid})
+      Outbound.send_packet(%Message.SmsgShowBank{banker_guid: banker_guid})
       %{state | active_banker_guid: banker_guid}
     else
       %{state | active_banker_guid: nil}
@@ -139,7 +139,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Bank do
   end
 
   defp send_purchase_failure(state, result) do
-    Network.send_packet(%Message.SmsgBuyBankSlotResult{result: result})
+    Outbound.send_packet(%Message.SmsgBuyBankSlotResult{result: result})
     state
   end
 end

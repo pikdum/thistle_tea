@@ -2,16 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSwapItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SWAP_ITEM
 
-  alias ThistleTea.Game.World.Entity.Player.Inventory
-
   defstruct [:dst_bag, :dst_slot, :src_bag, :src_slot]
-
-  @impl ClientMessage
-  def handle(%__MODULE__{} = message, %{ready: true, character: %Character{}} = state) do
-    Inventory.swap(state, {message.src_bag, message.src_slot}, {message.dst_bag, message.dst_slot})
-  end
-
-  def handle(_message, state), do: state
 
   @impl ClientMessage
   def from_binary(payload) do

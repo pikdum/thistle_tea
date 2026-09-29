@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveFeatherFallAckTest do
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World.Entity.Player.MovementControl
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
 
   describe "from_binary/1" do
     test "dispatches a vanilla acknowledgment with its trailing apply flag" do
@@ -24,12 +25,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveFeatherFallAckTest do
       {disabled, state} = MovementControl.prepare(%Message.SmsgMoveNormalFall{guid: 42}, state)
 
       state =
-        CmsgMoveFeatherFallAck.handle(%CmsgMoveFeatherFallAck{guid: 42, counter: enabled.counter, apply: 1}, state)
+        Inbound.handle(%CmsgMoveFeatherFallAck{guid: 42, counter: enabled.counter, apply: 1}, state)
 
       assert state.pending_movement_acks == %{disabled.counter => {:feather_fall, false}}
 
       state =
-        CmsgMoveFeatherFallAck.handle(%CmsgMoveFeatherFallAck{guid: 42, counter: disabled.counter, apply: 0}, state)
+        Inbound.handle(%CmsgMoveFeatherFallAck{guid: 42, counter: disabled.counter, apply: 0}, state)
 
       assert state.pending_movement_acks == %{}
     end
@@ -39,7 +40,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveFeatherFallAckTest do
 
       for {guid, counter, apply} <- [{41, 7, 1}, {42, 8, 1}, {42, 7, 0}] do
         message = %CmsgMoveFeatherFallAck{guid: guid, counter: counter, apply: apply}
-        assert CmsgMoveFeatherFallAck.handle(message, state) == state
+        assert Inbound.handle(message, state) == state
       end
     end
 
@@ -48,7 +49,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveFeatherFallAckTest do
       message = CmsgMoveFeatherFallAck.from_binary(payload)
       state = %State{guid: 42, pending_movement_acks: %{7 => {:feather_fall, true}}}
 
-      assert CmsgMoveFeatherFallAck.handle(message, state).pending_movement_acks == %{}
+      assert Inbound.handle(message, state).pending_movement_acks == %{}
     end
   end
 end

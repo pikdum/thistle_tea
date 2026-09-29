@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
   alias ThistleTea.Game.Network.Message.CmsgBuyItem
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Registry
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
@@ -62,7 +63,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
       state = %{ready: true, guid: 1, character: character}
       message = %CmsgBuyItem{vendor_guid: vendor_guid, item_id: template.entry, count: 1}
 
-      assert CmsgBuyItem.handle(message, state) == state
+      assert Inbound.handle(message, state) == state
 
       assert_receive {:"$gen_cast",
                       {:send_packet,
@@ -111,7 +112,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
       state = %{ready: true, guid: player_guid, character: character}
       message = %CmsgBuyItem{vendor_guid: vendor_guid, item_id: template.entry, count: 2}
 
-      state = CmsgBuyItem.handle(message, state)
+      state = Inbound.handle(message, state)
 
       assert state.character.player.coinage == 55
       item_guid = state.character.player.inv1

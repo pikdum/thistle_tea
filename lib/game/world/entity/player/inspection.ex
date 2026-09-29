@@ -7,15 +7,15 @@ defmodule ThistleTea.Game.World.Entity.Player.Inspection do
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Math
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgInspect
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Outbound
 
   def inspect(%{character: %Character{} = character} = state, guid) do
     character = %{character | unit: %{character.unit | target: guid}}
 
-    if available?(character, guid), do: Network.send_packet(%SmsgInspect{guid: guid})
+    if available?(character, guid), do: Outbound.send_packet(%SmsgInspect{guid: guid})
 
     %{state | character: character, target: guid}
   end

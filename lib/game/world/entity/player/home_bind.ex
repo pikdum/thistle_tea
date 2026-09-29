@@ -11,7 +11,6 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBind do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Travel.HomeBind
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
@@ -20,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBind do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Pathfinding
 
   @innkeeper_flag 0x00000080
@@ -27,8 +27,8 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBind do
 
   def confirm(%State{ready: true, character: %Character{} = character} = state, guid) do
     if valid_innkeeper?(character, guid) do
-      Network.send_packet(%Message.SmsgGossipComplete{})
-      Network.send_packet(%Message.SmsgBinderConfirm{guid: guid})
+      Outbound.send_packet(%Message.SmsgGossipComplete{})
+      Outbound.send_packet(%Message.SmsgBinderConfirm{guid: guid})
       %{state | gossip_menu_options: []}
     else
       state
@@ -40,7 +40,7 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBind do
   def activate(%State{ready: true, character: %Character{} = character} = state, guid) do
     if valid_innkeeper?(character, guid) do
       Entity.trigger_spell(guid, @bind_spell, character.object.guid)
-      Network.send_packet(%Message.SmsgGossipComplete{})
+      Outbound.send_packet(%Message.SmsgGossipComplete{})
       %{state | gossip_menu_options: []}
     else
       state
@@ -67,7 +67,7 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBind do
       character = %{character | internal: %{character.internal | home_bind: home}}
       CharacterStore.put(character)
       send_update(character)
-      Network.send_packet(%Message.SmsgPlayerbound{guid: guid, area: area_id})
+      Outbound.send_packet(%Message.SmsgPlayerbound{guid: guid, area: area_id})
       %{state | character: character}
     else
       state
@@ -78,7 +78,7 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBind do
 
   def send_update(%Character{internal: %{home_bind: %HomeBind{} = home}}) do
     {x, y, z} = home.position
-    Network.send_packet(%Message.SmsgBindpointupdate{x: x, y: y, z: z, map: home.map_id, area: home.area_id})
+    Outbound.send_packet(%Message.SmsgBindpointupdate{x: x, y: y, z: z, map: home.map_id, area: home.area_id})
   end
 
   def send_update(%Character{}), do: :ok

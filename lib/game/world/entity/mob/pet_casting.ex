@@ -12,11 +12,11 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetCasting do
   alias ThistleTea.Game.Core.Spell.Cooldowns
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.AIEnvironment
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
 
   def cast(
         %Mob{internal: %Internal{pet: %Pet{owner_guid: controller}}} = state,
@@ -56,10 +56,10 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetCasting do
     do: %{state | internal: %{state.internal | blackboard: blackboard}}
 
   defp complete(state, spell, {:error, reason}, controller, now) do
-    Network.send_packet(%Message.SmsgPetCastFailed{spell_id: spell.id, reason: reason}, controller)
+    Outbound.send_packet(%Message.SmsgPetCastFailed{spell_id: spell.id, reason: reason}, controller)
 
     if !Cooldowns.on_cooldown?(state, spell, now) do
-      Network.send_packet(%Message.SmsgClearCooldown{spell_id: spell.id, target_guid: state.object.guid}, controller)
+      Outbound.send_packet(%Message.SmsgClearCooldown{spell_id: spell.id, target_guid: state.object.guid}, controller)
     end
 
     state

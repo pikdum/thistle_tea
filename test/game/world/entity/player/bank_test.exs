@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BankTest do
   alias ThistleTea.Game.World.Entity.Player.Bank
   alias ThistleTea.Game.World.Entity.Player.Inventory, as: PlayerInventory
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
@@ -166,13 +167,13 @@ defmodule ThistleTea.Game.World.Entity.Player.BankTest do
       assert message == %Message.CmsgAutostoreBagItem{source_bag: 255, source_slot: 39, destination_bag: 255}
       item = ItemStore.create(%ItemTemplate{entry: 20_000}, owner: state.guid)
       state = put_in(state.character.player.bank1, item.object.guid)
-      rejected = Message.CmsgAutostoreBagItem.handle(message, state)
+      rejected = Inbound.handle(message, state)
       assert rejected.character.player.bank1 == item.object.guid
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgInventoryChangeFailure{code: 35}}}
       rejected = PlayerInventory.auto_store_in_bag(state, {255, 23}, 63)
       assert rejected.character.player.bank1 == item.object.guid
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgInventoryChangeFailure{code: 35}}}
-      accepted = Message.CmsgAutostoreBagItem.handle(message, Bank.activate(state, banker_guid))
+      accepted = Inbound.handle(message, Bank.activate(state, banker_guid))
       assert accepted.character.player.bank1 == 0
       assert accepted.character.player.inv1 == item.object.guid
       assert CharacterStore.get(state.character.id).player.inv1 == item.object.guid

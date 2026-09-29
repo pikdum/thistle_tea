@@ -3,10 +3,10 @@ defmodule ThistleTea.Game.World.Entity.Player.Weather do
 
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Weather
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgWeather
   alias ThistleTea.Game.World.Entity.Player.Rest
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.System.Weather, as: WeatherSystem
 
@@ -93,7 +93,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Weather do
   defp describe(_error, _zone), do: "Use: .weather [fine|auto|step] or .weather <rain|snow|storm> <0..1> [permanent]"
 
   defp project(%Weather{} = weather) do
-    Network.send_packet(%SmsgWeather{
+    Outbound.send_packet(%SmsgWeather{
       weather_type: Weather.type_id(weather),
       grade: weather.grade,
       sound_id: Weather.sound(weather)

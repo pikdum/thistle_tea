@@ -2,12 +2,7 @@ defmodule ThistleTea.Game.Network.Message.MsgCorpseQuery do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_CORPSE_QUERY
 
-  alias ThistleTea.Game.World.Entity.Player.Corpses
-
   defstruct []
-
-  @impl ClientMessage
-  def handle(%__MODULE__{}, state), do: Corpses.query(state)
 
   @impl ClientMessage
   def from_binary(_payload), do: %__MODULE__{}

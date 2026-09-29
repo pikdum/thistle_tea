@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ContainersTest do
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.Looting
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
@@ -61,7 +62,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ContainersTest do
       assert %CmsgOpenItem{bag: 255, slot: 23} =
                message = Dispatch.to_message(%Packet{opcode: opcode, payload: <<255, 23>>})
 
-      opened = CmsgOpenItem.handle(message, state)
+      opened = Inbound.handle(message, state)
       assert opened.loot_guid == source.object.guid
       assert opened.loot_type == :container
       assert Item.loot_generated?(ItemStore.get(source.object.guid))
@@ -189,7 +190,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ContainersTest do
         targets: TargetCodec.encode(Target.item(source.object.guid))
       }
 
-      cast = CmsgUseItem.handle(message, state, fn @spell -> spell end)
+      cast = Inbound.Item.use_item(message, state, fn @spell -> spell end)
       assert ItemStore.get(key.object.guid) == key
       assert_receive {:open_lock, _guid, ^spell, _key, _events} = command
       assert {:noreply, opened} = PlayerServer.handle_info(command, cast)

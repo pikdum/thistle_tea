@@ -2,19 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPing do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PING
 
-  alias ThistleTea.Game.Network.ConnectionState
-
-  require Logger
-
   defstruct [:sequence_id, :latency]
-
-  @impl ClientMessage
-  def handle(%__MODULE__{sequence_id: sequence_id, latency: latency}, %ConnectionState{} = state) do
-    Logger.info("CMSG_PING: #{latency}")
-
-    Network.send_packet(%Message.SmsgPong{sequence_id: sequence_id})
-    %{state | latency: latency}
-  end
 
   @impl ClientMessage
   def from_binary(payload) do

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelChannellingTest do
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message.CmsgCancelChannelling
+  alias ThistleTea.Game.World.Inbound
 
   test "clears the fishing channel and its bobber" do
     spell = %Spell{id: 7620}
@@ -21,7 +22,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelChannellingTest do
       internal: %Internal{world: %WorldRef{map_id: 0}, casting: %Cast{spell: spell, channel_ms: 20_000}}
     }
 
-    state = CmsgCancelChannelling.handle(%CmsgCancelChannelling{}, %{guid: 42, character: character})
+    state = Inbound.handle(%CmsgCancelChannelling{}, %{guid: 42, character: character})
 
     assert state.character.internal.casting == nil
     assert state.character.unit.channel_object == 0

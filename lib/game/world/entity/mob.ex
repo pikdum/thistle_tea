@@ -85,7 +85,6 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   alias ThistleTea.Game.Core.Spell.SpellResist
   alias ThistleTea.Game.Core.Spell.SpellThreat
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
@@ -120,6 +119,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Spell.SpellReception
   alias ThistleTea.Game.World.System.CreatureGroups
   alias ThistleTea.Game.World.System.GameEvent
@@ -210,10 +210,10 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       state = Visibility.refresh_entity(state)
 
       UpdateObject.from_entity(state)
-      |> Network.send_packet(pid)
+      |> Outbound.send_packet(pid)
 
       case Message.SmsgPetNameQueryResponse.for_pet(state) do
-        %Message.SmsgPetNameQueryResponse{} = packet -> Network.send_packet(packet, pid)
+        %Message.SmsgPetNameQueryResponse{} = packet -> Outbound.send_packet(packet, pid)
         nil -> :ok
       end
 
@@ -1891,7 +1891,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       resumed ->
         resumed
         |> Message.SmsgMonsterMove.build(resumed.internal.movement_options || [])
-        |> Network.send_packet(pid)
+        |> Outbound.send_packet(pid)
     end
   end
 

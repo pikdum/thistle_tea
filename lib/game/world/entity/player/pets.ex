@@ -6,7 +6,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Pets do
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Pet.Companion.EntityRef
   alias ThistleTea.Game.Core.Pet.PetName
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
@@ -15,6 +14,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Pets do
   alias ThistleTea.Game.World.Entity.Player.CompanionVisibility
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Visibility
 
   def rename(%{ready: true, character: %Character{} = character} = state, guid, name) do
@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Pets do
       %{state | character: character}
     else
       {:error, :invalid_name} ->
-        Network.send_packet(%Message.SmsgPetNameInvalid{})
+        Outbound.send_packet(%Message.SmsgPetNameInvalid{})
         state
 
       _ ->
@@ -75,7 +75,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Pets do
          %{name: name, pet_number: ^number, pet_name_timestamp: timestamp} <-
            Metadata.query(guid, [:name, :pet_number, :pet_name_timestamp]),
          true <- is_binary(name) and is_integer(timestamp) and number > 0 do
-      Network.send_packet(%Message.SmsgPetNameQueryResponse{pet_number: number, name: name, timestamp: timestamp})
+      Outbound.send_packet(%Message.SmsgPetNameQueryResponse{pet_number: number, name: name, timestamp: timestamp})
     end
 
     state

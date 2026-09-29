@@ -4,12 +4,13 @@ defmodule ThistleTea.Game.World.Entity.Player.TravelTest do
   alias ThistleTea.Game.Network.Message.CmsgMoveWorldportAck
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Player.Travel
+  alias ThistleTea.Game.World.Inbound
 
   describe "worldport_ack/1" do
     test "ignores unsolicited and replayed worldport acknowledgements" do
       for state <- [%State{ready: false}, %State{ready: true}] do
         assert Travel.worldport_ack(state) == state
-        assert CmsgMoveWorldportAck.handle(%CmsgMoveWorldportAck{}, state) == state
+        assert Inbound.handle(%CmsgMoveWorldportAck{}, state) == state
         refute_received _message
       end
     end

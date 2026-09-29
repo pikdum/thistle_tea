@@ -12,7 +12,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Teaching do
   alias ThistleTea.Game.Core.Item.Proficiency
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.SpellTeaching
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.Reputation
@@ -20,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Teaching do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Outbound
 
   def validate(%Character{} = character, %Spell{} = spell, item_guid) do
     if SpellTeaching.spell?(spell) do
@@ -134,7 +134,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Teaching do
   end
 
   defp fail(state, spell, reason) do
-    Network.send_packet(Message.SmsgCastResult.failure(spell.id, reason))
+    Outbound.send_packet(Message.SmsgCastResult.failure(spell.id, reason))
     state
   end
 end

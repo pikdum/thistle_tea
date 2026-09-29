@@ -17,13 +17,13 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
   alias ThistleTea.Game.Core.Reputation.KillReward
   alias ThistleTea.Game.Core.Reputation.State
   alias ThistleTea.Game.Core.Vendor.VendorItem
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player.ConditionContext
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Presence
 
   @alliance_races [1, 3, 4, 7]
@@ -41,8 +41,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
         end
       end)
 
-    Network.send_packet(%Message.SmsgInitializeFactions{factions: factions})
-    Network.send_packet(%Message.SmsgSetForcedReactions{reactions: forced_reactions(character)})
+    Outbound.send_packet(%Message.SmsgInitializeFactions{factions: factions})
+    Outbound.send_packet(%Message.SmsgSetForcedReactions{reactions: forced_reactions(character)})
   end
 
   def standing(%Character{} = character, faction_id) do
@@ -227,7 +227,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
   def set_visible(%{character: %Character{} = character} = state, faction_id) do
     case ReputationLogic.set_visible(character.player.reputation, faction_id) do
       {:ok, reputation, change} ->
-        Network.send_packet(%Message.SmsgSetFactionVisible{index: change.index})
+        Outbound.send_packet(%Message.SmsgSetFactionVisible{index: change.index})
         store_reputation(state, reputation, false)
 
       {:error, :not_allowed} ->
@@ -258,7 +258,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
     case ReputationLogic.set_at_war(previous, catalog, index, enabled, context(character)) do
       {:ok, reputation, _change} ->
         if Keyword.get(opts, :notify?, false) do
-          Network.send_packet(%Message.SmsgSetFactionAtwar{index: index, enabled: enabled})
+          Outbound.send_packet(%Message.SmsgSetFactionAtwar{index: index, enabled: enabled})
         end
 
         store_reputation(state, reputation, false)
@@ -367,7 +367,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
       previous_state = Map.get(previous.states, change.faction_id)
 
       if not visible?(previous_state) and visible?(change) do
-        Network.send_packet(%Message.SmsgSetFactionVisible{index: change.index})
+        Outbound.send_packet(%Message.SmsgSetFactionVisible{index: change.index})
       end
     end)
 
@@ -376,7 +376,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
 
   defp put_reputation(%{character: %Character{}} = state, reputation, changes) do
     if changes != [] do
-      Network.send_packet(%Message.SmsgSetFactionStanding{
+      Outbound.send_packet(%Message.SmsgSetFactionStanding{
         standings: Enum.map(changes, &{&1.index, &1.standing})
       })
     end

@@ -8,7 +8,6 @@ defmodule ThistleTea.Game.Network.Send do
   alias ThistleTea.Game.Network.Connection.Crypto
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
-  alias ThistleTea.Game.World.Entity.Player.MovementControl
   alias ThousandIsland.Socket
 
   def send_packet(%Packet{opcode: @smsg_update_object, payload: payload}, {socket, state}) do
@@ -31,9 +30,9 @@ defmodule ThistleTea.Game.Network.Send do
   end
 
   def send_packet(message, {socket, state}) do
-    {message, state} = MovementControl.prepare(message, state)
-    packet = Message.to_packet(message)
-    send_packet(packet, {socket, state})
+    message
+    |> Message.to_packet()
+    |> send_packet({socket, state})
   end
 
   defp size_header(size) when size > 0x7FFF, do: <<Bitwise.bor(size, 0x800000)::big-size(24)>>

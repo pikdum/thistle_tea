@@ -13,9 +13,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Quest
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.CmsgTrainerList
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage.GossipItem
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage.QuestItem
   alias ThistleTea.Game.World
@@ -40,6 +38,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Player.TalentReset
   alias ThistleTea.Game.World.Entity.Player.Taxi
+  alias ThistleTea.Game.World.Entity.Player.Training
   alias ThistleTea.Game.World.Entity.Player.Vendor
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
@@ -47,6 +46,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   alias ThistleTea.Game.World.Loader.Gossip.Option
   alias ThistleTea.Game.World.Loader.Gossip.Text
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
 
   @default_gossip_text_id 68
 
@@ -137,7 +137,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
         %GossipItem{id: option.id, item_icon: option.icon, coded: option.coded, message: option.text}
       end)
 
-    Network.send_packet(%Message.SmsgGossipMessage{
+    Outbound.send_packet(%Message.SmsgGossipMessage{
       guid: npc_guid,
       title_text_id: context_title_text_id(menu, context),
       gossips: gossips,
@@ -184,7 +184,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   defp context_title_text_id(%Menu{}, _context), do: @default_gossip_text_id
 
   def run_taxi_script(%{character: %Character{} = character} = state, steps) when is_list(steps) do
-    Network.send_packet(%Message.SmsgGossipComplete{})
+    Outbound.send_packet(%Message.SmsgGossipComplete{})
     {character, _blackboard} = Script.run(character, Blackboard.new(), steps, character.object.guid, Time.now())
     character = EventSink.emit_pending(character)
     %{state | character: character, gossip_menu_options: []}
@@ -218,7 +218,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   end
 
   defp dispatch(state, character, guid, %Option{option_id: option_id}, %{vendor: option_id}) do
-    Network.send_packet(%Message.SmsgListInventory{
+    Outbound.send_packet(%Message.SmsgListInventory{
       vendor_guid: guid,
       items: Vendor.visible_items(character, guid)
     })
@@ -229,7 +229,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{taxi: option_id}), do: Taxi.query(state, guid)
 
   defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{trainer: option_id}),
-    do: CmsgTrainerList.send_list(state, guid)
+    do: Training.send_list(state, guid)
 
   defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{petitioner: option_id}),
     do: Petitions.show_list(state, guid)
@@ -253,7 +253,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
     do: HomeBind.confirm(state, guid)
 
   defp dispatch(state, character, guid, %Option{option_id: option_id}, %{spirit_healer: option_id}) do
-    if not Death.alive?(character), do: Network.send_packet(%Message.SmsgSpiritHealerConfirm{guid: guid})
+    if not Death.alive?(character), do: Outbound.send_packet(%Message.SmsgSpiritHealerConfirm{guid: guid})
     state
   end
 
@@ -278,7 +278,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   end
 
   defp dispatch_gossip_menu(state, _character, _guid, action_menu_id) when action_menu_id < 0 do
-    Network.send_packet(%Message.SmsgGossipComplete{})
+    Outbound.send_packet(%Message.SmsgGossipComplete{})
     %{state | gossip_menu_options: []}
   end
 

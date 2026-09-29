@@ -13,12 +13,12 @@ defmodule ThistleTea.Game.World.Entity.DynamicObject do
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.Spell.PersistentArea
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Spell.SpellTargetResolver
   alias ThistleTea.Game.World.Visibility
 
@@ -73,7 +73,7 @@ defmodule ThistleTea.Game.World.Entity.DynamicObject do
 
   def handle_cast({:send_update_to, pid}, %{entity: entity} = state) do
     UpdateObject.from_entity(entity)
-    |> Network.send_packet(pid)
+    |> Outbound.send_packet(pid)
 
     {:noreply, state}
   end

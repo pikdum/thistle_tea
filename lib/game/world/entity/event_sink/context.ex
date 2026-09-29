@@ -3,8 +3,8 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Context do
   Identifies the entity process that receives owner-local effect commands.
   """
 
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Outbound
 
   @enforce_keys [:owner_pid]
   defstruct [:owner_pid, :instance_system]
@@ -41,7 +41,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Context do
   def cast(nil, _message), do: :ok
 
   def send_packet(%__MODULE__{owner_pid: owner_pid}, message) do
-    Network.send_packet(message, owner_pid)
+    Outbound.send_packet(message, owner_pid)
   end
 
   def send_packet(nil, _message), do: :ok

@@ -2,8 +2,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetRename do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PET_RENAME
 
-  alias ThistleTea.Game.World.Entity.Player.Pets
-
   defstruct [:pet_guid, :name]
 
   @impl ClientMessage
@@ -12,7 +10,4 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetRename do
       %__MODULE__{pet_guid: pet_guid, name: name}
     end
   end
-
-  @impl ClientMessage
-  def handle(%__MODULE__{pet_guid: guid, name: name}, state), do: Pets.rename(state, guid, name)
 end

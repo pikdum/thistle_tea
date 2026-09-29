@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTimeSkippedTest do
   alias ThistleTea.Game.World.Entity.Player.PacketSink
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Visibility
 
   defmodule TransportUpdateServer do
@@ -61,7 +62,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTimeSkippedTest do
       }
 
       message = %CmsgMoveTimeSkipped{guid: player_guid, lag: 25}
-      state = CmsgMoveTimeSkipped.handle(message, state)
+      state = Inbound.handle(message, state)
 
       assert state.transport_refresh_pending == nil
       assert state.character.movement_block.timestamp == 125
@@ -77,7 +78,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTimeSkippedTest do
       assert_receive {:"$gen_cast",
                       {:send_packet, %UpdateObject{object: %Object{guid: ^transport_guid}, has_transport: false}}}
 
-      assert CmsgMoveTimeSkipped.handle(message, state).transport_refresh_pending == nil
+      assert Inbound.handle(message, state).transport_refresh_pending == nil
       refute_receive {:"$gen_cast", {:send_packet, %UpdateObject{update_type: :out_of_range_objects}}}
       refute_receive {:"$gen_cast", {:send_packet, %UpdateObject{object: %Object{guid: ^transport_guid}}}}
     end
@@ -85,7 +86,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTimeSkippedTest do
     test "ignores another mover" do
       state = %State{guid: 1, character: %Character{movement_block: %MovementBlock{timestamp: 100}}}
 
-      assert CmsgMoveTimeSkipped.handle(%CmsgMoveTimeSkipped{guid: 2, lag: 25}, state) == state
+      assert Inbound.handle(%CmsgMoveTimeSkipped{guid: 2, lag: 25}, state) == state
     end
 
     test "broadcasts skipped time to other viewers" do
@@ -103,7 +104,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTimeSkippedTest do
         }
       }
 
-      state = CmsgMoveTimeSkipped.handle(%CmsgMoveTimeSkipped{guid: player_guid, lag: 25}, state)
+      state = Inbound.handle(%CmsgMoveTimeSkipped{guid: player_guid, lag: 25}, state)
 
       assert state.character.movement_block.timestamp == 125
 

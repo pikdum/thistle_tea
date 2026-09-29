@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
   alias ThistleTea.Game.World.Entity.Player.Enchantments
   alias ThistleTea.Game.World.Entity.Player.SpiritHealer
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -237,7 +238,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
       payload = <<vendor::little-size(64), item.object.guid::little-size(64)>>
       message = Dispatch.to_message(Packet.build(payload, 0x2A8))
       assert %Message.CmsgRepairItem{vendor_guid: ^vendor} = message
-      repaired = Message.CmsgRepairItem.handle(message, state)
+      repaired = Inbound.handle(message, state)
       assert repaired.character.player.coinage == 990
       assert ItemStore.get(item.object.guid).item.durability == 50
       assert Message.SmsgDurabilityDamageDeath.to_binary(%Message.SmsgDurabilityDamageDeath{}) == <<>>

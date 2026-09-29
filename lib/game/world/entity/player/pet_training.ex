@@ -8,12 +8,12 @@ defmodule ThistleTea.Game.World.Entity.Player.PetTraining do
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Pet.PetTraining, as: Training
   alias ThistleTea.Game.Core.Spell
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.Spells
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.PetSpells
+  alias ThistleTea.Game.World.Outbound
 
   def discover(%State{character: %Character{} = character} = state, %Effects.LearnPetRecipe{} = effect) do
     if effect.target_guid == character.object.guid and Companion.summon_guid(character) == effect.source_guid do
@@ -75,11 +75,11 @@ defmodule ThistleTea.Game.World.Entity.Player.PetTraining do
     case request(character, :learn_pet_spell, effect.target_guid, effect.spell) do
       {:ok, spells, control} ->
         character = Companion.remember_controls(character, effect.target_guid, control)
-        Network.send_packet(Message.SmsgPetSpells.for_pet(effect.target_guid, spells, control))
+        Outbound.send_packet(Message.SmsgPetSpells.for_pet(effect.target_guid, spells, control))
         %{state | character: character}
 
       {:error, reason} ->
-        Network.send_packet(Message.SmsgCastResult.failure(effect.spell.id, reason))
+        Outbound.send_packet(Message.SmsgCastResult.failure(effect.spell.id, reason))
         state
     end
   end

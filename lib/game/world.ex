@@ -20,7 +20,6 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.Core.SpatialGrid
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Corpse, as: CorpseServer
   alias ThistleTea.Game.World.Entity.DynamicObject, as: DynamicObjectServer
@@ -30,6 +29,7 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.World.Entity.Transport, as: TransportServer
   alias ThistleTea.Game.World.Loader.Transport, as: TransportLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.Position.ClientMotion
@@ -175,11 +175,11 @@ defmodule ThistleTea.Game.World do
   end
 
   defp send_broadcast_packet(packet, source_guid, source_guid) do
-    Network.send_packet(packet, source_guid)
+    Outbound.send_packet(packet, source_guid)
   end
 
   defp send_broadcast_packet(packet, guid, source_guid) do
-    Network.send_packet(packet, guid, source_guid: source_guid)
+    Outbound.send_packet(packet, guid, source_guid: source_guid)
   end
 
   def tracking_players(entity) do

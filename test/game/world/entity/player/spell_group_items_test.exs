@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellGroupItemsTest do
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Metadata
 
@@ -49,7 +50,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellGroupItemsTest do
       targets: TargetCodec.encode(Target.unit(target_guid))
     }
 
-    done = Message.CmsgUseItem.handle(message, state, fn _id -> context.spell end)
+    done = Inbound.Item.use_item(message, state, fn _id -> context.spell end)
     assert done.character.internal.casting == nil
     assert done.character.internal.cooldowns == state.character.internal.cooldowns
     assert done.character.unit.power1 == 100

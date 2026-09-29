@@ -1,36 +1,10 @@
 defmodule ThistleTea.Game.Network do
   @moduledoc """
-  Packet-sending facade: delivers messages to a player's network handler by
-  pid or guid, hiding the cast/registry plumbing from callers.
+  The world-server wire layer: the ThousandIsland connection handler, header
+  encryption, opcode tables, and one codec module per client and server
+  message. Client messages decode into structs and go to the
+  `ThistleTea.Game.Network.Session` supplied at startup; server messages encode
+  structs into packets. Nothing here knows about the game world.
   """
-  use Boundary, exports: :all, check: [out: false]
-
-  alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
-
-  def send_packet(packet, target \\ self(), opts \\ [])
-
-  def send_packet(packets, target, opts) when is_list(packets) do
-    Enum.reduce_while(packets, :ok, fn packet, _acc ->
-      case send_packet(packet, target, opts) do
-        :ok -> {:cont, :ok}
-        error -> {:halt, error}
-      end
-    end)
-  end
-
-  def send_packet(packet, pid, opts) when is_pid(pid) do
-    GenServer.cast(pid, send_packet_message(packet, opts))
-  end
-
-  def send_packet(packet, guid, opts) when is_integer(guid) do
-    case EntityRegistry.whereis(guid) do
-      pid when is_pid(pid) -> GenServer.cast(pid, send_packet_message(packet, opts))
-      _ -> {:error, :not_found}
-    end
-  end
-
-  def send_packet(_packet, _target, _opts), do: {:error, :invalid_target}
-
-  defp send_packet_message(packet, []), do: {:send_packet, packet}
-  defp send_packet_message(packet, opts), do: {:send_packet, packet, opts}
+  use Boundary, deps: [ThistleTea.Game.Core], exports: :all
 end

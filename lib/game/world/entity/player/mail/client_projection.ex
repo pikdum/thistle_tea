@@ -3,8 +3,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail.ClientProjection do
   Projects semantic mailbox outcomes to the 1.12 mail protocol.
   """
 
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.Outbound
 
   @actions %{
     send: 0,
@@ -27,24 +27,24 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail.ClientProjection do
   }
 
   def received do
-    Network.send_packet(%Message.SmsgReceivedMail{})
+    Outbound.send_packet(%Message.SmsgReceivedMail{})
   end
 
   def list(mails, now) when is_list(mails) and is_integer(now) do
-    Network.send_packet(%Message.SmsgMailListResult{mails: mails, now: now})
+    Outbound.send_packet(%Message.SmsgMailListResult{mails: mails, now: now})
   end
 
   def text(item_text_id, text) when is_integer(item_text_id) and is_binary(text) do
-    Network.send_packet(%Message.SmsgItemTextQueryResponse{item_text_id: item_text_id, text: text})
+    Outbound.send_packet(%Message.SmsgItemTextQueryResponse{item_text_id: item_text_id, text: text})
   end
 
   def next_delivery(unread_mails) when is_float(unread_mails) do
-    Network.send_packet(%Message.MsgQueryNextMailTime{unread_mails: unread_mails})
+    Outbound.send_packet(%Message.MsgQueryNextMailTime{unread_mails: unread_mails})
   end
 
   def result(mail_id, action, result, opts \\ [])
       when is_integer(mail_id) and is_map_key(@actions, action) and is_map_key(@results, result) do
-    Network.send_packet(%Message.SmsgSendMailResult{
+    Outbound.send_packet(%Message.SmsgSendMailResult{
       mail_id: mail_id,
       action: Map.fetch!(@actions, action),
       result: Map.fetch!(@results, result),

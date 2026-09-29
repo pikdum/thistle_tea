@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.World.Entity.Player.MovementControl
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
 
   describe "from_binary/1" do
     test "parses force root acknowledgements" do
@@ -60,7 +61,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
         state = %{base | character: character}
 
         state =
-          CmsgForceMoveRootAck.handle(
+          Inbound.handle(
             %CmsgForceMoveRootAck{guid: 1, counter: 2, movement_payload: movement_payload()},
             state
           )
@@ -75,7 +76,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
       character = %{state.character | unit: %Unit{health: 1}, player: %Player{flags: 0x10}}
 
       state =
-        CmsgForceMoveUnrootAck.handle(
+        Inbound.handle(
           %CmsgForceMoveUnrootAck{guid: 1, counter: 3, movement_payload: movement_payload()},
           %{state | character: character}
         )
@@ -90,7 +91,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
       state = %{state | character: %{state.character | movement_block: destination}}
 
       state =
-        CmsgForceMoveUnrootAck.handle(
+        Inbound.handle(
           %CmsgForceMoveUnrootAck{guid: 1, counter: 3, movement_payload: movement_payload()},
           state
         )
@@ -106,7 +107,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
       {_packet, state} = MovementControl.prepare(%SmsgNewWorld{map: 0}, state)
 
       state =
-        CmsgForceMoveUnrootAck.handle(
+        Inbound.handle(
           %CmsgForceMoveUnrootAck{guid: 1, counter: 3, movement_payload: movement_payload()},
           state
         )
@@ -119,7 +120,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
       state = ack_state(%{2 => :root})
 
       state =
-        CmsgForceMoveRootAck.handle(
+        Inbound.handle(
           %CmsgForceMoveRootAck{guid: 1, counter: 2, movement_payload: movement_payload()},
           state
         )
@@ -133,7 +134,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
       state = ack_state(%{3 => :unroot})
 
       state =
-        CmsgForceMoveUnrootAck.handle(
+        Inbound.handle(
           %CmsgForceMoveUnrootAck{guid: 1, counter: 3, movement_payload: movement_payload()},
           state
         )
@@ -147,7 +148,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
       state = ack_state(%{3 => :unroot})
 
       state =
-        CmsgForceMoveRootAck.handle(
+        Inbound.handle(
           %CmsgForceMoveRootAck{guid: 1, counter: 3, movement_payload: movement_payload()},
           state
         )
@@ -172,7 +173,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
       }
 
       state =
-        CmsgForceMoveRootAck.handle(
+        Inbound.handle(
           %CmsgForceMoveRootAck{
             guid: player_guid,
             counter: 2,

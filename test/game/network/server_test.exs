@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.Server
+  alias ThistleTea.Game.World.Session
   alias ThousandIsland.Socket
   alias ThousandIsland.Telemetry
 
@@ -26,7 +27,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
       socket = test_socket()
 
       assert {:continue, %ConnectionState{conn: %Connection{}} = state} =
-               Server.handle_connection(socket, %{})
+               Server.handle_connection(socket, %{session: Session})
 
       refute Map.has_key?(state, :character)
       assert_receive {:socket_send, challenge}
@@ -37,7 +38,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
   describe "handle_cast/2" do
     test "writes an encoded player packet without interpreting it" do
       socket = test_socket()
-      state = %ConnectionState{conn: %Connection{session_key: <<0>>}}
+      state = %ConnectionState{session: Session, conn: %Connection{session_key: <<0>>}}
       packet = %Packet{opcode: 0x123, payload: <<1, 2, 3>>}
 
       assert {:noreply, {^socket, %ConnectionState{}}, 0} =
@@ -58,7 +59,13 @@ defmodule ThistleTea.Game.Network.ServerTest do
         end)
 
       packet = %Packet{opcode: Opcodes.get(:CMSG_QUESTGIVER_STATUS_QUERY), payload: <<1::little-size(64)>>}
-      state = %ConnectionState{account: %{id: 1}, conn: %Connection{session_key: <<0>>, packet_queue: [packet, packet]}}
+
+      state = %ConnectionState{
+        session: Session,
+        account: %{id: 1},
+        conn: %Connection{session_key: <<0>>, packet_queue: [packet, packet]}
+      }
+
       state = ConnectionState.attach_player(state, player_pid)
       monitor = state.player_monitor
 
@@ -86,7 +93,13 @@ defmodule ThistleTea.Game.Network.ServerTest do
         end)
 
       packet = %Packet{opcode: Opcodes.get(:CMSG_QUESTGIVER_STATUS_QUERY), payload: <<1::little-size(64)>>}
-      state = ConnectionState.attach_player(%ConnectionState{conn: %Connection{packet_queue: [packet]}}, player_pid)
+
+      state =
+        ConnectionState.attach_player(
+          %ConnectionState{session: Session, conn: %Connection{packet_queue: [packet]}},
+          player_pid
+        )
+
       monitor = state.player_monitor
       send(player_pid, :logout)
       assert_receive {:DOWN, ^monitor, :process, ^player_pid, {:shutdown, :logout}} = down
@@ -107,7 +120,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
         end)
 
       packet = %Packet{opcode: Opcodes.get(:CMSG_QUESTGIVER_STATUS_QUERY), payload: <<1::little-size(64)>>}
-      state = %ConnectionState{player_pid: player_pid, conn: %Connection{packet_queue: [packet]}}
+      state = %ConnectionState{session: Session, player_pid: player_pid, conn: %Connection{packet_queue: [packet]}}
       assert {:boom, {GenServer, :call, _args}} = catch_exit(Server.handle_packets(state))
     end
 
@@ -119,6 +132,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
 
       for player_pid <- [nil, self()] do
         state = %ConnectionState{
+          session: Session,
           player_pid: player_pid,
           conn: %Connection{packet_queue: [packet]}
         }
@@ -138,6 +152,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
       monitor = make_ref()
 
       state = %ConnectionState{
+        session: Session,
         account: %{id: 1},
         player_pid: player_pid,
         player_monitor: monitor,
@@ -162,6 +177,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
       monitor = make_ref()
 
       state = %ConnectionState{
+        session: Session,
         account: %{id: 1},
         player_pid: player_pid,
         player_monitor: monitor
@@ -170,7 +186,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
       assert {:noreply, {^socket, detached}, 0} =
                Server.handle_info({:DOWN, monitor, :process, player_pid, :normal}, {socket, state})
 
-      assert detached == %ConnectionState{account: %{id: 1}, latency: state.latency, conn: state.conn}
+      assert detached == %ConnectionState{account: %{id: 1}, latency: state.latency, session: Session, conn: state.conn}
     end
 
     test "closes the connection when its player owner crashes" do
@@ -178,6 +194,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
       monitor = make_ref()
 
       state = %ConnectionState{
+        session: Session,
         account: %{id: 1},
         player_pid: player_pid,
         player_monitor: monitor
@@ -188,7 +205,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
       assert {:stop, {:shutdown, :local_closed}, {^socket, detached}} =
                Server.handle_info({:DOWN, monitor, :process, player_pid, :boom}, {socket, state})
 
-      assert detached == %ConnectionState{account: %{id: 1}, latency: state.latency, conn: state.conn}
+      assert detached == %ConnectionState{account: %{id: 1}, latency: state.latency, session: Session, conn: state.conn}
     end
   end
 

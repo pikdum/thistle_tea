@@ -36,7 +36,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Spellcasting do
   alias ThistleTea.Game.Core.Spell.TargetCodec
   alias ThistleTea.Game.Core.Spell.UnitTargets
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
@@ -59,6 +58,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Spellcasting do
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Spell.SpellAreas
   alias ThistleTea.Game.World.Spell.SpellEnvironment
   alias ThistleTea.Game.World.Spell.SpellFocus
@@ -266,7 +266,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Spellcasting do
       casting ->
         spell_id = Cast.spell_id(casting)
 
-        Network.send_packet(%Message.SmsgCastResult{
+        Outbound.send_packet(%Message.SmsgCastResult{
           spell: Cast.result_spell(casting).id,
           result: 2,
           reason: reason,
@@ -277,7 +277,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Spellcasting do
           equipped_item_inventory_type_mask: nil
         })
 
-        Network.send_packet(%Message.SmsgSpellFailure{
+        Outbound.send_packet(%Message.SmsgSpellFailure{
           guid: state.guid,
           spell: spell_id,
           result: reason
@@ -540,14 +540,14 @@ defmodule ThistleTea.Game.World.Entity.Player.Spellcasting do
     Logger.warning("Spell #{spell_id} failed validation: #{reason}")
 
     if reason == :no_edible_corpses,
-      do: Network.send_packet(%Message.SmsgClearCooldown{spell_id: spell_id, target_guid: state.guid})
+      do: Outbound.send_packet(%Message.SmsgClearCooldown{spell_id: spell_id, target_guid: state.guid})
 
-    Network.send_packet(Message.SmsgCastResult.failure(spell, reason))
+    Outbound.send_packet(Message.SmsgCastResult.failure(spell, reason))
   end
 
   defp unknown_spell(state, spell_id) do
     Logger.warning("CMSG_CAST_SPELL: spell #{spell_id} not in caster's spellbook")
-    Network.send_packet(Message.SmsgCastResult.failure(spell_id, :not_known))
+    Outbound.send_packet(Message.SmsgCastResult.failure(spell_id, :not_known))
     state
   end
 

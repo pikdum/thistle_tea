@@ -6,7 +6,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Attacking do
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.TargetRef
   alias ThistleTea.Game.Core.Guid
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
@@ -14,6 +13,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Attacking do
   alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.Entity.Player.TickScheduler
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Visibility
 
   require Logger
@@ -85,7 +85,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Attacking do
 
   defp send_attack_stop(%{guid: guid} = state, target_guid) when is_integer(guid) do
     enemy = if is_integer(target_guid) and target_guid > 0, do: target_guid, else: 0
-    Network.send_packet(%Message.SmsgAttackstop{player: guid, enemy: enemy})
+    Outbound.send_packet(%Message.SmsgAttackstop{player: guid, enemy: enemy})
     state
   end
 

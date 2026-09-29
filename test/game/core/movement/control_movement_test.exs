@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Core.Movement.ControlMovementTest do
   alias ThistleTea.Game.World.Entity.NavigationResolver
   alias ThistleTea.Game.World.Entity.Player.Movement, as: PlayerMovement
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
 
   setup [:character]
 
@@ -196,7 +197,7 @@ defmodule ThistleTea.Game.Core.Movement.ControlMovementTest do
     test "ordinary movement cannot move a corpse but permits a released ghost", %{character: character} do
       character = %{character | unit: %{character.unit | health: 0}}
       state = %State{guid: 1, ready: true, character: character}
-      assert MsgMove.handle(%MsgMove{payload: <<1>>, opcode: 0xEE}, state) == state
+      assert Inbound.handle(%MsgMove{payload: <<1>>, opcode: 0xEE}, state) == state
       character = %{character | unit: %{character.unit | health: 1}, player: %{character.player | flags: 0x10}}
       assert PlayerMovement.accepts_input?(character)
     end
@@ -222,7 +223,7 @@ defmodule ThistleTea.Game.Core.Movement.ControlMovementTest do
       for type <- [:mod_fear, :mod_confuse] do
         {character, _} = change(character, [holder(1, type)], 0)
         state = %State{guid: 1, character: character, ready: true}
-        assert MsgMove.handle(%MsgMove{payload: <<1>>, opcode: 0xEE}, state) == state
+        assert Inbound.handle(%MsgMove{payload: <<1>>, opcode: 0xEE}, state) == state
         refute PlayerMovement.accepts_input?(character)
         {character, _} = change(character, [], 100)
         assert PlayerMovement.accepts_input?(character)

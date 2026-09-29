@@ -33,7 +33,6 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   alias ThistleTea.Game.Core.Stats.MovementStats
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
@@ -66,6 +65,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.System.Auction, as: AuctionSystem
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
@@ -1410,7 +1410,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   defp maybe_send_level_up(state, nil), do: state
 
   defp maybe_send_level_up(state, level_up) when is_map(level_up) do
-    Network.send_packet(struct(Message.SmsgLevelupInfo, level_up))
+    Outbound.send_packet(struct(Message.SmsgLevelupInfo, level_up))
     state
   end
 
@@ -1516,7 +1516,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
     |> Enum.each(fn item ->
       item
       |> UpdateObject.from_item()
-      |> Network.send_packet()
+      |> Outbound.send_packet()
     end)
 
     state
@@ -1544,7 +1544,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   end
 
   defp system_message(state, message) do
-    Network.send_packet(Message.SmsgMessagechat.system(message, state.guid))
+    Outbound.send_packet(Message.SmsgMessagechat.system(message, state.guid))
     state
   end
 end

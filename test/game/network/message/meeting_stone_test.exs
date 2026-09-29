@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.MeetingStoneTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.World.Inbound
 
   describe "to_message/1" do
     test "dispatches all three vanilla client requests" do
@@ -16,7 +17,7 @@ defmodule ThistleTea.Game.Network.Message.MeetingStoneTest do
           ] do
         assert Dispatch.implemented?(opcode)
         assert Dispatch.to_message(%Packet{opcode: opcode, payload: payload}) == expected
-        assert Message.handle(expected, %{ready: false}) == %{ready: false}
+        assert Inbound.handle(expected, %{ready: false}) == %{ready: false}
       end
     end
   end

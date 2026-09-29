@@ -16,7 +16,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
   alias ThistleTea.Game.Core.Party.Group
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
@@ -31,6 +30,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
   alias ThistleTea.Game.World.Loader.Gossip.Option
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.Battleground.Match
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -77,7 +77,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
           Gossip.send_menu(guid, build_gossip_menu(menu), Gossip.quest_items(guid, character), state)
 
         :close ->
-          Network.send_packet(%Message.SmsgGossipComplete{})
+          Outbound.send_packet(%Message.SmsgGossipComplete{})
           %{state | gossip_menu_options: []}
 
         :unhandled ->
@@ -191,7 +191,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
     guid
     |> BattlegroundSystem.status()
     |> status_packet()
-    |> Network.send_packet()
+    |> Outbound.send_packet()
 
     state
   end
@@ -245,7 +245,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
     if not Death.alive?(character) and spirit_guide?(character, healer_guid) do
       case BattlegroundSystem.spirit_healer_time(character.internal.world) do
         time_ms when is_integer(time_ms) ->
-          Network.send_packet(%Message.SmsgAreaSpiritHealerTime{guid: healer_guid, time_ms: time_ms})
+          Outbound.send_packet(%Message.SmsgAreaSpiritHealerTime{guid: healer_guid, time_ms: time_ms})
 
         _ ->
           :ok
@@ -274,7 +274,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
   def scoreboard(%{ready: true, character: %Character{} = character} = state) do
     scoreboard = BattlegroundSystem.scoreboard(character.internal.world)
 
-    Network.send_packet(%Message.MsgPvpLogData{
+    Outbound.send_packet(%Message.MsgPvpLogData{
       ended?: scoreboard.ended?,
       winner: scoreboard.winner || :none,
       players: scoreboard.players
@@ -301,7 +301,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
     result = BattlegroundSystem.list(map_id, state.character.unit.level)
 
     if result.template do
-      Network.send_packet(%Message.SmsgBattlefieldList{
+      Outbound.send_packet(%Message.SmsgBattlefieldList{
         guid: battlemaster_guid,
         map: map_id,
         bracket: result.bracket || 0,
@@ -358,7 +358,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
 
   defp battleground_world?(_world), do: false
 
-  defp send_deserter_error, do: Network.send_packet(%Message.SmsgGroupJoinedBattleground{result: -2})
+  defp send_deserter_error, do: Outbound.send_packet(%Message.SmsgGroupJoinedBattleground{result: -2})
 
   defp collect_snapshots(players) do
     if Enum.any?(players, &is_nil/1), do: :error, else: {:ok, players}
@@ -458,7 +458,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
       player ->
         teammates = positions_for(match, world, &(&1.team == player.team))
         carriers = carrier_positions(match, world, player.team)
-        Network.send_packet(%Message.MsgBattlegroundPlayerPositions{teammates: teammates, carriers: carriers})
+        Outbound.send_packet(%Message.MsgBattlegroundPlayerPositions{teammates: teammates, carriers: carriers})
     end
   end
 
@@ -481,8 +481,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
   end
 
   defp notify_queued(guid, map_id) do
-    Network.send_packet(%Message.SmsgGroupJoinedBattleground{result: map_id}, guid)
-    Network.send_packet(status_packet(BattlegroundSystem.status(guid)), guid)
+    Outbound.send_packet(%Message.SmsgGroupJoinedBattleground{result: map_id}, guid)
+    Outbound.send_packet(status_packet(BattlegroundSystem.status(guid)), guid)
   end
 
   defp spirit_guide?(character, guid) do

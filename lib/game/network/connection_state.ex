@@ -8,7 +8,9 @@ defmodule ThistleTea.Game.Network.ConnectionState do
 
   alias ThistleTea.Game.Network.Connection
 
-  defstruct [:account, :player_pid, :player_monitor, :latency, conn: %Connection{}]
+  defstruct [:account, :player_pid, :player_monitor, :latency, :session, conn: %Connection{}]
+
+  @type t :: %__MODULE__{}
 
   def attach_player(%__MODULE__{player_pid: nil} = state, player_pid) when is_pid(player_pid) do
     %{state | player_pid: player_pid, player_monitor: Process.monitor(player_pid)}
@@ -16,6 +18,6 @@ defmodule ThistleTea.Game.Network.ConnectionState do
 
   def clear_player(%__MODULE__{} = state) do
     if is_reference(state.player_monitor), do: Process.demonitor(state.player_monitor, [:flush])
-    %__MODULE__{account: state.account, latency: state.latency, conn: state.conn}
+    %__MODULE__{account: state.account, latency: state.latency, session: state.session, conn: state.conn}
   end
 end

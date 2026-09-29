@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgTogglePvpTest do
   alias ThistleTea.Game.Network.Message.CmsgTogglePvp
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.World.Inbound
 
   describe "from_binary/1" do
     test "decodes both vanilla forms through packet dispatch" do
@@ -21,7 +22,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgTogglePvpTest do
   describe "handle/2" do
     test "ignores requests before entering the world" do
       state = %{ready: false}
-      assert CmsgTogglePvp.handle(%CmsgTogglePvp{enabled: :toggle}, state) == state
+      assert Inbound.handle(%CmsgTogglePvp{enabled: :toggle}, state) == state
     end
   end
 end

@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Network.Message.MsgRandomRollTest do
   alias ThistleTea.Game.Network.Message.MsgRandomRoll
   alias ThistleTea.Game.Network.Message.MsgRandomRollResponse
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.World.Inbound
 
   describe "from_binary/1" do
     test "dispatches unsigned vanilla bounds without accepting a caller-supplied identity" do
@@ -33,7 +34,7 @@ defmodule ThistleTea.Game.Network.Message.MsgRandomRollTest do
   describe "handle/2" do
     test "ignores requests before world entry" do
       state = %{ready: false}
-      assert MsgRandomRoll.handle(%MsgRandomRoll{minimum: 1, maximum: 100}, state) == state
+      assert Inbound.handle(%MsgRandomRoll{minimum: 1, maximum: 100}, state) == state
       refute_received {:"$gen_cast", {:send_packet, %MsgRandomRollResponse{}}}
     end
   end

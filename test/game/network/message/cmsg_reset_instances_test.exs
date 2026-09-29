@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgResetInstancesTest do
   alias ThistleTea.Game.Network.Message.SmsgInstanceReset
   alias ThistleTea.Game.Network.Message.SmsgInstanceResetFailed
   alias ThistleTea.Game.Network.Opcodes
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
   describe "from_binary/1" do
@@ -22,7 +23,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgResetInstancesTest do
       assert {:ok, world} = InstanceSystem.enter(389, guid)
       InstanceSystem.leave(guid, world)
 
-      assert CmsgResetInstances.handle(%CmsgResetInstances{}, state) == state
+      assert Inbound.handle(%CmsgResetInstances{}, state) == state
       assert_receive {:"$gen_cast", {:send_packet, %SmsgInstanceReset{map: 389}}}
     end
 
@@ -31,7 +32,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgResetInstancesTest do
       state = %{ready: true, guid: guid}
       assert {:ok, world} = InstanceSystem.enter(389, guid)
 
-      assert CmsgResetInstances.handle(%CmsgResetInstances{}, state) == state
+      assert Inbound.handle(%CmsgResetInstances{}, state) == state
       assert_receive {:"$gen_cast", {:send_packet, %SmsgInstanceResetFailed{reason: 0, map: 389}}}
 
       InstanceSystem.leave(guid, world)

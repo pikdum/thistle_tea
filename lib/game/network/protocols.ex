@@ -1,24 +1,22 @@
 defprotocol ThistleTea.Game.Network.Message do
   @moduledoc """
   Protocol implemented by every network message struct: binary encoding,
-  packet building, opcode lookup, and handling.
+  packet building, and opcode lookup. Handling decoded client messages is a
+  world concern; see `ThistleTea.Game.World.Inbound`.
   """
   def to_binary(message)
   def to_packet(message)
   def opcode(message)
-  def handle(message, state)
 end
 
 defmodule ThistleTea.Game.Network.ClientMessage do
   @moduledoc """
   `use` macro for CMSG_* message modules: wires up the opcode, common aliases,
-  and the `Message` protocol implementation around `from_binary/1` and
-  `handle/2`.
+  and the `Message` protocol implementation around `from_binary/1`.
   """
   alias ThistleTea.Game.Network.Opcodes
 
   @callback opcode() :: integer()
-  @callback handle(message :: struct(), state :: map()) :: map()
   @callback from_binary(payload :: binary()) :: struct()
   defmacro __using__(opcode) do
     opcode = Opcodes.get(opcode)
@@ -26,16 +24,10 @@ defmodule ThistleTea.Game.Network.ClientMessage do
     quote do
       @behaviour ThistleTea.Game.Network.ClientMessage
 
-      alias ThistleTea.Game.Core.Entity.Character
       alias ThistleTea.Game.Core.Entity.Component.MovementBlock
-      alias ThistleTea.Game.Core.Entity.Component.Unit
-      alias ThistleTea.Game.Network
       alias ThistleTea.Game.Network.BinaryUtils
       alias ThistleTea.Game.Network.ClientMessage
-      alias ThistleTea.Game.Network.Connection
       alias ThistleTea.Game.Network.Message
-      alias ThistleTea.Game.Network.UpdateObject
-      alias ThistleTea.Game.World
 
       @impl ClientMessage
       def opcode, do: unquote(opcode)
@@ -43,10 +35,6 @@ defmodule ThistleTea.Game.Network.ClientMessage do
       defimpl Message do
         def to_binary(_message), do: raise("unimplemented")
         def to_packet(_message), do: raise("unimplemented")
-
-        def handle(message, state) do
-          unquote(Macro.escape(__CALLER__.module)).handle(message, state)
-        end
 
         def opcode(message), do: unquote(opcode)
       end
@@ -87,8 +75,6 @@ defmodule ThistleTea.Game.Network.ServerMessage do
       end
 
       defimpl Message do
-        def handle(_message, _state), do: raise("unimplemented")
-
         def to_packet(message) do
           unquote(Macro.escape(__CALLER__.module)).to_packet(message)
         end

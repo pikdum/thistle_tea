@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgReadItemTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.CmsgReadItem
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
 
   @backpack_start 23
@@ -34,7 +35,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgReadItemTest do
       on_exit(fn -> ItemStore.delete(item.object.guid) end)
       guid = item.object.guid
 
-      CmsgReadItem.handle(
+      Inbound.handle(
         %CmsgReadItem{bag: Inventory.bag_0(), slot: @backpack_start},
         %{ready: true, character: character(player_guid, guid)}
       )
@@ -47,7 +48,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgReadItemTest do
       item = ItemStore.create(%ItemTemplate{entry: 9001, name: "Rock"}, owner: player_guid)
       on_exit(fn -> ItemStore.delete(item.object.guid) end)
 
-      CmsgReadItem.handle(
+      Inbound.handle(
         %CmsgReadItem{bag: Inventory.bag_0(), slot: @backpack_start},
         %{ready: true, character: character(player_guid, item.object.guid)}
       )
@@ -59,7 +60,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgReadItemTest do
     test "sends an inventory failure for empty slots" do
       player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
 
-      CmsgReadItem.handle(
+      Inbound.handle(
         %CmsgReadItem{bag: Inventory.bag_0(), slot: @backpack_start},
         %{ready: true, character: character(player_guid, nil)}
       )

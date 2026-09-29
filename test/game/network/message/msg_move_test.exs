@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.ServerMovement
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.Position.ClientMotion
@@ -49,12 +50,12 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
         player_guids: []
       }
 
-      sitting = MsgMove.handle(move_message(:MSG_MOVE_HEARTBEAT, 0, {0.0, 0.0, 0.0, 0.0}), state)
+      sitting = Inbound.handle(move_message(:MSG_MOVE_HEARTBEAT, 0, {0.0, 0.0, 0.0, 0.0}), state)
       assert sitting.character.unit.stand_state == 1
       assert sitting.character.unit.npc_emote_state == 10
       refute_receive {:"$gen_cast", {:send_packet, %SmsgStandstateUpdate{}}}
 
-      moving = MsgMove.handle(move_message(:MSG_MOVE_START_FORWARD, 1, {0.0, 0.0, 0.0, 0.0}), sitting)
+      moving = Inbound.handle(move_message(:MSG_MOVE_START_FORWARD, 1, {0.0, 0.0, 0.0, 0.0}), sitting)
       assert moving.character.unit.stand_state == 0
       assert moving.character.unit.npc_emote_state == 0
       assert_receive {:"$gen_cast", {:send_packet, %SmsgStandstateUpdate{stand_state: 0}}}
@@ -82,9 +83,9 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
         player_guids: []
       }
 
-      falling = MsgMove.handle(move_message(:MSG_MOVE_HEARTBEAT, 0x4000, {0.0, 0.0, 30.0, 0.0}), state)
+      falling = Inbound.handle(move_message(:MSG_MOVE_HEARTBEAT, 0x4000, {0.0, 0.0, 30.0, 0.0}), state)
       landing = move_message(:MSG_MOVE_FALL_LAND, 0, {0.0, 0.0, 0.0, 0.0}, 2000)
-      landed = MsgMove.handle(landing, falling)
+      landed = Inbound.handle(landing, falling)
 
       assert landed.character.unit.health == 703
       assert landed.character.internal.fall == nil
@@ -94,7 +95,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
       assert_receive {:"$gen_cast",
                       {:send_packet, %SmsgEnvironmentalDamageLog{guid: ^guid, damage_type: 2, damage: 297}}}
 
-      assert MsgMove.handle(landing, landed).character.unit.health == 703
+      assert Inbound.handle(landing, landed).character.unit.health == 703
       refute_receive {:"$gen_cast", {:send_packet, %SmsgEnvironmentalDamageLog{}}}
     end
 
@@ -111,7 +112,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
 
       message = %MsgMove{opcode: :MSG_MOVE_HEARTBEAT, payload: <<1, 2, 3>>}
 
-      assert MsgMove.handle(message, session) == session
+      assert Inbound.handle(message, session) == session
       assert_receive {:controlled_move, 23, <<1, 2, 3>>, :MSG_MOVE_HEARTBEAT}
     end
 
@@ -128,7 +129,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
 
       message = %MsgMove{opcode: :MSG_MOVE_HEARTBEAT, payload: <<1, 2, 3>>}
 
-      assert MsgMove.handle(message, session) == session
+      assert Inbound.handle(message, session) == session
       refute_receive {:controlled_move, _, _, _}
     end
 
@@ -136,7 +137,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
       character = %Character{unit: %Unit{}, internal: %Internal{taxi_flight: struct(Flight)}}
       session = %State{guid: 23, ready: true, character: character}
 
-      assert MsgMove.handle(%MsgMove{opcode: :MSG_MOVE_HEARTBEAT, payload: <<>>}, session) == session
+      assert Inbound.handle(%MsgMove{opcode: :MSG_MOVE_HEARTBEAT, payload: <<>>}, session) == session
     end
 
     test "ignores client movement during finite server movement" do
@@ -145,7 +146,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
         character: %Character{}
       }
 
-      assert MsgMove.handle(%MsgMove{opcode: :MSG_MOVE_HEARTBEAT, payload: <<>>}, session) == session
+      assert Inbound.handle(%MsgMove{opcode: :MSG_MOVE_HEARTBEAT, payload: <<>>}, session) == session
     end
 
     test "publishes forward motion immediately and clears it on stop" do
@@ -162,7 +163,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
         player_guids: []
       }
 
-      moving = MsgMove.handle(move_message(:MSG_MOVE_START_FORWARD, 0x00000001, {0.0, 0.0, 0.0, 0.0}), state)
+      moving = Inbound.handle(move_message(:MSG_MOVE_START_FORWARD, 0x00000001, {0.0, 0.0, 0.0, 0.0}), state)
 
       assert %ClientMotion{started_at: started_at, expires_at: expires_at, velocity: velocity} =
                Position.projection(guid)
@@ -176,7 +177,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
                moving_until: expires_at
              }
 
-      stopped = MsgMove.handle(move_message(:MSG_MOVE_STOP, 0, {35.0, 0.0, 0.0, 0.0}), moving)
+      stopped = Inbound.handle(move_message(:MSG_MOVE_STOP, 0, {35.0, 0.0, 0.0, 0.0}), moving)
 
       assert stopped.character.movement_block.position == {35.0, 0.0, 0.0, 0.0}
       assert Position.projection(guid) == nil

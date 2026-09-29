@@ -13,7 +13,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Corpses do
   alias ThistleTea.Game.Core.Inventory
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.EventSink
@@ -25,6 +24,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Corpses do
   alias ThistleTea.Game.World.Loader.Graveyard
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.System.Battleground
   alias ThistleTea.Game.World.Visibility
@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Corpses do
   end
 
   def query(%{ready: true, character: %Character{} = character} = state) do
-    Network.send_packet(location(character))
+    Outbound.send_packet(location(character))
     state
   end
 
@@ -137,7 +137,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Corpses do
     remaining = CorpseReclaim.remaining_ms(character.internal.corpse_reclaim, now)
 
     if Death.ghost?(character) and remaining > 0 do
-      Network.send_packet(%Message.SmsgCorpseReclaimDelay{delay_ms: remaining})
+      Outbound.send_packet(%Message.SmsgCorpseReclaimDelay{delay_ms: remaining})
     end
   end
 

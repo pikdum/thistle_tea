@@ -2,24 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetSelection do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SET_SELECTION
 
-  alias ThistleTea.Game.Core.Entity
-  alias ThistleTea.Game.Core.Entity.Component.Unit
-  alias ThistleTea.Game.World.Entity.Player.Reputation
-
   defstruct [:guid]
-
-  @impl ClientMessage
-  def handle(%__MODULE__{guid: guid}, %{character: %{unit: %Unit{} = unit} = character} = state) do
-    character = %{character | unit: %{unit | target: guid}} |> Entity.mark_broadcast_update()
-
-    state
-    |> then(&%{&1 | character: character, target: guid})
-    |> Reputation.reveal_target(guid)
-  end
-
-  def handle(%__MODULE__{guid: guid}, state) do
-    %{state | target: guid}
-  end
 
   @impl ClientMessage
   def from_binary(payload) do

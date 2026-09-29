@@ -11,7 +11,6 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestSharing do
   alias ThistleTea.Game.Core.Quest.QuestSharing, as: Sharing
   alias ThistleTea.Game.Core.Quest.QuestSharing.Offer
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
@@ -19,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestSharing do
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.Entity.Registry
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   def share(%{ready: true, character: %Character{} = character} = state, quest_id) do
@@ -97,7 +97,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestSharing do
   def clear(state), do: state
 
   def close(%{quest_share: %Offer{}} = state) do
-    Network.send_packet(%Message.SmsgGossipComplete{}, state.guid)
+    Outbound.send_packet(%Message.SmsgGossipComplete{}, state.guid)
     clear(state)
   end
 
@@ -165,12 +165,19 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestSharing do
   defp present(state, quest, %Offer{} = offer) do
     case offer.mode do
       :manual ->
-        Network.send_packet(%Message.SmsgQuestgiverQuestDetails{npc_guid: offer.sharer_guid, quest: quest}, state.guid)
+        Outbound.send_packet(
+          %Message.SmsgQuestgiverQuestDetails{
+            npc_guid: offer.sharer_guid,
+            quest: quest,
+            item_display_ids: Quests.item_display_ids(quest)
+          },
+          state.guid
+        )
 
       :party_accept ->
-        Network.send_packet(%Message.SmsgGossipComplete{}, state.guid)
+        Outbound.send_packet(%Message.SmsgGossipComplete{}, state.guid)
 
-        Network.send_packet(
+        Outbound.send_packet(
           %Message.SmsgQuestConfirmAccept{quest_id: quest.id, title: quest.title, sharer_guid: offer.sharer_guid},
           state.guid
         )
@@ -188,7 +195,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestSharing do
       accepted = Quests.force_accept(state, quest.id, source_guid, shared_entry: source_entry)
 
       if QuestLog.active?(accepted.character.player.quest_log, quest.id) do
-        Network.send_packet(%Message.SmsgGossipComplete{}, state.guid)
+        Outbound.send_packet(%Message.SmsgGossipComplete{}, state.guid)
         accepted(accepted, quest, offer)
       else
         send_result(offer.sharer_guid, state.guid, :cannot_take)
@@ -281,7 +288,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestSharing do
   end
 
   defp send_result(sharer, recipient, result) do
-    Network.send_packet(
+    Outbound.send_packet(
       %Message.MsgQuestPushResult{guid: recipient, result: Message.MsgQuestPushResult.code(result)},
       sharer
     )

@@ -20,7 +20,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Trade do
   alias ThistleTea.Game.Core.Trade.Prepare
   alias ThistleTea.Game.Core.Trade.Receipt
   alias ThistleTea.Game.Core.Trade.Spells, as: TradeSpells
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgTradeStatus
   alias ThistleTea.Game.World
@@ -34,6 +33,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Trade do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemEnchantment
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.Trade, as: TradeSystem
 
   def request(%{ready: true, character: %Character{}} = state, action) do
@@ -47,7 +47,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Trade do
         state
 
       {:error, reason} ->
-        Network.send_packet(%SmsgTradeStatus{status: reason})
+        Outbound.send_packet(%SmsgTradeStatus{status: reason})
         state
     end
   end
@@ -62,7 +62,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Trade do
          {:ok, batch} <- TradeSpells.costs(Batch.new(character.player), character, offer, &ItemStore.get/1),
          {:ok, _changes} <- Inventory.plan(batch, &ItemStore.get/1),
          :ok <- TradeSystem.request(state.guid, {:spell, id, cast}) do
-      Network.send_packet(Message.SmsgCastResult.failure(spell.id, :dont_report))
+      Outbound.send_packet(Message.SmsgCastResult.failure(spell.id, :dont_report))
       {:ok, state}
     else
       {:error, :item_not_found} -> cast_failure(state, spell, :reagents)
@@ -97,7 +97,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Trade do
   end
 
   defp cast_failure(state, spell, reason) do
-    Network.send_packet(Message.SmsgCastResult.failure(spell.id, reason))
+    Outbound.send_packet(Message.SmsgCastResult.failure(spell.id, reason))
     {:error, state}
   end
 
@@ -200,7 +200,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Trade do
         project_cast(state.character, receipt.cast)
         CharacterStore.put(state.character)
         ItemStore.acknowledge_trade(receipt)
-        Network.send_packet(%SmsgTradeStatus{status: :trade_complete})
+        Outbound.send_packet(%SmsgTradeStatus{status: :trade_complete})
         state
 
       _ ->
@@ -233,7 +233,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Trade do
   defp project_cast(_character, nil), do: :ok
 
   defp project_cast(character, %TradeCast{} = cast) do
-    Network.send_packet(%Message.SmsgCastResult{spell: cast.spell.id, result: 0})
+    Outbound.send_packet(%Message.SmsgCastResult{spell: cast.spell.id, result: 0})
 
     World.broadcast_packet(
       %Message.SmsgSpellGo{

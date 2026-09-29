@@ -10,10 +10,10 @@ defmodule ThistleTea.Game.World.Entity.Mob.Pockets do
   alias ThistleTea.Game.Core.Loot.Pickpocket
   alias ThistleTea.Game.Core.Loot.Release
   alias ThistleTea.Game.Core.Loot.Reservation
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Mob.Respawn
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
+  alias ThistleTea.Game.World.Outbound
 
   def open(%Mob{} = mob, %Actor{} = actor, level) do
     if Pickpocket.available?(mob) and Actor.within?(actor, 5.0) do
@@ -51,7 +51,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Pockets do
     with %LootSession{} = session <- Map.get(sessions(mob), guid),
          {:ok, item, session} <- LootSession.commit(session, command) do
       Process.demonitor(command.token, [:flush])
-      Enum.each(LootSession.viewers(session), &Network.send_packet(%Message.SmsgLootRemoved{slot: item.slot}, &1))
+      Enum.each(LootSession.viewers(session), &Outbound.send_packet(%Message.SmsgLootRemoved{slot: item.slot}, &1))
       mob = put_session(mob, guid, session)
       Respawn.maybe_continue(mob)
       {:ok, mob}
@@ -94,7 +94,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Pockets do
   def close(%Mob{} = mob) do
     Enum.reduce(sessions(mob), mob, fn {guid, session}, mob ->
       packet = %Message.SmsgLootReleaseResponse{guid: mob.object.guid}
-      Enum.each(LootSession.viewers(session), &Network.send_packet(packet, &1))
+      Enum.each(LootSession.viewers(session), &Outbound.send_packet(packet, &1))
       put_session(mob, guid, %{session | viewers: MapSet.new()})
     end)
   end

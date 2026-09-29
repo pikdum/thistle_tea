@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstopTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message.CmsgAttackstop
   alias ThistleTea.Game.Network.Message.SmsgCastResult
+  alias ThistleTea.Game.World.Inbound
 
   describe "handle/2" do
     test "stops auto attack without resetting the swing timer" do
@@ -19,7 +20,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstopTest do
       target_guid = Guid.from_low_guid(:mob, 1, unique_id())
 
       state =
-        CmsgAttackstop.handle(%CmsgAttackstop{}, %{
+        Inbound.handle(%CmsgAttackstop{}, %{
           guid: player_guid,
           character: %Character{
             object: %Object{guid: player_guid},
@@ -54,7 +55,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstopTest do
       auto_shot = %{target_guid: target_guid, next_at: 12_345}
 
       state =
-        CmsgAttackstop.handle(%CmsgAttackstop{}, %{
+        Inbound.handle(%CmsgAttackstop{}, %{
           guid: player_guid,
           character: %Character{
             object: %Object{guid: player_guid},

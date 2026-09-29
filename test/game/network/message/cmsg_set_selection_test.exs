@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetSelectionTest do
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Network.Message.CmsgSetSelection
+  alias ThistleTea.Game.World.Inbound
 
   describe "handle/2" do
     test "publishes selection changes while preserving target-bound combo points" do
@@ -17,7 +18,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetSelectionTest do
         internal: %Internal{}
       }
 
-      state = CmsgSetSelection.handle(%CmsgSetSelection{guid: 0}, %{character: character, target: 77})
+      state = Inbound.handle(%CmsgSetSelection{guid: 0}, %{character: character, target: 77})
 
       assert state.character.unit.target == 0
       assert state.character.player.field_combo_target == 77

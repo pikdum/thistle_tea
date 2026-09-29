@@ -7,8 +7,8 @@ defmodule ThistleTea.Game.World.Entity.Player.WorldStates do
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.OutdoorPvp, as: OutdoorPvpSystem
@@ -19,7 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Player.WorldStates do
 
     character
     |> build()
-    |> Network.send_packet()
+    |> Outbound.send_packet()
   end
 
   def build(

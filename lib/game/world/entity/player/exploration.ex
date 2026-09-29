@@ -9,7 +9,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Exploration do
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Player.Exploration, as: ExplorationLogic
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.CharacterStore
@@ -19,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Exploration do
   alias ThistleTea.Game.World.Entity.Player.Stats
   alias ThistleTea.Game.World.Entity.Player.Weather
   alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.System.Party.Notifier, as: PartyNotifier
 
@@ -71,9 +71,9 @@ defmodule ThistleTea.Game.World.Entity.Player.Exploration do
       xp = ExplorationLogic.experience(character.unit.level, area_level, @max_level, &ExplorationLoader.base_xp/1)
       {character, level_ups} = if xp > 0, do: Stats.gain_xp(character, xp), else: {character, []}
       CharacterStore.put(character)
-      Network.send_packet(UpdateObject.from_entity(character, :values))
-      Network.send_packet(%Message.SmsgExplorationExperience{area_id: area_id, experience: xp})
-      Enum.each(level_ups, &Network.send_packet(struct(Message.SmsgLevelupInfo, &1)))
+      Outbound.send_packet(UpdateObject.from_entity(character, :values))
+      Outbound.send_packet(%Message.SmsgExplorationExperience{area_id: area_id, experience: xp})
+      Enum.each(level_ups, &Outbound.send_packet(struct(Message.SmsgLevelupInfo, &1)))
 
       if level_ups != [] do
         PartyNotifier.broadcast_stats(state.guid, character)
@@ -88,7 +88,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Exploration do
   def unlock_all(%{character: %Character{} = character} = state) do
     character = ExplorationLogic.unlock_all(character)
     CharacterStore.put(character)
-    Network.send_packet(UpdateObject.from_entity(character, :values))
+    Outbound.send_packet(UpdateObject.from_entity(character, :values))
     %{state | character: character}
   end
 end

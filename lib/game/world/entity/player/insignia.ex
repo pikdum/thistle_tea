@@ -6,10 +6,10 @@ defmodule ThistleTea.Game.World.Entity.Player.Insignia do
   alias ThistleTea.Game.Core.Death.CorpseReclaim
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Corpse
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.Corpses
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Spell.InsigniaTarget
 
   def complete(%{character: %Character{} = character} = state, targets, spell_id) do
@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Insignia do
         state
 
       {:error, reason} ->
-        Network.send_packet(Message.SmsgCastResult.failure(spell_id, reason))
+        Outbound.send_packet(Message.SmsgCastResult.failure(spell_id, reason))
         state
     end
   end
@@ -38,8 +38,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Insignia do
 
       case claim(Corpse.guid_for(state.guid), looter_guid, death_id) do
         {:ok, _bones} ->
-          Network.send_packet(%Message.SmsgPlayerSkinned{})
-          Network.send_packet(%Message.MsgCorpseQueryResponse{})
+          Outbound.send_packet(%Message.SmsgPlayerSkinned{})
+          Outbound.send_packet(%Message.MsgCorpseQueryResponse{})
           %{state | character: CorpseReclaim.clear_release(state.character)}
 
         _failed ->

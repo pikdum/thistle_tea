@@ -10,13 +10,13 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemDurations do
   alias ThistleTea.Game.Core.Item.ItemLifetime
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgItemTimeUpdate
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.Looting
   alias ThistleTea.Game.World.Entity.Player.Spellcasting
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Outbound
 
   def restore(%Character{} = character, now \\ Time.now()) do
     {:ok, changes} = ItemLifetime.plan(character, now, :login, &ItemStore.get/1)
@@ -111,7 +111,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemDurations do
   defp send_time(item, now) do
     if ItemLifetime.deadline(item) do
       projected = ItemLifetime.project(item, now)
-      Network.send_packet(%SmsgItemTimeUpdate{guid: item.object.guid, duration: projected.item.duration})
+      Outbound.send_packet(%SmsgItemTimeUpdate{guid: item.object.guid, duration: projected.item.duration})
     end
   end
 

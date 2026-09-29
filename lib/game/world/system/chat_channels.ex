@@ -9,11 +9,11 @@ defmodule ThistleTea.Game.World.System.ChatChannels do
   alias ThistleTea.Game.Core.Chat.Channel.Member
   alias ThistleTea.Game.Core.Chat.Channels
   alias ThistleTea.Game.Core.Entity.Character
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.ChatChannel, as: ChatChannelLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.SocialStore
 
   require Logger
@@ -113,7 +113,7 @@ defmodule ThistleTea.Game.World.System.ChatChannels do
   defp dispatch_call({:list, actor, name}, _from, state) do
     with {:ok, channel} <- Channels.fetch(state.channels, actor, name),
          {:ok, members} <- Channel.list(channel, actor.guid) do
-      Network.send_packet(
+      Outbound.send_packet(
         %Message.SmsgChannelList{channel_name: channel.name, channel_flags: channel.flags, members: members},
         actor.guid
       )
@@ -176,10 +176,10 @@ defmodule ThistleTea.Game.World.System.ChatChannels do
          {:ok, target} <- find_player(target_name),
          :ok <- Channel.invite(channel, actor.guid, target) do
       if not SocialStore.ignores?(target.guid, actor.guid) do
-        Network.send_packet(notice(channel, :invite, guid: actor.guid), target.guid)
+        Outbound.send_packet(notice(channel, :invite, guid: actor.guid), target.guid)
       end
 
-      Network.send_packet(notice(channel, :player_invited, player_name: target.name), actor.guid)
+      Outbound.send_packet(notice(channel, :player_invited, player_name: target.name), actor.guid)
       {:reply, :ok, state}
     else
       {:error, reason} ->
@@ -200,7 +200,7 @@ defmodule ThistleTea.Game.World.System.ChatChannels do
     with {:ok, channel} <- Channels.fetch(state.channels, actor, name),
          {:ok, _member} <- Channel.fetch_member(channel, actor.guid) do
       owner_name = channel.members |> Map.get(channel.owner_guid, %Member{name: "Nobody"}) |> then(& &1.name)
-      Network.send_packet(notice(channel, :channel_owner, owner_name: owner_name), actor.guid)
+      Outbound.send_packet(notice(channel, :channel_owner, owner_name: owner_name), actor.guid)
       {:reply, :ok, state}
     else
       {:error, reason} ->
@@ -281,7 +281,7 @@ defmodule ThistleTea.Game.World.System.ChatChannels do
       send_to_guids(outcome.recipients, notice(channel, :joined, guid: outcome.member.guid))
     end
 
-    Network.send_packet(
+    Outbound.send_packet(
       notice(channel, :you_joined, channel_flags: channel.flags, channel_index: 0),
       outcome.member.guid
     )
@@ -292,7 +292,7 @@ defmodule ThistleTea.Game.World.System.ChatChannels do
   end
 
   defp notify_leave(channel, guid, outcome, notify_self?) do
-    if notify_self?, do: Network.send_packet(notice(channel, :you_left), guid)
+    if notify_self?, do: Outbound.send_packet(notice(channel, :you_left), guid)
 
     if channel.announcements? do
       send_to_guids(outcome.recipients, notice(channel, :left, guid: guid))
@@ -325,7 +325,7 @@ defmodule ThistleTea.Game.World.System.ChatChannels do
   defp send_error(guid, name, reason) do
     {type, attrs} = error_notice(reason, guid)
     channel = %Channel{name: name}
-    Network.send_packet(notice(channel, type, attrs), guid)
+    Outbound.send_packet(notice(channel, type, attrs), guid)
   end
 
   defp error_notice(:already_member, guid), do: {:player_already_member, [guid: guid]}
@@ -360,7 +360,7 @@ defmodule ThistleTea.Game.World.System.ChatChannels do
   end
 
   defp send_to_members(members, packet), do: members |> Enum.map(& &1.guid) |> send_to_guids(packet)
-  defp send_to_guids(guids, packet), do: Enum.each(guids, &Network.send_packet(packet, &1))
+  defp send_to_guids(guids, packet), do: Enum.each(guids, &Outbound.send_packet(packet, &1))
 
   defp find_player(name) do
     case Metadata.find_guid_by(:name, name) do

@@ -46,7 +46,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.Travel.Taxi.Flight
   alias ThistleTea.Game.Core.Travel.Transport, as: TransportLogic
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.CooldownSpell
@@ -82,6 +81,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -97,7 +97,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   @update_flag_has_position 0x40
 
   def query_time(%{ready: true, guid: guid} = state) do
-    Network.send_packet(%Message.SmsgQueryTimeResponse{time: System.system_time(:second)}, guid)
+    Outbound.send_packet(%Message.SmsgQueryTimeResponse{time: System.system_time(:second)}, guid)
     state
   end
 
@@ -188,7 +188,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
 
     {x, y, z, o} = c.movement_block.position
 
-    Network.send_packet(%Message.SmsgLoginVerifyWorld{
+    Outbound.send_packet(%Message.SmsgLoginVerifyWorld{
       map: c.internal.world.map_id,
       position: {x, y, z},
       orientation: o
@@ -319,15 +319,15 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
     Corpses.send_reclaim_delay(c)
 
     # needed for no white chatbox + keybinds
-    Network.send_packet(%Message.SmsgAccountDataTimes{})
+    Outbound.send_packet(%Message.SmsgAccountDataTimes{})
 
     # maybe useless? mangos sends it, though
-    Network.send_packet(%Message.SmsgSetRestStart{unknown1: 0})
+    Outbound.send_packet(%Message.SmsgSetRestStart{unknown1: 0})
 
     HomeBind.send_update(c)
 
     # no tutorials
-    Network.send_packet(%Message.SmsgTutorialFlags{
+    Outbound.send_packet(%Message.SmsgTutorialFlags{
       tutorial_data: [0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF]
     })
 
@@ -350,13 +350,13 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
         }
       end)
 
-    Network.send_packet(%Message.SmsgInitialSpells{
+    Outbound.send_packet(%Message.SmsgInitialSpells{
       unknown1: 0,
       initial_spells: spells,
       cooldowns: cooldowns
     })
 
-    Network.send_packet(%Message.SmsgActionButtons{
+    Outbound.send_packet(%Message.SmsgActionButtons{
       buttons: c.internal.action_buttons || %{}
     })
 
@@ -371,7 +371,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
       (dt.year - 2000) <<< 24 ||| (dt.month - 1) <<< 20 ||| (dt.day - 1) <<< 14 |||
         rem(Date.day_of_week(dt), 7) <<< 11 ||| dt.hour <<< 6 ||| dt.minute
 
-    Network.send_packet(%Message.SmsgLoginSettimespeed{
+    Outbound.send_packet(%Message.SmsgLoginSettimespeed{
       datetime: date,
       timescale: 0.01666667
     })
@@ -381,7 +381,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
     # SMSG_TRIGGER_CINEMATIC
     # TODO: on first login only
     if false do
-      Network.send_packet(%Message.SmsgTriggerCinematic{
+      Outbound.send_packet(%Message.SmsgTriggerCinematic{
         cinematic_sequence_id: chr_race.cinematic_sequence
       })
     end
@@ -389,10 +389,10 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
     item_updates = owned_item_updates(c)
 
     if item_updates != [] do
-      Network.send_packet(item_updates)
+      Outbound.send_packet(item_updates)
     end
 
-    if Keyword.get(opts, :send_self?, true), do: Network.send_packet(self_update(c))
+    if Keyword.get(opts, :send_self?, true), do: Outbound.send_packet(self_update(c))
 
     EventSink.emit(c, AuraLogic.self_duration_events(c, Time.now()))
   end
@@ -400,7 +400,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   def send_worldport_packets(%Character{} = character) do
     {character, updates} = worldport_updates(character)
     send_init_packets(character, send_self?: false)
-    Network.send_packet(updates)
+    Outbound.send_packet(updates)
     character
   end
 

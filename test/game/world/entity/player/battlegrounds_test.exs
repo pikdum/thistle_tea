@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BattlegroundsTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.Battlegrounds
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
@@ -107,7 +108,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BattlegroundsTest do
   defp join(state, group?) do
     flag = if group?, do: 1, else: 0
     message = Message.CmsgBattlefieldJoin.from_binary(<<489::little-size(32), 0::little-size(32), flag>>)
-    Message.CmsgBattlefieldJoin.handle(message, state)
+    Inbound.handle(message, state)
   end
 
   defp assert_deserter_error do

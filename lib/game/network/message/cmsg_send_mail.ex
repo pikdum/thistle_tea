@@ -2,12 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSendMail do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SEND_MAIL
 
-  alias ThistleTea.Game.World.Entity.Player.Mail
-
   defstruct [:mailbox, :receiver, :subject, :body, :stationery, :item_guid, money: 0, cod: 0]
-
-  @impl ClientMessage
-  def handle(%__MODULE__{} = message, state), do: Mail.send_mail(state, message)
 
   @impl ClientMessage
   def from_binary(<<mailbox::little-size(64), rest::binary>>) do

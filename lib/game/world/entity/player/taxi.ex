@@ -18,7 +18,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
   alias ThistleTea.Game.Core.Travel.Taxi.Network, as: TaxiNetwork
   alias ThistleTea.Game.Core.Travel.Taxi.Node
   alias ThistleTea.Game.Core.Travel.Taxi.Path
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
@@ -32,6 +31,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Trade
   alias ThistleTea.Game.World.Visibility
@@ -58,7 +58,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
 
   def status(%{character: %Character{} = character} = state, flightmaster_guid, %TaxiNetwork{} = network) do
     with {:ok, %Node{id: node_id}} <- flightmaster_node(character, flightmaster_guid, network) do
-      Network.send_packet(%Message.SmsgTaxinodeStatus{
+      Outbound.send_packet(%Message.SmsgTaxinodeStatus{
         guid: flightmaster_guid,
         known?: known?(character, node_id)
       })
@@ -416,7 +416,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
   defp cancel_arrival(_state), do: :ok
 
   defp send_reply(reply) do
-    Network.send_packet(%Message.SmsgActivatetaxireply{reply: reply})
+    Outbound.send_packet(%Message.SmsgActivatetaxireply{reply: reply})
   end
 
   defp reply_for(:no_such_path), do: @reply_no_such_path
@@ -435,13 +435,13 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
     known = MapSet.put(player.taxi_nodes || MapSet.new(), node_id)
     character = %{character | player: %{player | taxi_nodes: known}}
     CharacterStore.put(character)
-    Network.send_packet(%Message.SmsgNewTaxiPath{})
-    Network.send_packet(%Message.SmsgTaxinodeStatus{guid: flightmaster_guid, known?: true})
+    Outbound.send_packet(%Message.SmsgNewTaxiPath{})
+    Outbound.send_packet(%Message.SmsgTaxinodeStatus{guid: flightmaster_guid, known?: true})
     %{state | character: character}
   end
 
   defp send_menu(%Character{player: player}, flightmaster_guid, node_id, network) do
-    Network.send_packet(%Message.SmsgShowtaxinodes{
+    Outbound.send_packet(%Message.SmsgShowtaxinodes{
       guid: flightmaster_guid,
       nearest_node: node_id,
       nodes: TaxiNetwork.mask(network, player.taxi_nodes || MapSet.new())
