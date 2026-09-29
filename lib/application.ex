@@ -18,6 +18,7 @@ defmodule ThistleTea.Application do
   use Application
 
   alias ThistleTea.Auth.Account
+  alias ThistleTea.Auth.SessionKey
   alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.Core.InstanceScript
@@ -221,7 +222,7 @@ defmodule ThistleTea.Application do
       ]
       |> Enum.filter(& &1)
 
-    :ets.new(:session, [:named_table, :public, read_concurrency: true, write_concurrency: :auto])
+    SessionKey.init()
     Metadata.init()
     InstanceData.init()
     ServerVariables.init()

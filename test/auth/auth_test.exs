@@ -3,6 +3,7 @@ defmodule ThistleTea.AuthTest do
 
   alias ThistleTea.Auth
   alias ThistleTea.Auth.Account
+  alias ThistleTea.Auth.SessionKey
   alias ThousandIsland.Socket
   alias ThousandIsland.Telemetry
 
@@ -44,7 +45,7 @@ defmodule ThistleTea.AuthTest do
     test "reconnect challenge retains the account and accepts its proof", %{socket: socket, username: username} do
       {:ok, _account} = Account.register(username, "test")
       session = :crypto.strong_rand_bytes(40)
-      :ets.insert(:session, {username, session})
+      SessionKey.put(username, session)
       assert {:continue, state} = Auth.handle_data(challenge(2, username), socket, %{})
       assert_receive {:socket_send, <<2, 0, challenge_data::binary-size(16), _checksum_salt::binary-size(16)>>}
       proof_data = :crypto.strong_rand_bytes(16)

@@ -3,12 +3,13 @@ defmodule ThistleTea.Auth do
   The auth/logon server: handles SRP6 logon challenge/proof and serves the
   realm list for registered accounts.
   """
-  use Boundary, deps: [ThistleTea.Game.Core], exports: [Account, SRP]
+  use Boundary, deps: [ThistleTea.Game.Core], exports: [Account, SessionKey, SRP]
   use ThousandIsland.Handler
 
   import Binary, only: [reverse: 1]
 
   alias ThistleTea.Auth.Account
+  alias ThistleTea.Auth.SessionKey
   alias ThistleTea.Auth.SRP
   alias ThistleTea.Game.Core.Realm
 
@@ -174,7 +175,7 @@ defmodule ThistleTea.Auth do
       state =
         Map.merge(state, %{public_a: public_a, session: session, server_proof: server_proof})
 
-      :ets.insert(:session, {username, state.session})
+      SessionKey.put(username, state.session)
 
       ThousandIsland.Socket.send(socket, <<1, 0>> <> state.server_proof <> <<0, 0, 0, 0>>)
       {:continue, state}
@@ -219,7 +220,7 @@ defmodule ThistleTea.Auth do
     Logger.info("CMD_AUTH_RECONNECT_CHALLENGE")
 
     with {:ok, account} <- Account.get_user(username),
-         [{_, session}] <- :ets.lookup(:session, account.username) do
+         {:ok, session} <- SessionKey.fetch(account.username) do
       challenge_data = :crypto.strong_rand_bytes(16)
       ThousandIsland.Socket.send(socket, <<2, 0>> <> challenge_data <> :crypto.strong_rand_bytes(16))
       {:continue, Map.merge(state, %{account: account, challenge_data: challenge_data, session: session})}

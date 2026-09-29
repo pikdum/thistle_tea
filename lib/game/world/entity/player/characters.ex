@@ -1,20 +1,23 @@
 defmodule ThistleTea.Game.World.Entity.Player.Characters do
   @moduledoc """
-  Character creation flow: validates name uniqueness and the per-account
-  limit, assigns the guid and starting equipment, and stores the new
-  character.
+  Character screen flow. Creation validates name uniqueness and the
+  per-account limit, assigns the guid and starting equipment, and stores the
+  new character; the character list projects each stored character with its
+  visible gear and guild.
   """
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Item
   alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Inventory
   alias ThistleTea.Game.Core.Item.Proficiency
+  alias ThistleTea.Game.Network.Message.SmsgCharEnum
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.Items
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.System.Guild, as: GuildSystem
 
   @character_limit 10
 
@@ -33,6 +36,11 @@ defmodule ThistleTea.Game.World.Entity.Player.Characters do
       {:exists, %Character{}} -> {:error, :character_exists}
       {:limit, true} -> {:error, :character_limit}
     end
+  end
+
+  def enum(account_id) do
+    characters = account_id |> CharacterStore.for_account() |> Enum.map(&enum_entry/1)
+    %SmsgCharEnum{amount_of_characters: length(characters), characters: characters}
   end
 
   def assign_starting_items(
@@ -67,6 +75,56 @@ defmodule ThistleTea.Game.World.Entity.Player.Characters do
       end)
 
     Equipment.sync_stats(%{character | player: player})
+  end
+
+  defp enum_entry(%Character{} = character) do
+    {x, y, z, _o} = character.movement_block.position
+
+    %SmsgCharEnum.Character{
+      guid: character.id,
+      name: character.internal.name,
+      race: character.unit.race,
+      class: character.unit.class,
+      gender: character.unit.gender,
+      skin: character.player.skin,
+      face: character.player.face,
+      hair_style: character.player.hair_style,
+      hair_color: character.player.hair_color,
+      facial_hair: character.player.facial_hair,
+      level: character.unit.level,
+      area: character.internal.area,
+      map: character.internal.world.map_id,
+      position: {x, y, z},
+      guild_id: guild_id(character.object.guid),
+      flags: 0,
+      first_login: 0,
+      pet_display_id: 0,
+      pet_level: 0,
+      pet_family: 0,
+      equipment:
+        Enum.map(Inventory.slots(), &enum_gear(Inventory.equipment_entry(character.player, &1, include_broken: true))),
+      first_bag_display_id: 0,
+      first_bag_inventory_type: 0
+    }
+  end
+
+  defp enum_gear(entry) when is_integer(entry) and entry > 0 do
+    case ItemLoader.get_template(entry) do
+      %ItemTemplate{} = template ->
+        %SmsgCharEnum.CharacterGear{equipment_display_id: template.display_id, inventory_type: template.inventory_type}
+
+      nil ->
+        enum_gear(0)
+    end
+  end
+
+  defp enum_gear(_entry), do: %SmsgCharEnum.CharacterGear{equipment_display_id: 0, inventory_type: 0}
+
+  defp guild_id(guid) do
+    case GuildSystem.group_of(guid) do
+      %{id: id} -> id
+      nil -> 0
+    end
   end
 
   defp at_character_limit?(account_id) do

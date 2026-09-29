@@ -3,11 +3,14 @@ defmodule ThistleTea.Game.World.Entity.Player.CharactersTest do
 
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Inventory
+  alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Network.Message.SmsgCharEnum
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player.Characters
   alias ThistleTea.Game.World.ItemStore
@@ -148,6 +151,33 @@ defmodule ThistleTea.Game.World.Entity.Player.CharactersTest do
 
       assert ItemStore.get(character.player.mainhand).object.entry == 8190
       assert Inventory.count_entry(character.player, 25, &ItemStore.get/1) == 0
+    end
+  end
+
+  describe "enum/1" do
+    test "lists the account's characters with their pose and visible gear" do
+      cache_templates([
+        template(25, inventory_type: 21, class: 2, subclass: 7, dmg_min1: 1.0, dmg_max1: 2.0, display_id: 1542),
+        template(38, inventory_type: 4, display_id: 9891)
+      ])
+
+      {:ok, character} =
+        Characters.create(character("Lister", [%{item_id: 25, amount: 1}, %{item_id: 38, amount: 1}]))
+
+      CharacterStore.put(%{
+        character
+        | movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.5}},
+          internal: %{character.internal | world: WorldRef.open(0), area: 12}
+      })
+
+      assert %SmsgCharEnum{amount_of_characters: 1, characters: [entry]} = Characters.enum(1)
+      assert {entry.name, entry.guid, entry.map, entry.area} == {"Lister", character.id, 0, 12}
+      assert entry.position == {1.0, 2.0, 3.0}
+      assert length(entry.equipment) == length(Inventory.slots())
+      assert Enum.at(entry.equipment, Inventory.slot_index(:mainhand)).equipment_display_id == 1542
+      assert Enum.at(entry.equipment, Inventory.slot_index(:body)).inventory_type == 4
+      assert Enum.at(entry.equipment, Inventory.slot_index(:head)).equipment_display_id == 0
+      assert %SmsgCharEnum{amount_of_characters: 0, characters: []} = Characters.enum(2)
     end
   end
 
