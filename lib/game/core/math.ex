@@ -30,7 +30,10 @@ defmodule ThistleTea.Game.Core.Math do
   end
 
   def distance({x0, y0, z0}, {x1, y1, z1}) do
-    :math.sqrt(:math.pow(x1 - x0, 2) + :math.pow(y1 - y0, 2) + :math.pow(z1 - z0, 2))
+    dx = x1 - x0
+    dy = y1 - y0
+    dz = z1 - z0
+    :math.sqrt(dx * dx + dy * dy + dz * dz)
   end
 
   def behind?({x, y, orientation}, {other_x, other_y}) do
@@ -53,10 +56,11 @@ defmodule ThistleTea.Game.Core.Math do
     distance({x0, y0, z0}, {x1, y1, z1}) / speed
   end
 
-  def movement_duration(path_list, speed) when is_list(path_list) do
-    path_list
-    |> Enum.chunk_every(2, 1, :discard)
-    |> Enum.map(fn [start, finish] -> movement_duration(start, finish, speed) end)
-    |> Enum.sum()
-  end
+  def movement_duration([start | rest], speed), do: movement_duration(start, rest, speed, 0)
+  def movement_duration([], _speed), do: 0
+
+  defp movement_duration(_previous, [], _speed, duration), do: duration
+
+  defp movement_duration(previous, [point | rest], speed, duration),
+    do: movement_duration(point, rest, speed, duration + movement_duration(previous, point, speed))
 end

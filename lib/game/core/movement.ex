@@ -612,12 +612,10 @@ defmodule ThistleTea.Game.Core.Movement do
     path = [start_position | spline_nodes]
     total_distance = path_length(path)
 
-    if total_distance <= 0 do
-      List.last(path)
+    if total_distance <= 0 or elapsed >= duration do
+      List.last(spline_nodes)
     else
-      elapsed = min(max(elapsed, 0), duration)
-      {position, _orientation} = pose_along_path(path, total_distance * elapsed / duration, 0.0)
-      position
+      point_along_path(path, total_distance * max(elapsed, 0) / duration)
     end
   end
 
@@ -758,14 +756,27 @@ defmodule ThistleTea.Game.Core.Movement do
 
   defp boundary_fraction(_position, _delta, _min_boundary, _max_boundary), do: nil
 
-  defp path_length(points) when is_list(points) do
-    points
-    |> Enum.chunk_every(2, 1, :discard)
-    |> Enum.reduce(0.0, fn [start, finish], acc -> acc + segment_distance(start, finish) end)
-  end
+  defp path_length([start | rest]), do: path_length(start, rest, 0.0)
 
-  defp segment_distance(start, finish) do
-    Math.movement_duration(start, finish, 1.0)
+  defp path_length(_previous, [], length), do: length
+
+  defp path_length(previous, [node | rest], length),
+    do: path_length(node, rest, length + segment_distance(previous, node))
+
+  defp segment_distance(start, finish), do: Math.distance(start, finish)
+
+  defp point_along_path([start | rest], distance), do: point_along_path(start, rest, distance)
+
+  defp point_along_path(previous, [], _remaining), do: previous
+
+  defp point_along_path(previous, [node | rest], remaining) do
+    segment_distance = segment_distance(previous, node)
+
+    cond do
+      segment_distance <= 0 -> point_along_path(node, rest, remaining)
+      remaining <= segment_distance -> lerp_point(previous, node, segment_distance, max(remaining, 0.0))
+      true -> point_along_path(node, rest, remaining - segment_distance)
+    end
   end
 
   defp pose_along_path([start | rest], distance, orientation) do
