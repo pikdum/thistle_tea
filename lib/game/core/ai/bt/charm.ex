@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Charm do
   end
 
   defp act(%Character{internal: %{casting: %Cast{}}} = entity, blackboard, context) do
-    {_status, entity, blackboard} = SpellBT.cast_tick(entity, blackboard, context.now)
+    {_status, entity, blackboard} = SpellBT.cast_tick(entity, blackboard, context.now, context.perception)
     {BT.running(100, :charm), entity, blackboard}
   end
 

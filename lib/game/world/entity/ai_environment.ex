@@ -42,6 +42,8 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Pet.Possession
   alias ThistleTea.Game.Core.Spell.Area
+  alias ThistleTea.Game.Core.Spell.Cast
+  alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.CombatZone, as: CombatZoneEnvironment
@@ -175,6 +177,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
 
     guids =
       [own_guid(entity), Fear.source_guid(entity), Distancing.target_guid(entity) | direct_guids(entity)]
+      |> Enum.concat(casting_guids(entity))
       |> Enum.concat(observed_guids)
       |> Enum.concat(Enum.flat_map(nearby, fn {_kind, entries} -> Enum.map(entries, &elem(&1, 0)) end))
       |> Enum.filter(&(is_integer(&1) and &1 > 0))
@@ -468,6 +471,11 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
       nil -> nil
     end
   end
+
+  defp casting_guids(%{unit: %Unit{channel_object: channel_object}, internal: %{casting: %Cast{targets: targets}}}),
+    do: [channel_object, Target.unit_guid(targets)]
+
+  defp casting_guids(_entity), do: []
 
   defp own_guid(%{object: %{guid: guid}}) when is_integer(guid) and guid > 0, do: guid
   defp own_guid(_entity), do: nil

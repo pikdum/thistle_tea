@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
   The behavior tree schedules these transitions; this module owns preparation,
   launch, impact, channel ticks, and finish.
   """
+  alias ThistleTea.Game.Core.AI.BT.Context.Perception
   alias ThistleTea.Game.Core.Aura, as: AuraLogic
   alias ThistleTea.Game.Core.Aura.Heartbeat
   alias ThistleTea.Game.Core.Aura.Holder
@@ -172,16 +173,19 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
     end
   end
 
-  def advance(%{internal: %Internal{casting: %Cast{}}} = entity, now) when is_integer(now) do
+  def advance(entity, now, perception \\ nil)
+
+  def advance(%{internal: %Internal{casting: %Cast{}}} = entity, now, perception) when is_integer(now) do
     entity = interrupt_movement(entity, now)
 
     case entity.internal.casting do
       nil -> {:finished, entity}
+      %Cast{phase: :channel_tick} = casting -> advance_channel(entity, casting, now, perception)
       casting -> advance_phase(entity, casting, now)
     end
   end
 
-  def advance(entity, _now), do: {:idle, entity}
+  def advance(entity, _now, _perception), do: {:idle, entity}
 
   def complete(%{internal: %Internal{casting: %Cast{} = casting}} = entity, now) when is_integer(now) do
     complete(entity, casting, now)
@@ -243,9 +247,15 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
     apply_impact(entity, casting, now)
   end
 
-  defp advance_phase(entity, %Cast{phase: :channel_tick} = casting, now) do
+  defp advance_phase(entity, %Cast{phase: :finish} = casting, now) do
+    {:finished, finish(entity, casting, now)}
+  end
+
+  defp advance_phase(entity, %Cast{phase: :channel_tick} = casting, now), do: advance_channel(entity, casting, now, nil)
+
+  defp advance_channel(entity, %Cast{} = casting, now, perception) do
     tick_at = if is_integer(casting.ends_at), do: min(now, casting.ends_at), else: now
-    {entity, delay_ms} = channel_tick(entity, casting, tick_at)
+    {entity, delay_ms} = channel_tick(entity, casting, tick_at, perception)
 
     case entity.internal.casting do
       %Cast{ends_at: ends_at} = casting when is_integer(ends_at) and now >= ends_at ->
@@ -258,10 +268,6 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
       nil ->
         {:finished, entity}
     end
-  end
-
-  defp advance_phase(entity, %Cast{phase: :finish} = casting, now) do
-    {:finished, finish(entity, casting, now)}
   end
 
   defp launch(entity, %Cast{requirements: :unchecked} = casting, now) do
@@ -1238,12 +1244,9 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
 
   defp queue_cast_result(character, _casting), do: character
 
-  defp channel_tick(%{internal: %Internal{}} = character, %Cast{} = casting, now) do
+  defp channel_tick(%{internal: %Internal{}} = character, %Cast{} = casting, now, perception) do
     cond do
-      unit_channel_target_dead?(character, casting) ->
-        {stop_channel(character, casting), 50}
-
-      not unit_channel_target_in_range?(character, casting) ->
+      channel_target_lost?(character, casting, perception) ->
         {stop_channel(character, casting), 50}
 
       is_integer(casting.next_channel_tick_at) and now >= casting.next_channel_tick_at ->
@@ -1254,7 +1257,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
     end
   end
 
-  defp channel_tick(character, casting, now), do: {character, Cast.next_channel_delay(casting, now)}
+  defp channel_tick(character, casting, now, _perception), do: {character, Cast.next_channel_delay(casting, now)}
 
   defp pay_and_apply_channel_tick(character, %Cast{} = casting, now) do
     cost = casting.resolution.costs.channel_power
@@ -1273,19 +1276,6 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
     end
   end
 
-  defp unit_channel_target_dead?(%{unit: %{channel_object: guid}}, %Cast{}) when is_integer(guid) and guid > 0 do
-    dead_target?(guid)
-  end
-
-  defp unit_channel_target_dead?(_character, %Cast{targets: %Target{} = targets}) do
-    case Target.unit_guid(targets) do
-      guid when is_integer(guid) and guid > 0 -> dead_target?(guid)
-      _none -> false
-    end
-  end
-
-  defp unit_channel_target_dead?(_character, _casting), do: false
-
   defp valid_channel_target?(character, %Cast{
          spell: %Spell{} = spell,
          targets: %Target{} = targets,
@@ -1303,50 +1293,47 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
 
   defp valid_channel_target?(_character, _casting), do: true
 
-  defp unit_channel_target_in_range?(character, %Cast{spell: %Spell{} = spell} = casting) do
+  defp channel_target_lost?(_character, _casting, nil), do: false
+
+  defp channel_target_lost?(character, %Cast{spell: %Spell{} = spell} = casting, %Perception{} = perception) do
     case unit_channel_target_guid(character, casting) do
       guid when is_integer(guid) and guid > 0 ->
-        metadata =
-          case Metadata.query(guid, [:combat_reach, :faction_template]) do
-            nil -> %{}
-            metadata -> metadata
-          end
+        metadata = Perception.metadata(perception, guid) || %{}
 
-        target_info =
-          metadata
-          |> Map.put(:position, World.position(guid))
-          |> Map.put(:hostile?, channel_target_hostile?(character, guid, spell, metadata))
-
-        CastValidation.channel_in_range?(character, spell, target_info)
+        match?(%{alive?: false}, metadata) or
+          not CastValidation.channel_in_range?(
+            character,
+            spell,
+            channel_target_info(character, guid, spell, metadata, perception)
+          )
 
       _none ->
-        true
+        false
     end
   end
 
-  defp unit_channel_target_in_range?(_character, _casting), do: true
+  defp channel_target_lost?(_character, _casting, _perception), do: false
 
-  defp channel_target_hostile?(character, guid, %Spell{} = spell, metadata) do
-    case metadata do
-      %{faction_template: _faction_template} ->
-        Hostility.hostile?(character, Map.put(metadata, :guid, guid))
+  defp channel_target_info(%{object: %{guid: self_guid}}, guid, %Spell{} = spell, metadata, perception) do
+    hostile? =
+      case metadata do
+        %{faction_template: _faction_template} ->
+          Hostility.hostile?(Perception.actor(perception, self_guid), Perception.actor(perception, guid))
 
-      _unknown ->
-        Spell.harmful?(spell)
-    end
+        _unknown ->
+          Spell.harmful?(spell)
+      end
+
+    metadata
+    |> Map.take([:combat_reach, :faction_template])
+    |> Map.put(:position, Perception.position(perception, guid))
+    |> Map.put(:hostile?, hostile?)
   end
 
   defp unit_channel_target_guid(%{unit: %{channel_object: guid}}, %Cast{}) when is_integer(guid) and guid > 0, do: guid
 
   defp unit_channel_target_guid(_character, %Cast{targets: %Target{} = targets}), do: Target.unit_guid(targets)
   defp unit_channel_target_guid(_character, _casting), do: nil
-
-  defp dead_target?(guid) do
-    case Metadata.query(guid, [:alive?]) do
-      %{alive?: false} -> true
-      _ -> false
-    end
-  end
 
   defp validate_cast_target(character, %Cast{spell: spell, targets: targets} = casting) do
     cond do

@@ -4,6 +4,8 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
   alias ThistleTea.Game.Core.AI.BehaviorRunner
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Context
+  alias ThistleTea.Game.Core.AI.BT.Context.Perception
+  alias ThistleTea.Game.Core.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Core.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
@@ -36,7 +38,6 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.SpatialHash
 
   describe "cancel/2" do
     test "removes a channel aura from its recorded target after pet possession changes ownership" do
@@ -516,8 +517,7 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
     test "stops when the channel object dies even if the cast target is the caster" do
       now = 1_000
       target_guid = System.unique_integer([:positive])
-      Metadata.put(target_guid, %{alive?: false})
-      on_exit(fn -> Metadata.delete(target_guid) end)
+      perception = channel_perception(now, target_guid, nil, %{alive?: false})
 
       spell = %Spell{id: 5143, attributes: MapSet.new([:channeled]), effects: []}
 
@@ -538,7 +538,7 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
         }
       }
 
-      assert {:success, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
+      assert {:success, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now, perception)
       assert mob.internal.casting == nil
       assert mob.unit.channel_object == 0
       assert mob.unit.channel_spell == 0
@@ -548,13 +548,7 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
       now = 1_000
       target_guid = System.unique_integer([:positive])
       world = WorldRef.open(0)
-      SpatialHash.insert(:mobs, target_guid, world, 53.0, 0.0, 0.0)
-      Metadata.put(target_guid, %{alive?: true, combat_reach: 12.5})
-
-      on_exit(fn ->
-        SpatialHash.remove(:mobs, target_guid)
-        Metadata.delete(target_guid)
-      end)
+      perception = channel_perception(now, target_guid, {world, 53.0, 0.0, 0.0}, %{alive?: true, combat_reach: 12.5})
 
       spell = %Spell{
         id: 19_304,
@@ -590,11 +584,20 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
         }
       }
 
-      assert {{:running, _delay_ms}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
+      assert {{:running, _delay_ms}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now, perception)
       assert %Cast{} = mob.internal.casting
       assert mob.internal.casting.next_channel_tick_at > now
       assert mob.internal.events in [nil, []]
+
+      far = channel_perception(now, target_guid, {world, 90.0, 0.0, 0.0}, %{alive?: true, combat_reach: 12.5})
+      assert {:success, stopped, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now, far)
+      assert stopped.internal.casting == nil
     end
+  end
+
+  defp channel_perception(now, target_guid, position, metadata) do
+    observation = %Observation{guid: target_guid, position: position, metadata: metadata}
+    Perception.new(now, nil, %{target_guid => observation}, %{mobs: [], players: [], game_objects: []})
   end
 
   describe "complete/3" do
