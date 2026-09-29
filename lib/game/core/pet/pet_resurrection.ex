@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.Core.Pet.PetResurrection do
       )
       when is_number(orientation) do
     if resurrectable_kind?(kind) and Entity.dead?(entity) do
-      %{entity: entity} = Engagement.leave(entity, :resurrection)
+      %{entity: entity} = Engagement.leave(entity, :resurrection, now)
 
       unit = %{
         entity.unit

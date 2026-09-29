@@ -65,7 +65,6 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.Spell.UnitTargets
   alias ThistleTea.Game.Core.Stats.CastSpeed
-  alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World.Spell.SpellTargetResolver
 
   def start(entity, spell, targets, now, cast_item_guid \\ nil, cast_item_id \\ 0, opts \\ [])
@@ -383,7 +382,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
       if valid_channel_target?(entity, casting) do
         {:waiting, entity, Cast.next_channel_delay(casting, now)}
       else
-        {:finished, stop_channel(entity, casting)}
+        {:finished, stop_channel(entity, casting, :cancelled, now)}
       end
     else
       casting = Cast.transition(casting, :finish)
@@ -418,9 +417,9 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
       |> consume_unavoidable_finisher(casting, now)
 
     if Cast.channeled?(casting) do
-      stop_channel(entity, casting, :completed)
+      stop_channel(entity, casting, :completed, now)
     else
-      cancel(entity)
+      cancel(entity, now)
     end
   end
 
@@ -848,8 +847,6 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
 
   defp action_interrupt_mask(action, _spell), do: AuraCore.interrupt_mask(action)
 
-  def cancel(character), do: cancel(character, Time.now())
-
   def cancel(%{internal: %Internal{} = internal} = character, now) do
     character = reset_preparing_gcd(character, internal.casting)
 
@@ -949,12 +946,13 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
 
   def finish_game_object_channel(
         %{internal: %Internal{channel_game_object_guid: game_object_guid, casting: %Cast{} = casting}} = character,
-        game_object_guid
+        game_object_guid,
+        now
       ) do
-    stop_channel(character, casting, :completed)
+    stop_channel(character, casting, :completed, now)
   end
 
-  def finish_game_object_channel(character, _game_object_guid), do: character
+  def finish_game_object_channel(character, _game_object_guid, _now), do: character
 
   defp start_channel(
          %{object: %{guid: guid}, unit: unit} = character,
@@ -1014,10 +1012,6 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
       true -> 0
     end
   end
-
-  defp stop_channel(character, casting), do: stop_channel(character, casting, :cancelled)
-
-  defp stop_channel(character, casting, reason), do: stop_channel(character, casting, reason, Time.now())
 
   defp stop_channel(
          %{object: %{guid: user_guid}, internal: %Internal{} = internal} = character,
@@ -1245,7 +1239,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
   defp channel_tick(%{internal: %Internal{}} = character, %Cast{} = casting, now, perception) do
     cond do
       channel_target_lost?(character, casting, perception) ->
-        {stop_channel(character, casting), 50}
+        {stop_channel(character, casting, :cancelled, now), 50}
 
       is_integer(casting.next_channel_tick_at) and now >= casting.next_channel_tick_at ->
         pay_and_apply_channel_tick(character, casting, now)
@@ -1270,7 +1264,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
       delay_ms = Cast.next_channel_delay(casting, now)
       {%{character | internal: %{character.internal | casting: casting}}, delay_ms}
     else
-      {stop_channel(character, casting), 50}
+      {stop_channel(character, casting, :cancelled, now), 50}
     end
   end
 

@@ -57,7 +57,7 @@ defmodule ThistleTea.Game.Core.Combat.CombatLeashTest do
       assert mob.internal.combat_leash.origin == {1_000.0, 0.0, 0.0}
       refute CombatLeash.should_evade?(mob, 20_000)
       assert CombatLeash.reference(mob) == original
-      %{entity: mob} = Engagement.leave(mob, :evade)
+      %{entity: mob} = Engagement.leave(mob, :evade, 1_000)
       assert CombatLeash.reference(mob) == nil
       assert %Effects.CombatLeashEvent{ref: original, event: :stop} in mob.internal.events
       %{entity: mob} = Engagement.enter(mob, 20, 21_000, ThreatSelection.opts(mob))

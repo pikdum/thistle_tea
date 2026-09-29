@@ -43,7 +43,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Spells do
   def cancel_aura(state, _spell_id), do: state
 
   defp maybe_cancel_channel(%Character{internal: %{casting: %Cast{spell: %Spell{id: id} = spell}}} = character, id) do
-    if Spell.attribute?(spell, :channeled), do: Casting.cancel(character), else: character
+    if Spell.attribute?(spell, :channeled), do: Casting.cancel(character, Time.now()), else: character
   end
 
   defp maybe_cancel_channel(character, _spell_id), do: character

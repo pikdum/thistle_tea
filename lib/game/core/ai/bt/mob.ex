@@ -570,7 +570,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   end
 
   defp clear_combat(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
-    %Engagement.Result{entity: state} = Engagement.leave(state, :evade, blackboard: blackboard)
+    %Engagement.Result{entity: state} = Engagement.leave(state, :evade, now, blackboard: blackboard)
     {state, events} = AuraCore.remove_on_evade(state, now)
     state = Effects.enqueue(state, events)
     {:success, state, state.internal.blackboard}

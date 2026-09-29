@@ -202,7 +202,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.Spells do
 
     with true <- not is_nil(spell),
          true <- flags_allow?(state, entry, target_guid, context),
-         {:ok, state} <- release_previous_cast(state, entry),
+         {:ok, state} <- release_previous_cast(state, entry, now),
          :ok <-
            CastValidation.validate(
              state,
@@ -224,11 +224,11 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.Spells do
 
   def attempt_commanded_cast(_state, _blackboard, _entry, _targets, _context, _options), do: {:error, :bad_targets}
 
-  defp release_previous_cast(%Mob{internal: %Internal{casting: nil}} = state, _entry), do: {:ok, state}
+  defp release_previous_cast(%Mob{internal: %Internal{casting: nil}} = state, _entry, _now), do: {:ok, state}
 
-  defp release_previous_cast(%Mob{} = state, %CreatureSpell{} = entry) do
+  defp release_previous_cast(%Mob{} = state, %CreatureSpell{} = entry, now) do
     if CreatureSpell.flag?(entry, :interrupt_previous) do
-      {:ok, Casting.cancel(state)}
+      {:ok, Casting.cancel(state, now)}
     else
       :busy
     end

@@ -48,6 +48,7 @@
 ### Architecture Patterns
 - Functional core / boundary layer split (à la "Designing Elixir Systems with OTP"): the core handles data + logic and stays pure; the boundary handles process orchestration (GenServers, Registries, ETS tables)
 - Keep the core pure: functions like `take_damage` operate on entity/component data and return new data — no DB calls, no process sends, no side effects. This makes logic generic across players, mobs, and game objects, and trivially testable
+- Time and randomness are inputs: core takes `now` as a parameter and never reads the clock (`Core.Time.now/0` is for world callers), and rolls come from a caller-supplied source — a roll argument, `BT.Context.Random`, or the `Core.Rolls` on `CastContext` (pin with `Rolls.fixed/1` in tests, not `:rand.seed`). `dependency_test.exs` ratchets both: no clock reads in core, and no new files with ambient `:rand`/`Enum.random` draws
 - Database queries live at the boundary, not in the core. Loaders (e.g. `lib/game/world/loader/mob.ex` and `World.Loader.Mob.Builder`) query Mangos and translate rows into core structs (e.g. `lib/game/core/entity/mob.ex`); core code never touches `Mangos.*` or `DBC.*` schemas
 - Runtime state is decoupled from the Mangos DB — Mangos is a read-only seed at boundaries, not the system's source of truth at runtime
 - No Mangos queries in gameplay paths: loaders cache in ETS (boot preload or lazy + cache); CMSG handlers and game systems answer from those caches, never `Mangos.Repo` per request

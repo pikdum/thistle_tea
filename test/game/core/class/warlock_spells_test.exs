@@ -503,7 +503,7 @@ defmodule ThistleTea.Game.Core.Class.WarlockSpellsTest do
           }
       }
 
-      caster = Casting.cancel(caster)
+      caster = Casting.cancel(caster, 1_500)
 
       assert caster.internal.channel_game_object_guid == nil
       assert Enum.any?(caster.internal.events, &(is_struct(&1, Effects.DespawnEntity) and &1.target_guid == 77))
@@ -513,7 +513,7 @@ defmodule ThistleTea.Game.Core.Class.WarlockSpellsTest do
       visual = %Spell{id: 698, duration_ms: 120_000, attributes: MapSet.new([:channeled])}
 
       helper = Casting.start_game_object_channel(character(), 77, visual, 120_000, 1_000)
-      helper = Casting.cancel(helper)
+      helper = Casting.cancel(helper, 1_500)
 
       assert Enum.any?(helper.internal.events, fn event ->
                is_struct(event, Effects.LeaveRitual) and event.target_guid == 77 and event.source_guid == 1
@@ -526,7 +526,7 @@ defmodule ThistleTea.Game.Core.Class.WarlockSpellsTest do
       visual = %Spell{id: 698, duration_ms: 120_000, attributes: MapSet.new([:channeled])}
 
       helper = Casting.start_game_object_channel(character(), 77, visual, 120_000, 1_000)
-      helper = Casting.finish_game_object_channel(helper, 77)
+      helper = Casting.finish_game_object_channel(helper, 77, 2_000)
 
       assert helper.internal.casting == nil
       assert helper.unit.channel_object == 0
@@ -798,7 +798,7 @@ defmodule ThistleTea.Game.Core.Class.WarlockSpellsTest do
 
       caster = character(summon: 2)
       caster = Casting.start(caster, spell, Target.none(), 1_000)
-      caster = Casting.cancel(caster)
+      caster = Casting.cancel(caster, 1_500)
 
       assert Enum.any?(caster.internal.events, fn event ->
                is_struct(event, Effects.RemoveAura) and event.source_guid == 1 and event.target_guid == 2 and
@@ -810,7 +810,7 @@ defmodule ThistleTea.Game.Core.Class.WarlockSpellsTest do
   describe "pet commands" do
     test "attack assigns the commanded target and enters combat" do
       pet = pet()
-      result = PetBT.command(pet, :attack, 99)
+      result = PetBT.command(pet, :attack, 99, 1_000)
 
       assert result.unit.target == 99
       assert result.internal.in_combat
@@ -819,8 +819,8 @@ defmodule ThistleTea.Game.Core.Class.WarlockSpellsTest do
     end
 
     test "follow stops attacking while retaining recent combat contact" do
-      pet = PetBT.command(pet(), :attack, 99)
-      result = PetBT.command(pet, :follow, 0)
+      pet = PetBT.command(pet(), :attack, 99, 1_000)
+      result = PetBT.command(pet, :follow, 0, 1_500)
 
       assert result.unit.target == 0
       assert result.internal.in_combat
@@ -828,8 +828,8 @@ defmodule ThistleTea.Game.Core.Class.WarlockSpellsTest do
     end
 
     test "passive immediately stops attacking while retaining recent combat contact" do
-      pet = PetBT.command(pet(), :attack, 99)
-      result = PetBT.reaction(pet, :passive)
+      pet = PetBT.command(pet(), :attack, 99, 1_000)
+      result = PetBT.reaction(pet, :passive, 1_500)
 
       assert result.unit.target == 0
       assert result.internal.in_combat

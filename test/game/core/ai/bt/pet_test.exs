@@ -115,22 +115,22 @@ defmodule ThistleTea.Game.Core.AI.BT.PetTest do
     end
   end
 
-  describe "command/3" do
+  describe "command/4" do
     test "stay stops the active spline through the movement transition" do
       state = active_pet()
 
-      stopped = PetBT.command(state, :stay, 0)
+      stopped = PetBT.command(state, :stay, 0, @now)
 
       assert stopped.movement_block.spline_nodes == []
       assert Enum.any?(stopped.internal.events, &is_struct(&1, Effects.MovementStopped))
     end
   end
 
-  describe "reaction/2" do
+  describe "reaction/3" do
     test "passive stops the active spline through the movement transition" do
       state = active_pet()
 
-      stopped = PetBT.reaction(state, :passive)
+      stopped = PetBT.reaction(state, :passive, @now)
 
       assert stopped.movement_block.spline_nodes == []
       assert Enum.any?(stopped.internal.events, &is_struct(&1, Effects.MovementStopped))

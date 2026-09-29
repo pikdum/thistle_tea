@@ -197,7 +197,7 @@ defmodule ThistleTea.Game.Core.Combat.Engagement do
     end
   end
 
-  def leave(%Mob{} = entity, reason, opts \\ []) when is_atom(reason) do
+  def leave(%Mob{} = entity, reason, now, opts \\ []) when is_atom(reason) and is_integer(now) do
     previous = entity
     entity = entity |> CombatLeash.stop() |> ZoneCombat.clear()
     clear_tap? = Keyword.get(opts, :clear_tap?, true)
@@ -219,7 +219,7 @@ defmodule ThistleTea.Game.Core.Combat.Engagement do
       %{entity | unit: unit, internal: %{internal | pet: clear_pet_attack(internal.pet)}}
       |> PetCombat.leave(reason)
       |> clear_combat_timer(reason)
-      |> Casting.cancel()
+      |> Casting.cancel(now)
       |> Combat.sync_combat_flag()
       |> ControlMovement.sync_flags()
       |> Effects.enqueue(leave_effects(entity.object.guid, target, clear_tap?))
@@ -255,8 +255,8 @@ defmodule ThistleTea.Game.Core.Combat.Engagement do
     end
   end
 
-  def die(%Mob{} = entity) do
-    leave(entity, :death, clear_tap?: not DamageOrigin.loot_allowed?(entity))
+  def die(%Mob{} = entity, now) do
+    leave(entity, :death, now, clear_tap?: not DamageOrigin.loot_allowed?(entity))
   end
 
   def reset(%Mob{} = entity) do

@@ -179,7 +179,7 @@ defmodule ThistleTea.Game.Core.Combat.ZoneCombatTest do
       assert Engagement.stop_attack(fighting).entity.internal.combat_zone == fighting.internal.combat_zone
 
       for reason <- [:evade, :death, :reset, :combat_stop] do
-        stopped = Engagement.leave(fighting, reason).entity
+        stopped = Engagement.leave(fighting, reason, 1_000).entity
         assert stopped.internal.combat_zone == nil
         assert ZoneCombat.maintain(stopped, %{context | now: 100_000}) == stopped
         assert ZoneCombat.next_at(stopped, 100_000) == nil

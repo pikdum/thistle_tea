@@ -1375,7 +1375,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
     if EntityCore.dead?(state) or Corpse.removed?(state) do
       {:noreply, state}
     else
-      state = state |> PetBT.command(:attack, target_guid) |> wake_ai_tick()
+      state = state |> PetBT.command(:attack, target_guid, Time.now()) |> wake_ai_tick()
       {:noreply, state, {:continue, :maybe_broadcast}}
     end
   rescue
@@ -1427,12 +1427,12 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   end
 
   def handle_info({:pet_command, command, target_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
-    state = state |> PetBT.command(command, target_guid) |> wake_ai_tick() |> EventSink.emit_pending()
+    state = state |> PetBT.command(command, target_guid, Time.now()) |> wake_ai_tick() |> EventSink.emit_pending()
     {:noreply, state, {:continue, :maybe_broadcast}}
   end
 
   def handle_info({:pet_reaction, reaction}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
-    state = state |> PetBT.reaction(reaction) |> wake_ai_tick() |> EventSink.emit_pending()
+    state = state |> PetBT.reaction(reaction, Time.now()) |> wake_ai_tick() |> EventSink.emit_pending()
     {:noreply, state}
   end
 
@@ -1515,7 +1515,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   end
 
   def handle_info(:tame_stop, %Mob{} = state) do
-    state = state |> Engagement.leave(:tamed) |> Map.fetch!(:entity) |> EventSink.emit_pending()
+    state = state |> Engagement.leave(:tamed, Time.now()) |> Map.fetch!(:entity) |> EventSink.emit_pending()
     pid = self()
     Task.start(fn -> World.stop_entity(pid) end)
     {:noreply, state}

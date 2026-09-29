@@ -181,7 +181,7 @@ defmodule ThistleTea.Game.World.Combat.CallForHelpTest do
       %{entity: caller} = Engagement.enter(caller, enemy_guid, 1_000, ThreatSelection.opts(caller))
       source = CombatLeash.reference(caller)
       helpers = CallForHelp.capture(caller, enemy_guid)
-      %{entity: idle} = Engagement.leave(caller, :evade)
+      %{entity: idle} = Engagement.leave(caller, :evade, 1_000)
       CallForHelp.deliver(idle, enemy_guid, helpers, source)
       %{entity: fighting} = Engagement.enter(idle, enemy_guid, 2_000, ThreatSelection.opts(idle))
       refute CombatLeash.reference(fighting) == source

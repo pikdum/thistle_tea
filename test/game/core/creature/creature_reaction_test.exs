@@ -85,7 +85,7 @@ defmodule ThistleTea.Game.Core.Creature.CreatureReactionTest do
       assert passive.unit.target == 1
       assert passive.internal.threat == fighting.internal.threat
       assert passive.internal.in_combat
-      %{entity: idle} = Engagement.leave(passive, :evade)
+      %{entity: idle} = Engagement.leave(passive, :evade, 1_000)
       assert CreatureReaction.mode(idle) == :passive
       assert CreatureReaction.mode(Mob.respawn(idle)) == :passive
     end
@@ -98,7 +98,7 @@ defmodule ThistleTea.Game.Core.Creature.CreatureReactionTest do
       commanded = PetBT.command(passive, :attack, 2, 100)
       assert commanded.unit.target == 2
       assert commanded.internal.pet.attack_command?
-      stopped = PetBT.reaction(commanded, :passive)
+      stopped = PetBT.reaction(commanded, :passive, 200)
       assert stopped.unit.target in [nil, 0]
       refute stopped.internal.pet.attack_command?
     end

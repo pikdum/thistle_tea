@@ -42,7 +42,7 @@ defmodule ThistleTea.Game.Core.Pet.PetLearningTest do
       casting = Casting.start(pet, %{spell | cast_time_ms: 500}, Target.none(), 1_000)
       assert {:waiting, waiting, 500} = Casting.advance(casting, 1_000)
       refute Enum.any?(waiting.internal.events || [], &is_struct(&1, Effects.PetAbilityUsed))
-      canceled = Casting.cancel(waiting)
+      canceled = Casting.cancel(waiting, 1_500)
       assert {:idle, ^canceled} = Casting.advance(canceled, 2_000)
       refute Enum.any?(canceled.internal.events, &is_struct(&1, Effects.PetAbilityUsed))
 

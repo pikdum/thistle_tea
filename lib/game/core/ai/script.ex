@@ -599,8 +599,8 @@ defmodule ThistleTea.Game.Core.AI.Script do
     {state, blackboard}
   end
 
-  defp execute(state, blackboard, %ScriptStep{command: :interrupt_casts} = step, _target, _now, %Context{}) do
-    {interrupt_casts(state, step.datalong2), blackboard}
+  defp execute(state, blackboard, %ScriptStep{command: :interrupt_casts} = step, _target, now, %Context{}) do
+    {interrupt_casts(state, step.datalong2, now), blackboard}
   end
 
   defp execute(
@@ -1201,8 +1201,8 @@ defmodule ThistleTea.Game.Core.AI.Script do
     {Effects.enqueue(state, Effects.remove_self()), blackboard}
   end
 
-  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :combat_stop}, _target, _now) do
-    %Engagement.Result{entity: state} = Engagement.leave(state, :script, blackboard: blackboard)
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :combat_stop}, _target, now) do
+    %Engagement.Result{entity: state} = Engagement.leave(state, :script, now, blackboard: blackboard)
     {state, state.internal.blackboard}
   end
 
@@ -1353,13 +1353,13 @@ defmodule ThistleTea.Game.Core.AI.Script do
   defp player_controlled?(flags, _pet) when is_integer(flags), do: (flags &&& @unit_flag_player_controlled) != 0
   defp player_controlled?(_flags, _pet), do: false
 
-  defp interrupt_casts(%{internal: %{casting: nil}} = state, _spell_id), do: state
+  defp interrupt_casts(%{internal: %{casting: nil}} = state, _spell_id, _now), do: state
 
-  defp interrupt_casts(%{internal: %{casting: casting}} = state, spell_id) do
-    if spell_id == 0 or Cast.spell_id(casting) == spell_id, do: Casting.cancel(state), else: state
+  defp interrupt_casts(%{internal: %{casting: casting}} = state, spell_id, now) do
+    if spell_id == 0 or Cast.spell_id(casting) == spell_id, do: Casting.cancel(state, now), else: state
   end
 
-  defp interrupt_casts(state, _spell_id), do: state
+  defp interrupt_casts(state, _spell_id, _now), do: state
 
   defp unspecified_coordinate(value) when value == 0, do: nil
   defp unspecified_coordinate(value), do: value

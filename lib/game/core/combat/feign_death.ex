@@ -108,8 +108,8 @@ defmodule ThistleTea.Game.Core.Combat.FeignDeath do
 
   defp apply_attempt(entity, %Attempt{resisted?: true}, _now), do: {entity, []}
 
-  defp apply_attempt(%Mob{} = entity, %Attempt{}, _now) do
-    %Engagement.Result{entity: entity} = Engagement.leave(entity, :feign_death)
+  defp apply_attempt(%Mob{} = entity, %Attempt{}, now) do
+    %Engagement.Result{entity: entity} = Engagement.leave(entity, :feign_death, now)
     {entity, [%Effects.FeignDeathApplied{}]}
   end
 end

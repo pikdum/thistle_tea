@@ -56,7 +56,7 @@ defmodule ThistleTea.Game.Core.Condition.CreatureGroupScriptsTest do
                Effects.creature_group_event({:attack, 99, CombatLeash.reference(leader)})
              ]
 
-      %{entity: leader} = Engagement.leave(leader, :evade)
+      %{entity: leader} = Engagement.leave(leader, :evade, 1_000)
       assert List.last(leader.internal.events) == Effects.creature_group_event(:evade)
     end
 
@@ -74,11 +74,11 @@ defmodule ThistleTea.Game.Core.Condition.CreatureGroupScriptsTest do
       member = EventSink.emit_pending(member, Context.new(self()))
       assert CombatLeashes.last_extended_at(member) == 1_000
       %{entity: leader} = Engagement.enter(leader, 99, 10_000, selection: :target)
-      %{entity: leader} = Engagement.die(%{leader | unit: %{leader.unit | health: 0}})
+      %{entity: leader} = Engagement.die(%{leader | unit: %{leader.unit | health: 0}}, 1_000)
       EventSink.emit_pending(leader, Context.new(self()))
       assert CombatLeashes.last_extended_at(source) == nil
       assert CombatLeashes.last_extended_at(member) == 10_000
-      %{entity: member} = Engagement.leave(member, :evade)
+      %{entity: member} = Engagement.leave(member, :evade, 1_000)
       EventSink.emit_pending(member, Context.new(self()))
       assert CombatLeashes.last_extended_at(member) == nil
     end

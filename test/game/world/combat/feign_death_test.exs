@@ -117,7 +117,7 @@ defmodule ThistleTea.Game.World.Combat.FeignDeathTest do
       character = Companion.activate(ctx.character, :hunter_pet, %EntityRef{guid: ctx.pet, entry: 1, spell_id: 1515})
       assert prepare(%{ctx | character: character}, 0).feign_death.pet_in_combat?
 
-      pet = Engagement.leave(pet, :pet_command).entity
+      pet = Engagement.leave(pet, :pet_command, 1_000).entity
       assert {:noreply, _pet} = MobServer.handle_continue(:maybe_broadcast, pet)
       refute prepare(%{ctx | character: character}, 0).feign_death.pet_in_combat?
     end

@@ -188,7 +188,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AmmunitionTest do
 
       character = state.character |> Casting.start(spell, Target.self(state.guid), 0) |> Casting.complete(1_000)
       assert %Effects.LaunchRanged{kind: :cast} = request = List.last(character.internal.events)
-      state = %{state | character: Casting.cancel(character)}
+      state = %{state | character: Casting.cancel(character, 1_000)}
       assert Ammunition.launch(state, request) == state
       assert ItemStore.get(arrows.object.guid).item.stack_count == 2
     end

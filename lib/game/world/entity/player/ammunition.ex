@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Ammunition do
   alias ThistleTea.Game.Core.Spell.AutoRepeat
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Spell.Casting
+  alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.ItemCosts
@@ -162,7 +163,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Ammunition do
   end
 
   defp fail(state, spell_id, reason, kind) do
-    character = if kind == :cast, do: Casting.cancel(state.character), else: state.character
+    character = if kind == :cast, do: Casting.cancel(state.character, Time.now()), else: state.character
     character = character |> Ranged.stop() |> Effects.enqueue(Effects.spell_cast_failed(spell_id, reason))
     %{state | character: EventSink.emit_pending(character)}
   end

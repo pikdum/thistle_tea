@@ -67,7 +67,7 @@ defmodule ThistleTea.Game.World.Entity.CombatZoneTest do
       assert_receive {:"$gen_cast", {:threat_ref_gained, ^guid, 123}}
       refute_receive {:"$gen_cast", {:threat_ref_gained, ^guid, 123}}, 20
       assert fighting.internal.threat == %{player => 0.0, pet => 0.0}
-      stopped = Engagement.leave(fighting, :evade).entity |> EventSink.emit_pending()
+      stopped = Engagement.leave(fighting, :evade, 1_000).entity |> EventSink.emit_pending()
       assert_receive {:"$gen_cast", {:threat_ref_lost, ^guid, 123}}
       assert_receive {:"$gen_cast", {:threat_ref_lost, ^guid, 123}}
       assert stopped.internal.combat_zone == nil

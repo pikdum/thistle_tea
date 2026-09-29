@@ -126,7 +126,7 @@ defmodule ThistleTea.Game.Core.Aura.Transition do
     {entity, movement_events} = MovementSync.sync_movement_state(entity, now)
     {entity, control_movement_events} = ControlMovement.reconcile(entity, previous, holders, now)
     {entity, feign_events} = FeignDeath.reconcile(entity, previous, holders, now)
-    entity = maybe_interrupt_fear_casting(entity)
+    entity = maybe_interrupt_fear_casting(entity, now)
     viewpoint_events = ViewpointSync.events(previous, holders, entity_guid(entity))
     release_events = release_controlled_events(entity, removed)
     forced_reaction_events = forced_reaction_events(entity, previous, holders)
@@ -278,7 +278,7 @@ defmodule ThistleTea.Game.Core.Aura.Transition do
         {current, sit_events} =
           current
           |> maybe_reset_shapeshift_power(holder)
-          |> maybe_interrupt_casting(holder)
+          |> maybe_interrupt_casting(holder, now)
           |> maybe_sit(holder)
 
         {current, events ++ sit_events}
@@ -386,41 +386,42 @@ defmodule ThistleTea.Game.Core.Aura.Transition do
 
   defp maybe_interrupt_casting(
          %{object: %{guid: guid}, internal: %{casting: %Cast{phase: :impact, spell: %Spell{id: id}}}} = entity,
-         %Holder{caster_guid: guid, spell: %Spell{id: id}}
+         %Holder{caster_guid: guid, spell: %Spell{id: id}},
+         _now
        ), do: entity
 
-  defp maybe_interrupt_casting(%{internal: %{casting: casting}} = entity, %Holder{} = holder)
+  defp maybe_interrupt_casting(%{internal: %{casting: casting}} = entity, %Holder{} = holder, now)
        when not is_nil(casting) do
     cond do
       Holder.has_any_type?(holder, @cast_breaking_controls) ->
-        clear_casting(entity)
+        clear_casting(entity, now)
 
       Holder.has_any_type?(holder, [:mod_silence, :mod_pacify_silence]) and silenceable_cast?(casting) ->
-        clear_casting(entity)
+        clear_casting(entity, now)
 
       true ->
         entity
     end
   end
 
-  defp maybe_interrupt_casting(entity, _holder), do: entity
+  defp maybe_interrupt_casting(entity, _holder, _now), do: entity
 
-  defp maybe_interrupt_fear_casting(%{internal: %{casting: casting}} = entity) when not is_nil(casting) do
-    if Fear.active?(entity), do: clear_casting(entity), else: entity
+  defp maybe_interrupt_fear_casting(%{internal: %{casting: casting}} = entity, now) when not is_nil(casting) do
+    if Fear.active?(entity), do: clear_casting(entity, now), else: entity
   end
 
-  defp maybe_interrupt_fear_casting(entity), do: entity
+  defp maybe_interrupt_fear_casting(entity, _now), do: entity
 
   defp silenceable_cast?(%{spell: %Spell{prevention_type: 1}}), do: true
   defp silenceable_cast?(_casting), do: false
 
-  defp clear_casting(%{internal: %{casting: %{spell: %Spell{id: id}}}} = entity) do
+  defp clear_casting(%{internal: %{casting: %{spell: %Spell{id: id}}}} = entity, now) do
     entity
     |> Effects.enqueue(Effects.spell_cast_failed(id, :interrupted))
-    |> Casting.cancel()
+    |> Casting.cancel(now)
   end
 
-  defp clear_casting(entity), do: Casting.cancel(entity)
+  defp clear_casting(entity, now), do: Casting.cancel(entity, now)
 
   defp maybe_sit(%{unit: %Unit{stand_state: stand_state} = unit} = entity, %Holder{spell: %Spell{} = spell}) do
     if (spell.aura_interrupt_flags &&& @aura_interrupt_not_seated) != 0 and stand_state != @stand_state_sit do

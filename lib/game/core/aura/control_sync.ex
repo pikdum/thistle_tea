@@ -64,7 +64,7 @@ defmodule ThistleTea.Game.Core.Aura.ControlSync do
     original_faction = original_value(previous, :original_faction_template, mob.unit.faction_template)
     original_npc_flags = original_value(previous, :original_npc_flags, mob.unit.npc_flags)
     original_pvp? = original_value(previous, :original_pvp?, Pvp.active?(mob))
-    %Engagement.Result{entity: mob} = Engagement.leave(mob, :controlled, clear_tap?: false)
+    %Engagement.Result{entity: mob} = Engagement.leave(mob, :controlled, now, clear_tap?: false)
 
     pet = %Pet{
       owner_guid: holder.caster_guid,
@@ -146,7 +146,7 @@ defmodule ThistleTea.Game.Core.Aura.ControlSync do
     mob = MovementHandoff.clear(mob)
     original_faction = original_value(previous, :original_faction_template, mob.unit.faction_template)
     original_npc_flags = original_value(previous, :original_npc_flags, mob.unit.npc_flags)
-    %Engagement.Result{entity: mob} = Engagement.leave(mob, :controlled, clear_tap?: false)
+    %Engagement.Result{entity: mob} = Engagement.leave(mob, :controlled, now, clear_tap?: false)
 
     pet = possession_pet(previous, holder, original_faction, original_npc_flags, mob.unit.flags || 0)
     faction_template = holder.caster_faction_template || mob.unit.faction_template

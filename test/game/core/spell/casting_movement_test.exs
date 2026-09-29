@@ -115,7 +115,7 @@ defmodule ThistleTea.Game.Core.Spell.CastingMovementTest do
       assert Enum.count(stopped.internal.events, &match?(%Effects.DespawnEntity{target_guid: 777}, &1)) == 1
       assert Casting.interrupt_movement(stopped, 1_200) == stopped
 
-      finished = Casting.finish_game_object_channel(started, 777)
+      finished = Casting.finish_game_object_channel(started, 777, 1_300)
       assert finished.internal.casting == nil
       assert finished.internal.channel_game_object_guid == nil
       refute Enum.any?(finished.internal.events, &is_struct(&1, Effects.DespawnEntity))

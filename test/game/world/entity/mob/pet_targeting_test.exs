@@ -109,7 +109,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetTargetingTest do
 
     test "zero-damage contact keeps a waiting or passive pet in combat", %{pet: pet, target: target} do
       for reaction <- [:passive, :defensive] do
-        waiting = pet |> PetBT.command(:stay, 0, 1_000) |> PetBT.reaction(reaction)
+        waiting = pet |> PetBT.command(:stay, 0, 1_000) |> PetBT.reaction(reaction, 1_000)
         attack = %{attack(target) | damage: 0}
 
         assert {:noreply, contacted, {:continue, :maybe_broadcast}} =

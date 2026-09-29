@@ -197,7 +197,7 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
   end
 
   defp disengage(%__MODULE__{character: %Character{} = character} = state) do
-    character = character |> Casting.cancel() |> MovementHandoff.clear()
+    character = character |> Casting.cancel(Time.now()) |> MovementHandoff.clear()
     {character, effects} = PlayerCombat.disengage(character)
     character = character |> Totems.dismiss_all() |> EventSink.emit_pending()
     %{state | character: EventSink.emit(character, effects)}

@@ -443,7 +443,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   end
 
   def handle_cast({:finish_game_object_channel, game_object_guid}, %{character: %Character{} = character} = state) do
-    character = Casting.finish_game_object_channel(character, game_object_guid)
+    character = Casting.finish_game_object_channel(character, game_object_guid, Time.now())
     character = EventSink.emit_pending(character)
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   end

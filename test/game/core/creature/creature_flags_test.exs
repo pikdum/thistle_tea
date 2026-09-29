@@ -192,7 +192,7 @@ defmodule ThistleTea.Game.Core.Creature.CreatureFlagsTest do
       {_status, chasing} = BT.tick(MobBT.tree(), mob, context(20.0))
       assert chasing.internal.navigation_intents != []
 
-      %Engagement.Result{entity: reset} = Engagement.leave(mob, :evade)
+      %Engagement.Result{entity: reset} = Engagement.leave(mob, :evade, 1_000)
       refute Blackboard.melee_enabled?(reset.internal.blackboard, reset)
       refute Blackboard.combat_movement?(reset.internal.blackboard, reset)
       respawned = Mob.respawn(Entity.kill(mob, 2_000))

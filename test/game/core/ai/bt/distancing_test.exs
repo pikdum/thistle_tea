@@ -200,7 +200,7 @@ defmodule ThistleTea.Game.Core.AI.BT.DistancingTest do
 
     test "death and combat exit clear distancing", %{mob: mob} do
       moving = resolve(request(mob))
-      %{entity: left} = Engagement.leave(moving, :evade)
+      %{entity: left} = Engagement.leave(moving, :evade, 1_000)
       dead = Entity.kill(moving, 500)
       refute Distancing.active?(left)
       refute Distancing.active?(dead)

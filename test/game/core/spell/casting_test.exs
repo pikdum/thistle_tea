@@ -343,7 +343,7 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
     end
 
     test "a cancelled channel cannot deliver its pending completion tick" do
-      mob = Casting.cancel(final_channel_tick_fixture())
+      mob = Casting.cancel(final_channel_tick_fixture(), 1_500)
 
       assert {:idle, ^mob} = Casting.advance(mob, 21_000)
       refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
@@ -619,7 +619,7 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
         spell = %Spell{id: 123, cast_time_ms: 1_000, effects: [%Effect{type: :dummy, implicit_target_a: target}]}
         preparing = Casting.start(character, spell, Target.unit(7), 1_000)
         assert Aura.has_aura?(preparing, :honorless_target)
-        assert Aura.has_aura?(Casting.cancel(preparing), :honorless_target)
+        assert Aura.has_aura?(Casting.cancel(preparing, 1_500), :honorless_target)
 
         resolution =
           if missed?,
@@ -1413,7 +1413,7 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
       casting = Casting.start(character, spell, Target.item(42), 1_000)
       assert casting.internal.casting.ends_at == 4_000
       refute Enum.any?(casting.internal.events || [], &is_struct(&1, Effects.DisenchantItem))
-      cancelled = casting |> Casting.cancel() |> Casting.complete(4_000)
+      cancelled = casting |> Casting.cancel(1_500) |> Casting.complete(4_000)
       refute Enum.any?(cancelled.internal.events || [], &is_struct(&1, Effects.DisenchantItem))
 
       completed = Casting.complete(casting, 4_000)
@@ -1435,7 +1435,7 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
       }
 
       casting = Casting.start(character, spell, Target.item(42), 1_000)
-      cancelled = casting |> Casting.cancel() |> Casting.complete(6_000)
+      cancelled = casting |> Casting.cancel(1_500) |> Casting.complete(6_000)
       refute Enum.any?(cancelled.internal.events, &is_struct(&1, Effects.EnchantItem))
       completed = Casting.complete(casting, 6_000)
 
@@ -1459,7 +1459,7 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
       }
 
       casting = Casting.start(character, spell, Target.item(42), 1_000, 43)
-      cancelled = casting |> Casting.cancel() |> Casting.complete(4_000)
+      cancelled = casting |> Casting.cancel(1_500) |> Casting.complete(4_000)
       refute Enum.any?(cancelled.internal.events, &is_struct(&1, Effects.EnchantItem))
       completed = Casting.complete(casting, 4_000)
 
@@ -1489,7 +1489,7 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
       }
 
       casting = Casting.start(character, spell, Target.item(42), 1000, 43)
-      cancelled = casting |> Casting.cancel() |> Casting.complete(2000)
+      cancelled = casting |> Casting.cancel(1_500) |> Casting.complete(2000)
       refute Enum.any?(cancelled.internal.events, &is_struct(&1, Effects.TransformItem))
       completed = Casting.complete(casting, 2000)
 

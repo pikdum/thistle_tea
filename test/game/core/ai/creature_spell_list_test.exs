@@ -103,7 +103,11 @@ defmodule ThistleTea.Game.Core.AI.CreatureSpellListTest do
       {changed, memory} = Script.execute_steps(mob, Blackboard.new(), [step(list)], 0, context(0))
       changed = %{changed | internal: %{changed.internal | blackboard: memory, in_combat: true}}
 
-      for result <- [Engagement.leave(changed, :evade), Engagement.die(changed), Engagement.reset(changed)] do
+      for result <- [
+            Engagement.leave(changed, :evade, 1_000),
+            Engagement.die(changed, 1_000),
+            Engagement.reset(changed)
+          ] do
         memory = Blackboard.ensure(result.entity.internal.blackboard)
         assert memory.spells.list == nil
         assert memory.spells.timers == nil

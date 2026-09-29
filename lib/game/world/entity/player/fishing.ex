@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Fishing do
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Spell.Casting
+  alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
@@ -70,16 +71,16 @@ defmodule ThistleTea.Game.World.Entity.Player.Fishing do
     case Entity.call(bobber_guid, {:fishing_use, state.guid, skill}) do
       {:ok, _loot, _catch} ->
         character = advance_skill(character)
-        character = character |> Casting.finish_game_object_channel(bobber_guid) |> EventSink.emit_pending()
+        character = character |> Casting.finish_game_object_channel(bobber_guid, Time.now()) |> EventSink.emit_pending()
         Looting.open(%{state | character: character}, bobber_guid, loot_type: @loot_type_fishing)
 
       {:error, :not_hooked} ->
-        character = character |> Casting.cancel() |> EventSink.emit_pending()
+        character = character |> Casting.cancel(Time.now()) |> EventSink.emit_pending()
         Outbound.send_packet(%Message.SmsgFishNotHooked{})
         %{state | character: character}
 
       {:error, :escaped} ->
-        character = character |> Casting.cancel() |> EventSink.emit_pending()
+        character = character |> Casting.cancel(Time.now()) |> EventSink.emit_pending()
         Outbound.send_packet(%Message.SmsgFishEscaped{})
         %{state | character: character}
 

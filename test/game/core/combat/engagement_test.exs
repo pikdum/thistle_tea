@@ -69,7 +69,7 @@ defmodule ThistleTea.Game.Core.Combat.EngagementTest do
 
     test "refuses renewed combat until return-home movement finishes" do
       %{entity: creature} = Engagement.enter(mob(), 20, 1_000, selection())
-      %{entity: creature} = Engagement.leave(creature, :evade)
+      %{entity: creature} = Engagement.leave(creature, :evade, 1_000)
       blackboard = creature.internal.blackboard
       blackboard = %{blackboard | navigation: %{blackboard.navigation | returning_home?: true}}
       creature = %{creature | internal: %{creature.internal | blackboard: blackboard}}
@@ -145,7 +145,7 @@ defmodule ThistleTea.Game.Core.Combat.EngagementTest do
       mob = Engagement.claim(mob, %Tap{player: target, group_id: 7})
 
       %Engagement.Result{entity: mob, from: :engaged, to: :idle, reason: :evade} =
-        Engagement.leave(mob, :evade)
+        Engagement.leave(mob, :evade, 1_000)
 
       refute mob.internal.in_combat
       assert mob.internal.threat == %{}
@@ -191,7 +191,7 @@ defmodule ThistleTea.Game.Core.Combat.EngagementTest do
           internal: %{mob.internal | damage_origin: %DamageOrigin{player: 100}}
       }
 
-      %Engagement.Result{entity: mob, from: :engaged, to: :dead, reason: :death} = Engagement.die(mob)
+      %Engagement.Result{entity: mob, from: :engaged, to: :dead, reason: :death} = Engagement.die(mob, 1_000)
 
       refute mob.internal.in_combat
       assert mob.internal.threat == %{}

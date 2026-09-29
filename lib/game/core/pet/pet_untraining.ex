@@ -53,7 +53,7 @@ defmodule ThistleTea.Game.Core.Pet.PetUntraining do
 
   defp clear(%Mob{} = pet, family_spells, cost, now) do
     removed_ids = Map.keys(pet.internal.spellbook) -- Map.keys(family_spells)
-    pet = Casting.cancel(pet)
+    pet = Casting.cancel(pet, now)
     {pet, effects} = Aura.remove_spells(pet, removed_ids, now)
 
     action_bar =

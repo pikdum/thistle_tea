@@ -107,7 +107,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
         state
 
       true ->
-        %{entity: state} = Engagement.leave(state, :despawn)
+        %{entity: state} = Engagement.leave(state, :despawn, Time.now())
         state = EventSink.emit_pending(state)
         state = %{state | unit: %{state.unit | health: 0}}
         CreatureGroups.event(state, :despawn, self())

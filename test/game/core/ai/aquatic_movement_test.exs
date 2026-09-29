@@ -88,7 +88,7 @@ defmodule ThistleTea.Game.Core.AI.AquaticMovementTest do
         |> NavigationResolver.resolve(-5_000, fn _, _, destination, _ -> [destination] end)
 
       assert succeeded.internal.blackboard.navigation.unreachable_since == nil
-      %{entity: left} = Engagement.leave(failed, :evade)
+      %{entity: left} = Engagement.leave(failed, :evade, 1_000)
       assert left.internal.blackboard.navigation.unreachable_since == nil
     end
 

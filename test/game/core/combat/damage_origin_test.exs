@@ -132,7 +132,7 @@ defmodule ThistleTea.Game.Core.Combat.DamageOriginTest do
         Engagement.enter(stopped, 8, 3, valid?: fn _guid -> false end, in_melee?: fn _guid -> false end)
 
       assert changed.internal.damage_origin == stopped.internal.damage_origin
-      assert Engagement.leave(changed, :evade).entity.internal.damage_origin == %DamageOrigin{}
+      assert Engagement.leave(changed, :evade, 1_000).entity.internal.damage_origin == %DamageOrigin{}
       assert Mob.respawn(changed).internal.damage_origin == %DamageOrigin{}
     end
 

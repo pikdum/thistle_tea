@@ -320,7 +320,7 @@ defmodule ThistleTea.Game.Core.Entity do
 
   defp prepare_death_state(%{internal: %Internal{}, unit: %Unit{}, movement_block: %MovementBlock{}} = entity, now) do
     entity = Movement.sync_position(entity, now)
-    entity = clear_death_engagement(entity)
+    entity = clear_death_engagement(entity, now)
     entity = Reactive.clear(entity, now)
     unit = entity.unit
 
@@ -368,17 +368,17 @@ defmodule ThistleTea.Game.Core.Entity do
     |> Combat.sync_combat_flag()
   end
 
-  defp clear_death_engagement(%Mob{} = entity) do
-    %Engagement.Result{entity: entity} = Engagement.die(entity)
+  defp clear_death_engagement(%Mob{} = entity, now) do
+    %Engagement.Result{entity: entity} = Engagement.die(entity, now)
     entity
   end
 
-  defp clear_death_engagement(%Character{} = entity) do
+  defp clear_death_engagement(%Character{} = entity, _now) do
     {entity, effects} = PlayerCombat.disengage(entity)
     Effects.enqueue(entity, effects)
   end
 
-  defp clear_death_engagement(%{internal: %Internal{} = internal, unit: %Unit{} = unit} = entity) do
+  defp clear_death_engagement(%{internal: %Internal{} = internal, unit: %Unit{} = unit} = entity, _now) do
     %{entity | unit: %{unit | target: 0}, internal: %{internal | in_combat: false}}
   end
 

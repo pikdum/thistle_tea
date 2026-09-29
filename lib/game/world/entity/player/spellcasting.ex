@@ -291,7 +291,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Spellcasting do
 
         character =
           character
-          |> Casting.cancel()
+          |> Casting.cancel(Time.now())
           |> EventSink.emit_pending()
 
         state

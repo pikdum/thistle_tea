@@ -8,6 +8,37 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
                              {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World.Spell.SpellTargetResolver"}
                            ])
 
+  @random_sources MapSet.new([
+                    "lib/game/core/math.ex",
+                    "lib/game/core/rolls.ex"
+                  ])
+
+  @allowed_core_random_draws MapSet.new([
+                               "lib/game/core/ai/creature_spell.ex",
+                               "lib/game/core/aura.ex",
+                               "lib/game/core/aura/class_script.ex",
+                               "lib/game/core/aura/dispel.ex",
+                               "lib/game/core/aura/periodic_damage.ex",
+                               "lib/game/core/aura/proc_chance.ex",
+                               "lib/game/core/aura/proc_spell.ex",
+                               "lib/game/core/aura/transition.ex",
+                               "lib/game/core/class/racial.ex",
+                               "lib/game/core/class/shaman.ex",
+                               "lib/game/core/combat.ex",
+                               "lib/game/core/combat/attack_table.ex",
+                               "lib/game/core/entity/game_object.ex",
+                               "lib/game/core/loot.ex",
+                               "lib/game/core/loot/loot_roll.ex",
+                               "lib/game/core/profession/engineering/death_ray.ex",
+                               "lib/game/core/reputation.ex",
+                               "lib/game/core/skills.ex",
+                               "lib/game/core/spell/cast_pushback.ex",
+                               "lib/game/core/spell/effect.ex",
+                               "lib/game/core/spell/proc.ex",
+                               "lib/game/core/spell/spell_resist.ex",
+                               "lib/game/core/spell/target_trigger.ex"
+                             ])
+
   @spatial_index_boundaries MapSet.new([
                               "lib/game/world.ex",
                               "lib/game/world/position.ex",
@@ -16,6 +47,25 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
 
   test "core files do not gain new references to the world or seed databases" do
     assert core_outer_references() == @allowed_core_references
+  end
+
+  test "core never reads the clock" do
+    readers =
+      core_files()
+      |> Enum.filter(&(File.read!(&1) =~ ~r/\bTime\.now\b|System\.(monotonic|system|os)_time|utc_now|:os\.timestamp/))
+      |> MapSet.new(&Path.relative_to(&1, @root))
+
+    assert readers == MapSet.new(["lib/game/core/time.ex"])
+  end
+
+  test "core files do not gain new ambient random draws" do
+    drawers =
+      core_files()
+      |> Enum.filter(&(File.read!(&1) =~ ~r/:rand\.|Enum\.(random|shuffle|take_random)|Math\.random_int/))
+      |> MapSet.new(&Path.relative_to(&1, @root))
+      |> MapSet.difference(@random_sources)
+
+    assert drawers == @allowed_core_random_draws
   end
 
   test "event interpreters do not depend on their caller process" do
@@ -72,7 +122,7 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
   end
 
   defp core_outer_references do
-    Path.wildcard(Path.join([@root, "lib/game/core/**/*.ex"]))
+    core_files()
     |> Enum.flat_map(fn path ->
       path
       |> File.read!()
@@ -96,6 +146,8 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
 
     Enum.filter(modules, &Regex.match?(~r/^ThistleTea\.(?:Game\.(?:Network|World)|DB)(?:\.|$)/, &1))
   end
+
+  defp core_files, do: Path.wildcard(Path.join([@root, "lib/game/core/**/*.ex"]))
 
   defp event_sink_files do
     [

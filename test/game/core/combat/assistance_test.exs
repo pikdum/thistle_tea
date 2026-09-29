@@ -208,7 +208,7 @@ defmodule ThistleTea.Game.Core.Combat.AssistanceTest do
 
     test "combat end and death clear the retreat", %{mob: mob} do
       moving = moving(mob)
-      %{entity: left} = Engagement.leave(moving, :evade)
+      %{entity: left} = Engagement.leave(moving, :evade, 1_000)
       dead = Entity.kill(moving, 500)
 
       for entity <- [left, dead] do

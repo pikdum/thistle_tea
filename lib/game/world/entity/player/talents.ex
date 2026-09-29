@@ -42,7 +42,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Talents do
         now = Time.now()
 
         character
-        |> Casting.cancel()
+        |> Casting.cancel(now)
         |> remove_triggered_auras(talent_spell_ids, now)
         |> Spells.unlearn(with_dependent_spells(talent_spell_ids), now)
         |> then(&sync_pet_aura_links(character, &1, now))

@@ -30,7 +30,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
   alias ThistleTea.Game.Core.Movement
   alias ThistleTea.Game.Core.Movement.Distraction
   alias ThistleTea.Game.Core.Spell.Casting
-  alias ThistleTea.Game.Core.Time
 
   @follow_distance 2.0
   @follow_angle :math.pi() / 2
@@ -75,7 +74,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
     MobSpells.try_cast(state, blackboard, context, self_only?: true)
   end
 
-  def command(state, command, target_guid, now \\ Time.now())
+  def command(state, command, target_guid, now)
 
   def command(%Mob{internal: %Internal{pet: %Pet{possessed?: true} = pet}} = state, command, _target, _now)
       when command in [:stay, :follow] do
@@ -124,20 +123,20 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
 
   def command(%Mob{} = state, _command, _target_guid, _now), do: state
 
-  def reaction(%Mob{internal: %Internal{pet: %Pet{}}} = state, reaction)
+  def reaction(%Mob{internal: %Internal{pet: %Pet{}}} = state, reaction, now)
       when reaction in [:passive, :defensive, :aggressive] do
     state = CreatureReaction.set(state, reaction)
 
     if reaction == :passive do
       state
-      |> clear_combat_state()
-      |> Movement.stop(Time.now())
+      |> clear_combat_state(now)
+      |> Movement.stop(now)
     else
       state
     end
   end
 
-  def reaction(%Mob{} = state, _reaction), do: state
+  def reaction(%Mob{} = state, _reaction, _now), do: state
 
   defp dead?(%Mob{internal: %Internal{pet: %Pet{broken?: true}}}, _blackboard), do: true
   defp dead?(state, _blackboard), do: Entity.dead?(state)
@@ -157,7 +156,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
     blackboard = blackboard |> Blackboard.clear_chase() |> Blackboard.reset_spells()
     state = %{state | internal: %{state.internal | pet: pet, blackboard: blackboard}}
     %Engagement.Result{entity: state} = Engagement.stop_attack(state)
-    state = state |> Casting.cancel() |> halt(now)
+    state = state |> Casting.cancel(now) |> halt(now)
 
     state =
       case TargetSelection.next(state, context, previous_victim) do
@@ -179,9 +178,9 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
 
   def victim_died(%Mob{} = state, _victim, %Context{}), do: state
 
-  def clear_combat_state(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, now \\ Time.now()) do
+  def clear_combat_state(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, now) do
     pet = %{pet | attack_command?: false}
-    %Engagement.Result{entity: state} = Engagement.leave(state, :pet_command)
+    %Engagement.Result{entity: state} = Engagement.leave(state, :pet_command, now)
 
     %{state | internal: %{state.internal | pet: pet}}
     |> halt(now)

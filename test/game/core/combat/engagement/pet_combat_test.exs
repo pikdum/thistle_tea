@@ -74,7 +74,7 @@ defmodule ThistleTea.Game.Core.Combat.Engagement.PetCombatTest do
       assert pet.unit.target == nil
 
       for command <- [:stay, :follow] do
-        commanded = pet |> PetBT.command(command, 0, 1_001) |> PetBT.reaction(:passive)
+        commanded = pet |> PetBT.command(command, 0, 1_001) |> PetBT.reaction(:passive, 1_001)
         assert commanded.unit.target == 0
         assert Engagement.maintain(commanded, Context.new(5_999)).internal.in_combat
         refute Engagement.maintain(commanded, Context.new(6_000)).internal.in_combat
@@ -120,7 +120,7 @@ defmodule ThistleTea.Game.Core.Combat.Engagement.PetCombatTest do
   describe "die/1" do
     test "death clears references and rejects delayed combat messages", %{pet: pet, enemy: enemy} do
       pet = pet |> Engagement.gain_threat_ref(enemy, 7, 0) |> Engagement.contact(enemy, 1_000)
-      dead = Engagement.die(%{pet | unit: %{pet.unit | health: 0}}).entity
+      dead = Engagement.die(%{pet | unit: %{pet.unit | health: 0}}, 1_000).entity
       assert dead.internal.threat_refs == MapSet.new()
       assert dead.internal.last_hostile_time == nil
       assert Engagement.gain_threat_ref(dead, enemy, 7, 0) == dead

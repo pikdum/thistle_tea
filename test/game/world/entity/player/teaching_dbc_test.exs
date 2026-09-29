@@ -100,7 +100,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TeachingDbcTest do
     test "cancellation preserves the book and teaches nothing", %{state: state} do
       {state, item} = book(state, 6325, 7756, 1)
       started = use_book(state)
-      cancelled = Casting.cancel(started.character)
+      cancelled = Casting.cancel(started.character, started.character.internal.casting.ends_at - 1)
       completed = Casting.complete(cancelled, started.character.internal.casting.ends_at + 1)
       EventSink.emit_pending(completed, Context.new(self()))
       refute_received {:teach_spell, _}

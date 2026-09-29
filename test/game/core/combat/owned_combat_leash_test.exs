@@ -33,7 +33,7 @@ defmodule ThistleTea.Game.Core.Combat.OwnedCombatLeashTest do
       assert CombatLeashes.last_extended_at(owner) == 9_000
 
       %{entity: owner} = Engagement.enter(owner, 99, 10_000, selection: :target)
-      %{entity: dead} = Engagement.die(%{owner | unit: %{owner.unit | health: 0}})
+      %{entity: dead} = Engagement.die(%{owner | unit: %{owner.unit | health: 0}}, 1_000)
       EventSink.emit_pending(dead, Context.new(self()))
       assert CombatLeashes.last_extended_at(summon) == 10_000
       assert CombatLeashes.last_extended_at(owner) == nil
@@ -64,12 +64,12 @@ defmodule ThistleTea.Game.Core.Combat.OwnedCombatLeashTest do
       summon = enter(summon, 3_000, leash_source: source)
       assert summon.internal.combat_leash.last_extended_at == nil
       assert CombatLeashes.last_extended_at(summon) == 1_000
-      %{entity: summon} = Engagement.leave(summon, :evade)
+      %{entity: summon} = Engagement.leave(summon, :evade, 1_000)
       summon = EventSink.emit_pending(summon, Context.new(self()))
       summon = %{summon | internal: %{summon.internal | world: WorldRef.open(1)}} |> enter(4_000)
       assert CombatLeashes.last_extended_at(summon) == 4_000
       assert CombatLeashes.last_extended_at(owner) == 1_000
-      %{entity: summon} = Engagement.leave(summon, :evade)
+      %{entity: summon} = Engagement.leave(summon, :evade, 1_000)
       EventSink.emit_pending(summon, Context.new(self()))
     end
 
@@ -81,7 +81,7 @@ defmodule ThistleTea.Game.Core.Combat.OwnedCombatLeashTest do
         independent = enter(independent, 2_000)
         assert CombatLeashes.last_extended_at(independent) == 2_000
         assert CombatLeashes.last_extended_at(owner) == 1_000
-        %{entity: independent} = Engagement.leave(independent, :evade)
+        %{entity: independent} = Engagement.leave(independent, :evade, 1_000)
         EventSink.emit_pending(independent, Context.new(self()))
       end
     end
@@ -90,7 +90,7 @@ defmodule ThistleTea.Game.Core.Combat.OwnedCombatLeashTest do
   describe "Engagement.leave/3" do
     test "idle owner despawn detaches its clock without discarding the summon", %{owner: owner, summon: summon} do
       summon = enter(summon, 1_000)
-      %{entity: owner} = Engagement.leave(owner, :despawn)
+      %{entity: owner} = Engagement.leave(owner, :despawn, 1_000)
       owner = EventSink.emit_pending(owner, Context.new(self()))
       owner = enter(owner, 5_000)
       assert CombatLeashes.last_extended_at(summon) == 1_000

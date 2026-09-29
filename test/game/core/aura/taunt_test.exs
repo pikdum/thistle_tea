@@ -156,7 +156,7 @@ defmodule ThistleTea.Game.Core.Aura.TauntTest do
         assert removed.internal.temporary_threat == %{}
       end
 
-      for cleared <- [Engagement.leave(taunted, :evade).entity, Engagement.reset(taunted).entity] do
+      for cleared <- [Engagement.leave(taunted, :evade, 1_000).entity, Engagement.reset(taunted).entity] do
         {expired, _events} = cleared |> Threat.add(2, 10) |> Aura.expire_due(7_000)
         assert expired.internal.threat == %{2 => 10.0}
         assert expired.internal.temporary_threat == %{}
