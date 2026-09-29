@@ -3,8 +3,8 @@ defmodule ThistleTea.Game.World.Loader.Graveyard do
 
   import Ecto.Query
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.DBC
   alias ThistleTea.Game.Core.Instance.Dungeon
   alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.World.Loader.MapTemplate
@@ -32,7 +32,7 @@ defmodule ThistleTea.Game.World.Loader.Graveyard do
       )
 
     ids = links |> Enum.map(& &1.id) |> Enum.uniq()
-    locations = DBC.all(from(l in WorldSafeLocs, where: l.id in ^ids))
+    locations = DBC.all(from(l in DBC.WorldSafeLocs, where: l.id in ^ids))
     load(links, locations)
   end
 

@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Fishing do
   alias ThistleTea.Game.Core.Spell.Casting
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
@@ -171,7 +172,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Fishing do
       {:gained, skills} ->
         character = %{character | player: %{character.player | skills: skills}}
         CharacterStore.put(character)
-        Network.send_packet(EntityCore.update_object(character, :values))
+        Network.send_packet(UpdateObject.from_entity(character, :values))
         character
 
       :unchanged ->

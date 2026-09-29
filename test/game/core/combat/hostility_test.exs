@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.Combat.HostilityTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Unit
@@ -29,8 +30,8 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
     end
 
     test "honors explicit friend factions before masks" do
-      assert FactionTemplate.friendly_to?(friendly_defias(), defias())
-      refute FactionTemplate.hostile_to?(friendly_defias(), defias())
+      assert DBC.FactionTemplate.friendly_to?(friendly_defias(), defias())
+      refute DBC.FactionTemplate.hostile_to?(friendly_defias(), defias())
     end
 
     test "uses at-war for player reactions to reputation factions" do
@@ -304,23 +305,47 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
   end
 
   defp alliance do
-    %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+    %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
   end
 
   defp horde do
-    %FactionTemplate{id: 2, faction: 2, flags: 72, faction_group: 5, friend_group: 4, enemy_group: 10}
+    %DBC.FactionTemplate{id: 2, faction: 2, flags: 72, faction_group: 5, friend_group: 4, enemy_group: 10}
   end
 
   defp defias do
-    %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, friend_group: 0, enemy_group: 1, friends_0: 15}
+    %DBC.FactionTemplate{
+      id: 17,
+      faction: 15,
+      flags: 1,
+      faction_group: 8,
+      friend_group: 0,
+      enemy_group: 1,
+      friends_0: 15
+    }
   end
 
   defp friendly_defias do
-    %FactionTemplate{id: 99, faction: 99, flags: 0, faction_group: 8, friend_group: 0, enemy_group: 1, friends_0: 15}
+    %DBC.FactionTemplate{
+      id: 99,
+      faction: 99,
+      flags: 0,
+      faction_group: 8,
+      friend_group: 0,
+      enemy_group: 1,
+      friends_0: 15
+    }
   end
 
   defp wolf do
-    %FactionTemplate{id: 32, faction: 29, flags: 16, faction_group: 0, friend_group: 0, enemy_group: 0, enemies_0: 28}
+    %DBC.FactionTemplate{
+      id: 32,
+      faction: 29,
+      flags: 16,
+      faction_group: 0,
+      friend_group: 0,
+      enemy_group: 0,
+      enemies_0: 28
+    }
   end
 
   defp contested_guard do
@@ -328,11 +353,19 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
   end
 
   defp neutral_creature do
-    %FactionTemplate{id: 7, faction: 7, flags: 0, faction_group: 0, friend_group: 0, enemy_group: 0}
+    %DBC.FactionTemplate{id: 7, faction: 7, flags: 0, faction_group: 0, friend_group: 0, enemy_group: 0}
   end
 
   defp friendly do
-    %FactionTemplate{id: 35, faction: 31, flags: 0, faction_group: 0, friend_group: 1, enemy_group: 0, friends_0: 31}
+    %DBC.FactionTemplate{
+      id: 35,
+      faction: 31,
+      flags: 0,
+      faction_group: 0,
+      friend_group: 1,
+      enemy_group: 0,
+      friends_0: 31
+    }
   end
 
   defp player(faction_template, low_guid \\ 1, reputation \\ nil) do

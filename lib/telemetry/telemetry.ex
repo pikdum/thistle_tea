@@ -1,4 +1,5 @@
 defmodule ThistleTea.Telemetry do
+  use Boundary, deps: [ThistleTea.Game.Network]
   use GenServer
 
   alias ThistleTea.Game.Network.Opcodes

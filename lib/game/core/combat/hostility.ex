@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Core.Combat.Hostility do
 
   import Bitwise, only: [&&&: 2, |||: 2]
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Combat.FeignDeath
   alias ThistleTea.Game.Core.Duel.Dueling
   alias ThistleTea.Game.Core.Entity
@@ -57,7 +58,7 @@ defmodule ThistleTea.Game.Core.Combat.Hostility do
   def neutral_to_all?(source) do
     source
     |> faction_template()
-    |> FactionTemplate.neutral_to_all?()
+    |> DBC.FactionTemplate.neutral_to_all?()
   end
 
   def can_initiate_attack?(source) do
@@ -121,15 +122,15 @@ defmodule ThistleTea.Game.Core.Combat.Hostility do
       (not FeignDeath.successful?(target) or player_controlled?(source) or Keyword.get(opts, :area?, false))
   end
 
-  def faction_template(%FactionTemplate{} = faction_template), do: faction_template
-  def faction_template(%{faction_template: %FactionTemplate{} = faction_template}), do: faction_template
+  def faction_template(%DBC.FactionTemplate{} = faction_template), do: faction_template
+  def faction_template(%{faction_template: %DBC.FactionTemplate{} = faction_template}), do: faction_template
 
   def faction_template(%{game_object: %{created_by: owner}}) when is_integer(owner) and owner > 0,
     do: faction_template(%{object: %{guid: owner}})
 
   def faction_template(%{object: %{guid: guid}}) when is_integer(guid) do
     case Metadata.query(guid, [:faction_template]) do
-      %{faction_template: %FactionTemplate{} = faction_template} -> faction_template
+      %{faction_template: %DBC.FactionTemplate{} = faction_template} -> faction_template
       _ -> nil
     end
   end
@@ -137,12 +138,12 @@ defmodule ThistleTea.Game.Core.Combat.Hostility do
   def faction_template(_source), do: nil
 
   defp template_reaction_rank(source, target) do
-    with %FactionTemplate{} = source_template <- faction_template(source),
-         %FactionTemplate{} = target_template <- faction_template(target) do
+    with %DBC.FactionTemplate{} = source_template <- faction_template(source),
+         %DBC.FactionTemplate{} = target_template <- faction_template(target) do
       cond do
-        FactionTemplate.hostile_to?(source_template, target_template) -> :hostile
-        FactionTemplate.friendly_to?(source_template, target_template) -> :friendly
-        FactionTemplate.friendly_to?(target_template, source_template) -> :friendly
+        DBC.FactionTemplate.hostile_to?(source_template, target_template) -> :hostile
+        DBC.FactionTemplate.friendly_to?(source_template, target_template) -> :friendly
+        DBC.FactionTemplate.friendly_to?(target_template, source_template) -> :friendly
         true -> :neutral
       end
     else
@@ -324,7 +325,7 @@ defmodule ThistleTea.Game.Core.Combat.Hostility do
   defp contested_guard_reaction?(creature, player) do
     creature
     |> faction_template()
-    |> FactionTemplate.attacks_contested_players?() and contested_pvp?(player)
+    |> DBC.FactionTemplate.attacks_contested_players?() and contested_pvp?(player)
   end
 
   defp contested_pvp?(%{contested_pvp?: contested_pvp?}) when is_boolean(contested_pvp?), do: contested_pvp?
@@ -395,7 +396,7 @@ defmodule ThistleTea.Game.Core.Combat.Hostility do
 
   defp faction_id(entity) do
     case faction_template(entity) do
-      %FactionTemplate{faction: faction_id} when faction_id > 0 -> faction_id
+      %DBC.FactionTemplate{faction: faction_id} when faction_id > 0 -> faction_id
       _ -> nil
     end
   end

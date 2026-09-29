@@ -1,4 +1,4 @@
-defmodule EmotesText do
+defmodule ThistleTea.DB.DBC.EmotesText do
   @moduledoc false
   use Ecto.Schema
 

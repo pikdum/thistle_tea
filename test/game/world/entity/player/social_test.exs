@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.Player.SocialTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Chat.ChatStatus
   alias ThistleTea.Game.Core.Duel
   alias ThistleTea.Game.Core.Entity.Character
@@ -193,7 +194,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SocialTest do
     for state <- [owner, target, enemy] do
       CharacterStore.put(state.character)
       area = state.character.internal.area
-      :ets.insert(Exploration, {{:area, area}, %AreaTable{id: area, parent_area_table: 12, flags: 0x40}})
+      :ets.insert(Exploration, {{:area, area}, %DBC.AreaTable{id: area, parent_area_table: 12, flags: 0x40}})
     end
 
     publish(owner.character)

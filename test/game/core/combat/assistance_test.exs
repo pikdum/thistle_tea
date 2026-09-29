@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.Combat.AssistanceTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Blackboard
@@ -29,6 +30,7 @@ defmodule ThistleTea.Game.Core.Combat.AssistanceTest do
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.Entity.NavigationResolver
   alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
 
@@ -93,8 +95,8 @@ defmodule ThistleTea.Game.Core.Combat.AssistanceTest do
       mob = start(mob)
       assert mob.internal.blackboard.assistance.helper_guid == 3
       assert mob.unit.target == 2
-      assert Entity.update_object(mob).unit.target == 0
-      assert Entity.update_object(mob, :values).unit.target == 0
+      assert UpdateObject.from_entity(mob).unit.target == 0
+      assert UpdateObject.from_entity(mob, :values).unit.target == 0
       assert [%Effects.MonsterTalk{chat_type: :text_emote}] = mob.internal.events
       assert Script.observation_radius([%ScriptStep{command: :flee, datalong: 1}]) == 30.0
     end
@@ -147,7 +149,7 @@ defmodule ThistleTea.Game.Core.Combat.AssistanceTest do
       assert {:failure, resumed} = tick(waiting, 4_501)
       assert resumed.internal.running
       assert resumed.internal.blackboard.assistance == nil
-      assert Entity.update_object(resumed).unit.target == 2
+      assert UpdateObject.from_entity(resumed).unit.target == 2
       assert resumed.internal.broadcast_update?
     end
 
@@ -245,7 +247,7 @@ defmodule ThistleTea.Game.Core.Combat.AssistanceTest do
       2 => %Observation{
         guid: 2,
         position: {WorldRef.open(0), -3.0, 0.0, 0.0},
-        metadata: %{alive?: true, faction_template: %FactionTemplate{id: 1, faction_group: 1}}
+        metadata: %{alive?: true, faction_template: %DBC.FactionTemplate{id: 1, faction_group: 1}}
       },
       3 => helper(3, 21.0),
       4 => helper(4, 28.0)
@@ -261,7 +263,7 @@ defmodule ThistleTea.Game.Core.Combat.AssistanceTest do
       line_of_sight?: true,
       metadata: %{
         assistance_available?: true,
-        faction_template: %FactionTemplate{id: 17, flags: 1, faction_group: 8, enemy_group: 1}
+        faction_template: %DBC.FactionTemplate{id: 17, flags: 1, faction_group: 8, enemy_group: 1}
       }
     }
   end

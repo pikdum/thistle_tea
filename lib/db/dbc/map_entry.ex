@@ -1,4 +1,4 @@
-defmodule MapEntry do
+defmodule ThistleTea.DB.DBC.MapEntry do
   @moduledoc false
   use Ecto.Schema
 

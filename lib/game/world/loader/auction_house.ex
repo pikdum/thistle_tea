@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.World.Loader.AuctionHouse do
 
   import Bitwise, only: [band: 2]
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Auction.House
 
   def init(table \\ __MODULE__) do
@@ -17,7 +17,7 @@ defmodule ThistleTea.Game.World.Loader.AuctionHouse do
   end
 
   def load_all(table \\ __MODULE__) do
-    for row <- DBC.all(AuctionHouse) do
+    for row <- DBC.all(DBC.AuctionHouse) do
       house = %House{
         id: row.id,
         market: market(row.id),
@@ -40,15 +40,15 @@ defmodule ThistleTea.Game.World.Loader.AuctionHouse do
 
   def for_faction(faction, table \\ __MODULE__), do: get(house_id(faction), table)
 
-  defp house_id(%FactionTemplate{id: id}) when id in [11, 12], do: 1
-  defp house_id(%FactionTemplate{id: id}) when id in [55, 57, 534], do: 2
-  defp house_id(%FactionTemplate{id: id}) when id in [79, 80], do: 3
-  defp house_id(%FactionTemplate{id: id}) when id in [68, 71], do: 4
-  defp house_id(%FactionTemplate{id: id}) when id in [104, 105], do: 5
-  defp house_id(%FactionTemplate{id: id}) when id in [29, 85], do: 6
-  defp house_id(%FactionTemplate{id: id}) when id in [120, 474, 855], do: 7
-  defp house_id(%FactionTemplate{faction_group: group}) when band(group, 2) != 0, do: 1
-  defp house_id(%FactionTemplate{faction_group: group}) when band(group, 4) != 0, do: 6
+  defp house_id(%DBC.FactionTemplate{id: id}) when id in [11, 12], do: 1
+  defp house_id(%DBC.FactionTemplate{id: id}) when id in [55, 57, 534], do: 2
+  defp house_id(%DBC.FactionTemplate{id: id}) when id in [79, 80], do: 3
+  defp house_id(%DBC.FactionTemplate{id: id}) when id in [68, 71], do: 4
+  defp house_id(%DBC.FactionTemplate{id: id}) when id in [104, 105], do: 5
+  defp house_id(%DBC.FactionTemplate{id: id}) when id in [29, 85], do: 6
+  defp house_id(%DBC.FactionTemplate{id: id}) when id in [120, 474, 855], do: 7
+  defp house_id(%DBC.FactionTemplate{faction_group: group}) when band(group, 2) != 0, do: 1
+  defp house_id(%DBC.FactionTemplate{faction_group: group}) when band(group, 4) != 0, do: 6
   defp house_id(_faction), do: 7
 
   defp market(id) when id in 1..3, do: :alliance

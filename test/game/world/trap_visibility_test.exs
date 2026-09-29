@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.TrapVisibilityTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Entity.Character
@@ -140,6 +141,6 @@ defmodule ThistleTea.Game.World.TrapVisibilityTest do
     }
   end
 
-  defp alliance, do: %FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
-  defp horde, do: %FactionTemplate{id: 2, faction: 2, faction_group: 5, friend_group: 4, enemy_group: 10}
+  defp alliance, do: %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
+  defp horde, do: %DBC.FactionTemplate{id: 2, faction: 2, faction_group: 5, friend_group: 4, enemy_group: 10}
 end

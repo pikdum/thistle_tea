@@ -3,6 +3,10 @@ defmodule ThistleTea.Game.World do
   World-level spatial queries and position upkeep: nearby players/mobs/units
   by range, and updating an entity's place in the spatial hash tables.
   """
+  use Boundary,
+    deps: [ThistleTea.Game.Core, ThistleTea.Game.Network, ThistleTea.DB, ThistleTea.Native.Namigator, ThistleTea.Auth],
+    exports: :all
+
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock

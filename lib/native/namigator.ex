@@ -2,6 +2,7 @@ defmodule ThistleTea.Native.Namigator do
   @moduledoc """
   Fine NIF bindings to namigator for runtime pathfinding queries.
   """
+  use Boundary, deps: []
 
   require Logger
 

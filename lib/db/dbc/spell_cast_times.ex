@@ -1,4 +1,4 @@
-defmodule SpellCastTimes do
+defmodule ThistleTea.DB.DBC.SpellCastTimes do
   use Ecto.Schema
 
   @primary_key {:id, :integer, autogenerate: false}

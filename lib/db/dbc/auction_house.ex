@@ -1,4 +1,4 @@
-defmodule AuctionHouse do
+defmodule ThistleTea.DB.DBC.AuctionHouse do
   @moduledoc false
   use Ecto.Schema
 

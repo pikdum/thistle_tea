@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.Spell.AreaSpellAvoidanceTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity
@@ -126,8 +127,8 @@ defmodule ThistleTea.Game.Core.Spell.AreaSpellAvoidanceTest do
     target = entity(Guid.from_low_guid(:player, System.unique_integer([:positive])))
 
     for {guid, faction} <- [
-          {caster.object.guid, %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}},
-          {target.object.guid, %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}}
+          {caster.object.guid, %DBC.FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}},
+          {target.object.guid, %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}}
         ] do
       Metadata.put(guid, %{alive?: true, faction_template: faction, unit_flags: 0, level: 60})
       on_exit(fn -> Metadata.delete(guid) end)

@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.Loader.Emote do
   Startup cache of vanilla animation definitions and text-emote mappings.
   """
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Chat.Emote
 
   def init(table \\ __MODULE__) do
@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.World.Loader.Emote do
     end
   end
 
-  def load_all(table \\ __MODULE__), do: load(DBC.all(Emotes), DBC.all(EmotesText), table)
+  def load_all(table \\ __MODULE__), do: load(DBC.all(DBC.Emotes), DBC.all(DBC.EmotesText), table)
 
   def load(animations, texts, table \\ __MODULE__) do
     for row <- animations do

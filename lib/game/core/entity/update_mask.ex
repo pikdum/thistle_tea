@@ -4,6 +4,13 @@ defmodule ThistleTea.Game.Core.Entity.UpdateMask do
   encoder, visibility) into a component struct plus `to_list/2` for building
   SMSG_UPDATE_OBJECT values blocks.
   """
+  def build_bytes([]), do: <<>>
+
+  def build_bytes([{size, value} | rest]) do
+    value = value || 0
+    <<value::little-size(size)>> <> build_bytes(rest)
+  end
+
   defp build_struct(fields) do
     fields
     |> Keyword.reject(&fn_field?/1)

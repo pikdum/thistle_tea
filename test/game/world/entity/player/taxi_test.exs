@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.Player.TaxiTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -166,7 +167,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TaxiTest do
         |> then(&%{&1 | player: %{&1.player | reputation: reputation}})
 
       Metadata.update(context.flightmaster_guid, %{
-        faction_template: %FactionTemplate{faction: 72}
+        faction_template: %DBC.FactionTemplate{faction: 72}
       })
 
       state = %State{

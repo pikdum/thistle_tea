@@ -1,7 +1,6 @@
 defmodule ThistleTea.Game.World.Entity.Player.CompanionOwner.Attachment do
   @moduledoc false
 
-  alias ThistleTea.Game.Core.Entity, as: EntityCore
   alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
   alias ThistleTea.Game.Core.Entity.Component.Internal.Spawn
   alias ThistleTea.Game.Core.Entity.Mob
@@ -9,6 +8,7 @@ defmodule ThistleTea.Game.World.Entity.Player.CompanionOwner.Attachment do
   alias ThistleTea.Game.Core.Pet.Companion.EntityRef
   alias ThistleTea.Game.Core.Pet.PetProgression
   alias ThistleTea.Game.Network.Message.SmsgPetNameQueryResponse
+  alias ThistleTea.Game.Network.UpdateObject
 
   @enforce_keys [:kind, :entity_ref, :pid, :spells]
   defstruct [:kind, :entity_ref, :pid, :spells, :create, :progress, :name_response, restore_automatically?: true]
@@ -29,7 +29,7 @@ defmodule ThistleTea.Game.World.Entity.Player.CompanionOwner.Attachment do
       entity_ref: %EntityRef{guid: entity.object.guid, entry: entity.object.entry, spell_id: spell_id},
       pid: pid,
       spells: spells || Map.values(entity.internal.spellbook || %{}),
-      create: EntityCore.update_object(entity),
+      create: UpdateObject.from_entity(entity),
       progress: PetProgression.snapshot(entity),
       restore_automatically?: restore_automatically?(entity.internal.spawn),
       name_response: SmsgPetNameQueryResponse.for_pet(entity)

@@ -8,7 +8,7 @@ defmodule ThistleTea.MixProject do
       elixir: "~> 1.20",
       start_permanent: Mix.env() == :prod,
       consolidate_protocols: Mix.env() != :dev,
-      compilers: [:elixir_make] ++ Mix.compilers(),
+      compilers: [:boundary, :elixir_make] ++ Mix.compilers(),
       aliases: aliases(),
       deps: deps(),
       listeners: [Phoenix.CodeReloader]
@@ -35,6 +35,7 @@ defmodule ThistleTea.MixProject do
       {:deps_nix, "~> 3.0", only: :dev, runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:binary, "~> 0.0.5"},
+      {:boundary, "~> 0.10", runtime: false},
       {:ecto_sqlite3, "~> 0.24"},
       {:group, "~> 0.2"},
       {:thousand_island, "~> 1.0"},

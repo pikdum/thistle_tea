@@ -14,8 +14,8 @@ defmodule ThistleTea.Game.Core.Entity.Corpse do
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Entity.UpdateMask
   alias ThistleTea.Game.Core.Guid
-  alias ThistleTea.Game.Network.UpdateObject
 
   @update_flag_all 0x10
   @update_flag_has_position 0x40
@@ -83,7 +83,7 @@ defmodule ThistleTea.Game.Core.Entity.Corpse do
   end
 
   defp bytes_1(unit, player) do
-    UpdateObject.build_bytes([
+    UpdateMask.build_bytes([
       {8, 0},
       {8, unit.race},
       {8, unit.gender},
@@ -92,7 +92,7 @@ defmodule ThistleTea.Game.Core.Entity.Corpse do
   end
 
   defp bytes_2(player) do
-    UpdateObject.build_bytes([
+    UpdateMask.build_bytes([
       {8, player.face},
       {8, player.hair_style},
       {8, player.hair_color},

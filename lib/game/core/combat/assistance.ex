@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Core.Combat.Assistance do
 
   import Bitwise, only: [&&&: 2]
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Context
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
@@ -57,12 +58,12 @@ defmodule ThistleTea.Game.Core.Combat.Assistance do
   end
 
   def eligible_flee?(
-        %{flee_from_help_available?: true, faction_template: %FactionTemplate{} = helper},
-        %FactionTemplate{} = caller,
-        %FactionTemplate{} = enemy
+        %{flee_from_help_available?: true, faction_template: %DBC.FactionTemplate{} = helper},
+        %DBC.FactionTemplate{} = caller,
+        %DBC.FactionTemplate{} = enemy
       ) do
-    FactionTemplate.flees_from_call_for_help?(helper) and allied?(helper, caller, :friendly) and
-      not FactionTemplate.friendly_to?(helper, enemy)
+    DBC.FactionTemplate.flees_from_call_for_help?(helper) and allied?(helper, caller, :friendly) and
+      not DBC.FactionTemplate.friendly_to?(helper, enemy)
   end
 
   def eligible_flee?(_helper, _caller, _enemy), do: false
@@ -109,13 +110,13 @@ defmodule ThistleTea.Game.Core.Combat.Assistance do
   end
 
   def eligible?(
-        %{assistance_available?: true, faction_template: %FactionTemplate{} = helper},
-        %FactionTemplate{} = caller,
-        %FactionTemplate{} = enemy,
+        %{assistance_available?: true, faction_template: %DBC.FactionTemplate{} = helper},
+        %DBC.FactionTemplate{} = caller,
+        %DBC.FactionTemplate{} = enemy,
         faction_check
       ) do
-    FactionTemplate.responds_to_call_for_help?(helper) and allied?(helper, caller, faction_check) and
-      not FactionTemplate.friendly_to?(helper, enemy)
+    DBC.FactionTemplate.responds_to_call_for_help?(helper) and allied?(helper, caller, faction_check) and
+      not DBC.FactionTemplate.friendly_to?(helper, enemy)
   end
 
   def eligible?(_helper, _caller, _enemy, _faction_check), do: false
@@ -134,7 +135,7 @@ defmodule ThistleTea.Game.Core.Combat.Assistance do
     end)
   end
 
-  def faction(%{faction_template: %FactionTemplate{} = faction}), do: faction
+  def faction(%{faction_template: %DBC.FactionTemplate{} = faction}), do: faction
   def faction(_metadata), do: nil
 
   defp helper_position(entity, perception, guid) do
@@ -144,7 +145,7 @@ defmodule ThistleTea.Game.Core.Combat.Assistance do
     end
   end
 
-  defp allied?(%FactionTemplate{id: id}, %FactionTemplate{id: id}, _check), do: true
-  defp allied?(helper, caller, :friendly), do: FactionTemplate.friendly_to?(helper, caller)
+  defp allied?(%DBC.FactionTemplate{id: id}, %DBC.FactionTemplate{id: id}, _check), do: true
+  defp allied?(helper, caller, :friendly), do: DBC.FactionTemplate.friendly_to?(helper, caller)
   defp allied?(_helper, _caller, _check), do: false
 end

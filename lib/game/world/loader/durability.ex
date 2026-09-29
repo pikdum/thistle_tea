@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.World.Loader.Durability do
   class, subclass, and quality. Repair requests never query the database.
   """
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Entity.Item
   alias ThistleTea.Game.Core.Item.Durability, as: DurabilityLogic
 
@@ -16,13 +16,13 @@ defmodule ThistleTea.Game.World.Loader.Durability do
   end
 
   def load_all(table \\ __MODULE__) do
-    for row <- DBC.all(DurabilityCosts),
+    for row <- DBC.all(DBC.DurabilityCosts),
         {class, prefix, subclasses} <- [{2, "weapon", 0..20}, {4, "armour", 0..7}],
         subclass <- subclasses do
       :ets.insert(table, {{row.id, class, subclass}, Map.fetch!(row, :"#{prefix}_subclass_cost_#{subclass}")})
     end
 
-    for row <- DBC.all(DurabilityQuality), do: :ets.insert(table, {{:quality, row.id}, row.data})
+    for row <- DBC.all(DBC.DurabilityQuality), do: :ets.insert(table, {{:quality, row.id}, row.data})
     :ok
   end
 

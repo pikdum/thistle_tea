@@ -1,4 +1,4 @@
-defmodule SpellRange do
+defmodule ThistleTea.DB.DBC.SpellRange do
   use Ecto.Schema
 
   @primary_key {:id, :integer, autogenerate: false}

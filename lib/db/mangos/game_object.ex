@@ -4,8 +4,6 @@ defmodule ThistleTea.DB.Mangos.GameObject do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Core.SpatialGrid
-  alias ThistleTea.Game.Core.WorldRef
 
   @primary_key {:guid, :integer, autogenerate: false}
   schema "gameobject" do
@@ -37,10 +35,7 @@ defmodule ThistleTea.DB.Mangos.GameObject do
     )
   end
 
-  def query_cell({world, _x, _y} = cell, events \\ []) do
-    map = WorldRef.map_id(world)
-    {{x1, x2}, {y1, y2}} = SpatialGrid.cell_bounds(cell)
-
+  def query_bounds(map, {{x1, x2}, {y1, y2}}, events \\ []) do
     from(g in __MODULE__,
       where:
         g.map == ^map and g.position_x >= ^x1 and g.position_x < ^x2 and g.position_y >= ^y1 and

@@ -1929,7 +1929,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   defp cancel_cast_if_dead(state), do: state
 
   defp do_broadcast_update(%{character: %Character{internal: %Internal{broadcast_update?: true}} = character} = state) do
-    EntityCore.update_object(character, :values)
+    UpdateObject.from_entity(character, :values)
     |> World.broadcast_packet(character)
 
     PartyNotifier.broadcast_stats(state.guid, character)

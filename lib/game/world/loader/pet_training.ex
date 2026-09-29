@@ -6,8 +6,8 @@ defmodule ThistleTea.Game.World.Loader.PetTraining do
 
   import Ecto.Query
 
-  alias ThistleTea.DBC
-  alias ThistleTea.DBC.CreatureFamily
+  alias ThistleTea.DB.DBC
+  alias ThistleTea.DB.DBC.CreatureFamily
   alias ThistleTea.Game.Core.Pet.PetAbility
   alias ThistleTea.Game.Core.Spell, as: SpellData
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.World.Loader.PetTraining do
     family_rows = DBC.all(CreatureFamily)
     families = Map.new(family_rows, &{&1.id, &1.training_skill})
     skills = Enum.uniq([270 | Enum.flat_map(family_rows, &[&1.training_skill, &1.secondary_skill])])
-    rows = DBC.all(from(ability in SkillLineAbility, where: ability.skill_line in ^skills))
+    rows = DBC.all(from(ability in DBC.SkillLineAbility, where: ability.skill_line in ^skills))
     spells = rows |> Enum.map(& &1.spell) |> SpellLoader.build_spellbook()
     abilities = build(rows, spells)
 

@@ -3,6 +3,7 @@ defmodule ThistleTea.Auth do
   The auth/logon server: handles SRP6 logon challenge/proof and serves the
   realm list for registered accounts.
   """
+  use Boundary, deps: [ThistleTea.Game.Core], exports: [Account, SRP]
   use ThousandIsland.Handler
 
   import Binary, only: [reverse: 1]

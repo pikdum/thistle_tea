@@ -1,4 +1,4 @@
-defmodule TalentTab do
+defmodule ThistleTea.DB.DBC.TalentTab do
   @moduledoc false
   use Ecto.Schema
 

@@ -1,11 +1,13 @@
 defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.SpatialGrid
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Mob.Batch
@@ -167,8 +169,8 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
   describe "Batch.load/1" do
     test "loads a populated cell with a bounded query count" do
       rows =
-        {WorldRef.open(0), -71, -2}
-        |> Mangos.Creature.query_cell([])
+        0
+        |> Mangos.Creature.query_bounds(SpatialGrid.cell_bounds({WorldRef.open(0), -71, -2}), [])
         |> Mangos.Repo.all()
 
       counter = :counters.new(1, [:atomics])
@@ -176,7 +178,7 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
 
       events = [
         Mangos.Repo.config()[:telemetry_prefix] ++ [:query],
-        ThistleTea.DBC.config()[:telemetry_prefix] ++ [:query]
+        DBC.config()[:telemetry_prefix] ++ [:query]
       ]
 
       :ok =

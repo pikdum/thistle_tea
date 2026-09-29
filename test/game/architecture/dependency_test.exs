@@ -3,37 +3,40 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
 
   @root Path.expand("../../..", __DIR__)
 
-  @allowed_logic_boundaries MapSet.new([
-                              {"lib/game/core/ai/bt/combat.ex", "ThistleTea.Game.World.Spell.SpellTargetResolver"},
-                              {"lib/game/core/ai/bt/mob.ex", "ThistleTea.Game.World"},
-                              {"lib/game/core/ai/bt/mob.ex", "ThistleTea.Game.World.Metadata"},
-                              {"lib/game/core/class/shaman.ex", "ThistleTea.Game.World.Loader.Spell"},
-                              {"lib/game/core/combat/hostility.ex", "ThistleTea.Game.World.Metadata"},
-                              {"lib/game/core/combat/hostility.ex", "ThistleTea.Game.World.System.Duel"},
-                              {"lib/game/core/combat/threat.ex", "ThistleTea.Game.World"},
-                              {"lib/game/core/combat/threat.ex", "ThistleTea.Game.World.Metadata"},
-                              {"lib/game/core/entity.ex", "ThistleTea.Game.Network.UpdateObject"},
-                              {"lib/game/core/entity/character.ex", "ThistleTea.Game.World.ItemStore"},
-                              {"lib/game/core/entity/character.ex", "ThistleTea.Game.World.Loader.Item"},
-                              {"lib/game/core/entity/character.ex", "ThistleTea.Game.World.Loader.ItemEnchantment"},
-                              {"lib/game/core/entity/character.ex", "ThistleTea.Game.World.Loader.ItemSet"},
-                              {"lib/game/core/entity/character.ex", "ThistleTea.Game.World.Loader.Spell"},
-                              {"lib/game/core/entity/component/movement_block.ex",
-                               "ThistleTea.Game.Network.BinaryUtils"},
-                              {"lib/game/core/entity/component/player.ex", "ThistleTea.Game.Network.UpdateObject"},
-                              {"lib/game/core/entity/component/unit.ex", "ThistleTea.Game.Network.UpdateObject"},
-                              {"lib/game/core/entity/corpse.ex", "ThistleTea.Game.Network.UpdateObject"},
-                              {"lib/game/core/party.ex", "ThistleTea.Game.World.System.Party"},
-                              {"lib/game/core/party/member_stats.ex", "ThistleTea.Game.Network.BinaryUtils"},
-                              {"lib/game/core/player/talents.ex", "ThistleTea.Game.World.Loader.Talent"},
-                              {"lib/game/core/spell/cast_context.ex", "ThistleTea.Game.World.Loader.SpellThreat"},
-                              {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World"},
-                              {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World.Metadata"},
-                              {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World.Spell.SpellTargetResolver"},
-                              {"lib/game/core/spell/spell_effect/script.ex",
-                               "ThistleTea.Game.World.Loader.SpellPetAura"},
-                              {"lib/game/core/spell/target_codec.ex", "ThistleTea.Game.Network.BinaryUtils"}
-                            ])
+  @allowed_core_references MapSet.new([
+                             {"lib/game/core/ai/bt/combat.ex", "ThistleTea.Game.World.Spell.SpellTargetResolver"},
+                             {"lib/game/core/ai/bt/mob.ex", "ThistleTea.Game.World"},
+                             {"lib/game/core/ai/bt/mob.ex", "ThistleTea.Game.World.Metadata"},
+                             {"lib/game/core/class/shaman.ex", "ThistleTea.Game.World.Loader.Spell"},
+                             {"lib/game/core/combat/assistance.ex", "ThistleTea.DB.DBC"},
+                             {"lib/game/core/combat/hostility.ex", "ThistleTea.DB.DBC"},
+                             {"lib/game/core/combat/hostility.ex", "ThistleTea.Game.World.Metadata"},
+                             {"lib/game/core/combat/hostility.ex", "ThistleTea.Game.World.System.Duel"},
+                             {"lib/game/core/combat/threat.ex", "ThistleTea.Game.World"},
+                             {"lib/game/core/combat/threat.ex", "ThistleTea.Game.World.Metadata"},
+                             {"lib/game/core/entity/character.ex", "ThistleTea.Game.World.ItemStore"},
+                             {"lib/game/core/entity/character.ex", "ThistleTea.Game.World.Loader.Item"},
+                             {"lib/game/core/entity/character.ex", "ThistleTea.Game.World.Loader.ItemEnchantment"},
+                             {"lib/game/core/entity/character.ex", "ThistleTea.Game.World.Loader.ItemSet"},
+                             {"lib/game/core/entity/character.ex", "ThistleTea.Game.World.Loader.Spell"},
+                             {"lib/game/core/entity/component/internal/waypoint_route.ex",
+                              "ThistleTea.DB.Mangos.Creature"},
+                             {"lib/game/core/entity/component/internal/waypoint_route.ex",
+                              "ThistleTea.DB.Mangos.CreatureMovement"},
+                             {"lib/game/core/entity/creature_template.ex", "ThistleTea.DB.Mangos"},
+                             {"lib/game/core/entity/game_object.ex", "ThistleTea.DB.Mangos"},
+                             {"lib/game/core/entity/game_object_template.ex", "ThistleTea.DB.Mangos"},
+                             {"lib/game/core/entity/item_template.ex", "ThistleTea.DB.Mangos"},
+                             {"lib/game/core/entity/mob.ex", "ThistleTea.DB.Mangos"},
+                             {"lib/game/core/party.ex", "ThistleTea.Game.World.System.Party"},
+                             {"lib/game/core/player/talents.ex", "ThistleTea.Game.World.Loader.Talent"},
+                             {"lib/game/core/quest.ex", "ThistleTea.DB.Mangos"},
+                             {"lib/game/core/spell/cast_context.ex", "ThistleTea.Game.World.Loader.SpellThreat"},
+                             {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World"},
+                             {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World.Metadata"},
+                             {"lib/game/core/spell/casting.ex", "ThistleTea.Game.World.Spell.SpellTargetResolver"},
+                             {"lib/game/core/spell/spell_effect/script.ex", "ThistleTea.Game.World.Loader.SpellPetAura"}
+                           ])
 
   @spatial_index_boundaries MapSet.new([
                               "lib/game/world.ex",
@@ -41,8 +44,8 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
                               "lib/game/world/spatial_hash.ex"
                             ])
 
-  test "pure logic does not acquire new boundary dependencies" do
-    assert logic_boundary_dependencies() == @allowed_logic_boundaries
+  test "core files do not gain new references to the world or seed databases" do
+    assert core_outer_references() == @allowed_core_references
   end
 
   test "event interpreters do not depend on their caller process" do
@@ -98,19 +101,19 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
     assert violations == []
   end
 
-  defp logic_boundary_dependencies do
+  defp core_outer_references do
     Path.wildcard(Path.join([@root, "lib/game/core/**/*.ex"]))
     |> Enum.flat_map(fn path ->
       path
       |> File.read!()
-      |> boundary_modules()
+      |> outer_modules()
       |> Enum.map(&{Path.relative_to(path, @root), &1})
     end)
     |> MapSet.new()
   end
 
-  defp boundary_modules(source) do
-    ~r/ThistleTea\.Game\.(?:Network|World(?!Ref))(?:\.[A-Z][A-Za-z0-9_]*)*/
+  defp outer_modules(source) do
+    ~r/ThistleTea\.(?:Game\.(?:Network|World)|DB)(?:\.[A-Z][A-Za-z0-9_]*)*/
     |> Regex.scan(source, capture: :first)
     |> List.flatten()
   end

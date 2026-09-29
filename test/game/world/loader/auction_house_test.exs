@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.AuctionHouseTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Auction.House
   alias ThistleTea.Game.World.Loader.AuctionHouse, as: AuctionHouseLoader
 
@@ -13,11 +14,11 @@ defmodule ThistleTea.Game.World.Loader.AuctionHouseTest do
       end
 
       for {faction, house} <- [{11, 1}, {55, 2}, {79, 3}, {68, 4}, {104, 5}, {29, 6}, {120, 7}, {474, 7}, {855, 7}] do
-        assert AuctionHouseLoader.for_faction(%FactionTemplate{id: faction}, table).id == house
+        assert AuctionHouseLoader.for_faction(%DBC.FactionTemplate{id: faction}, table).id == house
       end
 
-      assert AuctionHouseLoader.for_faction(%FactionTemplate{id: 9999, faction_group: 2}, table).id == 1
-      assert AuctionHouseLoader.for_faction(%FactionTemplate{id: 9999, faction_group: 4}, table).id == 6
+      assert AuctionHouseLoader.for_faction(%DBC.FactionTemplate{id: 9999, faction_group: 2}, table).id == 1
+      assert AuctionHouseLoader.for_faction(%DBC.FactionTemplate{id: 9999, faction_group: 4}, table).id == 6
       assert AuctionHouseLoader.for_faction(nil, table).id == 7
       assert AuctionHouseLoader.get(8, table) == nil
     end

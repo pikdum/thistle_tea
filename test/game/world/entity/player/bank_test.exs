@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.Player.BankTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -90,7 +91,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BankTest do
       reputation = ReputationLogic.initialize(catalog, 1, 1)
       {reputation, _changes} = ReputationLogic.set(reputation, catalog, 72, -6_000, %{race: 1, class: 1})
       character = %{state.character | player: %{state.character.player | reputation: reputation}}
-      Metadata.update(banker_guid, %{faction_template: %FactionTemplate{faction: 72}})
+      Metadata.update(banker_guid, %{faction_template: %DBC.FactionTemplate{faction: 72}})
 
       refute Bank.valid_banker?(character, banker_guid)
     end

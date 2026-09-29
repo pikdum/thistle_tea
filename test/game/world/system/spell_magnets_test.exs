@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.System.SpellMagnetsTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -198,7 +199,7 @@ defmodule ThistleTea.Game.World.System.SpellMagnetsTest do
       Metadata.put(guid, %{
         alive?: true,
         creature_type: 11,
-        faction_template: %FactionTemplate{id: faction, faction: faction, enemies_1: 3 - faction},
+        faction_template: %DBC.FactionTemplate{id: faction, faction: faction, enemies_1: 3 - faction},
         unit_flags: 0,
         pvp?: true
       })

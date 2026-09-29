@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Skinning do
   alias ThistleTea.Game.Core.Profession.Skinning, as: SkinningLogic
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.Looting
@@ -50,7 +51,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Skinning do
       {:gained, skills} ->
         character = %{character | player: %{character.player | skills: skills}}
         CharacterStore.put(character)
-        Network.send_packet(EntityCore.update_object(character, :values))
+        Network.send_packet(UpdateObject.from_entity(character, :values))
         character
 
       :unchanged ->

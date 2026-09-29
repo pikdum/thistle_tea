@@ -8,7 +8,6 @@ defmodule ThistleTea.Game.World.Entity.Corpse do
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Core.Battleground.Insignia
-  alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Component.Internal.Corpse, as: Body
   alias ThistleTea.Game.Core.Entity.Corpse
   alias ThistleTea.Game.Core.Guid
@@ -17,6 +16,7 @@ defmodule ThistleTea.Game.World.Entity.Corpse do
   alias ThistleTea.Game.Core.Loot.LootSession
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.World.Metadata
@@ -112,7 +112,7 @@ defmodule ThistleTea.Game.World.Entity.Corpse do
 
   @impl GenServer
   def handle_cast({:send_update_to, pid}, state) do
-    Entity.update_object(state)
+    UpdateObject.from_entity(state)
     |> Network.send_packet(pid)
 
     {:noreply, state}
@@ -190,7 +190,7 @@ defmodule ThistleTea.Game.World.Entity.Corpse do
     }
 
     if flags != state.corpse.dynamic_flags,
-      do: updated |> Entity.update_object(:values) |> World.broadcast_packet(updated)
+      do: updated |> UpdateObject.from_entity(:values) |> World.broadcast_packet(updated)
 
     updated
   end

@@ -1,4 +1,4 @@
-defmodule Lock do
+defmodule ThistleTea.DB.DBC.Lock do
   @moduledoc false
   use Ecto.Schema
 

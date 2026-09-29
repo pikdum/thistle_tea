@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.Player.ExplorationTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Player
@@ -33,7 +34,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ExplorationTest do
     test "persists and sends the first discovery but not repeats" do
       :ets.insert(
         ExplorationLoader,
-        {{:area, 9}, %AreaTable{id: 9, area_bit: 125, exploration_level: 0, name: "Northshire Valley"}}
+        {{:area, 9}, %DBC.AreaTable{id: 9, area_bit: 125, exploration_level: 0, name: "Northshire Valley"}}
       )
 
       state = %{guid: @character_id, character: character()}
@@ -48,7 +49,12 @@ defmodule ThistleTea.Game.World.Entity.Player.ExplorationTest do
 
     test "preserves discovery for a living return after death or spirit release" do
       area_id = 900_000
-      :ets.insert(ExplorationLoader, {{:area, area_id}, %AreaTable{id: area_id, area_bit: 126, exploration_level: 0}})
+
+      :ets.insert(
+        ExplorationLoader,
+        {{:area, area_id}, %DBC.AreaTable{id: area_id, area_bit: 126, exploration_level: 0}}
+      )
+
       on_exit(fn -> :ets.delete(ExplorationLoader, {:area, area_id}) end)
       alive = character()
       dead = %{alive | unit: %{alive.unit | health: 0}}

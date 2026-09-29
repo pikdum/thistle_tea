@@ -1,4 +1,4 @@
-defmodule ItemRandomProperties do
+defmodule ThistleTea.DB.DBC.ItemRandomProperties do
   @moduledoc false
   use Ecto.Schema
 

@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.MovementBlock do
   """
   import Bitwise, only: [&&&: 2, |||: 2, band: 2, bnot: 1, bor: 2]
 
-  alias ThistleTea.Game.Network.BinaryUtils
+  alias ThistleTea.Game.Core.Guid
 
   defstruct [
     :update_flag,
@@ -433,7 +433,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.MovementBlock do
         <<>>
       end <>
       if (m.update_flag &&& @update_flag_melee_attacking) > 0 do
-        BinaryUtils.pack_guid(m.target_guid || 0)
+        Guid.pack(m.target_guid || 0)
       else
         <<>>
       end <>

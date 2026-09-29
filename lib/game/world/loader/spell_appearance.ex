@@ -3,8 +3,8 @@ defmodule ThistleTea.Game.World.Loader.SpellAppearance do
 
   import Ecto.Query
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.DBC
   alias ThistleTea.Game.Core.Entity.Appearance
   alias ThistleTea.Game.Core.Entity.CreatureTemplate
   alias ThistleTea.Game.Core.Entity.Model
@@ -79,7 +79,7 @@ defmodule ThistleTea.Game.World.Loader.SpellAppearance do
   end
 
   defp deception_models do
-    DBC.all(ChrRaces)
+    DBC.all(DBC.ChrRaces)
     |> Enum.filter(&Map.has_key?(@deception_models, &1.id))
     |> Enum.flat_map(fn race ->
       {male, female} = Map.fetch!(@deception_models, race.id)

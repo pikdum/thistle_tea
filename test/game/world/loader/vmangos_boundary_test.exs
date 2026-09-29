@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.Loader.VMangosBoundaryTest do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.Entity.GameObject
+  alias ThistleTea.Game.Core.SpatialGrid
   alias ThistleTea.Game.World.Loader.GameObject, as: GameObjectLoader
   alias ThistleTea.Game.World.Loader.NpcText, as: NpcTextLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
@@ -12,8 +13,8 @@ defmodule ThistleTea.Game.World.Loader.VMangosBoundaryTest do
   describe "gameobject spawns" do
     test "load through VMangos spawn timing columns" do
       [row | _] =
-        {0, 19, 13}
-        |> Mangos.GameObject.query_cell([])
+        0
+        |> Mangos.GameObject.query_bounds(SpatialGrid.cell_bounds({0, 19, 13}), [])
         |> Mangos.Repo.all()
 
       game_object = GameObject.build(row)

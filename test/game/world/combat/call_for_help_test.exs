@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Combat.CallForHelpTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Combat.CombatLeash
   alias ThistleTea.Game.Core.Combat.Engagement
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -255,27 +256,51 @@ defmodule ThistleTea.Game.World.Combat.CallForHelpTest do
   end
 
   defp alliance do
-    %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+    %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
   end
 
   defp defias do
-    %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, friend_group: 0, enemy_group: 1, friends_0: 15}
+    %DBC.FactionTemplate{
+      id: 17,
+      faction: 15,
+      flags: 1,
+      faction_group: 8,
+      friend_group: 0,
+      enemy_group: 1,
+      friends_0: 15
+    }
   end
 
   defp defias_ally do
-    %FactionTemplate{id: 92, faction: 88, flags: 1, faction_group: 8, friend_group: 0, enemy_group: 1, friends_0: 15}
+    %DBC.FactionTemplate{
+      id: 92,
+      faction: 88,
+      flags: 1,
+      faction_group: 8,
+      friend_group: 0,
+      enemy_group: 1,
+      friends_0: 15
+    }
   end
 
   defp defias_but_alliance_friend do
-    %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, friend_group: 2, enemy_group: 1, friends_0: 15}
+    %DBC.FactionTemplate{
+      id: 17,
+      faction: 15,
+      flags: 1,
+      faction_group: 8,
+      friend_group: 2,
+      enemy_group: 1,
+      friends_0: 15
+    }
   end
 
   defp wild_animal do
-    %FactionTemplate{id: 32, faction: 29, flags: 16, faction_group: 0, friend_group: 0, enemy_group: 0}
+    %DBC.FactionTemplate{id: 32, faction: 29, flags: 16, faction_group: 0, friend_group: 0, enemy_group: 0}
   end
 
   defp fleeing_trogg do
-    %FactionTemplate{
+    %DBC.FactionTemplate{
       id: 36,
       faction: 45,
       flags: 0x401,

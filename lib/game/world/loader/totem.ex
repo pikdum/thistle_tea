@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.Loader.Totem do
 
   import Ecto.Query
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Pet.Totems
   alias ThistleTea.Game.World.Loader.Summon
@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.World.Loader.Totem do
 
   def preload do
     DBC.all(
-      from(s in Spell,
+      from(s in DBC.Spell,
         where: s.effect_0 in @effects or s.effect_1 in @effects or s.effect_2 in @effects
       )
     )

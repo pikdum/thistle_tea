@@ -6,6 +6,7 @@ defmodule Mix.Tasks.Condition.Coverage do
       mix condition.coverage
       mix condition.coverage --check
   """
+  use Boundary, classify_to: ThistleTea.Game.World
   use Mix.Task
 
   alias ThistleTea.DB.Mangos.Repo

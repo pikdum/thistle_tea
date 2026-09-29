@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.AI.BT.DistancingTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Blackboard
@@ -280,7 +281,7 @@ defmodule ThistleTea.Game.Core.AI.BT.DistancingTest do
     }
 
   defp context(now) do
-    faction = %FactionTemplate{id: 36, flags: 0x401, faction_group: 8, enemy_group: 1}
+    faction = %DBC.FactionTemplate{id: 36, flags: 0x401, faction_group: 8, enemy_group: 1}
 
     entities = %{
       1 => %Observation{
@@ -291,7 +292,7 @@ defmodule ThistleTea.Game.Core.AI.BT.DistancingTest do
       2 => %Observation{
         guid: 2,
         position: {WorldRef.open(0), -3.0, 0.0, 0.0},
-        metadata: %{alive?: true, bounding_radius: 0.5, faction_template: %FactionTemplate{id: 1, faction_group: 1}}
+        metadata: %{alive?: true, bounding_radius: 0.5, faction_template: %DBC.FactionTemplate{id: 1, faction_group: 1}}
       },
       3 => %Observation{
         guid: 3,

@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.Player.ProfessionsTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -80,8 +81,8 @@ defmodule ThistleTea.Game.World.Entity.Player.ProfessionsTest do
 
     SkillLoader.load(
       [],
-      [%SkillRaceClassInfo{skill_line: 186, race_mask: 1, class_mask: 1, flags: 0x20}],
-      Enum.map([999_100, 999_101], &%SkillLineAbility{skill_line: 186, spell: &1})
+      [%DBC.SkillRaceClassInfo{skill_line: 186, race_mask: 1, class_mask: 1, flags: 0x20}],
+      Enum.map([999_100, 999_101], &%DBC.SkillLineAbility{skill_line: 186, spell: &1})
     )
 
     skills = %{} |> Skills.learn_rank(186, 300) |> Skills.learn_rank(182, 75)

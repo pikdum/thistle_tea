@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.Loader.Exploration do
   @moduledoc """
   Cached AreaTable exploration metadata and VMangos exploration base XP.
   """
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos.ExplorationBaseXp
   alias ThistleTea.DB.Mangos.Repo
 
@@ -20,8 +21,8 @@ defmodule ThistleTea.Game.World.Loader.Exploration do
   end
 
   def load_areas do
-    AreaTable
-    |> ThistleTea.DBC.all()
+    DBC.AreaTable
+    |> DBC.all()
     |> Enum.each(fn area ->
       :ets.insert(__MODULE__, [{{:area, area.id}, area}, {{:area_bit, area.map, area.area_bit}, area.id}])
     end)

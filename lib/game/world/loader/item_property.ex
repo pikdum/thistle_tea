@@ -2,8 +2,8 @@ defmodule ThistleTea.Game.World.Loader.ItemProperty do
   @moduledoc "Preloads item-property definitions and patch-appropriate weighted selection tables."
   import Ecto.Query
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.DBC
   alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Item.ItemProperties
   alias ThistleTea.Game.Core.Item.ItemProperty
@@ -24,7 +24,7 @@ defmodule ThistleTea.Game.World.Loader.ItemProperty do
   end
 
   def load_definitions do
-    DBC.all(ItemRandomProperties)
+    DBC.all(DBC.ItemRandomProperties)
     |> Enum.each(fn row ->
       property = %ItemProperty{
         id: row.id,

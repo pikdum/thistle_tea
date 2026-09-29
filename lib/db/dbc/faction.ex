@@ -1,4 +1,4 @@
-defmodule Faction do
+defmodule ThistleTea.DB.DBC.Faction do
   @moduledoc false
 
   use Ecto.Schema

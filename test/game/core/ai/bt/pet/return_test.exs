@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.AI.BT.Pet.ReturnTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Context
@@ -186,8 +187,8 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet.ReturnTest do
 
   defp context(pet, target, extra \\ []) do
     world = pet.internal.world
-    source = %FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}
-    enemy = %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+    source = %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}
+    enemy = %DBC.FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
 
     actors = %{
       pet.object.guid => %Observation{guid: pet.object.guid, metadata: %{faction_template: source}},

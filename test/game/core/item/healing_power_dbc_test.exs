@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Core.Item.HealingPowerDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity, as: EntityCore
@@ -40,7 +40,7 @@ defmodule ThistleTea.Game.Core.Item.HealingPowerDbcTest do
             {528, 1, 28_789, [635, 19_750], [331, 8013, 20_473]},
             {527, 0, 28_823, [331, 8004], [635, 19_750, 1064]}
           ] do
-        set = DBC.get(ItemSet, set_id)
+        set = DBC.get(DBC.ItemSet, set_id)
         assert Map.fetch!(set, :"set_spell_#{index}") == bonus
         assert Map.fetch!(set, :"set_threshold_#{index}") == 6
         spell = SpellLoader.cached(bonus)

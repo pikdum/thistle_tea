@@ -4,8 +4,8 @@ defmodule ThistleTea.Game.World.Loader.SpellChain do
   """
   import Ecto.Query
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.DBC
   alias ThistleTea.Game.Core.Spell.RankChain
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
@@ -26,8 +26,8 @@ defmodule ThistleTea.Game.World.Loader.SpellChain do
   def load_abilities do
     abilities =
       DBC.all(
-        from(a in SkillLineAbility,
-          join: s in Spell,
+        from(a in DBC.SkillLineAbility,
+          join: s in DBC.Spell,
           on: s.id == a.spell,
           select: {a.spell, a.superseded_by}
         )
@@ -83,7 +83,7 @@ defmodule ThistleTea.Game.World.Loader.SpellChain do
       rows
       |> Enum.flat_map(&[&1.spell_id, &1.first_spell])
       |> Enum.uniq()
-      |> then(fn ids -> DBC.all(from(s in Spell, where: s.id in ^ids, select: {s.id, s.name_en_gb})) end)
+      |> then(fn ids -> DBC.all(from(s in DBC.Spell, where: s.id in ^ids, select: {s.id, s.name_en_gb})) end)
       |> Map.new()
 
     rows

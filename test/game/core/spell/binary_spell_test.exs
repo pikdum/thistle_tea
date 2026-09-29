@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.Spell.BinarySpellTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -171,8 +172,8 @@ defmodule ThistleTea.Game.Core.Spell.BinarySpellTest do
       caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
       target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
 
-      caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
-      target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
+      caster_faction = %DBC.FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
+      target_faction = %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
 
       for {guid, faction} <- [{caster_guid, caster_faction}, {target_guid, target_faction}] do
         Metadata.put(guid, %{

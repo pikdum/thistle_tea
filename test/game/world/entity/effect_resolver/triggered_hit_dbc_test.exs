@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.EffectResolver.TriggeredHitDbcTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Effects
@@ -345,7 +346,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.TriggeredHitDbcTest do
           alive?: true,
           level: 60,
           unit_flags: 0,
-          faction_template: %FactionTemplate{
+          faction_template: %DBC.FactionTemplate{
             id: 1,
             faction: 1,
             flags: 72,
@@ -363,7 +364,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.TriggeredHitDbcTest do
       alive?: true,
       level: 60,
       unit_flags: 0,
-      faction_template: %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1},
+      faction_template: %DBC.FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1},
       faction_can_have_reputation?: false
     })
 

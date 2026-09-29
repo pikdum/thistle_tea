@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.Loader.BankBagSlotPrice do
   Startup cache of the six bank-bag slot prices supported by build 5875.
   """
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
 
   @table_options [:named_table, :public, read_concurrency: true]
   @client_slots 1..6
@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.World.Loader.BankBagSlotPrice do
   end
 
   def load_all(table \\ __MODULE__) do
-    BankBagSlotPrices
+    DBC.BankBagSlotPrices
     |> DBC.all()
     |> Enum.filter(&(&1.id in @client_slots))
     |> Enum.each(&:ets.insert(table, {&1.id, &1.cost}))

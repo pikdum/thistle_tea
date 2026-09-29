@@ -4,8 +4,8 @@ defmodule ThistleTea.Game.World.Loader.ItemEnchantment do
   """
   import Ecto.Query
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.DBC
   alias ThistleTea.Game.Core.Item.ItemEnchantment
   alias ThistleTea.Game.Core.Spell.Effect
 
@@ -21,7 +21,7 @@ defmodule ThistleTea.Game.World.Loader.ItemEnchantment do
   end
 
   def load_all do
-    rows = DBC.all(SpellItemEnchantment)
+    rows = DBC.all(DBC.SpellItemEnchantment)
     equip_spell_ids = rows |> Enum.flat_map(&equip_spell_ids/1) |> Enum.uniq()
     skill_bonuses = load_skill_bonuses(equip_spell_ids)
 
@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.World.Loader.ItemEnchantment do
       [] ->
         recipe =
           DBC.one(
-            from(s in SkillLineAbility,
+            from(s in DBC.SkillLineAbility,
               where: s.spell == ^spell_id and s.skill_line == 333,
               select: %{
                 skill_id: s.skill_line,
@@ -148,7 +148,7 @@ defmodule ThistleTea.Game.World.Loader.ItemEnchantment do
 
   defp load_skill_bonuses(spell_ids) do
     DBC.all(
-      from(s in Elixir.Spell,
+      from(s in DBC.Spell,
         where: s.id in ^spell_ids,
         select: %{
           id: s.id,

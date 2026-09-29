@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Rest do
   """
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Player.Rest, as: RestLogic
@@ -62,8 +62,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Rest do
   end
 
   def default_zone(map_id) when is_integer(map_id) do
-    case DBC.get(MapEntry, map_id) do
-      %MapEntry{area_table: zone_id} when is_integer(zone_id) and zone_id > 0 -> zone_id
+    case DBC.get(DBC.MapEntry, map_id) do
+      %DBC.MapEntry{area_table: zone_id} when is_integer(zone_id) and zone_id > 0 -> zone_id
       _missing -> nil
     end
   end
@@ -89,8 +89,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Rest do
   end
 
   defp friendly_capital?(%Character{unit: %{race: race}}, zone_id) when is_integer(zone_id) and zone_id > 0 do
-    case DBC.get(AreaTable, zone_id) do
-      %AreaTable{flags: flags, faction_group: faction_group} when is_integer(flags) ->
+    case DBC.get(DBC.AreaTable, zone_id) do
+      %DBC.AreaTable{flags: flags, faction_group: faction_group} when is_integer(flags) ->
         (flags &&& @area_flag_capital) != 0 and friendly_area_team?(race, faction_group)
 
       _missing ->

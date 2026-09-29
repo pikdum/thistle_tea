@@ -1,4 +1,4 @@
-defmodule DurabilityQuality do
+defmodule ThistleTea.DB.DBC.DurabilityQuality do
   @moduledoc false
   use Ecto.Schema
 

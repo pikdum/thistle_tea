@@ -6,8 +6,8 @@ defmodule ThistleTea.Game.World.Loader.Character do
   """
   import Bitwise, only: [|||: 2]
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.DBC
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -29,7 +29,7 @@ defmodule ThistleTea.Game.World.Loader.Character do
     spells = Mangos.PlayerCreateInfoSpell.get_all(params.race, params.class)
     action_buttons = Mangos.PlayerCreateInfoAction.get_all(params.race, params.class)
     starting_items = Mangos.PlayerCreateInfoItem.get_all(params.race, params.class)
-    chr_race = DBC.get_by(ChrRaces, id: params.race)
+    chr_race = DBC.get_by(DBC.ChrRaces, id: params.race)
     stats = Stats.get!(params.race, params.class, 1)
 
     unit_display_id =

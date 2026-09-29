@@ -1,4 +1,4 @@
-defmodule StableSlotPrices do
+defmodule ThistleTea.DB.DBC.StableSlotPrices do
   @moduledoc false
   use Ecto.Schema
 

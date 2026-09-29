@@ -12,10 +12,10 @@ defmodule ThistleTea.Game.World.Entity.Player.MiniPetOwner do
 
   alias ThistleTea.Game.Core.Death
   alias ThistleTea.Game.Core.Effects
-  alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Pet.Companion.EntityRef
   alias ThistleTea.Game.Core.Pet.MiniPet
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Player.MiniPetOwner.Monitor
   alias ThistleTea.Game.World.Entity.Player.PacketSink
@@ -59,7 +59,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MiniPetOwner do
             monitor = %Monitor{token: Process.monitor(pid), guid: pet.object.guid}
             character = MiniPet.activate(state.character, ref)
             state = %{state | character: character, mini_pet_monitor: monitor}
-            PacketSink.ensure_created(state, Entity.update_object(pet))
+            PacketSink.ensure_created(state, UpdateObject.from_entity(pet))
 
           _failed ->
             state

@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
 
   import Bitwise, only: [&&&: 2]
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Entity.Character
@@ -108,7 +109,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
 
   def faction_id(guid) when is_integer(guid) and guid > 0 do
     case Metadata.query(guid, [:faction_template]) do
-      %{faction_template: %FactionTemplate{faction: faction_id}} when faction_id > 0 -> faction_id
+      %{faction_template: %DBC.FactionTemplate{faction: faction_id}} when faction_id > 0 -> faction_id
       _metadata -> nil
     end
   end
@@ -241,7 +242,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
         _ -> nil
       end
 
-    with %{faction_can_have_reputation?: true, faction_template: %FactionTemplate{faction: faction_id}} <-
+    with %{faction_can_have_reputation?: true, faction_template: %DBC.FactionTemplate{faction: faction_id}} <-
            target,
          false <- Hostility.hostile?(character, target) do
       set_visible(state, faction_id)

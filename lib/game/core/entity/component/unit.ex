@@ -149,10 +149,10 @@ defmodule ThistleTea.Game.Core.Entity.Component.Unit do
     ranged_weapon: :virtual,
     base_melee_attack_time: :virtual
 
-  alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Core.Entity.UpdateMask
 
   def bytes_0(%{race: race, class: class, gender: gender, power_type: power_type}) do
-    UpdateObject.build_bytes([
+    UpdateMask.build_bytes([
       {8, race},
       {8, class},
       {8, gender},
@@ -166,7 +166,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Unit do
         shapeshift_form: shapeshift_form,
         vis_flag: vis_flag
       }) do
-    UpdateObject.build_bytes([
+    UpdateMask.build_bytes([
       {8, stand_state},
       {8, pet_loyalty},
       {8, shapeshift_form},
@@ -175,7 +175,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Unit do
   end
 
   def bytes_2(%{sheath_state: sheath_state, misc_flags: misc_flags, pet_flags: pet_flags}) do
-    UpdateObject.build_bytes([
+    UpdateMask.build_bytes([
       {8, sheath_state},
       {8, misc_flags},
       {8, pet_flags},

@@ -4,8 +4,8 @@ defmodule ThistleTea.Game.World.Loader.Reputation do
   immutable internal catalog cached at the world boundary.
   """
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.DBC
   alias ThistleTea.Game.Core.Reputation.Catalog
   alias ThistleTea.Game.Core.Reputation.Definition
   alias ThistleTea.Game.Core.Reputation.KillReward
@@ -30,7 +30,7 @@ defmodule ThistleTea.Game.World.Loader.Reputation do
   def load_all do
     catalog =
       build_catalog(
-        DBC.all(Faction),
+        DBC.all(DBC.Faction),
         Mangos.Repo.all(Mangos.ReputationSpilloverTemplate),
         Mangos.Repo.all(Mangos.CreatureOnkillReputation),
         Mangos.Repo.all(Mangos.ReputationRewardRate)

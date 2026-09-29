@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Spell.SpellAreas do
   @moduledoc "Builds spell-area snapshots from terrain and the controlling player's cached facts."
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Condition.Subject
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Spell
@@ -42,8 +43,8 @@ defmodule ThistleTea.Game.World.Spell.SpellAreas do
 
   defp cached_location(%{internal: %{area: id}}, map) do
     case Exploration.area(id) do
-      %AreaTable{id: area, map: ^map, parent_area_table: 0} -> {area, area}
-      %AreaTable{id: area, map: ^map, parent_area_table: zone} -> {zone, area}
+      %DBC.AreaTable{id: area, map: ^map, parent_area_table: 0} -> {area, area}
+      %DBC.AreaTable{id: area, map: ^map, parent_area_table: zone} -> {zone, area}
       _missing -> {nil, nil}
     end
   end

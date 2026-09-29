@@ -1,4 +1,4 @@
-defmodule BankBagSlotPrices do
+defmodule ThistleTea.DB.DBC.BankBagSlotPrices do
   use Ecto.Schema
 
   @primary_key {:id, :integer, autogenerate: false}

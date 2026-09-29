@@ -45,11 +45,14 @@ defmodule ThistleTea.DevSeed do
   The Windreaver at {16383.2, 16398.1} retains its invasion death script to
   exercise server-wide variable assignment through combat.
   """
+  use Boundary,
+    deps: [ThistleTea.Game.Core, ThistleTea.Game.Network, ThistleTea.Game.World, ThistleTea.DB, ThistleTea.Auth]
+
   import Ecto.Query
 
   alias ThistleTea.Auth.Account
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.DBC
   alias ThistleTea.DevSeed.ActionBars
   alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.Entity.Character
@@ -251,7 +254,7 @@ defmodule ThistleTea.DevSeed do
        ) do
     learned_spells =
       DBC.all(
-        from(s in Spell,
+        from(s in DBC.Spell,
           where: s.id in ^internal.spells,
           select: %{
             id: s.id,

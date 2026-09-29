@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.AI.BT.Pet.TargetsTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Mob.Spells
   alias ThistleTea.Game.Core.AI.BT.Pet.Autocast
@@ -191,8 +192,8 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet.TargetsTest do
     outsider = Guid.from_low_guid(:player, System.unique_integer([:positive]))
     enemy = Guid.runtime(:mob, 2)
     guid = Guid.runtime(:pet, 416)
-    friendly = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
-    hostile = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
+    friendly = %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+    hostile = %DBC.FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
 
     for {type, actor, distance, faction} <- [
           {:players, owner, 5.0, friendly},

@@ -1,4 +1,4 @@
-defmodule CreatureDisplayInfoExtra do
+defmodule ThistleTea.DB.DBC.CreatureDisplayInfoExtra do
   @moduledoc false
   use Ecto.Schema
 

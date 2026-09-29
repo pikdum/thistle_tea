@@ -1,4 +1,4 @@
-defmodule ChrRaces do
+defmodule ThistleTea.DB.DBC.ChrRaces do
   use Ecto.Schema
 
   @primary_key {:id, :integer, autogenerate: false}

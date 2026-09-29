@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.Loader.ItemSet do
   Preloads DBC equipment set definitions for database-free gameplay lookups.
   """
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Item.ItemSet
 
   def init(table \\ __MODULE__) do
@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.World.Loader.ItemSet do
   end
 
   def load_all(table \\ __MODULE__) do
-    for row <- DBC.all(Elixir.ItemSet), do: :ets.insert(table, {row.id, build(row)})
+    for row <- DBC.all(DBC.ItemSet), do: :ets.insert(table, {row.id, build(row)})
     :ok
   end
 

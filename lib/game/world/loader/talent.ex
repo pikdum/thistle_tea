@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.World.Loader.Talent do
   import Bitwise, only: [<<<: 2, &&&: 2]
   import Ecto.Query
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Player.Talent, as: TalentData
   alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
 
@@ -23,8 +23,8 @@ defmodule ThistleTea.Game.World.Loader.Talent do
   end
 
   def load_all do
-    tabs = DBC.all(TalentTab)
-    talent_rows = DBC.all(Talent)
+    tabs = DBC.all(DBC.TalentTab)
+    talent_rows = DBC.all(DBC.Talent)
 
     effects_by_parent =
       talent_rows
@@ -33,7 +33,7 @@ defmodule ThistleTea.Game.World.Loader.Talent do
 
     successor_by_spell =
       DBC.all(
-        from(s in SkillLineAbility,
+        from(s in DBC.SkillLineAbility,
           where: s.spell > 0 and s.superseded_by > 0,
           select: {s.spell, s.superseded_by}
         )
@@ -227,7 +227,7 @@ defmodule ThistleTea.Game.World.Loader.Talent do
 
   defp effects_by_parent(spell_ids) do
     DBC.all(
-      from(s in Spell,
+      from(s in DBC.Spell,
         where: s.id in ^spell_ids,
         select: %{
           id: s.id,

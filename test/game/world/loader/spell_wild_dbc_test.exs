@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.Loader.SpellWildDbcTest do
 
   import Ecto.Query
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -19,7 +19,7 @@ defmodule ThistleTea.Game.World.Loader.SpellWildDbcTest do
 
   describe "load/1" do
     test "every wild summon includes its caster execution target" do
-      ids = DBC.all(from(s in Spell, where: s.effect_0 == 41 or s.effect_1 == 41 or s.effect_2 == 41, select: s.id))
+      ids = DBC.all(from(s in DBC.Spell, where: s.effect_0 == 41 or s.effect_1 == 41 or s.effect_2 == 41, select: s.id))
       saved = Enum.flat_map(ids, &:ets.take(SpellEffectOverride, {:mods, &1}))
       on_exit(fn -> :ets.insert(SpellEffectOverride, saved) end)
 

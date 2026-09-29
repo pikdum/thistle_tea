@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.ProfessionDBCTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Skills
   alias ThistleTea.Game.Core.Skills.SpellSkills
   alias ThistleTea.Game.World.Loader.Skill
@@ -42,7 +42,7 @@ defmodule ThistleTea.Game.World.Loader.ProfessionDBCTest do
     end
 
     test "primary profession rules match every DBC skill category" do
-      for line <- DBC.all(SkillLine) do
+      for line <- DBC.all(DBC.SkillLine) do
         assert Skills.primary_profession?(line.id) == (line.category == 11)
       end
     end

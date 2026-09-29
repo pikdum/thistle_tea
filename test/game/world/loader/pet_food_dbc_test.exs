@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.PetFoodDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DBC
-  alias ThistleTea.DBC.CreatureFamily
+  alias ThistleTea.DB.DBC
+  alias ThistleTea.DB.DBC.CreatureFamily
   alias ThistleTea.Game.Core.Class.Hunter
 
   @moduletag :dbc_db

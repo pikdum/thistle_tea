@@ -9,9 +9,9 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   import Bitwise, only: [&&&: 2, |||: 2]
   import Ecto.Query
 
+  alias ThistleTea.DB.DBC
+  alias ThistleTea.DB.DBC.CreatureFamily
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.DBC
-  alias ThistleTea.DBC.CreatureFamily
   alias ThistleTea.Game.Core.Creature.CreatureMovement
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
@@ -399,7 +399,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
 
     skill_lines =
       DBC.all(
-        from(ability in SkillLineAbility,
+        from(ability in DBC.SkillLineAbility,
           where: ability.spell in ^spell_ids,
           select: ability.skill_line,
           distinct: true
@@ -413,8 +413,8 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   defp creature_spell_data(entry) do
     with %Mangos.Creature{creature_template: %Mangos.CreatureTemplate{pet_spell_data_id: id}} <- template(entry),
          true <- is_integer(id) and id > 0,
-         %CreatureSpellData{} = row <- DBC.get(CreatureSpellData, id) do
-      CreatureSpellData.spell_ids(row)
+         %DBC.CreatureSpellData{} = row <- DBC.get(DBC.CreatureSpellData, id) do
+      DBC.CreatureSpellData.spell_ids(row)
     else
       _missing -> []
     end
@@ -458,7 +458,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   defp highest_rank_spell_ids({skill_lines, spell_ids}, level, filter) do
     names =
       DBC.all(
-        from(spell in Spell,
+        from(spell in DBC.Spell,
           where: spell.id in ^spell_ids,
           select: spell.name_en_gb,
           distinct: true
@@ -466,8 +466,8 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       )
 
     DBC.all(
-      from(ability in SkillLineAbility,
-        join: spell in Spell,
+      from(ability in DBC.SkillLineAbility,
+        join: spell in DBC.Spell,
         on: spell.id == ability.spell,
         where: ability.skill_line in ^skill_lines and spell.name_en_gb in ^names and spell.base_level <= ^level,
         select: %{id: spell.id, name: spell.name_en_gb, level: spell.base_level, attributes: spell.attributes}

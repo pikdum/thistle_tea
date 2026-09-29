@@ -1,4 +1,4 @@
-defmodule SpellRadius do
+defmodule ThistleTea.DB.DBC.SpellRadius do
   use Ecto.Schema
 
   @primary_key {:id, :integer, autogenerate: false}

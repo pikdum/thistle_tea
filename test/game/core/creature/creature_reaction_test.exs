@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.Creature.CreatureReactionTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.AI.BehaviorRunner
   alias ThistleTea.Game.Core.AI.BT.Blackboard
@@ -194,8 +195,8 @@ defmodule ThistleTea.Game.Core.Creature.CreatureReactionTest do
   end
 
   defp combat_context(mob) do
-    source = %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
-    enemy = %FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
+    source = %DBC.FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+    enemy = %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
 
     observations = %{
       mob.object.guid => %Observation{guid: mob.object.guid, metadata: %{faction_template: source}},

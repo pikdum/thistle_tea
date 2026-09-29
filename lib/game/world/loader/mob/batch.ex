@@ -4,9 +4,9 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
   """
   import Ecto.Query
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.AddonAuras
-  alias ThistleTea.DBC
   alias ThistleTea.Game.Core.AI.AIEvent
   alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.AI.ScriptStep
@@ -128,17 +128,17 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
 
   defp display_models(display_ids) do
     display_rows =
-      DBC.all(from(row in CreatureDisplayInfo, where: row.id in ^display_ids))
+      DBC.all(from(row in DBC.CreatureDisplayInfo, where: row.id in ^display_ids))
 
     model_ids = display_rows |> Enum.map(& &1.model) |> Enum.filter(&positive?/1) |> Enum.uniq()
 
     models =
-      DBC.all(from(row in CreatureModelData, where: row.id in ^model_ids))
+      DBC.all(from(row in DBC.CreatureModelData, where: row.id in ^model_ids))
       |> Map.new(&{&1.id, &1})
 
     Map.new(display_rows, fn display ->
       scale =
-        with %CreatureModelData{model_scale: model_scale} when is_number(model_scale) <-
+        with %DBC.CreatureModelData{model_scale: model_scale} when is_number(model_scale) <-
                Map.get(models, display.model),
              display_scale when is_number(display_scale) <- display.creature_model_scale do
           display_scale * model_scale

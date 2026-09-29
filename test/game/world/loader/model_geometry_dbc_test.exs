@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.ModelGeometryDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.World.Loader.ModelGeometry
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.World.Loader.ModelGeometryDbcTest do
 
   describe "load_all/0" do
     test "reads Vanilla collision height from column 15 and caches display geometry" do
-      model = DBC.get!(CreatureModelData, DBC.get!(CreatureDisplayInfo, 50).model)
+      model = DBC.get!(DBC.CreatureModelData, DBC.get!(DBC.CreatureDisplayInfo, 50).model)
       assert_in_delta model.collision_height, 1.913, 0.001
       ModelGeometry.load_all()
       assert_in_delta ModelGeometry.height(50), 1.913, 0.001

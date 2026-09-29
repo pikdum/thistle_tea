@@ -1,14 +1,14 @@
 defmodule ThistleTea.Game.World.Loader.ReputationDbcTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.World.Loader.Reputation
 
   @moduletag :dbc_db
 
   describe "build_catalog/4" do
     test "translates all indexed DBC factions and signed base standings" do
-      catalog = Reputation.build_catalog(DBC.all(Faction), [], [], [])
+      catalog = Reputation.build_catalog(DBC.all(DBC.Faction), [], [], [])
 
       assert map_size(catalog.factions) == 54
       assert catalog.factions[87].name == "Bloodsail Buccaneers"

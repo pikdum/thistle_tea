@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.System.ScriptedEventTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.Script.Request
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Condition
@@ -122,8 +123,8 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
   end
 
   test "condition results preserve exact faction-reaction comparisons", context do
-    player_faction = %FactionTemplate{faction: 1, faction_group: 1, friend_group: 1}
-    creature_faction = %FactionTemplate{faction: 29}
+    player_faction = %DBC.FactionTemplate{faction: 1, faction_group: 1, friend_group: 1}
+    creature_faction = %DBC.FactionTemplate{faction: 29}
 
     Metadata.update(context.source_guid, %{
       faction_template: creature_faction,
@@ -156,11 +157,11 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
 
   test "nearby-player modes distinguish any, hostile, and friendly players", context do
     Metadata.update(context.source_guid, %{
-      faction_template: %FactionTemplate{faction: 15, faction_group: 8, enemy_group: 1}
+      faction_template: %DBC.FactionTemplate{faction: 15, faction_group: 8, enemy_group: 1}
     })
 
     Metadata.update(context.target_guid, %{
-      faction_template: %FactionTemplate{faction: 1, faction_group: 1, friend_group: 1}
+      faction_template: %DBC.FactionTemplate{faction: 1, faction_group: 1, friend_group: 1}
     })
 
     conditions = [

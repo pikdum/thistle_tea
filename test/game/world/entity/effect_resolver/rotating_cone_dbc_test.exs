@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.EffectResolver.RotatingConeDbcTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
@@ -143,7 +144,11 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.RotatingConeDbcTest do
       unit_flags: 0,
       no_spell_defense?: true,
       faction_can_have_reputation?: false,
-      faction_template: %FactionTemplate{id: faction, faction: faction, enemies_0: if(faction == 1, do: 17, else: 1)}
+      faction_template: %DBC.FactionTemplate{
+        id: faction,
+        faction: faction,
+        enemies_0: if(faction == 1, do: 17, else: 1)
+      }
     })
 
     on_exit(fn ->

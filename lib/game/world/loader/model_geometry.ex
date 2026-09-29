@@ -6,8 +6,8 @@ defmodule ThistleTea.Game.World.Loader.ModelGeometry do
   import Bitwise, only: [&&&: 2]
   import Ecto.Query
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.DBC
   alias ThistleTea.Game.Core.Entity.Model
 
   def init(table \\ __MODULE__) do
@@ -18,12 +18,12 @@ defmodule ThistleTea.Game.World.Loader.ModelGeometry do
   end
 
   def load_all do
-    from(display in CreatureDisplayInfo,
-      join: model in CreatureModelData,
+    from(display in DBC.CreatureDisplayInfo,
+      join: model in DBC.CreatureModelData,
       on: model.id == display.model,
-      left_join: extra in CreatureDisplayInfoExtra,
+      left_join: extra in DBC.CreatureDisplayInfoExtra,
       on: extra.id == display.extended_display_info,
-      left_join: race in ChrRaces,
+      left_join: race in DBC.ChrRaces,
       on: race.id == extra.display_race,
       select: %{
         id: display.id,

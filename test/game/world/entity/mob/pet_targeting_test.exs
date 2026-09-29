@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.Mob.PetTargetingTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT.Pet, as: PetBT
   alias ThistleTea.Game.Core.Combat.KillFeedback
   alias ThistleTea.Game.Core.Effects
@@ -178,8 +179,8 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetTargetingTest do
     target = Guid.runtime(:mob, 2)
     other = Guid.runtime(:mob, 2)
     world = WorldRef.open(999)
-    alliance = %FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
-    hostile = %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+    alliance = %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
+    hostile = %DBC.FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
     Metadata.put(guid, %{faction_template: alliance, alive?: true})
 
     for enemy <- [target, other] do

@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.Loader.SpellMiniPetDbcTest do
 
   import Ecto.Query
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Spell.Semantics
@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.World.Loader.SpellMiniPetDbcTest do
 
   describe "load/1" do
     test "all critter summons execute on the caster without a selected unit" do
-      ids = DBC.all(from(s in Spell, where: s.effect_0 == 97, select: s.id))
+      ids = DBC.all(from(s in DBC.Spell, where: s.effect_0 == 97, select: s.id))
       assert length(ids) == 100
       caster = %Character{object: %Object{guid: 7}}
 

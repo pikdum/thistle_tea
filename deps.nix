@@ -243,6 +243,23 @@ let
         in
         drv;
 
+      boundary =
+        let
+          version = "0.11.0";
+          drv = buildMix {
+            inherit version;
+            name = "boundary";
+            appConfigPath = ./config;
+
+            src = fetchHex {
+              inherit version;
+              pkg = "boundary";
+              sha256 = "b9297a96ea14c0e63dbd77b8135e0d483f9c6f34ed1c9dee4b3fea82c596f55a";
+            };
+          };
+        in
+        drv;
+
       cc_precompiler =
         let
           version = "0.1.11";

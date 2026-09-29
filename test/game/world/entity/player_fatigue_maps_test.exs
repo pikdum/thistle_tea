@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.PlayerFatigueMapsTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BehaviorRunner
   alias ThistleTea.Game.Core.AI.BT.Player, as: PlayerBT
   alias ThistleTea.Game.Core.Entity.Character
@@ -63,7 +64,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerFatigueMapsTest do
 
   describe "repop_at_graveyard/1" do
     test "rescues ghosts beyond navigation coverage using terrain exploration bits" do
-      area = %AreaTable{id: 2364, map: 0, parent_area_table: 40, area_bit: 894}
+      area = %DBC.AreaTable{id: 2364, map: 0, parent_area_table: 40, area_bit: 894}
       cache(Exploration, {:area, 2364}, area)
       cache(Exploration, {:area_bit, 0, 894}, 2364)
       cache(Graveyard, 40, [%{id: 900_001, map: 0, position: {-10_000.0, 1900.0, 10.0}, faction: 469}])

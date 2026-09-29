@@ -1,4 +1,4 @@
-defmodule AreaTable do
+defmodule ThistleTea.DB.DBC.AreaTable do
   @moduledoc false
   use Ecto.Schema
 

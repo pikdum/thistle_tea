@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.World.Loader.Skill do
   import Bitwise, only: [&&&: 2, <<<: 2]
   import Ecto.Query
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Skills
   alias ThistleTea.Game.Core.Skills.SpellSkills
   alias ThistleTea.Game.Core.Spell, as: SpellData
@@ -27,13 +27,13 @@ defmodule ThistleTea.Game.World.Loader.Skill do
   end
 
   def load_all(table \\ __MODULE__) do
-    load(DBC.all(SkillLine), DBC.all(SkillRaceClassInfo), DBC.all(SkillLineAbility), table)
+    load(DBC.all(DBC.SkillLine), DBC.all(DBC.SkillRaceClassInfo), DBC.all(DBC.SkillLineAbility), table)
     load_spell_skills(table)
   end
 
   defp load_spell_skills(table) do
     DBC.all(
-      from(s in Spell,
+      from(s in DBC.Spell,
         where: s.effect_0 == 118 or s.effect_1 == 118 or s.effect_2 == 118,
         select: map(s, ^@skill_fields)
       )

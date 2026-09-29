@@ -1,4 +1,4 @@
-defmodule SkillLine do
+defmodule ThistleTea.DB.DBC.SkillLine do
   @moduledoc false
   use Ecto.Schema
 

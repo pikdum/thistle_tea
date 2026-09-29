@@ -87,6 +87,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Combat.CallForHelp
   alias ThistleTea.Game.World.Combat.ChaseWatch
@@ -208,7 +209,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       World.update_position(state)
       state = Visibility.refresh_entity(state)
 
-      EntityCore.update_object(state)
+      UpdateObject.from_entity(state)
       |> Network.send_packet(pid)
 
       case Message.SmsgPetNameQueryResponse.for_pet(state) do
@@ -1682,7 +1683,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       Metadata.update(state.object.guid, metadata)
       if previous_visibility != visibility, do: Visibility.notify_visibility_changed(state)
       update_type = if EntityCore.dead?(state), do: :create_object2, else: :values
-      EntityCore.update_object(state, update_type) |> World.broadcast_packet(state)
+      UpdateObject.from_entity(state, update_type) |> World.broadcast_packet(state)
     end
 
     %{state | internal: %{state.internal | broadcast_update?: false}}

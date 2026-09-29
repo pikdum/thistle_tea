@@ -1,4 +1,4 @@
-defmodule ItemSet do
+defmodule ThistleTea.DB.DBC.ItemSet do
   @moduledoc false
   use Ecto.Schema
 

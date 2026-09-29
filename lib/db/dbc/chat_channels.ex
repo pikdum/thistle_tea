@@ -1,4 +1,4 @@
-defmodule ChatChannels do
+defmodule ThistleTea.DB.DBC.ChatChannels do
   @moduledoc false
   use Ecto.Schema
 

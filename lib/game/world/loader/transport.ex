@@ -5,8 +5,8 @@ defmodule ThistleTea.Game.World.Loader.Transport do
 
   import Ecto.Query
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.DBC
   alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Travel.Transport
 
@@ -79,7 +79,7 @@ defmodule ThistleTea.Game.World.Loader.Transport do
   end
 
   def load_taxi_path_nodes(path_ids) when is_list(path_ids) do
-    TaxiPathNode
+    DBC.TaxiPathNode
     |> where([node], node.taxi_path in ^path_ids)
     |> order_by([node], [node.taxi_path, node.node_index])
     |> DBC.all()
@@ -98,14 +98,14 @@ defmodule ThistleTea.Game.World.Loader.Transport do
   def load_animation_routes(entries \\ :all)
 
   def load_animation_routes(:all) do
-    TransportAnimation
+    DBC.TransportAnimation
     |> order_by([frame], [frame.transport, frame.time_index])
     |> DBC.all()
     |> build_animation_routes()
   end
 
   def load_animation_routes(entries) when is_list(entries) do
-    TransportAnimation
+    DBC.TransportAnimation
     |> where([frame], frame.transport in ^entries)
     |> order_by([frame], [frame.transport, frame.time_index])
     |> DBC.all()

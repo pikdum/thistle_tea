@@ -1,4 +1,4 @@
-defmodule WorldSafeLocs do
+defmodule ThistleTea.DB.DBC.WorldSafeLocs do
   use Ecto.Schema
 
   @primary_key {:id, :integer, autogenerate: false}

@@ -4,8 +4,6 @@ defmodule ThistleTea.DB.Mangos.Creature do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Core.SpatialGrid
-  alias ThistleTea.Game.Core.WorldRef
 
   @primary_key {:guid, :integer, autogenerate: false}
 
@@ -58,10 +56,7 @@ defmodule ThistleTea.DB.Mangos.Creature do
     )
   end
 
-  def query_cell({world, _x, _y} = cell, events \\ []) do
-    map = WorldRef.map_id(world)
-    {{x1, x2}, {y1, y2}} = SpatialGrid.cell_bounds(cell)
-
+  def query_bounds(map, {{x1, x2}, {y1, y2}}, events \\ []) do
     from(c in __MODULE__,
       where:
         c.map == ^map and c.position_x >= ^x1 and c.position_x < ^x2 and c.position_y >= ^y1 and

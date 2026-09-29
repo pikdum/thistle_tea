@@ -5,9 +5,9 @@ defmodule ThistleTea.Game.World.Loader.Mail do
   database.
   """
 
+  alias ThistleTea.DB.DBC
+  alias ThistleTea.DB.DBC.MailTemplate
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.DBC
-  alias ThistleTea.DBC.MailTemplate
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
   @table_options [:named_table, :public, read_concurrency: true]

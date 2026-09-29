@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   """
   import Bitwise, only: [<<<: 2, |||: 2]
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Player, as: PlayerBT
   alias ThistleTea.Game.Core.Aura, as: AuraLogic
@@ -376,7 +376,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
       timescale: 0.01666667
     })
 
-    chr_race = DBC.get_by(ChrRaces, id: c.unit.race)
+    chr_race = DBC.get_by(DBC.ChrRaces, id: c.unit.race)
 
     # SMSG_TRIGGER_CINEMATIC
     # TODO: on first login only
@@ -519,8 +519,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   end
 
   defp normalize_faction_template(%Character{unit: %Unit{race: race} = unit} = character) when is_integer(race) do
-    case DBC.get_by(ChrRaces, id: race) do
-      %ChrRaces{faction: faction_template_id} when is_integer(faction_template_id) and faction_template_id > 0 ->
+    case DBC.get_by(DBC.ChrRaces, id: race) do
+      %DBC.ChrRaces{faction: faction_template_id} when is_integer(faction_template_id) and faction_template_id > 0 ->
         %{character | unit: %{unit | faction_template: faction_template_id}}
 
       _ ->

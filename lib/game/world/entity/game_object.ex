@@ -11,7 +11,6 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.Script.Request, as: ScriptRequest
   alias ThistleTea.Game.Core.Effects
-  alias ThistleTea.Game.Core.Entity, as: EntityCore
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Ritual
   alias ThistleTea.Game.Core.Entity.Component.Internal.Summon
@@ -36,6 +35,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   alias ThistleTea.Game.Network.Message.SmsgGameobjectCustomAnim
   alias ThistleTea.Game.Network.Message.SmsgGameobjectResetState
   alias ThistleTea.Game.Network.Message.SmsgPlayObjectSound
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.AIEnvironment
@@ -97,7 +97,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
 
   @impl GenServer
   def handle_cast({:send_update_to, pid}, state) do
-    EntityCore.update_object(state)
+    UpdateObject.from_entity(state)
     |> Network.send_packet(pid)
 
     reset_banner_interaction(state, pid)
@@ -119,7 +119,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
       {:noreply, state}
     else
       state = %{state | game_object: %{state.game_object | art_kit: art_kit}}
-      World.broadcast_packet(EntityCore.update_object(state, :values), state)
+      World.broadcast_packet(UpdateObject.from_entity(state, :values), state)
 
       World.broadcast_packet(
         %SmsgGameobjectCustomAnim{guid: state.object.guid, animation: animation},
@@ -499,7 +499,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
 
   def handle_info(:fishing_bite, %GameObject{} = state) do
     state = state |> Fishing.bite() |> publish_condition_metadata()
-    EntityCore.update_object(state, :values) |> World.broadcast_packet(state)
+    UpdateObject.from_entity(state, :values) |> World.broadcast_packet(state)
 
     %SmsgGameobjectCustomAnim{guid: state.object.guid}
     |> World.broadcast_packet(state)
@@ -834,7 +834,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
 
   defp broadcast_if_pending(%GameObject{internal: %Internal{broadcast_update?: true} = internal} = state) do
     publish_condition_metadata(state)
-    EntityCore.update_object(state, :values) |> World.broadcast_packet(state)
+    UpdateObject.from_entity(state, :values) |> World.broadcast_packet(state)
     %{state | internal: %{internal | broadcast_update?: false}}
   end
 

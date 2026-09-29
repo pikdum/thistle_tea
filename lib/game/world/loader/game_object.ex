@@ -4,16 +4,20 @@ defmodule ThistleTea.Game.World.Loader.GameObject do
   """
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.Entity.GameObject
+  alias ThistleTea.Game.Core.SpatialGrid
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.SpawnPool
   alias ThistleTea.Game.World.System.SpawnPool.Catalog
   alias ThistleTea.Game.World.Transports
 
-  def load(cell) do
+  def load({world, _x, _y} = cell) do
     events = GameEvent.get_events()
 
-    Mangos.GameObject.query_cell(cell, events)
+    world
+    |> WorldRef.map_id()
+    |> Mangos.GameObject.query_bounds(SpatialGrid.cell_bounds(cell), events)
     |> Mangos.Repo.all()
     |> Enum.each(&activate(&1, cell))
   end

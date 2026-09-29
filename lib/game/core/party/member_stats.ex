@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Core.Party.MemberStats do
 
   alias ThistleTea.Game.Core.Chat.ChatStatus
   alias ThistleTea.Game.Core.Death
-  alias ThistleTea.Game.Network.BinaryUtils
+  alias ThistleTea.Game.Core.Guid
 
   @status_online 0x01
   @status_dead 0x04
@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.Core.Party.MemberStats do
         end
       end)
 
-    BinaryUtils.pack_guid(Map.fetch!(stats, :guid)) <> <<mask::little-size(32)>> <> payload
+    Guid.pack(Map.fetch!(stats, :guid)) <> <<mask::little-size(32)>> <> payload
   end
 
   defp status(character) do

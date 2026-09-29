@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.LockTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Profession.Lock, as: LockData
   alias ThistleTea.Game.Core.Profession.Lock.Requirement
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
@@ -8,7 +9,11 @@ defmodule ThistleTea.Game.World.Loader.LockTest do
   describe "load/2" do
     test "retains requirement ordering and ignores unused slots" do
       table = :ets.new(__MODULE__, [:set])
-      LockLoader.load([%Lock{id: 36, ty_0: 1, property_0: 3467, ty_1: 2, property_1: 1, required_skill_1: 100}], table)
+
+      LockLoader.load(
+        [%DBC.Lock{id: 36, ty_0: 1, property_0: 3467, ty_1: 2, property_1: 1, required_skill_1: 100}],
+        table
+      )
 
       assert LockLoader.get(36, table) == %LockData{
                id: 36,

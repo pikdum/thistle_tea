@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.GameObjectSpellCastTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Combat.Engagement
   alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Condition
@@ -115,7 +116,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSpellCastTest do
 
     test "owned object hostility follows the owner instead of the template", %{object: object} do
       owner = player(object, 100.0)
-      faction = %FactionTemplate{id: 1, faction: 1, faction_group: 1, friend_group: 1, enemy_group: 2}
+      faction = %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 1, friend_group: 1, enemy_group: 2}
       Metadata.update(owner.object.guid, %{faction_template: faction})
       object = %{object | game_object: %{object.game_object | created_by: owner.object.guid}}
       assert Hostility.faction_template(object) == faction

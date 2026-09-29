@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.Loader.SpellGuardianDbcTest do
 
   import Ecto.Query
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -58,7 +58,7 @@ defmodule ThistleTea.Game.World.Loader.SpellGuardianDbcTest do
     end
 
     test "guardian summons include the caster execution target" do
-      ids = DBC.all(from(s in Spell, where: s.effect_0 == 42 or s.effect_1 == 42 or s.effect_2 == 42, select: s.id))
+      ids = DBC.all(from(s in DBC.Spell, where: s.effect_0 == 42 or s.effect_1 == 42 or s.effect_2 == 42, select: s.id))
 
       saved = Enum.flat_map(ids, &:ets.take(SpellEffectOverride, {:mods, &1}))
       on_exit(fn -> :ets.insert(SpellEffectOverride, saved) end)

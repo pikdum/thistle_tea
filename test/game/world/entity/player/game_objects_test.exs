@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.Player.GameObjectsTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -133,8 +134,8 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectsTest do
       object = GameObject.build_summoned(template, WorldRef.open(0), {0.0, 0.0, 0.0, 0.0})
       guid = object.object.guid
       World.update_position(object)
-      alliance = %FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
-      horde = %FactionTemplate{id: 2, faction: 2, faction_group: 5, friend_group: 4, enemy_group: 10}
+      alliance = %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
+      horde = %DBC.FactionTemplate{id: 2, faction: 2, faction_group: 5, friend_group: 4, enemy_group: 10}
 
       :ets.insert(
         FactionLoader,

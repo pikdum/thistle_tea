@@ -6,9 +6,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   import Bitwise, only: [&&&: 2]
   import Ecto.Query
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.SpellEffectMod
-  alias ThistleTea.DBC
   alias ThistleTea.Game.Core.Entity.CreatureTemplate
   alias ThistleTea.Game.Core.Spell, as: SpellData
   alias ThistleTea.Game.Core.Spell.AuraRank
@@ -41,7 +41,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   end
 
   def load(spell_id) when is_integer(spell_id) and spell_id > 0 do
-    case DBC.get(Spell, spell_id) do
+    case DBC.get(DBC.Spell, spell_id) do
       nil -> nil
       row -> row |> build() |> put_chain(chain(spell_id))
     end
@@ -126,7 +126,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
     rows =
       DBC.all(
-        from(s in Spell,
+        from(s in DBC.Spell,
           where: s.id in ^spell_ids,
           preload: [:spell_cast_time, :spell_duration, :spell_range]
         )
@@ -148,7 +148,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     spell_ids = Enum.uniq(spell_ids)
 
     DBC.all(
-      from(s in Spell,
+      from(s in DBC.Spell,
         where: s.id in ^spell_ids,
         select: %{
           id: s.id,
@@ -172,7 +172,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     spell_ids = Enum.uniq(spell_ids)
 
     DBC.all(
-      from(s in Spell,
+      from(s in DBC.Spell,
         where: s.id in ^spell_ids,
         select: %{
           id: s.id,
@@ -195,7 +195,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
     dbc_map =
       DBC.all(
-        from(s in SkillLineAbility,
+        from(s in DBC.SkillLineAbility,
           where: s.spell in ^spell_ids and s.superseded_by > 0,
           select: {s.spell, s.superseded_by}
         )
@@ -286,7 +286,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   end
 
   defp triggers_school_immunity?(%Effect{type: :trigger_spell, trigger_spell_id: id}) when is_integer(id) and id > 0 do
-    case DBC.get(Spell, id) do
+    case DBC.get(DBC.Spell, id) do
       nil -> false
       row -> Enum.any?(build_effects(row, fn _radius -> 0.0 end), &(&1.aura == :school_immunity))
     end
@@ -298,7 +298,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     auras =
       for id <- Scripts.boost_aura_ids(spell),
           not MapSet.member?(ancestors, id),
-          row = DBC.get(Spell, id),
+          row = DBC.get(DBC.Spell, id),
           not is_nil(row),
           do: build(row, ancestors)
 
@@ -309,7 +309,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     auras =
       for id <- Scripts.form_aura_ids(spell),
           not MapSet.member?(ancestors, id),
-          row = DBC.get(Spell, id),
+          row = DBC.get(DBC.Spell, id),
           not is_nil(row),
           do: build(row, ancestors)
 
@@ -320,7 +320,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     dependencies =
       for id <- PassiveSpellLoader.get(spell.id),
           not MapSet.member?(ancestors, id),
-          row = DBC.get(Spell, id),
+          row = DBC.get(DBC.Spell, id),
           not is_nil(row),
           do: build(row, ancestors)
 
@@ -332,15 +332,16 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       for %Effect{aura: :linked_aura, trigger_spell_id: id} <- effects,
           is_integer(id) and id > 0,
           not MapSet.member?(ancestors, id),
-          row = DBC.get(Spell, id),
+          row = DBC.get(DBC.Spell, id),
           not is_nil(row),
           do: build(row, ancestors)
 
     %{spell | linked_auras: Enum.uniq_by(linked, & &1.id)}
   end
 
-  defp cost_skill_id(%Spell{id: id, mana_cost_per_level: per_level}) when is_integer(per_level) and per_level != 0 do
-    DBC.one(from(a in SkillLineAbility, where: a.spell == ^id, order_by: a.id, limit: 1, select: a.skill_line))
+  defp cost_skill_id(%DBC.Spell{id: id, mana_cost_per_level: per_level})
+       when is_integer(per_level) and per_level != 0 do
+    DBC.one(from(a in DBC.SkillLineAbility, where: a.spell == ^id, order_by: a.id, limit: 1, select: a.skill_line))
   end
 
   defp cost_skill_id(_row), do: nil
@@ -403,7 +404,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   end
 
   defp load_passive_aura_effects(passive_id, radius_lookup) do
-    case DBC.get(Spell, passive_id) do
+    case DBC.get(DBC.Spell, passive_id) do
       nil -> []
       row -> passive_aura_effects(row, radius_lookup, 0)
     end
@@ -549,7 +550,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   defp area_target?(target_int), do: target_int in @area_target_ints
 
-  defp effect_amplitude(_mod, %Spell{id: 8067}, 0), do: 10_000
+  defp effect_amplitude(_mod, %DBC.Spell{id: 8067}, 0), do: 10_000
 
   defp effect_amplitude(mod, row, index) do
     case mod do
@@ -558,13 +559,13 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     end
   end
 
-  defp aura_type(%Spell{id: 8067}, 4), do: :periodic_emote
+  defp aura_type(%DBC.Spell{id: 8067}, 4), do: :periodic_emote
   defp aura_type(_row, type), do: aura_type(type)
 
-  defp effect_type(%Spell{spell_class_set: 10, spell_class_mask_0: mask}, 77)
+  defp effect_type(%DBC.Spell{spell_class_set: 10, spell_class_mask_0: mask}, 77)
        when is_integer(mask) and (mask &&& 0x40000000) != 0, do: :heal
 
-  defp effect_type(%Spell{id: 31_247}, 122), do: :reputation
+  defp effect_type(%DBC.Spell{id: 31_247}, 122), do: :reputation
   defp effect_type(_row, type_int), do: effect_type(type_int)
 
   defp effect_misc_value(mod, row, index, type, _aura) when type in [:create_item, :summon_change_item] do
@@ -611,9 +612,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
         %{}
 
       _ ->
-        DBC.all(from(r in SpellRadius, where: r.id in ^radius_ids))
+        DBC.all(from(r in DBC.SpellRadius, where: r.id in ^radius_ids))
         |> Enum.reduce(%{}, fn
-          %SpellRadius{id: id, radius: radius}, acc when is_number(radius) -> Map.put(acc, id, radius)
+          %DBC.SpellRadius{id: id, radius: radius}, acc when is_number(radius) -> Map.put(acc, id, radius)
           _, acc -> acc
         end)
     end
@@ -623,25 +624,25 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp lookup_radius(0), do: nil
 
   defp lookup_radius(radius_id) when is_integer(radius_id) do
-    case DBC.get(SpellRadius, radius_id) do
-      %SpellRadius{radius: radius} when is_number(radius) -> radius
+    case DBC.get(DBC.SpellRadius, radius_id) do
+      %DBC.SpellRadius{radius: radius} when is_number(radius) -> radius
       _ -> nil
     end
   end
 
-  defp cast_time_ms(%SpellCastTimes{base: base}) when is_integer(base), do: base
+  defp cast_time_ms(%DBC.SpellCastTimes{base: base}) when is_integer(base), do: base
   defp cast_time_ms(_), do: 0
 
-  defp duration_ms(%SpellDuration{duration: duration}) when is_integer(duration), do: duration
+  defp duration_ms(%DBC.SpellDuration{duration: duration}) when is_integer(duration), do: duration
   defp duration_ms(_), do: 0
 
-  defp max_duration_ms(%SpellDuration{max_duration: duration}) when is_integer(duration), do: duration
+  defp max_duration_ms(%DBC.SpellDuration{max_duration: duration}) when is_integer(duration), do: duration
   defp max_duration_ms(_), do: 0
 
-  defp range_yards(%SpellRange{range_max: range}) when is_number(range), do: range
+  defp range_yards(%DBC.SpellRange{range_max: range}) when is_number(range), do: range
   defp range_yards(_), do: 0.0
 
-  defp min_range_yards(%SpellRange{range_min: range}) when is_number(range), do: range
+  defp min_range_yards(%DBC.SpellRange{range_min: range}) when is_number(range), do: range
   defp min_range_yards(_), do: 0.0
 
   defp nonzero(value) when is_integer(value) and value > 0, do: value

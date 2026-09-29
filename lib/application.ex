@@ -2,9 +2,23 @@ defmodule ThistleTea.Application do
   # See https://hexdocs.pm/elixir/Application.html
   # for more information on OTP Applications
   @moduledoc false
+  use Boundary,
+    deps: [
+      ThistleTea.Game.Core,
+      ThistleTea.Game.Network,
+      ThistleTea.Game.World,
+      ThistleTea.DB,
+      ThistleTea.Native.Namigator,
+      ThistleTea.Auth,
+      ThistleTea.Telemetry,
+      ThistleTea.DevSeed,
+      ThistleTeaWeb
+    ]
+
   use Application
 
   alias ThistleTea.Auth.Account
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.Core.InstanceScript
   alias ThistleTea.Game.Core.OutdoorPvp.Plaguelands
@@ -181,7 +195,7 @@ defmodule ThistleTea.Application do
         AreaEffects,
         SpellMagnets,
         SingleTargetAuras,
-        ThistleTea.DBC,
+        DBC,
         Repo,
         BattlegroundSupervisor,
         {Registry, keys: :unique, name: BuffRegistry},

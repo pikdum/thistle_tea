@@ -1,4 +1,4 @@
-defmodule TaxiPathNode do
+defmodule ThistleTea.DB.DBC.TaxiPathNode do
   @moduledoc false
 
   use Ecto.Schema

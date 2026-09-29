@@ -1,16 +1,17 @@
 defmodule ThistleTea.Game.World.Loader.SkillTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.World.Loader.Skill
 
   setup do
     table = :ets.new(__MODULE__, [:set, :public])
 
     Skill.load(
-      [%SkillLine{id: 186, category: 11}, %SkillLine{id: 43, category: 6}],
+      [%DBC.SkillLine{id: 186, category: 11}, %DBC.SkillLine{id: 43, category: 6}],
       [
-        %SkillRaceClassInfo{skill_line: 186, race_mask: 1, class_mask: 1, flags: 0x20, skill_tier: 2},
-        %SkillRaceClassInfo{skill_line: 43, race_mask: 0, class_mask: 0, flags: 0, skill_tier: 0}
+        %DBC.SkillRaceClassInfo{skill_line: 186, race_mask: 1, class_mask: 1, flags: 0x20, skill_tier: 2},
+        %DBC.SkillRaceClassInfo{skill_line: 43, race_mask: 0, class_mask: 0, flags: 0, skill_tier: 0}
       ],
       [
         ability(186, 2575, 0, 0),
@@ -51,8 +52,8 @@ defmodule ThistleTea.Game.World.Loader.SkillTest do
   describe "initial_skills/5" do
     test "grants full language skills despite a training tier", %{table: table} do
       Skill.load(
-        [%SkillLine{id: 111, category: 10}],
-        [%SkillRaceClassInfo{skill_line: 111, race_mask: 1, class_mask: 1, flags: 160, skill_tier: 21}],
+        [%DBC.SkillLine{id: 111, category: 10}],
+        [%DBC.SkillRaceClassInfo{skill_line: 111, race_mask: 1, class_mask: 1, flags: 160, skill_tier: 21}],
         [ability(111, 672, 2, 1)],
         table
       )
@@ -68,10 +69,10 @@ defmodule ThistleTea.Game.World.Loader.SkillTest do
 
     test "derives rogue class skills from base abilities, excluding recipes and other classes", %{table: table} do
       Skill.load(
-        [%SkillLine{id: 633, category: 7}, %SkillLine{id: 40, category: 7}],
+        [%DBC.SkillLine{id: 633, category: 7}, %DBC.SkillLine{id: 40, category: 7}],
         for(
           id <- [40, 633],
-          do: %SkillRaceClassInfo{skill_line: id, race_mask: 0, class_mask: 8, flags: 128, skill_tier: 0}
+          do: %DBC.SkillRaceClassInfo{skill_line: id, race_mask: 0, class_mask: 8, flags: 128, skill_tier: 0}
         ),
         [
           %{ability(633, 1804, 0, 0) | trivial_skill_line_rank_high: 0},
@@ -92,7 +93,7 @@ defmodule ThistleTea.Game.World.Loader.SkillTest do
   end
 
   defp ability(skill, spell, method, rank) do
-    %SkillLineAbility{
+    %DBC.SkillLineAbility{
       skill_line: skill,
       spell: spell,
       acquire_method: method,

@@ -64,7 +64,7 @@ defmodule ThistleTea.Game.Core.Entity.CorpseTest do
       packet =
         fixture_character()
         |> Corpse.build([%ItemTemplate{entry: 1, display_id: 1000, inventory_type: 1}])
-        |> Entity.update_object()
+        |> UpdateObject.from_entity()
         |> UpdateObject.to_packet()
 
       assert %Packet{payload: <<1::little-size(32), 0, 3, _rest::binary>>} = packet

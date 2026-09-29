@@ -1,4 +1,4 @@
-defmodule DurabilityCosts do
+defmodule ThistleTea.DB.DBC.DurabilityCosts do
   @moduledoc false
   use Ecto.Schema
 

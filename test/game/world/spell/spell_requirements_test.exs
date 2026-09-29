@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Spell.SpellRequirementsTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Corpse, as: CorpseComponent
@@ -309,6 +310,6 @@ defmodule ThistleTea.Game.World.Spell.SpellRequirementsTest do
     guid
   end
 
-  defp friendly, do: %FactionTemplate{id: 1, faction: 1, faction_group: 1, friend_group: 1, enemy_group: 2}
-  defp enemy, do: %FactionTemplate{id: 2, faction: 2, faction_group: 2, friend_group: 2, enemy_group: 1}
+  defp friendly, do: %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 1, friend_group: 1, enemy_group: 2}
+  defp enemy, do: %DBC.FactionTemplate{id: 2, faction: 2, faction_group: 2, friend_group: 2, enemy_group: 1}
 end

@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.Loader.Taxi do
   """
   import Ecto.Query
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.Travel.Taxi.Network
   alias ThistleTea.Game.Core.Travel.Taxi.Node
@@ -79,13 +80,13 @@ defmodule ThistleTea.Game.World.Loader.Taxi do
 
   def load_paths do
     nodes_by_path =
-      TaxiPathNode
+      DBC.TaxiPathNode
       |> order_by([node], [node.taxi_path, node.node_index])
-      |> ThistleTea.DBC.all()
+      |> DBC.all()
       |> Enum.group_by(& &1.taxi_path)
 
-    TaxiPath
-    |> ThistleTea.DBC.all()
+    DBC.TaxiPath
+    |> DBC.all()
     |> Enum.map(fn row ->
       nodes =
         nodes_by_path
@@ -118,7 +119,7 @@ defmodule ThistleTea.Game.World.Loader.Taxi do
   end
 
   def load_spell_path_ids do
-    from(spell in Spell,
+    from(spell in DBC.Spell,
       where:
         spell.effect_0 == @send_taxi_effect or spell.effect_1 == @send_taxi_effect or
           spell.effect_2 == @send_taxi_effect,
@@ -126,7 +127,7 @@ defmodule ThistleTea.Game.World.Loader.Taxi do
         {spell.effect_0, spell.effect_misc_value_0, spell.effect_1, spell.effect_misc_value_1, spell.effect_2,
          spell.effect_misc_value_2}
     )
-    |> ThistleTea.DBC.all()
+    |> DBC.all()
     |> Enum.flat_map(fn row ->
       row
       |> Tuple.to_list()

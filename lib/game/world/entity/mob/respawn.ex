@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Spell.SpellResist
   alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.AIEnvironment
   alias ThistleTea.Game.World.Entity.EventSink
@@ -204,7 +205,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
   end
 
   defp broadcast_respawn(%Mob{} = state) do
-    Entity.update_object(state, :create_object2) |> World.broadcast_packet(state)
+    UpdateObject.from_entity(state, :create_object2) |> World.broadcast_packet(state)
     state
   end
 

@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.PlayerReputationTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -22,7 +23,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerReputationTest do
       Metadata.put(mob_guid, %{
         alive?: true,
         incarnation_id: 7,
-        faction_template: %FactionTemplate{faction: 529}
+        faction_template: %DBC.FactionTemplate{faction: 529}
       })
 
       on_exit(fn -> Metadata.delete(mob_guid) end)

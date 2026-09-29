@@ -1,5 +1,7 @@
-defmodule Spell do
+defmodule ThistleTea.DB.DBC.Spell do
   use Ecto.Schema
+
+  alias ThistleTea.DB.DBC
 
   @primary_key {:id, :integer, autogenerate: false}
   schema "Spell" do
@@ -176,8 +178,8 @@ defmodule Spell do
     field(:min_reputation, :integer)
     field(:required_aura_vision, :integer)
 
-    has_one(:spell_cast_time, SpellCastTimes, foreign_key: :id, references: :casting_time_index)
-    has_one(:spell_duration, SpellDuration, foreign_key: :id, references: :duration)
-    has_one(:spell_range, SpellRange, foreign_key: :id, references: :range)
+    has_one(:spell_cast_time, DBC.SpellCastTimes, foreign_key: :id, references: :casting_time_index)
+    has_one(:spell_duration, DBC.SpellDuration, foreign_key: :id, references: :duration)
+    has_one(:spell_range, DBC.SpellRange, foreign_key: :id, references: :range)
   end
 end

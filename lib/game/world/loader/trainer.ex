@@ -6,8 +6,8 @@ defmodule ThistleTea.Game.World.Loader.Trainer do
   """
   import Ecto.Query
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.DBC
   alias ThistleTea.Game.Core.Player.TrainerSpell
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
@@ -83,7 +83,7 @@ defmodule ThistleTea.Game.World.Loader.Trainer do
 
   defp skill_step_map(teach_spell_ids) do
     DBC.all(
-      from(s in Spell,
+      from(s in DBC.Spell,
         where: s.id in ^teach_spell_ids,
         select: %{
           id: s.id,
@@ -132,7 +132,7 @@ defmodule ThistleTea.Game.World.Loader.Trainer do
   defp spell_level_map([]), do: %{}
 
   defp spell_level_map(learned_ids) do
-    DBC.all(from(s in Spell, where: s.id in ^learned_ids, select: {s.id, s.spell_level}))
+    DBC.all(from(s in DBC.Spell, where: s.id in ^learned_ids, select: {s.id, s.spell_level}))
     |> Map.new(fn {id, level} -> {id, level || 0} end)
   end
 
@@ -149,7 +149,7 @@ defmodule ThistleTea.Game.World.Loader.Trainer do
 
   defp class_race_masks_map(learned_ids) do
     DBC.all(
-      from(sla in SkillLineAbility,
+      from(sla in DBC.SkillLineAbility,
         where: sla.spell in ^learned_ids,
         select: {sla.spell, sla.class_mask, sla.race_mask}
       )

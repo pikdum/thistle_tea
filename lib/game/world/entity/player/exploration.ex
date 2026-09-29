@@ -3,14 +3,15 @@ defmodule ThistleTea.Game.World.Entity.Player.Exploration do
   Player exploration boundary: resolves terrain areas, applies first-discovery
   state and XP, persists the character, and emits client updates.
   """
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Death
-  alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Player.Exploration, as: ExplorationLogic
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player.OutdoorPvp
   alias ThistleTea.Game.World.Entity.Player.Pvp
@@ -65,12 +66,12 @@ defmodule ThistleTea.Game.World.Entity.Player.Exploration do
 
   def discover_area(%{character: %Character{} = character} = state, area_id) do
     with true <- Death.alive?(character),
-         %AreaTable{area_bit: area_bit, exploration_level: area_level} <- ExplorationLoader.area(area_id),
+         %DBC.AreaTable{area_bit: area_bit, exploration_level: area_level} <- ExplorationLoader.area(area_id),
          {:ok, character} <- ExplorationLogic.discover(character, area_bit) do
       xp = ExplorationLogic.experience(character.unit.level, area_level, @max_level, &ExplorationLoader.base_xp/1)
       {character, level_ups} = if xp > 0, do: Stats.gain_xp(character, xp), else: {character, []}
       CharacterStore.put(character)
-      Network.send_packet(Entity.update_object(character, :values))
+      Network.send_packet(UpdateObject.from_entity(character, :values))
       Network.send_packet(%Message.SmsgExplorationExperience{area_id: area_id, experience: xp})
       Enum.each(level_ups, &Network.send_packet(struct(Message.SmsgLevelupInfo, &1)))
 
@@ -87,7 +88,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Exploration do
   def unlock_all(%{character: %Character{} = character} = state) do
     character = ExplorationLogic.unlock_all(character)
     CharacterStore.put(character)
-    Network.send_packet(Entity.update_object(character, :values))
+    Network.send_packet(UpdateObject.from_entity(character, :values))
     %{state | character: character}
   end
 end

@@ -1,5 +1,6 @@
 import Config
 
+alias ThistleTea.DB.DBC
 alias ThistleTea.DB.Mangos.Repo
 
 config :esbuild,
@@ -35,18 +36,18 @@ config :tailwind,
     cd: Path.expand("../assets", __DIR__)
   ]
 
-config :thistle_tea, Repo,
-  database: "db/vmangos.sqlite",
+config :thistle_tea, DBC,
+  database: "db/dbc.sqlite",
   log: false,
-  pool_size: 10,
+  pool_size: 20,
   queue_target: 1_000,
   queue_interval: 5_000,
   busy_timeout: 5_000
 
-config :thistle_tea, ThistleTea.DBC,
-  database: "db/dbc.sqlite",
+config :thistle_tea, Repo,
+  database: "db/vmangos.sqlite",
   log: false,
-  pool_size: 20,
+  pool_size: 10,
   queue_target: 1_000,
   queue_interval: 5_000,
   busy_timeout: 5_000
@@ -62,6 +63,6 @@ config :thistle_tea, ThistleTeaWeb.Endpoint,
   live_view: [signing_salt: "TDSztxLy"]
 
 config :thistle_tea, :map_dir, "maps"
-config :thistle_tea, ecto_repos: [ThistleTea.DBC, Repo]
+config :thistle_tea, ecto_repos: [DBC, Repo]
 
 import_config "#{config_env()}.exs"

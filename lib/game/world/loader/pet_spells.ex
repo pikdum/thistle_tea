@@ -6,8 +6,8 @@ defmodule ThistleTea.Game.World.Loader.PetSpells do
 
   import Ecto.Query
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.DBC
   alias ThistleTea.Game.Core.Pet.PetAbility
   alias ThistleTea.Game.World.Loader.PetTraining
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.World.Loader.PetSpells do
 
     teaching =
       DBC.all(
-        from(spell in Spell,
+        from(spell in DBC.Spell,
           where: spell.effect_0 in [36, 57] and spell.effect_trigger_spell_0 in ^ability_ids,
           select: {spell.id, spell.effect_trigger_spell_0}
         )
@@ -41,7 +41,7 @@ defmodule ThistleTea.Game.World.Loader.PetSpells do
       )
 
     fallback = Map.new(Mangos.Repo.all(Mangos.PetCreateInfoSpell), &{&1.entry, Mangos.PetCreateInfoSpell.spell_ids(&1)})
-    dbc = Map.new(DBC.all(CreatureSpellData), &{&1.id, CreatureSpellData.spell_ids(&1)})
+    dbc = Map.new(DBC.all(DBC.CreatureSpellData), &{&1.id, DBC.CreatureSpellData.spell_ids(&1)})
 
     sources =
       Map.new(creatures, fn {entry, data_id} -> {entry, Map.get(dbc, data_id, Map.get(fallback, entry, []))} end)

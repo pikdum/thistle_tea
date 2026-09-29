@@ -8,7 +8,9 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.SpatialGrid
   alias ThistleTea.Game.Core.Spell.SpellResist
+  alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.Mob.Incarnation
   alias ThistleTea.Game.World.Loader.CreatureGroup, as: CreatureGroupLoader
@@ -19,12 +21,13 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   alias ThistleTea.Game.World.System.SpawnPool
   alias ThistleTea.Game.World.System.SpawnPool.Catalog
 
-  def load(cell) do
+  def load({world, _x, _y} = cell) do
     events = GameEvent.get_events()
 
     creatures =
-      cell
-      |> Mangos.Creature.query_cell(events)
+      world
+      |> WorldRef.map_id()
+      |> Mangos.Creature.query_bounds(SpatialGrid.cell_bounds(cell), events)
       |> Mangos.Repo.all()
 
     creatures = include_formation_members(creatures, events)

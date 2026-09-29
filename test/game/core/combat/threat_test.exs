@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.Combat.ThreatTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Combat.Threat
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -317,11 +318,11 @@ defmodule ThistleTea.Game.Core.Combat.ThreatTest do
   end
 
   defp alliance do
-    %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+    %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
   end
 
   defp neutral_creature do
-    %FactionTemplate{id: 7, faction: 7, flags: 0, faction_group: 0, friend_group: 0, enemy_group: 0}
+    %DBC.FactionTemplate{id: 7, faction: 7, flags: 0, faction_group: 0, friend_group: 0, enemy_group: 0}
   end
 
   defp unique_guid do

@@ -1,4 +1,4 @@
-defmodule SkillRaceClassInfo do
+defmodule ThistleTea.DB.DBC.SkillRaceClassInfo do
   @moduledoc false
   use Ecto.Schema
 

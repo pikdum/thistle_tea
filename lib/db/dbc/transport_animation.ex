@@ -1,4 +1,4 @@
-defmodule TransportAnimation do
+defmodule ThistleTea.DB.DBC.TransportAnimation do
   @moduledoc false
 
   use Ecto.Schema

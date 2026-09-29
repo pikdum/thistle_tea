@@ -5,7 +5,6 @@ defmodule ThistleTea.Game.World.Entity.Transport do
 
   use GenServer
 
-  alias ThistleTea.Game.Core.Entity, as: EntityCore
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.GameObject
@@ -74,7 +73,7 @@ defmodule ThistleTea.Game.World.Entity.Transport do
   @impl GenServer
   def handle_cast({:send_update_to, pid}, %State{entity: entity} = state) do
     entity
-    |> EntityCore.update_object()
+    |> UpdateObject.from_entity()
     |> Network.send_packet(pid)
 
     {:noreply, state}
@@ -90,7 +89,7 @@ defmodule ThistleTea.Game.World.Entity.Transport do
   end
 
   def handle_call(:transport_update, _from, %State{entity: entity} = state) do
-    {:reply, {:ok, EntityCore.update_object(entity)}, state}
+    {:reply, {:ok, UpdateObject.from_entity(entity)}, state}
   end
 
   def handle_call(
@@ -292,7 +291,7 @@ defmodule ThistleTea.Game.World.Entity.Transport do
   end
 
   defp create_for_world_players(%GameObject{} = entity, world, excluded_guids) do
-    update = %{EntityCore.update_object(entity) | has_transport: false}
+    update = %{UpdateObject.from_entity(entity) | has_transport: false}
 
     world
     |> player_guids()

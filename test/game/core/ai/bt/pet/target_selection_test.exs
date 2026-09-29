@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.AI.BT.Pet.TargetSelectionTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Context
@@ -195,7 +196,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet.TargetSelectionTest do
 
     source = %Observation{
       guid: guid,
-      metadata: %{faction_template: %FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}}
+      metadata: %{faction_template: %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}}
     }
 
     owner = %Observation{
@@ -219,7 +220,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet.TargetSelectionTest do
         level: 10,
         in_combat: true,
         combat_victim_guid: victim,
-        faction_template: %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+        faction_template: %DBC.FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
       }
     }
   end

@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.Aura.PersistentAreaTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Effects
@@ -297,7 +298,7 @@ defmodule ThistleTea.Game.Core.Aura.PersistentAreaTest do
 
       Metadata.put(caster.object.guid, %{
         alive?: true,
-        faction_template: %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+        faction_template: %DBC.FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
       })
 
       Metadata.put(target_guid, %{
@@ -305,7 +306,7 @@ defmodule ThistleTea.Game.Core.Aura.PersistentAreaTest do
         stealthed?: true,
         invisibility: %{0 => 100},
         unit_flags: 0,
-        faction_template: %FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}
+        faction_template: %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}
       })
 
       on_exit(fn ->

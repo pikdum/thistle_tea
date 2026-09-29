@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.Spell.CastingTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BehaviorRunner
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Context
@@ -948,8 +949,8 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
     test "queues a take-side outcome when a hostile magic spell is fully resisted" do
       caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
       target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
-      target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
+      caster_faction = %DBC.FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
+      target_faction = %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
 
       Metadata.put(caster_guid, %{
         alive?: true,
@@ -1056,8 +1057,8 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
     test "applies the victim's school-masked spell hit modifier from metadata" do
       caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
       target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
-      target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
+      caster_faction = %DBC.FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
+      target_faction = %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
 
       Metadata.put(caster_guid, %{
         alive?: true,
@@ -1124,8 +1125,8 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
     test "creatures without spell defense cannot fail the caster hit roll" do
       caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
       target_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
-      caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
-      target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
+      caster_faction = %DBC.FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
+      target_faction = %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
 
       Metadata.put(caster_guid, %{alive?: true, faction_template: caster_faction, level: 1})
 
@@ -1174,8 +1175,8 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
     test "applies matching mechanic resistance from metadata and observes its removal" do
       caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
       target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
-      target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
+      caster_faction = %DBC.FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
+      target_faction = %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
 
       Metadata.put(caster_guid, %{
         alive?: true,

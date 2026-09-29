@@ -5,8 +5,8 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
 
   import Ecto.Query
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.DBC
   alias ThistleTea.Game.Core.Battleground
   alias ThistleTea.Game.Core.Battleground.Template
 
@@ -202,7 +202,7 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
       |> Kernel.++([169, 610, 611, 689, 690, 729, 749, 750, 751, 771, 772, 893, 894, 895, 896, 897, 898, 899])
       |> Enum.uniq()
 
-    DBC.all(from(loc in WorldSafeLocs, where: loc.id in ^ids))
+    DBC.all(from(loc in DBC.WorldSafeLocs, where: loc.id in ^ids))
     |> Map.new(&{&1.id, &1})
   end
 

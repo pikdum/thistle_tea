@@ -8,9 +8,15 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   """
   use ThistleTea.Game.Network.Opcodes, [:SMSG_UPDATE_OBJECT]
 
+  alias ThistleTea.Game.Core.Combat.Assistance
+  alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Corpse
+  alias ThistleTea.Game.Core.Entity.DynamicObject
+  alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Entity.Item, as: DataItem
+  alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Pet.Empathy
   alias ThistleTea.Game.Core.Time
@@ -72,6 +78,22 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     dynamic_object: 0x40,
     corpse: 0x80
   }
+
+  def from_entity(entity, update_type \\ :create_object2)
+
+  def from_entity(%Mob{} = entity, update_type) do
+    entity = %{entity | unit: %{entity.unit | target: Assistance.visible_target(entity)}}
+    from_entity(entity, update_type, :unit)
+  end
+
+  def from_entity(%GameObject{} = entity, update_type), do: from_entity(entity, update_type, :game_object)
+  def from_entity(%Corpse{} = entity, update_type), do: from_entity(entity, update_type, :corpse)
+  def from_entity(%DynamicObject{} = entity, update_type), do: from_entity(entity, update_type, :dynamic_object)
+  def from_entity(%Character{} = entity, update_type), do: from_entity(entity, update_type, :player)
+
+  def from_entity(entity, update_type, object_type) do
+    struct(%__MODULE__{update_type: update_type, object_type: object_type}, Map.from_struct(entity))
+  end
 
   def mask_blocks_count(fields) do
     fields
@@ -149,13 +171,6 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   def field({_, value, {_, size, :byte}}), do: <<value::binary-size(4 * size)>>
   def field({_, value, {_, size, :two_short}}), do: <<value::little-size(32 * size)>>
   def field({_, value, {_, _size, :bytes}}), do: value
-
-  def build_bytes([]), do: <<>>
-
-  def build_bytes([{size, value} | rest]) do
-    value = value || 0
-    <<value::little-size(size)>> <> build_bytes(rest)
-  end
 
   defp packet_body(%__MODULE__{update_type: :out_of_range_objects, out_of_range_guids: guids}, _recipient_guid)
        when is_list(guids) do

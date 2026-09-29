@@ -1,4 +1,4 @@
-defmodule CreatureSpellData do
+defmodule ThistleTea.DB.DBC.CreatureSpellData do
   @moduledoc false
   use Ecto.Schema
 

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Attacking do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.EventSink.Context
@@ -35,7 +36,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Attacking do
       context = Context.new(self())
       character = character |> EventSink.emit(events, context) |> EventSink.emit_pending(context)
 
-      Entity.update_object(character, :values)
+      UpdateObject.from_entity(character, :values)
       |> World.broadcast_packet(character)
 
       state
@@ -51,7 +52,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Attacking do
     context = Context.new(self())
     character = character |> EventSink.emit(events, context) |> EventSink.emit_pending(context)
 
-    character |> Entity.update_object(:values) |> World.broadcast_packet(character)
+    character |> UpdateObject.from_entity(:values) |> World.broadcast_packet(character)
 
     case Map.get(state, :player_tick_ref) do
       ref when is_reference(ref) -> Process.cancel_timer(ref)

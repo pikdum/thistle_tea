@@ -1,4 +1,4 @@
-defmodule SpellDuration do
+defmodule ThistleTea.DB.DBC.SpellDuration do
   use Ecto.Schema
 
   @primary_key {:id, :integer, autogenerate: false}

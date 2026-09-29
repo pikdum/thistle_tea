@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.Combat.AggroProbe do
   @moduledoc """
   Movement-triggered aggro probes for nearby idle mobs.
   """
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Core.Aura.StealthDetection
   alias ThistleTea.Game.Core.Combat.Aggro
@@ -108,7 +109,11 @@ defmodule ThistleTea.Game.World.Combat.AggroProbe do
     end
   end
 
-  defp eligible?(%{faction_template: %FactionTemplate{}, level: level} = mob, %{level: player_level} = player, distance)
+  defp eligible?(
+         %{faction_template: %DBC.FactionTemplate{}, level: level} = mob,
+         %{level: player_level} = player,
+         distance
+       )
        when is_integer(level) and is_integer(player_level) do
     Hostility.can_initiate_attack?(mob) and
       Hostility.valid_hostile_target?(mob, player) and

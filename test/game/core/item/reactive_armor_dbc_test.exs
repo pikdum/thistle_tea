@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Core.Item.ReactiveArmorDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity
@@ -39,7 +39,7 @@ defmodule ThistleTea.Game.Core.Item.ReactiveArmorDbcTest do
         refute Proc.roll?(spell, nil, fn -> (chance + 1) / 100 end)
       end
 
-      set = DBC.get(ItemSet, 526)
+      set = DBC.get(DBC.ItemSet, 526)
       assert set.set_spell_3 == @adaptive
       assert set.set_threshold_3 == 4
 

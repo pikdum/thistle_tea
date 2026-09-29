@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Core.Spell.SupportMatrixVmangosTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Spell.SupportMatrix
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Core.Spell.SupportMatrixVmangosTest do
 
   test "every talent rank spell resolves inside the support matrix" do
     spellbook =
-      Talent
+      DBC.Talent
       |> DBC.all()
       |> Enum.flat_map(fn row ->
         for index <- 0..8,

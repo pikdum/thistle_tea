@@ -7,7 +7,6 @@ defmodule ThistleTea.Game.World.Entity.DynamicObject do
   use GenServer, restart: :temporary
 
   alias ThistleTea.Game.Core.Aura.UnitSync
-  alias ThistleTea.Game.Core.Entity, as: EntityCore
   alias ThistleTea.Game.Core.Entity.DynamicObject
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.CastContext
@@ -15,6 +14,7 @@ defmodule ThistleTea.Game.World.Entity.DynamicObject do
   alias ThistleTea.Game.Core.Spell.PersistentArea
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.Entity
@@ -72,7 +72,7 @@ defmodule ThistleTea.Game.World.Entity.DynamicObject do
   end
 
   def handle_cast({:send_update_to, pid}, %{entity: entity} = state) do
-    EntityCore.update_object(entity)
+    UpdateObject.from_entity(entity)
     |> Network.send_packet(pid)
 
     {:noreply, state}

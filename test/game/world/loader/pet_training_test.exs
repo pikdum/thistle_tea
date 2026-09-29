@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.PetTrainingTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Pet.PetAbility
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.World.Loader.PetTraining
@@ -8,11 +9,11 @@ defmodule ThistleTea.Game.World.Loader.PetTrainingTest do
   describe "family_passives/3" do
     test "selects automatic passives from both family skills" do
       rows = [
-        %SkillLineAbility{spell: 1, skill_line: 208, acquire_method: 2},
-        %SkillLineAbility{spell: 2, skill_line: 270, acquire_method: 2},
-        %SkillLineAbility{spell: 3, skill_line: 209, acquire_method: 2},
-        %SkillLineAbility{spell: 4, skill_line: 208, acquire_method: 1},
-        %SkillLineAbility{spell: 5, skill_line: 208, acquire_method: 2}
+        %DBC.SkillLineAbility{spell: 1, skill_line: 208, acquire_method: 2},
+        %DBC.SkillLineAbility{spell: 2, skill_line: 270, acquire_method: 2},
+        %DBC.SkillLineAbility{spell: 3, skill_line: 209, acquire_method: 2},
+        %DBC.SkillLineAbility{spell: 4, skill_line: 208, acquire_method: 1},
+        %DBC.SkillLineAbility{spell: 5, skill_line: 208, acquire_method: 2}
       ]
 
       spells = Map.new(1..4, &{&1, %Spell{id: &1, attributes: MapSet.new([:passive])}})
@@ -24,10 +25,10 @@ defmodule ThistleTea.Game.World.Loader.PetTrainingTest do
   describe "build/2" do
     test "derives rank chains from skill successors and merges family eligibility" do
       rows = [
-        %SkillLineAbility{spell: 100, skill_line: 208, training_points: 5, superseded_by: 101},
-        %SkillLineAbility{spell: 100, skill_line: 209, training_points: 5, superseded_by: 101},
-        %SkillLineAbility{spell: 101, skill_line: 208, training_points: 10, superseded_by: 0},
-        %SkillLineAbility{spell: 999, skill_line: 270, training_points: 0, superseded_by: 0}
+        %DBC.SkillLineAbility{spell: 100, skill_line: 208, training_points: 5, superseded_by: 101},
+        %DBC.SkillLineAbility{spell: 100, skill_line: 209, training_points: 5, superseded_by: 101},
+        %DBC.SkillLineAbility{spell: 101, skill_line: 208, training_points: 10, superseded_by: 0},
+        %DBC.SkillLineAbility{spell: 999, skill_line: 270, training_points: 0, superseded_by: 0}
       ]
 
       catalogue = PetTraining.build(rows, %{100 => %Spell{id: 100}, 101 => %Spell{id: 101}})

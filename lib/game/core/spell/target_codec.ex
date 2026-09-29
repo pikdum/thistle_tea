@@ -6,7 +6,6 @@ defmodule ThistleTea.Game.Core.Spell.TargetCodec do
 
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Spell.Target
-  alias ThistleTea.Game.Network.BinaryUtils
 
   @self 0x00000000
   @unit 0x00000002
@@ -100,21 +99,21 @@ defmodule ThistleTea.Game.Core.Spell.TargetCodec do
   defp parse_location(rest, target, _put), do: {rest, target}
 
   defp unpack_guid(rest) do
-    BinaryUtils.unpack_guid(rest)
+    Guid.unpack(rest)
   rescue
     _ -> :error
   end
 
   defp encode_selection(:none), do: {@self, <<>>}
   defp encode_selection({:self, _guid}), do: {@self, <<>>}
-  defp encode_selection({:unit, guid}), do: {@unit, BinaryUtils.pack_guid(guid)}
-  defp encode_selection({:item, guid}), do: {@item, BinaryUtils.pack_guid(guid)}
-  defp encode_selection({:trade_item, slot}), do: {@trade_item, BinaryUtils.pack_guid(slot)}
-  defp encode_selection({:object, guid, :open}), do: {@object, BinaryUtils.pack_guid(guid)}
-  defp encode_selection({:object, guid, :locked}), do: {@object_locked, BinaryUtils.pack_guid(guid)}
+  defp encode_selection({:unit, guid}), do: {@unit, Guid.pack(guid)}
+  defp encode_selection({:item, guid}), do: {@item, Guid.pack(guid)}
+  defp encode_selection({:trade_item, slot}), do: {@trade_item, Guid.pack(slot)}
+  defp encode_selection({:object, guid, :open}), do: {@object, Guid.pack(guid)}
+  defp encode_selection({:object, guid, :locked}), do: {@object_locked, Guid.pack(guid)}
 
   defp encode_target(%Target{selection: {:corpse, guid, _player_guid}, corpse_type: type}) do
-    {if(type == :enemy, do: @enemy_corpse, else: @corpse), BinaryUtils.pack_guid(guid)}
+    {if(type == :enemy, do: @enemy_corpse, else: @corpse), Guid.pack(guid)}
   end
 
   defp encode_target(%Target{selection: selection}), do: encode_selection(selection)

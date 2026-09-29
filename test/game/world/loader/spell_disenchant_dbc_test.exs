@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.SpellDisenchantDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Spell.Semantics
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.World.Loader.SpellDisenchantDbcTest do
       assert spell.name == "Disenchant"
       assert spell.cast_time_ms == 3_000
       assert [%{type: :disenchant, semantic: %Semantics.Inventory{kind: :disenchant}}] = spell.effects
-      ability = DBC.get(SkillLineAbility, 7316)
+      ability = DBC.get(DBC.SkillLineAbility, 7316)
       assert ability.spell == spell.id
       assert ability.skill_line == 333
       assert ability.trivial_skill_line_rank_low == 20

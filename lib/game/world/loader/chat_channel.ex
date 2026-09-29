@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.World.Loader.ChatChannel do
   """
   import Bitwise
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
 
   @dbc_trade 0x00008
   @dbc_city 0x00020
@@ -17,19 +17,19 @@ defmodule ThistleTea.Game.World.Loader.ChatChannel do
   @flag_lfg 0x40
 
   def load do
-    ChatChannels
+    DBC.ChatChannels
     |> DBC.all()
     |> Enum.map(&definition/1)
   end
 
   def defaults do
     [
-      %ChatChannels{id: 1, flags: 3, name: "General - %s"},
-      %ChatChannels{id: 2, flags: 59, name: "Trade - %s"},
-      %ChatChannels{id: 22, flags: 65_539, name: "LocalDefense - %s"},
-      %ChatChannels{id: 23, flags: 65_540, name: "WorldDefense"},
-      %ChatChannels{id: 24, flags: 0, name: "LookingForGroup"},
-      %ChatChannels{id: 25, flags: 131_122, name: "GuildRecruitment - %s"}
+      %DBC.ChatChannels{id: 1, flags: 3, name: "General - %s"},
+      %DBC.ChatChannels{id: 2, flags: 59, name: "Trade - %s"},
+      %DBC.ChatChannels{id: 22, flags: 65_539, name: "LocalDefense - %s"},
+      %DBC.ChatChannels{id: 23, flags: 65_540, name: "WorldDefense"},
+      %DBC.ChatChannels{id: 24, flags: 0, name: "LookingForGroup"},
+      %DBC.ChatChannels{id: 25, flags: 131_122, name: "GuildRecruitment - %s"}
     ]
     |> Enum.map(&definition/1)
   end
@@ -38,7 +38,7 @@ defmodule ThistleTea.Game.World.Loader.ChatChannel do
     Enum.find(definitions, &matches?(&1.pattern, name)) || %{kind: :custom, flags: 0x01, pattern: name}
   end
 
-  defp definition(%ChatChannels{} = channel) do
+  defp definition(%DBC.ChatChannels{} = channel) do
     %{kind: {:builtin, channel.id}, flags: channel_flags(channel.flags), pattern: channel.name}
   end
 

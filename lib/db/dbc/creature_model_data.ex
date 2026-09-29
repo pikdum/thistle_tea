@@ -1,4 +1,4 @@
-defmodule CreatureModelData do
+defmodule ThistleTea.DB.DBC.CreatureModelData do
   @moduledoc """
   Model scale and collision height. The pinned Vanilla DBC converter names
   column 15 `mount_height`; Vanilla's CreatureModelData uses it for collision

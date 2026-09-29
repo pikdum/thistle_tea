@@ -3,8 +3,6 @@ defmodule ThistleTea.DB.Mangos.CreatureMovement do
 
   import Ecto.Query
 
-  alias ThistleTea.Game.Core.Math
-
   @primary_key {:id, :integer, autogenerate: false}
   schema "creature_movement" do
     field(:point, :integer)
@@ -38,13 +36,5 @@ defmodule ThistleTea.DB.Mangos.CreatureMovement do
     creature_movement
     |> Enum.map(& &1.point)
     |> Enum.min()
-  end
-
-  def closest_point(creature_movement, {x, y, z}) do
-    creature_movement
-    |> Enum.min_by(fn %__MODULE__{} = cm ->
-      Math.distance({cm.position_x, cm.position_y, cm.position_z}, {x, y, z})
-    end)
-    |> Map.get(:point)
   end
 end

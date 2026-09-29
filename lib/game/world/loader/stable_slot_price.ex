@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.Loader.StableSlotPrice do
   Startup cache of vanilla's two stable slot prices.
   """
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
 
   def init do
     case :ets.whereis(__MODULE__) do
@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.World.Loader.StableSlotPrice do
   end
 
   def load_all do
-    StableSlotPrices
+    DBC.StableSlotPrices
     |> DBC.all()
     |> Enum.filter(&(&1.id in 1..2))
     |> Enum.each(&:ets.insert(__MODULE__, {&1.id, &1.cost}))

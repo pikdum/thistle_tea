@@ -279,7 +279,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CorpseTest do
     test "retains the winner on inventory failure", %{corpse: corpse, killer: killer, member: member} do
       prepared = Corpse.prepare(corpse, killer)
       assert_receive {:loot_award, _, reservation}
-      initial = Tap.personalize(Entity.update_object(prepared, :values), killer)
+      initial = Tap.personalize(UpdateObject.from_entity(prepared, :values), killer)
       assert (initial.unit.dynamic_flags &&& @dynamic_flag_lootable) == 0
 
       assert {:ok, released} =

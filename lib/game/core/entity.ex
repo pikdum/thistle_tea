@@ -7,7 +7,6 @@ defmodule ThistleTea.Game.Core.Entity do
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Chat.Emote
   alias ThistleTea.Game.Core.Combat
-  alias ThistleTea.Game.Core.Combat.Assistance
   alias ThistleTea.Game.Core.Combat.CombatLeash
   alias ThistleTea.Game.Core.Combat.DamageImmunity
   alias ThistleTea.Game.Core.Combat.DamageOrigin
@@ -28,9 +27,6 @@ defmodule ThistleTea.Game.Core.Entity do
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Unit
-  alias ThistleTea.Game.Core.Entity.Corpse
-  alias ThistleTea.Game.Core.Entity.DynamicObject, as: DataDynamicObject
-  alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Honor.Combat, as: HonorCombat
   alias ThistleTea.Game.Core.Item.Durability
@@ -46,34 +42,12 @@ defmodule ThistleTea.Game.Core.Entity do
   alias ThistleTea.Game.Core.Spell.CastPushback
   alias ThistleTea.Game.Core.Spell.Combat, as: SpellCombat
   alias ThistleTea.Game.Core.Stats.MovementStats
-  alias ThistleTea.Game.Network.UpdateObject
 
   @spirit_of_redemption_talent 20_711
   @spirit_of_redemption_form 27_827
   @spirit_of_redemption_auras [27_827, 27_792, 27_795]
   @spirit_of_redemption_suicide 27_965
   @spirit_of_redemption_duration_ms 15_000
-
-  def update_object(entity, update_type \\ :create_object2)
-
-  def update_object(%Mob{} = entity, update_type) do
-    entity = %{entity | unit: %{entity.unit | target: Assistance.visible_target(entity)}}
-    update_object(entity, update_type, :unit)
-  end
-
-  def update_object(%GameObject{} = entity, update_type), do: update_object(entity, update_type, :game_object)
-  def update_object(%Corpse{} = entity, update_type), do: update_object(entity, update_type, :corpse)
-
-  def update_object(%DataDynamicObject{} = entity, update_type), do: update_object(entity, update_type, :dynamic_object)
-  def update_object(%Character{} = entity, update_type), do: update_object(entity, update_type, :player)
-
-  def update_object(entity, update_type, object_type) do
-    %UpdateObject{
-      update_type: update_type,
-      object_type: object_type
-    }
-    |> struct(Map.from_struct(entity))
-  end
 
   def take_damage(entity, damage, now, opts \\ []) do
     {entity, _absorbed} = take_damage_with_absorb(entity, damage, now, opts)

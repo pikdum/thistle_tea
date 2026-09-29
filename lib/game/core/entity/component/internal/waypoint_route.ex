@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.WaypointRoute do
   alias ThistleTea.DB.Mangos.Creature
   alias ThistleTea.DB.Mangos.CreatureMovement
   alias ThistleTea.Game.Core.Entity.Component.Internal.Waypoint
+  alias ThistleTea.Game.Core.Math
 
   defstruct first_point: 0,
             destination_point: 0,
@@ -19,7 +20,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.WaypointRoute do
 
   def build(%Creature{position_x: x, position_y: y, position_z: z, creature_movement: creature_movement} = creature) do
     route = build_rows(creature_movement, creature.movement_scripts)
-    closest_point = CreatureMovement.closest_point(creature_movement, {x, y, z})
+    closest_point = closest_point(creature_movement, {x, y, z})
     %{route | destination_point: closest_point, cyclic?: creature.movement_type == 3}
   end
 
@@ -78,4 +79,12 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.WaypointRoute do
 
   defp orientation(100.0), do: nil
   defp orientation(orientation), do: orientation
+
+  defp closest_point(creature_movement, {x, y, z}) do
+    creature_movement
+    |> Enum.min_by(fn %CreatureMovement{} = cm ->
+      Math.distance({cm.position_x, cm.position_y, cm.position_z}, {x, y, z})
+    end)
+    |> Map.get(:point)
+  end
 end

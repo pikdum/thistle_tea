@@ -3,8 +3,8 @@ defmodule ThistleTea.Game.World.Loader.PetTrainingDbcTest do
 
   import Ecto.Query
 
-  alias ThistleTea.DBC
-  alias ThistleTea.DBC.CreatureFamily
+  alias ThistleTea.DB.DBC
+  alias ThistleTea.DB.DBC.CreatureFamily
   alias ThistleTea.Game.World.Loader.PetTraining
 
   @moduletag :dbc_db
@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.World.Loader.PetTrainingDbcTest do
   describe "vanilla training columns" do
     test "reads family skills, training costs, and rank successors" do
       assert %{training_skill: 208, secondary_skill: 270, pet_food_mask: 1} = DBC.get(CreatureFamily, 1)
-      rows = DBC.all(from(ability in SkillLineAbility, where: ability.spell in [4187, 4188, 2649]))
+      rows = DBC.all(from(ability in DBC.SkillLineAbility, where: ability.spell in [4187, 4188, 2649]))
       assert Enum.find(rows, &(&1.spell == 4187)).training_points == 5
       assert Enum.find(rows, &(&1.spell == 4187)).superseded_by == 4188
       assert Enum.find(rows, &(&1.spell == 4188)).training_points == 10

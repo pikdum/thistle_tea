@@ -1,4 +1,4 @@
-defmodule ThistleTea.DBC.MailTemplate do
+defmodule ThistleTea.DB.DBC.MailTemplate do
   @moduledoc false
   use Ecto.Schema
 

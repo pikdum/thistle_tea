@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Corpse do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.GameObjectSummons
@@ -100,7 +101,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Corpse do
         |> maybe_set_lootable_flag()
         |> publish_skinning()
 
-      Entity.update_object(state, :values) |> World.broadcast_packet(state)
+      UpdateObject.from_entity(state, :values) |> World.broadcast_packet(state)
       rank = if state.internal.creature, do: state.internal.creature.rank, else: 0
       {{:ok, loot, state.unit.level, rank}, state}
     else
@@ -530,7 +531,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Corpse do
           state = put_session(state, nil)
           state = clear_lootable_flag(state)
           state = publish_skinning(state)
-          Entity.update_object(state, :values) |> World.broadcast_packet(state)
+          UpdateObject.from_entity(state, :values) |> World.broadcast_packet(state)
           state
         else
           state
@@ -547,7 +548,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Corpse do
 
   defp publish_lootability(%Mob{} = state) do
     if session(state) do
-      Entity.update_object(state, :values) |> World.broadcast_packet(state)
+      UpdateObject.from_entity(state, :values) |> World.broadcast_packet(state)
     end
 
     state

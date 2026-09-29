@@ -1,4 +1,4 @@
-defmodule SpellItemEnchantment do
+defmodule ThistleTea.DB.DBC.SpellItemEnchantment do
   @moduledoc false
   use Ecto.Schema
 

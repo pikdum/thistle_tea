@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.TargetDamageDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DBC
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Combat.TargetDamage
   alias ThistleTea.Game.Core.Entity
@@ -87,7 +87,7 @@ defmodule ThistleTea.Game.World.Loader.TargetDamageDbcTest do
 
   defp enchanted_weapons(_context) do
     for id <- [853, 854] do
-      row = DBC.get(SpellItemEnchantment, id)
+      row = DBC.get(DBC.SpellItemEnchantment, id)
       assert row.enchantment_type_0 == 3
       enchantment = %ItemEnchantment{id: id, effects: [%{type: 3, spell_id: row.effect_arg_0}]}
       previous = :ets.lookup(EnchantmentLoader, {:enchantment, id})
