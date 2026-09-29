@@ -64,7 +64,7 @@ defmodule ThistleTea.Game.Core.Effects.SpellTypes do
     {:ChannelUpdate, [:source_guid, :channel_time_ms], []},
     {:SpellDelayed, [:source_guid, :delay_ms], []},
     {:DelayAura, [:source_guid, :target_guid, :spell_id, :delay_ms], []},
-    {:DeliverSpell, [:target_guid, :cast_context, :spell], [delay_ms: nil]},
+    {:DeliverSpell, [:target_guid, :cast_context, :spell], [delay_ms: nil, hostility_check: nil]},
     {:ProcDamage, [:target_guid, :spell, :effect_index], []},
     {:TriggerSpellRequest, [:source_guid, :target_guid, :spell_id, :opts], []},
     {:ScriptedCast, [:entry, :target_guid], []},

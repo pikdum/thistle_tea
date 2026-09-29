@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Core.Class.Warrior
   alias ThistleTea.Game.Core.Combat.CombatTimer
   alias ThistleTea.Game.Core.Combat.ExtraAttacks
+  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Guid
@@ -182,15 +183,23 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
   end
 
   def resolved_delivery(entity, %Effects.DeliverSpell{} = effect) do
-    context = effect.cast_context
+    context = target_hostility(entity, effect)
 
     context =
       if context.caster_guid == entity.object.guid and match?(%{unit: %Unit{}}, entity),
         do: %{context | caster_detection: StealthDetection.target_metadata(entity)},
         else: context
 
-    [%{effect | cast_context: context, delay_ms: projectile_delay_ms(entity, effect)}]
+    [%{effect | cast_context: context, hostility_check: nil, delay_ms: projectile_delay_ms(entity, effect)}]
   end
+
+  defp target_hostility(entity, %Effects.DeliverSpell{hostility_check: opts, target_guid: target, cast_context: context})
+       when is_list(opts) do
+    source = if context.caster_guid == entity.object.guid, do: entity, else: context.caster_guid
+    %{context | target_hostile?: Hostility.valid_attack_target?(source, target, opts)}
+  end
+
+  defp target_hostility(_entity, %Effects.DeliverSpell{cast_context: context}), do: context
 
   defp timed_target?(%{object: %{guid: guid}} = entity, guid), do: CombatTimer.uses_timer?(entity)
 

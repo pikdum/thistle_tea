@@ -18,7 +18,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
   alias ThistleTea.Game.Core.Combat.CombatControl
   alias ThistleTea.Game.Core.Combat.CombatSkills
   alias ThistleTea.Game.Core.Combat.Disarm
-  alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Death
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
@@ -367,11 +366,10 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
       context = %{
         CastContext.from_caster(entity, spell, target)
         | power_cost: cost,
-          selected_target_guid: List.first(targets),
-          target_hostile?: Hostility.valid_attack_target?(entity, target)
+          selected_target_guid: List.first(targets)
       }
 
-      Effects.enqueue(entity, Effects.deliver_spell(target, context, spell))
+      Effects.enqueue(entity, Effects.deliver_spell(target, context, spell, hostility_check: []))
     end)
   end
 

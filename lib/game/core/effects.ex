@@ -272,8 +272,13 @@ defmodule ThistleTea.Game.Core.Effects do
     %Effects.DeliverAttack{target_guid: target_guid, attack: attack}
   end
 
-  def deliver_spell(target_guid, cast_context, spell) when is_integer(target_guid) do
-    %Effects.DeliverSpell{target_guid: target_guid, cast_context: cast_context, spell: spell}
+  def deliver_spell(target_guid, cast_context, spell, opts \\ []) when is_integer(target_guid) do
+    %Effects.DeliverSpell{
+      target_guid: target_guid,
+      cast_context: cast_context,
+      spell: spell,
+      hostility_check: Keyword.get(opts, :hostility_check)
+    }
   end
 
   def proc_damage(target_guid, %Spell{} = spell, effect_index)

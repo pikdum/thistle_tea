@@ -1511,12 +1511,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
           cooldown_started_at: cooldown_started_at(caster, spell.id),
           selected_target_guid: casting.resolution.followups.selected_unit_guid,
           destination_position: Target.ground_location(casting.targets),
-          target_hostile?:
-            target_guid != caster_guid and
-              Hostility.valid_attack_target?(caster, target_guid,
-                area?: true,
-                allow_dead?: Spell.attribute?(spell, :allow_dead_target)
-              ),
+          target_hostile?: if(target_guid == caster_guid, do: false),
           target_role: target_role,
           effect_indices: impact.effect_indices,
           effect_target_counts: casting.resolution.effect_target_counts,
@@ -1557,7 +1552,8 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
   end
 
   defp dispatch_to_target(character, %CastContext{} = context, spell, target_guid, _now) when is_integer(target_guid) do
-    Effects.enqueue(character, Effects.deliver_spell(target_guid, context, spell))
+    hostility_check = [area?: true, allow_dead?: Spell.attribute?(spell, :allow_dead_target)]
+    Effects.enqueue(character, Effects.deliver_spell(target_guid, context, spell, hostility_check: hostility_check))
   end
 
   defp dispatch_to_target(character, _context, _spell, _target_guid, _now), do: character
