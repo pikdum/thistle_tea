@@ -242,7 +242,7 @@ defmodule ThistleTea.Game.Player.Petitions do
   def decline(%{ready: true, guid: guid} = state, item_guid) do
     case PetitionSystem.by_item(item_guid) do
       %Petition{} = petition ->
-        Network.send_packet(%Message.MsgPetitionDeclineServer{signer_guid: guid}, petition.owner.guid)
+        Network.send_packet(%Message.MsgPetitionDecline{signer_guid: guid}, petition.owner.guid)
 
       nil ->
         :ok
@@ -269,7 +269,7 @@ defmodule ThistleTea.Game.Player.Petitions do
   defp rename_available(state, item_guid, guid, name) do
     case PetitionSystem.rename(item_guid, guid, name) do
       {:ok, petition} ->
-        Network.send_packet(%Message.MsgPetitionRenameServer{item_guid: item_guid, name: petition.name})
+        Network.send_packet(%Message.MsgPetitionRename{item_guid: item_guid, name: petition.name})
         state
 
       {:error, :invalid_name} ->

@@ -49,7 +49,7 @@ defmodule ThistleTea.Game.Player.Guilds do
 
   def activate_tabard(%{ready: true, character: %Character{} = character} = state, vendor_guid) do
     if tabard_vendor?(character, vendor_guid) do
-      Network.send_packet(%Message.MsgTabardvendorActivateServer{vendor_guid: vendor_guid})
+      Network.send_packet(%Message.MsgTabardvendorActivate{vendor_guid: vendor_guid})
     end
 
     state
@@ -93,7 +93,7 @@ defmodule ThistleTea.Game.Player.Guilds do
   end
 
   defp emblem_result(state, result) do
-    Network.send_packet(%Message.MsgSaveGuildEmblemServer{result: result})
+    Network.send_packet(%Message.MsgSaveGuildEmblem{result: result})
     state
   end
 

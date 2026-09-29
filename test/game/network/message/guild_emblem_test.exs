@@ -23,13 +23,13 @@ defmodule ThistleTea.Game.Network.Message.GuildEmblemTest do
 
   describe "to_binary/1" do
     test "encodes the tabard vendor and result opcodes" do
-      assert Message.MsgTabardvendorActivateServer.to_binary(%Message.MsgTabardvendorActivateServer{vendor_guid: 42}) ==
+      assert Message.MsgTabardvendorActivate.to_binary(%Message.MsgTabardvendorActivate{vendor_guid: 42}) ==
                <<42::little-size(64)>>
 
-      assert Message.MsgSaveGuildEmblemServer.to_binary(%Message.MsgSaveGuildEmblemServer{result: :ok}) ==
+      assert Message.MsgSaveGuildEmblem.to_binary(%Message.MsgSaveGuildEmblem{result: :ok}) ==
                <<0::little-size(32)>>
 
-      assert Message.MsgSaveGuildEmblemServer.to_binary(%Message.MsgSaveGuildEmblemServer{result: :not_enough_money}) ==
+      assert Message.MsgSaveGuildEmblem.to_binary(%Message.MsgSaveGuildEmblem{result: :not_enough_money}) ==
                <<4::little-size(32)>>
     end
   end

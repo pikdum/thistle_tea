@@ -22,11 +22,11 @@ defmodule ThistleTea.Game.Player.GuildEmblemTest do
   describe "activate_tabard/2" do
     test "opens only at a nearby tabard designer", %{founder: founder, vendor: vendor} do
       assert Guilds.activate_tabard(founder, vendor) == founder
-      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgTabardvendorActivateServer{vendor_guid: ^vendor}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgTabardvendorActivate{vendor_guid: ^vendor}}}
 
       SpatialHash.update(:mobs, vendor, WorldRef.open(1), 40.0, 0.0, 0.0)
       assert Guilds.activate_tabard(founder, vendor) == founder
-      refute_receive {:"$gen_cast", {:send_packet, %Message.MsgTabardvendorActivateServer{}}}
+      refute_receive {:"$gen_cast", {:send_packet, %Message.MsgTabardvendorActivate{}}}
     end
   end
 
@@ -40,7 +40,7 @@ defmodule ThistleTea.Game.Player.GuildEmblemTest do
       assert group.emblem == emblem
       assert saved.character.player.coinage == 100_000
       assert CharacterStore.get(founder.character.id).player.coinage == 100_000
-      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgSaveGuildEmblemServer{result: :ok}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgSaveGuildEmblem{result: :ok}}}
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgGuildQueryResponse{guild: ^group}}}
     end
 
@@ -51,7 +51,7 @@ defmodule ThistleTea.Game.Player.GuildEmblemTest do
     } do
       emblem = {3, 4, 5, 6, 7}
       assert Guilds.save_emblem(founder, vendor, emblem) == founder
-      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgSaveGuildEmblemServer{result: :not_in_guild}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgSaveGuildEmblem{result: :not_in_guild}}}
 
       founder = Guilds.create(founder, name)
       target = state(System.unique_integer([:positive]), "Member", 200_000)
@@ -60,19 +60,19 @@ defmodule ThistleTea.Game.Player.GuildEmblemTest do
       on_exit(fn -> :ets.delete(CharacterStore, target.character.id) end)
 
       assert Guilds.save_emblem(target, vendor, emblem) == target
-      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgSaveGuildEmblemServer{result: :not_leader}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgSaveGuildEmblem{result: :not_leader}}}
 
       SpatialHash.update(:mobs, vendor, WorldRef.open(1), 40.0, 0.0, 0.0)
       assert Guilds.save_emblem(founder, vendor, emblem) == founder
-      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgSaveGuildEmblemServer{result: :invalid_vendor}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgSaveGuildEmblem{result: :invalid_vendor}}}
       SpatialHash.update(:mobs, vendor, WorldRef.open(1), 2.0, 0.0, 0.0)
 
       assert Guilds.save_emblem(founder, vendor, {300, 4, 5, 6, 7}) == founder
-      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgSaveGuildEmblemServer{result: :invalid_emblem}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgSaveGuildEmblem{result: :invalid_emblem}}}
 
       poor = %{founder | character: %{founder.character | player: %{founder.character.player | coinage: 99_999}}}
       assert Guilds.save_emblem(poor, vendor, emblem) == poor
-      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgSaveGuildEmblemServer{result: :not_enough_money}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgSaveGuildEmblem{result: :not_enough_money}}}
       assert GuildSystem.group_of(founder.guid).emblem == {0, 0, 0, 0, 0}
     end
   end
