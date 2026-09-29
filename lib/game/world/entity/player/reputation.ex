@@ -46,19 +46,36 @@ defmodule ThistleTea.Game.World.Entity.Player.Reputation do
   end
 
   def standing(%Character{} = character, faction_id) do
-    ReputationCore.standing(
-      character.player.reputation,
-      ReputationLoader.catalog(),
-      faction_id,
-      character.unit.race,
-      character.unit.class
-    )
+    catalog_standing(character, ReputationLoader.catalog(), faction_id)
   end
 
   def standings(%Character{} = character) do
-    ReputationLoader.catalog().factions
+    catalog = ReputationLoader.catalog()
+
+    catalog.factions
     |> Map.keys()
-    |> Map.new(&{&1, standing(character, &1)})
+    |> Map.new(&{&1, catalog_standing(character, catalog, &1)})
+  end
+
+  defp catalog_standing(%Character{} = character, catalog, faction_id) do
+    ReputationCore.standing(character.player.reputation, catalog, faction_id, character.unit.race, character.unit.class)
+  end
+
+  def cached_projection(%Character{} = character, cache) do
+    key = projection_key(character)
+
+    case cache do
+      {^key, projection} ->
+        {projection, cache}
+
+      _stale ->
+        projection = projection(character)
+        {projection, {key, projection}}
+    end
+  end
+
+  defp projection_key(%Character{player: player, unit: unit} = character) do
+    {player && player.reputation, unit.race, unit.class, forced_reactions(character)}
   end
 
   def projection(%Character{} = character) do

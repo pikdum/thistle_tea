@@ -308,6 +308,28 @@ defmodule ThistleTea.Game.World.Entity.Player.ReputationTest do
     end
   end
 
+  describe "cached_projection/2" do
+    test "reuses the projection until standings or forced reactions change", %{id: id} do
+      catalog = catalog([definition(529, 13)])
+      character = state(id, catalog).character
+      ReputationLoader.put_catalog(catalog)
+
+      {projection, cache} = Reputation.cached_projection(character, nil)
+      assert projection == Reputation.projection(character)
+      assert Reputation.cached_projection(character, cache) == {projection, cache}
+
+      hated = put_standing(character, catalog, 529, -42_000)
+      {hated_projection, hated_cache} = Reputation.cached_projection(hated, cache)
+      assert hated_projection[529].rank == :hated
+      assert hated_cache != cache
+
+      holder = %Holder{spell: %Spell{id: 6405}, auras: [%AuraCore{type: :force_reaction, misc_value: 529, amount: 3}]}
+      forced = %{hated | unit: %{hated.unit | auras: [holder]}}
+      {forced_projection, _cache} = Reputation.cached_projection(forced, hated_cache)
+      assert forced_projection[529].forced_rank == :neutral
+    end
+  end
+
   defp state(id, catalog) do
     guid = Guid.from_low_guid(:player, id)
 

@@ -1941,14 +1941,15 @@ defmodule ThistleTea.Game.World.Entity.Player do
 
   defp do_broadcast_update(state), do: state
 
-  defp sync_character_metadata(%{guid: guid, character: %Character{} = character} = state) when is_integer(guid) do
+  defp sync_character_metadata(%State{guid: guid, character: %Character{} = character} = state) when is_integer(guid) do
     character =
       case Metadata.query(guid, [:level]) do
         %{level: level} when level != character.unit.level -> Honor.sync(character)
         _unchanged -> character
       end
 
-    state = %{state | character: character}
+    {reputation, reputation_cache} = PlayerReputation.cached_projection(character, state.reputation_projection)
+    state = %{state | character: character, reputation_projection: reputation_cache}
     detection = StealthDetection.target_metadata(character)
     detection_keys = Map.keys(detection)
     previous_detection = Metadata.query(guid, detection_keys)
@@ -1990,7 +1991,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
         friendly_mechanic_immunities: Aura.friendly_mechanics(character),
         spell_threat: SpellThreat.projection(character),
         dispel_resistance: DispelResistance.projection(character),
-        reputation: PlayerReputation.projection(character),
+        reputation: reputation,
         condition_subject: ConditionContext.refresh_subject(character, previous_subject)
       }
       |> Map.merge(SpellResist.defense_snapshot(character))
