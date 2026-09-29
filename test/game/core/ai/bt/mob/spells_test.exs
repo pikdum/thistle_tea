@@ -1,12 +1,12 @@
 defmodule ThistleTea.Game.Core.AI.BT.Mob.SpellsTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
@@ -659,11 +659,11 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.SpellsTest do
   end
 
   defp alliance do
-    %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+    %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
   end
 
   defp defias do
-    %DBC.FactionTemplate{
+    %FactionTemplate{
       id: 17,
       faction: 15,
       flags: 1,

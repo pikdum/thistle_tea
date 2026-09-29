@@ -1,7 +1,6 @@
 defmodule ThistleTea.Game.Core.AI.ScriptTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Context
   alias ThistleTea.Game.Core.AI.BT.Context.Navigation
@@ -10,6 +9,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
   alias ThistleTea.Game.Core.AI.BT.Context.Waypoints
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
@@ -364,9 +364,9 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
     test "nearest friendly player uses the perception faction snapshot", %{mob: mob} do
       hostile = Guid.from_low_guid(:player, 1)
       friendly = Guid.from_low_guid(:player, 2)
-      mob_faction = %DBC.FactionTemplate{faction: 15, faction_group: 8, friend_group: 8, enemy_group: 1}
-      hostile_faction = %DBC.FactionTemplate{faction: 1, faction_group: 1, friend_group: 1, enemy_group: 8}
-      friendly_faction = %DBC.FactionTemplate{faction: 15, faction_group: 8, friend_group: 8, enemy_group: 1}
+      mob_faction = %FactionTemplate{faction: 15, faction_group: 8, friend_group: 8, enemy_group: 1}
+      hostile_faction = %FactionTemplate{faction: 1, faction_group: 1, friend_group: 1, enemy_group: 8}
+      friendly_faction = %FactionTemplate{faction: 15, faction_group: 8, friend_group: 8, enemy_group: 1}
       mob = %{mob | unit: %{mob.unit | faction_template: mob_faction}}
 
       observations = %{

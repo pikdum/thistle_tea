@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Spell.SpellUnitLocationsTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -300,8 +300,8 @@ defmodule ThistleTea.Game.World.Spell.SpellUnitLocationsTest do
     mob
   end
 
-  defp friendly, do: %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
-  defp enemy, do: %DBC.FactionTemplate{id: 17, faction: 15, faction_group: 8, friend_group: 0, enemy_group: 1}
+  defp friendly, do: %FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
+  defp enemy, do: %FactionTemplate{id: 17, faction: 15, faction_group: 8, friend_group: 0, enemy_group: 1}
 
   defp deliveries(caster), do: Enum.filter(caster.internal.events, &is_struct(&1, Effects.DeliverSpell))
 

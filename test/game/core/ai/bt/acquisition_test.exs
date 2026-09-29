@@ -1,7 +1,6 @@
 defmodule ThistleTea.Game.Core.AI.BT.AcquisitionTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT.Acquisition
   alias ThistleTea.Game.Core.AI.BT.Context
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
@@ -9,6 +8,7 @@ defmodule ThistleTea.Game.Core.AI.BT.AcquisitionTest do
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Combat.Aggro
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Creature.CreatureReaction
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -173,7 +173,7 @@ defmodule ThistleTea.Game.Core.AI.BT.AcquisitionTest do
     %{entity | unit: %{entity.unit | auras: [holder]}}
   end
 
-  defp source_faction, do: %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
-  defp enemy_faction, do: %DBC.FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+  defp source_faction, do: %FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
+  defp enemy_faction, do: %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
   defp world, do: WorldRef.open(999)
 end

@@ -7,13 +7,13 @@ defmodule ThistleTea.Test.FactionFixtures do
   """
   import ExUnit.Callbacks, only: [on_exit: 1]
 
-  alias ThistleTea.DB.DBC
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.World.Loader.Faction
 
   @templates [
-    %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12},
-    %DBC.FactionTemplate{id: 14, faction: 14, faction_group: 8, enemy_group: 1},
-    %DBC.FactionTemplate{id: 35, faction: 31, friend_group: 1, friends_0: 31}
+    %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12},
+    %FactionTemplate{id: 14, faction: 14, faction_group: 8, enemy_group: 1},
+    %FactionTemplate{id: 35, faction: 31, friend_group: 1, friends_0: 31}
   ]
 
   def seed(_context) do

@@ -1,11 +1,11 @@
 defmodule ThistleTea.Game.Core.Combat.DeepWoundsDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Combat.AttackFeedback
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
@@ -239,7 +239,7 @@ defmodule ThistleTea.Game.Core.Combat.DeepWoundsDbcTest do
       movement_block: %MovementBlock{position: {1.0, 0.0, 0.0, 0.0}}
     }
 
-    Metadata.put(target_guid, %{alive?: true, level: 60, unit_flags: 0, faction_template: %DBC.FactionTemplate{id: 14}})
+    Metadata.put(target_guid, %{alive?: true, level: 60, unit_flags: 0, faction_template: %FactionTemplate{id: 14}})
     on_exit(fn -> Metadata.delete(target_guid) end)
     %{caster: caster, target: target}
   end

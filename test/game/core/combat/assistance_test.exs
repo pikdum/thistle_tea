@@ -1,7 +1,6 @@
 defmodule ThistleTea.Game.Core.Combat.AssistanceTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Blackboard
@@ -15,6 +14,7 @@ defmodule ThistleTea.Game.Core.Combat.AssistanceTest do
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Combat.Assistance
   alias ThistleTea.Game.Core.Combat.Engagement
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -247,7 +247,7 @@ defmodule ThistleTea.Game.Core.Combat.AssistanceTest do
       2 => %Observation{
         guid: 2,
         position: {WorldRef.open(0), -3.0, 0.0, 0.0},
-        metadata: %{alive?: true, faction_template: %DBC.FactionTemplate{id: 1, faction_group: 1}}
+        metadata: %{alive?: true, faction_template: %FactionTemplate{id: 1, faction_group: 1}}
       },
       3 => helper(3, 21.0),
       4 => helper(4, 28.0)
@@ -263,7 +263,7 @@ defmodule ThistleTea.Game.Core.Combat.AssistanceTest do
       line_of_sight?: true,
       metadata: %{
         assistance_available?: true,
-        faction_template: %DBC.FactionTemplate{id: 17, flags: 1, faction_group: 8, enemy_group: 1}
+        faction_template: %FactionTemplate{id: 17, flags: 1, faction_group: 8, enemy_group: 1}
       }
     }
   end

@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.Player.AttackingTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -61,9 +61,9 @@ defmodule ThistleTea.Game.World.Entity.Player.AttackingTest do
   defp selected_target(_context) do
     guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
     target_guid = Guid.runtime(:mob, 1)
-    alliance = %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+    alliance = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
 
-    wolf = %DBC.FactionTemplate{
+    wolf = %FactionTemplate{
       id: 32,
       faction: 29,
       flags: 16,

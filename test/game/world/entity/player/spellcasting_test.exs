@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.World.Entity.Player.SpellcastingTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -35,8 +35,8 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellcastingTest do
       controller = Guid.from_low_guid(:mob, 1, state.guid)
       target = state.guid + 1_000_000
       world = state.character.internal.world
-      enemy = %DBC.FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
-      friendly = %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}
+      enemy = %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+      friendly = %FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}
       Metadata.put(controller, %{alive?: true, in_combat: true, faction_template: enemy})
       Metadata.put(state.guid, %{alive?: true, owner_guid: controller, faction_template: enemy})
       Metadata.put(target, %{alive?: true, faction_template: friendly, unit_flags: 8})

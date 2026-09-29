@@ -1,7 +1,6 @@
 defmodule ThistleTea.Game.Core.AI.BT.CombatTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Combat
   alias ThistleTea.Game.Core.AI.BT.Context
@@ -10,6 +9,7 @@ defmodule ThistleTea.Game.Core.AI.BT.CombatTest do
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Combat.AttackFeedback
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -465,7 +465,7 @@ defmodule ThistleTea.Game.Core.AI.BT.CombatTest do
       primary_guid = Guid.from_low_guid(:mob, 1, 10)
       secondary_guid = Guid.from_low_guid(:mob, 1, 11)
 
-      player_faction = %DBC.FactionTemplate{
+      player_faction = %FactionTemplate{
         id: 1,
         faction: 1,
         flags: 72,
@@ -474,7 +474,7 @@ defmodule ThistleTea.Game.Core.AI.BT.CombatTest do
         enemy_group: 12
       }
 
-      mob_faction = %DBC.FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
+      mob_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
 
       Enum.each([{player_guid, :players, 0.0}, {primary_guid, :mobs, 1.0}, {secondary_guid, :mobs, 2.0}], fn
         {guid, table, x} -> SpatialHash.update(table, guid, 0, x, 0.0, 0.0)

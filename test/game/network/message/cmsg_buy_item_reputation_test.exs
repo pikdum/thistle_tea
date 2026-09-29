@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -89,7 +89,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItemReputationTest do
 
       Registry.register(player_guid)
       :ets.insert(VendorLoader, {vendor_entry, [%VendorItem{index: 1, template: template, max_count: 0}]})
-      Metadata.update(vendor_guid, %{faction_template: %DBC.FactionTemplate{faction: 72}})
+      Metadata.update(vendor_guid, %{faction_template: %FactionTemplate{faction: 72}})
 
       on_exit(fn ->
         ReputationLoader.put_catalog(previous_catalog)

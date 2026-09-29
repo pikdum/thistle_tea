@@ -1,7 +1,6 @@
 defmodule ThistleTea.Game.Core.Combat.ZoneCombatTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.AI.AIEvent
   alias ThistleTea.Game.Core.AI.BT.Blackboard
@@ -16,6 +15,7 @@ defmodule ThistleTea.Game.Core.Combat.ZoneCombatTest do
   alias ThistleTea.Game.Core.AI.TickPlan
   alias ThistleTea.Game.Core.Combat.CombatZone, as: State
   alias ThistleTea.Game.Core.Combat.Engagement
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Combat.Threat
   alias ThistleTea.Game.Core.Combat.ZoneCombat
   alias ThistleTea.Game.Core.Effects
@@ -258,6 +258,6 @@ defmodule ThistleTea.Game.Core.Combat.ZoneCombatTest do
     Context.new(1_000, perception: perception, combat_zone: zone)
   end
 
-  defp enemy_faction, do: %DBC.FactionTemplate{id: 17, faction: 15, faction_group: 8, friend_group: 8, enemy_group: 1}
-  defp player_faction, do: %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
+  defp enemy_faction, do: %FactionTemplate{id: 17, faction: 15, faction_group: 8, friend_group: 8, enemy_group: 1}
+  defp player_faction, do: %FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
 end

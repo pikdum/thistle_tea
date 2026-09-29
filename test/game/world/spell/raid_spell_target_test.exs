@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.World.Spell.RaidSpellTargetTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
@@ -227,7 +227,7 @@ defmodule ThistleTea.Game.World.Spell.RaidSpellTargetTest do
       unit_flags: 0,
       no_spell_defense?: true,
       faction_can_have_reputation?: false,
-      faction_template: %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
+      faction_template: %FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
     })
 
     on_exit(fn ->

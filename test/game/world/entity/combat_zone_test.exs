@@ -1,12 +1,12 @@
 defmodule ThistleTea.Game.World.Entity.CombatZoneTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
   alias ThistleTea.Game.Core.AI.BT.Context.Perception.Request
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Combat.Engagement
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Combat.ZoneCombat
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
@@ -113,7 +113,7 @@ defmodule ThistleTea.Game.World.Entity.CombatZoneTest do
 
     Metadata.put(guid, %{
       alive?: true,
-      faction_template: %DBC.FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+      faction_template: %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
     })
 
     on_exit(fn ->
@@ -136,7 +136,7 @@ defmodule ThistleTea.Game.World.Entity.CombatZoneTest do
     Metadata.put(guid, %{
       alive?: true,
       in_combat: false,
-      faction_template: %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}
+      faction_template: %FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}
     })
 
     on_exit(fn ->

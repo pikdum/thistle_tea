@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.World.Loader.FlareDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -130,14 +130,14 @@ defmodule ThistleTea.Game.World.Loader.FlareDbcTest do
         internal: %{caster.internal | world: world}
     }
 
-    Metadata.put(guid, %{alive?: true, unit_flags: 0, faction_template: %DBC.FactionTemplate{id: 1, faction_group: 1}})
+    Metadata.put(guid, %{alive?: true, unit_flags: 0, faction_template: %FactionTemplate{id: 1, faction_group: 1}})
 
     Metadata.put(target_guid, %{
       alive?: true,
       unit_flags: 0,
       level: 1,
       no_spell_defense?: true,
-      faction_template: %DBC.FactionTemplate{id: 17, faction_group: 8, enemy_group: 1}
+      faction_template: %FactionTemplate{id: 17, faction_group: 8, enemy_group: 1}
     })
 
     SpatialHash.insert(:mobs, target_guid, world, 3.0, 0.0, 0.0)

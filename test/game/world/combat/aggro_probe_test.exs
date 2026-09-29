@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Combat.AggroProbeTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.World.Combat.AggroProbe
   alias ThistleTea.Game.World.Entity
@@ -245,11 +245,11 @@ defmodule ThistleTea.Game.World.Combat.AggroProbeTest do
   end
 
   defp alliance do
-    %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+    %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
   end
 
   defp defias do
-    %DBC.FactionTemplate{
+    %FactionTemplate{
       id: 17,
       faction: 15,
       flags: 1,
@@ -261,7 +261,7 @@ defmodule ThistleTea.Game.World.Combat.AggroProbeTest do
   end
 
   defp wolf do
-    %DBC.FactionTemplate{
+    %FactionTemplate{
       id: 32,
       faction: 29,
       flags: 16,

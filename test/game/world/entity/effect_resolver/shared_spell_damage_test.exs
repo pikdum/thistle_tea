@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.World.Entity.EffectResolver.SharedSpellDamageTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -216,7 +216,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.SharedSpellDamageTest do
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
 
-    faction = %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
+    faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
 
     targets =
       for x <- [1.0, 2.0, 3.0] do
@@ -236,7 +236,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.SharedSpellDamageTest do
       alive?: true,
       level: 60,
       unit_flags: 0,
-      faction_template: %DBC.FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
+      faction_template: %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
     })
 
     on_exit(fn ->

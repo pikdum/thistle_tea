@@ -1,12 +1,12 @@
 defmodule ThistleTea.Game.Core.AI.BT.Pet.TargetingTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT.Acquisition
   alias ThistleTea.Game.Core.AI.BT.Context
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
   alias ThistleTea.Game.Core.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Core.AI.BT.Pet.Targeting
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Object
@@ -138,7 +138,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet.TargetingTest do
 
     source = %Observation{
       guid: pet.object.guid,
-      metadata: %{faction_template: %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}}
+      metadata: %{faction_template: %FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}}
     }
 
     target = %Observation{
@@ -150,7 +150,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet.TargetingTest do
           %{
             alive?: true,
             level: 10,
-            faction_template: %DBC.FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+            faction_template: %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
           },
           Map.new(extra)
         )

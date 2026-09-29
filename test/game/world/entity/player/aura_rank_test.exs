@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.Player.AuraRankTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -118,7 +118,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AuraRankTest do
   defp caster(_context) do
     [guid, target, low_id, high_id] = for _ <- 1..4, do: System.unique_integer([:positive]) + 95_000_000
     world = WorldRef.instance(999, guid)
-    faction = %DBC.FactionTemplate{id: 1, faction_group: 1, friend_group: 1, enemy_group: 2}
+    faction = %FactionTemplate{id: 1, faction_group: 1, friend_group: 1, enemy_group: 2}
     Metadata.put(target, %{level: 1, alive?: true, faction_template: faction})
     Metadata.put(guid, %{level: 60, alive?: true, faction_template: faction})
     SpatialHash.update(:players, target, world, 1.0, 0.0, 0.0)

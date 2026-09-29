@@ -1,7 +1,6 @@
 defmodule ThistleTea.Game.Core.AI.AquaticMovementTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BehaviorRunner
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Context
@@ -10,6 +9,7 @@ defmodule ThistleTea.Game.Core.AI.AquaticMovementTest do
   alias ThistleTea.Game.Core.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Core.AI.NavigationIntent
   alias ThistleTea.Game.Core.Combat.Engagement
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Combat.UnreachableTarget
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
@@ -157,14 +157,14 @@ defmodule ThistleTea.Game.Core.AI.AquaticMovementTest do
       alive?: true,
       level: 5,
       unit_flags: 0,
-      faction_template: %DBC.FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+      faction_template: %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
     }
 
     target = %{
       alive?: true,
       level: 5,
       unit_flags: 0,
-      faction_template: %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}
+      faction_template: %FactionTemplate{id: 1, faction: 1, faction_group: 3, enemy_group: 12}
     }
 
     observations = %{

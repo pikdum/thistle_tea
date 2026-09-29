@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Core.Combat.HostilityTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.DB.DBC
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Unit
@@ -30,8 +30,8 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
     end
 
     test "honors explicit friend factions before masks" do
-      assert DBC.FactionTemplate.friendly_to?(friendly_defias(), defias())
-      refute DBC.FactionTemplate.hostile_to?(friendly_defias(), defias())
+      assert FactionTemplate.friendly_to?(friendly_defias(), defias())
+      refute FactionTemplate.hostile_to?(friendly_defias(), defias())
     end
 
     test "uses at-war for player reactions to reputation factions" do
@@ -305,15 +305,15 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
   end
 
   defp alliance do
-    %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+    %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
   end
 
   defp horde do
-    %DBC.FactionTemplate{id: 2, faction: 2, flags: 72, faction_group: 5, friend_group: 4, enemy_group: 10}
+    %FactionTemplate{id: 2, faction: 2, flags: 72, faction_group: 5, friend_group: 4, enemy_group: 10}
   end
 
   defp defias do
-    %DBC.FactionTemplate{
+    %FactionTemplate{
       id: 17,
       faction: 15,
       flags: 1,
@@ -325,7 +325,7 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
   end
 
   defp friendly_defias do
-    %DBC.FactionTemplate{
+    %FactionTemplate{
       id: 99,
       faction: 99,
       flags: 0,
@@ -337,7 +337,7 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
   end
 
   defp wolf do
-    %DBC.FactionTemplate{
+    %FactionTemplate{
       id: 32,
       faction: 29,
       flags: 16,
@@ -353,11 +353,11 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
   end
 
   defp neutral_creature do
-    %DBC.FactionTemplate{id: 7, faction: 7, flags: 0, faction_group: 0, friend_group: 0, enemy_group: 0}
+    %FactionTemplate{id: 7, faction: 7, flags: 0, faction_group: 0, friend_group: 0, enemy_group: 0}
   end
 
   defp friendly do
-    %DBC.FactionTemplate{
+    %FactionTemplate{
       id: 35,
       faction: 31,
       flags: 0,

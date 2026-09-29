@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.Core.Profession.ExplosiveGuardianDbcTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Guardian
@@ -174,6 +174,6 @@ defmodule ThistleTea.Game.Core.Profession.ExplosiveGuardianDbcTest do
     }
   end
 
-  defp friendly, do: %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
-  defp hostile, do: %DBC.FactionTemplate{id: 17, faction: 15, faction_group: 8, friend_group: 0, enemy_group: 1}
+  defp friendly, do: %FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
+  defp hostile, do: %FactionTemplate{id: 17, faction: 15, faction_group: 8, friend_group: 0, enemy_group: 1}
 end

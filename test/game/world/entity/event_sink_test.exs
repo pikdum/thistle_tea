@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.World.Entity.EventSinkTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.Combat.CombatState
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
@@ -833,7 +833,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       Entity.register(target_guid)
       SpatialHash.update(:players, target_guid, 0, 3.0, 0.0, 0.0)
 
-      player_faction = %DBC.FactionTemplate{
+      player_faction = %FactionTemplate{
         id: 1,
         faction: 1,
         flags: 72,
@@ -855,7 +855,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
         Metadata.delete(target_guid)
       end)
 
-      hostile_faction = %DBC.FactionTemplate{
+      hostile_faction = %FactionTemplate{
         id: 17,
         faction: 15,
         flags: 1,

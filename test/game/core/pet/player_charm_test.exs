@@ -1,7 +1,6 @@
 defmodule ThistleTea.Game.Core.Pet.PlayerCharmTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Charm
@@ -12,6 +11,7 @@ defmodule ThistleTea.Game.Core.Pet.PlayerCharmTest do
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Change
   alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
@@ -259,8 +259,8 @@ defmodule ThistleTea.Game.Core.Pet.PlayerCharmTest do
   defp context(character, target_distance) do
     controller = character.internal.possession.caster_guid
     world = character.internal.world
-    enemy = %DBC.FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
-    friendly = %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
+    enemy = %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+    friendly = %FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
 
     rows = [
       {1, 0.0, %{alive?: true, faction_template: enemy, owner_guid: controller}},

@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.World.Spell.SpellTargetResolverTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Combat.Hostility
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
@@ -787,11 +787,11 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolverTest do
   end
 
   defp faction_template(:players) do
-    %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+    %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
   end
 
   defp faction_template(:mobs) do
-    %DBC.FactionTemplate{
+    %FactionTemplate{
       id: 17,
       faction: 15,
       flags: 1,
@@ -803,6 +803,6 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolverTest do
   end
 
   defp neutral_creature do
-    %DBC.FactionTemplate{id: 7, faction: 7, flags: 0, faction_group: 0, friend_group: 0, enemy_group: 0}
+    %FactionTemplate{id: 7, faction: 7, flags: 0, faction_group: 0, friend_group: 0, enemy_group: 0}
   end
 end

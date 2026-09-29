@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.World.Entity.Player.ReputationTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Aura, as: AuraData
   alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -346,7 +346,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ReputationTest do
 
   defp vendor_guid(faction_id) do
     guid = Guid.from_low_guid(:mob, faction_id, System.unique_integer([:positive, :monotonic]))
-    Metadata.put(guid, %{faction_template: %DBC.FactionTemplate{faction: faction_id}})
+    Metadata.put(guid, %{faction_template: %FactionTemplate{faction: faction_id}})
     on_exit(fn -> Metadata.delete(guid) end)
     guid
   end

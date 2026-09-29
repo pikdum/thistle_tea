@@ -8,8 +8,6 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
                              {"lib/game/core/ai/bt/mob.ex", "ThistleTea.Game.World"},
                              {"lib/game/core/ai/bt/mob.ex", "ThistleTea.Game.World.Metadata"},
                              {"lib/game/core/class/shaman.ex", "ThistleTea.Game.World.Loader.Spell"},
-                             {"lib/game/core/combat/assistance.ex", "ThistleTea.DB.DBC"},
-                             {"lib/game/core/combat/hostility.ex", "ThistleTea.DB.DBC"},
                              {"lib/game/core/combat/hostility.ex", "ThistleTea.Game.World.Metadata"},
                              {"lib/game/core/combat/hostility.ex", "ThistleTea.Game.World.System.Duel"},
                              {"lib/game/core/combat/threat.ex", "ThistleTea.Game.World"},

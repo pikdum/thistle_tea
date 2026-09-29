@@ -1,10 +1,10 @@
 defmodule ThistleTea.Game.World.Entity.Player.AuctionTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.Auction.Change
   alias ThistleTea.Game.Core.Auction.House
   alias ThistleTea.Game.Core.Auction.Receipt
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AuctionTest do
       assert Auction.hello(context.state, context.npc) == context.state
       assert_receive {:"$gen_cast", {:send_packet, %Message.MsgAuctionHello{house_id: 1}}}
 
-      Metadata.update(context.npc, %{faction_template: %DBC.FactionTemplate{id: 120}})
+      Metadata.update(context.npc, %{faction_template: %FactionTemplate{id: 120}})
       assert {:ok, %House{id: 7, market: :neutral}} = Auction.house(context.state.character, context.npc)
     end
 
@@ -153,7 +153,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AuctionTest do
     {:ok, _owner} = Entity.register(seller.object.guid)
     {:ok, _owner} = Entity.register(buyer.object.guid)
     npc = Guid.from_low_guid(:mob, 8661, seller.id)
-    Metadata.put(npc, %{npc_flags: 0x1000, alive?: true, faction_template: %DBC.FactionTemplate{id: 11}})
+    Metadata.put(npc, %{npc_flags: 0x1000, alive?: true, faction_template: %FactionTemplate{id: 11}})
     SpatialHash.update(:mobs, npc, WorldRef.open(0), 2.0, 0.0, 0.0)
 
     for character <- [seller, buyer] do

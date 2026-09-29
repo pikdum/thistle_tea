@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.Mob.ChargeAttackTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -66,9 +66,9 @@ defmodule ThistleTea.Game.World.Entity.Mob.ChargeAttackTest do
   defp entities(_context) do
     guid = Guid.runtime(:mob, 1)
     target_guid = Guid.runtime(:mob, 2)
-    alliance = %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+    alliance = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
 
-    wolf = %DBC.FactionTemplate{
+    wolf = %FactionTemplate{
       id: 32,
       faction: 29,
       flags: 16,

@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Network.Message.CmsgAttackswingTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -66,11 +66,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswingTest do
   end
 
   defp alliance do
-    %DBC.FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+    %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
   end
 
   defp wolf do
-    %DBC.FactionTemplate{
+    %FactionTemplate{
       id: 32,
       faction: 29,
       flags: 16,

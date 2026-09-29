@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.PowerTransferTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -31,12 +31,12 @@ defmodule ThistleTea.Game.World.Entity.PowerTransferTest do
 
       Metadata.put(caster_guid, %{
         alive?: true,
-        faction_template: %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 1, enemy_group: 8},
+        faction_template: %FactionTemplate{id: 1, faction: 1, faction_group: 1, enemy_group: 8},
         attackers: MapSet.new([mob.object.guid, 123])
       })
 
       Metadata.put(mob.object.guid, %{
-        faction_template: %DBC.FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+        faction_template: %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
       })
 
       on_exit(fn ->

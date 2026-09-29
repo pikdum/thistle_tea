@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.WildObjectTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -104,7 +104,7 @@ defmodule ThistleTea.Game.World.Entity.WildObjectTest do
     end
 
     test "triggers on hostile creatures outside combat", %{trap: trap, target: target} do
-      Metadata.update(target.object.guid, %{faction_template: %DBC.FactionTemplate{faction: 2, faction_group: 4}})
+      Metadata.update(target.object.guid, %{faction_template: %FactionTemplate{faction: 2, faction_group: 4}})
       assert TrapServer.target(trap) == target.object.guid
     end
 
@@ -117,7 +117,7 @@ defmodule ThistleTea.Game.World.Entity.WildObjectTest do
       Metadata.put(guid, %{
         alive?: true,
         pvp?: true,
-        faction_template: %DBC.FactionTemplate{faction: 2, faction_group: 4}
+        faction_template: %FactionTemplate{faction: 2, faction_group: 4}
       })
 
       on_exit(fn ->
@@ -135,11 +135,11 @@ defmodule ThistleTea.Game.World.Entity.WildObjectTest do
     guid = Guid.from_low_guid(:mob, 721, System.unique_integer([:positive]))
     target = %Mob{object: %Object{guid: guid}, internal: caster.internal, movement_block: caster.movement_block}
     World.update_position(target)
-    Metadata.put(guid, %{alive?: true, in_combat: false, faction_template: %DBC.FactionTemplate{faction: 3}})
+    Metadata.put(guid, %{alive?: true, in_combat: false, faction_template: %FactionTemplate{faction: 3}})
 
     Metadata.put(caster.object.guid, %{
       alive?: true,
-      faction_template: %DBC.FactionTemplate{faction: 1, faction_group: 2, enemy_group: 4}
+      faction_template: %FactionTemplate{faction: 1, faction_group: 2, enemy_group: 4}
     })
 
     trap = %GameObject{

@@ -1,7 +1,6 @@
 defmodule ThistleTea.Game.Core.AI.BT.PetTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Context
@@ -9,6 +8,7 @@ defmodule ThistleTea.Game.Core.AI.BT.PetTest do
   alias ThistleTea.Game.Core.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Core.AI.BT.Pet, as: PetBT
   alias ThistleTea.Game.Core.AI.CreatureSpell
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -55,9 +55,9 @@ defmodule ThistleTea.Game.Core.AI.BT.PetTest do
           internal: %{state.internal | pet: %{state.internal.pet | reaction_state: :aggressive}}
       }
 
-      source = %DBC.FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
-      enemy = %DBC.FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
-      neutral = %DBC.FactionTemplate{id: 7, faction: 7, faction_group: 0, enemy_group: 0}
+      source = %FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
+      enemy = %FactionTemplate{id: 17, faction: 15, faction_group: 8, enemy_group: 1}
+      neutral = %FactionTemplate{id: 7, faction: 7, faction_group: 0, enemy_group: 0}
       player_guid = Guid.from_low_guid(:player, 700)
       neutral_guid = Guid.from_low_guid(:mob, 7, 700)
       obstructed_guid = Guid.from_low_guid(:mob, 17, 701)

@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.Loader.Faction do
   @moduledoc false
 
   alias ThistleTea.DB.DBC
+  alias ThistleTea.Game.Core.Combat.FactionTemplate
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
@@ -28,7 +29,7 @@ defmodule ThistleTea.Game.World.Loader.Faction do
   end
 
   defp load_metadata(faction_template_id) do
-    faction_template = DBC.get(DBC.FactionTemplate, faction_template_id)
+    faction_template = DBC.FactionTemplate |> DBC.get(faction_template_id) |> FactionTemplate.from_row()
 
     metadata = %{
       faction_template_id: faction_template_id,
@@ -40,7 +41,7 @@ defmodule ThistleTea.Game.World.Loader.Faction do
     metadata
   end
 
-  defp faction_can_have_reputation?(%DBC.FactionTemplate{faction: faction_id})
+  defp faction_can_have_reputation?(%FactionTemplate{faction: faction_id})
        when is_integer(faction_id) and faction_id > 0 do
     faction_id
     |> then(&DBC.get(DBC.Faction, &1))
