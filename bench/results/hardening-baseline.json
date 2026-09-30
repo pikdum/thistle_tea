@@ -1,0 +1,415 @@
+{
+  "config": {
+    "copies": 2,
+    "duration_ms": 10000,
+    "players": 12,
+    "mobs": 80,
+    "interval_ms": 100,
+    "warmup_ms": 2000,
+    "pet_percent": 25
+  },
+  "environment": {
+    "otp": "29",
+    "schedulers": 12,
+    "elixir": "1.20.3",
+    "commit": "23c552b38548675158f6b7098c039451bad21567"
+  },
+  "results": [
+    {
+      "metrics": {
+        "counters": {
+          "fired": 3,
+          "coalesced": 2,
+          "scheduled": 1,
+          "wire_packets": 1770,
+          "wire_bytes": 225386,
+          "uncompressed_bytes": 365800
+        },
+        "runtime": {
+          "process_count": 1156,
+          "reductions": 16751855,
+          "run_queue": 0,
+          "entities": {
+            "players": 12,
+            "mobs": 145,
+            "game_objects": 66
+          },
+          "memory_bytes": 921537304,
+          "gc_collections": 3197,
+          "gc_reclaimed_words": 55774098
+        },
+        "elapsed_ms": 10103,
+        "durations": [
+          {
+            "count": 353,
+            "label": "running",
+            "name": "mob_tick",
+            "max_us_upper_bound": 8192,
+            "mean_us": 1938.9801699716713,
+            "p95_us_upper_bound": 4096,
+            "p99_us_upper_bound": 4096
+          },
+          {
+            "count": 2,
+            "label": "success",
+            "name": "mob_tick",
+            "max_us_upper_bound": 128,
+            "mean_us": 88.0,
+            "p95_us_upper_bound": 128,
+            "p99_us_upper_bound": 128
+          },
+          {
+            "count": 120,
+            "label": "all",
+            "name": "player_tick",
+            "max_us_upper_bound": 1024,
+            "mean_us": 279.40833333333336,
+            "p95_us_upper_bound": 512,
+            "p99_us_upper_bound": 1024
+          }
+        ],
+        "storage_bytes": 13840,
+        "storage_rows": 9
+      },
+      "scenario": "idle",
+      "owners_before": {
+        "count": 107,
+        "reductions": 17126277,
+        "minor_gcs": 976,
+        "memory_bytes": 113009648,
+        "queue_max": 0,
+        "queue_p95": 0,
+        "queue_p99": 0,
+        "queue_total": 0
+      },
+      "owners_after": {
+        "count": 107,
+        "reductions": 31004557,
+        "minor_gcs": 1728,
+        "memory_bytes": 115308024,
+        "queue_max": 0,
+        "queue_p95": 0,
+        "queue_p99": 0,
+        "queue_total": 0
+      },
+      "queue_peak": 0,
+      "timer_counts_before": {
+        "player_ticks": 12,
+        "mob_ticks": 3,
+        "proximity_contacts": 0,
+        "proximity_refreshes": 0,
+        "quest_refreshes": 0
+      },
+      "timer_counts_after": {
+        "player_ticks": 12,
+        "mob_ticks": 3,
+        "proximity_contacts": 0,
+        "proximity_refreshes": 0,
+        "quest_refreshes": 0
+      },
+      "isolation": true
+    },
+    {
+      "metrics": {
+        "counters": {
+          "fired": 1,
+          "coalesced": 1,
+          "scheduled": 2,
+          "wire_packets": 7770,
+          "wire_bytes": 429085,
+          "uncompressed_bytes": 547570
+        },
+        "runtime": {
+          "process_count": 1156,
+          "reductions": 29646514,
+          "run_queue": 0,
+          "entities": {
+            "players": 12,
+            "mobs": 145,
+            "game_objects": 66
+          },
+          "memory_bytes": 921940664,
+          "gc_collections": 8043,
+          "gc_reclaimed_words": 99503251
+        },
+        "elapsed_ms": 10104,
+        "durations": [
+          {
+            "count": 359,
+            "label": "running",
+            "name": "mob_tick",
+            "max_us_upper_bound": 16384,
+            "mean_us": 1948.150417827298,
+            "p95_us_upper_bound": 4096,
+            "p99_us_upper_bound": 8192
+          },
+          {
+            "count": 2,
+            "label": "success",
+            "name": "mob_tick",
+            "max_us_upper_bound": 128,
+            "mean_us": 80.0,
+            "p95_us_upper_bound": 128,
+            "p99_us_upper_bound": 128
+          },
+          {
+            "count": 1200,
+            "label": 238,
+            "name": "packet",
+            "max_us_upper_bound": 16384,
+            "mean_us": 1184.8491666666666,
+            "p95_us_upper_bound": 2048,
+            "p99_us_upper_bound": 4096
+          },
+          {
+            "count": 120,
+            "label": "all",
+            "name": "player_tick",
+            "max_us_upper_bound": 4096,
+            "mean_us": 281.85833333333335,
+            "p95_us_upper_bound": 512,
+            "p99_us_upper_bound": 1024
+          }
+        ],
+        "storage_bytes": 38720,
+        "storage_rows": 10
+      },
+      "scenario": "movement",
+      "owners_before": {
+        "count": 107,
+        "reductions": 19701817,
+        "minor_gcs": 1388,
+        "memory_bytes": 109029920,
+        "queue_max": 0,
+        "queue_p95": 0,
+        "queue_p99": 0,
+        "queue_total": 0
+      },
+      "owners_after": {
+        "count": 107,
+        "reductions": 45961772,
+        "minor_gcs": 3654,
+        "memory_bytes": 109415376,
+        "queue_max": 0,
+        "queue_p95": 0,
+        "queue_p99": 0,
+        "queue_total": 0
+      },
+      "queue_peak": 1,
+      "timer_counts_before": {
+        "player_ticks": 12,
+        "mob_ticks": 3,
+        "proximity_contacts": 0,
+        "proximity_refreshes": 0,
+        "quest_refreshes": 0
+      },
+      "timer_counts_after": {
+        "player_ticks": 12,
+        "mob_ticks": 3,
+        "proximity_contacts": 0,
+        "proximity_refreshes": 0,
+        "quest_refreshes": 0
+      },
+      "isolation": true
+    },
+    {
+      "metrics": {
+        "counters": {
+          "cancelled": 0,
+          "fired": 1,
+          "coalesced": 1,
+          "scheduled": 1,
+          "wire_packets": 18013,
+          "wire_bytes": 1152732,
+          "uncompressed_bytes": 2907253
+        },
+        "runtime": {
+          "process_count": 1156,
+          "reductions": 96861644,
+          "run_queue": 0,
+          "entities": {
+            "players": 12,
+            "mobs": 145,
+            "game_objects": 66
+          },
+          "memory_bytes": 926178064,
+          "gc_collections": 18868,
+          "gc_reclaimed_words": 292442755
+        },
+        "elapsed_ms": 10003,
+        "durations": [
+          {
+            "count": 3022,
+            "label": "running",
+            "name": "mob_tick",
+            "max_us_upper_bound": 16384,
+            "mean_us": 754.8732627399073,
+            "p95_us_upper_bound": 2048,
+            "p99_us_upper_bound": 4096
+          },
+          {
+            "count": 1,
+            "label": "success",
+            "name": "mob_tick",
+            "max_us_upper_bound": 64,
+            "mean_us": 61.0,
+            "p95_us_upper_bound": 64,
+            "p99_us_upper_bound": 64
+          },
+          {
+            "count": 1188,
+            "label": 238,
+            "name": "packet",
+            "max_us_upper_bound": 8192,
+            "mean_us": 1433.1767676767677,
+            "p95_us_upper_bound": 4096,
+            "p99_us_upper_bound": 4096
+          },
+          {
+            "count": 991,
+            "label": "all",
+            "name": "player_tick",
+            "max_us_upper_bound": 4096,
+            "mean_us": 545.1594349142281,
+            "p95_us_upper_bound": 1024,
+            "p99_us_upper_bound": 2048
+          }
+        ],
+        "storage_bytes": 39104,
+        "storage_rows": 12
+      },
+      "scenario": "combat",
+      "owners_before": {
+        "count": 107,
+        "reductions": 34239015,
+        "minor_gcs": 3126,
+        "memory_bytes": 113787704,
+        "queue_max": 0,
+        "queue_p95": 0,
+        "queue_p99": 0,
+        "queue_total": 0
+      },
+      "owners_after": {
+        "count": 107,
+        "reductions": 127860641,
+        "minor_gcs": 13253,
+        "memory_bytes": 111666920,
+        "queue_max": 0,
+        "queue_p95": 0,
+        "queue_p99": 0,
+        "queue_total": 0
+      },
+      "queue_peak": 58,
+      "timer_counts_before": {
+        "player_ticks": 12,
+        "mob_ticks": 65,
+        "proximity_contacts": 0,
+        "proximity_refreshes": 0,
+        "quest_refreshes": 0
+      },
+      "timer_counts_after": {
+        "player_ticks": 12,
+        "mob_ticks": 68,
+        "proximity_contacts": 0,
+        "proximity_refreshes": 0,
+        "quest_refreshes": 0
+      },
+      "isolation": true
+    },
+    {
+      "metrics": {
+        "counters": {
+          "cancelled": 0,
+          "fired": 1,
+          "coalesced": 2,
+          "scheduled": 1,
+          "wire_packets": 2834,
+          "wire_bytes": 239685,
+          "uncompressed_bytes": 372355
+        },
+        "runtime": {
+          "process_count": 1156,
+          "reductions": 34297300,
+          "run_queue": 0,
+          "entities": {
+            "players": 12,
+            "mobs": 145,
+            "game_objects": 66
+          },
+          "memory_bytes": 932528960,
+          "gc_collections": 7536,
+          "gc_reclaimed_words": 114349060
+        },
+        "elapsed_ms": 10096,
+        "durations": [
+          {
+            "count": 293,
+            "label": "running",
+            "name": "mob_tick",
+            "max_us_upper_bound": 262144,
+            "mean_us": 15352.873720136518,
+            "p95_us_upper_bound": 131072,
+            "p99_us_upper_bound": 262144
+          },
+          {
+            "count": 1104,
+            "label": 238,
+            "name": "packet",
+            "max_us_upper_bound": 32768,
+            "mean_us": 3355.1983695652175,
+            "p95_us_upper_bound": 16384,
+            "p99_us_upper_bound": 16384
+          },
+          {
+            "count": 120,
+            "label": "all",
+            "name": "player_tick",
+            "max_us_upper_bound": 32768,
+            "mean_us": 2256.475,
+            "p95_us_upper_bound": 16384,
+            "p99_us_upper_bound": 32768
+          }
+        ],
+        "storage_bytes": 39408,
+        "storage_rows": 13
+      },
+      "scenario": "stealth",
+      "owners_before": {
+        "count": 107,
+        "reductions": 23240838,
+        "minor_gcs": 1635,
+        "memory_bytes": 110672728,
+        "queue_max": 0,
+        "queue_p95": 0,
+        "queue_p99": 0,
+        "queue_total": 0
+      },
+      "owners_after": {
+        "count": 107,
+        "reductions": 54445513,
+        "minor_gcs": 3236,
+        "memory_bytes": 110725440,
+        "queue_max": 0,
+        "queue_p95": 0,
+        "queue_p99": 0,
+        "queue_total": 0
+      },
+      "queue_peak": 12,
+      "timer_counts_before": {
+        "player_ticks": 12,
+        "mob_ticks": 3,
+        "proximity_contacts": 0,
+        "proximity_refreshes": 0,
+        "quest_refreshes": 0
+      },
+      "timer_counts_after": {
+        "player_ticks": 12,
+        "mob_ticks": 3,
+        "proximity_contacts": 0,
+        "proximity_refreshes": 0,
+        "quest_refreshes": 0
+      },
+      "isolation": true
+    }
+  ]
+}

@@ -8,6 +8,14 @@ defmodule ThistleTea.Game.Core.Aura.StealthDetectionTest do
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Unit
 
+  describe "fact_keys/0" do
+    test "covers every published detection input" do
+      entity = %Character{unit: %Unit{level: 1, auras: []}, internal: %Internal{}}
+
+      assert Enum.sort(StealthDetection.fact_keys()) == Enum.sort(Map.keys(StealthDetection.target_metadata(entity)))
+    end
+  end
+
   describe "detection_distance/3" do
     test "distinguishes player and creature observers and targets" do
       player = %{level: 10, player?: true}
