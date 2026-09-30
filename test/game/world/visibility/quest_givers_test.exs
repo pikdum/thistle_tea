@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Visibility.QuestGiversTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -21,10 +22,12 @@ defmodule ThistleTea.Game.World.Visibility.QuestGiversTest do
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.Topics
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.World.Visibility.QuestGivers
+  alias ThistleTea.Game.World.Visibility.QuestGivers.Watch
 
   setup [:questgiver]
 
@@ -88,7 +91,7 @@ defmodule ThistleTea.Game.World.Visibility.QuestGiversTest do
       state = refresh_and_deliver(context.state, context.guid, 0)
       removed = Visibility.untrack_entity(state, context.guid)
       assert removed.questgiver_statuses == %{}
-      assert QuestGivers.refresh(removed) == removed
+      assert QuestGivers.refresh(removed).questgiver_statuses == %{}
       refute_received {:"$gen_cast", {:send_packet, %SmsgQuestgiverStatus{}, _}}
       packet = %SmsgQuestgiverStatus{guid: context.guid, status: 5}
       assert PacketSink.send(removed, packet, source_guid: context.guid) == removed
@@ -114,6 +117,62 @@ defmodule ThistleTea.Game.World.Visibility.QuestGiversTest do
   end
 
   describe "sync/1" do
+    test "learning and unlearning a required spell refreshes stationary status", context do
+      quest = %{
+        context.quest
+        | required_skill: 0,
+          required_condition_id: 1,
+          required_condition: %Condition{type: :spell, value1: 123, value2: 0}
+      }
+
+      :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
+      state = sync_and_deliver(context.state, context.guid, 0)
+      internal = %{state.character.internal | spellbook: %{123 => true}}
+      state = sync_and_deliver(%{state | character: %{state.character | internal: internal}}, context.guid, 5)
+      internal = %{internal | spellbook: %{}}
+      sync_and_deliver(%{state | character: %{state.character | internal: internal}}, context.guid, 0)
+    end
+
+    test "health requirements refresh without watching unrelated resource changes", context do
+      quest = %{
+        context.quest
+        | required_skill: 0,
+          required_condition_id: 1,
+          required_condition: %Condition{type: :health_percent, value1: 50, value2: 1}
+      }
+
+      :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
+      state = sync_and_deliver(context.state, context.guid, 5)
+      unit = %{state.character.unit | health: 20}
+      state = sync_and_deliver(%{state | character: %{state.character | unit: unit}}, context.guid, 0)
+      assert QuestGivers.sync(state) == state
+    end
+
+    test "saved variables notify only subscribed requirements and clean up on leave", context do
+      index = context.quest.id
+      original = ServerVariables.get(index)
+      on_exit(fn -> ServerVariables.put(index, original) end)
+
+      quest = %{
+        context.quest
+        | required_skill: 0,
+          required_condition_id: 1,
+          required_condition: %Condition{type: :saved_variable, value1: index, value2: 1, value3: 0}
+      }
+
+      :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
+      state = context.state |> QuestGivers.enter() |> sync_and_deliver(context.guid, 0)
+      ServerVariables.put(index, 1)
+      assert_receive {:server_variable_changed, ^index}
+      {:noreply, state} = PlayerServer.handle_info({:server_variable_changed, index}, state)
+      state = deliver(state, context.guid, 5)
+      ServerVariables.put(index, 1)
+      refute_received {:server_variable_changed, ^index}
+      QuestGivers.leave(state)
+      ServerVariables.put(index, 0)
+      refute_receive {:server_variable_changed, ^index}
+    end
+
     test "re-evaluates visible givers only when the viewer's eligibility changes", context do
       state = sync_and_deliver(context.state, context.guid, 0)
       assert QuestGivers.sync(state) == state
@@ -122,6 +181,31 @@ defmodule ThistleTea.Game.World.Visibility.QuestGiversTest do
       player = %{state.character.player | skills: %{185 => %{value: 50}}}
       state = sync_and_deliver(%{state | character: %{state.character | player: player}}, context.guid, 5)
       assert state.questgiver_statuses == %{context.guid => 5}
+    end
+  end
+
+  describe "timeout/2" do
+    test "time gates schedule truth boundaries and reject stale callbacks", context do
+      assert Watch.next_delay(%Watch{minutes: [12 * 60, 13 * 60 + 1]}, ~N[2026-09-30 11:59:30]) == 30_000
+      assert Watch.next_delay(%Watch{minutes: [12 * 60, 13 * 60 + 1]}, ~N[2026-09-30 12:00:00]) == 3_660_000
+      assert Watch.next_delay(%Watch{minutes: [0]}, ~N[2026-09-30 23:59:59]) == 1_000
+      assert Watch.next_delay(%Watch{}, ~N[2026-09-30 12:00:00]) == nil
+
+      quest = %{
+        context.quest
+        | required_skill: 0,
+          required_condition_id: 1,
+          required_condition: %Condition{type: :local_time, value1: 0, value3: 23, value4: 59}
+      }
+
+      :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
+      state = sync_and_deliver(context.state, context.guid, 5)
+      ref = state.quest_refresh
+      assert is_reference(ref)
+      assert QuestGivers.timeout(state, make_ref()) == state
+      left = state |> QuestGivers.enter() |> QuestGivers.leave()
+      assert left.quest_refresh == nil
+      assert :erlang.read_timer(ref) == false
     end
   end
 

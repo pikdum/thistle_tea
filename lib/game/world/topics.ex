@@ -24,6 +24,8 @@ defmodule ThistleTea.Game.World.Topics do
 
   def game_events, do: "game_events"
 
+  def server_variable(index) when is_integer(index), do: "server_variable/#{index}"
+
   def world_facts(%WorldRef{map_id: map_id, instance_id: instance_id}),
     do: "world_facts/#{map_id}/#{instance_id || "world"}"
 end

@@ -837,16 +837,18 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   defp event_key(world, id), do: {WorldRef.coerce(world), id}
 
   defp announce(events, previous) do
-    started = Map.keys(events) -- Map.keys(previous)
-    ended = Map.keys(previous) -- Map.keys(events)
-
-    (started ++ ended)
+    (Map.keys(events) ++ Map.keys(previous))
+    |> Enum.uniq()
+    |> Enum.filter(&(event_facts(Map.get(events, &1)) != event_facts(Map.get(previous, &1))))
     |> Enum.map(fn {world, _id} -> world end)
     |> Enum.uniq()
     |> Enum.each(&Topics.publish(Topics.world_facts(&1), {:world_facts_changed, &1}))
 
     events
   end
+
+  defp event_facts(%Event{data: data, targets: targets}), do: {data, targets}
+  defp event_facts(nil), do: nil
 
   defp condition_key(%Condition{entry: entry}) when is_integer(entry) and entry > 0, do: entry
   defp condition_key(%Condition{} = condition), do: condition

@@ -16,7 +16,6 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
   alias ThistleTea.Game.Core.Entity.Component.GameObject
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Object
-  alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.GameObjectTemplate
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Quest
@@ -30,6 +29,7 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Topics
+  alias ThistleTea.Game.World.Visibility.QuestGivers.Watch
 
   def personalize(
         %UpdateObject{object: %{guid: guid}, game_object: %GameObject{} = object} = update,
@@ -78,7 +78,8 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
     state = leave(state)
     :ok = Topics.subscribe(Topics.game_events())
     :ok = Topics.subscribe(key)
-    %{state | world_facts_key: key}
+    state = %{state | world_facts_key: key, quest_watch: nil}
+    install_watch(state, Watch.build(state.tracked_entities))
   end
 
   def enter(state), do: state
@@ -86,16 +87,20 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
   def leave(%State{world_facts_key: key} = state) when is_binary(key) do
     Topics.unsubscribe(Topics.game_events())
     Topics.unsubscribe(key)
-    %{state | world_facts_key: nil}
+    if state.quest_watch, do: Enum.each(state.quest_watch.keys, &Topics.unsubscribe/1)
+    cancel_refresh(state.quest_refresh)
+    %{state | world_facts_key: nil, quest_watch: nil, quest_refresh: nil, quest_eligibility: nil}
   end
 
   def leave(state), do: state
 
-  def sync(%State{character: %Character{player: %Player{}} = viewer, quest_eligibility: previous} = state) do
-    case eligibility(viewer) do
-      ^previous -> state
-      current -> %{refresh(state) | quest_eligibility: current}
-    end
+  def sync(%State{character: %Character{} = viewer} = state) do
+    watch = state.quest_watch || Watch.build(state.tracked_entities)
+    current = Watch.fingerprint(watch, viewer)
+
+    if watch.visible == state.tracked_entities and current == state.quest_eligibility,
+      do: state,
+      else: refresh(state)
   end
 
   def sync(state), do: state
@@ -112,15 +117,36 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
     quest_context = Quests.ctx(viewer)
     refresh_objects(state, viewer, quest_context)
     refresh_creatures(state, viewer, quest_context)
-    state
+    watch = Watch.build(state.tracked_entities)
+    state = install_watch(state, watch)
+    %{state | quest_eligibility: Watch.fingerprint(watch, viewer)}
   end
 
   def refresh(state), do: state
 
-  defp eligibility(%Character{unit: unit, player: player, internal: internal}) do
-    {unit.level, player.quest_log, player.rewarded_quests, player.skills, player.skill_bonuses, player.reputation,
-     Enum.map(unit.auras || [], & &1.spell.id), internal.area, internal.world}
+  def timeout(%State{quest_refresh: ref} = state, ref), do: refresh(%{state | quest_refresh: nil})
+  def timeout(state, _ref), do: state
+
+  def hear(%State{quest_watch: %Watch{spatial?: true}} = state), do: refresh(state)
+  def hear(state), do: state
+
+  defp install_watch(%State{} = state, %Watch{} = watch) do
+    previous_keys = if state.quest_watch, do: state.quest_watch.keys, else: []
+
+    if state.world_facts_key do
+      Enum.each(previous_keys -- watch.keys, &Topics.unsubscribe/1)
+      Enum.each(watch.keys -- previous_keys, &Topics.subscribe/1)
+    end
+
+    cancel_refresh(state.quest_refresh)
+    now = :calendar.local_time() |> NaiveDateTime.from_erl!()
+    delay = Watch.next_delay(watch, now)
+    ref = if delay, do: :erlang.start_timer(delay, self(), :quest_giver_refresh)
+    %{state | quest_watch: watch, quest_refresh: ref}
   end
+
+  defp cancel_refresh(ref) when is_reference(ref), do: :erlang.cancel_timer(ref)
+  defp cancel_refresh(_ref), do: :ok
 
   defp refresh_objects(state, viewer, quest_context) do
     for {guid, previous} <- state.quest_object_flags,

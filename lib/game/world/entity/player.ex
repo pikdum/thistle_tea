@@ -1103,7 +1103,8 @@ defmodule ThistleTea.Game.World.Entity.Player do
 
   def handle_info({:proximity, %Announcement{} = announcement}, %State{character: %Character{} = character} = state) do
     {character, _result} = Proximity.hear(character, announcement, Time.now())
-    {:noreply, Visibility.hear(%{state | character: character}, announcement)}
+    state = %{state | character: character} |> Visibility.hear(announcement) |> QuestGivers.hear()
+    {:noreply, state}
   rescue
     error ->
       Logger.error("Proximity announcement failed: #{Exception.format(:error, error, __STACKTRACE__)}")
@@ -1824,11 +1825,20 @@ defmodule ThistleTea.Game.World.Entity.Player do
       {:noreply, state}
   end
 
-  def handle_info({fact, _value}, %State{} = state) when fact in [:game_events_changed, :world_facts_changed] do
+  def handle_info({fact, _value}, %State{} = state)
+      when fact in [:game_events_changed, :world_facts_changed, :server_variable_changed] do
     {:noreply, QuestGivers.refresh(state)}
   rescue
     error ->
       Logger.error("Quest giver refresh failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:timeout, ref, :quest_giver_refresh}, %State{} = state) do
+    {:noreply, QuestGivers.timeout(state, ref)}
+  rescue
+    error ->
+      Logger.error("Quest giver timer failed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, state}
   end
 
@@ -1856,7 +1866,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   @impl GenServer
   def handle_info({:group, events, _info}, state) do
     state = Visibility.handle_events(state, events)
-    {:noreply, state}
+    {:noreply, QuestGivers.hear(state)}
   end
 
   def handle_info(:sync_guild_membership, state) do

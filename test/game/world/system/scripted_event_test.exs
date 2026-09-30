@@ -98,7 +98,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
     assert target_guid == context.target_guid
   end
 
-  test "starting and ending a map event announces its world's facts", context do
+  test "map event lifecycle, targets and changed data announce world facts", context do
     world = context.world
     :ok = Topics.subscribe(Topics.world_facts(world))
     on_exit(fn -> Topics.unsubscribe(Topics.world_facts(world)) end)
@@ -106,6 +106,11 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
     command(context, %ScriptStep{command: :start_map_event, datalong: 5_714, datalong2: 600})
     assert_receive {:world_facts_changed, ^world}
     command(context, %ScriptStep{command: :add_map_event_target, datalong: 5_714})
+    assert_receive {:world_facts_changed, ^world}
+    update = %ScriptStep{command: :set_map_event_data, datalong: 5_714, datalong2: 1, datalong3: 2}
+    command(context, update)
+    assert_receive {:world_facts_changed, ^world}
+    command(context, update)
     refute_receive {:world_facts_changed, ^world}, 50
     command(context, %ScriptStep{command: :end_map_event, datalong: 5_714, datalong2: 1})
     assert_receive {:world_facts_changed, ^world}
