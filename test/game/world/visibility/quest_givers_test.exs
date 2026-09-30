@@ -32,6 +32,12 @@ defmodule ThistleTea.Game.World.Visibility.QuestGiversTest do
   setup [:questgiver]
 
   describe "refresh/1" do
+    test "ignores characters without player state", %{state: state} do
+      state = %{state | character: %{state.character | player: nil}}
+      assert QuestGivers.refresh(state) == state
+      refute_received {:"$gen_cast", {:send_packet, %SmsgQuestgiverStatus{}, _}}
+    end
+
     test "refreshes stationary viewers when the world event starts and stops", context do
       saved = GameEvent.get_events()
       on_exit(fn -> GameEvent.set_events(saved) end)
@@ -117,6 +123,12 @@ defmodule ThistleTea.Game.World.Visibility.QuestGiversTest do
   end
 
   describe "sync/1" do
+    test "ignores characters without player state", %{state: state} do
+      state = %{state | character: %{state.character | player: nil}}
+      assert QuestGivers.sync(state) == state
+      refute_received {:"$gen_cast", {:send_packet, %SmsgQuestgiverStatus{}, _}}
+    end
+
     test "learning and unlearning a required spell refreshes stationary status", context do
       quest = %{
         context.quest

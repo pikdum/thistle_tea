@@ -12,9 +12,10 @@ provides bounded measurement, and establishes a repeatable population workload.
   compares the watch keys with the metadata projection itself.
 - Each owner holds one pending contact check per target and role. Duplicate
   announcements coalesce; replacement, departure, and death cancel work.
-  Delivered callbacks must match their timer reference, world, movement path,
-  process, and creature incarnation. A respawn in the same process cannot consume
-  an old contact check.
+  Schedule identities include world, movement path, process, and incarnation.
+  Delivered callbacks must match the active reference and current world, process,
+  and incarnation, then re-evaluate contact facts. A respawn in the same process
+  cannot consume an old contact check.
 - Quest refresh watches come from the visible quests' condition requirements.
   Learning, health, aura, group, and other owner inputs use a cheap fingerprint;
   saved variables use targeted Group subscriptions; local-time conditions use

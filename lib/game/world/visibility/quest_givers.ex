@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
   alias ThistleTea.Game.Core.Entity.Component.GameObject
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.GameObjectTemplate
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Quest
@@ -94,7 +95,7 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
 
   def leave(state), do: state
 
-  def sync(%State{character: %Character{} = viewer} = state) do
+  def sync(%State{character: %Character{player: %Player{}} = viewer} = state) do
     watch = state.quest_watch || Watch.build(state.tracked_entities)
     current = Watch.fingerprint(watch, viewer)
 
@@ -105,7 +106,7 @@ defmodule ThistleTea.Game.World.Visibility.QuestGivers do
 
   def sync(state), do: state
 
-  def refresh(%State{character: %Character{} = viewer} = state) do
+  def refresh(%State{character: %Character{player: %Player{}} = viewer} = state) do
     visible = MapSet.to_list(state.tracked_entities)
 
     state = %{
