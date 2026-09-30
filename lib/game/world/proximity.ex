@@ -51,17 +51,12 @@ defmodule ThistleTea.Game.World.Proximity do
 
   @group Groups
   @watched_keys Reaction.actor_keys() ++
+                  StealthDetection.fact_keys() ++
                   [
                     :level,
                     :in_combat,
                     :evading?,
                     :charmed_by,
-                    :stealthed?,
-                    :stealth_skill,
-                    :undetectable_until,
-                    :invisibility,
-                    :invisibility_detection,
-                    :stunned?,
                     :detection_range,
                     :detect_range_modifier
                   ]

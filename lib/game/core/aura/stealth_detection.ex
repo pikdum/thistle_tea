@@ -14,6 +14,22 @@ defmodule ThistleTea.Game.Core.Aura.StealthDetection do
   @base_creature_distance 5.0 / 6.0
   @max_distance 30.0
 
+  def fact_keys do
+    [
+      :stealthed?,
+      :stealth_skill,
+      :undetectable_until,
+      :level,
+      :player?,
+      :stealth_detection_bonus,
+      :stunned?,
+      :stalked_by,
+      :invisibility,
+      :invisibility_detection,
+      :detects_all_invisibility?
+    ]
+  end
+
   def target_metadata(%{unit: %Unit{level: level}} = entity) do
     level = level || 1
     stealthed? = Aura.has_aura?(entity, :mod_stealth)

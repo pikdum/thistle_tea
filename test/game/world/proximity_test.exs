@@ -196,6 +196,22 @@ defmodule ThistleTea.Game.World.ProximityTest do
   end
 
   describe "sync/2" do
+    test "announces stationary changes to every detection fact" do
+      player = player_guid() |> put_player() |> player() |> join() |> Proximity.sync(Time.now())
+      assert_receive {:proximity, %Announcement{}}
+
+      Enum.reduce(
+        [stealth_detection_bonus: 30, stalked_by: [123], detects_all_invisibility?: true],
+        player,
+        fn {key, value}, player ->
+          Metadata.update(player.object.guid, %{key => value})
+          player = Proximity.sync(player, Time.now())
+          assert_receive {:proximity, %Announcement{}}
+          player
+        end
+      )
+    end
+
     test "announces a unit when it moves two yards or changes how others react to it" do
       player = player_guid() |> put_player() |> player() |> join()
 
