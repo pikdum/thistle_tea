@@ -72,3 +72,76 @@ Update fixtures fill every update field a component declares, so they measure th
 | `HOT_PATHS_MEMORY_TIME` | `0.5` | Benchee memory measurement time per scenario |
 
 Compare runs on the same machine and commit range; the dev environment does not consolidate protocols, so profile a running dev server only for relative weight, not absolute Enumerable cost.
+
+# Population workload
+
+The population harness runs the production player, mob, and pet processes,
+visibility subscriptions, behavior trees, packet batching, encoding, compression,
+and header encryption. It creates synthetic copies of Programmer Isle and
+places each cohort in the same coordinates to check visibility isolation.
+Fixture relocation uses the normal presence and visibility funnels inside the
+owner process; these copies do not exercise instance admission or persistence.
+Players are level 60 rogues with invulnerability enabled, creatures are level 50,
+and a configurable fraction of players receive an Imp guardian. Each scenario
+starts a fresh population and cleans up its owners afterwards.
+
+```console
+MIX_ENV=bench mix run bench/population.exs
+```
+
+The default workload uses 12 players, 80 mobs, two copies, 25% pets, a one-second
+warmup and five seconds of measurement for each of `idle,movement,combat,stealth`.
+Movement inputs follow the same trajectory at a target of 10 batches per second.
+Inputs are synchronous and completion paced: an overloaded batch lowers the
+achieved input rate. Compare the packet count and elapsed time against the target
+rate; this is not a fixed-arrival-rate capacity test. Combat enables hostile
+creatures and starts melee through client input. Stealth casts the real spell
+before measurement, then moves the rogues through one another's detection range.
+
+The connection sink discards successful writes after the real network send path.
+Wire bytes include compressed payloads and headers, but do not measure TCP,
+kernel backpressure, or an actual client's rendering. Whole-VM telemetry includes
+normal server background work; owner reductions, GC, memory and mailbox samples
+cover only the benchmark population and its connection sinks.
+
+Reports include histogram p95/p99 upper bounds in microseconds, successful wire
+bytes, reductions and GC, sampled queue peaks, owner counts, timer counts, and
+copy isolation. Histograms use powers-of-two buckets: a reported 4096us means the
+quantile is no higher than 4096us, rather than an exact 4.096ms observation. Queue
+peaks are sampled every input interval and can miss shorter bursts. Timer counts
+are snapshots taken outside the measured interval. A stopped owner or visibility
+leak fails the run.
+
+All numeric options use the `POPULATION_BENCH_` prefix:
+
+| Suffix | Default | Meaning |
+| --- | ---: | --- |
+| `PLAYERS` | 12 | Player owners |
+| `MOBS` | 80 | Creature owners, excluding pets and normal server spawns |
+| `COPIES` | 2 | Synthetic isolated worlds |
+| `PET_PERCENT` | 25 | Deterministic fraction receiving guardians |
+| `DURATION_MS` | 5000 | Measurement window per scenario |
+| `WARMUP_MS` | 1000 | Warmup per scenario |
+| `INTERVAL_MS` | 100 | Target interval between input batches |
+
+`POPULATION_BENCH_SCENARIOS` selects comma-separated scenarios and
+`POPULATION_BENCH_OUTPUT` selects the JSON report path (default
+`/tmp/thistle-population.json`). Positive counts and intervals are required;
+use `PET_PERCENT=0` to omit pets.
+
+For diagnostic function timing, set `POPULATION_BENCH_PROFILE` to one scenario.
+This runs eprof on the population owners and prints its table. If the development
+Erlang excludes tools from its code path, set `POPULATION_BENCH_ERLANG_TOOLS` to the
+`tools-*/ebin` directory from the matching Erlang package. Profiled runs carry a
+`profiled: true` marker and should not be compared with ordinary latency runs.
+
+To sample a running server without resetting counters:
+
+```elixir
+before = ThistleTea.Telemetry.checkpoint()
+ThistleTea.Telemetry.report(before)
+ThistleTea.Telemetry.Runtime.owners([player_pid, mob_pid])
+```
+
+The collector owns its telemetry subscriptions, so supervision restarts reattach
+them. Storage grows with the finite metric labels, rather than the event count.
