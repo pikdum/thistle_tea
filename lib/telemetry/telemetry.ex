@@ -60,8 +60,11 @@ defmodule ThistleTea.Telemetry do
   def handle_event([:thistle_tea, :handle_packet, :stop], %{duration: duration}, %{opcode: opcode}, _config)
       when is_integer(opcode) and opcode in 0..0xFFFF, do: duration(:packet, opcode, duration)
 
-  def handle_event([:thistle_tea, :mob, :ai_tick], %{duration: duration}, metadata, _config),
-    do: duration(:mob_tick, Map.get(metadata, :status, :unknown), duration)
+  def handle_event([:thistle_tea, :mob, :ai_tick], %{duration: duration}, metadata, _config) do
+    status = Map.get(metadata, :status)
+    label = if status in [:running, :success, :failure], do: status, else: :unknown
+    duration(:mob_tick, label, duration)
+  end
 
   def handle_event([:thistle_tea, :player, :tick], %{duration: duration}, _metadata, _config),
     do: duration(:player_tick, :all, duration)
@@ -108,7 +111,6 @@ defmodule ThistleTea.Telemetry do
   def terminate(_reason, _state), do: :telemetry.detach(__MODULE__)
 
   defp duration(name, label, duration) do
-    label = if is_integer(label) or label in [:all, :running, :success, :failure, :unknown], do: label, else: :unknown
     value = max(System.convert_time_unit(duration, :native, :microsecond), 0)
     bucket = Enum.find_index(@bounds, &(&1 == :infinity or value <= &1))
     key = {:duration, name, label}

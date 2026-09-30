@@ -4,6 +4,20 @@ defmodule ThistleTea.TelemetryTest do
   alias ThistleTea.Telemetry
   alias ThistleTea.Telemetry.Runtime
 
+  describe "start_link/1" do
+    test "reattaches collection after the supervised owner restarts" do
+      before = Telemetry.checkpoint()
+      :ok = Supervisor.terminate_child(ThistleTea.Supervisor, Telemetry)
+      {:ok, pid} = Supervisor.restart_child(ThistleTea.Supervisor, Telemetry)
+      assert pid != before.epoch
+      tick(10)
+
+      report = Telemetry.report(before)
+      assert report.elapsed_ms == nil
+      assert Enum.any?(report.durations, &(&1.name == :mob_tick and &1.label == :success and &1.count == 1))
+    end
+  end
+
   describe "report/2" do
     test "reports window quantiles without deleting earlier measurements" do
       before = Telemetry.checkpoint()
@@ -37,6 +51,17 @@ defmodule ThistleTea.TelemetryTest do
       assert metric.count == 8_000
       assert metric.mean_us == 10
       assert :ets.info(Telemetry, :size) == size
+    end
+
+    test "coalesces arbitrary behavior statuses into one histogram" do
+      before = Telemetry.checkpoint()
+
+      Enum.each(1..100, fn status ->
+        :telemetry.execute([:thistle_tea, :mob, :ai_tick], %{duration: 0}, %{status: status})
+      end)
+
+      metrics = Enum.filter(Telemetry.report(before).durations, &(&1.name == :mob_tick))
+      assert [%{label: :unknown, count: 100}] = metrics
     end
 
     test "counts successful wire bytes and failures separately" do
