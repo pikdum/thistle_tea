@@ -470,7 +470,7 @@ let
 
       group =
         let
-          version = "0.2.1";
+          version = "0.3.0";
           drv = buildMix {
             inherit version;
             name = "group";
@@ -479,7 +479,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "group";
-              sha256 = "39a6080e00aa14e3e8c79466c2cebf49c25bf313c5f4b3c2b699c92d493b6fa6";
+              sha256 = "1e85aa10ca7fdd333f68a78bddaad8cfa74a438abcb2fafe62348c4ebd7523f0";
             };
           };
         in
