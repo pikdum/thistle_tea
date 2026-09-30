@@ -4,6 +4,8 @@ defmodule ThistleTea.Game.Core.Loot.LootRoll do
   voters, collects votes, and resolves a winner — need beats greed, missing
   votes count as pass.
   """
+  alias ThistleTea.Game.Core.Rolls
+
   defstruct [:slot, :item_id, :count, random_property_id: 0, eligible: [], votes: %{}]
 
   def new(slot, item_id, count, eligible_guids, random_property_id \\ 0) do
@@ -30,7 +32,7 @@ defmodule ThistleTea.Game.Core.Loot.LootRoll do
     Enum.all?(roll.eligible, &Map.has_key?(roll.votes, &1))
   end
 
-  def resolve(%__MODULE__{} = roll, rand \\ fn -> :rand.uniform(100) end) do
+  def resolve(%__MODULE__{} = roll, rand \\ Rolls.system()) do
     case {contenders(roll, :need), contenders(roll, :greed)} do
       {[], []} -> :all_passed
       {[], greedy} -> pick_winner(greedy, :greed, rand)
@@ -39,12 +41,15 @@ defmodule ThistleTea.Game.Core.Loot.LootRoll do
   end
 
   defp contenders(%__MODULE__{votes: votes}, vote) do
-    for {guid, ^vote} <- votes, do: guid
+    Enum.sort(for {guid, ^vote} <- votes, do: guid)
   end
 
   defp pick_winner(guids, vote, rand) do
-    rolled = Enum.map(guids, fn guid -> {guid, rand.()} end)
+    rolled = Enum.map(guids, fn guid -> {guid, number(rand)} end)
     {winner, number} = Enum.max_by(rolled, fn {_guid, number} -> number end)
     {:won, winner, number, vote, rolled}
   end
+
+  defp number(%Rolls{} = rolls), do: Rolls.integer(rolls, :loot_roll, 1, 100)
+  defp number(rand) when is_function(rand, 0), do: rand.()
 end

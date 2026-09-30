@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Core.Loot.LootRollTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Core.Loot.LootRoll
+  alias ThistleTea.Game.Core.Rolls
 
   defp roll_with_votes(votes) do
     roll = LootRoll.new(0, 1234, 1, Enum.map(votes, &elem(&1, 0)))
@@ -45,6 +46,11 @@ defmodule ThistleTea.Game.Core.Loot.LootRollTest do
   end
 
   describe "resolve/2" do
+    test "resolves tied rolls reproducibly in guid order" do
+      roll = roll_with_votes([{2, :need}, {1, :need}])
+      assert LootRoll.resolve(roll, Rolls.fixed(loot_roll: 42)) == {:won, 1, 42, :need, [{1, 42}, {2, 42}]}
+    end
+
     test "need beats greed" do
       roll = roll_with_votes([{1, :greed}, {2, :need}])
       assert {:won, 2, _number, :need, [{2, _}]} = LootRoll.resolve(roll)

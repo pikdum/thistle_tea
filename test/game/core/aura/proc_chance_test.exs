@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Core.Aura.ProcChanceTest do
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Rolls
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.Core.Spell.Effect
@@ -18,6 +19,14 @@ defmodule ThistleTea.Game.Core.Aura.ProcChanceTest do
   alias ThistleTea.Game.Core.Spell.SpellFeedback
 
   setup [:character]
+
+  describe "roll?/5" do
+    test "pins the proc roll at the chance boundary", %{character: character} do
+      spell = %{proc_spell() | proc_chance: 50}
+      assert ProcChance.roll?(character, spell, :incoming, %{}, Rolls.fixed(aura_proc: 0.5))
+      refute ProcChance.roll?(character, spell, :incoming, %{}, Rolls.fixed(aura_proc: 0.5001))
+    end
+  end
 
   describe "chance/4" do
     test "outgoing PPM uses the current weapon or form period before haste", %{character: character} do

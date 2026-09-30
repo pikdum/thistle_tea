@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Core.Spell.CastPushback do
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Rolls
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Spell.Casting
@@ -23,19 +24,19 @@ defmodule ThistleTea.Game.Core.Spell.CastPushback do
       entity
     else
       source = if Keyword.get(opts, :environmental?, false), do: entity.object.guid, else: Keyword.get(opts, :source)
-      apply_damage_reaction(entity, casting, now, source)
+      apply_damage_reaction(entity, casting, now, source, Keyword.get(opts, :rolls, Rolls.system()))
     end
   end
 
   def on_damage(entity, _now, _opts), do: entity
 
-  defp apply_damage_reaction(entity, %Cast{phase: :channel_tick, spell: %Spell{} = spell} = casting, now, source) do
+  defp apply_damage_reaction(entity, %Cast{phase: :channel_tick, spell: %Spell{} = spell} = casting, now, source, rolls) do
     cond do
       Spell.channel_delayed_on_damage?(spell) ->
         if self_damage?(entity, source) do
           entity
         else
-          maybe_shorten_channel(entity, casting, now)
+          maybe_shorten_channel(entity, casting, now, rolls)
         end
 
       Spell.channel_cancels_on_damage?(spell) ->
@@ -46,7 +47,7 @@ defmodule ThistleTea.Game.Core.Spell.CastPushback do
     end
   end
 
-  defp apply_damage_reaction(entity, %Cast{spell: %Spell{} = spell} = casting, now, _source) do
+  defp apply_damage_reaction(entity, %Cast{spell: %Spell{} = spell} = casting, now, _source, rolls) do
     cond do
       Spell.cancels_on_damage?(spell) ->
         entity
@@ -54,17 +55,22 @@ defmodule ThistleTea.Game.Core.Spell.CastPushback do
         |> Casting.cancel(now)
 
       Spell.pushback_on_damage?(spell) ->
-        maybe_push_back(entity, casting, now)
+        maybe_push_back(entity, casting, now, rolls)
 
       true ->
         entity
     end
   end
 
-  defp apply_damage_reaction(entity, _casting, _now, _source), do: entity
+  defp apply_damage_reaction(entity, _casting, _now, _source, _rolls), do: entity
 
-  defp maybe_push_back(%Character{internal: %Internal{} = internal, object: %{guid: guid}} = entity, casting, now) do
-    if resist_pushback?(entity, casting.spell) do
+  defp maybe_push_back(
+         %Character{internal: %Internal{} = internal, object: %{guid: guid}} = entity,
+         casting,
+         now,
+         rolls
+       ) do
+    if resist_pushback?(entity, casting.spell, rolls) do
       entity
     else
       {casting, delta} = Cast.push_back_cast(casting, now)
@@ -78,8 +84,13 @@ defmodule ThistleTea.Game.Core.Spell.CastPushback do
     end
   end
 
-  defp maybe_shorten_channel(%Character{internal: %Internal{} = internal, object: %{guid: guid}} = entity, casting, now) do
-    if resist_pushback?(entity, casting.spell) do
+  defp maybe_shorten_channel(
+         %Character{internal: %Internal{} = internal, object: %{guid: guid}} = entity,
+         casting,
+         now,
+         rolls
+       ) do
+    if resist_pushback?(entity, casting.spell, rolls) do
       entity
     else
       {casting, reduction, new_remaining} = Cast.shorten_channel(casting, now)
@@ -113,7 +124,7 @@ defmodule ThistleTea.Game.Core.Spell.CastPushback do
 
   defp delay_channel_auras(entity, _casting, _reduction, _now), do: entity
 
-  defp resist_pushback?(%Character{} = entity, %Spell{} = spell) do
+  defp resist_pushback?(%Character{} = entity, %Spell{} = spell, rolls) do
     chance =
       entity
       |> Modifiers.value(spell, :not_lose_casting_time, 100)
@@ -121,7 +132,7 @@ defmodule ThistleTea.Game.Core.Spell.CastPushback do
       |> Kernel.-(100)
       |> round()
 
-    chance > 0 and :rand.uniform(100) <= chance
+    chance > 0 and Rolls.integer(rolls, :cast_pushback, 1, 100) <= chance
   end
 
   defp self_damage?(%Character{object: %{guid: guid}}, source), do: source == guid

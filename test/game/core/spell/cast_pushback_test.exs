@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Core.Spell.CastPushbackTest do
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Rolls
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Spell.Casting
@@ -21,6 +22,15 @@ defmodule ThistleTea.Game.Core.Spell.CastPushbackTest do
   @channel_cancel 0x02
 
   describe "take_damage/4 hard-cast pushback" do
+    test "pins partial resistance at the exact named roll boundary" do
+      resist = %Holder{spell: %Spell{id: 900_027}, auras: [%Aura{type: :reduce_pushback, amount: 50}]}
+      caster = casting_character(hard_cast_spell(), 1_000, auras: [resist])
+      resisted = Entity.take_damage(caster, 10, 2_000, source: 99, rolls: Rolls.fixed(cast_pushback: 50))
+      delayed = Entity.take_damage(caster, 10, 2_000, source: 99, rolls: Rolls.fixed(cast_pushback: 51))
+      assert resisted.internal.casting.ends_at == 4_000
+      assert delayed.internal.casting.ends_at == 5_000
+    end
+
     test "direct damage delays the cast, capped at the full cast time" do
       caster = casting_character(hard_cast_spell(), 1_000)
       assert caster.internal.casting.ends_at == 4_000
@@ -78,7 +88,7 @@ defmodule ThistleTea.Game.Core.Spell.CastPushbackTest do
 
     test "resist-pushback auras can fully prevent the delay" do
       resist = %Holder{
-        spell: %Spell{id: 27_827},
+        spell: %Spell{id: 900_027},
         auras: [%Aura{type: :reduce_pushback, amount: 100}]
       }
 
@@ -142,7 +152,7 @@ defmodule ThistleTea.Game.Core.Spell.CastPushbackTest do
       assert damaged.internal.casting.ends_at == 11_000
       assert effects_of(damaged, Effects.DelayAreaEffects) == []
 
-      resist = %Holder{spell: %Spell{id: 27_827}, auras: [%Aura{type: :reduce_pushback, amount: 100}]}
+      resist = %Holder{spell: %Spell{id: 900_027}, auras: [%Aura{type: :reduce_pushback, amount: 100}]}
       caster = %{caster | unit: %{caster.unit | auras: [resist]}}
       damaged = Entity.take_damage(caster, 10, 2_000, source: 99)
       assert damaged.internal.casting.ends_at == 11_000
