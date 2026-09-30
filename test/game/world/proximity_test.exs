@@ -185,6 +185,19 @@ defmodule ThistleTea.Game.World.ProximityTest do
   end
 
   describe "due/5" do
+    test "rejects a different incarnation even when the same process still owns the guid" do
+      {player, guid} = hostile_pair({8.0, 0.0, 0.0})
+      now = Time.now()
+      Metadata.update(guid, %{incarnation_id: 1})
+      announcement = %{creature_announcement(guid, {8.0, 0.0, 0.0}) | incarnation_id: 1}
+      player = Checks.schedule(player, announcement, :alert, now + 60_000, now)
+      {ref, _, _} = player.internal.proximity_checks[{guid, :alert}]
+      Metadata.update(guid, %{incarnation_id: 2})
+      {player, :ignore} = Proximity.due(player, guid, :alert, ref, now)
+      assert player.internal.proximity_checks == %{}
+      refute_received {:"$gen_cast", {:aggro_probe, _guid}}
+    end
+
     test "coalesces duplicates and rejects cancelled callbacks" do
       guid = put_player(player_guid())
       mob = mob(put_mob(mob_guid(), {0.0, 0.0, 0.0}))

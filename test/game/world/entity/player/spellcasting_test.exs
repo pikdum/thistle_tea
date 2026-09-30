@@ -85,7 +85,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellcastingTest do
       cast = Spellcasting.charm_cast(state, effect)
       assert %Cast{spell: ^spell} = cast.character.internal.casting
       assert Target.unit_guid(cast.character.internal.casting.targets) == target
-      assert_receive :player_tick
+      assert_receive {:timeout, _ref, :player_tick}
 
       ground_spell = %{
         spell
@@ -245,7 +245,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellcastingTest do
       assert Target.unit_guid(cast_state.character.internal.casting.targets) == state.guid
       assert cast_state.character.internal.spellbook == %{}
       assert is_reference(cast_state.player_tick_ref)
-      assert_receive :player_tick
+      assert_receive {:timeout, _ref, :player_tick}
     end
 
     test "preserves a busy cast unless the script interrupts it", %{state: state, spell: spell, entry: entry} do
@@ -258,7 +258,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellcastingTest do
       assert interrupted.character.internal.casting.spell == spell
       assert_received {:"$gen_cast", {:send_packet, %Message.SmsgSpellFailure{spell: old_id}}}
       assert old_id == previous.id
-      assert_receive :player_tick
+      assert_receive {:timeout, _ref, :player_tick}
     end
 
     test "retains player death and resource validation", %{state: state, spell: spell, entry: entry} do
@@ -302,7 +302,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellcastingTest do
       state = Spellcasting.complete(%{character: character, player_tick_ref: nil})
 
       assert is_reference(state.player_tick_ref)
-      assert_receive :player_tick
+      assert_receive {:timeout, _ref, :player_tick}
     end
   end
 end

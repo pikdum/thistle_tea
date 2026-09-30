@@ -15,7 +15,6 @@ defmodule ThistleTea.Game.World.Entity.Player do
   alias ThistleTea.Game.Core.AI.BT.Context.Perception.Request, as: ObservationRequest
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.Script.Request, as: ScriptRequest
-  alias ThistleTea.Game.Core.AI.Tick
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.DispelResistance
   alias ThistleTea.Game.Core.Aura.StealthDetection
@@ -1842,7 +1841,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
       {:noreply, state}
   end
 
-  def handle_info(:player_tick, %{character: %Character{}} = state) do
+  def handle_info({:timeout, ref, :player_tick}, %State{player_tick_ref: ref, character: %Character{}} = state) do
     started = System.monotonic_time()
     now = Time.now()
     state = ServerMovement.advance(state, now)
@@ -1851,17 +1850,16 @@ defmodule ThistleTea.Game.World.Entity.Player do
     character = NavigationResolver.resolve(character, now)
     character = EventSink.emit_pending(character)
     state = %{state | character: character}
-    state = schedule_player_tick(state, character, status, now)
+    state = TickScheduler.after_tick(state, status, now)
     :telemetry.execute([:thistle_tea, :player, :tick], %{duration: System.monotonic_time() - started}, %{})
     {:noreply, state, {:continue, :maybe_broadcast_update}}
   rescue
     error ->
       Logger.error("Player tick crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
-      ref = Process.send_after(self(), :player_tick, @player_tick_retry_ms)
-      {:noreply, %{state | player_tick_ref: ref}}
+      {:noreply, TickScheduler.schedule(state, @player_tick_retry_ms)}
   end
 
-  def handle_info(:player_tick, state) do
+  def handle_info({:timeout, _ref, :player_tick}, state) do
     {:noreply, state}
   end
 
@@ -2062,16 +2060,6 @@ defmodule ThistleTea.Game.World.Entity.Player do
   end
 
   defp tick_player(character, _now), do: {:running, character}
-
-  defp schedule_player_tick(state, character, status, now) do
-    if Tick.needs_tick?(character) do
-      delay_ms = Tick.player_delay(character, status, now)
-      ref = Process.send_after(self(), :player_tick, delay_ms)
-      %{state | player_tick_ref: ref}
-    else
-      %{state | player_tick_ref: nil}
-    end
-  end
 
   defp spellbook_spell(%Character{internal: %Internal{spellbook: spellbook}}, spell_id)
        when is_map(spellbook) and is_integer(spell_id) do

@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MovementTest do
   describe "publish_changes/1" do
     test "shortens an existing aura wake when movement starts a breath timer" do
       now = Time.now()
-      ref = Process.send_after(self(), :player_tick, 40_000)
+      ref = :erlang.start_timer(40_000, self(), :player_tick)
       character = character(now)
       state = Movement.publish_changes(%State{character: character, player_tick_ref: ref})
       refute state.player_tick_ref == ref
@@ -32,7 +32,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MovementTest do
       state = Movement.publish_changes(%State{character: character})
       assert state.character.internal.events == []
       assert is_reference(state.player_tick_ref)
-      assert_receive :player_tick
+      assert_receive {:timeout, _ref, :player_tick}
     end
   end
 

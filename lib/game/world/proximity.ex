@@ -323,6 +323,7 @@ defmodule ThistleTea.Game.World.Proximity do
       %Announcement{
         guid: guid,
         world: world,
+        incarnation_id: Map.get(row, :incarnation_id),
         position: {x, y, z},
         level: actor_level(Reaction.actor(Map.put(row, :guid, guid))),
         path: observed_path(guid, now),

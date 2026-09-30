@@ -7,10 +7,11 @@ defmodule ThistleTea.Game.World.Proximity.Checks do
   alias ThistleTea.Game.Core.Combat.Proximity.Announcement
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Metadata
 
   def schedule(%{internal: %Internal{} = internal} = listener, %Announcement{guid: guid} = announcement, role, at, now) do
     key = {guid, role}
-    identity = {announcement.world, Entity.pid(guid), announcement.path}
+    identity = {announcement.world, Entity.pid(guid), announcement.incarnation_id, announcement.path}
 
     case Map.get(internal.proximity_checks, key) do
       {_ref, ^identity, previous_at} when abs(previous_at - at) <= 1 ->
@@ -27,9 +28,10 @@ defmodule ThistleTea.Game.World.Proximity.Checks do
 
   def take(%{internal: %Internal{} = internal} = listener, guid, role, ref) do
     case Map.get(internal.proximity_checks, {guid, role}) do
-      {^ref, {world, pid, _path}, _at} ->
+      {^ref, {world, pid, incarnation, _path}, _at} ->
         listener = cancel(listener, guid, role)
-        current? = world == internal.world and pid == Entity.pid(guid)
+        row = Metadata.query(guid, [:incarnation_id]) || %{}
+        current? = world == internal.world and pid == Entity.pid(guid) and incarnation == Map.get(row, :incarnation_id)
         emit(if(current?, do: :fired, else: :stale))
         {listener, current?}
 

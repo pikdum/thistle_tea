@@ -48,7 +48,7 @@ defmodule ThistleTea.Game.Core.Combat.Proximity do
   defmodule Announcement do
     @moduledoc false
     @enforce_keys [:guid, :world, :position, :level]
-    defstruct [:guid, :world, :position, :level, :path, :aggressor, hidden?: false]
+    defstruct [:guid, :world, :position, :level, :path, :aggressor, :incarnation_id, hidden?: false]
   end
 
   def announcement(
@@ -66,11 +66,15 @@ defmodule ThistleTea.Game.Core.Combat.Proximity do
       level: level,
       path: path(entity, now),
       aggressor: aggressor(entity),
+      incarnation_id: incarnation(entity),
       hidden?: hidden?
     }
   end
 
   def movement_step, do: @movement_step
+
+  defp incarnation(%{internal: %Internal{spawn: %{incarnation_id: id}}}), do: id
+  defp incarnation(_entity), do: nil
 
   def path(entity, now) do
     path = walking_path(entity, now)

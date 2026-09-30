@@ -677,7 +677,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
       assert state.character.internal.blackboard.combat.next_attack_at == now + 1_200
       assert state.player_tick_ref != old_ref
       assert Process.read_timer(old_ref) == false
-      assert_receive :player_tick
+      assert_receive {:timeout, _ref, :player_tick}
     end
 
     test "ignores an attack already in flight during vanish immunity" do

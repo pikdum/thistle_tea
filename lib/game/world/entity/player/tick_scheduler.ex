@@ -1,47 +1,49 @@
 defmodule ThistleTea.Game.World.Entity.Player.TickScheduler do
   @moduledoc """
-  Schedules `:player_tick` messages on the owning player process when the tick
-  policy (`Core.AI.Tick`) says the player needs behavior-tree ticking.
+  Owns player behavior wakes. Reference-bearing messages reject cancelled
+  callbacks, and every scheduling path replaces or preserves one owner timer.
   """
   alias ThistleTea.Game.Core.AI.Tick
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Time
 
   def ensure_scheduled(%{character: %Character{} = character} = state) do
-    case Map.get(state, :player_tick_ref) do
-      ref when is_reference(ref) ->
-        ensure_deadline(state, ref, Tick.player_delay(character, :running, Time.now()))
-
-      _ ->
-        if Tick.needs_tick?(character) do
-          ref = Process.send_after(self(), :player_tick, 0)
-          %{state | player_tick_ref: ref}
-        else
-          state
-        end
+    if Tick.needs_tick?(character) do
+      case state.player_tick_ref do
+        ref when is_reference(ref) -> ensure_deadline(state, ref, Tick.player_delay(character, :running, Time.now()))
+        _ -> schedule_now(state)
+      end
+    else
+      cancel(state)
     end
   end
 
   def ensure_scheduled(state), do: state
 
-  defp ensure_deadline(state, ref, delay_ms) do
-    case Process.read_timer(ref) do
-      remaining_ms when is_integer(remaining_ms) and remaining_ms > delay_ms ->
-        Process.cancel_timer(ref)
-        %{state | player_tick_ref: Process.send_after(self(), :player_tick, delay_ms)}
-
-      _ ->
-        state
-    end
+  def after_tick(%{character: %Character{} = character} = state, status, now) do
+    if Tick.needs_tick?(character),
+      do: schedule(state, Tick.player_delay(character, status, now)),
+      else: cancel(state)
   end
 
-  def schedule_now(state) do
-    case Map.get(state, :player_tick_ref) do
-      ref when is_reference(ref) -> Process.cancel_timer(ref)
-      _ -> :ok
-    end
+  def schedule_now(state), do: schedule(state, 0)
 
-    ref = Process.send_after(self(), :player_tick, 0)
-    %{state | player_tick_ref: ref}
+  def schedule(state, delay_ms) do
+    state = cancel(state)
+    %{state | player_tick_ref: :erlang.start_timer(delay_ms, self(), :player_tick)}
+  end
+
+  def cancel(%{player_tick_ref: ref} = state) when is_reference(ref) do
+    :erlang.cancel_timer(ref)
+    %{state | player_tick_ref: nil}
+  end
+
+  def cancel(state), do: state
+
+  defp ensure_deadline(state, ref, delay_ms) do
+    case :erlang.read_timer(ref) do
+      remaining_ms when is_integer(remaining_ms) and remaining_ms > delay_ms -> schedule(state, delay_ms)
+      _ -> state
+    end
   end
 end

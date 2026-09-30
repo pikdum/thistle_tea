@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
   alias ThistleTea.Game.World.Entity.Player.Resurrection
   alias ThistleTea.Game.World.Entity.Player.ServerMovement
   alias ThistleTea.Game.World.Entity.Player.Taxi
+  alias ThistleTea.Game.World.Entity.Player.TickScheduler
   alias ThistleTea.Game.World.Entity.Player.Weather
   alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Presence
@@ -154,12 +155,8 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
   def complete_worldport(%__MODULE__{} = state), do: %{state | pending_worldport?: false}
 
   def leave_world(%__MODULE__{} = state) do
-    state = state |> clear_scripts() |> Logout.clear() |> Instances.clear() |> Resurrection.clear()
-
-    case state.player_tick_ref do
-      ref when is_reference(ref) -> Process.cancel_timer(ref)
-      _ -> :ok
-    end
+    state =
+      state |> clear_scripts() |> Logout.clear() |> Instances.clear() |> Resurrection.clear() |> TickScheduler.cancel()
 
     state =
       if state.guid && state.character do
