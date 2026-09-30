@@ -1,99 +1,153 @@
 defmodule ThistleTea.Telemetry do
-  use Boundary, deps: [ThistleTea.Game.Network]
+  @moduledoc """
+  Bounded cumulative gameplay metrics. Each duration updates one fixed-size
+  histogram atomically; reports subtract checkpoints without deleting samples.
+  Quantiles are bucket upper bounds in microseconds, rather than exact samples.
+  Runtime and owner sampling is explicit and stays out of gameplay hot loops.
+  """
+  use Boundary, deps: []
   use GenServer
 
-  alias ThistleTea.Game.Network.Opcodes
+  alias ThistleTea.Telemetry.Runtime
 
   require Logger
 
-  @telemetry_interval 30_000
+  @bounds Enum.map(0..24, &Integer.pow(2, &1)) ++ [:infinity]
+  @bucket_count length(@bounds)
+  @empty_histogram List.to_tuple([nil, 0, 0 | List.duplicate(0, @bucket_count)])
+  @events [
+    [:thistle_tea, :handle_packet, :stop],
+    [:thistle_tea, :mob, :ai_tick],
+    [:thistle_tea, :player, :tick],
+    [:thistle_tea, :mob, :wake_up],
+    [:thistle_tea, :mob, :try_sleep],
+    [:thistle_tea, :network, :send],
+    [:thistle_tea, :proximity, :check]
+  ]
 
-  def start_link(initial) do
-    GenServer.start_link(__MODULE__, initial)
+  def start_link(options), do: GenServer.start_link(__MODULE__, options, name: __MODULE__)
+
+  def checkpoint do
+    %{
+      at: System.monotonic_time(:millisecond),
+      epoch: :ets.info(__MODULE__, :owner),
+      rows: Map.new(:ets.tab2list(__MODULE__), &{elem(&1, 0), &1}),
+      runtime: Runtime.sample()
+    }
   end
 
-  def handle_event([:thistle_tea, :handle_packet, :stop], %{duration: duration}, %{opcode: opcode}, _config) do
-    :ets.insert(:telemetry, {:handle_packet, opcode, duration})
+  def report(previous \\ nil, current \\ checkpoint()) do
+    previous = if previous && previous.epoch == current.epoch, do: previous, else: %{at: nil, rows: %{}, runtime: nil}
+
+    histograms =
+      for {{:duration, name, label} = key, row} <- current.rows, do: histogram(key, row, previous.rows, name, label)
+
+    counters =
+      for {{:counter, name} = key, {_, value}} <- current.rows,
+          into: %{},
+          do: {name, value - elem(Map.get(previous.rows, key, {key, 0}), 1)}
+
+    %{
+      elapsed_ms: if(previous.at, do: current.at - previous.at),
+      durations: Enum.filter(histograms, &(&1.count > 0)),
+      counters: counters,
+      runtime: Runtime.delta(current.runtime, previous.runtime),
+      storage_rows: :ets.info(__MODULE__, :size),
+      storage_bytes: :ets.info(__MODULE__, :memory) * :erlang.system_info(:wordsize)
+    }
   end
 
-  def handle_event([:thistle_tea, :mob, :wake_up], _measurements, _metadata, _config) do
-    :ets.update_counter(:telemetry_counters, :active_mobs, 1)
+  def handle_event([:thistle_tea, :handle_packet, :stop], %{duration: duration}, %{opcode: opcode}, _config)
+      when is_integer(opcode) and opcode in 0..0xFFFF, do: duration(:packet, opcode, duration)
+
+  def handle_event([:thistle_tea, :mob, :ai_tick], %{duration: duration}, metadata, _config),
+    do: duration(:mob_tick, Map.get(metadata, :status, :unknown), duration)
+
+  def handle_event([:thistle_tea, :player, :tick], %{duration: duration}, _metadata, _config),
+    do: duration(:player_tick, :all, duration)
+
+  def handle_event([:thistle_tea, :mob, :wake_up], _measurements, _metadata, _config), do: counter(:mob_wakeups, 1)
+  def handle_event([:thistle_tea, :mob, :try_sleep], _measurements, _metadata, _config), do: counter(:mob_sleeps, 1)
+
+  def handle_event([:thistle_tea, :network, :send], measurements, %{result: :ok}, _config) do
+    counter(:wire_packets, 1)
+    counter(:wire_bytes, measurements.bytes)
+    counter(:uncompressed_bytes, measurements.uncompressed_bytes)
   end
 
-  def handle_event([:thistle_tea, :mob, :try_sleep], _measurements, _metadata, _config) do
-    :ets.update_counter(:telemetry_counters, :active_mobs, -1)
-  end
+  def handle_event([:thistle_tea, :network, :send], _measurements, _metadata, _config), do: counter(:wire_failures, 1)
 
-  def handle_event(
-        [:thistle_tea, :mob, :ai_tick],
-        %{duration: duration, next_delay_ms: next_delay_ms},
-        metadata,
-        _config
-      ) do
-    reason = Map.get(metadata, :wake_reason, :unknown)
-    :ets.insert(:telemetry, {:mob_ai_tick, reason, duration, next_delay_ms})
-  end
+  def handle_event([:thistle_tea, :proximity, :check], _measurements, %{action: action}, _config)
+      when action in [:scheduled, :cancelled, :fired, :stale, :coalesced], do: counter(action, 1)
 
   def handle_event(_event, _measurements, _metadata, _config), do: :ok
 
   @impl GenServer
-  def init(_initial) do
-    :ets.new(:telemetry, [:duplicate_bag, :named_table, :public, {:write_concurrency, :auto}])
-    :ets.new(:telemetry_counters, [:set, :named_table, :public, {:write_concurrency, :auto}])
-    :ets.insert(:telemetry_counters, {:active_mobs, 0})
-    Process.send_after(self(), :summarize_data, @telemetry_interval)
-    {:ok, %{}}
+  def init(options) do
+    :ets.new(__MODULE__, [:named_table, :public, write_concurrency: :auto])
+    :telemetry.detach(__MODULE__)
+    :ok = :telemetry.attach_many(__MODULE__, @events, &__MODULE__.handle_event/4, nil)
+    interval = Keyword.get(options, :interval, 30_000)
+    if interval, do: Process.send_after(self(), :report, interval)
+    {:ok, %{interval: interval, previous: checkpoint()}}
   end
 
   @impl GenServer
-  def handle_info(:summarize_data, state) do
-    packet_data =
-      :ets.match_object(:telemetry, {:handle_packet, :_, :_})
-      |> Enum.group_by(&elem(&1, 1), &elem(&1, 2))
-      |> Enum.map(fn {k, v} ->
-        %{
-          opcode: Opcodes.get(k),
-          max_duration: Enum.max(v) |> System.convert_time_unit(:native, :microsecond),
-          count: Enum.count(v)
-        }
-      end)
-      |> Enum.sort(&(Map.get(&1, :max_duration) > Map.get(&2, :max_duration)))
+  def handle_info(:report, state) do
+    current = checkpoint()
 
-    if not Enum.empty?(packet_data) do
-      Logger.info("Packets: #{inspect(packet_data, pretty: true)}")
+    if state.interval do
+      Logger.info("Gameplay metrics: #{inspect(report(state.previous, current))}")
+      Process.send_after(self(), :report, state.interval)
     end
 
-    mob_ai_data =
-      :ets.match_object(:telemetry, {:mob_ai_tick, :_, :_, :_})
-      |> Enum.group_by(&elem(&1, 1))
-      |> Enum.map(fn {reason, samples} ->
-        durations = Enum.map(samples, &elem(&1, 2))
-        delays = Enum.map(samples, &elem(&1, 3))
+    {:noreply, %{state | previous: current}}
+  end
 
-        %{
-          reason: reason,
-          max_duration: durations |> Enum.max() |> System.convert_time_unit(:native, :microsecond),
-          max_next_delay: Enum.max(delays),
-          count: Enum.count(samples)
-        }
-      end)
-      |> Enum.sort(&(Map.get(&1, :count) > Map.get(&2, :count)))
+  @impl GenServer
+  def terminate(_reason, _state), do: :telemetry.detach(__MODULE__)
 
-    if not Enum.empty?(mob_ai_data) do
-      Logger.info("Mob AI ticks: #{inspect(mob_ai_data, pretty: true)}")
-    end
+  defp duration(name, label, duration) do
+    label = if is_integer(label) or label in [:all, :running, :success, :failure, :unknown], do: label, else: :unknown
+    value = max(System.convert_time_unit(duration, :native, :microsecond), 0)
+    bucket = Enum.find_index(@bounds, &(&1 == :infinity or value <= &1))
+    key = {:duration, name, label}
+    initial = put_elem(@empty_histogram, 0, key)
+    :ets.update_counter(__MODULE__, key, [{2, 1}, {3, value}, {4 + bucket, 1}], initial)
+    :ok
+  end
 
-    [:mobs, :game_objects, :players]
-    |> Enum.map(fn table ->
-      {table, :ets.tab2list(table) |> Enum.count()}
+  defp counter(name, amount) do
+    key = {:counter, name}
+    :ets.update_counter(__MODULE__, key, {2, amount}, {key, 0})
+    :ok
+  end
+
+  defp histogram(key, row, previous, name, label) do
+    before = Map.get(previous, key, List.to_tuple(List.duplicate(0, tuple_size(row))))
+    values = for index <- 1..(tuple_size(row) - 1), do: elem(row, index) - elem(before, index)
+    [count, sum | buckets] = values
+
+    %{
+      name: name,
+      label: label,
+      count: count,
+      mean_us: if(count > 0, do: sum / count, else: 0),
+      p95_us_upper_bound: quantile(buckets, count, 0.95),
+      p99_us_upper_bound: quantile(buckets, count, 0.99),
+      max_us_upper_bound: quantile(buckets, count, 1.0)
+    }
+  end
+
+  defp quantile(_buckets, 0, _fraction), do: 0
+
+  defp quantile(buckets, count, fraction) do
+    target = ceil(count * fraction)
+
+    buckets
+    |> Enum.zip(@bounds)
+    |> Enum.reduce_while(0, fn {n, bound}, seen ->
+      if seen + n >= target, do: {:halt, bound}, else: {:cont, seen + n}
     end)
-    |> Enum.each(fn {table, count} ->
-      Logger.info("Active #{table}: #{count}")
-    end)
-
-    :ets.match_delete(:telemetry, {:handle_packet, :_, :_})
-    :ets.match_delete(:telemetry, {:mob_ai_tick, :_, :_, :_})
-    Process.send_after(self(), :summarize_data, @telemetry_interval)
-    {:noreply, state}
   end
 end

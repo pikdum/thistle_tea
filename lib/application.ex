@@ -302,34 +302,6 @@ defmodule ThistleTea.Application do
     ChaseWatch.init()
     SpawnPool.CellIndex.init()
 
-    :telemetry.attach(
-      "handle-packet-handler",
-      [:thistle_tea, :handle_packet, :stop],
-      &ThistleTea.Telemetry.handle_event/4,
-      nil
-    )
-
-    :telemetry.attach(
-      "mob-wake-up-handler",
-      [:thistle_tea, :mob, :wake_up],
-      &ThistleTea.Telemetry.handle_event/4,
-      nil
-    )
-
-    :telemetry.attach(
-      "mob-try-sleep-handler",
-      [:thistle_tea, :mob, :try_sleep],
-      &ThistleTea.Telemetry.handle_event/4,
-      nil
-    )
-
-    :telemetry.attach(
-      "mob-ai-tick-handler",
-      [:thistle_tea, :mob, :ai_tick],
-      &ThistleTea.Telemetry.handle_event/4,
-      nil
-    )
-
     Logger.info("Loading maps...")
     map_dir = Application.fetch_env!(:thistle_tea, :map_dir)
     Namigator.load(map_dir)

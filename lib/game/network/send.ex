@@ -20,7 +20,14 @@ defmodule ThistleTea.Game.Network.Send do
     size = byte_size(payload) + 2
     header = size_header(size) <> <<opcode::little-size(16)>>
     {:ok, conn, header} = Crypto.encrypt_header(state.conn, header)
-    Socket.send(socket, header <> payload)
+    result = Socket.send(socket, header <> payload)
+
+    :telemetry.execute(
+      [:thistle_tea, :network, :send],
+      %{bytes: byte_size(header) + byte_size(payload), uncompressed_bytes: byte_size(packet.payload)},
+      %{result: result}
+    )
+
     %{state | conn: conn}
   end
 

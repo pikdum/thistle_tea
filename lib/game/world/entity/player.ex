@@ -1843,6 +1843,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   end
 
   def handle_info(:player_tick, %{character: %Character{}} = state) do
+    started = System.monotonic_time()
     now = Time.now()
     state = ServerMovement.advance(state, now)
     character = state.character
@@ -1851,6 +1852,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
     character = EventSink.emit_pending(character)
     state = %{state | character: character}
     state = schedule_player_tick(state, character, status, now)
+    :telemetry.execute([:thistle_tea, :player, :tick], %{duration: System.monotonic_time() - started}, %{})
     {:noreply, state, {:continue, :maybe_broadcast_update}}
   rescue
     error ->

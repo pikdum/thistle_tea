@@ -14,11 +14,13 @@ defmodule ThistleTea.Game.World.Proximity.Checks do
 
     case Map.get(internal.proximity_checks, key) do
       {_ref, ^identity, previous_at} when abs(previous_at - at) <= 1 ->
+        emit(:coalesced)
         listener
 
       _ ->
         listener = cancel(listener, guid, role)
         ref = :erlang.start_timer(max(at - now, 0), self(), {:proximity_due, guid, role})
+        emit(:scheduled)
         put(listener, key, {ref, identity, at})
     end
   end
@@ -27,9 +29,12 @@ defmodule ThistleTea.Game.World.Proximity.Checks do
     case Map.get(internal.proximity_checks, {guid, role}) do
       {^ref, {world, pid, _path}, _at} ->
         listener = cancel(listener, guid, role)
-        {listener, world == internal.world and pid == Entity.pid(guid)}
+        current? = world == internal.world and pid == Entity.pid(guid)
+        emit(if(current?, do: :fired, else: :stale))
+        {listener, current?}
 
       _ ->
+        emit(:stale)
         {listener, false}
     end
   end
@@ -40,17 +45,23 @@ defmodule ThistleTea.Game.World.Proximity.Checks do
         listener
 
       {{ref, _identity, _at}, checks} ->
-        :erlang.cancel_timer(ref)
+        cancel_timer(ref)
         %{listener | internal: %{internal | proximity_checks: checks}}
     end
   end
 
   def clear(%{internal: %Internal{} = internal} = listener) do
-    Enum.each(internal.proximity_checks, fn {_key, {ref, _identity, _at}} -> :erlang.cancel_timer(ref) end)
+    Enum.each(internal.proximity_checks, fn {_key, {ref, _identity, _at}} -> cancel_timer(ref) end)
     if internal.proximity_refresh, do: :erlang.cancel_timer(elem(internal.proximity_refresh, 0))
     %{listener | internal: %{internal | proximity_checks: %{}, proximity_refresh: nil}}
   end
 
   defp put(%{internal: %Internal{} = internal} = listener, key, check),
     do: %{listener | internal: %{internal | proximity_checks: Map.put(internal.proximity_checks, key, check)}}
+
+  defp cancel_timer(ref) do
+    if :erlang.cancel_timer(ref) != false, do: emit(:cancelled)
+  end
+
+  defp emit(action), do: :telemetry.execute([:thistle_tea, :proximity, :check], %{}, %{action: action})
 end
