@@ -38,7 +38,7 @@ defmodule ThistleTea.MixProject do
       {:binary, "~> 0.0.5"},
       {:boundary, "~> 0.10", runtime: false},
       {:ecto_sqlite3, "~> 0.24"},
-      {:group, "~> 0.2"},
+      {:group, "~> 0.3"},
       {:thousand_island, "~> 1.0"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:quokka, "~> 2.11", only: [:dev, :test], runtime: false},
