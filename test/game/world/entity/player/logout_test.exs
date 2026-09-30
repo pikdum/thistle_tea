@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.Entity.Player.LogoutTest do
   alias ThistleTea.Game.Core.Player.Logout, as: LogoutCore
   alias ThistleTea.Game.Core.Player.Rest
   alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Network.ConnectionState
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.EventSink
@@ -24,7 +25,6 @@ defmodule ThistleTea.Game.World.Entity.Player.LogoutTest do
   alias ThistleTea.Game.World.Entity.Player.Logout
   alias ThistleTea.Game.World.Entity.Player.Movement
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Inbound
 
   setup [:player_state]
 
@@ -116,17 +116,17 @@ defmodule ThistleTea.Game.World.Entity.Player.LogoutTest do
   describe "request/1 and cancel/1" do
     test "late packets after the player leaves keep the character-selection connection alive" do
       connection = %ConnectionState{player_pid: nil, player_monitor: nil}
-      assert Inbound.handle(%Message.CmsgLogoutCancel{}, connection) == connection
-      assert Inbound.handle(%Message.CmsgLogoutRequest{}, connection) == connection
+      assert Inbound.handle(%Inbound.CmsgLogoutCancel{}, connection) == connection
+      assert Inbound.handle(%Inbound.CmsgLogoutRequest{}, connection) == connection
       refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgLogoutCancelAck{}}}
     end
 
     test "schedules twenty seconds and starts offline rest only on world departure", %{state: state} do
-      waiting = Inbound.handle(%Message.CmsgLogoutRequest{}, state)
+      waiting = Inbound.handle(%Inbound.CmsgLogoutRequest{}, state)
       assert Process.read_timer(waiting.logout_timer.ref) in 19_000..20_000
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgLogoutResponse{result: 0, speed: 0}}}
       assert waiting.character.internal.rest_logout_at == nil
-      cancelled = Inbound.handle(%Message.CmsgLogoutCancel{}, waiting)
+      cancelled = Inbound.handle(%Inbound.CmsgLogoutCancel{}, waiting)
       assert cancelled.logout_timer == nil
       assert cancelled.character.internal.rest_logout_at == nil
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgLogoutCancelAck{}}}

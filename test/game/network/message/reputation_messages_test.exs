@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.Network.Message.ReputationMessagesTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Network.Message.CmsgSetFactionAtwar
-  alias ThistleTea.Game.Network.Message.CmsgSetFactionInactive
-  alias ThistleTea.Game.Network.Message.CmsgSetWatchedFaction
+  alias ThistleTea.Game.Inbound.CmsgSetFactionAtwar
+  alias ThistleTea.Game.Inbound.CmsgSetFactionInactive
+  alias ThistleTea.Game.Inbound.CmsgSetWatchedFaction
   alias ThistleTea.Game.Network.Message.SmsgInitializeFactions
   alias ThistleTea.Game.Network.Message.SmsgSetFactionAtwar
   alias ThistleTea.Game.Network.Message.SmsgSetFactionStanding

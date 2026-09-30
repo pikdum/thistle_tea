@@ -12,12 +12,12 @@ defmodule ThistleTea.Game.World.Entity.Player.BattlegroundsTest do
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.Battlegrounds
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
@@ -107,7 +107,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BattlegroundsTest do
 
   defp join(state, group?) do
     flag = if group?, do: 1, else: 0
-    message = Message.CmsgBattlefieldJoin.from_binary(<<489::little-size(32), 0::little-size(32), flag>>)
+    message = Inbound.CmsgBattlefieldJoin.from_binary(<<489::little-size(32), 0::little-size(32), flag>>)
     Inbound.handle(message, state)
   end
 

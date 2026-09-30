@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.Travel.Taxi.Flight
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message.MsgMove
   alias ThistleTea.Game.Network.Message.SmsgEnvironmentalDamageLog
@@ -22,7 +23,6 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.ServerMovement
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.Position.ClientMotion

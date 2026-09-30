@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PossessionOwnerTest do
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World
@@ -31,7 +32,6 @@ defmodule ThistleTea.Game.World.Entity.Player.PossessionOwnerTest do
   alias ThistleTea.Game.World.Entity.Player.PossessionOwner
   alias ThistleTea.Game.World.Entity.Player.Spellcasting
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Presence
 
   setup [:possessed_player]
@@ -222,7 +222,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PossessionOwnerTest do
       {packet, state} = MovementControl.prepare(%Message.SmsgForceMoveRoot{guid: victim.guid}, state)
       movement = %{victim.character.movement_block | position: {100.0, 0.0, 0.0, 0.0}}
 
-      ack = %Message.CmsgForceMoveRootAck{
+      ack = %Inbound.CmsgForceMoveRootAck{
         guid: victim.guid,
         counter: packet.move_event,
         movement_payload: MovementBlock.movement_info_to_binary(movement)

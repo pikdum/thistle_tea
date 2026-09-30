@@ -13,15 +13,15 @@ defmodule ThistleTea.Game.World.Entity.Player.ProfessionsTest do
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.Professions
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -32,7 +32,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ProfessionsTest do
     test "the registered packet removes spells and tracking, frees the slot, and persists", %{state: state} do
       packet = %Packet{opcode: Opcodes.get(:CMSG_UNLEARN_SKILL), payload: <<186::little-size(32)>>}
       assert Dispatch.implemented?(packet.opcode)
-      assert %Message.CmsgUnlearnSkill{skill_id: 186} = message = Dispatch.to_message(packet)
+      assert %Inbound.CmsgUnlearnSkill{skill_id: 186} = message = Dispatch.to_message(packet)
       changed = Inbound.handle(message, state)
       refute Skills.known?(changed.character.player.skills, 186)
       assert Skills.known?(changed.character.player.skills, 182)
@@ -71,7 +71,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ProfessionsTest do
       changed = Professions.unlearn(state, 186)
       assert changed.character.internal.casting == cast
 
-      assert Inbound.handle(%Message.CmsgUnlearnSkill{skill_id: 186}, %{state | ready: false}) ==
+      assert Inbound.handle(%Inbound.CmsgUnlearnSkill{skill_id: 186}, %{state | ready: false}) ==
                %{state | ready: false}
     end
   end

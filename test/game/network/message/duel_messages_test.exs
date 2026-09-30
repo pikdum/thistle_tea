@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.Network.Message.DuelMessagesTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Network.Message.CmsgDuelAccepted
-  alias ThistleTea.Game.Network.Message.CmsgDuelCancelled
-  alias ThistleTea.Game.Network.Message.Dispatch
+  alias ThistleTea.Game.Inbound.CmsgDuelAccepted
+  alias ThistleTea.Game.Inbound.CmsgDuelCancelled
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message.SmsgDuelComplete
   alias ThistleTea.Game.Network.Message.SmsgDuelCountdown
   alias ThistleTea.Game.Network.Message.SmsgDuelInbounds

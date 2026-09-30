@@ -23,8 +23,9 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.Spell.SpellEffect
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
@@ -38,7 +39,6 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
   alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.SpiritHealer
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -238,7 +238,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
       state = Durability.lose(state, :points, 1, :mainhand)
       payload = <<vendor::little-size(64), item.object.guid::little-size(64)>>
       message = Dispatch.to_message(Packet.build(payload, 0x2A8))
-      assert %Message.CmsgRepairItem{vendor_guid: ^vendor} = message
+      assert %Inbound.CmsgRepairItem{vendor_guid: ^vendor} = message
       repaired = Inbound.handle(message, state)
       assert repaired.character.player.coinage == 990
       assert ItemStore.get(item.object.guid).item.durability == 50

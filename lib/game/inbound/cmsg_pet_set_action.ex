@@ -1,0 +1,29 @@
+defmodule ThistleTea.Game.Inbound.CmsgPetSetAction do
+  @moduledoc false
+  use ThistleTea.Game.Inbound.ClientMessage, :CMSG_PET_SET_ACTION
+
+  alias ThistleTea.Game.World.Entity.Player.PetActions
+
+  defstruct [:pet_guid, actions: []]
+
+  @impl ClientMessage
+  def from_binary(
+        <<pet_guid::little-size(64), position1::little-size(32), data1::little-size(32), position2::little-size(32),
+          data2::little-size(32)>>
+      ) do
+    %__MODULE__{pet_guid: pet_guid, actions: [action(position1, data1), action(position2, data2)]}
+  end
+
+  def from_binary(<<pet_guid::little-size(64), position::little-size(32), data::little-size(32)>>) do
+    %__MODULE__{pet_guid: pet_guid, actions: [action(position, data)]}
+  end
+
+  defp action(position, data) do
+    %{position: position, action: Bitwise.band(data, 0x00FFFFFF), action_type: Bitwise.bsr(data, 24)}
+  end
+
+  @impl ClientMessage
+  def handle(%__MODULE__{pet_guid: guid, actions: actions}, state) do
+    PetActions.controls(state, guid, {:actions, actions})
+  end
+end

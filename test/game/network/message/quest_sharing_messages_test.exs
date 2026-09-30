@@ -1,17 +1,18 @@
 defmodule ThistleTea.Game.Network.Message.QuestSharingMessagesTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
 
   describe "from_binary/1" do
     test "dispatches sharing, confirmation, and result requests" do
       cases = [
-        {:CMSG_PUSHQUESTTOPARTY, <<7::little-32>>, %Message.CmsgPushquesttoparty{quest_id: 7}},
-        {:CMSG_QUEST_CONFIRM_ACCEPT, <<7::little-32>>, %Message.CmsgQuestConfirmAccept{quest_id: 7}},
-        {:MSG_QUEST_PUSH_RESULT, <<42::little-64, 3>>, %Message.MsgQuestPushResultClient{guid: 42, result: 3}}
+        {:CMSG_PUSHQUESTTOPARTY, <<7::little-32>>, %Inbound.CmsgPushquesttoparty{quest_id: 7}},
+        {:CMSG_QUEST_CONFIRM_ACCEPT, <<7::little-32>>, %Inbound.CmsgQuestConfirmAccept{quest_id: 7}},
+        {:MSG_QUEST_PUSH_RESULT, <<42::little-64, 3>>, %Inbound.MsgQuestPushResultClient{guid: 42, result: 3}}
       ]
 
       for {opcode, payload, expected} <- cases do

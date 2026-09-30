@@ -4,8 +4,9 @@ defmodule ThistleTea.Game.Network.Message.PetitionTest do
   alias ThistleTea.Game.Core.Guild.Member
   alias ThistleTea.Game.Core.Guild.Petitions.Petition
   alias ThistleTea.Game.Core.Guild.Petitions.Signature
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
 
   describe "from_binary/1" do
@@ -24,22 +25,22 @@ defmodule ThistleTea.Game.Network.Message.PetitionTest do
 
       assert Enum.all?(opcodes, &(Opcodes.get(&1) |> Dispatch.implemented?()))
 
-      assert %Message.CmsgPetitionShowlist{npc_guid: 10} =
-               Message.CmsgPetitionShowlist.from_binary(<<10::little-size(64)>>)
+      assert %Inbound.CmsgPetitionShowlist{npc_guid: 10} =
+               Inbound.CmsgPetitionShowlist.from_binary(<<10::little-size(64)>>)
 
       buy = <<10::little-size(64), 0::little-size(32), 0::little-size(64)>> <> "Fellowship" <> <<0::size(384)>>
-      assert %Message.CmsgPetitionBuy{npc_guid: 10, name: "Fellowship"} = Message.CmsgPetitionBuy.from_binary(buy)
+      assert %Inbound.CmsgPetitionBuy{npc_guid: 10, name: "Fellowship"} = Inbound.CmsgPetitionBuy.from_binary(buy)
 
-      assert %Message.CmsgPetitionQuery{petition_id: 4, item_guid: 50} =
-               Message.CmsgPetitionQuery.from_binary(<<4::little-size(32), 50::little-size(64)>>)
+      assert %Inbound.CmsgPetitionQuery{petition_id: 4, item_guid: 50} =
+               Inbound.CmsgPetitionQuery.from_binary(<<4::little-size(32), 50::little-size(64)>>)
 
-      assert %Message.CmsgOfferPetition{item_guid: 50, target_guid: 2} =
-               Message.CmsgOfferPetition.from_binary(<<50::little-size(64), 2::little-size(64)>>)
+      assert %Inbound.CmsgOfferPetition{item_guid: 50, target_guid: 2} =
+               Inbound.CmsgOfferPetition.from_binary(<<50::little-size(64), 2::little-size(64)>>)
 
-      assert %Message.CmsgPetitionSign{item_guid: 50} = Message.CmsgPetitionSign.from_binary(<<50::little-size(64), 0>>)
+      assert %Inbound.CmsgPetitionSign{item_guid: 50} = Inbound.CmsgPetitionSign.from_binary(<<50::little-size(64), 0>>)
 
-      assert %Message.MsgPetitionRenameClient{item_guid: 50, name: "New Name"} =
-               Message.MsgPetitionRenameClient.from_binary(<<50::little-size(64)>> <> "New Name" <> <<0>>)
+      assert %Inbound.MsgPetitionRenameClient{item_guid: 50, name: "New Name"} =
+               Inbound.MsgPetitionRenameClient.from_binary(<<50::little-size(64)>> <> "New Name" <> <<0>>)
     end
   end
 

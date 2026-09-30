@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Core.Pet.PlayerPossessionTest do
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.Input
   alias ThistleTea.Game.World.Entity.Player.Movement
@@ -153,31 +154,31 @@ defmodule ThistleTea.Game.Core.Pet.PlayerPossessionTest do
 
       for message <- [
             %Message.MsgMove{},
-            %Message.CmsgAttackswing{},
-            %Message.CmsgAttackstop{},
-            %Message.CmsgCastSpell{},
-            %Message.CmsgUseItem{},
-            %Message.CmsgPetAction{},
-            %Message.CmsgSetSelection{}
+            %Inbound.CmsgAttackswing{},
+            %Inbound.CmsgAttackstop{},
+            %Inbound.CmsgCastSpell{},
+            %Inbound.CmsgUseItem{},
+            %Inbound.CmsgPetAction{},
+            %Inbound.CmsgSetSelection{}
           ] do
         refute Input.allowed?(message, state)
         assert Input.handle(message, state) == state
       end
 
       for message <- [
-            %Message.CmsgMessagechat{},
-            %Message.CmsgNameQuery{},
-            %Message.CmsgLogoutRequest{},
-            %Message.CmsgSetActiveMover{},
-            %Message.CmsgMoveNotActiveMover{},
-            %Message.CmsgForceMoveRootAck{}
+            %Inbound.CmsgMessagechat{},
+            %Inbound.CmsgNameQuery{},
+            %Inbound.CmsgLogoutRequest{},
+            %Inbound.CmsgSetActiveMover{},
+            %Inbound.CmsgMoveNotActiveMover{},
+            %Inbound.CmsgForceMoveRootAck{}
           ] do
         assert Input.allowed?(message, state)
       end
 
       refute Movement.accepts_input?(character)
       {released, _} = change(character, [], :removed)
-      assert Input.allowed?(%Message.CmsgCastSpell{}, %{character: released})
+      assert Input.allowed?(%Inbound.CmsgCastSpell{}, %{character: released})
       assert Movement.accepts_input?(released)
     end
   end

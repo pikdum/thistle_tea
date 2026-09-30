@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Network.Message.ChatMessagesTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Network.Message.CmsgMessagechat
+  alias ThistleTea.Game.Inbound.CmsgMessagechat
   alias ThistleTea.Game.Network.Message.SmsgMessagechat
   alias ThistleTea.Game.Network.Message.SmsgNotification
 

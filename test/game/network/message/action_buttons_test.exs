@@ -5,12 +5,12 @@ defmodule ThistleTea.Game.Network.Message.ActionButtonsTest do
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Spell
-  alias ThistleTea.Game.Network.Message.CmsgSetActionbarToggles
-  alias ThistleTea.Game.Network.Message.CmsgSetActionButton
-  alias ThistleTea.Game.Network.Message.Dispatch
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.CmsgSetActionbarToggles
+  alias ThistleTea.Game.Inbound.CmsgSetActionButton
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message.SmsgActionButtons
   alias ThistleTea.Game.Network.Opcodes
-  alias ThistleTea.Game.World.Inbound
 
   defp state_with_buttons(action_buttons) do
     %{

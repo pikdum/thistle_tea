@@ -1,12 +1,12 @@
 defmodule ThistleTea.Game.Network.Message.QueryTimeTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World.Entity.Registry
-  alias ThistleTea.Game.World.Inbound
 
   describe "handle/2" do
     test "answers an empty time query with current Unix seconds for the ready player" do
@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.Network.Message.QueryTimeTest do
       Registry.register(guid)
       state = %{ready: true, guid: guid}
       packet = %Packet{opcode: Opcodes.get(:CMSG_QUERY_TIME), payload: <<>>}
-      assert %Message.CmsgQueryTime{} = message = Dispatch.to_message(packet)
+      assert %Inbound.CmsgQueryTime{} = message = Dispatch.to_message(packet)
       before = System.system_time(:second)
       assert Inbound.handle(message, state) == state
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgQueryTimeResponse{time: time} = response}}

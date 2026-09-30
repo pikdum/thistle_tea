@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.Entity.Player.FirstAidTest do
   alias ThistleTea.Game.Core.Spell.TargetCodec
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Player.State
@@ -42,7 +43,7 @@ defmodule ThistleTea.Game.World.Entity.Player.FirstAidTest do
   end
 
   defp assert_rejected(state, target_guid, context) do
-    message = %Message.CmsgUseItem{
+    message = %Inbound.CmsgUseItem{
       bag: Inventory.bag_0(),
       slot: 23,
       spell_count: 1,

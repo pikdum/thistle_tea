@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MailTest do
   alias ThistleTea.Game.Core.Quest
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network.Message.CmsgSendMail
+  alias ThistleTea.Game.Inbound.CmsgSendMail
   alias ThistleTea.Game.Network.Message.SmsgSendMailResult
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player.Mail

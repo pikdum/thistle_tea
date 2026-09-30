@@ -22,7 +22,8 @@ defmodule ThistleTea.Game.World.Entity.Player.TaxiTest do
   alias ThistleTea.Game.Core.Travel.Taxi.Path
   alias ThistleTea.Game.Core.Travel.Taxi.PathNode
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network.Message.CmsgSetActiveMover
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.CmsgSetActiveMover
   alias ThistleTea.Game.Network.Message.SmsgActivatetaxireply
   alias ThistleTea.Game.Network.Message.SmsgMonsterMove
   alias ThistleTea.Game.Network.Message.SmsgNewTaxiPath
@@ -32,7 +33,6 @@ defmodule ThistleTea.Game.World.Entity.Player.TaxiTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Player.Taxi
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position

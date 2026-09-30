@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Network.Message.MailMessagesTest do
   alias ThistleTea.Game.Core.Entity.Item
   alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Mail
-  alias ThistleTea.Game.Network.Message.CmsgSendMail
+  alias ThistleTea.Game.Inbound.CmsgSendMail
   alias ThistleTea.Game.Network.Message.MsgQueryNextMailTime
   alias ThistleTea.Game.Network.Message.SmsgMailListResult
   alias ThistleTea.Game.Network.Message.SmsgSendMailResult

@@ -1,15 +1,16 @@
 defmodule ThistleTea.Game.Network.Message.TalentResetTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
 
   describe "talent reset packets" do
     test "dispatches the trainer GUID and encodes the price on the shared opcode" do
       guid = 0xF13000158B000007
 
-      assert Dispatch.to_message(Packet.build(<<guid::little-64>>, 0x2AA)) == %Message.MsgTalentWipeConfirmClient{
+      assert Dispatch.to_message(Packet.build(<<guid::little-64>>, 0x2AA)) == %Inbound.MsgTalentWipeConfirmClient{
                trainer_guid: guid
              }
 

@@ -3,45 +3,48 @@ name: client-message
 description: Implement Thistle Tea CMSG_* client messages following our architecture patterns. Use this when asked to implement a new message or you need to use one that isn't implemented yet.
 ---
 
-A client message has two halves:
+A client message is one module under `lib/game/inbound/` (`ThistleTea.Game.Inbound.CmsgFoo`) that both decodes its payload and handles the decoded struct by calling into the world.
 
-1. A pure codec under `lib/game/network/message/` that decodes the payload.
-2. A handler clause under `lib/game/world/inbound/` that routes the decoded struct into a world system.
+The inbound layer sits above the world: it may call World, Core, Network, and Auth, but nothing below it may reference an inbound module. `boundary` rejects that at compile time. World code never names a client message; the player process applies one through the `ThistleTea.Game.World.ClientInput` protocol, which the `use` macro implements.
 
-Network message modules never call into the world; `boundary` rejects it at compile time.
+## Module
 
-## Codec
+Create or modify a module under `lib/game/inbound/` that:
 
-Create/modify a module under `lib/game/network/message/` that:
-
-- `use ThistleTea.Game.Network.ClientMessage, :CMSG_FOO`
+- has `use ThistleTea.Game.Inbound.ClientMessage, :CMSG_FOO`
 - defines a `defstruct` matching the fields decoded from the payload
 - implements `from_binary/1` using little-endian bit syntax patterns like `<<x::little-size(32)>>`
+- implements `handle/2`, which pattern matches `%__MODULE__{}` and dispatches into a world system
 
-Then register the opcode in `@messages` in `lib/game/network/message/dispatch.ex` so packets decode into the struct.
+Then register the opcode in `@messages` in `lib/game/inbound/dispatch.ex` so packets decode into the struct.
 
-Minimal payload (`CMSG_PING`):
+The macro aliases `ClientMessage`, `Message` (server messages, `ThistleTea.Game.Network.Message`), `BinaryUtils`, and `MovementBlock`. Alias the world modules the handler calls yourself.
+
+Use `use ThistleTea.Game.Inbound.ClientMessage, opcode: :CMSG_FOO, while_possessed: true` only for messages a player's client must still be able to send while another unit possesses the player. These are connection, chat, logout, cache query, and movement acknowledgement traffic. Everything else is suspended during possession.
+
+A minimal payload, `CMSG_GROUP_INVITE`:
 
 ```elixir
-defmodule ThistleTea.Game.Network.Message.CmsgPing do
+defmodule ThistleTea.Game.Inbound.CmsgGroupInvite do
   @moduledoc false
-  use ThistleTea.Game.Network.ClientMessage, :CMSG_PING
+  use ThistleTea.Game.Inbound.ClientMessage, :CMSG_GROUP_INVITE
 
-  defstruct [:sequence_id, :latency]
+  alias ThistleTea.Game.World.Entity.Player.Groups
+
+  defstruct [:name]
 
   @impl ClientMessage
   def from_binary(payload) do
-    <<sequence_id::little-size(32), latency::little-size(32)>> = payload
-
-    %__MODULE__{
-      sequence_id: sequence_id,
-      latency: latency
-    }
+    {:ok, name, _rest} = BinaryUtils.parse_string(payload)
+    %__MODULE__{name: name}
   end
+
+  @impl ClientMessage
+  def handle(%__MODULE__{name: name}, state), do: Groups.invite(state, name)
 end
 ```
 
-Payload with strings (`CMSG_MESSAGECHAT`):
+A payload with strings, from `CMSG_MESSAGECHAT`:
 
 ```elixir
 def from_binary(payload) do
@@ -56,17 +59,13 @@ def from_binary(payload) do
 end
 ```
 
-## Handler
+## Handling
 
-Pick the domain module in `lib/game/world/inbound/` (guild, trade, movement, ...), add the struct to its `messages/0` list, and add a `handle/2` clause that pattern matches the struct:
-
-```elixir
-def handle(%Message.CmsgGuildQuery{guild_id: id}, state), do: Guilds.query(state, id)
-```
-
-- Keep clauses as dispatch: destructure the message and call a system module (`World.Entity.Player.*`, `World.System.*`). Game logic belongs in that system module or in `Core`, not in the inbound clause.
-- `state` is the player process state once the character is in the world. Messages that arrive before login (auth, character screen, ping) get the connection's `%ConnectionState{}` and belong in `Inbound.Session`.
-- A clause for every routed message must match its own struct in the head; never add a catch-all `handle(message, state)` clause to a domain module.
+- Keep `handle/2` as dispatch: destructure the message and call a system module (`World.Entity.Player.*`, `World.System.*`). Game logic belongs in that system module or in `Core`, not in the message module.
+- `state` is the player process state once the character is in the world. Messages that arrive before login (auth, character screen, ping) get the connection's `%ConnectionState{}`. `Inbound.Session` handles pings on the connection even after login.
+- Every clause matches `%__MODULE__{}` in its head. Guard on state (`%{ready: true}`, in-combat checks) with extra clauses, and end with a `def handle(%__MODULE__{}, state), do: state` fallback when some states should ignore the message.
+- World code never names an inbound module. Destructure a few fields in the head and pass them, or hand the whole struct to a world function that reads many of its fields (`Mail.send_mail/2`, `Auction.search/2`).
+- `MSG_MOVE_*` is the exception: `Network.Message.MsgMove` stays in Network because the world also builds and rebroadcasts it. Its `ClientInput` implementation lives in `lib/game/inbound/msg_move.ex`.
 
 ## How to find the packet spec
 

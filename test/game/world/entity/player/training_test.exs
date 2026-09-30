@@ -11,12 +11,12 @@ defmodule ThistleTea.Game.World.Entity.Player.TrainingTest do
   alias ThistleTea.Game.Core.Player.TrainerSpell
   alias ThistleTea.Game.Core.Skills
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network.Message.CmsgTrainerBuySpell
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.CmsgTrainerBuySpell
   alias ThistleTea.Game.Network.Message.SmsgTrainerList
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Player.Training
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Loader.Gossip
   alias ThistleTea.Game.World.Loader.Trainer
   alias ThistleTea.Game.World.Metadata

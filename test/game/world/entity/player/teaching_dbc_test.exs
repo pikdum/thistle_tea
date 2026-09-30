@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TeachingDbcTest do
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.Spell.SpellTeaching
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.CharacterStore
@@ -26,7 +27,6 @@ defmodule ThistleTea.Game.World.Entity.Player.TeachingDbcTest do
   alias ThistleTea.Game.World.Entity.Player.Spells
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Player.Teaching
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -173,7 +173,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TeachingDbcTest do
   end
 
   defp use_book(state) do
-    message = %Message.CmsgUseItem{bag: Inventory.bag_0(), slot: 23, spell_count: 1, targets: <<0::little-size(16)>>}
+    message = %Inbound.CmsgUseItem{bag: Inventory.bag_0(), slot: 23, spell_count: 1, targets: <<0::little-size(16)>>}
     Inbound.handle(message, state)
   end
 

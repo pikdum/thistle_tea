@@ -23,11 +23,12 @@ defmodule ThistleTea.Game.World.Entity.Player.ContainersTest do
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.Spell.TargetCodec
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.CmsgOpenItem
+  alias ThistleTea.Game.Inbound.CmsgUseItem
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.CmsgOpenItem
-  alias ThistleTea.Game.Network.Message.CmsgUseItem
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World.CharacterStore
@@ -41,7 +42,6 @@ defmodule ThistleTea.Game.World.Entity.Player.ContainersTest do
   alias ThistleTea.Game.World.Entity.Player.Looting
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Player.UsableItems
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader

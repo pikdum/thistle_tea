@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectQuestsTest do
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
@@ -31,7 +32,6 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectQuestsTest do
   alias ThistleTea.Game.World.Entity.Player.PacketSink
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
@@ -170,7 +170,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectQuestsTest do
   describe "use_object/2" do
     test "opens the native details through the game-object use codec", context do
       guid = context.object_guid
-      message = Message.CmsgGameobjUse.from_binary(<<guid::little-size(64)>>)
+      message = Inbound.CmsgGameobjUse.from_binary(<<guid::little-size(64)>>)
       assert Inbound.handle(message, context.state) == context.state
 
       assert_received {:"$gen_cast", {:send_packet, %Message.SmsgQuestgiverQuestDetails{npc_guid: ^guid, quest: quest}}}

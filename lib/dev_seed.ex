@@ -64,7 +64,6 @@ defmodule ThistleTea.DevSeed do
   alias ThistleTea.Game.Core.Skills
   alias ThistleTea.Game.Core.Spell.SpellBook
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network.Message.CmsgCharCreate
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player.Characters
@@ -171,7 +170,7 @@ defmodule ThistleTea.DevSeed do
   end
 
   defp create_character({name, race, class}, account_id) do
-    params = %CmsgCharCreate{
+    params = %{
       name: name,
       race: race,
       class: class,

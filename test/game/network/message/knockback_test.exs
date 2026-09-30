@@ -2,9 +2,10 @@ defmodule ThistleTea.Game.Network.Message.KnockbackTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World.Entity.Player.MovementControl
   alias ThistleTea.Game.World.Entity.Player.State
@@ -34,7 +35,7 @@ defmodule ThistleTea.Game.Network.Message.KnockbackTest do
     test "dispatches the native acknowledgement and consumes it once", %{state: state, movement: movement} do
       payload = MovementBlock.movement_info_to_binary(movement)
 
-      assert %Message.CmsgMoveKnockBackAck{guid: 42, counter: 0, movement_payload: ^payload} =
+      assert %Inbound.CmsgMoveKnockBackAck{guid: 42, counter: 0, movement_payload: ^payload} =
                Dispatch.to_message(Packet.build(<<42::little-size(64), 0::little-size(32), payload::binary>>, 0xF0))
 
       assert {:ok, consumed} = MovementControl.acknowledge_knockback(state, 42, 0, movement)

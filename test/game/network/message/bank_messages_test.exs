@@ -1,11 +1,11 @@
 defmodule ThistleTea.Game.Network.Message.BankMessagesTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Network.Message.CmsgAutobankItem
-  alias ThistleTea.Game.Network.Message.CmsgAutostoreBankItem
-  alias ThistleTea.Game.Network.Message.CmsgBankerActivate
-  alias ThistleTea.Game.Network.Message.CmsgBuyBankSlot
-  alias ThistleTea.Game.Network.Message.Dispatch
+  alias ThistleTea.Game.Inbound.CmsgAutobankItem
+  alias ThistleTea.Game.Inbound.CmsgAutostoreBankItem
+  alias ThistleTea.Game.Inbound.CmsgBankerActivate
+  alias ThistleTea.Game.Inbound.CmsgBuyBankSlot
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message.SmsgBuyBankSlotResult
   alias ThistleTea.Game.Network.Message.SmsgShowBank
   alias ThistleTea.Game.Network.Opcodes

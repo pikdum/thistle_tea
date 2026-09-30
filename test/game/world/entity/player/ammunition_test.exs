@@ -20,8 +20,9 @@ defmodule ThistleTea.Game.World.Entity.Player.AmmunitionTest do
   alias ThistleTea.Game.Core.Spell.Casting
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
@@ -29,7 +30,6 @@ defmodule ThistleTea.Game.World.Entity.Player.AmmunitionTest do
   alias ThistleTea.Game.World.Entity.Player.Ammunition
   alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Metadata
@@ -40,7 +40,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AmmunitionTest do
   describe "select/2" do
     test "dispatch selects ammunition, recomputes damage, and saves the choice", %{state: state, arrows: arrows} do
       message = Dispatch.to_message(Packet.build(<<arrows.object.entry::little-size(32)>>, 0x268))
-      assert %Message.CmsgSetAmmo{} = message
+      assert %Inbound.CmsgSetAmmo{} = message
       selected = Inbound.handle(message, state)
       assert selected.character.player.ammo_id == arrows.object.entry
       assert selected.character.unit.base_ranged_min_damage == 30.0

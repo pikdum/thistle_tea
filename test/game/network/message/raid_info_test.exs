@@ -1,12 +1,12 @@
 defmodule ThistleTea.Game.Network.Message.RaidInfoTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Network.Message.CmsgRequestRaidInfo
-  alias ThistleTea.Game.Network.Message.Dispatch
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.CmsgRequestRaidInfo
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message.SmsgInstanceSaveCreated
   alias ThistleTea.Game.Network.Message.SmsgRaidInstanceInfo
   alias ThistleTea.Game.Network.Opcodes
-  alias ThistleTea.Game.World.Inbound
 
   describe "CMSG_REQUEST_RAID_INFO" do
     test "dispatches the native empty request and replies with an empty list for an unsaved player" do

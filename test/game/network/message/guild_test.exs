@@ -3,8 +3,9 @@ defmodule ThistleTea.Game.Network.Message.GuildTest do
 
   alias ThistleTea.Game.Core.Guild.Group
   alias ThistleTea.Game.Core.Guild.Rank
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Message.SmsgGuildRoster.Entry
   alias ThistleTea.Game.Network.Opcodes
 
@@ -73,22 +74,22 @@ defmodule ThistleTea.Game.Network.Message.GuildTest do
     test "registers and parses core guild requests" do
       assert Dispatch.implemented?(Opcodes.get(:CMSG_GUILD_QUERY))
       assert Dispatch.implemented?(Opcodes.get(:CMSG_GUILD_CREATE))
-      assert %Message.CmsgGuildQuery{guild_id: 7} = Message.CmsgGuildQuery.from_binary(<<7::little-size(32)>>)
+      assert %Inbound.CmsgGuildQuery{guild_id: 7} = Inbound.CmsgGuildQuery.from_binary(<<7::little-size(32)>>)
 
-      assert %Message.CmsgGuildCreate{name: "Fellowship"} =
-               Message.CmsgGuildCreate.from_binary("Fellowship" <> <<0>>)
+      assert %Inbound.CmsgGuildCreate{name: "Fellowship"} =
+               Inbound.CmsgGuildCreate.from_binary("Fellowship" <> <<0>>)
 
-      assert %Message.CmsgGuildInvite{name: "Member"} = Message.CmsgGuildInvite.from_binary("Member" <> <<0>>)
-      assert %Message.CmsgGuildAccept{} = Message.CmsgGuildAccept.from_binary(<<>>)
+      assert %Inbound.CmsgGuildInvite{name: "Member"} = Inbound.CmsgGuildInvite.from_binary("Member" <> <<0>>)
+      assert %Inbound.CmsgGuildAccept{} = Inbound.CmsgGuildAccept.from_binary(<<>>)
       assert Dispatch.implemented?(Opcodes.get(:CMSG_GUILD_RANK))
       assert Dispatch.implemented?(Opcodes.get(:CMSG_GUILD_ADD_RANK))
       assert Dispatch.implemented?(Opcodes.get(:CMSG_GUILD_DEL_RANK))
 
-      assert %Message.CmsgGuildRank{rank_id: 4, rights: 0x43, name: "Initiate"} =
-               Message.CmsgGuildRank.from_binary(<<4::little-size(32), 0x43::little-size(32)>> <> "Initiate" <> <<0>>)
+      assert %Inbound.CmsgGuildRank{rank_id: 4, rights: 0x43, name: "Initiate"} =
+               Inbound.CmsgGuildRank.from_binary(<<4::little-size(32), 0x43::little-size(32)>> <> "Initiate" <> <<0>>)
 
-      assert %Message.CmsgGuildAddRank{name: "Scout"} = Message.CmsgGuildAddRank.from_binary("Scout" <> <<0>>)
-      assert %Message.CmsgGuildDelRank{} = Message.CmsgGuildDelRank.from_binary(<<>>)
+      assert %Inbound.CmsgGuildAddRank{name: "Scout"} = Inbound.CmsgGuildAddRank.from_binary("Scout" <> <<0>>)
+      assert %Inbound.CmsgGuildDelRank{} = Inbound.CmsgGuildDelRank.from_binary(<<>>)
     end
   end
 end

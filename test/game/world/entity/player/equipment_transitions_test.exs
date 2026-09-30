@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EquipmentTransitionsTest do
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Cooldowns
   alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.EventSink
@@ -23,7 +24,6 @@ defmodule ThistleTea.Game.World.Entity.Player.EquipmentTransitionsTest do
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Player.UsableItems
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -50,7 +50,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EquipmentTransitionsTest do
 
       rejected =
         use_item(
-          %Message.CmsgUseItem{bag: 255, slot: 12, targets: <<0::little-size(16)>>},
+          %Inbound.CmsgUseItem{bag: 255, slot: 12, targets: <<0::little-size(16)>>},
           equipped,
           fn ^id -> spell end
         )
@@ -94,7 +94,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EquipmentTransitionsTest do
     end
 
     test "same-slot requests leave the equip cooldown and packets untouched", %{state: state, item: item, spell: spell} do
-      message = %Message.CmsgAutoequipItemSlot{item_guid: item.object.guid, destination_slot: 13}
+      message = %Inbound.CmsgAutoequipItemSlot{item_guid: item.object.guid, destination_slot: 13}
       equipped = Inbound.handle(message, state)
       deadline = Cooldowns.ready_at(equipped.character, spell)
       assert is_integer(deadline)

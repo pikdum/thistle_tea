@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Outbound do
   @moduledoc """
   Delivers server messages to a player's connection by pid or guid, hiding the
-  cast and entity-registry plumbing from callers. `ThistleTea.Game.World.Inbound`
+  cast and entity-registry plumbing from callers. `ThistleTea.Game.Inbound`
   is the opposite direction.
   """
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry

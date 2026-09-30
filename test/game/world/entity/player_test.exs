@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.Travel.Transport
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Network.ConnectionState
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
@@ -51,7 +52,6 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
   alias ThistleTea.Game.World.Entity.Player.Stats
   alias ThistleTea.Game.World.Entity.PlayerSupervisor
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Position
@@ -97,7 +97,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
       assert {:ok, player_pid} = PlayerServer.login(account, self(), guid)
 
       connection = %ConnectionState{account: account}
-      message = %Message.CmsgPlayerLogin{character_guid: guid}
+      message = %Inbound.CmsgPlayerLogin{character_guid: guid}
 
       assert ^connection = Inbound.handle(message, connection)
 
@@ -174,7 +174,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
       assert {:ok, player_pid} = PlayerServer.login(account, self(), guid)
       monitor = Process.monitor(player_pid)
 
-      assert :ok = PlayerServer.handle_message(player_pid, %Message.CmsgLogoutRequest{})
+      assert :ok = PlayerServer.handle_message(player_pid, %Inbound.CmsgLogoutRequest{})
       assert_receive {:DOWN, ^monitor, :process, ^player_pid, {:shutdown, :logout}}, 1_500
       assert Entity.pid(guid) == nil
 

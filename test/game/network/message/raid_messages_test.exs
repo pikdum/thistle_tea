@@ -1,25 +1,26 @@
 defmodule ThistleTea.Game.Network.Message.RaidMessagesTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
 
   describe "from_binary/1" do
     test "dispatches the vanilla raid commands and optional ready-check payload" do
       cases = [
-        {:CMSG_GROUP_RAID_CONVERT, <<>>, %Message.CmsgGroupRaidConvert{}},
-        {:CMSG_GROUP_CHANGE_SUB_GROUP, <<"Café", 0, 7>>, %Message.CmsgGroupChangeSubGroup{name: "Café", subgroup: 7}},
+        {:CMSG_GROUP_RAID_CONVERT, <<>>, %Inbound.CmsgGroupRaidConvert{}},
+        {:CMSG_GROUP_CHANGE_SUB_GROUP, <<"Café", 0, 7>>, %Inbound.CmsgGroupChangeSubGroup{name: "Café", subgroup: 7}},
         {:CMSG_GROUP_SWAP_SUB_GROUP, <<"First", 0, "Second", 0>>,
-         %Message.CmsgGroupSwapSubGroup{first: "First", second: "Second"}},
+         %Inbound.CmsgGroupSwapSubGroup{first: "First", second: "Second"}},
         {:CMSG_GROUP_ASSISTANT_LEADER, <<42::little-64, 1>>,
-         %Message.CmsgGroupAssistantLeader{guid: 42, enabled?: true}},
-        {:MSG_RAID_TARGET_UPDATE, <<255>>, %Message.MsgRaidTargetUpdate{icon: 255}},
-        {:MSG_RAID_TARGET_UPDATE, <<7, 42::little-64>>, %Message.MsgRaidTargetUpdate{icon: 7, target: 42}},
-        {:MSG_RAID_READY_CHECK, <<>>, %Message.MsgRaidReadyCheck{}},
-        {:MSG_RAID_READY_CHECK, <<0>>, %Message.MsgRaidReadyCheck{ready?: false}},
-        {:MSG_RAID_READY_CHECK, <<1>>, %Message.MsgRaidReadyCheck{ready?: true}}
+         %Inbound.CmsgGroupAssistantLeader{guid: 42, enabled?: true}},
+        {:MSG_RAID_TARGET_UPDATE, <<255>>, %Inbound.MsgRaidTargetUpdate{icon: 255}},
+        {:MSG_RAID_TARGET_UPDATE, <<7, 42::little-64>>, %Inbound.MsgRaidTargetUpdate{icon: 7, target: 42}},
+        {:MSG_RAID_READY_CHECK, <<>>, %Inbound.MsgRaidReadyCheck{}},
+        {:MSG_RAID_READY_CHECK, <<0>>, %Inbound.MsgRaidReadyCheck{ready?: false}},
+        {:MSG_RAID_READY_CHECK, <<1>>, %Inbound.MsgRaidReadyCheck{ready?: true}}
       ]
 
       for {opcode, payload, expected} <- cases do

@@ -6,8 +6,9 @@ defmodule ThistleTea.Game.Network.Message.AuctionMessagesTest do
   alias ThistleTea.Game.Core.Auction.Query
   alias ThistleTea.Game.Core.Entity.Item
   alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
 
@@ -17,11 +18,11 @@ defmodule ThistleTea.Game.Network.Message.AuctionMessagesTest do
       item_guid = 0x4000_0000_0000_0011
 
       requests = [
-        {:MSG_AUCTION_HELLO, <<auctioneer::little-size(64)>>, %Message.MsgAuctionHelloClient{auctioneer: auctioneer}},
+        {:MSG_AUCTION_HELLO, <<auctioneer::little-size(64)>>, %Inbound.MsgAuctionHelloClient{auctioneer: auctioneer}},
         {:CMSG_AUCTION_SELL_ITEM,
          <<auctioneer::little-size(64), item_guid::little-size(64), 100::little-size(32), 200::little-size(32),
            120::little-size(32)>>,
-         %Message.CmsgAuctionSellItem{
+         %Inbound.CmsgAuctionSellItem{
            auctioneer: auctioneer,
            item_guid: item_guid,
            start_bid: 100,
@@ -29,11 +30,11 @@ defmodule ThistleTea.Game.Network.Message.AuctionMessagesTest do
            duration_minutes: 120
          }},
         {:CMSG_AUCTION_PLACE_BID, <<auctioneer::little-size(64), 8::little-size(32), 100::little-size(32)>>,
-         %Message.CmsgAuctionPlaceBid{auctioneer: auctioneer, auction_id: 8, price: 100}},
+         %Inbound.CmsgAuctionPlaceBid{auctioneer: auctioneer, auction_id: 8, price: 100}},
         {:CMSG_AUCTION_REMOVE_ITEM, <<auctioneer::little-size(64), 8::little-size(32)>>,
-         %Message.CmsgAuctionRemoveItem{auctioneer: auctioneer, auction_id: 8}},
+         %Inbound.CmsgAuctionRemoveItem{auctioneer: auctioneer, auction_id: 8}},
         {:CMSG_AUCTION_LIST_OWNER_ITEMS, <<auctioneer::little-size(64), 50::little-size(32)>>,
-         %Message.CmsgAuctionListOwnerItems{auctioneer: auctioneer, offset: 50}}
+         %Inbound.CmsgAuctionListOwnerItems{auctioneer: auctioneer, offset: 50}}
       ]
 
       for {opcode, payload, expected} <- requests do
@@ -47,7 +48,7 @@ defmodule ThistleTea.Game.Network.Message.AuctionMessagesTest do
           0::little-size(32), 1::little-size(32), 2::little-size(32), 1>>
 
       assert Dispatch.to_message(%Packet{opcode: Opcodes.get(:CMSG_AUCTION_LIST_ITEMS), payload: payload}) ==
-               %Message.CmsgAuctionListItems{
+               %Inbound.CmsgAuctionListItems{
                  auctioneer: 123,
                  query: %Query{
                    offset: 50,
@@ -66,13 +67,13 @@ defmodule ThistleTea.Game.Network.Message.AuctionMessagesTest do
       payload = <<123::little-size(64), 0::little-size(32), 2::little-size(32), 7::little-size(32), 9::little-size(32)>>
 
       assert Dispatch.to_message(%Packet{opcode: Opcodes.get(:CMSG_AUCTION_LIST_BIDDER_ITEMS), payload: payload}) ==
-               %Message.CmsgAuctionListBidderItems{auctioneer: 123, offset: 0, refresh_ids: [7, 9]}
+               %Inbound.CmsgAuctionListBidderItems{auctioneer: 123, offset: 0, refresh_ids: [7, 9]}
 
       assert_raise FunctionClauseError, fn ->
-        Message.CmsgAuctionListBidderItems.from_binary(binary_part(payload, 0, 20))
+        Inbound.CmsgAuctionListBidderItems.from_binary(binary_part(payload, 0, 20))
       end
 
-      assert_raise FunctionClauseError, fn -> Message.CmsgAuctionListBidderItems.from_binary(payload <> <<0>>) end
+      assert_raise FunctionClauseError, fn -> Inbound.CmsgAuctionListBidderItems.from_binary(payload <> <<0>>) end
     end
   end
 

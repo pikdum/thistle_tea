@@ -1,10 +1,10 @@
 defmodule ThistleTea.Game.Network.Message.TaxiMessagesTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Network.Message.CmsgActivatetaxi
-  alias ThistleTea.Game.Network.Message.CmsgActivatetaxiexpress
-  alias ThistleTea.Game.Network.Message.CmsgTaxinodeStatusQuery
-  alias ThistleTea.Game.Network.Message.CmsgTaxiqueryavailablenodes
+  alias ThistleTea.Game.Inbound.CmsgActivatetaxi
+  alias ThistleTea.Game.Inbound.CmsgActivatetaxiexpress
+  alias ThistleTea.Game.Inbound.CmsgTaxinodeStatusQuery
+  alias ThistleTea.Game.Inbound.CmsgTaxiqueryavailablenodes
   alias ThistleTea.Game.Network.Message.SmsgActivatetaxireply
   alias ThistleTea.Game.Network.Message.SmsgNewTaxiPath
   alias ThistleTea.Game.Network.Message.SmsgShowtaxinodes

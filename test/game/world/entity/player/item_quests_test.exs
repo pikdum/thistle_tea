@@ -14,15 +14,15 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemQuestsTest do
   alias ThistleTea.Game.Core.Quest
   alias ThistleTea.Game.Core.Quest.QuestLog
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Registry
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemQuestsTest do
   describe "cancel_dialog/1" do
     test "dispatches an empty cancel request without consuming the starter", context do
       packet = %Packet{opcode: Opcodes.get(:CMSG_QUESTGIVER_CANCEL), payload: <<>>}
-      assert %Message.CmsgQuestgiverCancel{} = message = Dispatch.to_message(packet)
+      assert %Inbound.CmsgQuestgiverCancel{} = message = Dispatch.to_message(packet)
       assert Inbound.handle(message, context.state) == context.state
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgGossipComplete{}}}
       assert ItemStore.get(context.item.object.guid) == context.item
@@ -50,7 +50,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemQuestsTest do
     test "opens an owned item's quest through the registered client codec", context do
       payload = <<context.item.object.guid::little-size(64), context.quest.id::little-size(32)>>
       packet = %Packet{opcode: Opcodes.get(:CMSG_QUESTGIVER_QUERY_QUEST), payload: payload}
-      assert %Message.CmsgQuestgiverQueryQuest{} = message = Dispatch.to_message(packet)
+      assert %Inbound.CmsgQuestgiverQueryQuest{} = message = Dispatch.to_message(packet)
       assert Inbound.handle(message, context.state) == context.state
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgQuestgiverQuestDetails{npc_guid: guid, quest: quest}}}
       assert guid == context.item.object.guid

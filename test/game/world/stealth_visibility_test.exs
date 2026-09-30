@@ -14,11 +14,11 @@ defmodule ThistleTea.Game.World.StealthVisibilityTest do
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Groups
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.Proximity
@@ -62,7 +62,7 @@ defmodule ThistleTea.Game.World.StealthVisibilityTest do
       state = %{state | character: character, tracked_entities: MapSet.new([target])}
       assert Visibility.can_see?(state, target)
 
-      state = Inbound.handle(%Message.CmsgCancelAura{spell_id: spell.id}, state)
+      state = Inbound.handle(%Inbound.CmsgCancelAura{spell_id: spell.id}, state)
       refute Visibility.tracked?(state, target)
       assert Metadata.get(state.guid).stealth_detection_bonus == 0
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{guid: ^target}, force: true}}

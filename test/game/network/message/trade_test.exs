@@ -5,8 +5,9 @@ defmodule ThistleTea.Game.Network.Message.TradeTest do
   alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.Spell.TargetCodec
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
 
   describe "trade packets" do
@@ -19,16 +20,16 @@ defmodule ThistleTea.Game.Network.Message.TradeTest do
 
     test "dispatches every vanilla client trade opcode" do
       packets = [
-        {0x116, <<123::little-64>>, %Message.CmsgInitiateTrade{player_guid: 123}},
-        {0x117, <<>>, %Message.CmsgBeginTrade{}},
-        {0x118, <<>>, %Message.CmsgBusyTrade{}},
-        {0x119, <<>>, %Message.CmsgIgnoreTrade{}},
-        {0x11A, <<1::little-32>>, %Message.CmsgAcceptTrade{unknown: 1}},
-        {0x11B, <<>>, %Message.CmsgUnacceptTrade{}},
-        {0x11C, <<>>, %Message.CmsgCancelTrade{}},
-        {0x11D, <<6, 255, 23>>, %Message.CmsgSetTradeItem{trade_slot: 6, bag: 255, slot: 23}},
-        {0x11E, <<6>>, %Message.CmsgClearTradeItem{trade_slot: 6}},
-        {0x11F, <<12_345::little-32>>, %Message.CmsgSetTradeGold{gold: 12_345}}
+        {0x116, <<123::little-64>>, %Inbound.CmsgInitiateTrade{player_guid: 123}},
+        {0x117, <<>>, %Inbound.CmsgBeginTrade{}},
+        {0x118, <<>>, %Inbound.CmsgBusyTrade{}},
+        {0x119, <<>>, %Inbound.CmsgIgnoreTrade{}},
+        {0x11A, <<1::little-32>>, %Inbound.CmsgAcceptTrade{unknown: 1}},
+        {0x11B, <<>>, %Inbound.CmsgUnacceptTrade{}},
+        {0x11C, <<>>, %Inbound.CmsgCancelTrade{}},
+        {0x11D, <<6, 255, 23>>, %Inbound.CmsgSetTradeItem{trade_slot: 6, bag: 255, slot: 23}},
+        {0x11E, <<6>>, %Inbound.CmsgClearTradeItem{trade_slot: 6}},
+        {0x11F, <<12_345::little-32>>, %Inbound.CmsgSetTradeGold{gold: 12_345}}
       ]
 
       Enum.each(packets, fn {opcode, body, expected} ->

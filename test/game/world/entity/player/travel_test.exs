@@ -1,10 +1,10 @@
 defmodule ThistleTea.Game.World.Entity.Player.TravelTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Network.Message.CmsgMoveWorldportAck
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.CmsgMoveWorldportAck
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Player.Travel
-  alias ThistleTea.Game.World.Inbound
 
   describe "worldport_ack/1" do
     test "ignores unsolicited and replayed worldport acknowledgements" do

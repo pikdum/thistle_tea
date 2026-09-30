@@ -14,11 +14,11 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.Spell.TargetCodec
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.World.Entity
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Test.PetControlOwner
@@ -47,7 +47,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
     test "dispatches to an owned creature and a possessed player" do
       guid = Guid.from_low_guid(:mob, 1, 131)
       Entity.register(guid)
-      message = Message.CmsgPetStopAttack.from_binary(<<guid::little-size(64)>>)
+      message = Inbound.CmsgPetStopAttack.from_binary(<<guid::little-size(64)>>)
       state = %{character: companion(:guardian, guid)}
       assert Inbound.handle(message, state) == state
       assert_receive {:pet_stop_attack, 7}
@@ -66,7 +66,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
     test "decodes pet aura cancellation and rejects remote possession or a different pet" do
       guid = Guid.from_low_guid(:mob, 1, 133)
       Entity.register(guid)
-      message = Message.CmsgPetCancelAura.from_binary(<<guid::little-size(64), 11_767::little-size(32)>>)
+      message = Inbound.CmsgPetCancelAura.from_binary(<<guid::little-size(64), 11_767::little-size(32)>>)
       state = %{character: companion(:guardian, guid)}
       assert Inbound.handle(message, state) == state
       assert_receive {:pet_cancel_aura, 7, 11_767}
@@ -89,7 +89,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       on_exit(fn -> Entity.unregister(guid) end)
       targets = Target.at({12.5, -8.0, 3.0})
       payload = <<guid::little-size(64), 19_717::little-size(32)>> <> TargetCodec.encode(targets)
-      message = Message.CmsgPetCastSpell.from_binary(payload)
+      message = Inbound.CmsgPetCastSpell.from_binary(payload)
       character = companion(:charm, guid)
       state = %{character: character}
 
@@ -102,7 +102,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       guid = Guid.from_low_guid(:mob, 1, 129)
       Entity.register(guid)
       on_exit(fn -> Entity.unregister(guid) end)
-      message = Message.CmsgPetCastSpell.from_binary(<<guid::little-size(64), 3110::little-size(32), 0::16>>)
+      message = Inbound.CmsgPetCastSpell.from_binary(<<guid::little-size(64), 3110::little-size(32), 0::16>>)
       state = %{character: companion(:guardian, guid)}
 
       assert Inbound.handle(message, state) == state
@@ -119,7 +119,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       Entity.register(pet_guid)
       on_exit(fn -> Entity.unregister(pet_guid) end)
 
-      message = Message.CmsgRequestPetInfo.from_binary(<<>>)
+      message = Inbound.CmsgRequestPetInfo.from_binary(<<>>)
       state = %{ready: true, character: companion(:hunter_pet, pet_guid)}
 
       assert Inbound.handle(message, state) == state
@@ -128,7 +128,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
     end
 
     test "does not start a second summon while initial restoration is pending" do
-      message = Message.CmsgRequestPetInfo.from_binary(<<>>)
+      message = Inbound.CmsgRequestPetInfo.from_binary(<<>>)
 
       character =
         %Character{unit: %Unit{health: 100}, internal: %Internal{}}
@@ -151,7 +151,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       data = 11_778 + Bitwise.bsl(0xC1, 24)
 
       message =
-        Message.CmsgPetSetAction.from_binary(<<pet_guid::little-size(64), 3::little-size(32), data::little-size(32)>>)
+        Inbound.CmsgPetSetAction.from_binary(<<pet_guid::little-size(64), 3::little-size(32), data::little-size(32)>>)
 
       state = %{character: companion(:guardian, pet_guid)}
 
@@ -165,7 +165,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       Entity.register(controlled_guid)
       on_exit(fn -> Entity.unregister(controlled_guid) end)
 
-      message = %Message.CmsgPetSetAction{
+      message = %Inbound.CmsgPetSetAction{
         pet_guid: controlled_guid,
         actions: [%{position: 3, action: 3110, action_type: 0xC1}]
       }
@@ -184,7 +184,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       guid = Guid.from_low_guid(:mob, 1, 127)
       start_supervised!({PetControlOwner, guid: guid, spells: [%Spell{id: 3110}]})
       state = %{character: companion(:guardian, guid)}
-      message = Message.CmsgPetSpellAutocast.from_binary(<<guid::little-size(64), 3110::little-size(32), 1>>)
+      message = Inbound.CmsgPetSpellAutocast.from_binary(<<guid::little-size(64), 3110::little-size(32), 1>>)
       updated = Inbound.handle(message, state)
       assert Companion.autocast(updated.character) == MapSet.new([3110])
       assert Companion.relationship(updated.character).action_bar[3] == {3110, 0xC1}
@@ -207,7 +207,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       data = 1 + Bitwise.bsl(0x07, 24)
 
       message =
-        Message.CmsgPetAction.from_binary(
+        Inbound.CmsgPetAction.from_binary(
           <<pet_guid::little-size(64), data::little-size(32), target_guid::little-size(64)>>
         )
 
@@ -222,7 +222,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       Entity.register(controlled_guid)
       on_exit(fn -> Entity.unregister(controlled_guid) end)
 
-      message = %Message.CmsgPetAction{
+      message = %Inbound.CmsgPetAction{
         pet_guid: controlled_guid,
         action: 1,
         action_type: 0x07,
@@ -240,7 +240,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       Entity.register(pet_guid)
       on_exit(fn -> Entity.unregister(pet_guid) end)
 
-      message = %Message.CmsgPetAction{pet_guid: pet_guid, action: 2, action_type: 0x07, target_guid: 0}
+      message = %Inbound.CmsgPetAction{pet_guid: pet_guid, action: 2, action_type: 0x07, target_guid: 0}
       state = %{character: companion(:guardian, pet_guid)}
 
       assert Inbound.handle(message, state) == state
@@ -259,7 +259,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
         Metadata.delete(target_guid)
       end)
 
-      message = %Message.CmsgPetAction{pet_guid: pet_guid, action: 2, action_type: 0x07, target_guid: target_guid}
+      message = %Inbound.CmsgPetAction{pet_guid: pet_guid, action: 2, action_type: 0x07, target_guid: target_guid}
       state = %{character: companion(:guardian, pet_guid)}
 
       assert Inbound.handle(message, state) == state
@@ -328,12 +328,12 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
 
   describe "pet name messages" do
     test "decodes a vanilla rename and encodes the empty invalid-name reply" do
-      assert Message.CmsgPetRename.from_binary(<<123::little-size(64), "Fang", 0>>) ==
-               %Message.CmsgPetRename{pet_guid: 123, name: "Fang"}
+      assert Inbound.CmsgPetRename.from_binary(<<123::little-size(64), "Fang", 0>>) ==
+               %Inbound.CmsgPetRename{pet_guid: 123, name: "Fang"}
 
       assert Message.SmsgPetNameInvalid.to_binary(%Message.SmsgPetNameInvalid{}) == <<>>
       assert Message.SmsgPetNameInvalid.opcode() == Opcodes.get(:SMSG_PET_NAME_INVALID)
-      assert Message.CmsgPetAbandon.from_binary(<<123::little-size(64)>>) == %Message.CmsgPetAbandon{pet_guid: 123}
+      assert Inbound.CmsgPetAbandon.from_binary(<<123::little-size(64)>>) == %Inbound.CmsgPetAbandon{pet_guid: 123}
     end
 
     test "responds with the published name timestamp and validates the pet number" do
@@ -347,7 +347,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       end)
 
       state = %{ready: true, guid: 7, character: companion(:hunter_pet, pet_guid)}
-      query = %Message.CmsgPetNameQuery{pet_number: 77, pet_guid: pet_guid}
+      query = %Inbound.CmsgPetNameQuery{pet_number: 77, pet_guid: pet_guid}
       assert Inbound.handle(query, state) == state
 
       assert_receive {:"$gen_cast",
@@ -367,7 +367,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
     end
 
     test "decodes the query and encodes the vanilla name response" do
-      query = Message.CmsgPetNameQuery.from_binary(<<77::little-size(32), 123::little-size(64)>>)
+      query = Inbound.CmsgPetNameQuery.from_binary(<<77::little-size(32), 123::little-size(64)>>)
       assert query.pet_number == 77
       assert query.pet_guid == 123
 
@@ -383,7 +383,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       on_exit(fn -> Metadata.delete(pet_guid) end)
 
       state = %{}
-      assert Inbound.handle(%Message.CmsgNameQuery{guid: pet_guid}, state) == state
+      assert Inbound.handle(%Inbound.CmsgNameQuery{guid: pet_guid}, state) == state
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgNameQueryResponse{character_name: "Voidwalker"}}}
     end
   end

@@ -15,8 +15,9 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBindTest do
   alias ThistleTea.Game.Core.Spell.SpellEffect
   alias ThistleTea.Game.Core.Travel.HomeBind, as: Home
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
@@ -24,7 +25,6 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBindTest do
   alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.Entity.Player.HomeBind
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Loader.Gossip.Option
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Metadata
@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBindTest do
   describe "confirm/2" do
     test "gossip requests confirmation without changing the home", %{state: state, guid: guid} do
       state = %{state | gossip_menu_options: [%Option{id: 2, option_id: 8}], gossip_menu_guid: guid}
-      message = %Message.CmsgGossipSelectOption{guid: guid, gossip_list_id: 2}
+      message = %Inbound.CmsgGossipSelectOption{guid: guid, gossip_list_id: 2}
       result = Inbound.handle(message, state)
 
       assert result.character == state.character
@@ -51,7 +51,7 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBindTest do
   describe "activate/2" do
     test "dispatches the client confirmation to the innkeeper's bind spell", %{state: state, guid: guid} do
       message = Dispatch.to_message(Packet.build(<<guid::little-size(64)>>, 0x1B5))
-      assert message == %Message.CmsgBinderActivate{guid: guid}
+      assert message == %Inbound.CmsgBinderActivate{guid: guid}
       assert Inbound.handle(message, state).character == state.character
       player_guid = state.guid
       assert_receive {:"$gen_cast", {:trigger_spell, 3286, ^player_guid, []}}

@@ -26,12 +26,12 @@ defmodule ThistleTea.Game.Core.Movement.ControlMovementTest do
   alias ThistleTea.Game.Core.Movement.Fear
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Network.Message.MsgMove
   alias ThistleTea.Game.World.Entity.Mob, as: MobServer
   alias ThistleTea.Game.World.Entity.NavigationResolver
   alias ThistleTea.Game.World.Entity.Player.Movement, as: PlayerMovement
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Inbound
 
   setup [:character]
 

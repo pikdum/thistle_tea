@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.World.Loader.ItemSetDbcTest do
   alias ThistleTea.Game.Core.Item.ItemSet
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.Core.WorldRef
-  alias ThistleTea.Game.Network.Message.CmsgMessagechat
+  alias ThistleTea.Game.Inbound.CmsgMessagechat
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThistleTea.Game.World.Entity.Player.Equipment

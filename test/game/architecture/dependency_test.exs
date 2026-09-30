@@ -40,7 +40,7 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
                               "lib/game/world/spatial_hash.ex"
                             ])
 
-  test "core files never reference the world, network, or seed databases" do
+  test "core files never reference outer layers or the seed databases" do
     assert core_outer_references() == MapSet.new()
   end
 
@@ -139,7 +139,7 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
           {node, acc}
       end)
 
-    Enum.filter(modules, &Regex.match?(~r/^ThistleTea\.(?:Game\.(?:Network|World)|DB)(?:\.|$)/, &1))
+    Enum.filter(modules, &Regex.match?(~r/^ThistleTea\.(?:Game\.(?:Inbound|Network|World)|DB)(?:\.|$)/, &1))
   end
 
   defp core_files, do: Path.wildcard(Path.join([@root, "lib/game/core/**/*.ex"]))
@@ -162,12 +162,11 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
       "lib/game/world/entity/player/gossip.ex",
       "lib/game/world/entity/player/gossip_condition.ex",
       "lib/game/world/entity/player/looting.ex",
-      "lib/game/world/entity/player/vendor.ex",
-      "lib/game/world/inbound/interaction.ex",
-      "lib/game/world/inbound/vendor.ex"
+      "lib/game/world/entity/player/vendor.ex"
     ]
 
     Enum.map(relative, &Path.join(@root, &1)) ++
-      Path.wildcard(Path.join([@root, "lib/game/core/condition/**/*.ex"]))
+      Path.wildcard(Path.join([@root, "lib/game/core/condition/**/*.ex"])) ++
+      Path.wildcard(Path.join([@root, "lib/game/inbound/**/*.ex"]))
   end
 end

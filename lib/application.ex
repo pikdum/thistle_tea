@@ -7,6 +7,7 @@ defmodule ThistleTea.Application do
       ThistleTea.Game.Core,
       ThistleTea.Game.Network,
       ThistleTea.Game.World,
+      ThistleTea.Game.Inbound,
       ThistleTea.DB,
       ThistleTea.Native.Namigator,
       ThistleTea.Auth,
@@ -25,6 +26,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.Core.OutdoorPvp.Plaguelands
   alias ThistleTea.Game.Core.OutdoorPvp.PlaguelandsRewards
   alias ThistleTea.Game.Core.OutdoorPvp.Towers
+  alias ThistleTea.Game.Inbound.Session
   alias ThistleTea.Game.Network.Server, as: GameServer
   alias ThistleTea.Game.Network.Sessions
   alias ThistleTea.Game.World
@@ -103,7 +105,6 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.MailStore
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.ServerVariables
-  alias ThistleTea.Game.World.Session
   alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.World.System.Auction, as: AuctionSystem
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem

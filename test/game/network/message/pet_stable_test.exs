@@ -1,21 +1,22 @@
 defmodule ThistleTea.Game.Network.Message.PetStableTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
 
   describe "stable packet dispatch" do
     test "decodes all five client operations" do
       for {opcode, module} <- [
-            {0x26F, Message.MsgListStabledPetsClient},
-            {0x270, Message.CmsgStablePet},
-            {0x272, Message.CmsgBuyStableSlot}
+            {0x26F, Inbound.MsgListStabledPetsClient},
+            {0x270, Inbound.CmsgStablePet},
+            {0x272, Inbound.CmsgBuyStableSlot}
           ] do
         assert Dispatch.to_message(Packet.build(<<123::little-64>>, opcode)) == struct!(module, guid: 123)
       end
 
-      for {opcode, module} <- [{0x271, Message.CmsgUnstablePet}, {0x275, Message.CmsgStableSwapPet}] do
+      for {opcode, module} <- [{0x271, Inbound.CmsgUnstablePet}, {0x275, Inbound.CmsgStableSwapPet}] do
         assert Dispatch.to_message(Packet.build(<<123::little-64, 456::little-32>>, opcode)) ==
                  struct!(module, guid: 123, pet_number: 456)
       end

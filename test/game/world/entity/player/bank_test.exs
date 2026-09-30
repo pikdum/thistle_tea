@@ -15,8 +15,9 @@ defmodule ThistleTea.Game.World.Entity.Player.BankTest do
   alias ThistleTea.Game.Core.Reputation.Definition
   alias ThistleTea.Game.Core.Reputation.Variant
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.CharacterStore
@@ -24,7 +25,6 @@ defmodule ThistleTea.Game.World.Entity.Player.BankTest do
   alias ThistleTea.Game.World.Entity.Player.Bank
   alias ThistleTea.Game.World.Entity.Player.Inventory, as: PlayerInventory
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
@@ -164,7 +164,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BankTest do
 
     test "decodes bag auto-storage and rejects remote bank access", %{state: state, banker_guid: banker_guid} do
       message = Dispatch.to_message(Packet.build(<<255, 39, 255>>, 0x10B))
-      assert message == %Message.CmsgAutostoreBagItem{source_bag: 255, source_slot: 39, destination_bag: 255}
+      assert message == %Inbound.CmsgAutostoreBagItem{source_bag: 255, source_slot: 39, destination_bag: 255}
       item = ItemStore.create(%ItemTemplate{entry: 20_000}, owner: state.guid)
       state = put_in(state.character.player.bank1, item.object.guid)
       rejected = Inbound.handle(message, state)

@@ -18,9 +18,9 @@ defmodule ThistleTea.Game.World.Entity.Player.TemporaryEnchantmentsTest do
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.Spell.TargetCodec
   alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Inbound.CmsgUseItem
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.CmsgUseItem
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink

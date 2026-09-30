@@ -16,8 +16,9 @@ defmodule ThistleTea.Game.World.Entity.Player.BuybackTest do
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.CharacterStore
@@ -26,7 +27,6 @@ defmodule ThistleTea.Game.World.Entity.Player.BuybackTest do
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Player.Vendor
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -62,7 +62,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BuybackTest do
 
       assert CharacterStore.get(state.guid).internal.buyback.entries[69].guid == guid
       buy = Dispatch.to_message(%Packet{opcode: 0x290, payload: <<vendor::little-size(64), 69::little-size(32)>>})
-      assert %Message.CmsgBuybackItem{vendor_guid: ^vendor, slot: 69} = buy
+      assert %Inbound.CmsgBuybackItem{vendor_guid: ^vendor, slot: 69} = buy
       restored = Inbound.handle(buy, sold)
       assert restored.character.player.coinage == 1_000
       assert restored.character.player.inv1 == guid

@@ -1,10 +1,10 @@
 defmodule ThistleTea.Game.Network.Message.EmoteMessagesTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Network.Message.CmsgEmote
-  alias ThistleTea.Game.Network.Message.CmsgStandstatechange
-  alias ThistleTea.Game.Network.Message.CmsgTextEmote
-  alias ThistleTea.Game.Network.Message.Dispatch
+  alias ThistleTea.Game.Inbound.CmsgEmote
+  alias ThistleTea.Game.Inbound.CmsgStandstatechange
+  alias ThistleTea.Game.Inbound.CmsgTextEmote
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message.SmsgEmote
   alias ThistleTea.Game.Network.Message.SmsgTextEmote
   alias ThistleTea.Game.Network.Opcodes

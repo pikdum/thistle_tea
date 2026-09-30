@@ -2,11 +2,11 @@ defmodule ThistleTea.Game.Network.Server do
   @moduledoc """
   ThousandIsland transport for a world client connection.
 
-  Decoded messages go to the `ThistleTea.Game.Network.Session` implementation
-  given in the handler options. Authentication and character-selection
-  messages run on the connection until login starts a player entity process;
-  once logged in, inbound messages are forwarded to that process and outbound
-  packets arrive here already encoded.
+  Framed packets go to the `ThistleTea.Game.Network.Session` implementation
+  given in the handler options, which decodes them and decides where each
+  message is handled: on the connection until login starts a player entity
+  process, and in that process afterwards. Outbound packets arrive here
+  already encoded.
   """
   use ThousandIsland.Handler
   use ThistleTea.Game.Network.Opcodes, [:SMSG_AUTH_CHALLENGE]
@@ -14,7 +14,6 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.Connection
   alias ThistleTea.Game.Network.ConnectionState
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.Send
@@ -34,20 +33,16 @@ defmodule ThistleTea.Game.Network.Server do
 
   def handle_packets(%{conn: %Connection{packet_queue: []}} = state), do: state
 
-  def handle_packets(%{conn: %Connection{packet_queue: [packet | rest]}} = state) do
-    message_name = Opcodes.get(packet.opcode)
-
+  def handle_packets(%{conn: %Connection{packet_queue: [packet | rest]}, session: session} = state) do
     state =
-      case Dispatch.implemented?(packet.opcode) do
-        true ->
+      case session.decode(packet) do
+        {:ok, message} ->
           :telemetry.span([:thistle_tea, :handle_packet], %{opcode: packet.opcode}, fn ->
-            message = Dispatch.to_message(packet)
-            state = dispatch_message(message, state)
-            {state, %{opcode: packet.opcode}}
+            {session.handle_message(message, state), %{opcode: packet.opcode}}
           end)
 
-        false ->
-          Logger.warning("Unimplemented: #{message_name}")
+        :error ->
+          Logger.warning("Unimplemented: #{Opcodes.get(packet.opcode)}")
           state
       end
 
@@ -120,20 +115,4 @@ defmodule ThistleTea.Game.Network.Server do
     Logger.info("CLIENT DISCONNECTED")
     :ok
   end
-
-  defp dispatch_message(%Message.CmsgPing{} = message, %ConnectionState{session: session} = state) do
-    session.handle_message(message, state)
-  end
-
-  defp dispatch_message(message, %ConnectionState{player_pid: player_pid, session: session} = state)
-       when is_pid(player_pid) do
-    :ok = session.forward(player_pid, message)
-    state
-  catch
-    :exit, {reason, {GenServer, :call, [^player_pid | _args]}}
-    when reason in [:noproc, :normal, {:shutdown, :logout}] ->
-      state
-  end
-
-  defp dispatch_message(message, %ConnectionState{session: session} = state), do: session.handle_message(message, state)
 end

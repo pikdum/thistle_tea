@@ -5,20 +5,20 @@ defmodule ThistleTea.Game.Network.Message.MovementSpeedTest do
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Object
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.Entity.Player.MovementControl
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Inbound
 
   @modes [
-    {:run_speed, Message.SmsgForceRunSpeedChange, Message.CmsgForceRunSpeedChangeAck, 0xE3},
-    {:run_back_speed, Message.SmsgForceRunBackSpeedChange, Message.CmsgForceRunBackSpeedChangeAck, 0xE5},
-    {:swim_speed, Message.SmsgForceSwimSpeedChange, Message.CmsgForceSwimSpeedChangeAck, 0xE7},
-    {:swim_back_speed, Message.SmsgForceSwimBackSpeedChange, Message.CmsgForceSwimBackSpeedChangeAck, 0x2DD}
+    {:run_speed, Message.SmsgForceRunSpeedChange, Inbound.CmsgForceRunSpeedChangeAck, 0xE3},
+    {:run_back_speed, Message.SmsgForceRunBackSpeedChange, Inbound.CmsgForceRunBackSpeedChangeAck, 0xE5},
+    {:swim_speed, Message.SmsgForceSwimSpeedChange, Inbound.CmsgForceSwimSpeedChangeAck, 0xE7},
+    {:swim_back_speed, Message.SmsgForceSwimBackSpeedChange, Inbound.CmsgForceSwimBackSpeedChangeAck, 0x2DD}
   ]
 
   describe "to_binary/1" do
@@ -135,7 +135,7 @@ defmodule ThistleTea.Game.Network.Message.MovementSpeedTest do
       state = MovementControl.defer_repop(state, {10.0, 20.0, 30.0, 1})
       token = state.pending_repop.token
       assert_receive {:"$gen_cast", {:finish_repop, ^token}}
-      message = %Message.CmsgForceSwimSpeedChangeAck{guid: 42, counter: 7, new_speed: 4.72222185}
+      message = %Inbound.CmsgForceSwimSpeedChangeAck{guid: 42, counter: 7, new_speed: 4.72222185}
       state = Inbound.handle(message, state)
       assert state.pending_movement_acks == %{}
       assert state.pending_repop == nil

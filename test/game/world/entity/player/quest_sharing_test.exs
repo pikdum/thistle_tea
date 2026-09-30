@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestSharingTest do
   alias ThistleTea.Game.Core.Quest.QuestSharing.Offer
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
@@ -26,7 +27,6 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestSharingTest do
   alias ThistleTea.Game.World.Entity.Player.QuestSharing
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Registry
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
@@ -303,7 +303,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestSharingTest do
 
       declined =
         Inbound.handle(
-          %Message.MsgQuestPushResultClient{guid: context.other.guid, result: 3},
+          %Inbound.MsgQuestPushResultClient{guid: context.other.guid, result: 3},
           state
         )
 

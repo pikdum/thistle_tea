@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AuctionTest do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Inventory.ChangeSet
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.AuctionStore
   alias ThistleTea.Game.World.CharacterStore
@@ -80,12 +81,12 @@ defmodule ThistleTea.Game.World.Entity.Player.AuctionTest do
       assert_receive {:"$gen_cast",
                       {:send_packet, %Message.SmsgAuctionCommandResult{action: :started, error: :ok, auction_id: id}}}
 
-      Auction.owned(seller, %Message.CmsgAuctionListOwnerItems{auctioneer: context.npc, offset: 0})
+      Auction.owned(seller, %Inbound.CmsgAuctionListOwnerItems{auctioneer: context.npc, offset: 0})
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgAuctionOwnerListResult{auctions: listings}}}
       assert Enum.any?(listings, &(&1.id == id))
 
       buyer =
-        Auction.bid(context.buyer, %Message.CmsgAuctionPlaceBid{auctioneer: context.npc, auction_id: id, price: 200})
+        Auction.bid(context.buyer, %Inbound.CmsgAuctionPlaceBid{auctioneer: context.npc, auction_id: id, price: 200})
 
       assert buyer.character.player.coinage == 800
       assert AuctionStore.pending(buyer.guid) == nil
@@ -203,7 +204,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AuctionTest do
   end
 
   defp sale(npc, item_guid) do
-    %Message.CmsgAuctionSellItem{
+    %Inbound.CmsgAuctionSellItem{
       auctioneer: npc,
       item_guid: item_guid,
       start_bid: 100,

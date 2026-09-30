@@ -10,15 +10,15 @@ defmodule ThistleTea.Game.World.Entity.Player.GiftsTest do
   alias ThistleTea.Game.Core.Entity.Item
   alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player.Containers
   alias ThistleTea.Game.World.Entity.Player.Gifts
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
@@ -32,7 +32,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GiftsTest do
       %{state: state, paper: paper, target: target} = context
       assert Dispatch.implemented?(0x1D3)
       message = Dispatch.to_message(%Packet{opcode: 0x1D3, payload: <<255, 23, 255, 24>>})
-      assert %Message.CmsgWrapItem{gift_bag: 255, gift_slot: 23, item_bag: 255, item_slot: 24} = message
+      assert %Inbound.CmsgWrapItem{gift_bag: 255, gift_slot: 23, item_bag: 255, item_slot: 24} = message
       wrapped_state = Inbound.handle(message, state)
       assert ItemStore.get(paper.object.guid) == nil
       wrapped = ItemStore.get(target.object.guid)
@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GiftsTest do
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{guid: destroyed}}}
       assert destroyed == paper.object.guid
       restored = %{wrapped_state | character: CharacterStore.get(state.guid)}
-      opened = Inbound.handle(%Message.CmsgOpenItem{bag: 255, slot: 24}, restored)
+      opened = Inbound.handle(%Inbound.CmsgOpenItem{bag: 255, slot: 24}, restored)
       assert ItemStore.get(target.object.guid) == target
       assert opened.loot_guid == nil
       assert opened.loot_type == nil

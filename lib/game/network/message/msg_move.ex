@@ -1,14 +1,17 @@
 defmodule ThistleTea.Game.Network.Message.MsgMove do
-  @moduledoc false
-  use ThistleTea.Game.Network.ClientMessage, :MSG_MOVE_JUMP
+  @moduledoc """
+  A movement update in both directions: decoded from any of the client's
+  MSG_MOVE_* opcodes, applied to the player, and rebroadcast to observers.
+  """
   use ThistleTea.Game.Network.Opcodes, [:MSG_MOVE_KNOCK_BACK, :MSG_MOVE_STOP, :MSG_MOVE_HEARTBEAT]
 
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
+  alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
 
   defstruct [:opcode, :payload]
 
-  @impl ClientMessage
   def from_binary(payload), do: %__MODULE__{payload: payload}
 
   def from_final_movement(payload) do

@@ -13,13 +13,13 @@ defmodule ThistleTea.Game.World.Entity.Player.KnockbackTest do
   alias ThistleTea.Game.Core.Pet.Companion.EntityRef
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.Knockback
   alias ThistleTea.Game.World.Entity.Player.MovementControl
   alias ThistleTea.Game.World.Entity.Player.State
-  alias ThistleTea.Game.World.Inbound
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
 

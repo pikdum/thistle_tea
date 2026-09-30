@@ -15,8 +15,9 @@ defmodule ThistleTea.Game.World.Entity.Player.HonorTest do
   alias ThistleTea.Game.Core.Honor.Damage
   alias ThistleTea.Game.Core.Honor.Snapshot
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World.CharacterStore
@@ -80,13 +81,13 @@ defmodule ThistleTea.Game.World.Entity.Player.HonorTest do
   describe "honor messages" do
     test "dispatches ordinary inspection and encodes its acknowledgement" do
       packet = %Packet{opcode: Opcodes.get(:CMSG_INSPECT), payload: <<7::little-size(64)>>}
-      assert %Message.CmsgInspect{guid: 7} = Dispatch.to_message(packet)
+      assert %Inbound.CmsgInspect{guid: 7} = Dispatch.to_message(packet)
       assert Message.SmsgInspect.to_binary(%Message.SmsgInspect{guid: 7}) == <<7::little-size(64)>>
     end
 
     test "dispatches inspection and encodes the build-5875 response" do
       packet = %Packet{opcode: Opcodes.get(:MSG_INSPECT_HONOR_STATS), payload: <<7::little-size(64)>>}
-      assert %Message.CmsgInspectHonorStats{guid: 7} = Dispatch.to_message(packet)
+      assert %Inbound.CmsgInspectHonorStats{guid: 7} = Dispatch.to_message(packet)
 
       player = %Player{
         highest_honor_rank: 9,

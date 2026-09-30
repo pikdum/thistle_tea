@@ -18,8 +18,9 @@ defmodule ThistleTea.Game.World.Entity.Player.MoverTest do
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
@@ -73,7 +74,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MoverTest do
           %Possession{caster_guid: other, spell_id: 605, original_faction_template: 1}
         )
 
-      assert Input.handle(%Message.CmsgSetActiveMover{guid: state.guid}, possessed) == possessed
+      assert Input.handle(%Inbound.CmsgSetActiveMover{guid: state.guid}, possessed) == possessed
     end
   end
 
@@ -134,7 +135,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MoverTest do
     test "dispatches the previous mover and movement snapshot", %{state: state} do
       payload = payload(state, 1.0)
       packet = %Packet{opcode: 0x2D1, payload: <<state.guid::little-size(64), payload::binary>>}
-      assert %Message.CmsgMoveNotActiveMover{guid: guid, movement_payload: ^payload} = Dispatch.to_message(packet)
+      assert %Inbound.CmsgMoveNotActiveMover{guid: guid, movement_payload: ^payload} = Dispatch.to_message(packet)
       assert guid == state.guid
     end
   end

@@ -2,20 +2,21 @@ defmodule ThistleTea.Game.Network.Message.SocialMessagesTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Core.Social.Friend
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
 
   describe "from_binary/1" do
     test "dispatches the vanilla social requests" do
       cases = [
-        {:CMSG_FRIEND_LIST, <<>>, %Message.CmsgFriendList{}},
-        {:CMSG_ADD_FRIEND, <<"Café", 0>>, %Message.CmsgAddFriend{name: "Café"}},
-        {:CMSG_DEL_FRIEND, <<42::little-64>>, %Message.CmsgDelFriend{guid: 42}},
-        {:CMSG_ADD_IGNORE, <<"Café", 0>>, %Message.CmsgAddIgnore{name: "Café"}},
-        {:CMSG_DEL_IGNORE, <<42::little-64>>, %Message.CmsgDelIgnore{guid: 42}},
-        {:CMSG_CHAT_IGNORED, <<42::little-64, 0>>, %Message.CmsgChatIgnored{guid: 42}}
+        {:CMSG_FRIEND_LIST, <<>>, %Inbound.CmsgFriendList{}},
+        {:CMSG_ADD_FRIEND, <<"Café", 0>>, %Inbound.CmsgAddFriend{name: "Café"}},
+        {:CMSG_DEL_FRIEND, <<42::little-64>>, %Inbound.CmsgDelFriend{guid: 42}},
+        {:CMSG_ADD_IGNORE, <<"Café", 0>>, %Inbound.CmsgAddIgnore{name: "Café"}},
+        {:CMSG_DEL_IGNORE, <<42::little-64>>, %Inbound.CmsgDelIgnore{guid: 42}},
+        {:CMSG_CHAT_IGNORED, <<42::little-64, 0>>, %Inbound.CmsgChatIgnored{guid: 42}}
       ]
 
       for {opcode, payload, expected} <- cases do

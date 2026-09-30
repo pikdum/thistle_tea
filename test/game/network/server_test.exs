@@ -1,14 +1,14 @@
 defmodule ThistleTea.Game.Network.ServerTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Inbound.CmsgQuestgiverStatusQuery
+  alias ThistleTea.Game.Inbound.Session
   alias ThistleTea.Game.Network.Connection
   alias ThistleTea.Game.Network.ConnectionState
-  alias ThistleTea.Game.Network.Message.CmsgQuestgiverStatusQuery
   alias ThistleTea.Game.Network.Message.SmsgPong
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.Server
-  alias ThistleTea.Game.World.Session
   alias ThousandIsland.Socket
   alias ThousandIsland.Telemetry
 

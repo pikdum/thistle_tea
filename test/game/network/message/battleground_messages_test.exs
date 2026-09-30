@@ -1,8 +1,9 @@
 defmodule ThistleTea.Game.Network.Message.BattlegroundMessagesTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
 
@@ -16,27 +17,27 @@ defmodule ThistleTea.Game.Network.Message.BattlegroundMessagesTest do
           payload: <<489::little-size(32), 7::little-size(32), flag>>
         }
 
-        assert %Message.CmsgBattlefieldJoin{map: 489, instance_id: 7, join_as_group: ^group?} =
+        assert %Inbound.CmsgBattlefieldJoin{map: 489, instance_id: 7, join_as_group: ^group?} =
                  Dispatch.to_message(packet)
       end
 
-      assert %Message.CmsgBattlefieldJoin{map: 489, instance_id: 0, join_as_group: false} =
-               Message.CmsgBattlefieldJoin.from_binary(<<489::little-size(32)>>)
+      assert %Inbound.CmsgBattlefieldJoin{map: 489, instance_id: 0, join_as_group: false} =
+               Inbound.CmsgBattlefieldJoin.from_binary(<<489::little-size(32)>>)
     end
 
     test "decodes battlemaster queue and port requests" do
-      assert %Message.CmsgBattlemasterJoin{
+      assert %Inbound.CmsgBattlemasterJoin{
                guid: 42,
                map: 489,
                instance_id: 7,
                join_as_group: true
              } =
-               Message.CmsgBattlemasterJoin.from_binary(
+               Inbound.CmsgBattlemasterJoin.from_binary(
                  <<42::little-size(64), 489::little-size(32), 7::little-size(32), 1>>
                )
 
-      assert %Message.CmsgBattlefieldPort{map: 489, action: 1} =
-               Message.CmsgBattlefieldPort.from_binary(<<489::little-size(32), 1>>)
+      assert %Inbound.CmsgBattlefieldPort{map: 489, action: 1} =
+               Inbound.CmsgBattlefieldPort.from_binary(<<489::little-size(32), 1>>)
     end
   end
 

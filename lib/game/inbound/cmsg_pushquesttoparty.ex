@@ -1,0 +1,14 @@
+defmodule ThistleTea.Game.Inbound.CmsgPushquesttoparty do
+  @moduledoc false
+  use ThistleTea.Game.Inbound.ClientMessage, :CMSG_PUSHQUESTTOPARTY
+
+  alias ThistleTea.Game.World.Entity.Player.QuestSharing
+
+  defstruct [:quest_id]
+
+  @impl ClientMessage
+  def from_binary(<<quest_id::little-size(32)>>), do: %__MODULE__{quest_id: quest_id}
+
+  @impl ClientMessage
+  def handle(%__MODULE__{quest_id: quest_id}, state), do: QuestSharing.share(state, quest_id)
+end

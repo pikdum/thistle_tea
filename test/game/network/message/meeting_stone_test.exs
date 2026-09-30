@@ -1,19 +1,19 @@
 defmodule ThistleTea.Game.Network.Message.MeetingStoneTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Inbound
+  alias ThistleTea.Game.Inbound.Dispatch
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
-  alias ThistleTea.Game.World.Inbound
 
   describe "to_message/1" do
     test "dispatches all three vanilla client requests" do
       guid = 0xF110_0001_0000_0002
 
       for {opcode, payload, expected} <- [
-            {0x292, <<guid::little-size(64)>>, %Message.CmsgMeetingstoneJoin{guid: guid}},
-            {0x293, <<>>, %Message.CmsgMeetingstoneLeave{}},
-            {0x296, <<>>, %Message.CmsgMeetingstoneInfo{}}
+            {0x292, <<guid::little-size(64)>>, %Inbound.CmsgMeetingstoneJoin{guid: guid}},
+            {0x293, <<>>, %Inbound.CmsgMeetingstoneLeave{}},
+            {0x296, <<>>, %Inbound.CmsgMeetingstoneInfo{}}
           ] do
         assert Dispatch.implemented?(opcode)
         assert Dispatch.to_message(%Packet{opcode: opcode, payload: payload}) == expected
