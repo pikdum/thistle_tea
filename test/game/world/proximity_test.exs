@@ -24,13 +24,23 @@ defmodule ThistleTea.Game.World.ProximityTest do
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Proximity
+  alias ThistleTea.Game.World.Proximity.Checks
   alias ThistleTea.Game.World.SpatialHash
+
+  defp hear(listener, announcement, now), do: elem(Proximity.hear(listener, announcement, now), 1)
+
+  defp due(listener, guid, role, now) do
+    announcement = %Announcement{guid: guid, world: listener.internal.world, position: {0.0, 0.0, 0.0}, level: 5}
+    listener = Checks.schedule(listener, announcement, role, now + 60_000, now)
+    {ref, _, _} = listener.internal.proximity_checks[{guid, role}]
+    elem(Proximity.due(listener, guid, role, ref, now), 1)
+  end
 
   describe "hear/3" do
     test "asks a hostile idle creature to notice a listener inside its radius" do
       {player, mob_guid} = hostile_pair({10.0, 0.0, 0.0})
 
-      assert Proximity.hear(player, creature_announcement(mob_guid, {10.0, 0.0, 0.0}), Time.now()) == :ignore
+      assert hear(player, creature_announcement(mob_guid, {10.0, 0.0, 0.0}), Time.now()) == :ignore
       assert_receive {:"$gen_cast", {:aggro_probe, guid}}
       assert guid == player.object.guid
     end
@@ -39,11 +49,11 @@ defmodule ThistleTea.Game.World.ProximityTest do
       {player, mob_guid} = hostile_pair({15.0, 0.0, 0.0})
       Metadata.update(mob_guid, %{detect_range_modifier: -10})
 
-      Proximity.hear(player, creature_announcement(mob_guid, {15.0, 0.0, 0.0}), Time.now())
+      hear(player, creature_announcement(mob_guid, {15.0, 0.0, 0.0}), Time.now())
       refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
 
       Metadata.update(mob_guid, %{detect_range_modifier: 0})
-      Proximity.hear(player, creature_announcement(mob_guid, {15.0, 0.0, 0.0}), Time.now())
+      hear(player, creature_announcement(mob_guid, {15.0, 0.0, 0.0}), Time.now())
       assert_receive {:"$gen_cast", {:aggro_probe, _guid}}
     end
 
@@ -51,11 +61,11 @@ defmodule ThistleTea.Game.World.ProximityTest do
       {player, mob_guid} = hostile_pair({10.0, 0.0, 0.0})
       Metadata.update(player.object.guid, %{unit_flags: 0x00100000})
 
-      Proximity.hear(player, creature_announcement(mob_guid, {10.0, 0.0, 0.0}), Time.now())
+      hear(player, creature_announcement(mob_guid, {10.0, 0.0, 0.0}), Time.now())
       refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
 
       Metadata.update(player.object.guid, %{unit_flags: 0})
-      Proximity.hear(player, creature_announcement(mob_guid, {10.0, 0.0, 0.0}), Time.now())
+      hear(player, creature_announcement(mob_guid, {10.0, 0.0, 0.0}), Time.now())
       assert_receive {:"$gen_cast", {:aggro_probe, _guid}}
     end
 
@@ -63,25 +73,25 @@ defmodule ThistleTea.Game.World.ProximityTest do
       {player, mob_guid} = hostile_pair({1.0, 0.0, 0.0})
       Metadata.update(player.object.guid, %{invisibility: %{0 => 200}})
 
-      Proximity.hear(player, creature_announcement(mob_guid, {1.0, 0.0, 0.0}), Time.now())
+      hear(player, creature_announcement(mob_guid, {1.0, 0.0, 0.0}), Time.now())
       refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
 
       Metadata.update(mob_guid, %{invisibility_detection: %{0 => 200}})
-      Proximity.hear(player, creature_announcement(mob_guid, {1.0, 0.0, 0.0}), Time.now())
+      hear(player, creature_announcement(mob_guid, {1.0, 0.0, 0.0}), Time.now())
       assert_receive {:"$gen_cast", {:aggro_probe, _guid}}
     end
 
     test "friendly, neutral, and forced-friendly creatures are not asked" do
       player = player(put_player(player_guid()))
       wolf = put_mob(mob_guid(), {10.0, 0.0, 0.0}, faction_template: wolf())
-      Proximity.hear(player, creature_announcement(wolf, {10.0, 0.0, 0.0}), Time.now())
+      hear(player, creature_announcement(wolf, {10.0, 0.0, 0.0}), Time.now())
       refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
 
       forced =
         player(put_player(player_guid(), reputation: %{15 => %{rank: :hostile, at_war?: true, forced_rank: :friendly}}))
 
       defias = put_mob(mob_guid(), {10.0, 0.0, 0.0})
-      Proximity.hear(forced, creature_announcement(defias, {10.0, 0.0, 0.0}), Time.now())
+      hear(forced, creature_announcement(defias, {10.0, 0.0, 0.0}), Time.now())
       refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
     end
 
@@ -89,7 +99,7 @@ defmodule ThistleTea.Game.World.ProximityTest do
       player = player(put_player(player_guid(), reputation: %{29 => %{rank: :hostile, at_war?: true}}))
       mob_guid = put_mob(mob_guid(), {10.0, 0.0, 0.0}, faction_template: wolf(), faction_can_have_reputation?: true)
 
-      Proximity.hear(player, creature_announcement(mob_guid, {10.0, 0.0, 0.0}), Time.now())
+      hear(player, creature_announcement(mob_guid, {10.0, 0.0, 0.0}), Time.now())
       assert_receive {:"$gen_cast", {:aggro_probe, _guid}}
     end
 
@@ -100,7 +110,7 @@ defmodule ThistleTea.Game.World.ProximityTest do
       dead = put_mob(mob_guid(), {10.0, 0.0, 0.0}, alive?: false)
 
       for guid <- [passive, fighting, dead] do
-        Proximity.hear(player, creature_announcement(guid, {10.0, 0.0, 0.0}), Time.now())
+        hear(player, creature_announcement(guid, {10.0, 0.0, 0.0}), Time.now())
       end
 
       refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
@@ -108,11 +118,11 @@ defmodule ThistleTea.Game.World.ProximityTest do
 
     test "listeners beyond the level-scaled radius or dead are not offered" do
       {player, mob_guid} = hostile_pair({30.0, 0.0, 0.0})
-      Proximity.hear(player, creature_announcement(mob_guid, {30.0, 0.0, 0.0}), Time.now())
+      hear(player, creature_announcement(mob_guid, {30.0, 0.0, 0.0}), Time.now())
       refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
 
       ghost = player(put_player(player_guid(), alive?: false))
-      Proximity.hear(ghost, creature_announcement(mob_guid, {10.0, 0.0, 0.0}), Time.now())
+      hear(ghost, creature_announcement(mob_guid, {10.0, 0.0, 0.0}), Time.now())
       refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
     end
 
@@ -120,15 +130,15 @@ defmodule ThistleTea.Game.World.ProximityTest do
       stealthed = player(put_player(player_guid(), stealthed?: true, stealth_skill: 25))
       mob_guid = put_mob(mob_guid(), {5.0, 0.0, 0.0})
 
-      Proximity.hear(stealthed, creature_announcement(mob_guid, {5.0, 0.0, 0.0}), Time.now())
+      hear(stealthed, creature_announcement(mob_guid, {5.0, 0.0, 0.0}), Time.now())
       refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
 
       Metadata.update(mob_guid, %{stealth_detection_bonus: 30})
-      Proximity.hear(stealthed, creature_announcement(mob_guid, {5.0, 0.0, 0.0}), Time.now())
+      hear(stealthed, creature_announcement(mob_guid, {5.0, 0.0, 0.0}), Time.now())
       assert_receive {:"$gen_cast", {:aggro_probe, _guid}}
 
       vanished = player(put_player(player_guid(), undetectable_until: Time.now() + 1_000))
-      Proximity.hear(vanished, creature_announcement(mob_guid, {0.5, 0.0, 0.0}), Time.now())
+      hear(vanished, creature_announcement(mob_guid, {0.5, 0.0, 0.0}), Time.now())
       refute_receive {:"$gen_cast", {:aggro_probe, _guid}}
     end
 
@@ -136,15 +146,15 @@ defmodule ThistleTea.Game.World.ProximityTest do
       player_guid = put_player(player_guid())
       mob = mob(put_mob(mob_guid(), {0.0, 0.0, 0.0}))
 
-      assert Proximity.hear(mob, player_announcement(player_guid, {10.0, 0.0, 0.0}), Time.now()) == :notice
-      assert Proximity.hear(mob, player_announcement(player_guid, {30.0, 0.0, 0.0}), Time.now()) == :ignore
+      assert hear(mob, player_announcement(player_guid, {10.0, 0.0, 0.0}), Time.now()) == :notice
+      assert hear(mob, player_announcement(player_guid, {30.0, 0.0, 0.0}), Time.now()) == :ignore
 
       wolf = mob(put_mob(mob_guid(), {0.0, 0.0, 0.0}, faction_template: wolf()))
-      assert Proximity.hear(wolf, player_announcement(player_guid, {10.0, 0.0, 0.0}), Time.now()) == :ignore
+      assert hear(wolf, player_announcement(player_guid, {10.0, 0.0, 0.0}), Time.now()) == :ignore
 
       fighting = %{mob | internal: %{mob.internal | in_combat: true}}
-      assert Proximity.hear(fighting, player_announcement(player_guid, {10.0, 0.0, 0.0}), Time.now()) == :ignore
-      assert Proximity.hear(mob, creature_announcement(mob.object.guid, {0.0, 0.0, 0.0}), Time.now()) == :ignore
+      assert hear(fighting, player_announcement(player_guid, {10.0, 0.0, 0.0}), Time.now()) == :ignore
+      assert hear(mob, creature_announcement(mob.object.guid, {0.0, 0.0, 0.0}), Time.now()) == :ignore
     end
 
     test "a creature with an out-of-combat sight event wakes for announcers in range" do
@@ -154,11 +164,11 @@ defmodule ThistleTea.Game.World.ProximityTest do
       creature = %{greeter.internal.creature | ai_events: [sight]}
       greeter = %{greeter | internal: %{greeter.internal | creature: creature}}
 
-      assert Proximity.hear(greeter, player_announcement(player_guid, {10.0, 0.0, 0.0}), Time.now()) == :sight
-      assert Proximity.hear(greeter, player_announcement(player_guid, {30.0, 0.0, 0.0}), Time.now()) == :ignore
+      assert hear(greeter, player_announcement(player_guid, {10.0, 0.0, 0.0}), Time.now()) == :sight
+      assert hear(greeter, player_announcement(player_guid, {30.0, 0.0, 0.0}), Time.now()) == :ignore
 
       fighting = %{greeter | internal: %{greeter.internal | in_combat: true}}
-      assert Proximity.hear(fighting, player_announcement(player_guid, {10.0, 0.0, 0.0}), Time.now()) == :ignore
+      assert hear(fighting, player_announcement(player_guid, {10.0, 0.0, 0.0}), Time.now()) == :ignore
     end
 
     test "a walking announcer schedules one check for the moment of contact" do
@@ -168,28 +178,68 @@ defmodule ThistleTea.Game.World.ProximityTest do
       path = %Path{origin: {100.0, 0.0, 0.0}, nodes: [{0.0, 0.0, 0.0}], started_at: now, duration_ms: 1_000}
       announcement = %{player_announcement(player_guid, {100.0, 0.0, 0.0}) | path: path}
 
-      assert Proximity.hear(mob, announcement, now) == :ignore
-      refute_received {:proximity_due, _guid, _role}
-      assert_receive {:proximity_due, ^player_guid, :notice}, 1_000
+      assert hear(mob, announcement, now) == :ignore
+      refute_received {:timeout, _ref, {:proximity_due, _guid, _role}}
+      assert_receive {:timeout, _ref, {:proximity_due, ^player_guid, :notice}}, 1_000
     end
   end
 
-  describe "due/4" do
+  describe "due/5" do
+    test "coalesces duplicates and rejects cancelled callbacks" do
+      guid = put_player(player_guid())
+      mob = mob(put_mob(mob_guid(), {0.0, 0.0, 0.0}))
+      now = Time.now()
+      path = %Path{origin: {100.0, 0.0, 0.0}, nodes: [{0.0, 0.0, 0.0}], started_at: now, duration_ms: 60_000}
+      announcement = %{player_announcement(guid, path.origin) | path: path}
+      {mob, :ignore} = Proximity.hear(mob, announcement, now)
+      checks = mob.internal.proximity_checks
+
+      mob = Enum.reduce(1..100, mob, fn _, mob -> elem(Proximity.hear(mob, announcement, now), 0) end)
+      assert mob.internal.proximity_checks == checks
+      assert map_size(checks) == 1
+      {old_ref, _, _} = checks[{guid, :notice}]
+
+      changed = %{announcement | path: %{path | duration_ms: 30_000}}
+      {mob, :ignore} = Proximity.hear(mob, changed, now)
+      {new_ref, _, _} = mob.internal.proximity_checks[{guid, :notice}]
+      assert new_ref != old_ref
+      assert :erlang.read_timer(old_ref) == false
+      assert Proximity.due(mob, guid, :notice, old_ref, now) == {mob, :ignore}
+
+      {mob, :notice} = Proximity.hear(mob, player_announcement(guid, {8.0, 0.0, 0.0}), now)
+      assert mob.internal.proximity_checks == %{}
+      assert :erlang.read_timer(new_ref) == false
+      assert Proximity.due(mob, guid, :notice, new_ref, now) == {mob, :ignore}
+    end
+
+    test "leaving cancels contact and hidden refresh timers" do
+      guid = put_player(player_guid())
+      mob = mob(put_mob(mob_guid(), {0.0, 0.0, 0.0})) |> join()
+      now = Time.now()
+      path = %Path{origin: {100.0, 0.0, 0.0}, nodes: [{0.0, 0.0, 0.0}], started_at: now, duration_ms: 60_000}
+      {mob, :ignore} = Proximity.hear(mob, %{player_announcement(guid, path.origin) | path: path}, now)
+      {ref, _, _} = mob.internal.proximity_checks[{guid, :notice}]
+      left = Proximity.leave(mob, mob.internal.visibility_cell)
+      assert left.internal.proximity_checks == %{}
+      assert :erlang.read_timer(ref) == false
+      assert Proximity.due(left, guid, :notice, ref, now) == {left, :ignore}
+    end
+
     test "rechecks the authoritative position before noticing" do
       player_guid = put_player(player_guid())
       mob = mob(put_mob(mob_guid(), {0.0, 0.0, 0.0}))
 
       SpatialHash.update(:players, player_guid, WorldRef.open(0), 40.0, 0.0, 0.0)
-      assert Proximity.due(mob, player_guid, :notice, Time.now()) == :ignore
+      assert due(mob, player_guid, :notice, Time.now()) == :ignore
 
       SpatialHash.update(:players, player_guid, WorldRef.open(0), 8.0, 0.0, 0.0)
-      assert Proximity.due(mob, player_guid, :notice, Time.now()) == :notice
+      assert due(mob, player_guid, :notice, Time.now()) == :notice
     end
 
     test "asks the creature to notice a listener it has reached" do
       {player, mob_guid} = hostile_pair({8.0, 0.0, 0.0})
 
-      assert Proximity.due(player, mob_guid, :alert, Time.now()) == :ignore
+      assert due(player, mob_guid, :alert, Time.now()) == :ignore
       assert_receive {:"$gen_cast", {:aggro_probe, guid}}
       assert guid == player.object.guid
     end
@@ -354,7 +404,7 @@ defmodule ThistleTea.Game.World.ProximityTest do
     {player(put_player(player_guid())), put_mob(mob_guid(), mob_position)}
   end
 
-  defp join(%Character{internal: internal} = character) do
+  defp join(%{internal: %Internal{} = internal} = character) do
     cell = SpatialGrid.cell(internal.world, 0.0, 0.0, 0.0)
     Proximity.join(%{character | internal: %{internal | visibility_cell: cell}}, cell)
   end

@@ -1102,17 +1102,17 @@ defmodule ThistleTea.Game.World.Entity.Player do
   end
 
   def handle_info({:proximity, %Announcement{} = announcement}, %State{character: %Character{} = character} = state) do
-    Proximity.hear(character, announcement, Time.now())
-    {:noreply, Visibility.hear(state, announcement)}
+    {character, _result} = Proximity.hear(character, announcement, Time.now())
+    {:noreply, Visibility.hear(%{state | character: character}, announcement)}
   rescue
     error ->
       Logger.error("Proximity announcement failed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, state}
   end
 
-  def handle_info({:proximity_due, guid, role}, %State{character: %Character{} = character} = state) do
-    Proximity.due(character, guid, role, Time.now())
-    {:noreply, state}
+  def handle_info({:timeout, ref, {:proximity_due, guid, role}}, %State{character: %Character{} = character} = state) do
+    {character, _result} = Proximity.due(character, guid, role, ref, Time.now())
+    {:noreply, %{state | character: character}}
   rescue
     error ->
       Logger.error("Proximity check failed: #{Exception.format(:error, error, __STACKTRACE__)}")
@@ -1128,7 +1128,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   end
 
   def handle_info({:proximity, _announcement}, state), do: {:noreply, state}
-  def handle_info({:proximity_due, _guid, _role}, state), do: {:noreply, state}
+  def handle_info({:timeout, _ref, {:proximity_due, _guid, _role}}, state), do: {:noreply, state}
   def handle_info({:timeout, _ref, :proximity_refresh}, state), do: {:noreply, state}
 
   def handle_info({:transport_lost, transport_guid}, %State{character: %Character{} = character} = state) do

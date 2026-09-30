@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.World.Proximity do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.Position.Spline
+  alias ThistleTea.Game.World.Proximity.Checks
   alias ThistleTea.Game.World.Reaction
 
   @group Groups
@@ -98,9 +99,13 @@ defmodule ThistleTea.Game.World.Proximity do
 
   def join(entity, _cell), do: entity
 
-  def leave(%{internal: %Internal{} = internal} = entity, cell) when unit?(entity) do
+  def leave(%{internal: %Internal{}} = entity, cell) when unit?(entity) do
     Group.leave(@group, key(cell))
-    list_hidden(%{entity | internal: %{internal | proximity: nil}}, false, cell)
+
+    entity
+    |> Checks.clear()
+    |> then(&%{&1 | internal: %{&1.internal | proximity: nil}})
+    |> list_hidden(false, cell)
   end
 
   def leave(entity, cell) when stealthed_trap?(entity) do
@@ -142,6 +147,7 @@ defmodule ThistleTea.Game.World.Proximity do
         hidden? = Map.get(facts, :stealthed?) == true
         current = {world, motion(entity, {x, y, z}, now), facts, ProximityCore.aggressor(entity)}
         entity = list_hidden(entity, hidden?, cell)
+        entity = if Map.get(facts, :alive?) == false, do: Checks.clear(entity), else: entity
 
         if forced? or changed?(internal.proximity, current),
           do: publish(entity, current, {x, y, z}, hidden? or forced?, now),
@@ -200,7 +206,7 @@ defmodule ThistleTea.Game.World.Proximity do
     %{entity | internal: %{internal | hidden_cell: if(hidden?, do: cell)}}
   end
 
-  def hear(%{object: %{guid: guid}}, %Announcement{guid: guid}, _now), do: :ignore
+  def hear(%{object: %{guid: guid}} = listener, %Announcement{guid: guid}, _now), do: {listener, :ignore}
 
   def hear(
         %{internal: %Internal{world: world}} = listener,
@@ -212,82 +218,86 @@ defmodule ThistleTea.Game.World.Proximity do
 
     with true <- not is_nil(announcer) or not is_nil(aggressor) or sight_range > 0,
          {^world, x, y, z} <- World.position(listener, now) do
-      alert(listener, announcement, {x, y, z}, now)
+      {listener, _result} = alert(listener, announcement, {x, y, z}, now)
 
       case notice(listener, aggressor, announcement, {x, y, z}, now) do
-        :notice -> :notice
-        :ignore -> sight(sight_range, announcement, {x, y, z}, now)
+        {listener, :notice} -> {Checks.cancel(listener, announcement.guid, :sight), :notice}
+        {listener, :ignore} -> sight(listener, sight_range, announcement, {x, y, z}, now)
       end
     else
-      _ -> :ignore
+      _ -> {listener, :ignore}
     end
   end
 
-  def hear(_listener, _announcement, _now), do: :ignore
+  def hear(listener, _announcement, _now), do: {listener, :ignore}
 
-  def due(%{internal: %Internal{world: world}} = listener, guid, role, now) when is_integer(guid) do
-    with {^world, x, y, z} <- World.position(listener, now),
+  def due(%{internal: %Internal{world: world}} = listener, guid, role, ref, now) when is_integer(guid) do
+    {listener, current?} = Checks.take(listener, guid, role, ref)
+
+    with true <- current?,
+         {^world, x, y, z} <- World.position(listener, now),
          %Announcement{} = observed <- observed(guid, world, now) do
       case role do
         :alert ->
           alert(listener, observed, {x, y, z}, now)
-          :ignore
 
         :notice ->
           notice(listener, ProximityCore.aggressor(listener), observed, {x, y, z}, now)
 
         :sight ->
-          sight(sight_range(listener, now), observed, {x, y, z}, now)
+          sight(listener, sight_range(listener, now), observed, {x, y, z}, now)
       end
     else
-      _ -> :ignore
+      _ -> {listener, :ignore}
     end
   end
 
-  def due(_listener, _guid, _role, _now), do: :ignore
+  def due(listener, _guid, _role, _ref, _now), do: {listener, :ignore}
 
   defp alert(listener, %Announcement{aggressor: %Aggressor{} = aggressor} = announcement, center, now) do
     radius = ProximityCore.radius(aggressor, aggro_level(listener))
 
-    react(announcement, center, radius, :alert, now, fn distance ->
+    react(listener, announcement, center, radius, :alert, now, fn distance ->
       target = listener.object.guid
       if engages?(announcement.guid, target, distance, now), do: Entity.aggro_probe(announcement.guid, target)
+      :ignore
     end)
   end
 
-  defp alert(_listener, _announcement, _center, _now), do: :ignore
+  defp alert(listener, announcement, _center, _now), do: {Checks.cancel(listener, announcement.guid, :alert), :ignore}
 
   defp notice(listener, %Aggressor{} = aggressor, %Announcement{} = announcement, center, now) do
     radius = ProximityCore.radius(aggressor, announcement.level)
 
-    react(announcement, center, radius, :notice, now, fn distance ->
+    react(listener, announcement, center, radius, :notice, now, fn distance ->
       if engages?(listener.object.guid, announcement.guid, distance, now), do: :notice, else: :ignore
     end)
   end
 
-  defp notice(_listener, _aggressor, _announcement, _center, _now), do: :ignore
+  defp notice(listener, _aggressor, announcement, _center, _now),
+    do: {Checks.cancel(listener, announcement.guid, :notice), :ignore}
 
-  defp sight(range, %Announcement{} = announcement, center, now) when range > 0,
-    do: react(announcement, center, range, :sight, now, fn _distance -> :sight end)
+  defp sight(listener, range, %Announcement{} = announcement, center, now) when range > 0,
+    do: react(listener, announcement, center, range, :sight, now, fn _distance -> :sight end)
 
-  defp sight(_range, _announcement, _center, _now), do: :ignore
+  defp sight(listener, _range, announcement, _center, _now),
+    do: {Checks.cancel(listener, announcement.guid, :sight), :ignore}
 
   defp sight_range(%Mob{internal: %Internal{blackboard: blackboard}} = mob, now),
     do: EventAI.ooc_los_radius(mob, Blackboard.ensure(blackboard), now)
 
   defp sight_range(_listener, _now), do: 0.0
 
-  defp react(%Announcement{guid: guid} = announcement, center, radius, role, now, act) do
+  defp react(listener, %Announcement{guid: guid} = announcement, center, radius, role, now, act) do
     case ProximityCore.contact(announcement, center, radius, now) do
       {:now, distance} ->
-        act.(distance)
+        {Checks.cancel(listener, guid, role), act.(distance)}
 
       {:after, delay} ->
-        Process.send_after(self(), {:proximity_due, guid, role}, delay)
-        :ignore
+        {Checks.schedule(listener, announcement, role, now + delay, now), :ignore}
 
       :never ->
-        :ignore
+        {Checks.cancel(listener, guid, role), :ignore}
     end
   end
 

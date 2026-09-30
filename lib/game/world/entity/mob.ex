@@ -1554,23 +1554,15 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   end
 
   def handle_info({:proximity, %Announcement{} = announcement}, %Mob{} = state) do
-    case Proximity.hear(state, announcement, Time.now()) do
-      :notice -> notice_nearby(state)
-      :sight -> {:noreply, look_around(state)}
-      :ignore -> {:noreply, state}
-    end
+    proximity_result(Proximity.hear(state, announcement, Time.now()))
   rescue
     error ->
       Logger.error("Proximity announcement failed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, state}
   end
 
-  def handle_info({:proximity_due, guid, role}, %Mob{} = state) do
-    case Proximity.due(state, guid, role, Time.now()) do
-      :notice -> notice_nearby(state)
-      :sight -> {:noreply, look_around(state)}
-      :ignore -> {:noreply, state}
-    end
+  def handle_info({:timeout, ref, {:proximity_due, guid, role}}, %Mob{} = state) do
+    proximity_result(Proximity.due(state, guid, role, ref, Time.now()))
   rescue
     error ->
       Logger.error("Proximity check failed: #{Exception.format(:error, error, __STACKTRACE__)}")
@@ -2024,6 +2016,10 @@ defmodule ThistleTea.Game.World.Entity.Mob do
     blackboard = blackboard |> Blackboard.ensure() |> Blackboard.reset_deadline(:next_chase_at)
     %{state | internal: %{internal | blackboard: blackboard}}
   end
+
+  defp proximity_result({state, :notice}), do: notice_nearby(state)
+  defp proximity_result({state, :sight}), do: {:noreply, look_around(state)}
+  defp proximity_result({state, :ignore}), do: {:noreply, state}
 
   defp notice_nearby(%Mob{internal: %Internal{in_combat: false}} = state) do
     state

@@ -104,6 +104,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal do
     :undetectable_until,
     :invincibility_health_threshold,
     world: WorldRef.open(0),
+    proximity_checks: %{},
     single_target_sequence: 0,
     scripts: %Scripts{},
     object_action: %ObjectAction{},
