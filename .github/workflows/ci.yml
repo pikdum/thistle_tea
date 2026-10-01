@@ -48,6 +48,8 @@ jobs:
           otp-version: ${{ matrix.otp }}
       - run: mix deps.get
       - run: mix tailwind.install
+      - run: npm ci
+        working-directory: assets
       - name: fetch namigator (C++ NIF source, pinned by flake.lock)
         run: |
           rev=$(jq -r '.nodes["namigator-src"].locked.rev' flake.lock)
