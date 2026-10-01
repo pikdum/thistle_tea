@@ -45,7 +45,8 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestRequiredConditionTest do
     npc_entry = 800_000 + id
     player_guid = Guid.from_low_guid(:player, id)
     npc_guid = Guid.from_low_guid(:mob, npc_entry, id)
-    item_id = 10_575
+    item_id = 600_000 + id
+    :ets.insert(ItemLoader, {item_id, %ItemTemplate{entry: item_id, name: "Required", display_id: 123}})
     source_item_id = 700_000 + id
     character = character(id, player_guid)
     CharacterStore.put(character)
@@ -59,6 +60,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestRequiredConditionTest do
       :ets.delete(QuestLoader, {:giver, npc_entry})
       :ets.delete(QuestLoader, {:ender, npc_entry})
       :ets.delete(GossipLoader, {:creature_menu, npc_entry})
+      :ets.delete(ItemLoader, item_id)
       :ets.delete(CharacterStore, id)
       Metadata.delete(player_guid)
       Metadata.delete(npc_guid)
@@ -90,7 +92,10 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestRequiredConditionTest do
       GameEvent.set_events([quest.event_id | saved])
       assert [{^quest, _icon}] = Quests.quest_menu(context.npc_guid, context.character)
       Quests.hello(state, context.npc_guid)
-      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgQuestgiverQuestDetails{quest: ^quest}}}
+
+      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgQuestgiverQuestDetails{} = details}}
+      assert details.quest == quest
+      assert details.item_display_ids == %{context.item_id => 123}
       GameEvent.set_events(saved)
       assert Quests.accept(state, context.npc_guid, quest.id) == state
       refute QuestLog.active?(CharacterStore.get(state.guid).player.quest_log, quest.id)
