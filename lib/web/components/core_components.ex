@@ -160,7 +160,7 @@ defmodule ThistleTeaWeb.CoreComponents do
     <button
       type={@type}
       class={[
-        "phx-submit-loading:opacity-75 rounded-lg bg-zinc-900 px-3 py-2 hover:bg-zinc-700",
+        "rounded-lg bg-zinc-900 px-3 py-2 hover:bg-zinc-700 phx-submit-loading:opacity-75",
         "text-sm/6 font-semibold text-white active:text-white/80",
         @class
       ]}
