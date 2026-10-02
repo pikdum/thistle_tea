@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetStable do
   alias ThistleTea.Game.World.Entity.Player.CompanionOwner
   alias ThistleTea.Game.World.Entity.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.World.Entity.Player.CompanionVisibility
+  alias ThistleTea.Game.World.Entity.Player.NpcReach
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.CreatureTemplate
@@ -76,9 +77,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetStable do
          %{alive?: true, npc_flags: flags} when is_integer(flags) <- Metadata.query(guid, [:alive?, :npc_flags]),
          true <- (flags &&& @stablemaster_flag) != 0,
          true <- Reputation.can_interact?(character, guid),
-         world = character.internal.world,
-         {^world, _x, _y, _z} <- World.position(guid),
-         distance when is_number(distance) and distance <= 5.0 <- World.distance_between(character, guid) do
+         true <- NpcReach.within?(character, guid) do
       true
     else
       _ -> false

@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
+  alias ThistleTea.Game.World.Entity.Player.NpcReach
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
@@ -30,7 +31,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
 
   @tabard_designer_flag 0x400
   @tabard_cost 100_000
-  @interaction_distance 5.0
 
   def create(%{ready: true, character: %Character{} = character} = state, name) do
     case GuildSystem.create(member(character), name) do
@@ -103,10 +103,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
          %{alive?: true, npc_flags: flags} when is_integer(flags) <- Metadata.query(vendor_guid, [:alive?, :npc_flags]),
          true <- (flags &&& @tabard_designer_flag) != 0,
          true <- Reputation.can_interact?(character, vendor_guid),
-         world = character.internal.world,
-         {^world, _x, _y, _z} <- World.position(vendor_guid),
-         distance when is_number(distance) and distance <= @interaction_distance <-
-           World.distance_between(character, vendor_guid) do
+         true <- NpcReach.within?(character, vendor_guid) do
       true
     else
       _invalid -> false

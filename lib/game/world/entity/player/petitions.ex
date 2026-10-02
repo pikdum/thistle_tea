@@ -21,12 +21,12 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
   alias ThistleTea.Game.Core.Party
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgGuildCommandResult
-  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.Guilds
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.Items
+  alias ThistleTea.Game.World.Entity.Player.NpcReach
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -349,9 +349,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Petitions do
          %{alive?: true, npc_flags: flags} when is_integer(flags) <- Metadata.query(npc_guid, [:alive?, :npc_flags]),
          true <- (flags &&& required_flags) == required_flags,
          true <- Reputation.can_interact?(character, npc_guid),
-         world = character.internal.world,
-         {^world, _x, _y, _z} <- World.position(npc_guid),
-         distance when is_number(distance) and distance <= 5.0 <- World.distance_between(character, npc_guid) do
+         true <- NpcReach.within?(character, npc_guid) do
       true
     else
       _ -> false

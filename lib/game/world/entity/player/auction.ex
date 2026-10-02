@@ -14,7 +14,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Auction do
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Time
-  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AuctionStore
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.EventSink
@@ -22,6 +21,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Auction do
   alias ThistleTea.Game.World.Entity.Player.Auction.Eligibility
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.ItemCosts
+  alias ThistleTea.Game.World.Entity.Player.NpcReach
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.Loader.AuctionHouse
@@ -30,7 +30,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Auction do
   alias ThistleTea.Game.World.System.Auction, as: AuctionSystem
 
   @auctioneer_flag 0x00001000
-  @interaction_distance 5.0
 
   def hello(%{ready: true, character: %Character{} = character} = state, guid) do
     case house(character, guid) do
@@ -78,10 +77,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Auction do
          true <- band(flags, @auctioneer_flag) != 0,
          true <- Reputation.can_interact?(character, guid),
          false <- Reaction.hostile?(character, guid),
-         world = character.internal.world,
-         {^world, _x, _y, _z} <- World.position(guid),
-         distance when is_number(distance) and distance <= @interaction_distance <-
-           World.distance_between(character, guid),
+         true <- NpcReach.within?(character, guid),
          %House{} = house <- AuctionHouse.for_faction(faction) do
       {:ok, house}
     else

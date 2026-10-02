@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Vendor do
   alias ThistleTea.Game.World.Entity.Player.ConditionContext
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.ItemCosts
+  alias ThistleTea.Game.World.Entity.Player.NpcReach
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.Entity.Player.VendorPurchase
   alias ThistleTea.Game.World.ItemStore
@@ -95,9 +96,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Vendor do
          %{alive?: true, npc_flags: flags} when is_integer(flags) <- Metadata.query(vendor_guid, [:alive?, :npc_flags]),
          true <- (flags &&& 0x4) != 0,
          true <- Reputation.can_interact?(character, vendor_guid),
-         world = character.internal.world,
-         {^world, _x, _y, _z} <- World.position(vendor_guid),
-         distance when is_number(distance) and distance <= 5.0 <- World.distance_between(character, vendor_guid) do
+         true <- NpcReach.within?(character, vendor_guid) do
       true
     else
       _ -> false

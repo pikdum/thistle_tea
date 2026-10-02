@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetUntraining do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Player.NpcReach
   alias ThistleTea.Game.World.Entity.Player.PetUntraining.Offer
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.Entity.Player.State
@@ -100,9 +101,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetUntraining do
          %{alive?: true, npc_flags: flags} when is_integer(flags) <- Metadata.query(guid, [:alive?, :npc_flags]),
          true <- (flags &&& 0x10) != 0,
          true <- Reputation.can_interact?(character, guid),
-         world = character.internal.world,
-         {^world, _x, _y, _z} <- World.position(guid),
-         distance when is_number(distance) and distance <= 5.0 <- World.distance_between(character, guid) do
+         true <- NpcReach.within?(character, guid) do
       true
     else
       _ -> false

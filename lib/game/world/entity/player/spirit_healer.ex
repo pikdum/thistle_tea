@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpiritHealer do
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThistleTea.Game.World.Entity.Player.Durability
+  alias ThistleTea.Game.World.Entity.Player.NpcReach
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Visibility
@@ -31,9 +32,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpiritHealer do
          :mob <- Guid.entity_type(healer_guid),
          %{alive?: true, npc_flags: flags} when is_integer(flags) <- Metadata.query(healer_guid, [:alive?, :npc_flags]),
          true <- (flags &&& 0x20) != 0,
-         world = character.internal.world,
-         {^world, _x, _y, _z} <- World.position(healer_guid),
-         distance when is_number(distance) and distance <= 5.0 <- World.distance_between(character, healer_guid) do
+         true <- NpcReach.within?(character, healer_guid) do
       true
     else
       _invalid -> false

@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Training do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
+  alias ThistleTea.Game.World.Entity.Player.NpcReach
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.Entity.Player.Spells
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
@@ -68,9 +69,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Training do
              character.unit.race,
              Reputation.exalted_with?(character, guid)
            ),
-         world = character.internal.world,
-         {^world, _x, _y, _z} <- World.position(guid),
-         distance when is_number(distance) and distance <= 5.0 <- World.distance_between(character, guid) do
+         true <- NpcReach.within?(character, guid) do
       true
     else
       _invalid -> false

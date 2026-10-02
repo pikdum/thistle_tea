@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentReset do
   alias ThistleTea.Game.World.Entity.Player.CompanionOwner
   alias ThistleTea.Game.World.Entity.Player.CompanionVisibility
   alias ThistleTea.Game.World.Entity.Player.Items
+  alias ThistleTea.Game.World.Entity.Player.NpcReach
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Player.TalentReset.Offer
@@ -150,9 +151,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentReset do
          true <- available?(character, trainer),
          true <- interactable_trainer?(trainer),
          true <- Reputation.can_interact?(character, trainer),
-         world = character.internal.world,
-         {^world, _x, _y, _z} <- World.position(trainer),
-         distance when is_number(distance) and distance <= 5.0 <- World.distance_between(character, trainer) do
+         true <- NpcReach.within?(character, trainer) do
       true
     else
       _ -> false

@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Durability do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
+  alias ThistleTea.Game.World.Entity.Player.NpcReach
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
@@ -71,9 +72,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Durability do
          %{alive?: true, npc_flags: flags} when is_integer(flags) <- Metadata.query(vendor_guid, [:alive?, :npc_flags]),
          true <- (flags &&& @repair_flag) != 0,
          true <- Reputation.can_interact?(character, vendor_guid),
-         world = character.internal.world,
-         {^world, _x, _y, _z} <- World.position(vendor_guid),
-         distance when is_number(distance) and distance <= 5.0 <- World.distance_between(character, vendor_guid) do
+         true <- NpcReach.within?(character, vendor_guid) do
       true
     else
       _invalid -> false

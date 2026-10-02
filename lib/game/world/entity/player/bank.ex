@@ -13,8 +13,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Bank do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Inventory
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
+  alias ThistleTea.Game.World.Entity.Player.NpcReach
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
@@ -23,7 +23,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Bank do
   alias ThistleTea.Game.World.Outbound
 
   @banker_flag 0x00000100
-  @interaction_distance 5.0
 
   def activate(%State{ready: true, character: %Character{} = character} = state, banker_guid) do
     if valid_banker?(character, banker_guid) do
@@ -88,10 +87,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Bank do
          %{alive?: true, npc_flags: npc_flags} <- Metadata.query(banker_guid, [:alive?, :npc_flags]),
          true <- (npc_flags &&& @banker_flag) != 0,
          true <- Reputation.can_interact?(character, banker_guid),
-         %{internal: %{world: world}} <- character,
-         {^world, _x, _y, _z} <- World.position(banker_guid),
-         distance when is_number(distance) and distance <= @interaction_distance <-
-           World.distance_between(character, banker_guid) do
+         true <- NpcReach.within?(character, banker_guid) do
       true
     else
       _invalid -> false

@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestGiver do
   alias ThistleTea.Game.Core.Movement.Fear
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Player.NpcReach
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
@@ -62,7 +63,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestGiver do
          true <- (flags &&& 0x2) != 0,
          false <- Map.get(metadata, :in_combat, false),
          true <- ((Map.get(metadata, :unit_flags) || 0) &&& 0x03000000) == 0,
-         distance when is_number(distance) and distance <= 5.0 <- World.distance_between(character, guid) do
+         true <- NpcReach.within?(character, guid) do
       true
     else
       _invalid -> false

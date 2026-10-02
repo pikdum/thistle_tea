@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThistleTea.Game.World.Entity.Player.CompanionOwner
   alias ThistleTea.Game.World.Entity.Player.Exploration
+  alias ThistleTea.Game.World.Entity.Player.NpcReach
   alias ThistleTea.Game.World.Entity.Player.Pvp
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.Entity.Player.Spellcasting
@@ -37,7 +38,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
   alias ThistleTea.Game.World.Visibility
 
   @flightmaster_flag 0x00000008
-  @interaction_distance 5.0
   @taxi_start_distance :math.sqrt(1_000.0)
   @reply_ok 0
   @reply_unspecified 1
@@ -455,8 +455,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Taxi do
          true <- (npc_flags &&& @flightmaster_flag) != 0,
          true <- Reputation.can_interact?(character, guid),
          {^world, x, y, z} <- World.position(guid),
-         distance when is_number(distance) <- World.distance_between(character, guid),
-         true <- distance <= @interaction_distance,
+         true <- NpcReach.within?(character, guid),
          %Node{} = node <- TaxiNetwork.nearest_node(network, world.map_id, {x, y, z}, team_for_race(unit.race)) do
       {:ok, node}
     else

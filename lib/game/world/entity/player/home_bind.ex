@@ -12,9 +12,9 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBind do
   alias ThistleTea.Game.Core.Travel.HomeBind
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Player.NpcReach
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.MapTemplate
@@ -85,14 +85,13 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBind do
 
   def valid_innkeeper?(%Character{} = character, guid) do
     with true <- Death.alive?(character),
-         %WorldRef{map_id: map_id, instance_id: nil} = world <- character.internal.world,
+         %WorldRef{map_id: map_id, instance_id: nil} <- character.internal.world,
          false <- MapTemplate.dungeon?(map_id) or MapTemplate.battleground?(map_id),
          :mob <- Guid.entity_type(guid),
          %{alive?: true, npc_flags: flags} when is_integer(flags) <- Metadata.query(guid, [:alive?, :npc_flags]),
          true <- (flags &&& @innkeeper_flag) != 0,
          true <- Reputation.can_interact?(character, guid),
-         {^world, _x, _y, _z} <- World.position(guid),
-         distance when is_number(distance) and distance <= 5.0 <- World.distance_between(character, guid) do
+         true <- NpcReach.within?(character, guid) do
       true
     else
       _invalid -> false
