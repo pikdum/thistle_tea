@@ -79,6 +79,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.PetSpells, as: PetSpellsLoader
   alias ThistleTea.Game.World.Loader.PetTraining, as: PetTrainingLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.World.Loader.QuestGreeting, as: QuestGreetingLoader
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -245,6 +246,7 @@ defmodule ThistleTea.Application do
     HonorStore.init()
     VendorLoader.init()
     QuestLoader.init()
+    QuestGreetingLoader.init()
     ReputationLoader.init()
     GossipLoader.init()
     CreatureTemplateLoader.init()
@@ -328,6 +330,7 @@ defmodule ThistleTea.Application do
         WaypointLoader.load_all()
         Logger.info("Loading quests...")
         QuestLoader.load_all()
+        QuestGreetingLoader.load_all()
         Logger.info("Loading reputation...")
         ReputationLoader.load_all()
         Logger.info("Loading gossip menus...")

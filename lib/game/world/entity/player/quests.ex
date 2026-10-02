@@ -39,9 +39,13 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   alias ThistleTea.Game.World.Entity.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.World.Entity.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.MapTemplate
+  alias ThistleTea.Game.World.Loader.NpcText, as: NpcTextLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.World.Loader.QuestGreeting, as: QuestGreetingLoader
+  alias ThistleTea.Game.World.Loader.QuestGreeting.Greeting
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.Presence
@@ -110,13 +114,13 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
             send_turn_in_dialog(npc_guid, quest, icon == QuestDialogStatus.reward_rep())
 
           true ->
-            send_quest_list(npc_guid, [{quest, icon}])
+            send_quest_list(npc_guid, [{quest, icon}], state.character)
         end
 
         state
 
       entries ->
-        send_quest_list(npc_guid, entries)
+        send_quest_list(npc_guid, entries, state.character)
         state
     end
   end
@@ -629,13 +633,38 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
     QuestRequirements.can_take(quest, availability.quest_context, result)
   end
 
-  defp send_quest_list(npc_guid, entries) do
+  defp send_quest_list(npc_guid, entries, %Character{} = character) do
+    greeting = greeting(npc_guid, character)
+
     Outbound.send_packet(%Message.SmsgQuestgiverQuestList{
       npc_guid: npc_guid,
-      title: "",
+      title: greeting.text,
+      emote: greeting.emote,
+      emote_delay: greeting.emote_delay,
       entries: entries
     })
   end
+
+  def greeting(npc_guid, %Character{} = character) do
+    source = Guid.type_id(npc_guid)
+    entry = World.entry(npc_guid)
+
+    QuestGreetingLoader.get(source, entry) || gossip_greeting(source, entry, npc_guid, character) || %Greeting{}
+  end
+
+  defp gossip_greeting(:unit, entry, npc_guid, character) do
+    with %GossipLoader.Menu{} = menu <- GossipLoader.menu_for_creature(entry),
+         text_id = Gossip.title_text_id(menu, character, npc_guid),
+         false <- text_id == Gossip.default_text_id(),
+         [%{text_0: male, text_1: female, em_0: emote, em_0_delay: delay} | _groups] <- NpcTextLoader.get(text_id),
+         text when text != "" <- if(male == "", do: female, else: male) do
+      %Greeting{text: text, emote: emote, emote_delay: delay}
+    else
+      _no_greeting -> nil
+    end
+  end
+
+  defp gossip_greeting(_source, _entry, _npc_guid, _character), do: nil
 
   def explore_area(%{character: %Character{} = character} = state, quest_id) do
     player = character.player

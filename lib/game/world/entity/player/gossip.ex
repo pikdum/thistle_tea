@@ -51,6 +51,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
 
   @default_gossip_text_id 68
 
+  def default_text_id, do: @default_gossip_text_id
+
   def hello(%{character: %Character{} = character} = state, guid) do
     if Reputation.can_interact?(character, guid) do
       quests = quest_items(guid, character)
