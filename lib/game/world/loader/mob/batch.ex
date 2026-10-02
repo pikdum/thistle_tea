@@ -266,7 +266,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
 
   defp attach_event_condition(%AIEvent{} = event, conditions) do
     actions = Enum.map(event.actions, fn steps -> Enum.map(steps, &attach_step_condition(&1, conditions)) end)
-    %{event | condition: Map.get(conditions, event.condition_id), actions: actions}
+    %{event | condition: condition(conditions, event.condition_id, event.condition), actions: actions}
   end
 
   defp attach_script_conditions(movement_scripts, conditions) do
@@ -281,8 +281,11 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
         {script_id, Enum.map(steps, &attach_step_condition(&1, conditions))}
       end)
 
-    %{step | condition: Map.get(conditions, step.condition_id), sub_scripts: sub_scripts}
+    %{step | condition: condition(conditions, step.condition_id, step.condition), sub_scripts: sub_scripts}
   end
+
+  defp condition(conditions, id, _inline) when is_integer(id) and id > 0, do: Map.get(conditions, id)
+  defp condition(_conditions, _id, inline), do: inline
 
   defp attach_equipment(creatures) do
     equipment_ids =

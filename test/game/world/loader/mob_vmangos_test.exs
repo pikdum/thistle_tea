@@ -89,6 +89,15 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
       assert Map.has_key?(mob.internal.spellbook, 17_743)
     end
 
+    test "keeps the conditions a script port gives its own events" do
+      emotes = mob(620).internal.creature.ai_events |> Enum.filter(&(&1.event_type == :receive_emote))
+
+      assert [
+               %Condition{type: :quest_none, value1: 3_861},
+               %Condition{type: :quest_taken, value1: 3_861}
+             ] = Enum.map(emotes, & &1.condition)
+    end
+
     test "attaches waypoint movement scripts with resolved texts" do
       mob =
         %Mangos.Creature{
