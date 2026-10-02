@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Social do
   """
 
   alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Party
   alias ThistleTea.Game.Core.Social
   alias ThistleTea.Game.Core.Social.Friend
@@ -16,13 +17,13 @@ defmodule ThistleTea.Game.World.Entity.Player.Social do
   alias ThistleTea.Game.World.SocialStore
 
   def send_lists(%Character{object: %{guid: guid}}) do
-    social = SocialStore.get(guid)
+    social = current(guid)
     send_friends(social)
     Outbound.send_packet(%Message.SmsgIgnoreList{guids: Enum.sort(social.ignored)}, guid)
   end
 
   def list(%{ready: true, character: %Character{} = character} = state) do
-    character.object.guid |> SocialStore.get() |> send_friends()
+    character.object.guid |> current() |> send_friends()
     state
   end
 
@@ -75,6 +76,12 @@ defmodule ThistleTea.Game.World.Entity.Player.Social do
   end
 
   def ignored(state, _sender), do: state
+
+  defp current(guid) do
+    social = SocialStore.get(guid)
+    retained = Social.retain(social, &(CharacterStore.get(Guid.low_guid(&1)) != nil))
+    if retained == social, do: social, else: SocialStore.put(retained)
+  end
 
   defp send_friends(%Social{owner_guid: guid, friends: guids}) do
     friends = guids |> Enum.sort() |> Enum.map(&Notifier.friend/1)

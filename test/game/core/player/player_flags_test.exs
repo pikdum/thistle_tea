@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Core.Player.PlayerFlagsTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Player.PlayerFlags
 
@@ -29,6 +30,22 @@ defmodule ThistleTea.Game.Core.Player.PlayerFlagsTest do
     test "reads the contested PvP update-field bit" do
       refute PlayerFlags.contested_pvp?(%Character{player: %Player{flags: 0}})
       assert PlayerFlags.contested_pvp?(%Character{player: %Player{flags: 0x100}})
+    end
+  end
+
+  describe "toggle_hidden/2" do
+    test "flips the helm and cloak bits independently and broadcasts the change" do
+      character = %Character{player: %Player{flags: 0x20}, internal: %Internal{}}
+
+      helmless = PlayerFlags.toggle_hidden(character, :helm)
+      assert helmless.player.flags == 0x420
+      assert helmless.internal.broadcast_update?
+      assert PlayerFlags.hidden?(helmless, :helm)
+      refute PlayerFlags.hidden?(helmless, :cloak)
+
+      bare = PlayerFlags.toggle_hidden(helmless, :cloak)
+      assert bare.player.flags == 0xC20
+      assert PlayerFlags.toggle_hidden(bare, :helm).player.flags == 0x820
     end
   end
 end

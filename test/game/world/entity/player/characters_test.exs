@@ -7,14 +7,26 @@ defmodule ThistleTea.Game.World.Entity.Player.CharactersTest do
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.CreatureTemplate
   alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Guild.Member
   alias ThistleTea.Game.Core.Inventory
+  alias ThistleTea.Game.Core.Mail
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.PetProgress
+  alias ThistleTea.Game.Core.Social
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message.SmsgCharEnum
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player.Characters
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.SocialStore
+  alias ThistleTea.Game.World.System.Guild, as: GuildSystem
+  alias ThistleTea.Game.World.System.PostOffice
+  alias ThistleTea.Test.Unique
 
   setup do
     CharacterStore.init()
@@ -178,6 +190,99 @@ defmodule ThistleTea.Game.World.Entity.Player.CharactersTest do
       assert Enum.at(entry.equipment, Inventory.slot_index(:body)).inventory_type == 4
       assert Enum.at(entry.equipment, Inventory.slot_index(:head)).equipment_display_id == 0
       assert %SmsgCharEnum{amount_of_characters: 0, characters: []} = Characters.enum(2)
+    end
+
+    test "projects hidden gear, ghost state, and the waiting pet" do
+      entry = 900_000 + Unique.integer()
+      :ets.insert(CreatureTemplateLoader, {entry, %CreatureTemplate{entry: entry, display_id: 903, family: 1}})
+      on_exit(fn -> :ets.delete(CreatureTemplateLoader, entry) end)
+
+      {:ok, character} = Characters.create(character("Packleader", []))
+
+      character = %{
+        character
+        | movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+          internal: %{character.internal | world: WorldRef.open(0)}
+      }
+
+      pet = %Companion{kind: :hunter_pet, status: {:suspended, entry, 0}, progress: %PetProgress{level: 7}}
+
+      CharacterStore.put(%{
+        character
+        | player: %{character.player | flags: 0xC00},
+          internal: %{character.internal | companion: pet}
+      })
+
+      assert %SmsgCharEnum{characters: [entry_row]} = Characters.enum(1)
+
+      assert {entry_row.flags, entry_row.pet_display_id, entry_row.pet_level, entry_row.pet_family} ==
+               {0xC00, 903, 7, 1}
+
+      CharacterStore.put(%{
+        character
+        | player: %{character.player | flags: 0x10},
+          internal: %{character.internal | companion: pet}
+      })
+
+      assert %SmsgCharEnum{characters: [ghost]} = Characters.enum(1)
+      assert {ghost.flags, ghost.pet_display_id} == {0x2000, 0}
+    end
+  end
+
+  describe "delete/2" do
+    test "forgets the character, its items, and its social row" do
+      cache_templates([template(38, inventory_type: 4), template(117, stackable: 20)])
+      {:ok, character} = Characters.create(character("Retiree", [{38, 1}, {117, 5}]))
+      guid = character.object.guid
+      item_guids = character.player |> Inventory.all_owned_items(&ItemStore.get/1) |> Enum.map(& &1.object.guid)
+      {:ok, social} = Social.add(%Social{owner_guid: guid}, :friend, guid + 1)
+      SocialStore.put(social)
+
+      assert :ok = Characters.delete(1, guid)
+      assert CharacterStore.get(character.id) == nil
+      assert length(item_guids) == 2
+      assert Enum.all?(item_guids, &(ItemStore.get(&1) == nil))
+      assert SocialStore.get(guid) == %Social{owner_guid: guid}
+      assert %SmsgCharEnum{amount_of_characters: 0} = Characters.enum(1)
+    end
+
+    test "refuses another account's character and a guild leader" do
+      {:ok, character} = Characters.create(character("Guildlord", []))
+      guid = character.object.guid
+      member = %Member{guid: guid, name: "Guildlord", race: 1, class: 1, level: 1}
+      {:ok, _group} = GuildSystem.create(member, "Retirement Home #{Unique.integer()}")
+      on_exit(fn -> GuildSystem.disband(guid) end)
+
+      assert {:error, :character_not_found} = Characters.delete(2, guid)
+      assert {:error, :guild_leader} = Characters.delete(1, guid)
+      assert %Character{} = CharacterStore.get(character.id)
+    end
+
+    test "returns cash-on-delivery attachments to their sender and drops the rest" do
+      id = Unique.integer()
+      guid = Guid.from_low_guid(:player, id)
+      sender = Guid.from_low_guid(:player, Unique.integer())
+      CharacterStore.put(%{character("Codvictim", []) | id: id, object: %Object{guid: guid}})
+      cod_item = ItemStore.create(template(2589, stackable: 20), owner: sender)
+      gift_item = ItemStore.create(template(2589, stackable: 20), owner: sender)
+
+      {:ok, _cod} =
+        PostOffice.post(%{sender: sender, receiver: guid, subject: "Linen", item_guid: cod_item.object.guid, cod: 50})
+
+      {:ok, _gift} =
+        PostOffice.post(%{sender: sender, receiver: guid, subject: "Gift", item_guid: gift_item.object.guid})
+
+      {:ok, _hello} = PostOffice.post(%{sender: sender, receiver: guid, subject: "Hello"})
+
+      assert :ok = Characters.delete(1, guid)
+
+      {token, mailbox} = PostOffice.open(sender)
+      on_exit(fn -> PostOffice.close(sender, token, []) end)
+      assert [%Mail{subject: "Linen", item_guid: returned_guid, cod: 0, receiver: ^sender}] = mailbox
+      assert returned_guid == cod_item.object.guid
+      assert ItemStore.get(returned_guid).item.owner == sender
+      assert ItemStore.get(gift_item.object.guid) == nil
+      assert PostOffice.forfeit(guid) == []
     end
   end
 

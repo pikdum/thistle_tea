@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.Entity.Player.StatsTest do
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Player.PlayedTime
   alias ThistleTea.Game.Core.Player.Rest
   alias ThistleTea.Game.Core.Skills
   alias ThistleTea.Game.World.Entity.Player.Stats
@@ -61,6 +62,21 @@ defmodule ThistleTea.Game.World.Entity.Player.StatsTest do
       assert capped.internal.rest_bonus == 0.0
       assert capped.player.rest_state_experience == 0
       assert capped.player.rest_state == 2
+    end
+
+    test "restarts level time played only when the level changes" do
+      played = %PlayedTime{total_ms: 50_000, level_ms: 20_000}
+
+      character = %Character{
+        unit: %Unit{race: 1, class: 1, level: 5},
+        player: %Player{skills: %{}},
+        internal: %Internal{played: played}
+      }
+
+      stats = %Stats{race: 1, class: 1, level: 5, base_health: 100, base_mana: 0, next_level_xp: 100}
+
+      assert Stats.apply(character, stats).internal.played == played
+      assert %PlayedTime{total_ms: 50_000, level_ms: 0} = Stats.apply(character, %{stats | level: 6}).internal.played
     end
   end
 

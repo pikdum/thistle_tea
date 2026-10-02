@@ -41,6 +41,9 @@ defmodule ThistleTea.Game.World.System.PostOffice do
     GenServer.call(server, {:close, recipient, token, mailbox})
   end
 
+  def forfeit(recipient, server \\ __MODULE__) when is_integer(recipient),
+    do: GenServer.call(server, {:forfeit, recipient})
+
   @impl GenServer
   def init(table) do
     table = table || :ets.new(MailStore, [:public])
@@ -98,6 +101,12 @@ defmodule ThistleTea.Game.World.System.PostOffice do
       _ ->
         {:reply, {:error, :stale_session}, state}
     end
+  end
+
+  def handle_call({:forfeit, recipient}, _from, state) do
+    mailbox = Map.get(state.mailboxes, recipient, [])
+    state = %{state | mailboxes: Map.delete(state.mailboxes, recipient), online: Map.delete(state.online, recipient)}
+    {:reply, mailbox, persist(state)}
   end
 
   def handle_call({:acknowledge, recipient, token, ids}, _from, state) do

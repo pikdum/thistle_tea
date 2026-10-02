@@ -260,6 +260,24 @@ defmodule ThistleTea.Game.World.Entity.Player.Mail do
 
   def return_to_sender(state, _message), do: state
 
+  def forfeit(guid) when is_integer(guid) do
+    now = Time.now()
+    guid |> PostOffice.forfeit() |> Enum.each(&forfeit_mail(&1, guid, now))
+  end
+
+  defp forfeit_mail(%MailCore{cod: cod, item_guid: item_guid} = mail, guid, now) when cod > 0 and item_guid > 0 do
+    with {:ok, attrs} <- MailCore.return_attrs(mail, guid, now),
+         _item = transfer_returned_item(mail),
+         {:ok, _returned} <- PostOffice.post(attrs) do
+      :ok
+    else
+      _ -> ItemStore.delete(item_guid)
+    end
+  end
+
+  defp forfeit_mail(%MailCore{item_guid: item_guid}, _guid, _now) when item_guid > 0, do: ItemStore.delete(item_guid)
+  defp forfeit_mail(%MailCore{}, _guid, _now), do: :ok
+
   def delete(%{ready: true, character: %Character{} = character} = state, message) do
     with :ok <- validate_mailbox(character, message.mailbox),
          %MailCore{} = mail <- visible_mail(character, message.mail_id),

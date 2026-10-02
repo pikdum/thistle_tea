@@ -34,8 +34,10 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Pet.Companion.EntityRef
   alias ThistleTea.Game.Core.Player.Logout
+  alias ThistleTea.Game.Core.Player.PlayedTime
   alias ThistleTea.Game.Core.Player.PlayerFlags
   alias ThistleTea.Game.Core.Player.Talents, as: TalentsCore
+  alias ThistleTea.Game.Core.Player.Tutorials
   alias ThistleTea.Game.Core.Pvp
   alias ThistleTea.Game.Core.Reputation
   alias ThistleTea.Game.Core.Spell
@@ -51,6 +53,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.CooldownSpell
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.InitialSpell
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World.AccountDataStore
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink
@@ -105,8 +108,40 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
 
   def query_time(state), do: state
 
+  def played_time(%{ready: true, guid: guid, character: %Character{} = character} = state) do
+    {total, level} = PlayedTime.seconds(character, Time.now())
+    Outbound.send_packet(%Message.SmsgPlayedTime{total: total, level: level}, guid)
+    state
+  end
+
+  def played_time(state), do: state
+
+  def mark_tutorial(%{account: %{id: account_id}} = state, index) do
+    account_id
+    |> AccountDataStore.tutorials()
+    |> Tutorials.mark(index)
+    |> then(&AccountDataStore.put_tutorials(account_id, &1))
+
+    state
+  end
+
+  def mark_tutorial(state, _index), do: state
+
+  def set_tutorials(%{account: %{id: account_id}} = state, :clear) do
+    AccountDataStore.put_tutorials(account_id, Tutorials.all_seen())
+    state
+  end
+
+  def set_tutorials(%{account: %{id: account_id}} = state, :reset) do
+    AccountDataStore.put_tutorials(account_id, Tutorials.new())
+    state
+  end
+
+  def set_tutorials(state, _action), do: state
+
   def enter_world(state, character_guid) do
     {:ok, c} = CharacterStore.fetch(state.account.id, character_guid)
+    first_login? = PlayedTime.first_login?(c)
     c = c |> Trade.recover() |> Auction.recover() |> VendorPurchase.recover()
     old_item_counts = Quests.quest_item_counts(c)
 
@@ -117,6 +152,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
       |> ChatStatus.reset()
       |> Reactive.clear(Time.now())
       |> Logout.cancel(Time.now())
+      |> PlayedTime.start(Time.now())
       |> Emote.reset()
       |> Instances.restore(character_guid)
       |> normalize_movement_state()
@@ -196,7 +232,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
       orientation: o
     })
 
-    send_init_packets(c)
+    send_init_packets(c, first_login?: first_login?)
     Social.send_lists(c)
     Enchantments.send_active_timers(c)
     Guilds.signed_on(c)
@@ -328,10 +364,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
 
     HomeBind.send_update(c)
 
-    # no tutorials
-    Outbound.send_packet(%Message.SmsgTutorialFlags{
-      tutorial_data: [0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF]
-    })
+    Outbound.send_packet(%Message.SmsgTutorialFlags{tutorial_data: AccountDataStore.tutorials(c.account_id)})
 
     # send initial spells
     spells =
@@ -378,15 +411,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
       timescale: 0.01666667
     })
 
-    chr_race = DBC.get_by(DBC.ChrRaces, id: c.unit.race)
-
-    # SMSG_TRIGGER_CINEMATIC
-    # TODO: on first login only
-    if false do
-      Outbound.send_packet(%Message.SmsgTriggerCinematic{
-        cinematic_sequence_id: chr_race.cinematic_sequence
-      })
-    end
+    if Keyword.get(opts, :first_login?, false), do: send_intro_cinematic(c)
 
     item_updates = owned_item_updates(c)
 
@@ -534,6 +559,16 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   end
 
   defp normalize_faction_template(character), do: character
+
+  defp send_intro_cinematic(%Character{unit: %Unit{race: race}}) do
+    case DBC.get_by(DBC.ChrRaces, id: race) do
+      %DBC.ChrRaces{cinematic_sequence: sequence} when is_integer(sequence) and sequence > 0 ->
+        Outbound.send_packet(%Message.SmsgTriggerCinematic{cinematic_sequence_id: sequence})
+
+      _ ->
+        :ok
+    end
+  end
 
   defp normalize_reputation(%Character{unit: unit, player: player} = character) do
     reputation =

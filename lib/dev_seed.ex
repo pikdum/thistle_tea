@@ -61,10 +61,13 @@ defmodule ThistleTea.DevSeed do
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Pet.PetProgress
+  alias ThistleTea.Game.Core.Player.PlayedTime
+  alias ThistleTea.Game.Core.Player.Tutorials
   alias ThistleTea.Game.Core.Skills
   alias ThistleTea.Game.Core.Spell.SpellBook
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.AccountDataStore
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity.Player.Characters
   alias ThistleTea.Game.World.Entity.Player.Equipment
@@ -153,6 +156,7 @@ defmodule ThistleTea.DevSeed do
         ] do
       Account.register(account, account)
       {:ok, %Account{id: account_id}} = Account.get_user(account)
+      AccountDataStore.put_tutorials(account_id, Tutorials.all_seen())
       create_character(character, account_id)
     end
   end
@@ -162,6 +166,7 @@ defmodule ThistleTea.DevSeed do
 
     case Account.get_user(@account) do
       {:ok, %Account{id: account_id}} ->
+        AccountDataStore.put_tutorials(account_id, Tutorials.all_seen())
         Enum.each(@characters, &create_character(&1, account_id))
 
       _ ->
@@ -190,6 +195,7 @@ defmodule ThistleTea.DevSeed do
     |> set_debug_action_bars()
     |> max_skills()
     |> set_coinage(@coinage)
+    |> set_veteran_played_time()
     |> move_to_isle()
     |> Characters.create()
     |> equip_debug_gear()
@@ -209,6 +215,10 @@ defmodule ThistleTea.DevSeed do
   end
 
   defp equip_debug_gear(result), do: result
+
+  defp set_veteran_played_time(%Character{internal: internal} = character) do
+    %{character | internal: %{internal | played: %PlayedTime{total_ms: to_timeout(day: 1)}}}
+  end
 
   defp set_debug_ammo(%Character{player: player} = character, 3), do: %{character | player: %{player | ammo_id: 11_285}}
 

@@ -96,6 +96,17 @@ defmodule ThistleTea.Game.World.Entity.Player.SocialTest do
       Presence.leave(target.character)
       refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgFriendStatus{}}}
     end
+
+    test "prunes deleted characters from both lists", %{owner: owner, target: target} do
+      PlayerSocial.add(owner, :friend, target.character.internal.name)
+      PlayerSocial.add(owner, :ignore, target.character.internal.name)
+      CharacterStore.delete(target.character.id)
+      PlayerSocial.send_lists(owner.character)
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgFriendList{friends: []}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgIgnoreList{guids: []}}}
+      refute SocialStore.ignores?(owner.guid, target.guid)
+    end
   end
 
   describe "remove/3" do

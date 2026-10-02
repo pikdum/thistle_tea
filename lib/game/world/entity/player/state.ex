@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
   alias ThistleTea.Game.Core.Movement.MovementHandoff
   alias ThistleTea.Game.Core.Party.Group
   alias ThistleTea.Game.Core.Pet.Totems
+  alias ThistleTea.Game.Core.Player.PlayedTime
   alias ThistleTea.Game.Core.Spell.Casting
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
@@ -186,7 +187,7 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
       BattlegroundSystem.disconnect(state.guid, state.character.movement_block.position)
     end
 
-    if state.character, do: CharacterStore.put(Rest.logout(state).character)
+    if state.character, do: CharacterStore.put(PlayedTime.fold(Rest.logout(state).character, Time.now()))
 
     if state.guid do
       Guilds.signed_off(state)

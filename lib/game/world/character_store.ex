@@ -32,6 +32,11 @@ defmodule ThistleTea.Game.World.CharacterStore do
     character
   end
 
+  def delete(id) when is_integer(id) and id > 0 do
+    :ets.delete(__MODULE__, id)
+    :ok
+  end
+
   def get(id) when is_integer(id) and id > 0 do
     case :ets.lookup(__MODULE__, id) do
       [{^id, %Character{} = character}] -> character

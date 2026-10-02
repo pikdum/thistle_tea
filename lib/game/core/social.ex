@@ -35,6 +35,10 @@ defmodule ThistleTea.Game.Core.Social do
     put_members(social, kind, MapSet.delete(members(social, kind), guid))
   end
 
+  def retain(%__MODULE__{} = social, keep?) when is_function(keep?, 1) do
+    %{social | friends: MapSet.filter(social.friends, keep?), ignored: MapSet.filter(social.ignored, keep?)}
+  end
+
   defp put_members(social, :friend, members), do: %{social | friends: members}
   defp put_members(social, :ignore, members), do: %{social | ignored: members}
 end

@@ -2,24 +2,46 @@ defmodule ThistleTea.Game.World.Entity.Player.Characters do
   @moduledoc """
   Character screen flow. Creation validates name uniqueness and the
   per-account limit, assigns the guid and starting equipment, and stores the
-  new character; the character list projects each stored character with its
-  visible gear and guild.
+  new character; deletion releases the character from its guild, group,
+  petitions, mailbox, and social row before forgetting it and its items; the
+  character list projects each stored character with its visible gear and
+  guild.
   """
+  import Bitwise, only: [|||: 2]
+
+  alias ThistleTea.Game.Core.Death
   alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Corpse
+  alias ThistleTea.Game.Core.Entity.CreatureTemplate
   alias ThistleTea.Game.Core.Entity.Item
   alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Inventory
   alias ThistleTea.Game.Core.Item.Proficiency
+  alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.PetProgress
+  alias ThistleTea.Game.Core.Player.PlayerFlags
   alias ThistleTea.Game.Network.Message.SmsgCharEnum
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.Equipment
+  alias ThistleTea.Game.World.Entity.Player.Guilds
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.Items
+  alias ThistleTea.Game.World.Entity.Player.Mail
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.World.System.Guild, as: GuildSystem
+  alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.System.Petition, as: PetitionSystem
 
   @character_limit 10
+  @character_flag_hide_helm 0x400
+  @character_flag_hide_cloak 0x800
+  @character_flag_ghost 0x2000
 
   def create(%Character{} = character, get_template \\ &ItemLoader.get_template/1) do
     with {:exists, nil} <- {:exists, CharacterStore.get_by_name(character.internal.name)},
@@ -35,6 +57,18 @@ defmodule ThistleTea.Game.World.Entity.Player.Characters do
     else
       {:exists, %Character{}} -> {:error, :character_exists}
       {:limit, true} -> {:error, :character_limit}
+    end
+  end
+
+  def delete(account_id, guid) when is_integer(guid) do
+    with {:ok, %Character{} = character} <- CharacterStore.fetch(account_id, Guid.low_guid(guid)),
+         {:online, false} <- {:online, Entity.online?(character.object.guid)},
+         {:guild_leader, false} <- {:guild_leader, Guilds.leader?(character.object.guid)} do
+      retire(character)
+    else
+      {:online, true} -> {:error, :online}
+      {:guild_leader, true} -> {:error, :guild_leader}
+      error -> error
     end
   end
 
@@ -77,8 +111,26 @@ defmodule ThistleTea.Game.World.Entity.Player.Characters do
     Equipment.sync_stats(%{character | player: player})
   end
 
+  defp retire(%Character{object: %{guid: guid}} = character) do
+    Guilds.forget(guid, character.internal.name)
+    PartySystem.leave(guid)
+    PetitionSystem.revoke_signer(guid)
+
+    case PetitionSystem.by_owner(guid) do
+      %{item_guid: item_guid} -> PetitionSystem.delete(item_guid)
+      nil -> :ok
+    end
+
+    Mail.forfeit(guid)
+    character.player |> Inventory.all_owned_items(&ItemStore.get/1) |> Enum.each(&ItemStore.delete(&1.object.guid))
+    World.stop_entity(Corpse.guid_for(guid))
+    SocialStore.delete(guid)
+    CharacterStore.delete(character.id)
+  end
+
   defp enum_entry(%Character{} = character) do
     {x, y, z, _o} = character.movement_block.position
+    {pet_display_id, pet_level, pet_family} = enum_pet(character)
 
     %SmsgCharEnum.Character{
       guid: character.id,
@@ -96,17 +148,36 @@ defmodule ThistleTea.Game.World.Entity.Player.Characters do
       map: character.internal.world.map_id,
       position: {x, y, z},
       guild_id: guild_id(character.object.guid),
-      flags: 0,
+      flags: enum_flags(character),
       first_login: 0,
-      pet_display_id: 0,
-      pet_level: 0,
-      pet_family: 0,
+      pet_display_id: pet_display_id,
+      pet_level: pet_level,
+      pet_family: pet_family,
       equipment:
         Enum.map(Inventory.slots(), &enum_gear(Inventory.equipment_entry(character.player, &1, include_broken: true))),
       first_bag_display_id: 0,
       first_bag_inventory_type: 0
     }
   end
+
+  defp enum_flags(%Character{} = character) do
+    hidden = if PlayerFlags.hidden?(character, :helm), do: @character_flag_hide_helm, else: 0
+    hidden = if PlayerFlags.hidden?(character, :cloak), do: hidden ||| @character_flag_hide_cloak, else: hidden
+    if Death.ghost?(character), do: hidden ||| @character_flag_ghost, else: hidden
+  end
+
+  defp enum_pet(%Character{} = character) do
+    with false <- Death.ghost?(character),
+         {_kind, entry, _spell_id} <- Companion.suspended(character),
+         %CreatureTemplate{} = template <- CreatureTemplateLoader.get(entry) do
+      {template.display_id || 0, pet_level(character), template.family || 0}
+    else
+      _ -> {0, 0, 0}
+    end
+  end
+
+  defp pet_level(%Character{internal: %{companion: %Companion{progress: %PetProgress{level: level}}}}), do: level
+  defp pet_level(%Character{unit: unit}), do: unit.level
 
   defp enum_gear(entry) when is_integer(entry) and entry > 0 do
     case ItemLoader.get_template(entry) do

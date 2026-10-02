@@ -27,6 +27,11 @@ defmodule ThistleTea.Game.World.SocialStore do
     social
   end
 
+  def delete(guid, table \\ __MODULE__) when is_integer(guid) do
+    :ets.delete(table, guid)
+    :ok
+  end
+
   def ignores?(owner_guid, target_guid, table \\ __MODULE__) do
     owner_guid |> get(table) |> Social.member?(:ignore, target_guid)
   end

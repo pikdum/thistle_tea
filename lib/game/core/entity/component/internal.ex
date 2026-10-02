@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal do
   alias ThistleTea.Game.Core.Honor.Damage, as: HonorDamage
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Pet.PetStable
+  alias ThistleTea.Game.Core.Player.PlayedTime
   alias ThistleTea.Game.Core.Player.TalentReset
   alias ThistleTea.Game.Core.Pvp
   alias ThistleTea.Game.Core.Vendor.Buyback
@@ -122,6 +123,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal do
     honor_damage: %HonorDamage{},
     damage_origin: %DamageOrigin{},
     talent_reset: %TalentReset{},
+    played: %PlayedTime{},
     forgotten_skills: %{},
     rest_bonus: 0.0,
     mailbox: [],

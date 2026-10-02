@@ -30,6 +30,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.Network.Server, as: GameServer
   alias ThistleTea.Game.Network.Sessions
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.AccountDataStore
   alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Combat.ChaseWatch
@@ -239,6 +240,7 @@ defmodule ThistleTea.Application do
     MailStore.init()
     CharacterStore.init()
     SocialStore.init()
+    AccountDataStore.init()
     HonorStore.init()
     VendorLoader.init()
     QuestLoader.init()

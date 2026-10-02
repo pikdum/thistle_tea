@@ -8,12 +8,14 @@ defmodule ThistleTea.Game.World.Entity.Player.Stats do
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Player.Experience
+  alias ThistleTea.Game.Core.Player.PlayedTime
   alias ThistleTea.Game.Core.Player.Rest
   alias ThistleTea.Game.Core.Player.Talents
   alias ThistleTea.Game.Core.Skills
   alias ThistleTea.Game.Core.Stats, as: StatsCore
   alias ThistleTea.Game.Core.Stats.CombatRatings
   alias ThistleTea.Game.Core.Stats.SpellPower
+  alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
 
@@ -107,11 +109,15 @@ defmodule ThistleTea.Game.World.Entity.Player.Stats do
     }
 
     %{character | unit: unit, player: player}
+    |> restart_level_played(character.unit.level, stats.level)
     |> CombatRatings.sync()
     |> SpellPower.recompute()
     |> Talents.sync_points(TalentLoader)
     |> Rest.set_bonus(character.internal.rest_bonus)
   end
+
+  defp restart_level_played(character, level, level), do: character
+  defp restart_level_played(character, _old_level, _new_level), do: PlayedTime.level_changed(character, Time.now())
 
   def level_delta(%__MODULE__{} = old, %__MODULE__{} = new) do
     %{

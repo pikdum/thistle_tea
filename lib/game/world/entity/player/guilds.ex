@@ -396,6 +396,15 @@ defmodule ThistleTea.Game.World.Entity.Player.Guilds do
 
   def leave(state), do: state
 
+  def leader?(guid), do: match?(%{leader: ^guid}, GuildSystem.group_of(guid))
+
+  def forget(guid, name) do
+    case GuildSystem.leave(guid) do
+      {:ok, group} -> notify_event(group, :left, [name])
+      {:error, _reason} -> :ok
+    end
+  end
+
   def disband(%{ready: true, guid: guid} = state) do
     case GuildSystem.disband(guid) do
       {:ok, group} ->
