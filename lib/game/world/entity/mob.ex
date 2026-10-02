@@ -1424,7 +1424,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
     if EntityCore.dead?(state) or Corpse.removed?(state) do
       {:noreply, state}
     else
-      state = state |> PetBT.command(:attack, target_guid, Time.now()) |> wake_ai_tick()
+      state = state |> PetBT.command(:attack, target_guid, pet_command_context(state, target_guid)) |> wake_ai_tick()
       {:noreply, state, {:continue, :maybe_broadcast}}
     end
   rescue
@@ -1480,7 +1480,12 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   end
 
   def handle_info({:pet_command, command, target_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
-    state = state |> PetBT.command(command, target_guid, Time.now()) |> wake_ai_tick() |> EventSink.emit_pending()
+    state =
+      state
+      |> PetBT.command(command, target_guid, pet_command_context(state, target_guid))
+      |> wake_ai_tick()
+      |> EventSink.emit_pending()
+
     {:noreply, state, {:continue, :maybe_broadcast}}
   end
 
@@ -2138,6 +2143,11 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   end
 
   defp apply_creature_group_command(%Mob{} = state, _command), do: state
+
+  defp pet_command_context(%Mob{} = state, target_guid) when is_integer(target_guid) and target_guid > 0,
+    do: AIEnvironment.context(state, Time.now(), ObservationRequest.actor(target_guid))
+
+  defp pet_command_context(%Mob{} = state, _target_guid), do: AIEnvironment.context(state, Time.now())
 
   defp engage_combat(%Mob{internal: %Internal{pet: %Pet{}}} = state, caster, opts) when is_integer(caster) do
     now = Time.now()

@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.Core.AI.Script.PetCommand do
     with metadata when is_map(metadata) <- Perception.metadata(context.perception, owner),
          {^world, _, _, _} <- Perception.position(context.perception, owner),
          true <- command != 2 or attack_allowed?(state, owner, target, context) do
-      PetBT.command(state, elem(@commands, command), target, context.now)
+      PetBT.command(state, elem(@commands, command), target, context)
     else
       _ -> state
     end

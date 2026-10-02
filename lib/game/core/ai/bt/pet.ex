@@ -69,16 +69,17 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
     MobSpells.try_cast(state, blackboard, context, self_only?: true)
   end
 
-  def command(state, command, target_guid, now)
+  def command(state, command, target_guid, now) when is_integer(now),
+    do: command(state, command, target_guid, Context.new(now))
 
-  def command(%Mob{internal: %Internal{pet: %Pet{possessed?: true} = pet}} = state, command, _target, _now)
+  def command(%Mob{internal: %Internal{pet: %Pet{possessed?: true} = pet}} = state, command, _target, %Context{})
       when command in [:stay, :follow] do
     position = if command == :stay, do: xyz(state.movement_block.position)
     pet = %{pet | command_state: command, stay_position: position, attack_command?: false}
     %{state | internal: %{state.internal | pet: pet}} |> returning(nil)
   end
 
-  def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :stay, _target_guid, now) do
+  def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :stay, _target_guid, %Context{now: now}) do
     state = Movement.sync_position(state, now)
     position = xyz(state.movement_block.position)
     pet = %{pet | command_state: :stay, stay_position: position, attack_command?: false}
@@ -89,34 +90,32 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
     |> returning(nil)
   end
 
-  def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :follow, _target_guid, now) do
+  def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :follow, _target_guid, %Context{now: now}) do
     state = clear_combat_state(state, now)
     pet = %{pet | command_state: :follow, stay_position: nil, attack_command?: false}
     %{state | internal: %{state.internal | pet: pet}} |> returning(:command)
   end
 
-  def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :attack, target_guid, now)
+  def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :attack, target_guid, %Context{} = context)
       when is_integer(target_guid) and target_guid > 0 do
     state = %{state | internal: %{state.internal | pet: %{pet | attack_command?: true}}} |> returning(nil)
-
-    %Engagement.Result{entity: state} =
-      Engagement.enter(state, target_guid, now, allow_passive?: true, selection: :target)
-
-    state
+    blackboard = Blackboard.ensure(state.internal.blackboard)
+    {state, blackboard} = engage(state, blackboard, target_guid, context, allow_passive?: true, selection: :target)
+    %{state | internal: %{state.internal | blackboard: blackboard}}
   end
 
-  def command(%Mob{internal: %{pet: %Pet{kind: :hunter}}} = state, :dismiss, _target, _now), do: state
+  def command(%Mob{internal: %{pet: %Pet{kind: :hunter}}} = state, :dismiss, _target, %Context{}), do: state
 
-  def command(%Mob{internal: %{pet: %Pet{kind: kind} = pet}} = state, :dismiss, _target, _now)
+  def command(%Mob{internal: %{pet: %Pet{kind: kind} = pet}} = state, :dismiss, _target, %Context{})
       when kind in [:charmed, :possessed] do
     Effects.enqueue(state, Effects.release_controlled(pet.owner_guid, state.object.guid, pet.control_spell_id))
   end
 
-  def command(%Mob{internal: %{pet: %Pet{}}} = state, :dismiss, _target, _now) do
+  def command(%Mob{internal: %{pet: %Pet{}}} = state, :dismiss, _target, %Context{}) do
     Effects.enqueue(state, Effects.despawn_self(0, 0))
   end
 
-  def command(%Mob{} = state, _command, _target_guid, _now), do: state
+  def command(%Mob{} = state, _command, _target_guid, %Context{}), do: state
 
   def reaction(%Mob{internal: %Internal{pet: %Pet{}}} = state, reaction, now)
       when reaction in [:passive, :defensive, :aggressive] do
@@ -190,14 +189,24 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
 
   defp aggressive?(_state, _blackboard), do: false
 
-  defp acquire_aggressive_target(state, blackboard, %Context{now: now} = context) do
+  defp acquire_aggressive_target(state, blackboard, %Context{} = context) do
     case Acquisition.nearest(state, context) do
       guid when is_integer(guid) ->
-        %Engagement.Result{entity: state} = Engagement.enter(state, guid, now, selection: :target)
+        {state, blackboard} = engage(state, blackboard, guid, context, selection: :target)
         {:success, state, blackboard}
 
       _ ->
         {:failure, state, blackboard}
+    end
+  end
+
+  defp engage(state, blackboard, target_guid, %Context{now: now} = context, opts) do
+    case Engagement.enter(state, target_guid, now, opts) do
+      %Engagement.Result{entity: state, from: from, to: :engaged} when from != :engaged ->
+        EventAI.enter_combat(state, blackboard, target_guid, context)
+
+      %Engagement.Result{entity: state} ->
+        {state, blackboard}
     end
   end
 

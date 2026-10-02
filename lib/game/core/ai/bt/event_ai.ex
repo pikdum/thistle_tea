@@ -8,4 +8,8 @@ defmodule ThistleTea.Game.Core.AI.BT.EventAI do
     {state, blackboard} = EventAI.tick(state, blackboard, now, context)
     {:failure, state, blackboard}
   end
+
+  def enter_combat(state, blackboard, enemy_guid, %Context{now: now} = context) do
+    EventAI.enter_combat(state, blackboard, enemy_guid, now, context)
+  end
 end

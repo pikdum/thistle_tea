@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Core.AI.BT.PetTest do
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
   alias ThistleTea.Game.Core.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Core.AI.BT.Pet, as: PetBT
+  alias ThistleTea.Game.Core.AI.CreatureScript
   alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
@@ -125,6 +126,25 @@ defmodule ThistleTea.Game.Core.AI.BT.PetTest do
       assert stopped.movement_block.spline_nodes == []
       assert Enum.any?(stopped.internal.events, &is_struct(&1, Effects.MovementStopped))
     end
+
+    test "an ordered attack starts the guardian's scripted fight" do
+      chicken = battle_chicken()
+      enemy = Guid.from_low_guid(:mob, 1, Unique.integer())
+
+      attacking = PetBT.command(chicken, :attack, enemy, @now)
+
+      assert attacking.internal.in_combat
+      assert Enum.any?(attacking.internal.events, &match?(%Effects.TriggerSpell{spell_id: 13_168}, &1))
+      refute Enum.any?(attacking.internal.events, &match?(%Effects.TriggerSpell{spell_id: 23_060}, &1))
+      assert %{0 => squawk_at, 2 => fury_at} = attacking.internal.blackboard.event_ai.timers
+      assert squawk_at >= @now + 30_000
+      assert fury_at >= @now + 25_000
+
+      %{internal: %{events: events}} =
+        PetBT.command(%{attacking | internal: %{attacking.internal | events: []}}, :attack, enemy, @now + 1)
+
+      refute Enum.any?(events, &match?(%Effects.TriggerSpell{spell_id: 13_168}, &1))
+    end
   end
 
   describe "reaction/3" do
@@ -183,6 +203,18 @@ defmodule ThistleTea.Game.Core.AI.BT.PetTest do
           | spline_nodes: [{10.0, 2.0, 0.0}],
             duration: 1_000
         }
+    }
+  end
+
+  defp battle_chicken do
+    owner_guid = Guid.from_low_guid(:player, Unique.integer())
+    state = pet_beside_owner(owner_guid)
+
+    %{
+      state
+      | object: %{state.object | entry: 8_836},
+        unit: %{state.unit | health: 100, max_health: 100, level: 60, flags: 0, auras: []},
+        internal: %{state.internal | creature: %Internal.Creature{ai_events: CreatureScript.events(8_836)}}
     }
   end
 
