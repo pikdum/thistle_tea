@@ -99,6 +99,26 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
     assert target_guid == context.target_guid
   end
 
+  test "a goal creature beside the swapped-in source satisfies the success condition", context do
+    SpatialHash.update(:mobs, context.extra_guid, context.world, -5.0, 0.0, 0.0)
+    success = %ScriptStep{command: :quest_explored, datalong: 1_560}
+
+    start = %ScriptStep{
+      command: :start_map_event,
+      datalong: 1_560,
+      datalong2: 600,
+      dataint2: 3,
+      success_condition: %Condition{type: :nearby_creature, value1: 4_236, value2: 6, swap_targets?: true},
+      sub_scripts: %{3 => [success]}
+    }
+
+    command(context, start)
+    evaluate_event()
+
+    assert_receive {:"$gen_cast", {:start_script, [^success], target_guid}}
+    assert target_guid == context.target_guid
+  end
+
   test "map event lifecycle, targets and changed data announce world facts", context do
     world = context.world
     :ok = Topics.subscribe(Topics.world_facts(world))

@@ -30,6 +30,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.Core.OutdoorPvp.PlaguelandsRewards
   alias ThistleTea.Game.Core.OutdoorPvp.Towers
   alias ThistleTea.Game.Core.Quest.QuestEscort.Catalog, as: QuestEscortCatalog
+  alias ThistleTea.Game.Core.Quest.QuestFollower.Catalog, as: QuestFollowerCatalog
   alias ThistleTea.Game.Inbound.Session
   alias ThistleTea.Game.Network.Server, as: GameServer
   alias ThistleTea.Game.Network.Sessions
@@ -85,6 +86,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.PetTraining, as: PetTrainingLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.QuestEscort, as: QuestEscortLoader
+  alias ThistleTea.Game.World.Loader.QuestFollower, as: QuestFollowerLoader
   alias ThistleTea.Game.World.Loader.QuestGreeting, as: QuestGreetingLoader
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
@@ -342,6 +344,7 @@ defmodule ThistleTea.Application do
         Logger.info("Loading quests...")
         QuestLoader.load_all()
         QuestEscortLoader.load_all()
+        QuestFollowerLoader.load_all()
         QuestLoader.append_start_steps(CreatureScript.quest_start_steps())
         QuestLoader.append_complete_steps(CreatureScript.quest_end_steps())
         QuestGreetingLoader.load_all()
@@ -372,6 +375,7 @@ defmodule ThistleTea.Application do
             PlaguelandsRewards.creature_entries() ++
             GuardPost.guard_entries() ++
             QuestEscortCatalog.summon_entries() ++
+            QuestFollowerCatalog.summon_entries() ++
             CreatureScript.summon_entries() ++
             AreaTriggerScript.summon_entries()
         )
