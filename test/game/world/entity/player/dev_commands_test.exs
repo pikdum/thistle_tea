@@ -161,8 +161,8 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
     end
   end
 
-  describe ".die" do
-    test "bypasses shields without spending mana" do
+  describe ".die and .revive" do
+    test "die through shields without spending mana, then revive at full health" do
       id = Unique.integer()
       guid = Guid.from_low_guid(:player, id)
 
@@ -195,6 +195,10 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
       assert updated.character.unit.power1 == 200
       assert updated.character.unit.auras == []
       assert updated.character.internal.death_finalized?
+
+      assert {:handled, revived} = DevCommands.run(updated, ".revive")
+      assert revived.character.unit.health == 100
+      assert revived.character.unit.power1 == 200
     end
   end
 

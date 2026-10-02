@@ -43,6 +43,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThistleTea.Game.World.Entity.Player.Battlegrounds, as: PlayerBattlegrounds
   alias ThistleTea.Game.World.Entity.Player.Characters
+  alias ThistleTea.Game.World.Entity.Player.Corpses
   alias ThistleTea.Game.World.Entity.Player.Durability
   alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.Exploration, as: PlayerExploration
@@ -197,6 +198,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
       ".debug transport advance <seconds> [entry] - advance a transport schedule",
       ".character level <level> - set player level",
       ".die - kill your character",
+      ".revive - bring your character back to life at full health",
       ".weather [fine|auto|step] or <rain|snow|storm> <0..1> [permanent] - zone weather",
       ".go xyz <x> <y> <z> [map] [facing] - teleport, optionally facing an angle in radians",
       ".guid - show target guid",
@@ -538,6 +540,15 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
         state
         |> put_character(character)
         |> system_message("You died.")
+    end
+    |> handled()
+  end
+
+  def run(state, ".revive" <> _) do
+    if Death.alive?(state.character) do
+      system_message(state, "Already alive.")
+    else
+      state |> Corpses.revive() |> system_message("Revived.")
     end
     |> handled()
   end

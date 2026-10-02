@@ -216,6 +216,10 @@ defmodule ThistleTea.Game.World.Entity.Player.Corpses do
     end
   end
 
+  def revive(%{character: %Character{} = character} = state, now \\ Time.now()) do
+    if Death.alive?(character), do: state, else: resurrect(state, Corpse.guid_for(state.guid), 1.0, now)
+  end
+
   defp resurrect(%{character: character} = state, corpse_guid, restore_percent, now) do
     World.stop_entity(corpse_guid)
     {character, events} = Death.resurrect(character, restore_percent, now)
