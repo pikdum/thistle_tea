@@ -272,6 +272,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
       state
       |> schedule_timer(quest.id)
       |> run_quest_script(source_guid, quest.start_script_steps)
+      |> QuestRewards.cast_source_spell(quest)
     else
       {:error, :log_full} ->
         Outbound.send_packet(%Message.SmsgQuestlogFull{})

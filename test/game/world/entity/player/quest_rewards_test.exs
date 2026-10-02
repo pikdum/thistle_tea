@@ -98,6 +98,28 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestRewardsTest do
     end
   end
 
+  describe "cast_source_spell/2" do
+    test "accepting a quest has the player cast its source spell on themselves", %{state: state, quest: quest} do
+      {:ok, _} = Entity.register(state.guid)
+      spell = cache_spell(%Spell{id: quest.id, effects: [%Effect{type: :learn_spell}]})
+      quest = %{quest | flags: 0, source_spell: spell.id}
+      :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
+
+      accepted = Quests.force_accept(state, quest.id)
+
+      assert QuestLog.active?(accepted.character.player.quest_log, quest.id)
+      assert_receive {:"$gen_cast", {:trigger_spell, id, target, []}}
+      assert id == spell.id
+      assert target == state.guid
+    end
+
+    test "casts nothing for quests without one", %{state: state, quest: quest} do
+      {:ok, _} = Entity.register(state.guid)
+      assert QuestRewards.cast_source_spell(state, quest) == state
+      refute_receive {:"$gen_cast", {:trigger_spell, _, _, _}}
+    end
+  end
+
   defp cache_spell(spell) do
     :ets.insert(SpellLoader, {{:spell, spell.id}, spell})
     spell

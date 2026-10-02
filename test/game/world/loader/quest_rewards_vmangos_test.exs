@@ -18,5 +18,10 @@ defmodule ThistleTea.Game.World.Loader.QuestRewardsVmangosTest do
       assert flag.min_level == 60
       assert Quest.exploration?(flag)
     end
+
+    test "keeps the spell a druid casts on accepting Moonglade" do
+      quest = Mangos.QuestTemplate |> Mangos.Repo.get_by!(entry: 5921) |> QuestLoader.build()
+      assert quest.source_spell == 19_027
+    end
   end
 end

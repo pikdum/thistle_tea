@@ -183,6 +183,7 @@ defmodule ThistleTea.Game.World.Loader.Quest do
       reward_money: row.rew_or_req_money,
       reward_money_max_level: row.rew_money_max_level,
       reward_xp: row.rew_xp,
+      source_spell: row.src_spell,
       reward_spell: row.rew_spell,
       reward_spell_cast: row.rew_spell_cast,
       reward_mail_template_id: abs(row.rew_mail_template_id),

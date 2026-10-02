@@ -1,5 +1,9 @@
 defmodule ThistleTea.Game.World.Entity.Player.QuestRewards do
-  @moduledoc "Dispatches a committed quest's reward spell through the appropriate entity owner."
+  @moduledoc """
+  Dispatches the spells a quest casts through the appropriate entity owner:
+  its source spell, which the player casts on themselves when accepting it,
+  and its reward spell once it is committed.
+  """
 
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Guid
@@ -7,6 +11,20 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestRewards do
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+
+  def cast_source_spell(%{character: character} = state, %Quest{source_spell: spell_id}) when spell_id > 0 do
+    case SpellLoader.cached(spell_id) do
+      %Spell{} = spell ->
+        guid = character.object.guid
+        event = Effects.trigger_spell_request(guid, spell.id, guid, [])
+        %{state | character: EventSink.emit(character, event)}
+
+      _missing ->
+        state
+    end
+  end
+
+  def cast_source_spell(state, %Quest{}), do: state
 
   def cast_spell(%{character: character} = state, %Quest{} = quest, giver_guid) do
     case SpellLoader.cached(Quest.reward_spell_id(quest)) do

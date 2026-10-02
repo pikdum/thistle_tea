@@ -63,6 +63,7 @@ defmodule ThistleTea.Game.Core.Quest do
     reward_money: 0,
     reward_money_max_level: 0,
     reward_xp: 0,
+    source_spell: 0,
     reward_spell: 0,
     reward_spell_cast: 0,
     reward_mail_template_id: 0,
