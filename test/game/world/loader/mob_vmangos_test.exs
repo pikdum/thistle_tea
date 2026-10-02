@@ -69,6 +69,26 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
       assert Map.has_key?(mob.internal.spellbook, 12_544)
     end
 
+    test "replaces the lazy peon's EventAI with its script port" do
+      mob = mob(10_556)
+      events = mob.internal.creature.ai_events
+
+      assert Enum.map(events, & &1.event_type) == [:timer_ooc, :hit_by_spell, :movement_inform, :reached_home]
+
+      [timed] =
+        events
+        |> Enum.find(&(&1.event_type == :hit_by_spell))
+        |> Map.fetch!(:actions)
+        |> List.flatten()
+        |> Enum.filter(&(&1.command == :start_script))
+
+      assert %ScriptStep{texts: [text]} =
+               timed.sub_scripts |> Map.values() |> List.flatten() |> Enum.find(&(&1.command == :talk))
+
+      assert text.text =~ "get back to work"
+      assert Map.has_key?(mob.internal.spellbook, 17_743)
+    end
+
     test "attaches waypoint movement scripts with resolved texts" do
       mob =
         %Mangos.Creature{

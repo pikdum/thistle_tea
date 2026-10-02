@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.AddonAuras
   alias ThistleTea.Game.Core.AI.AIEvent
+  alias ThistleTea.Game.Core.AI.CreatureScript
   alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Creature.CharmSpells
@@ -213,9 +214,23 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
 
         {entry, built}
       end)
+      |> Map.merge(scripted_events(entries))
 
     Enum.map(creatures, fn creature ->
       %{creature | ai_events: Map.get(events, creature.id, [])}
+    end)
+  end
+
+  defp scripted_events(entries) do
+    entries
+    |> Enum.filter(&CreatureScript.ported?/1)
+    |> Map.new(fn entry ->
+      events =
+        entry
+        |> CreatureScript.events()
+        |> Enum.map(fn event -> %{event | actions: Enum.map(event.actions, &ScriptLoader.resolve_texts/1)} end)
+
+      {entry, events}
     end)
   end
 
