@@ -200,7 +200,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
       ".die - kill your character",
       ".revive - bring your character back to life at full health",
       ".weather [fine|auto|step] or <rain|snow|storm> <0..1> [permanent] - zone weather",
-      ".go xyz <x> <y> <z> [map] [facing] - teleport, optionally facing an angle in radians",
+      ".go xyz <x> <y> <z> [map|here] [facing] - teleport, optionally facing an angle in radians",
       ".guid - show target guid",
       ".help - show help",
       ".instance info - show instance ownership and membership",
@@ -603,10 +603,11 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
     |> String.split(" ", trim: true)
     |> parse_coords()
     |> case do
+      {:ok, x, y, z, :here, facing} -> teleport_player(state, {x, y, z, facing}, state.character.internal.world)
       {:ok, x, y, z, map, facing} -> teleport_player(state, {x, y, z, facing}, map)
       {:ok, x, y, z, map} -> teleport_player(state, x, y, z, map)
       {:ok, x, y, z} -> teleport_player(state, x, y, z, state.character.internal.world)
-      :error -> system_message(state, "Invalid command. Use: .go xyz <x> <y> <z> [map] [facing]")
+      :error -> system_message(state, "Invalid command. Use: .go xyz <x> <y> <z> [map|here] [facing]")
     end
     |> handled()
   end
@@ -1176,6 +1177,15 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
 
   defp owner_label({:party, id}), do: "party #{id}"
   defp owner_label({:player, guid}), do: "player #{guid}"
+
+  defp parse_coords([x, y, z, "here", facing]) do
+    with {:ok, x, y, z} <- parse_coords([x, y, z]),
+         {facing, ""} <- Float.parse(facing) do
+      {:ok, x, y, z, :here, facing}
+    else
+      _ -> :error
+    end
+  end
 
   defp parse_coords([x, y, z, map, facing]) do
     with {:ok, x, y, z, map} <- parse_coords([x, y, z, map]),

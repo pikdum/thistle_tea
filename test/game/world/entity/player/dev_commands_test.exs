@@ -584,6 +584,8 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
             "1 2m 3",
             "1 2 3m",
             "1 2 3 -1",
+            "1 2 3 here",
+            "1 2 3 here 1x",
             "1 2 3 0x"
           ] do
         assert {:handled, ^state} = DevCommands.run(state, ".go xyz " <> args)
@@ -591,7 +593,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
         assert_received {:"$gen_cast",
                          {:send_packet,
                           %Message.SmsgMessagechat{
-                            message: "Invalid command. Use: .go xyz <x> <y> <z> [map] [facing]"
+                            message: "Invalid command. Use: .go xyz <x> <y> <z> [map|here] [facing]"
                           }}}
       end
 
@@ -623,6 +625,15 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
       assert message == "Teleporting to 3680.53, -3643.8, 140.03 on map 329 / instance #{world.instance_id}"
 
       assert_receive {:"$gen_cast", {:start_teleport, 3680.53, -3643.8, 140.03, ^world}}
+    end
+
+    test "faces the given angle in the current instance copy" do
+      world = WorldRef.instance(329, Unique.integer())
+      character = %{debug_character() | internal: %Internal{world: world}}
+      state = %{guid: 1, character: character}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".go xyz 3680.53 -3643.80 140.03 here 1.5")
+      assert_receive {:"$gen_cast", {:start_teleport, 3680.53, -3643.8, 140.03, 1.5, ^world}}
     end
   end
 
