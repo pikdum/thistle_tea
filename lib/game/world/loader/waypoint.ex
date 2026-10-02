@@ -51,6 +51,12 @@ defmodule ThistleTea.Game.World.Loader.Waypoint do
     :ok
   end
 
+  def put_routes(routes) when is_map(routes) do
+    catalog = @catalog_key |> :persistent_term.get(%{}) |> Map.merge(routes)
+    :persistent_term.put(@catalog_key, catalog)
+    :ok
+  end
+
   def context do
     @catalog_key
     |> :persistent_term.get(%{})

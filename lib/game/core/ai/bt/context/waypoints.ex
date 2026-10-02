@@ -1,6 +1,9 @@
 defmodule ThistleTea.Game.Core.AI.BT.Context.Waypoints do
   @moduledoc """
   Immutable VMangos waypoint catalog supplied to one behavior-tree tick.
+  Besides the vmangos path sources (0 guid or entry, 1 guid, 2 entry,
+  3 special), source 4 selects the `script_waypoint` path of a C++-scripted
+  escort (`Core.Quest.QuestEscort`).
   """
 
   alias ThistleTea.Game.Core.AI.ScriptStep
@@ -21,22 +24,22 @@ defmodule ThistleTea.Game.Core.AI.BT.Context.Waypoints do
     guid_key = positive_or(step.dataint, Guid.low_guid(guid))
     entry_key = positive_or(step.dataint2, positive_or(entry, Guid.entry(guid)))
 
-    route =
-      case step.datalong do
-        0 -> Map.get(routes, {:guid, guid_key}) || Map.get(routes, {:entry, entry_key})
-        1 -> Map.get(routes, {:guid, guid_key})
-        2 -> Map.get(routes, {:entry, entry_key})
-        3 -> Map.get(routes, {:special, entry_key})
-        _source -> nil
-      end
-
-    case route do
-      %WaypointRoute{} -> WaypointRoute.start(route, step.datalong2, step.datalong4 != 0)
+    case route(routes, step.datalong, guid_key, entry_key) do
+      %WaypointRoute{} = route -> WaypointRoute.start(route, step.datalong2, step.datalong4 != 0)
       nil -> nil
     end
   end
 
   def resolve(%__MODULE__{}, _entity, %ScriptStep{}), do: nil
+
+  defp route(routes, 0, guid_key, entry_key),
+    do: Map.get(routes, {:guid, guid_key}) || Map.get(routes, {:entry, entry_key})
+
+  defp route(routes, 1, guid_key, _entry_key), do: Map.get(routes, {:guid, guid_key})
+  defp route(routes, 2, _guid_key, entry_key), do: Map.get(routes, {:entry, entry_key})
+  defp route(routes, 3, _guid_key, entry_key), do: Map.get(routes, {:special, entry_key})
+  defp route(routes, 4, _guid_key, entry_key), do: Map.get(routes, {:escort, entry_key})
+  defp route(_routes, _source, _guid_key, _entry_key), do: nil
 
   defp positive_or(value, _fallback) when is_integer(value) and value > 0, do: value
   defp positive_or(_value, fallback), do: fallback

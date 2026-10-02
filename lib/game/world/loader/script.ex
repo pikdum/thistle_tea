@@ -181,25 +181,33 @@ defmodule ThistleTea.Game.World.Loader.Script do
     end
   end
 
-  defp resolve_texts(steps) do
+  def resolve_texts(steps) do
     texts_by_id =
       steps
+      |> Enum.flat_map(&with_sub_steps/1)
       |> Enum.flat_map(&ScriptStep.talk_text_ids/1)
       |> load_broadcast_texts()
 
-    Enum.map(steps, fn
-      %ScriptStep{command: :talk} = step ->
-        texts =
-          step
-          |> ScriptStep.talk_text_ids()
-          |> Enum.flat_map(&List.wrap(Map.get(texts_by_id, &1)))
+    attach_texts(steps, texts_by_id)
+  end
 
-        %{step | texts: texts}
-
-      step ->
-        step
+  defp attach_texts(steps, texts_by_id) do
+    Enum.map(steps, fn %ScriptStep{} = step ->
+      sub_scripts = Map.new(step.sub_scripts, fn {id, sub_steps} -> {id, attach_texts(sub_steps, texts_by_id)} end)
+      attach_step_texts(%{step | sub_scripts: sub_scripts}, texts_by_id)
     end)
   end
+
+  defp attach_step_texts(%ScriptStep{command: :talk} = step, texts_by_id) do
+    texts =
+      step
+      |> ScriptStep.talk_text_ids()
+      |> Enum.flat_map(&List.wrap(Map.get(texts_by_id, &1)))
+
+    %{step | texts: texts}
+  end
+
+  defp attach_step_texts(%ScriptStep{} = step, _texts_by_id), do: step
 
   defp load_broadcast_texts([]), do: %{}
 

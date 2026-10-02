@@ -54,6 +54,17 @@ defmodule ThistleTea.Game.World.Loader.Quest do
     :ok
   end
 
+  def append_start_steps(quest_id, steps) when is_list(steps) do
+    case get(quest_id) do
+      %Quest{} = quest ->
+        :ets.insert(__MODULE__, {{:quest, quest_id}, %{quest | start_script_steps: quest.start_script_steps ++ steps}})
+        :ok
+
+      nil ->
+        :ok
+    end
+  end
+
   def attach_required_condition(%Quest{required_condition_id: 0} = quest, _conditions), do: quest
 
   def attach_required_condition(%Quest{required_condition_id: condition_id} = quest, conditions)
