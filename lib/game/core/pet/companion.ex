@@ -118,7 +118,7 @@ defmodule ThistleTea.Game.Core.Pet.Companion do
 
   def remember_name(%Character{} = character, guid, %PetName{} = name) do
     case relationship(character) do
-      %Companion{kind: :hunter_pet, status: {:active, %EntityRef{guid: ^guid}}} = companion ->
+      %Companion{kind: kind, status: {:active, %EntityRef{guid: ^guid}}} = companion when kind in @summon_kinds ->
         put_relationship(character, %{companion | name: name})
 
       _ ->
@@ -406,8 +406,8 @@ defmodule ThistleTea.Game.Core.Pet.Companion do
     if entry(character) == entry, do: relationship(character).health
   end
 
-  defp retained_name(character, :hunter_pet, entry) do
-    if entry(character) == entry and relationship(character).kind == :hunter_pet, do: relationship(character).name
+  defp retained_name(character, kind, entry) when kind in @summon_kinds do
+    if entry(character) == entry and relationship(character).kind == kind, do: relationship(character).name
   end
 
   defp retained_name(_character, _kind, _entry), do: nil

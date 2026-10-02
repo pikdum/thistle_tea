@@ -6,12 +6,13 @@ defmodule ThistleTea.Game.World.Entity.Player.CompanionOwner.Attachment do
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Pet.Companion.EntityRef
+  alias ThistleTea.Game.Core.Pet.PetName
   alias ThistleTea.Game.Core.Pet.PetProgression
   alias ThistleTea.Game.Network.Message.SmsgPetNameQueryResponse
   alias ThistleTea.Game.Network.UpdateObject
 
   @enforce_keys [:kind, :entity_ref, :pid, :spells]
-  defstruct [:kind, :entity_ref, :pid, :spells, :create, :progress, :name_response, restore_automatically?: true]
+  defstruct [:kind, :entity_ref, :pid, :spells, :create, :progress, :name, :name_response, restore_automatically?: true]
 
   @type t :: %__MODULE__{
           kind: Companion.kind(),
@@ -19,6 +20,7 @@ defmodule ThistleTea.Game.World.Entity.Player.CompanionOwner.Attachment do
           pid: pid(),
           spells: list(),
           create: term(),
+          name: PetName.t() | nil,
           name_response: %SmsgPetNameQueryResponse{} | nil,
           restore_automatically?: boolean()
         }
@@ -32,9 +34,15 @@ defmodule ThistleTea.Game.World.Entity.Player.CompanionOwner.Attachment do
       create: UpdateObject.from_entity(entity),
       progress: PetProgression.snapshot(entity),
       restore_automatically?: restore_automatically?(entity.internal.spawn),
+      name: summoned_name(entity),
       name_response: SmsgPetNameQueryResponse.for_pet(entity)
     }
   end
+
+  defp summoned_name(%Mob{internal: %{pet: %Pet{kind: :summon}, name: name}, unit: unit}) when is_binary(name),
+    do: %PetName{name: name, timestamp: unit.pet_name_timestamp || 0}
+
+  defp summoned_name(_entity), do: nil
 
   defp restore_automatically?(%Spawn{despawn_delay_ms: delay}) when is_integer(delay) and delay > 0, do: false
   defp restore_automatically?(_spawn), do: true
@@ -74,6 +82,7 @@ defmodule ThistleTea.Game.World.Entity.Player.CompanionOwner do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Pet.Companion.EntityRef
+  alias ThistleTea.Game.Core.Pet.PetName
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.CompanionOwner.Attachment
@@ -108,6 +117,7 @@ defmodule ThistleTea.Game.World.Entity.Player.CompanionOwner do
       |> Companion.activate(attachment.kind, entity_ref)
       |> Companion.capture_progress(attachment.progress)
       |> Companion.set_automatic_restore(attachment.restore_automatically?)
+      |> remember_name(entity_ref.guid, attachment.name)
 
     %{state | character: character, companion_monitor: monitor}
   end
@@ -210,6 +220,9 @@ defmodule ThistleTea.Game.World.Entity.Player.CompanionOwner do
   end
 
   def suspend_hunter_pet(entity, _guid), do: entity
+
+  defp remember_name(character, _guid, nil), do: character
+  defp remember_name(character, guid, %PetName{} = name), do: Companion.remember_name(character, guid, name)
 
   defp replace_previous(%State{} = state, next_guid) do
     case Companion.relationship(state.character) do

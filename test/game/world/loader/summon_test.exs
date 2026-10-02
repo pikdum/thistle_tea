@@ -83,7 +83,7 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
       assert (Summon.build_pet(416, owner).unit.flags &&& 0x10) == 0
     end
 
-    test "draws a fresh demon name on every summon" do
+    test "draws a demon name once and keeps it across restores" do
       previous = :ets.lookup(PetNameLoader, 416)
       PetNameLoader.put(416, ["Zig"], ["zag"])
 
@@ -99,7 +99,18 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
         movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}}
       }
 
-      assert Summon.build_pet(416, owner).internal.name == "Zigzag"
+      pet = Summon.build_pet(416, owner)
+      assert pet.internal.name == "Zigzag"
+
+      restored =
+        owner
+        |> Companion.activate(:guardian, %EntityRef{guid: pet.object.guid, entry: 416, spell_id: 688})
+        |> Companion.remember_name(pet.object.guid, %PetName{name: "Gobtik", timestamp: 1})
+        |> Companion.suspend()
+        |> then(&Summon.build_pet(416, &1))
+
+      assert restored.internal.name == "Gobtik"
+      assert Summon.build_pet(416, Companion.clear(owner)).internal.name == "Zigzag"
     end
 
     test "restores only family passives after untraining and retains the reset price history" do
