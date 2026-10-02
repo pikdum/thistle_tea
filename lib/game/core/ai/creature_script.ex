@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.ArchmageTervosh
   alias ThistleTea.Game.Core.AI.CreatureScript.Bartleby
   alias ThistleTea.Game.Core.AI.CreatureScript.ChickenCluck
+  alias ThistleTea.Game.Core.AI.CreatureScript.CombatGadgets
   alias ThistleTea.Game.Core.AI.CreatureScript.FelwoodOoze
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
   alias ThistleTea.Game.Core.AI.CreatureScript.RabidThistleBear
@@ -43,6 +44,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     ArchmageTervosh,
     Bartleby,
     ChickenCluck,
+    CombatGadgets,
     FelwoodOoze,
     LazyPeon,
     RabidThistleBear,
