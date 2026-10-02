@@ -2,13 +2,15 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.WaypointRoute do
   @moduledoc """
   A mob's waypoint patrol route, tracking the current destination point and
   advancing through the loop. `World.Loader.Waypoint` builds it from
-  `creature_movement` rows.
+  `creature_movement` rows. The last point reached is where the mob returns
+  after combat; until it reaches one, it returns to its spawn.
   """
 
   alias ThistleTea.Game.Core.Entity.Component.Internal.Waypoint
 
   defstruct first_point: 0,
             destination_point: 0,
+            last_point: nil,
             points: %{},
             repeat?: true,
             cyclic?: false,
@@ -22,7 +24,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.WaypointRoute do
         route.first_point
       end
 
-    %{route | destination_point: destination_point, repeat?: repeat?}
+    %{route | destination_point: destination_point, last_point: nil, repeat?: repeat?}
   end
 
   def destination_waypoint(%__MODULE__{destination_point: id, points: points}) do
@@ -44,6 +46,13 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.WaypointRoute do
     next_id = points |> Map.keys() |> Enum.filter(&(&1 > id)) |> Enum.min(fn -> nil end)
     next_id = next_id || if(route.repeat?, do: first_point)
 
-    %{route | destination_point: next_id}
+    %{route | destination_point: next_id, last_point: id || route.last_point}
+  end
+
+  def reset_position(%__MODULE__{last_point: id, points: points}) do
+    case Map.get(points, id) do
+      %Waypoint{position: {x, y, z, _o}} -> {x, y, z}
+      _unreached -> nil
+    end
   end
 end

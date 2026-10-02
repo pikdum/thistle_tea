@@ -515,10 +515,14 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
       delay_ms = Movement.next_spatial_update_delay(state, now)
       {BT.running(delay_ms, :movement), state, blackboard}
     else
-      state = state |> restore_spawn_orientation() |> TemporaryFaction.restore(:reach_home)
+      state = state |> restore_home_orientation(blackboard) |> TemporaryFaction.restore(:reach_home)
       {state, blackboard} = EventAI.on_reached_home(state, blackboard, now, context)
       {:success, state, Blackboard.clear_move_target(blackboard)}
     end
+  end
+
+  defp restore_home_orientation(%Mob{} = state, %Blackboard{} = blackboard) do
+    if waypoint_reset_position(state, blackboard), do: state, else: restore_spawn_orientation(state)
   end
 
   defp restore_spawn_orientation(
@@ -550,7 +554,8 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
          %Blackboard{} = blackboard,
          %Context{} = context
        ) do
-    navigation = %{blackboard.navigation | target: Formation.home_position(context) || {x, y, z}, returning_home?: true}
+    home = Formation.home_position(context) || waypoint_reset_position(state, blackboard) || {x, y, z}
+    navigation = %{blackboard.navigation | target: home, returning_home?: true}
     {:success, state, %{blackboard | navigation: navigation}}
   end
 
@@ -1363,6 +1368,13 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   end
 
   defp waypoint_route(%Mob{}, %Blackboard{}), do: nil
+
+  defp waypoint_reset_position(%Mob{} = state, %Blackboard{} = blackboard) do
+    case waypoint_route(state, blackboard) do
+      %WaypointRoute{} = route -> WaypointRoute.reset_position(route)
+      nil -> nil
+    end
+  end
 
   defp increment_waypoint(
          %Mob{} = state,

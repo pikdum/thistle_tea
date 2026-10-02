@@ -118,4 +118,22 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.WaypointRouteTest do
       assert WaypointRoute.increment_waypoint(route).destination_point == nil
     end
   end
+
+  describe "reset_position/1" do
+    test "returns to the last point reached, forgetting it when the route restarts" do
+      route = %WaypointRoute{
+        first_point: 1,
+        destination_point: 1,
+        points: %{1 => %Waypoint{position: {1.0, 2.0, 3.0, 0.5}}, 2 => %Waypoint{position: {4.0, 5.0, 6.0, nil}}},
+        repeat?: false
+      }
+
+      assert WaypointRoute.reset_position(route) == nil
+      reached = route |> WaypointRoute.increment_waypoint() |> WaypointRoute.increment_waypoint()
+      assert reached.destination_point == nil
+      assert WaypointRoute.reset_position(reached) == {4.0, 5.0, 6.0}
+      assert WaypointRoute.reset_position(WaypointRoute.increment_waypoint(reached)) == {4.0, 5.0, 6.0}
+      assert WaypointRoute.reset_position(WaypointRoute.start(reached, 2, true)) == nil
+    end
+  end
 end

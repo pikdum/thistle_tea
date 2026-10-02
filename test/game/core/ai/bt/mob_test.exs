@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Combat.Engagement
   alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Combat.Threat
   alias ThistleTea.Game.Core.Effects
@@ -534,6 +535,33 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       end)
 
       assert_received :home_pathfinding
+    end
+
+    test "evading walkers return to the last point they reached instead of their spawn" do
+      points = %{
+        1 => %Waypoint{position: {5.0, 0.0, 0.0, nil}},
+        2 => %Waypoint{position: {10.0, 0.0, 0.0, nil}},
+        3 => %Waypoint{position: {15.0, 0.0, 0.0, nil}}
+      }
+
+      reached = %WaypointRoute{first_point: 1, destination_point: 3, last_point: 2, points: points}
+      fresh = %{reached | destination_point: 1, last_point: nil}
+
+      for {scripted, spawned, home} <- [
+            {reached, nil, {10.0, 0.0, 0.0}},
+            {nil, reached, {10.0, 0.0, 0.0}},
+            {fresh, nil, {0.0, 0.0, 0.0}}
+          ] do
+        mob = fixture_mob(position: {30.0, 0.0, 0.0, 0.0}, spline_nodes: [])
+        blackboard = %Blackboard{navigation: %Blackboard.Navigation{scripted_waypoint_route: scripted}}
+        spawn = %Spawn{position: {0.0, 0.0, 0.0}, waypoint_route: spawned}
+        mob = %{mob | internal: %{mob.internal | spawn: spawn, blackboard: blackboard}}
+        %{entity: mob} = Engagement.enter(mob, player_guid(), 0, selection: :target)
+
+        navigation = MobBT.reset_after_combat(mob, Context.new(1_000)).internal.blackboard.navigation
+        assert navigation.returning_home?
+        assert navigation.move_target == home
+      end
     end
 
     test "arrival reports the original point once and failed paths cannot advance it" do
