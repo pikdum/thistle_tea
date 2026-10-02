@@ -630,6 +630,25 @@ defmodule ThistleTea.Game.Core.AI.Script do
     end
   end
 
+  defp execute(
+         %Mob{object: %{guid: guid}} = state,
+         blackboard,
+         %ScriptStep{command: :movement, datalong: 15} = step,
+         leader,
+         now,
+         %Context{random: random}
+       )
+       when is_integer(leader) and leader > 0 and leader != guid do
+    {distance, angle} =
+      case step.position do
+        {distance, _y, _z, angle} -> {max(distance, 0.0), angle}
+        nil -> {0.0, 0.0}
+      end
+
+    angle = if angle < 0, do: Random.float(random) * 2 * :math.pi(), else: angle
+    {halt_scripted_movement(state, now), Blackboard.start_follow(blackboard, leader, distance, angle)}
+  end
+
   defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :movement}, _target, _now, %Context{}) do
     {state, blackboard}
   end

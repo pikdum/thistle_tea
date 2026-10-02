@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
   alias ThistleTea.Game.Core.AI.BT.EventAI
   alias ThistleTea.Game.Core.AI.BT.Fear, as: FearBT
+  alias ThistleTea.Game.Core.AI.BT.Follow
   alias ThistleTea.Game.Core.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Core.AI.BT.Navigation
   alias ThistleTea.Game.Core.AI.BT.Pet.TargetSelection
@@ -24,7 +25,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
-  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Movement
@@ -33,11 +33,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
 
   @follow_distance 2.0
   @follow_angle :math.pi() / 2
-  @follow_start_distance 0.25
-  @follow_repath_distance 0.5
-  @stationary_slack_factor 1.4
-  @follow_prediction_ms 500
-  @follow_tick_ms 100
   @idle_delay_ms 500
 
   def tree do
@@ -222,7 +217,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
           do: state,
           else: state |> run() |> Navigation.move_to(destination, [], context)
 
-      {{:running, @follow_tick_ms}, state, blackboard}
+      {{:running, Follow.tick_ms()}, state, blackboard}
     end
   end
 
@@ -236,7 +231,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
 
     case Perception.position(perception, owner) do
       {_world, x, y, z} ->
-        if distance_to(state, {x, y, z}) <= stationary_slack(state, owner, perception),
+        if distance_to(state, {x, y, z}) <= Follow.stationary_slack(state, @follow_distance, owner, perception),
           do: finish_return(state, blackboard),
           else: follow_owner(state, blackboard, context)
 
@@ -262,31 +257,10 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
     %{state | internal: %{state.internal | navigation_intents: []}}
   end
 
-  def follow_owner(
-        %Mob{internal: %Internal{pet: %Pet{owner_guid: owner_guid}, world: world}} = state,
-        blackboard,
-        %Context{now: now, perception: perception} = context
-      ) do
-    with {^world, x, y, z} <- Perception.projected_position(perception, owner_guid, @follow_prediction_ms),
-         %{orientation: orientation} when is_number(orientation) <- Perception.metadata(perception, owner_guid) do
-      destination = follow_position(state, {x, y, z}, orientation)
-      state = Movement.sync_position(state, now)
-
-      state =
-        if should_repath?(state, destination, owner_guid, {x, y, z}, context) do
-          velocity = catchup_velocity(state, destination)
-
-          state
-          |> run()
-          |> follow_with_context(destination, orientation, velocity, context)
-          |> face(orientation)
-        else
-          state
-        end
-
-      {{:running, @follow_tick_ms}, state, blackboard}
-    else
-      _ -> {:success, Effects.enqueue(state, Effects.despawn_self(0, 0)), blackboard}
+  def follow_owner(%Mob{internal: %Internal{pet: %Pet{owner_guid: owner_guid}}} = state, blackboard, context) do
+    case Follow.step(state, owner_guid, @follow_distance, follow_angle(state), context) do
+      {:ok, state} -> {{:running, Follow.tick_ms()}, state, blackboard}
+      :lost -> {:success, Effects.enqueue(state, Effects.despawn_self(0, 0)), blackboard}
     end
   end
 
@@ -318,15 +292,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
     {:success, Movement.stop(state, now), blackboard}
   end
 
-  defp face(%Mob{movement_block: %MovementBlock{position: {x, y, z, _o}} = movement_block} = state, orientation) do
-    %{state | movement_block: %{movement_block | position: {x, y, z, orientation}}}
-  end
-
-  defp follow_position(state, {x, y, z}, orientation) do
-    angle = orientation + follow_angle(state)
-    {x + :math.cos(angle) * @follow_distance, y + :math.sin(angle) * @follow_distance, z}
-  end
-
   defp follow_angle(%Mob{internal: %{pet: %Pet{kind: :mini_pet}}}), do: :math.pi()
   defp follow_angle(%Mob{internal: %{pet: %Pet{follow_angle: angle}}}) when is_number(angle), do: angle
   defp follow_angle(_state), do: @follow_angle
@@ -337,57 +302,8 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
 
   defp run(%Mob{internal: %Internal{} = internal} = state), do: %{state | internal: %{internal | running: true}}
 
-  defp should_repath?(state, destination, owner_guid, owner_position, %Context{} = context) do
-    not settled_at_owner?(state, owner_guid, owner_position, context) and
-      distance_to(state, destination) > @follow_start_distance and
-      destination_changed?(state.movement_block.spline_nodes, destination)
-  end
-
-  defp settled_at_owner?(state, owner_guid, owner_position, %Context{now: now, perception: perception}) do
-    not Perception.moving?(perception, owner_guid) and not Movement.moving?(state, now) and
-      distance_to(state, owner_position) <= stationary_slack(state, owner_guid, perception)
-  end
-
-  defp stationary_slack(%Mob{unit: %Unit{bounding_radius: radius}}, owner_guid, perception) do
-    @stationary_slack_factor * @follow_distance + bounding_radius(radius) +
-      owner_bounding_radius(owner_guid, perception)
-  end
-
-  defp owner_bounding_radius(owner_guid, perception) do
-    case Perception.metadata(perception, owner_guid) do
-      %{bounding_radius: radius} -> bounding_radius(radius)
-      _ -> Unit.default_bounding_radius()
-    end
-  end
-
-  defp bounding_radius(radius) when is_number(radius) and radius > 0, do: radius
-  defp bounding_radius(_radius), do: Unit.default_bounding_radius()
-
-  defp destination_changed?([_ | _] = nodes, destination) do
-    point_distance(List.last(nodes), destination) > @follow_repath_distance
-  end
-
-  defp destination_changed?(_nodes, _destination), do: true
-
-  defp catchup_velocity(%Mob{movement_block: %{run_speed: speed}} = state, destination)
-       when is_number(speed) and speed > 0 do
-    distance = distance_to(state, destination)
-    factor = if distance > speed, do: min(1.0 + 0.04 * (distance - speed), 2.1), else: 1.0
-    speed * factor
-  end
-
-  defp catchup_velocity(_state, _destination), do: nil
-
-  defp point_distance({x, y, z}, {tx, ty, tz}) do
-    :math.sqrt(:math.pow(tx - x, 2) + :math.pow(ty - y, 2) + :math.pow(tz - z, 2))
-  end
-
   defp chase_with_context(%Mob{} = state, target_guid, destination, %Context{} = context) do
     Navigation.chase(state, target_guid, destination, context)
-  end
-
-  defp follow_with_context(%Mob{} = state, destination, orientation, velocity, %Context{} = context) do
-    Navigation.follow(state, destination, orientation, velocity, context)
   end
 
   defp xyz({x, y, z, _o}), do: {x, y, z}

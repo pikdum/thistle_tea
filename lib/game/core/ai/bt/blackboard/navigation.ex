@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard.Navigation do
             move_target: nil,
             scripted_waypoint_route: nil,
             movement_override: nil,
+            follow: nil,
             wander_anchor: nil,
             wander_radius: nil,
             orientation: nil,

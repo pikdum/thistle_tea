@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard do
 
   alias __MODULE__.Combat
   alias __MODULE__.EventAI
+  alias __MODULE__.Follow
   alias __MODULE__.Guardian
   alias __MODULE__.Maintenance
   alias __MODULE__.Navigation
@@ -93,6 +94,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard do
       navigation
       | scripted_waypoint_route: route,
         movement_override: :waypoint,
+        follow: nil,
         wander_anchor: nil,
         wander_radius: nil,
         target: nil,
@@ -111,6 +113,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard do
       navigation
       | scripted_waypoint_route: nil,
         movement_override: :random,
+        follow: nil,
         wander_anchor: anchor,
         wander_radius: radius,
         target: nil,
@@ -136,6 +139,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard do
       navigation
       | scripted_waypoint_route: nil,
         movement_override: :idle,
+        follow: nil,
         wander_anchor: nil,
         wander_radius: nil,
         target: nil,
@@ -150,6 +154,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard do
       navigation
       | scripted_waypoint_route: nil,
         movement_override: :home,
+        follow: nil,
         wander_anchor: nil,
         wander_radius: nil,
         target: position,
@@ -159,11 +164,31 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard do
     %{blackboard | navigation: navigation}
   end
 
+  def start_follow(%__MODULE__{navigation: navigation} = blackboard, guid, distance, angle)
+      when is_integer(guid) and guid > 0 and is_number(distance) and is_number(angle) do
+    navigation = %{
+      navigation
+      | scripted_waypoint_route: nil,
+        movement_override: :follow,
+        follow: %Follow{guid: guid, distance: distance, angle: angle},
+        wander_anchor: nil,
+        wander_radius: nil,
+        target: nil,
+        move_target: nil
+    }
+
+    %{blackboard | navigation: navigation}
+  end
+
+  def following(%__MODULE__{navigation: %{movement_override: :follow, follow: %Follow{} = follow}}), do: follow
+  def following(_blackboard), do: nil
+
   def clear_movement_override(%__MODULE__{navigation: navigation} = blackboard) do
     navigation = %{
       navigation
       | scripted_waypoint_route: nil,
         movement_override: nil,
+        follow: nil,
         wander_anchor: nil,
         wander_radius: nil,
         target: nil,

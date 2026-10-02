@@ -333,12 +333,22 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
     Enum.filter([owner_guid, target], &(is_integer(&1) and &1 > 0))
   end
 
-  defp direct_guids(%{internal: %Internal{auto_shot: auto_shot, threat: threat}, unit: %Unit{target: target}}) do
-    [auto_repeat_target(auto_shot), target | threat_guids(threat)]
+  defp direct_guids(%{
+         internal: %Internal{auto_shot: auto_shot, threat: threat} = internal,
+         unit: %Unit{target: target}
+       }) do
+    [auto_repeat_target(auto_shot), target, leader_guid(internal.blackboard) | threat_guids(threat)]
     |> Enum.filter(&(is_integer(&1) and &1 > 0))
   end
 
   defp direct_guids(_entity), do: []
+
+  defp leader_guid(blackboard) do
+    case Blackboard.following(Blackboard.ensure(blackboard)) do
+      %{guid: guid} -> guid
+      nil -> nil
+    end
+  end
 
   defp player_combat_guids(%Character{internal: %{threat_refs: refs}} = entity) do
     companion = Companion.summon_guid(entity)

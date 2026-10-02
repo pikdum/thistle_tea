@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   alias ThistleTea.Game.Core.AI.BT.EventAI, as: EventAIBT
   alias ThistleTea.Game.Core.AI.BT.Fear, as: FearBT
   alias ThistleTea.Game.Core.AI.BT.Flee
+  alias ThistleTea.Game.Core.AI.BT.Follow
   alias ThistleTea.Game.Core.AI.BT.Formation
   alias ThistleTea.Game.Core.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Core.AI.BT.Navigation
@@ -169,6 +170,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
         BT.action(&move_to_target_with_context/3),
         BT.action(&wait_for_scripted_home/3)
       ]),
+      BT.action(&Follow.tick/3),
       BT.action(&Formation.tick/3),
       BT.sequence([
         BT.condition(&has_waypoints?/2),
@@ -217,7 +219,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   end
 
   defp has_waypoints?(%Mob{}, %Blackboard{navigation: %NavigationMemory{movement_override: override}})
-       when override in [:idle, :random], do: false
+       when override in [:idle, :random, :follow], do: false
 
   defp has_waypoints?(%Mob{} = state, %Blackboard{} = blackboard),
     do: is_struct(waypoint_destination(state, blackboard), Waypoint)
@@ -529,6 +531,14 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   defp home_orientation(%Spawn{movement_block: %MovementBlock{position: {_x, _y, _z, orientation}}}), do: orientation
 
   defp home_orientation(%Spawn{}), do: nil
+
+  defp set_tether_target(
+         %Mob{} = state,
+         %Blackboard{navigation: %NavigationMemory{movement_override: :follow}} = blackboard,
+         %Context{}
+       ) do
+    {:failure, state, blackboard}
+  end
 
   defp set_tether_target(
          %Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}} = state,
