@@ -164,9 +164,50 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScriptTest do
     end
   end
 
+  describe "the Twilight Grove" do
+    test "the nearest Twilight Corrupter whispers to a player on The Nightmare's Corruption" do
+      player = character(quests: [{8735, :incomplete}])
+      guid = player.object.guid
+      corrupter = Guid.from_low_guid(:mob, 15_625, Unique.integer())
+      perception = Perception.new(0, nil, %{}, %{mobs: [{corrupter, 300.0}], players: [], game_objects: []})
+
+      assert [
+               %Effects.ForwardScriptSteps{
+                 target_guid: ^corrupter,
+                 source_guid: ^guid,
+                 steps: [%ScriptStep{command: :talk, datalong: 4, dataint: 11_271}]
+               }
+             ] = effects(4017, player, Context.new(0, perception: perception))
+    end
+
+    test "raises a Twilight Corrupter to whisper when none is about" do
+      player = character(quests: [{8735, :incomplete}])
+      guid = player.object.guid
+
+      assert [%Effects.SummonCreature{summon: summon, steps: arrival, target_guid: ^guid}] = effects(4017, player)
+
+      assert %{
+               entry: 15_625,
+               position: {-10_335.9, -489.051, 50.6233, 2.59373},
+               despawn_type: 7,
+               unique?: true,
+               unique_limit: 1,
+               unique_distance: 350,
+               attack_guid: nil
+             } = summon
+
+      assert [%ScriptStep{command: :talk, datalong: 4, dataint: 11_271, target_type: :provided}] = arrival
+    end
+
+    test "leaves the grove quiet for everyone else" do
+      assert [] = effects(4017, character())
+      assert [] = effects(4017, character(quests: [{8735, :complete}]))
+    end
+  end
+
   describe "summon_entries/0" do
     test "lists every creature a trigger can call" do
-      assert Enum.sort(AreaTriggerScript.summon_entries()) == [1981, 4967, 9683 | @ancients]
+      assert Enum.sort(AreaTriggerScript.summon_entries()) == [1981, 4967, 9683 | @ancients] ++ [15_625]
     end
   end
 

@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.SicklyCritter
   alias ThistleTea.Game.Core.AI.CreatureScript.Triage
   alias ThistleTea.Game.Core.AI.CreatureScript.TwiggyFlathead
+  alias ThistleTea.Game.Core.AI.CreatureScript.TwilightCorrupter
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
 
@@ -37,7 +38,17 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
 
   @optional_callbacks quest_start_steps: 0, quest_end_steps: 0
 
-  @scripts [ArchmageTervosh, Bartleby, ChickenCluck, FelwoodOoze, LazyPeon, SicklyCritter, Triage, TwiggyFlathead]
+  @scripts [
+    ArchmageTervosh,
+    Bartleby,
+    ChickenCluck,
+    FelwoodOoze,
+    LazyPeon,
+    SicklyCritter,
+    Triage,
+    TwiggyFlathead,
+    TwilightCorrupter
+  ]
   @timed_script 1
 
   def ported?(entry), do: not is_nil(script(entry))

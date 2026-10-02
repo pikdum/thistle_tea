@@ -17,13 +17,14 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScript do
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.ScentOfLarkorwi
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.SentryPoint
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.TwiggyFlathead
+  alias ThistleTea.Game.Core.AI.AreaTriggerScript.TwilightGrove
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
 
   @callback triggers() :: [pos_integer()]
   @callback steps(pos_integer(), {number(), number(), number()}) :: [%ScriptStep{}]
 
-  @scripts [HuldarMiran, IrontreeWood, Ravenholdt, ScentOfLarkorwi, SentryPoint, TwiggyFlathead]
+  @scripts [HuldarMiran, IrontreeWood, Ravenholdt, ScentOfLarkorwi, SentryPoint, TwiggyFlathead, TwilightGrove]
   @origin {0.0, 0.0, 0.0}
 
   def ported?(trigger_id), do: not is_nil(script(trigger_id))
