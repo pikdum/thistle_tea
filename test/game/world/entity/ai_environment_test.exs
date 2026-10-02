@@ -44,7 +44,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironmentTest do
 
       entity = %Mob{
         internal: %Internal{world: WorldRef.open(999), blackboard: blackboard},
-        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, walk_speed: 2.5, run_speed: 7.0}
       }
 
       ordinary = AIEnvironment.move_to(entity, {4.0, 5.0, 6.0}, [], 1_000)

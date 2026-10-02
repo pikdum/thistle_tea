@@ -14,10 +14,38 @@ defmodule ThistleTea.Native.Namigator do
     {0, "Azeroth"},
     {1, "Kalimdor"},
     {30, "PVPZone01"},
+    {33, "Shadowfang"},
+    {34, "StormwindJail"},
     {36, "DeadminesInstance"},
-    {451, "development"},
-    {389, "OrgrimmarInstance"},
+    {43, "WailingCaverns"},
+    {47, "RazorfenKraulInstance"},
+    {48, "Blackfathom"},
+    {70, "Uldaman"},
+    {90, "GnomeragonInstance"},
+    {109, "SunkenTemple"},
+    {129, "RazorfenDowns"},
+    {189, "MonasteryInstances"},
+    {209, "TanarisInstance"},
+    {229, "BlackRockSpire"},
+    {230, "BlackrockDepths"},
+    {249, "OnyxiaLairInstance"},
+    {269, "CavernsOfTime"},
+    {289, "SchoolofNecromancy"},
+    {309, "Zul'gurub"},
     {329, "Stratholme"},
+    {349, "Mauradon"},
+    {369, "DeeprunTram"},
+    {389, "OrgrimmarInstance"},
+    {409, "MoltenCore"},
+    {429, "DireMaul"},
+    {449, "AlliancePVPBarracks"},
+    {450, "HordePVPBarracks"},
+    {451, "development"},
+    {469, "BlackwingLair"},
+    {489, "PVPZone03"},
+    {509, "AhnQiraj"},
+    {529, "PVPZone04"},
+    {531, "AhnQirajTemple"},
     {533, "Stratholme Raid"}
   ]
 
@@ -43,6 +71,8 @@ defmodule ThistleTea.Native.Namigator do
 
     failures == []
   end
+
+  def loaded?(map_id), do: Map.has_key?(:persistent_term.get(@maps_key, %{}), map_id)
 
   def get_zone_and_area(map_id, x, y, z) do
     with_map(map_id, &get_zone_and_area_native(&1, x, y, z))

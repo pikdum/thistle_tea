@@ -301,7 +301,7 @@
               echo "Building BVH from: ''${data_dir}"
               MapBuilder --data "''${data_dir}" --output "''${out_dir}" --bvh --threads "''${threads}" --logLevel 1
 
-              for map in Azeroth Kalimdor development OrgrimmarInstance Stratholme DeadminesInstance PVPZone01 "Stratholme Raid"; do
+              for map in Azeroth Kalimdor PVPZone01 Shadowfang StormwindJail DeadminesInstance WailingCaverns RazorfenKraulInstance Blackfathom Uldaman GnomeragonInstance SunkenTemple RazorfenDowns MonasteryInstances TanarisInstance BlackRockSpire BlackrockDepths OnyxiaLairInstance CavernsOfTime SchoolofNecromancy "Zul'gurub" Stratholme Mauradon DeeprunTram OrgrimmarInstance MoltenCore DireMaul AlliancePVPBarracks HordePVPBarracks development BlackwingLair PVPZone03 AhnQiraj PVPZone04 AhnQirajTemple "Stratholme Raid"; do
                 echo "Building ''${map}..."
                 MapBuilder --data "''${data_dir}" --output "''${out_dir}" --map "''${map}" --threads "''${threads}" --logLevel 1
               done

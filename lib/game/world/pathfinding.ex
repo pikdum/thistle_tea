@@ -1,7 +1,9 @@
 defmodule ThistleTea.Game.World.Pathfinding do
   @moduledoc """
   Navigation-mesh queries over the namigator NIF: pathfinding, random points,
-  terrain and liquid heights, interiors, and zone/area lookup.
+  terrain and liquid heights, interiors, and zone/area lookup. A map without a
+  loaded navigation mesh paths in a straight line, as vmangos does without
+  mmaps.
   """
   alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.World.Pathfinding.Aquatic
@@ -58,6 +60,7 @@ defmodule ThistleTea.Game.World.Pathfinding do
 
   def find_path(map_id, start, destination, opts \\ []) do
     cond do
+      not Namigator.loaded?(map_id) -> [destination]
       Keyword.get(opts, :flying?, false) -> flight_path(map_id, start, destination, opts)
       Keyword.has_key?(opts, :can_swim?) -> Aquatic.path(map_id, start, destination, opts, &ground_path/4)
       true -> ground_path(map_id, start, destination, opts)
