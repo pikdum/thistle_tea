@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TrapDisarmingTest do
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   @moduletag :namigator_maps
   @entry 950_211
@@ -100,7 +101,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TrapDisarmingTest do
     world = WorldRef.open(451)
     object = GameObject.build_summoned(template, world, {16_303.2, 16_254.1, 69.44, 0.0})
     {:ok, pid} = World.start_incarnation(object)
-    id = System.unique_integer([:positive, :monotonic])
+    id = Unique.integer()
 
     character = %Character{
       id: id,

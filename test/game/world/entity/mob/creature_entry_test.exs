@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CreatureEntryTest do
       spell = %Spell{id: 23_359, effects: [%Effect{index: 0, type: :dummy}]}
       refute Spell.starts_combat?(spell)
       caster_guid = Guid.runtime(:mob, 990_513)
-      EntityRegistry.register(caster_guid)
+      {:ok, _} = EntityRegistry.register(caster_guid)
       {:ok, pid} = World.start_entity(with_spell_hit(mob, template, spell))
       Entity.receive_spell(mob.object.guid, %CastContext{caster_guid: caster_guid, caster_level: 60}, spell)
       GenServer.cast(pid, {:send_update_to, self()})
@@ -72,7 +72,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CreatureEntryTest do
       }
 
       caster_guid = Guid.runtime(:mob, 990_513)
-      EntityRegistry.register(caster_guid)
+      {:ok, _} = EntityRegistry.register(caster_guid)
       {x, y, z, _orientation} = mob.movement_block.position
       dynamic = DynamicObject.build(caster_guid, mob.internal.world, spell, {x, y, z}, 10.0)
       World.update_position(dynamic)

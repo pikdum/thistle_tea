@@ -7,12 +7,13 @@ defmodule ThistleTea.Game.Network.Message.RaidInfoTest do
   alias ThistleTea.Game.Network.Message.SmsgInstanceSaveCreated
   alias ThistleTea.Game.Network.Message.SmsgRaidInstanceInfo
   alias ThistleTea.Game.Network.Opcodes
+  alias ThistleTea.Test.Unique
 
   describe "CMSG_REQUEST_RAID_INFO" do
     test "dispatches the native empty request and replies with an empty list for an unsaved player" do
       assert Dispatch.implemented?(Opcodes.get(:CMSG_REQUEST_RAID_INFO))
       message = CmsgRequestRaidInfo.from_binary(<<>>)
-      state = %{ready: true, guid: System.unique_integer([:positive])}
+      state = %{ready: true, guid: Unique.integer()}
       assert Inbound.handle(message, state) == state
       assert_receive {:"$gen_cast", {:send_packet, %SmsgRaidInstanceInfo{raids: []}}}
       assert Inbound.handle(message, %{ready: false}) == %{ready: false}

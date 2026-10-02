@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellGroupItemsTest do
   alias ThistleTea.Game.World.Entity.Player.UsableItems
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   setup [:scroll]
 
@@ -60,7 +61,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellGroupItemsTest do
   end
 
   defp scroll(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
 
     item =
       ItemStore.create(%ItemTemplate{entry: 998_411, stackable: 20, spellid_1: 8118, spellcharges_1: -1},

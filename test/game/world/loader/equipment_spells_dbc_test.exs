@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.Loader.EquipmentSpellsDbcTest do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -178,7 +179,7 @@ defmodule ThistleTea.Game.World.Loader.EquipmentSpellsDbcTest do
   end
 
   defp character(_context) do
-    guid = System.unique_integer([:positive, :monotonic]) + 2_000_000
+    guid = Unique.integer()
     on_exit(fn -> :ets.delete(CharacterStore, guid) end)
 
     character = %Character{

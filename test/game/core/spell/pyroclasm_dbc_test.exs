@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Core.Spell.PyroclasmDbcTest do
   alias ThistleTea.Game.World.Loader.SpellProcEvent
   alias ThistleTea.Game.World.Loader.Talent
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -36,7 +37,7 @@ defmodule ThistleTea.Game.Core.Spell.PyroclasmDbcTest do
 
   describe "receive/4" do
     test "creature owners retain unlearned damage spells in proc feedback", context do
-      guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:mob, 1, Unique.integer())
 
       mob = %Mob{
         object: %Object{guid: guid},
@@ -229,7 +230,7 @@ defmodule ThistleTea.Game.Core.Spell.PyroclasmDbcTest do
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
 
-    target_guid = System.unique_integer([:positive]) + 50_000_000
+    target_guid = Unique.integer()
     target = %{caster | object: %Object{guid: target_guid}}
     Metadata.put(target_guid, %{alive?: true, level: 60})
     on_exit(fn -> Metadata.delete(target_guid) end)

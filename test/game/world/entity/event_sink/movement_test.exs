@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.MovementTest do
   alias ThistleTea.Game.World.Position.Spline
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Test.Unique
 
   describe "emit/3 MovementRootChanged" do
     test "root changes reach only the possessed creature's controller" do
@@ -517,6 +518,6 @@ defmodule ThistleTea.Game.World.Entity.EventSink.MovementTest do
   end
 
   defp unique_low do
-    rem(System.unique_integer([:positive, :monotonic]), 0x00FFFFFF)
+    Unique.integer()
   end
 end

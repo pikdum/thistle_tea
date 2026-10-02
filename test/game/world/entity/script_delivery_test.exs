@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.World.Entity.ScriptDeliveryTest do
 
     pid =
       spawn(fn ->
-        Entity.register(guid)
+        {:ok, _} = Entity.register(guid)
         send(owner, {:ready, self()})
 
         receive do

@@ -8,11 +8,12 @@ defmodule ThistleTea.Game.World.WorldPositionTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position.Spline
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   describe "broadcast_packet/3" do
     test "sends a source entity's packet to itself without visibility filtering" do
-      guid = System.unique_integer([:positive, :monotonic])
-      Entity.register(guid)
+      guid = Unique.integer()
+      {:ok, _} = Entity.register(guid)
       on_exit(fn -> Entity.unregister(guid) end)
 
       packet = %Packet{opcode: 1, payload: <<>>}

@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.TriggeredHitDbcTest do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -321,7 +322,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.TriggeredHitDbcTest do
   end
 
   defp entities(_context) do
-    world = WorldRef.instance(0, System.unique_integer([:positive]))
+    world = WorldRef.instance(0, Unique.integer())
     penalty = %Holder{spell: %Spell{id: 999_801}, auras: [%Aura{type: :mod_spell_hit_chance, amount: -100}]}
 
     caster = %Mob{
@@ -334,7 +335,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.TriggeredHitDbcTest do
     targets =
       for x <- [1.0, 2.0] do
         target = %Character{
-          object: %Object{guid: Guid.from_low_guid(:player, System.unique_integer([:positive]))},
+          object: %Object{guid: Guid.from_low_guid(:player, Unique.integer())},
           unit: %Unit{level: 60, health: 1_000, max_health: 1_000, faction_template: 1, auras: []},
           internal: %Internal{world: world},
           movement_block: %MovementBlock{position: {x, 0.0, 0.0, 0.0}}

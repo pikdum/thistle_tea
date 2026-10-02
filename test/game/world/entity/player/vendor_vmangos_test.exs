@@ -13,13 +13,14 @@ defmodule ThistleTea.Game.World.Entity.Player.VendorVmangosTest do
   alias ThistleTea.Game.World.Entity.Player.Vendor
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @moduletag :vmangos_db
 
   describe "valid_vendor?/2" do
     test "accepts Corina Steele's vanilla vendor and repair flags from seed data" do
       template = Mangos.Repo.get_by!(Mangos.CreatureTemplate, entry: 54)
-      guid = Guid.from_low_guid(:mob, 54, System.unique_integer([:positive, :monotonic]))
+      guid = Guid.from_low_guid(:mob, 54, Unique.integer())
       Metadata.put(guid, %{alive?: true, npc_flags: template.npc_flags})
       SpatialHash.update(:mobs, guid, WorldRef.open(0), 2.0, 0.0, 0.0)
 

@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestObjectsTest do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Visibility.QuestGivers
+  alias ThistleTea.Test.Unique
 
   setup [:player]
 
@@ -231,7 +232,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestObjectsTest do
   end
 
   defp player(_context) do
-    guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+    guid = Guid.from_low_guid(:player, Unique.integer())
     world = WorldRef.instance(999, guid)
 
     character = %Character{
@@ -243,7 +244,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestObjectsTest do
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, movement_flags: 0}
     }
 
-    Entity.register(guid)
+    {:ok, _} = Entity.register(guid)
     World.update_position(character)
     Metadata.update(guid, %{alive?: true, level: 50})
 
@@ -257,7 +258,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestObjectsTest do
   end
 
   defp spawn_object(context, data) do
-    entry = 8_000_000 + System.unique_integer([:positive, :monotonic])
+    entry = Unique.integer()
 
     data =
       Map.new(data, fn {index, value} -> {index, if(value == 1 and index in [1, 2, 10, 19], do: entry, else: value)} end)

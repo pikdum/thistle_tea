@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemDurationsTest do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   @entry 999_940
 
@@ -172,7 +173,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemDurationsTest do
   end
 
   defp timed_inventory(_context) do
-    owner = System.unique_integer([:positive, :monotonic])
+    owner = Unique.integer()
 
     template = %ItemTemplate{
       entry: @entry,

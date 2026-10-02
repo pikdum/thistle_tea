@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.Entity.Player.CorpsesTest do
   alias ThistleTea.Game.World.Entity.Player.Corpses
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   setup [:build_ghost]
 
@@ -76,7 +77,7 @@ defmodule ThistleTea.Game.World.Entity.Player.CorpsesTest do
   end
 
   defp build_ghost(_context) do
-    guid = System.unique_integer([:positive]) + 20_000_000
+    guid = Unique.integer()
 
     character = %Character{
       object: %Object{guid: guid},

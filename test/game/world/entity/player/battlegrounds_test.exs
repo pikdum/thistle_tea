@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BattlegroundsTest do
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Test.Unique
 
   setup [:catalog, :players]
 
@@ -151,7 +152,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BattlegroundsTest do
     member = character()
 
     for character <- [leader, member] do
-      Entity.register(character.object.guid)
+      {:ok, _} = Entity.register(character.object.guid)
 
       Presence.enter(character, %{
         name: character.internal.name,
@@ -190,7 +191,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BattlegroundsTest do
   end
 
   defp character do
-    guid = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
 
     %Character{
       id: guid,

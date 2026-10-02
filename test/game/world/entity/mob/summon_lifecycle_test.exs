@@ -28,13 +28,14 @@ defmodule ThistleTea.Game.World.Entity.Mob.SummonLifecycleTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Test.FactionFixtures
+  alias ThistleTea.Test.Unique
 
   setup [{FactionFixtures, :seed}, :summoner]
 
   describe "summon lifecycle" do
     test "NPC pets grant one reward and leave an unlootable corpse until removal", %{summoner: summoner} do
-      killer = System.unique_integer([:positive]) + 10_000_000
-      Entity.register(killer)
+      killer = Unique.integer()
+      {:ok, _} = Entity.register(killer)
 
       for kind <- [:creature_pet, :guardian] do
         mob = mob(summoner)
@@ -67,8 +68,8 @@ defmodule ThistleTea.Game.World.Entity.Mob.SummonLifecycleTest do
     end
 
     test "player-owned pets grant no kill credit", %{summoner: summoner} do
-      killer = System.unique_integer([:positive]) + 10_000_000
-      Entity.register(killer)
+      killer = Unique.integer()
+      {:ok, _} = Entity.register(killer)
       mob = mob(summoner)
       guid = Guid.runtime(:pet, mob.object.entry)
 
@@ -166,7 +167,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.SummonLifecycleTest do
 
   defp summoner(_context) do
     summoner = Guid.runtime(:mob, 990_401)
-    Entity.register(summoner)
+    {:ok, _} = Entity.register(summoner)
     %{summoner: summoner}
   end
 

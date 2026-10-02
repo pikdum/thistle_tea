@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestItemProgressTest do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   @quest_id 3904
   @item_id 11_119
@@ -34,7 +35,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestItemProgressTest do
     on_exit(fn -> :ets.delete(QuestLoader, {:quest, @quest_id}) end)
 
     {:ok, quest_log} = QuestLog.add(%{}, @quest_id)
-    player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    player_guid = Guid.from_low_guid(:player, Unique.integer())
     on_exit(fn -> Metadata.delete(player_guid) end)
 
     character = %Character{

@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.World.Entity.Player.OutdoorPvpTest do
   alias ThistleTea.Game.World.Entity.Player.OutdoorPvp
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.System.OutdoorPvp, as: OutdoorPvpSystem
+  alias ThistleTea.Test.Unique
 
   setup [:character]
 
@@ -81,7 +82,7 @@ defmodule ThistleTea.Game.World.Entity.Player.OutdoorPvpTest do
   end
 
   defp character(_context) do
-    guid = System.unique_integer([:positive])
+    guid = Unique.integer()
 
     character = %Character{
       object: %Object{guid: guid},

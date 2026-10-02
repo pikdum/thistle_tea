@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.World.ProximityTest do
   alias ThistleTea.Game.World.Proximity
   alias ThistleTea.Game.World.Proximity.Checks
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   defp hear(listener, announcement, now), do: elem(Proximity.hear(listener, announcement, now), 1)
 
@@ -436,7 +437,7 @@ defmodule ThistleTea.Game.World.ProximityTest do
 
   defp trap(owner, stealthed?) do
     %GameObject{
-      object: %Object{guid: Guid.from_low_guid(:game_object, 1, System.unique_integer([:positive]))},
+      object: %Object{guid: Guid.from_low_guid(:game_object, 1, Unique.integer())},
       game_object: %GameObjectComponent{created_by: owner},
       internal: %Internal{world: WorldRef.open(0), trap: %Trap{stealthed?: stealthed?}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
@@ -496,7 +497,7 @@ defmodule ThistleTea.Game.World.ProximityTest do
   end
 
   defp put_mob(guid, {x, y, z}, opts \\ []) do
-    Entity.register(guid)
+    {:ok, _} = Entity.register(guid)
     SpatialHash.update(:mobs, guid, WorldRef.open(0), x, y, z)
 
     Metadata.put(guid, %{
@@ -518,9 +519,9 @@ defmodule ThistleTea.Game.World.ProximityTest do
     guid
   end
 
-  defp player_guid, do: Guid.from_low_guid(:player, System.unique_integer([:positive]))
+  defp player_guid, do: Guid.from_low_guid(:player, Unique.integer())
 
-  defp mob_guid, do: Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+  defp mob_guid, do: Guid.from_low_guid(:mob, 1, Unique.integer())
 
   defp alliance do
     %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}

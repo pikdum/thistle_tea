@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CorpseTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility.Tap
+  alias ThistleTea.Test.Unique
 
   @dynamic_flag_lootable 0x0001
   @loot_id 999_201
@@ -42,7 +43,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CorpseTest do
     :ets.insert(ItemLoader, {@quest_item_id, %ItemTemplate{entry: @quest_item_id, name: "Wolf Ear", quality: 1}})
     :ets.insert(ItemLoader, {@grey_item_id, %ItemTemplate{entry: @grey_item_id, name: "Wolf Pelt", quality: 0}})
 
-    killer = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    killer = Guid.from_low_guid(:player, Unique.integer())
 
     on_exit(fn ->
       :ets.delete(LootLoader, {:creature, @loot_id})
@@ -359,7 +360,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CorpseTest do
   end
 
   defp rolling_group(%{killer: killer}) do
-    member = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    member = Guid.from_low_guid(:player, Unique.integer())
     :ok = PartySystem.invite(killer, "Tagger", member)
     {:ok, _} = PartySystem.accept(member, "Member")
     {:ok, group} = PartySystem.set_loot(killer, 4, 0, 2)
@@ -370,7 +371,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CorpseTest do
     SpatialHash.insert(:mobs, corpse.object.guid, corpse.internal.world, 0.0, 0.0, 0.0)
 
     for guid <- [killer, member] do
-      EntityRegistry.register(guid)
+      {:ok, _} = EntityRegistry.register(guid)
       SpatialHash.insert(:players, guid, corpse.internal.world, 0.0, 0.0, 0.0)
     end
 
@@ -403,7 +404,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CorpseTest do
   end
 
   defp changed_group(%{killer: killer}) do
-    [first, second, new_member] = for _ <- 1..3, do: System.unique_integer([:positive, :monotonic])
+    [first, second, new_member] = for _ <- 1..3, do: Unique.integer()
     corpse = mob(killer)
     :ok = PartySystem.invite(killer, "Tagger", first)
     {:ok, _} = PartySystem.accept(first, "First")
@@ -440,7 +441,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CorpseTest do
 
   defp mob(killer) do
     %Mob{
-      object: %Object{guid: Guid.from_low_guid(:mob, 299, System.unique_integer([:positive, :monotonic]))},
+      object: %Object{guid: Guid.from_low_guid(:mob, 299, Unique.integer())},
       unit: %Unit{health: 0, max_health: 10, level: 1, dynamic_flags: 0},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{

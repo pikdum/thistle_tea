@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.ItemSpellDbcTest do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
   @spells [8342, 22_999, 8338, 23_055, 14_537, 11_921, 13_322, 21_179, 13_323, 25_189, 14_642]
@@ -32,7 +33,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.ItemSpellDbcTest do
     test "cable failures damage and stun only the caster without creating an offer", %{caster: caster} do
       dead = %{
         caster
-        | object: %Object{guid: Guid.from_low_guid(:player, System.unique_integer([:positive]))},
+        | object: %Object{guid: Guid.from_low_guid(:player, Unique.integer())},
           unit: %{caster.unit | health: 0}
       }
 
@@ -118,7 +119,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.ItemSpellDbcTest do
   end
 
   defp entities(_context) do
-    world = WorldRef.instance(0, System.unique_integer([:positive]))
+    world = WorldRef.instance(0, Unique.integer())
     spells = Map.new(@spells, &{&1, SpellLoader.load(&1)})
 
     unit = %Unit{
@@ -136,7 +137,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.ItemSpellDbcTest do
     movement = struct!(%MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, movement_flags: 0}, MovementBlock.player_speeds())
 
     caster = %Character{
-      object: %Object{guid: Guid.from_low_guid(:player, System.unique_integer([:positive]))},
+      object: %Object{guid: Guid.from_low_guid(:player, Unique.integer())},
       unit: unit,
       player: %Player{},
       internal: internal,

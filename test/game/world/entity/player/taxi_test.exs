@@ -37,12 +37,13 @@ defmodule ThistleTea.Game.World.Entity.Player.TaxiTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   setup do
-    flightmaster_guid = Guid.from_low_guid(:mob, 352, System.unique_integer([:positive, :monotonic]))
-    character_id = System.unique_integer([:positive, :monotonic])
+    flightmaster_guid = Guid.from_low_guid(:mob, 352, Unique.integer())
+    character_id = Unique.integer()
     character = character(character_id) |> CharacterStore.put()
-    Entity.register(character.object.guid)
+    {:ok, _} = Entity.register(character.object.guid)
 
     Metadata.put(flightmaster_guid, %{npc_flags: 0x8, alive?: true})
     SpatialHash.update(:mobs, flightmaster_guid, WorldRef.open(0), 2.0, 0.0, 0.0)

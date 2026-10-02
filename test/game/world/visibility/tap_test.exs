@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.Visibility.TapTest do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Visibility.Tap
+  alias ThistleTea.Test.Unique
 
   @dynamic_flag_tapped 0x0004
 
@@ -60,6 +61,6 @@ defmodule ThistleTea.Game.World.Visibility.TapTest do
   end
 
   defp unique_guid do
-    System.unique_integer([:positive, :monotonic])
+    Unique.integer()
   end
 end

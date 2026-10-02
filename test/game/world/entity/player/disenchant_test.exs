@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DisenchantTest do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
+  alias ThistleTea.Test.Unique
 
   @material 987_901
   @loot 987_902
@@ -131,7 +132,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DisenchantTest do
     ItemStore.init()
     ItemLoader.init()
     LootLoader.init()
-    low = System.unique_integer([:positive, :monotonic])
+    low = Unique.integer()
     guid = Guid.from_low_guid(:player, low)
     template = %ItemTemplate{entry: 987_900, disenchant_id: @loot}
     first = ItemStore.create(template, owner: guid)

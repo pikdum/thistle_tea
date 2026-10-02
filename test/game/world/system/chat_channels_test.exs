@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.System.ChatChannelsTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.World.System.ChatChannels
+  alias ThistleTea.Test.Unique
 
   describe "join/3" do
     test "sends built-in channel metadata from the catalog" do
@@ -141,11 +142,11 @@ defmodule ThistleTea.Game.World.System.ChatChannelsTest do
   end
 
   defp member(prefix) do
-    id = System.unique_integer([:positive, :monotonic])
+    id = Unique.integer()
     %Member{guid: id, name: "#{prefix}#{id}", team: :alliance}
   end
 
-  defp unique_name(prefix), do: "#{prefix}#{System.unique_integer([:positive, :monotonic])}"
+  defp unique_name(prefix), do: "#{prefix}#{Unique.integer()}"
 
   defp start_receiver(guid, label) do
     parent = self()

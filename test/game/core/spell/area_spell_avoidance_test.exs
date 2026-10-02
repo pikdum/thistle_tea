@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Core.Spell.AreaSpellAvoidanceTest do
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   setup [:entities]
 
@@ -123,8 +124,8 @@ defmodule ThistleTea.Game.Core.Spell.AreaSpellAvoidanceTest do
   end
 
   defp entities(_context) do
-    caster = entity(Guid.from_low_guid(:mob, 1, System.unique_integer([:positive])))
-    target = entity(Guid.from_low_guid(:player, System.unique_integer([:positive])))
+    caster = entity(Guid.from_low_guid(:mob, 1, Unique.integer()))
+    target = entity(Guid.from_low_guid(:player, Unique.integer()))
 
     for {guid, faction} <- [
           {caster.object.guid, %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}},

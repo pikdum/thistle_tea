@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
   alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   describe "visibility_metadata/1" do
     test "projects civilian status for proximity acquisition" do
@@ -505,7 +506,7 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
 
   describe "handle_cast/2" do
     test "Distract reaches an idle mob without engaging it" do
-      guid = Guid.from_low_guid(:mob, 478, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:mob, 478, Unique.integer())
 
       spell = %Spell{
         id: 1725,
@@ -537,9 +538,9 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
     end
 
     test "notifies a mob caster when a dummy spell hits successfully" do
-      caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
-      target_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
-      Entity.register(caster_guid)
+      caster_guid = Guid.from_low_guid(:mob, 1, Unique.integer())
+      target_guid = Guid.from_low_guid(:mob, 2, Unique.integer())
+      {:ok, _} = Entity.register(caster_guid)
       on_exit(fn -> Entity.unregister(caster_guid) end)
 
       spell = %Spell{id: 14_291, effects: [%Effect{index: 0, type: :dummy}]}
@@ -575,10 +576,10 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
     end
 
     test "rewards a player when their attack kills the mob" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      mob_guid = Guid.from_low_guid(:mob, 2, Unique.integer())
 
-      Entity.register(player_guid)
+      {:ok, _} = Entity.register(player_guid)
 
       on_exit(fn ->
         Entity.unregister(player_guid)
@@ -607,8 +608,8 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
     end
 
     test "does not reengage a finalized corpse when a spell proc arrives late" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      mob_guid = Guid.from_low_guid(:mob, 2, Unique.integer())
 
       spell = %Spell{
         id: 12_579,
@@ -627,10 +628,10 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
     end
 
     test "schedules respawn when a mob dies" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      mob_guid = Guid.from_low_guid(:mob, 2, Unique.integer())
 
-      Entity.register(player_guid)
+      {:ok, _} = Entity.register(player_guid)
 
       on_exit(fn ->
         Entity.unregister(player_guid)
@@ -663,10 +664,10 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
 
   describe "handle_continue/2" do
     test "credits the original tag when another player lands the killing blow" do
-      tagger = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      killer = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
-      Entity.register(tagger)
+      tagger = Guid.from_low_guid(:player, Unique.integer())
+      killer = Guid.from_low_guid(:player, Unique.integer())
+      mob_guid = Guid.from_low_guid(:mob, 2, Unique.integer())
+      {:ok, _} = Entity.register(tagger)
 
       mob = dead_mob(mob_guid, killed_by: killer, death_finalized?: false)
       tap = %Tap{player: tagger}
@@ -678,8 +679,8 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
     end
 
     test "projects a fireball tap before the first hostile update" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      mob_guid = Guid.from_low_guid(:mob, 2, Unique.integer())
 
       Metadata.put(mob_guid, %{tapped_player: nil, tapped_group_id: nil})
       on_exit(fn -> Metadata.delete(mob_guid) end)
@@ -715,7 +716,7 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
     end
 
     test "publishes the authoritative orientation after a mob transition" do
-      mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+      mob_guid = Guid.from_low_guid(:mob, 2, Unique.integer())
 
       Metadata.put(mob_guid, %{orientation: 0.0})
       on_exit(fn -> Metadata.delete(mob_guid) end)
@@ -732,10 +733,10 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
     end
 
     test "finalizes a death that did not arrive through an attack" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      mob_guid = Guid.from_low_guid(:mob, 2, Unique.integer())
 
-      Entity.register(player_guid)
+      {:ok, _} = Entity.register(player_guid)
       on_exit(fn -> Entity.unregister(player_guid) end)
 
       dead_mob = dead_mob(mob_guid, killed_by: player_guid, death_finalized?: false)
@@ -749,10 +750,10 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
     end
 
     test "does not finalize an already-finalized death again" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      mob_guid = Guid.from_low_guid(:mob, 2, Unique.integer())
 
-      Entity.register(player_guid)
+      {:ok, _} = Entity.register(player_guid)
       on_exit(fn -> Entity.unregister(player_guid) end)
 
       dead_mob = dead_mob(mob_guid, killed_by: player_guid, death_finalized?: true)
@@ -782,8 +783,8 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
 
   describe "handle_info/2" do
     test "respawns a dead mob in place" do
-      mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
-      previous_incarnation_id = System.unique_integer([:positive, :monotonic])
+      mob_guid = Guid.from_low_guid(:mob, 2, Unique.integer())
+      previous_incarnation_id = Unique.integer()
       spawn_unit = %Unit{health: 10, max_health: 10, power1: 4, max_power1: 4, level: 2, target: 0, dynamic_flags: 0}
       spawn_movement_block = %MovementBlock{position: {1.0, 2.0, 3.0, 4.0}, movement_flags: 0}
 

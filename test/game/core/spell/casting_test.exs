@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   describe "cancel/2" do
     test "removes a channel aura from its recorded target after pet possession changes ownership" do
@@ -516,7 +517,7 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
 
     test "stops when the channel object dies even if the cast target is the caster" do
       now = 1_000
-      target_guid = System.unique_integer([:positive])
+      target_guid = Unique.integer()
       perception = channel_perception(now, target_guid, nil, %{alive?: false})
 
       spell = %Spell{id: 5143, attributes: MapSet.new([:channeled]), effects: []}
@@ -546,7 +547,7 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
 
     test "keeps ticking inside the reach-aware hostile channel grace range" do
       now = 1_000
-      target_guid = System.unique_integer([:positive])
+      target_guid = Unique.integer()
       world = WorldRef.open(0)
       perception = channel_perception(now, target_guid, {world, 53.0, 0.0, 0.0}, %{alive?: true, combat_reach: 12.5})
 
@@ -899,7 +900,7 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
     end
 
     test "delivers corpse capture separately from its caster reward" do
-      target_guid = Guid.from_low_guid(:mob, 7584, System.unique_integer([:positive]))
+      target_guid = Guid.from_low_guid(:mob, 7584, Unique.integer())
       Metadata.put(target_guid, %{alive?: false, unit_flags: 0})
       on_exit(fn -> Metadata.delete(target_guid) end)
 
@@ -950,8 +951,8 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
     end
 
     test "queues a take-side outcome when a hostile magic spell is fully resisted" do
-      caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
-      target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      caster_guid = Guid.from_low_guid(:mob, 1, Unique.integer())
+      target_guid = Guid.from_low_guid(:player, Unique.integer())
       caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
       target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
 
@@ -1058,8 +1059,8 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
     end
 
     test "applies the victim's school-masked spell hit modifier from metadata" do
-      caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
-      target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      caster_guid = Guid.from_low_guid(:mob, 1, Unique.integer())
+      target_guid = Guid.from_low_guid(:player, Unique.integer())
       caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
       target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
 
@@ -1126,8 +1127,8 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
     end
 
     test "creatures without spell defense cannot fail the caster hit roll" do
-      caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
-      target_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+      caster_guid = Guid.from_low_guid(:mob, 1, Unique.integer())
+      target_guid = Guid.from_low_guid(:mob, 2, Unique.integer())
       caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
       target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
 
@@ -1176,8 +1177,8 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
     end
 
     test "applies matching mechanic resistance from metadata and observes its removal" do
-      caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
-      target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      caster_guid = Guid.from_low_guid(:mob, 1, Unique.integer())
+      target_guid = Guid.from_low_guid(:player, Unique.integer())
       caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
       target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
 

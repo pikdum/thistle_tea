@@ -13,10 +13,11 @@ defmodule ThistleTea.Game.World.Entity.TransportTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Transport, as: TransportServer
   alias ThistleTea.Game.World.Transports
+  alias ThistleTea.Test.Unique
 
   describe "route ownership" do
     test "publishes and advances an authoritative ship pose" do
-      entry = :erlang.unique_integer([:positive])
+      entry = Unique.integer()
       route = TransportCore.build_ship(entry, "Test Ship", 10, ship_nodes(), 10, 1, 20_000)
       entity = GameObject.build_transport(template(entry), TransportCore.pose_at(route, 0))
       clock = fn -> 1_000 end
@@ -47,14 +48,14 @@ defmodule ThistleTea.Game.World.Entity.TransportTest do
     end
 
     test "moves global ship visibility between maps" do
-      entry = :erlang.unique_integer([:positive])
+      entry = Unique.integer()
       route = TransportCore.build_ship(entry, "Test Ship", 10, cross_map_nodes(), 10, 1, 60_000)
       entity = GameObject.build_transport(template(entry), TransportCore.pose_at(route, 0))
       {:ok, pid} = TransportServer.start_link({entity, route, schedule: false, clock: fn -> 1_000 end})
       on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid) end)
 
-      old_player = :erlang.unique_integer([:positive])
-      new_player = :erlang.unique_integer([:positive])
+      old_player = Unique.integer()
+      new_player = Unique.integer()
       {:ok, _old_owner} = Entity.register(old_player)
       {:ok, _new_owner} = Entity.register(new_player)
       World.SpatialHash.insert(:players, old_player, WorldRef.open(0), 0.0, 0.0, 0.0)
@@ -95,7 +96,7 @@ defmodule ThistleTea.Game.World.Entity.TransportTest do
   describe "passenger ownership" do
     test "validates boarding, derives world coordinates, and tracks departure" do
       {entity, route, pid} = start_transport()
-      player_guid = :erlang.unique_integer([:positive])
+      player_guid = Unique.integer()
       {:ok, _owner} = Entity.register(player_guid)
       on_exit(fn -> Entity.unregister(player_guid) end)
 
@@ -126,7 +127,7 @@ defmodule ThistleTea.Game.World.Entity.TransportTest do
 
     test "rejects out-of-bounds local coordinates without boarding" do
       {entity, _route, pid} = start_transport()
-      player_guid = :erlang.unique_integer([:positive])
+      player_guid = Unique.integer()
       {:ok, _owner} = Entity.register(player_guid)
       on_exit(fn -> Entity.unregister(player_guid) end)
 
@@ -139,13 +140,13 @@ defmodule ThistleTea.Game.World.Entity.TransportTest do
     end
 
     test "moves attached players with the transport across maps" do
-      entry = :erlang.unique_integer([:positive])
+      entry = Unique.integer()
       route = TransportCore.build_ship(entry, "Test Ship", 10, cross_map_nodes(), 10, 1, 60_000)
       entity = GameObject.build_transport(template(entry), TransportCore.pose_at(route, 0))
       {:ok, pid} = TransportServer.start_link({entity, route, schedule: false, clock: fn -> 1_000 end})
       on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid) end)
 
-      player_guid = :erlang.unique_integer([:positive])
+      player_guid = Unique.integer()
       {:ok, _owner} = Entity.register(player_guid)
       on_exit(fn -> Entity.unregister(player_guid) end)
 
@@ -160,7 +161,7 @@ defmodule ThistleTea.Game.World.Entity.TransportTest do
   end
 
   defp start_transport do
-    entry = :erlang.unique_integer([:positive])
+    entry = Unique.integer()
     route = TransportCore.build_ship(entry, "Test Ship", 10, ship_nodes(), 10, 1, 20_000)
     entity = GameObject.build_transport(template(entry), TransportCore.pose_at(route, 0))
     clock = fn -> 1_000 end

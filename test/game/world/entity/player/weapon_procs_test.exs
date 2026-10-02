@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.World.Entity.Player.WeaponProcsTest do
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   @entry 998_420
   @innate 998_421
@@ -114,7 +115,7 @@ defmodule ThistleTea.Game.World.Entity.Player.WeaponProcsTest do
   describe "hit feedback" do
     test "the victim routes one request to the attacker and ordinary attack feedback cannot proc twice", context do
       %{character: character, hit: hit} = context
-      Entity.register(character.object.guid)
+      {:ok, _} = Entity.register(character.object.guid)
       target = %{character | object: %Object{guid: hit.target_guid}}
       EventSink.emit(target, hit)
       assert_received {:"$gen_cast", {:trigger_weapon_procs, ^hit}}
@@ -134,8 +135,8 @@ defmodule ThistleTea.Game.World.Entity.Player.WeaponProcsTest do
   defp charges(item), do: Item.temporary_enchantment(ItemStore.get(item.object.guid)).charges
 
   defp equipment(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
-    target = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
+    target = Unique.integer()
 
     template = %ItemTemplate{
       entry: @entry,

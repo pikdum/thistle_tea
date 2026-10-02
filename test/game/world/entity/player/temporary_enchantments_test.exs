@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TemporaryEnchantmentsTest do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   @entry 998_301
   @coating 998_302
@@ -219,7 +220,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TemporaryEnchantmentsTest do
   end
 
   defp equipment(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
     {:ok, _} = Entity.register(guid)
     template = %ItemTemplate{entry: @entry, class: 2, subclass: 15, inventory_type: 13, item_level: 1}
     :ets.insert(ItemLoader, {@entry, template})

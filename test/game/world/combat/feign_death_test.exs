@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.World.Combat.FeignDeathTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Spell.SpellReception
+  alias ThistleTea.Test.Unique
 
   setup [:opponents]
 
@@ -144,7 +145,7 @@ defmodule ThistleTea.Game.World.Combat.FeignDeathTest do
   end
 
   defp opponents(_ctx) do
-    guid = System.unique_integer([:positive])
+    guid = Unique.integer()
     mob = Guid.from_low_guid(:mob, 1, guid)
     pet = Guid.from_low_guid(:pet, 1, guid)
     world = WorldRef.open(0)

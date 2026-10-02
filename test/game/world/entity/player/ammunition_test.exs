@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AmmunitionTest do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   setup [:armed_character]
 
@@ -366,7 +367,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AmmunitionTest do
   end
 
   defp armed_character(_context) do
-    guid = System.unique_integer([:positive, :monotonic]) * 2
+    guid = Unique.integer() * 2
     {:ok, _} = Entity.register(guid)
     {:ok, _} = Entity.register(guid + 1)
 

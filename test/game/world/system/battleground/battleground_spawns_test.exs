@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.System.Battleground.BattlegroundSpawnsTest do
 
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.System.Battleground.Spawns
+  alias ThistleTea.Test.Unique
 
   defmodule Catalog do
     @moduledoc false
@@ -68,7 +69,7 @@ defmodule ThistleTea.Game.World.System.Battleground.BattlegroundSpawnsTest do
     end
 
     test "keeps copies independent and disables bindings during replacement and after teardown", %{world: world} do
-      other = WorldRef.instance(529, System.unique_integer([:positive]))
+      other = WorldRef.instance(529, Unique.integer())
       Spawns.open(other)
       on_exit(fn -> Spawns.close(other) end)
       Spawns.set_event(world, 0, nil, Catalog, Pool)
@@ -83,7 +84,7 @@ defmodule ThistleTea.Game.World.System.Battleground.BattlegroundSpawnsTest do
   end
 
   defp world_copy(_context) do
-    world = WorldRef.instance(529, System.unique_integer([:positive]))
+    world = WorldRef.instance(529, Unique.integer())
     Spawns.open(world)
     on_exit(fn -> Spawns.close(world) end)
     %{world: world}

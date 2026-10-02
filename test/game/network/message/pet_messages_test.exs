@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   describe "CMSG_PET_STOP_ATTACK" do
     test "dispatches to an owned creature and a possessed player" do
       guid = Guid.from_low_guid(:mob, 1, 131)
-      Entity.register(guid)
+      {:ok, _} = Entity.register(guid)
       message = Inbound.CmsgPetStopAttack.from_binary(<<guid::little-size(64)>>)
       state = %{character: companion(:guardian, guid)}
       assert Inbound.handle(message, state) == state
@@ -55,7 +55,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       assert Inbound.handle(message, stranger) == stranger
       refute_receive {:pet_stop_attack, _}, 0
       player = Guid.from_low_guid(:player, 132)
-      Entity.register(player)
+      {:ok, _} = Entity.register(player)
       state = %{character: companion(:possession, player)}
       assert Inbound.handle(%{message | pet_guid: player}, state) == state
       assert_receive {:controlled_command, 7, :stop_attack, 0}
@@ -65,7 +65,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   describe "CMSG_PET_CANCEL_AURA" do
     test "decodes pet aura cancellation and rejects remote possession or a different pet" do
       guid = Guid.from_low_guid(:mob, 1, 133)
-      Entity.register(guid)
+      {:ok, _} = Entity.register(guid)
       message = Inbound.CmsgPetCancelAura.from_binary(<<guid::little-size(64), 11_767::little-size(32)>>)
       state = %{character: companion(:guardian, guid)}
       assert Inbound.handle(message, state) == state
@@ -85,7 +85,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   describe "CMSG_PET_CAST_SPELL" do
     test "preserves a charmed creature's explicit destination" do
       guid = Guid.from_low_guid(:mob, 1, 128)
-      Entity.register(guid)
+      {:ok, _} = Entity.register(guid)
       on_exit(fn -> Entity.unregister(guid) end)
       targets = Target.at({12.5, -8.0, 3.0})
       payload = <<guid::little-size(64), 19_717::little-size(32)>> <> TargetCodec.encode(targets)
@@ -100,7 +100,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
 
     test "decodes self selection relative to the pet and rejects an unowned creature" do
       guid = Guid.from_low_guid(:mob, 1, 129)
-      Entity.register(guid)
+      {:ok, _} = Entity.register(guid)
       on_exit(fn -> Entity.unregister(guid) end)
       message = Inbound.CmsgPetCastSpell.from_binary(<<guid::little-size(64), 3110::little-size(32), 0::16>>)
       state = %{character: companion(:guardian, guid)}
@@ -116,7 +116,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   describe "CMSG_REQUEST_PET_INFO" do
     test "decodes the empty request and reuses the active companion attachment handshake" do
       pet_guid = Guid.from_low_guid(:mob, 1, 123)
-      Entity.register(pet_guid)
+      {:ok, _} = Entity.register(pet_guid)
       on_exit(fn -> Entity.unregister(pet_guid) end)
 
       message = Inbound.CmsgRequestPetInfo.from_binary(<<>>)
@@ -144,7 +144,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   describe "CMSG_PET_SET_ACTION" do
     test "decodes and dispatches an autocast toggle for an owned pet" do
       pet_guid = Guid.from_low_guid(:mob, 1, 123)
-      Entity.register(pet_guid)
+      {:ok, _} = Entity.register(pet_guid)
       on_exit(fn -> Entity.unregister(pet_guid) end)
       Entity.unregister(pet_guid)
       start_supervised!({PetControlOwner, guid: pet_guid, spells: [%Spell{id: 11_778}]})
@@ -162,7 +162,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
 
     test "dispatches action-bar changes to a charmed unit" do
       controlled_guid = Guid.from_low_guid(:mob, 1, 124)
-      Entity.register(controlled_guid)
+      {:ok, _} = Entity.register(controlled_guid)
       on_exit(fn -> Entity.unregister(controlled_guid) end)
 
       message = %Inbound.CmsgPetSetAction{
@@ -201,7 +201,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
     test "decodes and dispatches an owned pet follow command" do
       pet_guid = Guid.from_low_guid(:mob, 1, 123)
       target_guid = 0
-      Entity.register(pet_guid)
+      {:ok, _} = Entity.register(pet_guid)
       on_exit(fn -> Entity.unregister(pet_guid) end)
 
       data = 1 + Bitwise.bsl(0x07, 24)
@@ -219,7 +219,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
 
     test "dispatches commands to a charmed unit" do
       controlled_guid = Guid.from_low_guid(:mob, 1, 124)
-      Entity.register(controlled_guid)
+      {:ok, _} = Entity.register(controlled_guid)
       on_exit(fn -> Entity.unregister(controlled_guid) end)
 
       message = %Inbound.CmsgPetAction{
@@ -237,7 +237,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
 
     test "rejects an attack command without a target" do
       pet_guid = 125
-      Entity.register(pet_guid)
+      {:ok, _} = Entity.register(pet_guid)
       on_exit(fn -> Entity.unregister(pet_guid) end)
 
       message = %Inbound.CmsgPetAction{pet_guid: pet_guid, action: 2, action_type: 0x07, target_guid: 0}
@@ -251,7 +251,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
     test "rejects an attack command against an invalid target" do
       pet_guid = 126
       target_guid = 127
-      Entity.register(pet_guid)
+      {:ok, _} = Entity.register(pet_guid)
       Metadata.put(target_guid, %{alive?: false})
 
       on_exit(fn ->

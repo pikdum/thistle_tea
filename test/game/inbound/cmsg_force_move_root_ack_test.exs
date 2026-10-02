@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Inbound.CmsgForceMoveRootAckTest do
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.World.Entity.Player.MovementControl
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Test.Unique
 
   describe "from_binary/1" do
     test "parses force root acknowledgements" do
@@ -158,7 +159,7 @@ defmodule ThistleTea.Game.Inbound.CmsgForceMoveRootAckTest do
     end
 
     test "rejects a transport attachment that is not active" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
       transport_guid = Guid.from_low_guid(:mo_transport, 164_871)
 
       state = %State{

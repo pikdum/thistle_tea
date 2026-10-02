@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MiniPetOwnerTest do
   alias ThistleTea.Game.World.Loader.Summon
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Test.FactionFixtures
+  alias ThistleTea.Test.Unique
 
   @entries [990_101, 990_102]
 
@@ -121,8 +122,8 @@ defmodule ThistleTea.Game.World.Entity.Player.MiniPetOwnerTest do
   defp request(entry), do: %Effects.SummonMiniPet{entry: entry, spell_id: 500, duration_ms: 0}
 
   defp owner(_context) do
-    guid = System.unique_integer([:positive]) + 10_000_000
-    Entity.register(guid)
+    guid = Unique.integer()
+    {:ok, _} = Entity.register(guid)
 
     character = %Character{
       object: %Object{guid: guid},

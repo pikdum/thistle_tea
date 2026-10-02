@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.World.Spell.RaidSpellTargetTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Spell.SpellTargetResolver
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Test.Unique
 
   setup [:raid]
 
@@ -168,7 +169,7 @@ defmodule ThistleTea.Game.World.Spell.RaidSpellTargetTest do
   end
 
   defp raid(_context) do
-    world = WorldRef.instance(0, System.unique_integer([:positive]))
+    world = WorldRef.instance(0, Unique.integer())
     carrier = character(world, 0.0)
     member = character(world, 3.0)
     outsider = character(world, 2.0)
@@ -188,7 +189,7 @@ defmodule ThistleTea.Game.World.Spell.RaidSpellTargetTest do
   end
 
   defp character(world, x) do
-    guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+    guid = Guid.from_low_guid(:player, Unique.integer())
 
     %Character{
       object: %Object{guid: guid},

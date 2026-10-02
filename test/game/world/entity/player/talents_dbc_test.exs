@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentsDbcTest do
   alias ThistleTea.Game.World.Loader.Skill
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -48,7 +49,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentsDbcTest do
 
       character = %{
         character
-        | id: System.unique_integer([:positive, :monotonic]),
+        | id: Unique.integer(),
           unit: %{character.unit | class: 7, race: 2},
           player: %{character.player | skills: %{172 => skill, 160 => %{skill | value: 190}, 54 => skill}},
           internal: %{character.internal | spells: spells, spellbook: SpellLoader.build_spellbook(spells)}

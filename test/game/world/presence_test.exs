@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.World.PresenceTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Spell.SpellTargetInfo
   alias ThistleTea.Game.World.Spell.SpellTargetResolver
+  alias ThistleTea.Test.Unique
 
   describe "enter/2" do
     test "publishes health deficits through entry and subsequent owner updates" do
@@ -299,7 +300,7 @@ defmodule ThistleTea.Game.World.PresenceTest do
 
   defp character(world, position, area, guid \\ nil) do
     %Character{
-      object: %Object{guid: guid || Guid.from_low_guid(:player, System.unique_integer([:positive]))},
+      object: %Object{guid: guid || Guid.from_low_guid(:player, Unique.integer())},
       unit: %Unit{health: 100, max_health: 100, auras: []},
       internal: %Internal{world: world, area: area},
       movement_block: %MovementBlock{position: position}

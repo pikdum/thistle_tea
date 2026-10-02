@@ -14,11 +14,12 @@ defmodule ThistleTea.Game.World.Entity.Player.AreaTriggersConditionTest do
   alias ThistleTea.Game.Network.Message.SmsgAreaTriggerMessage
   alias ThistleTea.Game.World.Entity.Player.AreaTriggers
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
+  alias ThistleTea.Test.Unique
 
   describe "condition policy" do
     @tag :vmangos_db
     test "accepts or rejects a cached conditioned teleport" do
-      trigger_id = System.unique_integer([:positive, :monotonic])
+      trigger_id = Unique.integer()
       condition = %Condition{entry: 1, type: :level, value1: 10, value2: 1}
       cache_trigger(trigger_id, condition)
 
@@ -35,7 +36,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AreaTriggersConditionTest do
     end
 
     test "rejects an unknown cached condition" do
-      trigger_id = System.unique_integer([:positive, :monotonic])
+      trigger_id = Unique.integer()
       condition = %Condition{entry: 2, type: :item_with_bank, value1: 100, value2: 1}
       cache_trigger(trigger_id, condition)
 

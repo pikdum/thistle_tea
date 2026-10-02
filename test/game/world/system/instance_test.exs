@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Instance.InstanceData
+  alias ThistleTea.Test.Unique
 
   describe "admission" do
     test "serializes concurrent entrants without exceeding the copy capacity" do
@@ -23,7 +24,7 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
         cleanup: fn _ -> :ok end
       )
 
-      guids = Enum.map(1..5, fn _ -> System.unique_integer([:positive]) end)
+      guids = Enum.map(1..5, fn _ -> Unique.integer() end)
 
       results =
         guids
@@ -45,8 +46,8 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
     test "resolves the shared account quota from CharacterStore and expires it by the supplied clock" do
       name = unique_name()
       {:ok, clock} = start_supervised({Agent, fn -> 0 end})
-      account = System.unique_integer([:positive])
-      guids = Enum.map(1..3, fn _ -> System.unique_integer([:positive]) + 10_000_000 end)
+      account = Unique.integer()
+      guids = Enum.map(1..3, fn _ -> Unique.integer() end)
       [first, second, other] = guids
       Enum.each([first, second], &CharacterStore.put(%Character{id: &1, account_id: account}))
       CharacterStore.put(%Character{id: other, account_id: account + 1})
@@ -73,7 +74,7 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
     test "cleans up an empty copy after its timeout" do
       parent = self()
       name = unique_name()
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
 
       start_instance_system(name: name, empty_timeout_ms: 1, cleanup: fn world -> send(parent, {:cleaned, world}) end)
 
@@ -87,7 +88,7 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
     test "reuses a copy when its owner re-enters before cleanup" do
       parent = self()
       name = unique_name()
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
 
       table =
         start_instance_system(
@@ -108,7 +109,7 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
     test "resets an empty owned copy immediately" do
       parent = self()
       name = unique_name()
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
 
       table =
         start_instance_system(
@@ -129,7 +130,7 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
     test "refuses to reset an occupied copy" do
       parent = self()
       name = unique_name()
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
 
       start_instance_system(name: name, cleanup: fn world -> send(parent, {:cleaned, world}) end)
 
@@ -140,8 +141,8 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
 
     test "switches a player into an existing copy" do
       name = unique_name()
-      first_guid = System.unique_integer([:positive])
-      second_guid = System.unique_integer([:positive])
+      first_guid = Unique.integer()
+      second_guid = Unique.integer()
 
       start_instance_system(name: name)
 
@@ -155,7 +156,7 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
 
     test "stops selecting a former group's copy after membership changes" do
       name = unique_name()
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
       {:ok, owner} = start_supervised({Agent, fn -> {:party, 7} end})
 
       start_instance_system(
@@ -176,7 +177,7 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
 
     test "captures the map script only when a copy is created" do
       name = unique_name()
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
       {:ok, script_name} = start_supervised({Agent, fn -> "instance_stratholme" end})
 
       start_instance_system(
@@ -196,7 +197,7 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
 
     test "publishes commands after successful transitions and preserves rejected snapshots" do
       name = unique_name()
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
       table = start_instance_system(name: name, script_name: fn 329 -> "instance_stratholme" end)
 
       assert {:ok, world} = InstanceSystem.enter(329, guid, name)
@@ -212,7 +213,7 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
     test "dispatches exact-copy effects and owns script timers", %{test: test} do
       parent = self()
       name = unique_name()
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
 
       table =
         start_instance_system(
@@ -246,7 +247,7 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
     test "reconciles a spawned game object from current script data", %{test: test} do
       parent = self()
       name = unique_name()
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
 
       start_instance_system(
         name: name,
@@ -265,8 +266,8 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
 
     test "keeps copy projections isolated and removes timed-out data" do
       name = unique_name()
-      first_guid = System.unique_integer([:positive])
-      second_guid = System.unique_integer([:positive])
+      first_guid = Unique.integer()
+      second_guid = Unique.integer()
 
       table =
         start_instance_system(
@@ -289,7 +290,7 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
 
     test "ignores stale cleanup after re-entry" do
       name = unique_name()
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
 
       table =
         start_instance_system(
@@ -326,6 +327,6 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
   end
 
   defp unique_name do
-    :"instance_system_test_#{System.unique_integer([:positive])}"
+    :"instance_system_test_#{Unique.integer()}"
   end
 end

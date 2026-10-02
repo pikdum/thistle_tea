@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetExperienceTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Test.PetControlOwner
+  alias ThistleTea.Test.Unique
 
   setup [:build_reward_context]
 
@@ -90,7 +91,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetExperienceTest do
       assert {:noreply, updated, {:continue, :maybe_broadcast}} = MobServer.handle_info(reward, pet)
       assert updated.unit.pet_experience == 137
       assert updated.internal.broadcast_update?
-      Entity.register(1)
+      {:ok, _} = Entity.register(1)
       EventSink.emit_pending(updated)
       assert_receive %PetProgressChanged{progress: %PetProgress{level: 50, xp: 137}} = effect
       assert {:noreply, state} = PlayerServer.handle_info(effect, %State{character: character})
@@ -106,7 +107,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetExperienceTest do
 
   describe "taming" do
     test "forwards the wild creature's level to its new owner", %{pet: pet} do
-      Entity.register(1)
+      {:ok, _} = Entity.register(1)
       pet = %{pet | object: %{pet.object | guid: Guid.runtime(:mob, 2960)}, unit: %{pet.unit | level: 8}}
       EventSink.emit(pet, Effects.tame_creature(1, 2960))
       assert_receive {:tame_pet, 2960, 8}
@@ -156,8 +157,8 @@ defmodule ThistleTea.Game.World.Entity.Player.PetExperienceTest do
   end
 
   defp build_reward_context(_context) do
-    guid = Guid.from_low_guid(:pet, 2960, :erlang.unique_integer([:positive]))
-    Entity.register(guid)
+    guid = Guid.from_low_guid(:pet, 2960, Unique.integer())
+    {:ok, _} = Entity.register(guid)
 
     character =
       %Character{object: %Object{guid: 1}, unit: %Unit{health: 100, level: 60}, internal: %Internal{}}

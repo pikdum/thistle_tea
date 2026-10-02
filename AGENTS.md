@@ -20,6 +20,7 @@
 - Use `describe "function/arity" do ... end` to group tests by function
 - Use `setup [:named_setup]` for reusable test data
 - Keep test names concise and descriptive
+- Mint guids, ids, and names with `ThistleTea.Test.Unique.integer/0`, never `System.unique_integer/1` or a hand-picked offset: async tests share the entity registry and stores, and independently minted values collide. Draw once per id (`Unique.integer() + 1` can equal another test's next draw), and match `{:ok, _} = Entity.register(guid)` so a duplicate fails loudly
 - Do not query generated sqlite databases in default tests; `db/vmangos.sqlite` tests must be tagged `:vmangos_db`, and tests that query `db/dbc.sqlite` must be tagged `:dbc_db`
 - Database and map tags are mutually exclusive: a test must never have more than one of `:vmangos_db`, `:dbc_db`, and `:namigator_maps`. Split a test or use fixtures when it needs data from more than one unavailable source
 - `:vmangos_db` tests require generated VMangos data and run with `mix test --only vmangos_db`; `:dbc_db` tests require the DBC database and are not run by CI; `:namigator_maps` tests require Namigator map data and are not run by CI

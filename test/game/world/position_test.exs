@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.PositionTest do
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.Position.ClientMotion
   alias ThistleTea.Game.World.Position.Spline
+  alias ThistleTea.Test.Unique
 
   describe "put/2" do
     test "projects a falling corpse with the owner's acceleration and stops at the floor" do
@@ -199,5 +200,5 @@ defmodule ThistleTea.Game.World.PositionTest do
     }
   end
 
-  defp unique_guid, do: System.unique_integer([:positive, :monotonic])
+  defp unique_guid, do: Unique.integer()
 end

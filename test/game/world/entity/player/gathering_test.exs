@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GatheringTest do
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @moduletag :namigator_maps
 
@@ -306,7 +307,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GatheringTest do
   end
 
   defp gathering_node(_context) do
-    low = System.unique_integer([:positive, :monotonic])
+    low = Unique.integer()
     guid = Guid.from_low_guid(:game_object, @entry, low)
     position = {-8949.95, -132.493, 83.53, 0.0}
     tool = ItemStore.create(%ItemTemplate{entry: @tool}, owner: low)

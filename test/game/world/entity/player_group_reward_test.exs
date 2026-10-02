@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerGroupRewardTest do
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Test.Unique
 
   setup [:reward_context]
 
@@ -110,7 +111,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerGroupRewardTest do
 
   defp reward_context(_context) do
     previous = ReputationLoader.catalog()
-    guid = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
     faction = %Definition{id: 529, index: 13, variants: [%Variant{}]}
 
     catalog = %Catalog{

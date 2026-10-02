@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InsigniaTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Spell.InsigniaTarget
   alias ThistleTea.Game.World.Spell.SpellRequirements
+  alias ThistleTea.Test.Unique
 
   @moduletag :namigator_maps
 
@@ -161,7 +162,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InsigniaTest do
   end
 
   defp bodies(_context) do
-    guid = System.unique_integer([:positive]) + 90_000_000
+    guid = Unique.integer()
     world = WorldRef.instance(529, guid)
 
     caster = %Character{
@@ -191,7 +192,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InsigniaTest do
       }
       |> Insignia.prepare(true)
 
-    Entity.register(guid)
+    {:ok, _} = Entity.register(guid)
 
     for character <- [caster, victim] do
       Metadata.put(character.object.guid, %{

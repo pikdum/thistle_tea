@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SocialTest do
   alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Test.Unique
 
   setup [:characters]
 
@@ -213,7 +214,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SocialTest do
   end
 
   defp character(prefix, race) do
-    guid = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
 
     character = %Character{
       id: guid,

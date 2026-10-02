@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBindTest do
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   setup [:home_and_innkeeper]
 
@@ -125,7 +126,7 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBindTest do
     end
 
     test "rejects dungeon and battleground maps even without an instance id", %{state: state, guid: guid} do
-      map_id = System.unique_integer([:positive, :monotonic]) + 100_000
+      map_id = Unique.integer()
       world = WorldRef.open(map_id)
       character = state.character
       character = put_in(character.internal.world, world)
@@ -181,7 +182,7 @@ defmodule ThistleTea.Game.World.Entity.Player.HomeBindTest do
   end
 
   defp home_and_innkeeper(_context) do
-    id = System.unique_integer([:positive, :monotonic])
+    id = Unique.integer()
     guid = Guid.from_low_guid(:mob, 295, id)
     player_guid = Guid.from_low_guid(:player, id)
     {:ok, _player} = Entity.register(player_guid)

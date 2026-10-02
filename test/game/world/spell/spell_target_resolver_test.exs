@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolverTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Spell.SpellTargetResolver
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Test.Unique
 
   describe "resolve/3" do
     test "triggered area casts retain damage and caster recipients separately" do
@@ -740,7 +741,7 @@ defmodule ThistleTea.Game.World.Spell.SpellTargetResolverTest do
   end
 
   defp bounded_unique(max) do
-    rem(System.unique_integer([:positive]), max) + 1
+    rem(Unique.integer(), max) + 1
   end
 
   defp caster(guid, {x, y, z}) do

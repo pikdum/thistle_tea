@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Core.Combat.ElementalCombatTest do
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Test.Unique
 
   setup [:combatants]
 
@@ -110,7 +111,7 @@ defmodule ThistleTea.Game.Core.Combat.ElementalCombatTest do
 
   defp aura(entity, type, amount, mask) do
     holder = %Holder{
-      spell: %Spell{id: System.unique_integer([:positive])},
+      spell: %Spell{id: Unique.integer()},
       auras: [%AuraCore{type: type, amount: amount, misc_value: mask}]
     }
 

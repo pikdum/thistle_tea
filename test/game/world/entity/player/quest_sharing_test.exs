@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestSharingTest do
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Test.Unique
 
   setup [:party]
 
@@ -428,7 +429,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestSharingTest do
   end
 
   defp character(name, x) do
-    guid = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
 
     character = %Character{
       id: guid,

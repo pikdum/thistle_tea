@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position.Spline
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   describe "reached_home" do
     test "restores a scripted home orientation" do
@@ -1296,7 +1297,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
   end
 
   defp bounded_unique(max) do
-    rem(System.unique_integer([:positive]), max) + 1
+    rem(Unique.integer(), max) + 1
   end
 
   defp alliance do

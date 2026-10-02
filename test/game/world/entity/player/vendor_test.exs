@@ -25,10 +25,11 @@ defmodule ThistleTea.Game.World.Entity.Player.VendorTest do
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   describe "Gossip.hello/2" do
     test "opens an empty merchant when no gossip menu exists" do
-      entry = System.unique_integer([:positive, :monotonic]) + 900_000
+      entry = Unique.integer()
       guid = Guid.from_low_guid(:mob, entry, entry)
       publish_vendor(guid)
       :ets.insert(VendorLoader, {entry, []})
@@ -46,10 +47,10 @@ defmodule ThistleTea.Game.World.Entity.Player.VendorTest do
 
   describe "buy/4" do
     test "splits purchases into legal stacks and pays once" do
-      vendor_entry = System.unique_integer([:positive, :monotonic])
+      vendor_entry = Unique.integer()
       vendor = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
       publish_vendor(vendor)
-      owner = System.unique_integer([:positive, :monotonic])
+      owner = Unique.integer()
       Registry.register(owner)
       template = %ItemTemplate{entry: 999_956, buy_price: 2, buy_count: 3, stackable: 5}
       :ets.insert(VendorLoader, {vendor_entry, [%VendorItem{index: 1, template: template, max_count: 0}]})
@@ -70,7 +71,7 @@ defmodule ThistleTea.Game.World.Entity.Player.VendorTest do
     end
 
     test "rechecks current rank and level without hiding ranked merchandise" do
-      vendor_entry = System.unique_integer([:positive, :monotonic])
+      vendor_entry = Unique.integer()
       vendor_guid = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
       publish_vendor(vendor_guid)
       template = %ItemTemplate{entry: 15_200, required_honor_rank: 8, required_level: 30, buy_price: 1}
@@ -98,7 +99,7 @@ defmodule ThistleTea.Game.World.Entity.Player.VendorTest do
 
   describe "condition policy" do
     test "hides, shows, and rejects a stale conditioned purchase" do
-      vendor_entry = System.unique_integer([:positive, :monotonic])
+      vendor_entry = Unique.integer()
       vendor_guid = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
       publish_vendor(vendor_guid)
       hidden_template = %ItemTemplate{entry: 1001, buy_price: 1}
@@ -136,7 +137,7 @@ defmodule ThistleTea.Game.World.Entity.Player.VendorTest do
     end
 
     test "denies unknown conditions" do
-      vendor_entry = System.unique_integer([:positive, :monotonic])
+      vendor_entry = Unique.integer()
       vendor_guid = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
       template = %ItemTemplate{entry: 2001, buy_price: 1}
       condition = %Condition{entry: 2, type: :item_with_bank, value1: 2001, value2: 1}

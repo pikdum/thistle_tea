@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CreaturePetOwnerTest do
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Test.FactionFixtures
+  alias ThistleTea.Test.Unique
 
   @entries [990_301, 990_302]
   @levels [1, 18, 20]
@@ -329,8 +330,8 @@ defmodule ThistleTea.Game.World.Entity.Mob.CreaturePetOwnerTest do
   end
 
   defp player(%{owner: owner}) do
-    guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
-    Entity.register(guid)
+    guid = Guid.from_low_guid(:player, Unique.integer())
+    {:ok, _} = Entity.register(guid)
 
     character = %Character{
       object: %{owner.object | guid: guid},

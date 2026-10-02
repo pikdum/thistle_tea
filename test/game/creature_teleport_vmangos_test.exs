@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.CreatureTeleportVmangosTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Instance.InstanceSpawn
+  alias ThistleTea.Test.Unique
 
   @moduletag :vmangos_db
 
@@ -67,8 +68,8 @@ defmodule ThistleTea.Game.CreatureTeleportVmangosTest do
   end
 
   test "loaded Baron aggro resolves Aurius inside the current copy" do
-    world = WorldRef.instance(329, System.unique_integer([:positive, :monotonic]))
-    player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    world = WorldRef.instance(329, Unique.integer())
+    player_guid = Guid.from_low_guid(:player, Unique.integer())
     baron = 54_241 |> mob_fixture() |> InstanceSpawn.materialize(world)
     aurius = 53_297 |> mob_fixture() |> InstanceSpawn.materialize(world)
 

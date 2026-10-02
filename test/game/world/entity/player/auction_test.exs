@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AuctionTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.PostOffice
+  alias ThistleTea.Test.Unique
 
   setup [:auctioneer]
 
@@ -190,7 +191,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AuctionTest do
   defp restore_house({id, house}), do: :ets.insert(AuctionHouse, {id, house})
 
   defp character do
-    id = System.unique_integer([:positive, :monotonic])
+    id = Unique.integer()
 
     %Character{
       id: id,

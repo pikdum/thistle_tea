@@ -43,6 +43,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectQuestsTest do
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.World.Visibility.QuestGivers
+  alias ThistleTea.Test.Unique
 
   setup [:questgiver]
 
@@ -249,7 +250,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectQuestsTest do
       npc_guid = Guid.from_low_guid(:mob, context.template.entry, 1)
       npc = %{context.object | object: %{context.object.object | guid: npc_guid}}
       :ets.insert(QuestLoader, {{:giver, context.template.entry}, [context.quest.id]})
-      Entity.register(npc_guid)
+      {:ok, _} = Entity.register(npc_guid)
       World.update_position(npc, :mobs)
       Metadata.put(npc_guid, %{alive?: true, npc_flags: 2})
 
@@ -328,7 +329,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectQuestsTest do
     end
 
     test "shows conditioned object gossip, excludes NPC services, and binds selections to the source", context do
-      Entity.register(context.state.guid)
+      {:ok, _} = Entity.register(context.state.guid)
       steps = [%ScriptStep{command: :talk}]
       option = %Option{id: 0, option_id: 1, npc_flag: 1, text: "Read", action_menu_id: -1, action_steps: steps}
       vendor = %Option{id: 1, option_id: 3, npc_flag: 0, text: "Vendor"}
@@ -392,18 +393,19 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectQuestsTest do
   defp count(state, entry), do: Inventory.count_entry(state.character.player, entry, &ItemStore.get/1)
 
   defp questgiver(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
-    entry = 3_000_000 + guid * 10
+    guid = Unique.integer()
+    entry = Unique.integer()
+    quest_id = 3_000_000 + guid * 10
     template = %GameObjectTemplate{entry: entry, type: 2, size: 1.0, data: [0, 0, 0, 0]}
     object_guid = Guid.from_low_guid(:game_object, entry, 1)
-    source = %ItemTemplate{entry: entry + 3, name: "Source"}
-    reward = %ItemTemplate{entry: entry + 4, name: "Reward"}
+    source = %ItemTemplate{entry: quest_id + 3, name: "Source"}
+    reward = %ItemTemplate{entry: quest_id + 4, name: "Reward"}
     :ets.insert(GameObjectTemplateLoader, {entry, template})
     Enum.each([source, reward], &:ets.insert(ItemLoader, {&1.entry, &1}))
 
     quest =
       put_quest(%Quest{
-        id: entry,
+        id: quest_id,
         title: "Object Quest",
         src_item_id: source.entry,
         src_item_count: 1,
@@ -433,7 +435,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectQuestsTest do
       movement_block: character.movement_block
     }
 
-    Entity.register(object_guid)
+    {:ok, _} = Entity.register(object_guid)
     World.update_position(object, :game_objects)
     Metadata.put(object_guid, %{go_type: 2, go_spawned?: true, go_rotation: {0.0, 0.0, 0.0, 1.0}, go_scale: 1.0})
     CharacterStore.put(character)
@@ -442,7 +444,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectQuestsTest do
       :ets.delete(GameObjectTemplateLoader, entry)
       :ets.delete(GossipLoader, {:menu, entry})
       Enum.each([source, reward], &:ets.delete(ItemLoader, &1.entry))
-      Enum.each([entry, entry + 1], &:ets.delete(QuestLoader, {:quest, &1}))
+      Enum.each([quest_id, quest_id + 1], &:ets.delete(QuestLoader, {:quest, &1}))
 
       for role <- [:giver, :ender] do
         :ets.delete(QuestLoader, {role, :game_object, entry})

@@ -13,13 +13,14 @@ defmodule ThistleTea.Game.World.System.Battleground.BattlegroundEffectSinkTest d
   alias ThistleTea.Game.World.Loader.BroadcastText
   alias ThistleTea.Game.World.System.Battleground.EffectSink
   alias ThistleTea.Game.World.System.Honor
+  alias ThistleTea.Test.Unique
 
   describe "emit/2" do
     test "keeps the offline carrier's name after live metadata disappears" do
-      observer = System.unique_integer([:positive, :monotonic])
-      carrier = System.unique_integer([:positive, :monotonic])
-      text_id = System.unique_integer([:positive, :monotonic])
-      Entity.register(observer)
+      observer = Unique.integer()
+      carrier = Unique.integer()
+      text_id = Unique.integer()
+      {:ok, _} = Entity.register(observer)
       :ets.insert(BroadcastText, {text_id, %{text: "The Horde Flag was dropped by $n!"}})
       on_exit(fn -> :ets.delete(BroadcastText, text_id) end)
 
@@ -45,8 +46,8 @@ defmodule ThistleTea.Game.World.System.Battleground.BattlegroundEffectSinkTest d
     end
 
     test "delivers departure penalties to the departing player's owner" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
-      Entity.register(guid)
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      {:ok, _} = Entity.register(guid)
       match = %WarsongGulch{world: WorldRef.instance(489, 7), client_instance_id: 7, bracket: 5, template: %Template{}}
       assert :ok = EffectSink.emit(match, [%Effects.ApplyDeserter{guid: guid}])
       assert_receive {:"$gen_cast", :battleground_deserted}
@@ -65,8 +66,8 @@ defmodule ThistleTea.Game.World.System.Battleground.BattlegroundEffectSinkTest d
     end
 
     test "routes timed and trigger exits through the player's resurrection cleanup" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
-      Entity.register(guid)
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      {:ok, _} = Entity.register(guid)
       world = WorldRef.open(0)
       position = {1.0, 2.0, 3.0, 4.0}
       match = %WarsongGulch{world: WorldRef.instance(489, 7), client_instance_id: 7, bracket: 5, template: %Template{}}
@@ -76,8 +77,8 @@ defmodule ThistleTea.Game.World.System.Battleground.BattlegroundEffectSinkTest d
     end
 
     test "publishes the victory exit countdown immediately" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
-      Entity.register(guid)
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      {:ok, _} = Entity.register(guid)
       now = Time.now()
 
       match = %WarsongGulch{
@@ -101,8 +102,8 @@ defmodule ThistleTea.Game.World.System.Battleground.BattlegroundEffectSinkTest d
     end
 
     test "credits the realm ledger and notifies the owner without adding a kill" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
-      Entity.register(guid)
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      {:ok, _} = Entity.register(guid)
       Honor.register(guid, :alliance, 60)
       match = %WarsongGulch{world: WorldRef.instance(489, 7), client_instance_id: 7, bracket: 5, template: %Template{}}
 
@@ -115,7 +116,7 @@ defmodule ThistleTea.Game.World.System.Battleground.BattlegroundEffectSinkTest d
   end
 
   test "publishes a nonzero active-match runtime to inside players" do
-    guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    guid = Guid.from_low_guid(:player, Unique.integer())
     assert {:ok, _owner} = Entity.register(guid)
 
     match = %WarsongGulch{

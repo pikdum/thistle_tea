@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Inbound.CmsgReadItemTest do
   alias ThistleTea.Game.Inbound.CmsgReadItem
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Test.Unique
 
   @backpack_start 23
 
@@ -30,7 +31,7 @@ defmodule ThistleTea.Game.Inbound.CmsgReadItemTest do
 
   describe "handle/2" do
     test "sends read ok for readable items" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
       item = ItemStore.create(letter_template(), owner: player_guid)
       on_exit(fn -> ItemStore.delete(item.object.guid) end)
       guid = item.object.guid
@@ -44,7 +45,7 @@ defmodule ThistleTea.Game.Inbound.CmsgReadItemTest do
     end
 
     test "sends an inventory failure for items without page text" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
       item = ItemStore.create(%ItemTemplate{entry: 9001, name: "Rock"}, owner: player_guid)
       on_exit(fn -> ItemStore.delete(item.object.guid) end)
 
@@ -58,7 +59,7 @@ defmodule ThistleTea.Game.Inbound.CmsgReadItemTest do
     end
 
     test "sends an inventory failure for empty slots" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
 
       Inbound.handle(
         %CmsgReadItem{bag: Inventory.bag_0(), slot: @backpack_start},

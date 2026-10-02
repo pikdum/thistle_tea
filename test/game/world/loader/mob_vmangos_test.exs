@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Mob.Batch
   alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -182,7 +183,7 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
         |> Mangos.Repo.all()
 
       counter = :counters.new(1, [:atomics])
-      handler_id = "mob-batch-query-count-#{System.unique_integer([:positive])}"
+      handler_id = "mob-batch-query-count-#{Unique.integer()}"
 
       events = [
         Mangos.Repo.config()[:telemetry_prefix] ++ [:query],

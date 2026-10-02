@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.StealthVisibilityTest do
   alias ThistleTea.Game.World.Proximity
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Test.Unique
 
   @moduletag :namigator_maps
 
@@ -124,8 +125,8 @@ defmodule ThistleTea.Game.World.StealthVisibilityTest do
   end
 
   defp observers(_context) do
-    guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-    target = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+    guid = Guid.from_low_guid(:player, Unique.integer())
+    target = Guid.from_low_guid(:player, Unique.integer())
     world = WorldRef.open(451)
 
     character = %Character{
@@ -138,7 +139,7 @@ defmodule ThistleTea.Game.World.StealthVisibilityTest do
     Presence.enter(character, StealthDetection.target_metadata(character))
     SpatialHash.insert(:players, target, world, 16_323.2, 16_318.1, 69.44)
     Metadata.put(target, %{stealthed?: true, stealth_skill: 50, level: 10, player?: true})
-    Entity.register(target)
+    {:ok, _} = Entity.register(target)
     cell = Visibility.current_cell(character)
     Group.join(Visibility.group_name(), Visibility.cell_key(cell), %{guid: target, type: :player})
     Group.join(Groups, Proximity.hidden_key(cell), %{guid: target})

@@ -8,11 +8,12 @@ defmodule ThistleTea.Game.World.Entity.Player.ProjectileTest do
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.World.Entity.Player.Projectile
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Test.Unique
 
   describe "fields/2" do
     test "includes the selected ammo display for ranged spells and repeat effects" do
-      ammo_id = System.unique_integer([:positive])
-      weapon_id = System.unique_integer([:positive])
+      ammo_id = Unique.integer()
+      weapon_id = Unique.integer()
       ammo = %ItemTemplate{entry: ammo_id, display_id: 5996, inventory_type: 24}
       weapon = %ItemTemplate{entry: weapon_id, display_id: 123, inventory_type: 15}
       :ets.insert(ItemLoader, {ammo_id, ammo})
@@ -40,7 +41,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ProjectileTest do
     end
 
     test "uses the ranged weapon itself for thrown attacks" do
-      weapon_id = System.unique_integer([:positive])
+      weapon_id = Unique.integer()
       weapon = %ItemTemplate{entry: weapon_id, display_id: 256, inventory_type: 25}
       :ets.insert(ItemLoader, {weapon_id, weapon})
       on_exit(fn -> :ets.delete(ItemLoader, weapon_id) end)

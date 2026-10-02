@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Entity.WildObjectTest do
   alias ThistleTea.Game.World.Entity.GameObject.Trap, as: TrapServer
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   setup [:templates]
 
@@ -110,7 +111,7 @@ defmodule ThistleTea.Game.World.Entity.WildObjectTest do
 
     test "does not flag an unflagged owner through an enemy player", %{trap: trap, target: target, caster: caster} do
       World.remove_position(target)
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
       player = %{caster | object: %Object{guid: guid}}
       World.update_position(player)
 
@@ -132,7 +133,7 @@ defmodule ThistleTea.Game.World.Entity.WildObjectTest do
   end
 
   defp trap_targets(%{caster: caster}) do
-    guid = Guid.from_low_guid(:mob, 721, System.unique_integer([:positive]))
+    guid = Guid.from_low_guid(:mob, 721, Unique.integer())
     target = %Mob{object: %Object{guid: guid}, internal: caster.internal, movement_block: caster.movement_block}
     World.update_position(target)
     Metadata.put(guid, %{alive?: true, in_combat: false, faction_template: %FactionTemplate{faction: 3}})

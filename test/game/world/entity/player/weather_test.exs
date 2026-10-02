@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.World.Entity.Player.WeatherTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Player.Weather, as: PlayerWeather
   alias ThistleTea.Game.World.System.Weather, as: WeatherSystem
+  alias ThistleTea.Test.Unique
 
   setup [:player]
 
@@ -46,7 +47,7 @@ defmodule ThistleTea.Game.World.Entity.Player.WeatherTest do
   end
 
   defp player(_context) do
-    guid = System.unique_integer([:positive]) + 90_000_000
+    guid = Unique.integer()
     world = WorldRef.instance(529, guid)
     character = %Character{object: %Object{guid: guid}, internal: %Internal{world: world}}
     on_exit(fn -> WeatherSystem.clear_world(world) end)

@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.World.Loot.ActorFactoryTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.ServerVariables
+  alias ThistleTea.Test.Unique
 
   describe "for_character/2 and for_guid/2" do
     test "refresh global conditions for both local and remote loot actors" do
@@ -200,5 +201,5 @@ defmodule ThistleTea.Game.World.Loot.ActorFactoryTest do
     end
   end
 
-  defp unique_guid, do: System.unique_integer([:positive, :monotonic])
+  defp unique_guid, do: Unique.integer()
 end

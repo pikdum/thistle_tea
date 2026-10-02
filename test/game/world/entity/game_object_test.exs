@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectTest do
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   test "caught bobbers survive their cast expiry while loot is open" do
     state = %GameObject{internal: %Internal{fishing: %Fishing{consumed?: true}}}
@@ -28,7 +29,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectTest do
   end
 
   test "owner publishes condition state and updates GO state" do
-    db_guid = System.unique_integer([:positive, :monotonic])
+    db_guid = Unique.integer()
     guid = Guid.from_low_guid(:game_object, 21_145, db_guid)
 
     state = %GameObject{
@@ -54,7 +55,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectTest do
 
   describe "handle_cast/2" do
     test "creates slow-opening banners before resetting the recipient's interaction cache" do
-      lock_id = 9_000_000 + System.unique_integer([:positive])
+      lock_id = Unique.integer()
       :ets.insert(LockLoader, {lock_id, %Lock{id: lock_id, requirements: [%Requirement{type: :skill, index: 17}]}})
       on_exit(fn -> :ets.delete(LockLoader, lock_id) end)
 
@@ -80,7 +81,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectTest do
     end
 
     test "buttons trigger the nearest linked trap in the same copy" do
-      entry = 9_000_000 + rem(System.unique_integer([:positive]), 1_000_000)
+      entry = Unique.integer()
       world = WorldRef.instance(999, entry)
       button_template = %GameObjectTemplate{entry: entry, type: 1, flags: 0, size: 1.0, data: [0, 0, 0, entry + 1]}
       GameObjectTemplateLoader.put(button_template)
@@ -105,7 +106,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectTest do
     end
 
     test "projects a destroyed door state and can reset it" do
-      guid = Guid.from_low_guid(:game_object, 16_397, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:game_object, 16_397, Unique.integer())
 
       state = %GameObject{
         object: %Object{guid: guid, entry: 16_397},

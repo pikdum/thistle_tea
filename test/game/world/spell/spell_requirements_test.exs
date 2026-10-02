@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.World.Spell.SpellRequirementsTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Spell.SpellRequirements
+  alias ThistleTea.Test.Unique
 
   setup [:caster]
 
@@ -84,7 +85,7 @@ defmodule ThistleTea.Game.World.Spell.SpellRequirementsTest do
 
     test "corpse owners retain faction after the player leaves", %{caster: caster, spell: spell} do
       for {faction, edible?} <- [{friendly(), false}, {enemy(), true}] do
-        owner = Guid.from_low_guid(:player, System.unique_integer([:positive]) + 82_000_000)
+        owner = Guid.from_low_guid(:player, Unique.integer())
         Metadata.put(owner, %{faction_template: faction, faction_template_id: faction.id})
 
         corpse = %Corpse{
@@ -263,7 +264,7 @@ defmodule ThistleTea.Game.World.Spell.SpellRequirementsTest do
   end
 
   defp caster(_context) do
-    guid = Guid.from_low_guid(:player, System.unique_integer([:positive]) + 81_000_000)
+    guid = Guid.from_low_guid(:player, Unique.integer())
     Metadata.put(guid, %{faction_template: friendly()})
     on_exit(fn -> Metadata.delete(guid) end)
 
@@ -292,7 +293,7 @@ defmodule ThistleTea.Game.World.Spell.SpellRequirementsTest do
     guid =
       if kind == :mob,
         do: Guid.runtime(:mob, 1),
-        else: Guid.from_low_guid(kind, System.unique_integer([:positive]) + 81_000_000)
+        else: Guid.from_low_guid(kind, Unique.integer())
 
     table = %{mob: :mobs, player: :players, corpse: :corpses}[kind]
     SpatialHash.update(table, guid, world, x, y, z)

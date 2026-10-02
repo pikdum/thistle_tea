@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellInterruptTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.EventSink.Context
+  alias ThistleTea.Test.Unique
 
   setup [:caster]
 
@@ -134,7 +135,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellInterruptTest do
     spell = %Spell{id: 133, school: :fire, prevention_type: 1, interrupt_flags: 2, cast_time_ms: 3_000}
 
     entity = %Character{
-      object: %Object{guid: System.unique_integer([:positive]) + 84_000_000},
+      object: %Object{guid: Unique.integer()},
       unit: %Unit{health: 100, max_health: 1_000, level: 50},
       player: %Player{},
       internal: %Internal{spellbook: %{133 => spell, 116 => %Spell{id: 116, school: :frost}}},

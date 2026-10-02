@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EnchantmentsTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
+  alias ThistleTea.Test.Unique
 
   @enchant 998_201
   @spell 998_202
@@ -100,7 +101,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EnchantmentsTest do
   end
 
   defp inventory(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
     item = ItemStore.create(%ItemTemplate{entry: 998_205, class: 4, inventory_type: 5, item_level: 10}, owner: guid)
 
     dust =

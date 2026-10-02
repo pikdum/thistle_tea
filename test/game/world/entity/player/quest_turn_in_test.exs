@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestTurnInTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.Battleground.Match
+  alias ThistleTea.Test.Unique
 
   @moduletag :vmangos_db
 
@@ -46,12 +47,12 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestTurnInTest do
     ItemLoader.init()
     QuestLoader.init()
 
-    id = System.unique_integer([:positive, :monotonic])
+    id = Unique.integer()
     player_guid = Guid.from_low_guid(:player, id)
     npc_entry = 98_200
     npc_guid = Guid.from_low_guid(:mob, npc_entry, id)
     quest_id = 98_300 + rem(id, 10_000)
-    Entity.register(npc_guid)
+    {:ok, _} = Entity.register(npc_guid)
 
     npc = %{
       object: %Object{guid: npc_guid},
@@ -148,7 +149,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestTurnInTest do
     test "questgiver-only blacksmiths expose match gossip through the quest hello path", context do
       {world, _pid} = enter_alterac(context.player_guid)
       npc_guid = Guid.from_low_guid(:mob, 13_257, context.id)
-      Entity.register(npc_guid)
+      {:ok, _} = Entity.register(npc_guid)
 
       npc = %{
         object: %Object{guid: npc_guid},

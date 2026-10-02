@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.Loader.PeriodicDamageRampsDbcTest do
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -72,7 +73,7 @@ defmodule ThistleTea.Game.World.Loader.PeriodicDamageRampsDbcTest do
       caster_guid = target.object.guid + 1
 
       for guid <- [target.object.guid, caster_guid] do
-        Entity.register(guid)
+        {:ok, _} = Entity.register(guid)
         SpatialHash.insert(:players, guid, target.internal.world, 0.0, 0.0, 0.0)
       end
 
@@ -113,7 +114,7 @@ defmodule ThistleTea.Game.World.Loader.PeriodicDamageRampsDbcTest do
   end
 
   defp target(_context) do
-    guid = System.unique_integer([:positive])
+    guid = Unique.integer()
 
     %{
       target: %Character{

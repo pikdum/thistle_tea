@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.World.Spell.SpellUnitLocationsTest do
   alias ThistleTea.Game.World.Spell.SpellRequirements
   alias ThistleTea.Game.World.Spell.SpellTargetResolver
   alias ThistleTea.Test.FactionFixtures
+  alias ThistleTea.Test.Unique
 
   setup [{FactionFixtures, :seed}, :caster]
 
@@ -228,14 +229,14 @@ defmodule ThistleTea.Game.World.Spell.SpellUnitLocationsTest do
 
   defp caster(_context) do
     caster = %Character{
-      object: %Object{guid: Guid.from_low_guid(:player, System.unique_integer([:positive]) + 89_000_000)},
+      object: %Object{guid: Guid.from_low_guid(:player, Unique.integer())},
       unit: %Unit{health: 100, max_health: 100, power1: 100, max_power1: 100, level: 60, faction_template: 1},
       player: %Player{},
       internal: %Internal{world: WorldRef.instance(999, 953)},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 1.0}}
     }
 
-    Entity.register(caster.object.guid)
+    {:ok, _} = Entity.register(caster.object.guid)
     World.update_position(caster)
     Metadata.put(caster.object.guid, %{alive?: true, faction_template: friendly(), unit_flags: 0})
 
@@ -260,7 +261,7 @@ defmodule ThistleTea.Game.World.Spell.SpellUnitLocationsTest do
   end
 
   defp mob(caster, {x, y, z}, opts \\ []) do
-    guid = Guid.from_low_guid(:unit, 100, rem(System.unique_integer([:positive]), 1_000_000) + 8_000_000)
+    guid = Guid.from_low_guid(:unit, 100, Unique.integer())
 
     mob = %Mob{
       object: %Object{guid: guid, entry: 100},
@@ -284,7 +285,7 @@ defmodule ThistleTea.Game.World.Spell.SpellUnitLocationsTest do
         {Agent, :start_link,
          [
            fn ->
-             Entity.register(guid)
+             {:ok, _} = Entity.register(guid)
              World.update_position(mob)
              Metadata.put(guid, metadata)
              mob

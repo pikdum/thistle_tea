@@ -3,12 +3,13 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
 
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.System.CellActivator
+  alias ThistleTea.Test.Unique
 
   describe "activate/2" do
     test "loads newly activated cells once" do
       parent = self()
       loader = fn cell -> send(parent, {:loaded, cell}) end
-      name = :"cell_activator_test_#{System.unique_integer([:positive])}"
+      name = :"cell_activator_test_#{Unique.integer()}"
 
       start_supervised!({CellActivator, name: name, loader: loader})
 
@@ -23,7 +24,7 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
     test "invalidate allows cells to load again" do
       parent = self()
       loader = fn cell -> send(parent, {:loaded, cell}) end
-      name = :"cell_activator_test_#{System.unique_integer([:positive])}"
+      name = :"cell_activator_test_#{Unique.integer()}"
 
       start_supervised!({CellActivator, name: name, loader: loader})
 
@@ -43,7 +44,7 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
         receive do: (:continue -> :ok)
       end
 
-      name = :"cell_activator_test_#{System.unique_integer([:positive])}"
+      name = :"cell_activator_test_#{Unique.integer()}"
       start_supervised!({CellActivator, name: name, loader: loader, max_concurrency: 2})
 
       CellActivator.activate([{0, 1, 1}, {0, 1, 2}, {0, 1, 3}], name)
@@ -72,7 +73,7 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
         end
       end
 
-      name = :"cell_activator_test_#{System.unique_integer([:positive])}"
+      name = :"cell_activator_test_#{Unique.integer()}"
 
       start_supervised!({CellActivator, name: name, loader: loader, max_concurrency: 1, retry_delay_ms: 10})
 
@@ -87,7 +88,7 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
 
   describe "sweep" do
     test "re-asserts wanted cells and deactivates them after players leave" do
-      world = System.unique_integer([:positive])
+      world = Unique.integer()
       occupied = start_supervised!({Agent, fn -> [{world, 10, 10}] end})
       pid = start_sweeper(occupied, grace_ms: 0)
 
@@ -105,7 +106,7 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
     end
 
     test "keeps cells wanted by players loaded" do
-      world = System.unique_integer([:positive])
+      world = Unique.integer()
       occupied = start_supervised!({Agent, fn -> [{world, 10, 10}] end})
       pid = start_sweeper(occupied, grace_ms: 0)
 
@@ -120,7 +121,7 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
 
     test "invalidate keeps running cells eligible for deactivation" do
       parent = self()
-      world = System.unique_integer([:positive])
+      world = Unique.integer()
       occupied = start_supervised!({Agent, fn -> [] end})
 
       loader = fn cell ->
@@ -146,7 +147,7 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
     end
 
     test "tears down an open world after it stays empty" do
-      world = System.unique_integer([:positive])
+      world = Unique.integer()
       occupied = start_supervised!({Agent, fn -> [{world, 1, 1}] end})
       pid = start_sweeper(occupied, grace_ms: 999_999_999, world_empty_timeout_ms: 0)
 
@@ -163,7 +164,7 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
     end
 
     test "tears down a world kept alive only by resident pools" do
-      world = System.unique_integer([:positive])
+      world = Unique.integer()
       occupied = start_supervised!({Agent, fn -> [] end})
 
       pid =
@@ -178,7 +179,7 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
     end
 
     test "does not tear down worlds with players present" do
-      world = System.unique_integer([:positive])
+      world = Unique.integer()
       occupied = start_supervised!({Agent, fn -> [{world, 1, 1}] end})
       pid = start_sweeper(occupied, grace_ms: 999_999_999, world_empty_timeout_ms: 0)
 
@@ -192,7 +193,7 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
     end
 
     test "leaves instanced worlds alone" do
-      world = WorldRef.instance(389, System.unique_integer([:positive]))
+      world = WorldRef.instance(389, Unique.integer())
       occupied = start_supervised!({Agent, fn -> [] end})
       pid = start_sweeper(occupied, grace_ms: 0, world_empty_timeout_ms: 0)
 
@@ -222,7 +223,7 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
     parent = self()
 
     defaults = [
-      name: :"cell_activator_test_#{System.unique_integer([:positive])}",
+      name: :"cell_activator_test_#{Unique.integer()}",
       loader: fn cell -> send(parent, {:loaded, cell}) end,
       player_cells: fn -> Agent.get(occupied, & &1) end,
       pool_worlds: fn -> [] end,

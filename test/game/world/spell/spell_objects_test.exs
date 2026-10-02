@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.World.Spell.SpellObjectsTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Spell.SpellObjects
   alias ThistleTea.Game.World.Spell.SpellRequirements
+  alias ThistleTea.Test.Unique
 
   setup [:caster]
 
@@ -236,7 +237,7 @@ defmodule ThistleTea.Game.World.Spell.SpellObjectsTest do
 
   defp caster(_context) do
     caster = %Character{
-      object: %Object{guid: Guid.from_low_guid(:player, System.unique_integer([:positive]) + 82_000_000)},
+      object: %Object{guid: Guid.from_low_guid(:player, Unique.integer())},
       unit: %Unit{health: 100, max_health: 100, power1: 100, max_power1: 100, level: 60},
       player: %Player{},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},

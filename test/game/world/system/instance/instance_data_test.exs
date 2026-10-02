@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceDataTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.System.Instance.InstanceData
   alias ThistleTea.Game.World.Topics
+  alias ThistleTea.Test.Unique
 
   describe "read/3" do
     test "projects supported defaults and stored values in one batch" do
@@ -58,7 +59,7 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceDataTest do
   describe "publish/2" do
     test "announces a copy's data to its world facts subscribers only when it changes" do
       table = table()
-      world = WorldRef.instance(329, System.unique_integer([:positive]))
+      world = WorldRef.instance(329, Unique.integer())
       copy = %Copy{world: world, owner: {:player, 1}, script_name: "instance_stratholme", data: %{7 => 2}}
       :ok = Topics.subscribe(Topics.world_facts(world))
 

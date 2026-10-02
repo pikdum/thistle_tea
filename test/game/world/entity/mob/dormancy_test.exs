@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.DormancyTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Entity.Mob, as: MobServer
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   describe "handle_continue/2" do
     test "an idle creature with nothing to maintain keeps no timer" do
@@ -54,7 +55,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.DormancyTest do
   end
 
   defp mob do
-    guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive, :monotonic]))
+    guid = Guid.from_low_guid(:mob, 1, Unique.integer())
     Metadata.put(guid, %{alive?: true})
     on_exit(fn -> Metadata.delete(guid) end)
 

@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Core.AI.BT.PetTest do
   alias ThistleTea.Game.World.Entity.AIEnvironment
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @now 10_000
 
@@ -105,7 +106,7 @@ defmodule ThistleTea.Game.Core.AI.BT.PetTest do
     end
 
     test "despawns when the owner is gone" do
-      owner_guid = Guid.from_low_guid(:player, :erlang.unique_integer([:positive]))
+      owner_guid = Guid.from_low_guid(:player, Unique.integer())
       state = pet_beside_owner(owner_guid)
 
       context = AIEnvironment.context(state, @now)
@@ -138,7 +139,7 @@ defmodule ThistleTea.Game.Core.AI.BT.PetTest do
   end
 
   defp stationary_owner(opts) do
-    guid = Guid.from_low_guid(:player, :erlang.unique_integer([:positive]))
+    guid = Guid.from_low_guid(:player, Unique.integer())
     SpatialHash.update(:players, guid, world(), 0.0, 0.0, 0.0)
 
     Metadata.put(guid, %{
@@ -156,7 +157,7 @@ defmodule ThistleTea.Game.Core.AI.BT.PetTest do
 
   defp pet_beside_owner(owner_guid) do
     %Mob{
-      object: %Object{guid: Guid.from_low_guid(:pet, 1, :erlang.unique_integer([:positive]))},
+      object: %Object{guid: Guid.from_low_guid(:pet, 1, Unique.integer())},
       unit: %Unit{bounding_radius: Unit.default_bounding_radius()},
       internal: %Internal{
         world: world(),
@@ -167,7 +168,7 @@ defmodule ThistleTea.Game.Core.AI.BT.PetTest do
   end
 
   defp active_pet do
-    owner_guid = Guid.from_low_guid(:player, :erlang.unique_integer([:positive]))
+    owner_guid = Guid.from_low_guid(:player, Unique.integer())
     state = pet_beside_owner(owner_guid)
 
     %{

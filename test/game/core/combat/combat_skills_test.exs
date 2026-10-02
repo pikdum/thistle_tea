@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Core.Combat.CombatSkillsTest do
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Test.Unique
 
   setup [:combatants]
 
@@ -277,8 +278,8 @@ defmodule ThistleTea.Game.Core.Combat.CombatSkillsTest do
 
   describe "handle_cast/2" do
     test "typed feedback reaches the registered player owner and publishes progress", %{character: character, mob: mob} do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]) + 10_000_000)
-      Entity.register(guid)
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      {:ok, _} = Entity.register(guid)
       character = %{character | object: %{character.object | guid: guid}}
       effect = %Effects.AdvanceCombatSkill{target_guid: guid, skill_id: 173}
       EventSink.emit(mob, effect)

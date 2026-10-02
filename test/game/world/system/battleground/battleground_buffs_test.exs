@@ -3,13 +3,14 @@ defmodule ThistleTea.Game.World.System.Battleground.BattlegroundBuffsTest do
 
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.System.Battleground.Buffs
+  alias ThistleTea.Test.Unique
 
   describe "start_link/1" do
     test "rotates consumed pickups after the delay and cleans up when the match ends" do
       owner = spawn(fn -> receive do: (:stop -> :ok) end)
       parent = self()
       position = {1.0, 2.0, 3.0, 4.0}
-      world = WorldRef.instance(529, System.unique_integer([:positive]))
+      world = WorldRef.instance(529, Unique.integer())
 
       spawn_pickup = fn world, entry, position ->
         pid = spawn(fn -> receive do: (:consume -> :ok) end)

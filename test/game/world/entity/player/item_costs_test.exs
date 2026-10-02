@@ -12,10 +12,11 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemCostsTest do
   alias ThistleTea.Game.World.Entity.Player.ItemCosts
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Test.Unique
 
   describe "settle/1" do
     test "settles completed cast costs without consuming unrelated owner messages" do
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
       first = ItemStore.create(%ItemTemplate{entry: 10_940, stackable: 20}, owner: guid, stack_count: 3)
       second = ItemStore.create(%ItemTemplate{entry: 10_938, stackable: 20}, owner: guid, stack_count: 2)
       oil = ItemStore.create(%ItemTemplate{entry: 20_744, spellid_1: 25_117, spellcharges_1: -5}, owner: guid)

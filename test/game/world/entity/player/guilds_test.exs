@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GuildsTest do
   alias ThistleTea.Game.World.Entity.Player.Guilds
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.System.Guild, as: GuildSystem
+  alias ThistleTea.Test.Unique
 
   describe "create/2" do
     test "publishes a founder and returns a client-readable guild query", %{founder: founder, name: name} do
@@ -90,7 +91,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GuildsTest do
   end
 
   setup do
-    suffix = System.unique_integer([:positive])
+    suffix = Unique.integer()
     name = "Guild #{suffix}"
     founder_character = character("Founder#{suffix}", 1)
     target_character = character("Target#{suffix}", 3)
@@ -123,7 +124,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GuildsTest do
   end
 
   defp character(name, race) do
-    id = System.unique_integer([:positive])
+    id = Unique.integer()
 
     CharacterStore.put(%Character{
       id: id,

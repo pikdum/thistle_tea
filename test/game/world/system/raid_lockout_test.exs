@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.System.RaidLockoutTest do
   alias ThistleTea.Game.Core.Party.Group
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.System.Instance
+  alias ThistleTea.Test.Unique
 
   setup [:start_raid_owner]
 
@@ -93,8 +94,8 @@ defmodule ThistleTea.Game.World.System.RaidLockoutTest do
 
   defp start_raid_owner(_context) do
     parent = self()
-    guid = System.unique_integer([:positive]) + 10_000_000
-    Entity.register(guid)
+    guid = Unique.integer()
+    {:ok, _} = Entity.register(guid)
     {:ok, clock} = start_supervised({Agent, fn -> 0 end})
     table = :ets.new(:raid_projection, [:set, :public])
 

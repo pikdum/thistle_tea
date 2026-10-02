@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Core.Combat.PlayerCombatTest do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @unit_flag_in_combat 0x00080000
 
@@ -510,6 +511,6 @@ defmodule ThistleTea.Game.Core.Combat.PlayerCombatTest do
   end
 
   defp unique_guid do
-    System.unique_integer([:positive, :monotonic])
+    Unique.integer()
   end
 end

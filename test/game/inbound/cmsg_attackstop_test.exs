@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Inbound.CmsgAttackstopTest do
   alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Inbound.CmsgAttackstop
   alias ThistleTea.Game.Network.Message.SmsgCastResult
+  alias ThistleTea.Test.Unique
 
   describe "handle/2" do
     test "stops auto attack without resetting the swing timer" do
@@ -78,6 +79,6 @@ defmodule ThistleTea.Game.Inbound.CmsgAttackstopTest do
   end
 
   defp unique_id do
-    System.unique_integer([:positive, :monotonic])
+    Unique.integer()
   end
 end

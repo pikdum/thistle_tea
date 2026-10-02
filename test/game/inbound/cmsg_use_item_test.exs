@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Inbound.CmsgUseItemTest do
   alias ThistleTea.Game.World.Loader.ItemTarget
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @backpack_start 23
   @not_ready 0x3C
@@ -95,7 +96,7 @@ defmodule ThistleTea.Game.Inbound.CmsgUseItemTest do
 
     test "instant transformation keeps its charged source until atomic replacement" do
       player_guid = Guid.from_low_guid(:player, unique_id())
-      Entity.register(player_guid)
+      {:ok, _} = Entity.register(player_guid)
 
       spell = %Spell{
         id: @spell_id,
@@ -244,7 +245,7 @@ defmodule ThistleTea.Game.Inbound.CmsgUseItemTest do
   end
 
   defp unique_id do
-    System.unique_integer([:positive, :monotonic])
+    Unique.integer()
   end
 
   defp use_item(%{bag: bag, slot: slot, targets: targets}, state, load_spell),

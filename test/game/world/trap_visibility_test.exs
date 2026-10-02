@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.TrapVisibilityTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Proximity
   alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Test.Unique
 
   setup [:trap]
 
@@ -62,7 +63,7 @@ defmodule ThistleTea.Game.World.TrapVisibilityTest do
   describe "reveal_hidden/1" do
     test "re-checks listed traps against the viewer's current hostility and detection", context do
       %{state: state, trap: trap, owner: owner} = context
-      Entity.register(trap)
+      {:ok, _} = Entity.register(trap)
       Group.join(Groups, Proximity.hidden_key({state.character.internal.world, 0, 0}), %{guid: trap})
       state = %{state | tracked_entities: MapSet.new([trap])} |> Visibility.reveal_hidden()
       refute Visibility.tracked?(state, trap)
@@ -90,7 +91,7 @@ defmodule ThistleTea.Game.World.TrapVisibilityTest do
     test "a trap asks nearby viewers to re-check it when its owner's reactions change", context do
       %{state: state, trap: trap, owner: owner} = context
       world = state.character.internal.world
-      Entity.register(state.guid)
+      {:ok, _} = Entity.register(state.guid)
       World.SpatialHash.insert(:players, state.guid, world, 0.0, 0.0, 0.0)
       on_exit(fn -> World.SpatialHash.remove(:players, state.guid) end)
 
@@ -122,8 +123,8 @@ defmodule ThistleTea.Game.World.TrapVisibilityTest do
   end
 
   defp trap(_context) do
-    viewer = System.unique_integer([:positive, :monotonic])
-    owner = System.unique_integer([:positive, :monotonic])
+    viewer = Unique.integer()
+    owner = Unique.integer()
     trap = Guid.runtime(:game_object, 950_201)
     world = WorldRef.open(999)
 

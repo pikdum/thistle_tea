@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Spell.ChainTargetsTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Spell.ChainTargets
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Test.Unique
 
   setup [:build_caster]
 
@@ -214,7 +215,7 @@ defmodule ThistleTea.Game.World.Spell.ChainTargetsTest do
 
     guid =
       if type == :player,
-        do: Guid.from_low_guid(:player, System.unique_integer([:positive])),
+        do: Guid.from_low_guid(:player, Unique.integer()),
         else: Guid.runtime(type, 1)
 
     SpatialHash.update(table, guid, 0, x, 0.0, 0.0)

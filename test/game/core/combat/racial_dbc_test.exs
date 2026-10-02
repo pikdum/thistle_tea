@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Core.Combat.RacialDbcTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Entity.EffectResolver.Spells
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
   setup [:caster]
@@ -138,7 +139,7 @@ defmodule ThistleTea.Game.Core.Combat.RacialDbcTest do
 
     %{
       caster: %Character{
-        object: %Object{guid: System.unique_integer([:positive]) + 90_000_000},
+        object: %Object{guid: Unique.integer()},
         unit: unit,
         player: %Player{},
         internal: %Internal{world: %WorldRef{map_id: 0}},

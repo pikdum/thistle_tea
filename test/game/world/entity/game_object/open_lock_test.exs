@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject.OpenLockTest do
   alias ThistleTea.Game.World.Entity.GameObject.OpenLock, as: ObjectLock
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @actor %Actor{guid: 42, group_id: nil, needed_items: MapSet.new(), distance: 0.0}
   @opened %OpenLock{lock_id: 38, lock_type: 3, skill_id: 186, value: 1, required: 0, gain?: true}
@@ -129,7 +130,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject.OpenLockTest do
   end
 
   defp vein(_context) do
-    guid = Guid.from_low_guid(:game_object, 1731, System.unique_integer([:positive, :monotonic]))
+    guid = Guid.from_low_guid(:game_object, 1731, Unique.integer())
 
     state = %GameObject{
       object: %Object{guid: guid, entry: 1731},

@@ -7,10 +7,11 @@ defmodule ThistleTea.Game.Network.Message.QueryTimeTest do
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World.Entity.Registry
+  alias ThistleTea.Test.Unique
 
   describe "handle/2" do
     test "answers an empty time query with current Unix seconds for the ready player" do
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
       Registry.register(guid)
       state = %{ready: true, guid: guid}
       packet = %Packet{opcode: Opcodes.get(:CMSG_QUERY_TIME), payload: <<>>}

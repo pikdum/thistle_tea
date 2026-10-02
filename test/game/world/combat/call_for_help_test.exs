@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.Combat.CallForHelpTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   describe "assist/2" do
     test "captures the caller's current fight reference for initial assistance" do
@@ -206,7 +207,7 @@ defmodule ThistleTea.Game.World.Combat.CallForHelpTest do
 
   defp combat_scene(opts \\ []) do
     caller_guid = mob_guid()
-    enemy_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+    enemy_guid = Guid.from_low_guid(:player, Unique.integer())
 
     Metadata.put(caller_guid, %{faction_template: defias()})
     Metadata.put(enemy_guid, %{alive?: true, faction_template: alliance(), unit_flags: 0})
@@ -231,7 +232,7 @@ defmodule ThistleTea.Game.World.Combat.CallForHelpTest do
 
   defp put_helper({x, y, z}, opts \\ []) do
     helper_guid = mob_guid()
-    Entity.register(helper_guid)
+    {:ok, _} = Entity.register(helper_guid)
     SpatialHash.update(:mobs, helper_guid, 0, x, y, z)
 
     Metadata.put(helper_guid, %{
@@ -253,7 +254,7 @@ defmodule ThistleTea.Game.World.Combat.CallForHelpTest do
   end
 
   defp mob_guid do
-    Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+    Guid.from_low_guid(:mob, 1, Unique.integer())
   end
 
   defp alliance do

@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.SpellsTest do
   alias ThistleTea.Game.World.Entity.AIEnvironment
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   defp context(state), do: AIEnvironment.context(state, 1_000)
 
@@ -517,7 +518,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.SpellsTest do
   end
 
   defp injured_ally(distance, health_pct, opts \\ []) do
-    guid = Guid.from_low_guid(:mob, 590, rem(System.unique_integer([:positive]), 0x00FFFFFF) + 1)
+    guid = Guid.from_low_guid(:mob, 590, Unique.integer())
     SpatialHash.update(:mobs, guid, 0, distance, 0.0, 0.0)
 
     Metadata.put(guid, %{
@@ -651,11 +652,11 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.SpellsTest do
   end
 
   defp player_guid do
-    Guid.from_low_guid(:player, rem(System.unique_integer([:positive]), 0xFFFFFFF) + 1)
+    Guid.from_low_guid(:player, Unique.integer())
   end
 
   defp mob_guid do
-    Guid.from_low_guid(:mob, 589, rem(System.unique_integer([:positive]), 0x00FFFFFF) + 1)
+    Guid.from_low_guid(:mob, 589, Unique.integer())
   end
 
   defp alliance do

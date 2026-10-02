@@ -57,13 +57,14 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Test.PetControlOwner
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
   describe "login/3" do
     test "starts the registered owner of a character" do
       {:ok, account} = Account.get_user("test")
-      id = System.unique_integer([:positive])
+      id = Unique.integer()
       guid = Guid.from_low_guid(:player, id)
       character = CharacterStore.put(login_character(id, guid, account.id))
       guid = character.object.guid
@@ -90,7 +91,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
 
     test "returns the client to character selection when the owner already exists" do
       {:ok, account} = Account.get_user("test")
-      id = System.unique_integer([:positive])
+      id = Unique.integer()
       guid = Guid.from_low_guid(:player, id)
       CharacterStore.put(login_character(id, guid, account.id))
 
@@ -114,7 +115,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
   describe "logout" do
     test "settles rest on disconnect and consumes offline time before login publication" do
       {:ok, account} = Account.get_user("test")
-      id = System.unique_integer([:positive])
+      id = Unique.integer()
       guid = Guid.from_low_guid(:player, id)
       character = login_character(id, guid, account.id)
       next_level_xp = Stats.next_level_xp(character.unit.level)
@@ -147,7 +148,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
 
     test "connection loss begins wilderness rest at actual world departure" do
       {:ok, account} = Account.get_user("test")
-      id = System.unique_integer([:positive])
+      id = Unique.integer()
       guid = Guid.from_low_guid(:player, id)
       CharacterStore.put(login_character(id, guid, account.id))
       connection = spawn(fn -> receive do: (:stop -> :ok) end)
@@ -166,7 +167,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
 
     test "stops the owner before the connection completes logout" do
       {:ok, account} = Account.get_user("test")
-      id = System.unique_integer([:positive])
+      id = Unique.integer()
       guid = Guid.from_low_guid(:player, id)
       character = login_character(id, guid, account.id)
       CharacterStore.put(%{character | internal: %{character.internal | rest_type: {:tavern, 71}}})
@@ -235,8 +236,8 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
 
   describe "handle_cast/2" do
     test "untracks removals drained after a create in the same batch" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      target = Guid.from_low_guid(:mob, System.unique_integer([:positive]), 721)
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      target = Guid.from_low_guid(:mob, Unique.integer(), 721)
       state = %State{guid: guid, character: character(guid, []), connection_pid: self()}
       GenServer.cast(self(), {:send_packet, UpdateObject.out_of_range([target])})
 
@@ -247,8 +248,8 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "tracks a recreate following a queued removal in wire order" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      target = Guid.from_low_guid(:mob, System.unique_integer([:positive]), 721)
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      target = Guid.from_low_guid(:mob, Unique.integer(), 721)
 
       state = %State{
         guid: guid,
@@ -268,8 +269,8 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "drops stale queued creates for invisible units" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      target = Guid.from_low_guid(:mob, System.unique_integer([:positive]), 721)
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      target = Guid.from_low_guid(:mob, Unique.integer(), 721)
       Metadata.put(target, %{invisibility: %{0 => 200}})
       on_exit(fn -> Metadata.delete(target) end)
       state = %State{guid: guid, character: character(guid, []), connection_pid: self()}
@@ -341,7 +342,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "initializes instance ownership after a cross-map transfer" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
 
       state = %State{
         connection_pid: self(),
@@ -373,7 +374,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
 
     test "near and cross-map teleports discard an unfinished fall" do
       for destination <- [WorldRef.open(0), WorldRef.open(309)] do
-        guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+        guid = Guid.from_low_guid(:player, Unique.integer())
         character = character(guid, health: 100, max_health: 100)
         character = %{character | internal: %{character.internal | fall: %Falling{height: 200.0, far?: true}}}
         state = %State{connection_pid: self(), guid: guid, character: character, ready: true}
@@ -393,7 +394,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
 
     test "near and cross-map teleports notify the client when interrupting a cast" do
       for destination <- [WorldRef.open(0), WorldRef.open(309)] do
-        guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+        guid = Guid.from_low_guid(:player, Unique.integer())
         character = character(guid, health: 100, max_health: 100)
         spell = %Spell{id: 116, cast_time_ms: 3_000, gcd_ms: 1_500}
         casting = Cast.new(spell, Target.none(), Time.now())
@@ -415,7 +416,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "clears city rest when teleporting to a map without loaded navigation data" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
 
       character =
         %{character(guid, health: 100, max_health: 100) | player: %Player{flags: 0, next_level_xp: 100_000}}
@@ -439,9 +440,9 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "waits for the near teleport acknowledgement before restoring a suspended pet" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      pet_guid = Guid.from_low_guid(:pet, 1863, System.unique_integer([:positive]))
-      mob_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      pet_guid = Guid.from_low_guid(:pet, 1863, Unique.integer())
+      mob_guid = Guid.from_low_guid(:mob, 1, Unique.integer())
 
       character =
         character(guid, health: 100, max_health: 100, summon: pet_guid)
@@ -475,9 +476,9 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "combat relocation preserves combat, threat references, target, and pet" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      pet_guid = Guid.from_low_guid(:pet, 1863, System.unique_integer([:positive]))
-      mob_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      pet_guid = Guid.from_low_guid(:pet, 1863, Unique.integer())
+      mob_guid = Guid.from_low_guid(:mob, 1, Unique.integer())
 
       character =
         character(guid, health: 100, max_health: 100, summon: pet_guid)
@@ -518,7 +519,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "ordinary teleports detach from a transport" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
       transport_guid = Guid.from_low_guid(:mo_transport, 164_871)
       character = character(guid, health: 100, max_health: 100)
 
@@ -553,7 +554,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "teleports cancel projected server movement" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
       character = character(guid, health: 100, max_health: 100, auras: [])
       started_at = Time.now()
 
@@ -607,7 +608,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "records the previous instance when returning to the open world" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
       character = character(guid, health: 100, max_health: 100)
       character = %{character | internal: %{character.internal | world: WorldRef.instance(389, 12)}}
       state = %State{connection_pid: self(), guid: guid, character: character, ready: true}
@@ -724,8 +725,8 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
 
     test "notifies a creature caster only for cast hits, not ground aura refreshes" do
       caster_guid = Guid.runtime(:mob, 990_514)
-      EntityRegistry.register(caster_guid)
-      character = character(System.unique_integer([:positive]), health: 100, max_health: 100)
+      {:ok, _} = EntityRegistry.register(caster_guid)
+      character = character(Unique.integer(), health: 100, max_health: 100)
 
       spell = %Spell{
         id: 999_904,
@@ -762,7 +763,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "syncs detection metadata before projecting a pending update" do
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
       character = character(guid, health: 80, max_health: 100)
 
       internal = %{
@@ -783,7 +784,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "publishes avoidance changes through the player owner" do
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
 
       spell = %Spell{
         id: 999_902,
@@ -802,7 +803,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "cancels an in-flight cast when the character is dead" do
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
       character = character(guid, health: 0, max_health: 100)
       spell = %Spell{id: 1949, attributes: MapSet.new(), effects: []}
       casting = Cast.new(spell, Target.none(), 1_000)
@@ -818,7 +819,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "leaves an in-flight cast alone while the character lives" do
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
       character = character(guid, health: 50, max_health: 100)
       spell = %Spell{id: 1949, attributes: MapSet.new(), effects: []}
       casting = Cast.new(spell, Target.none(), 1_000)
@@ -836,7 +837,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
 
   describe "handle_info/2" do
     test "relocates an attached player from transport-local coordinates" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
       transport_guid = Guid.from_low_guid(:mo_transport, 164_871)
       local_position = {2.0, 3.0, 4.0, 0.5}
 
@@ -883,7 +884,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "worldports with transport attachment preserved across map changes" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
       transport_guid = Guid.from_low_guid(:mo_transport, 164_871)
       character = character(guid, health: 100, max_health: 100)
 
@@ -940,7 +941,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "resurrects a dead passenger before a transport map change" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
       transport_guid = Guid.from_low_guid(:mo_transport, 164_871)
       character = %{character(guid, health: 0, max_health: 100) | player: %Player{flags: 0}}
 
@@ -977,8 +978,8 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "atomically creates and tracks a pet before completing its attachment" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      pet_guid = Guid.from_low_guid(:pet, 1863, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      pet_guid = Guid.from_low_guid(:pet, 1863, Unique.integer())
 
       state = %State{
         connection_pid: self(),
@@ -1022,8 +1023,8 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "reuses a pet create already sent by visibility before attachment" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      pet_guid = Guid.from_low_guid(:pet, 1863, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      pet_guid = Guid.from_low_guid(:pet, 1863, Unique.integer())
 
       state = %State{
         connection_pid: self(),
@@ -1050,8 +1051,8 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "suspends a hunter pet and clears controls when its process exits" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      pet_guid = Guid.from_low_guid(:pet, 1, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      pet_guid = Guid.from_low_guid(:pet, 1, Unique.integer())
       pet_pid = spawn(fn -> receive do: (:stop -> :ok) end)
 
       state = %State{
@@ -1090,9 +1091,9 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "releases pet possession without dropping the pet or its monitor" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      pet_guid = Guid.from_low_guid(:pet, 1, System.unique_integer([:positive]))
-      Entity.register(pet_guid)
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      pet_guid = Guid.from_low_guid(:pet, 1, Unique.integer())
+      {:ok, _} = Entity.register(pet_guid)
 
       state = %State{
         connection_pid: self(),
@@ -1133,8 +1134,8 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
     end
 
     test "uses the monitored relationship for charm release" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      controlled_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      controlled_guid = Guid.from_low_guid(:mob, 1, Unique.integer())
 
       state = %State{
         connection_pid: self(),

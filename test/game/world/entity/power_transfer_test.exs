@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.Entity.PowerTransferTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   describe "handle_cast/2" do
     test "periodic leech threat goes to the drained creature without splitting among attackers" do
@@ -57,7 +58,7 @@ defmodule ThistleTea.Game.World.Entity.PowerTransferTest do
       for kind <- [:player, :mob] do
         entity = entity(kind)
         guid = entity.object.guid
-        Entity.register(guid)
+        {:ok, _} = Entity.register(guid)
         on_exit(fn -> Entity.unregister(guid) end)
         server = if kind == :player, do: PlayerServer, else: MobServer
         state = if kind == :player, do: %State{character: entity}, else: entity
@@ -131,7 +132,7 @@ defmodule ThistleTea.Game.World.Entity.PowerTransferTest do
       remote = entity(:player).object.guid
 
       for {guid, world} <- [{owner, 0}, {observer, 0}, {remote, 1}] do
-        Entity.register(guid)
+        {:ok, _} = Entity.register(guid)
         SpatialHash.update(:players, guid, world, 0.0, 0.0, 0.0)
       end
 
@@ -182,7 +183,7 @@ defmodule ThistleTea.Game.World.Entity.PowerTransferTest do
     test "direct leech threat routes only to creatures" do
       for kind <- [:player, :mob] do
         target = entity(kind)
-        Entity.register(target.object.guid)
+        {:ok, _} = Entity.register(target.object.guid)
         on_exit(fn -> Entity.unregister(target.object.guid) end)
         effect = %Effects.AddThreat{source_guid: 99, target_guid: target.object.guid, amount: 10.0}
         EventSink.emit(entity(:player), effect)
@@ -198,7 +199,7 @@ defmodule ThistleTea.Game.World.Entity.PowerTransferTest do
   end
 
   defp entity(kind) do
-    low = System.unique_integer([:positive, :monotonic])
+    low = Unique.integer()
     guid = if kind == :player, do: Guid.from_low_guid(:player, low), else: Guid.from_low_guid(:mob, 1, low)
     module = if kind == :player, do: Character, else: Mob
 

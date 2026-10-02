@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Spell.SpellReceptionThreatTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Spell.SpellReception
+  alias ThistleTea.Test.Unique
 
   setup [:entities]
 
@@ -148,7 +149,7 @@ defmodule ThistleTea.Game.World.Spell.SpellReceptionThreatTest do
 
   defp entities(_context) do
     Metadata.init()
-    [guid, caster] = guids = Enum.map(1..2, fn _ -> System.unique_integer([:positive]) end)
+    [guid, caster] = guids = Enum.map(1..2, fn _ -> Unique.integer() end)
     on_exit(fn -> Enum.each(guids, &Metadata.delete/1) end)
 
     %{

@@ -18,12 +18,13 @@ defmodule ThistleTea.Game.World.Spell.SpellReceptionTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Spell.SpellReception
+  alias ThistleTea.Test.Unique
 
   setup [:target]
 
   describe "receive/4" do
     test "party aura ranks refresh, upgrade and expire through normal stat transitions", ctx do
-      [low_id, high_id] = for _ <- 1..2, do: System.unique_integer([:positive]) + 96_000_000
+      [low_id, high_id] = for _ <- 1..2, do: Unique.integer()
 
       low = %Spell{
         id: low_id,
@@ -249,7 +250,7 @@ defmodule ThistleTea.Game.World.Spell.SpellReceptionTest do
 
   defp target(_context) do
     Metadata.init()
-    [guid, caster, dispeller, owner] = guids = Enum.map(1..4, fn _ -> System.unique_integer([:positive]) end)
+    [guid, caster, dispeller, owner] = guids = Enum.map(1..4, fn _ -> Unique.integer() end)
     on_exit(fn -> Enum.each(guids, &Metadata.delete/1) end)
 
     holder = %Holder{

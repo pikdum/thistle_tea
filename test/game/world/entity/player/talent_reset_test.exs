@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentResetTest do
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.PostOffice
+  alias ThistleTea.Test.Unique
 
   @talent 777_001
   @trained 777_002
@@ -274,10 +275,10 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentResetTest do
   end
 
   defp build_state(_context) do
-    owner = System.unique_integer([:positive, :monotonic]) + 10_000_000
+    owner = Unique.integer()
     trainer = Guid.from_low_guid(:mob, @trainer, owner)
-    Entity.register(owner)
-    Entity.register(trainer)
+    {:ok, _} = Entity.register(owner)
+    {:ok, _} = Entity.register(trainer)
     cache(Gossip, [{{:trainer, @trainer}, %{type: 0, class: 3}}])
     cache(ItemLoader, [{@reagent, %ItemTemplate{entry: @reagent, stackable: 1}}])
     cache(SpellChainLoader, for(id <- [@trained, @dependent, @ordinary, @foreign, @summon], do: {{:chain, id}, nil}))

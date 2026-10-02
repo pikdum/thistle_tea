@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Core.Pet.TotemsTest do
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   setup [:totem]
 
@@ -212,9 +213,9 @@ defmodule ThistleTea.Game.Core.Pet.TotemsTest do
 
   describe "handle_continue/2" do
     test "dead totems stop without loot or respawn and notify their owner" do
-      owner = System.unique_integer([:positive]) + 10_000_000
+      owner = Unique.integer()
       guid = Guid.runtime(:mob, 5925)
-      Entity.register(owner)
+      {:ok, _} = Entity.register(owner)
 
       totem = %Mob{
         object: %Object{guid: guid, entry: 5925},
@@ -243,8 +244,8 @@ defmodule ThistleTea.Game.Core.Pet.TotemsTest do
   describe "child_spec/1" do
     test "a stopped supervised totem never respawns from its original state" do
       guid = Guid.runtime(:mob, 5925)
-      owner = System.unique_integer([:positive]) + 10_000_000
-      Entity.register(owner)
+      owner = Unique.integer()
+      {:ok, _} = Entity.register(owner)
 
       totem = %Mob{
         object: %Object{guid: guid, entry: 5925},
@@ -269,14 +270,14 @@ defmodule ThistleTea.Game.Core.Pet.TotemsTest do
   end
 
   defp totem(_) do
-    guid = System.unique_integer([:positive]) + 9_000_000
+    guid = Unique.integer()
     {:ok, pid} = EntitySupervisor.start_child(guid, {Agent, fn -> Entity.register(guid) end})
     on_exit(fn -> if Process.alive?(pid), do: World.stop_entity(pid) end)
     %{guid: guid, pid: pid}
   end
 
   defp character(totems) do
-    id = System.unique_integer([:positive]) + 10_000_000
+    id = Unique.integer()
     on_exit(fn -> :ets.delete(CharacterStore, id) end)
 
     %Character{

@@ -19,12 +19,13 @@ defmodule ThistleTea.Game.World.Entity.PlayerKillRewardTest do
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   describe "handle_cast/2" do
     test "fatal blows notify the active pet even when the victim is gray" do
       pet_guid = Guid.runtime(:pet, 1)
-      player_guid = System.unique_integer([:positive])
-      Entity.register(pet_guid)
+      player_guid = Unique.integer()
+      {:ok, _} = Entity.register(pet_guid)
 
       character =
         %Character{object: %Object{guid: player_guid}, unit: %Unit{health: 100, level: 60}, internal: %Internal{}}
@@ -41,9 +42,9 @@ defmodule ThistleTea.Game.World.Entity.PlayerKillRewardTest do
     end
 
     test "preserves capped-player rested XP and still forwards the pet's group reward" do
-      pet_guid = Guid.from_low_guid(:pet, 1, System.unique_integer([:positive]))
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      Entity.register(pet_guid)
+      pet_guid = Guid.from_low_guid(:pet, 1, Unique.integer())
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      {:ok, _} = Entity.register(pet_guid)
       on_exit(fn -> Metadata.delete(player_guid) end)
 
       character =

@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetitionsTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Guild, as: GuildSystem
   alias ThistleTea.Game.World.System.Petition, as: PetitionSystem
+  alias ThistleTea.Test.Unique
 
   describe "buy/3" do
     test "purchases a named charter through one inventory plan", %{founder: founder, npc: npc, name: name} do
@@ -118,8 +119,8 @@ defmodule ThistleTea.Game.World.Entity.Player.PetitionsTest do
   end
 
   setup do
-    suffix = System.unique_integer([:positive])
-    id = System.unique_integer([:positive])
+    suffix = Unique.integer()
+    id = Unique.integer()
     npc = Guid.from_low_guid(:mob, id, id)
     character = character(id, "Founder#{suffix}", id, 5000)
     founder = %State{guid: character.object.guid, character: character, ready: true}
@@ -153,7 +154,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetitionsTest do
   end
 
   defp signer(index) do
-    id = System.unique_integer([:positive])
+    id = Unique.integer()
     character = character(id, "Signer#{index}#{id}", id, 0)
     %State{guid: character.object.guid, character: character, ready: true}
   end

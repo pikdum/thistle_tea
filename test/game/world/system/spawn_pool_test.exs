@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.World.System.SpawnPoolTest do
   alias ThistleTea.Game.World.System.Battleground.Spawns, as: BattlegroundSpawns
   alias ThistleTea.Game.World.System.SpawnPool
   alias ThistleTea.Game.World.System.SpawnPool.Supervisor, as: SpawnPoolSupervisor
+  alias ThistleTea.Test.Unique
 
   describe "singleton lifecycle" do
     test "disarmed and triggered static traps respawn through their pool with fresh state" do
@@ -56,9 +57,9 @@ defmodule ThistleTea.Game.World.System.SpawnPoolTest do
     end
 
     test "battleground ownership gates first activation, refresh, and delayed reactivation" do
-      db_guid = 8_000_000 + System.unique_integer([:positive])
+      db_guid = Unique.integer()
       guid = Guid.from_low_guid(:game_object, 1, db_guid)
-      world = WorldRef.instance(529, System.unique_integer([:positive]))
+      world = WorldRef.instance(529, Unique.integer())
       group = {:singleton, :game_object, db_guid}
       key = {world, group}
       member = {:game_object, db_guid}
@@ -126,7 +127,7 @@ defmodule ThistleTea.Game.World.System.SpawnPoolTest do
       on_exit(fn -> SpawnPool.stop_world(world) end)
       :ok = SpawnPool.activate(group, cell, blueprint)
       first = await_entity(guid)
-      user_guid = System.unique_integer([:positive])
+      user_guid = Unique.integer()
       SpatialHash.update(:players, user_guid, world, 1.0, 1.0, 1.0)
       on_exit(fn -> SpatialHash.remove(:players, user_guid) end)
       assert Entity.call(guid, {:use_goober, user_guid, world, true}) == :activated
@@ -157,10 +158,10 @@ defmodule ThistleTea.Game.World.System.SpawnPoolTest do
     end
 
     test "retains database identity across instance refreshes and repeated suspension" do
-      db_guid = 8_000_000 + System.unique_integer([:positive])
+      db_guid = Unique.integer()
       guid = Guid.from_low_guid(:game_object, 1, db_guid)
       group = {:singleton, :game_object, db_guid}
-      world = WorldRef.instance(489, System.unique_integer([:positive]))
+      world = WorldRef.instance(489, Unique.integer())
       key = {world, group}
       member = {:game_object, db_guid}
       on_exit(fn -> SpawnPool.stop_world(world) end)
@@ -185,7 +186,7 @@ defmodule ThistleTea.Game.World.System.SpawnPoolTest do
     end
 
     test "recycles a persistent entity into a fresh process" do
-      low_guid = System.unique_integer([:positive])
+      low_guid = Unique.integer()
       guid = Guid.from_low_guid(:game_object, 1, low_guid)
       group = {:singleton, :game_object, low_guid}
       key = {WorldRef.open(0), group}
@@ -215,7 +216,7 @@ defmodule ThistleTea.Game.World.System.SpawnPoolTest do
     end
 
     test "stops and restarts event-gated incarnations when eligibility changes" do
-      low_guid = System.unique_integer([:positive])
+      low_guid = Unique.integer()
       guid = Guid.from_low_guid(:game_object, 1, low_guid)
       group = {:singleton, :game_object, low_guid}
       key = {WorldRef.open(0), group}
@@ -360,11 +361,11 @@ defmodule ThistleTea.Game.World.System.SpawnPoolTest do
     end
 
     test "isolates and stops pools by world copy" do
-      low_guid = System.unique_integer([:positive])
+      low_guid = Unique.integer()
       guid = Guid.from_low_guid(:game_object, 1, low_guid)
       group = {:singleton, :game_object, low_guid}
-      first_world = WorldRef.instance(389, System.unique_integer([:positive]))
-      second_world = WorldRef.instance(389, System.unique_integer([:positive]))
+      first_world = WorldRef.instance(389, Unique.integer())
+      second_world = WorldRef.instance(389, Unique.integer())
       first_key = {first_world, group}
       second_key = {second_world, group}
       blueprint = game_object(guid)
@@ -436,7 +437,7 @@ defmodule ThistleTea.Game.World.System.SpawnPoolTest do
 
     test "defers members observed by players until they leave" do
       {guid, group, world, key, cell} = singleton_fixture()
-      player_guid = System.unique_integer([:positive])
+      player_guid = Unique.integer()
       SpatialHash.update(:players, player_guid, world, 1.0, 1.0, 1.0)
       on_exit(fn -> SpatialHash.remove(:players, player_guid) end)
 
@@ -461,7 +462,7 @@ defmodule ThistleTea.Game.World.System.SpawnPoolTest do
   end
 
   defp singleton_fixture do
-    low_guid = 8_000_000 + System.unique_integer([:positive])
+    low_guid = Unique.integer()
     guid = Guid.from_low_guid(:game_object, 1, low_guid)
     group = {:singleton, :game_object, low_guid}
     world = WorldRef.open(0)

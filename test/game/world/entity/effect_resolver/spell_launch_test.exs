@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.SpellLaunchTest do
   alias ThistleTea.Game.World.Entity.EventSink.Context, as: SinkContext
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   setup [:actors]
 
@@ -139,7 +140,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.SpellLaunchTest do
     end
 
     test "foreign launch and delivery use the actual caster's position", ctx do
-      source = System.unique_integer([:positive])
+      source = Unique.integer()
       SpatialHash.update(:players, source, ctx.world, -20.0, 0.0, 0.0)
       on_exit(fn -> SpatialHash.remove(:players, source) end)
       request = %{launch(ctx) | source_guid: source}
@@ -162,8 +163,8 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.SpellLaunchTest do
 
   defp actors(_context) do
     world = WorldRef.open(999)
-    source = System.unique_integer([:positive])
-    target = Guid.runtime(:mob, System.unique_integer([:positive]))
+    source = Unique.integer()
+    target = Guid.runtime(:mob, Unique.integer())
     SpatialHash.update(:mobs, target, world, 20.0, 0.0, 0.0)
     Metadata.put(target, %{alive?: true, in_combat: false, level: 50, faction_template: 14, incarnation_id: 1})
 

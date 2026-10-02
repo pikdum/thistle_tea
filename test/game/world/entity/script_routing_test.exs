@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.World.Entity.ScriptRoutingTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
   alias ThistleTea.Test.FactionFixtures
+  alias ThistleTea.Test.Unique
 
   setup [{FactionFixtures, :seed}, :world]
 
@@ -111,8 +112,8 @@ defmodule ThistleTea.Game.World.Entity.ScriptRoutingTest do
     end
 
     test "forwarding carries the source world into the player owner", %{world: world} do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      Entity.register(guid)
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      {:ok, _} = Entity.register(guid)
       character = character(guid, world)
       state = %State{guid: guid, character: character}
       step = %ScriptStep{command: :stand_state, datalong: 1}
@@ -166,7 +167,7 @@ defmodule ThistleTea.Game.World.Entity.ScriptRoutingTest do
     test "server variables are visible to the immediate tail and other worlds", %{world: world} do
       {source, source_pid} = start_mob(world)
       {_other, other_pid} = start_mob(WorldRef.instance(world.map_id, world.instance_id + 1_000_000))
-      index = System.unique_integer([:positive, :monotonic])
+      index = Unique.integer()
       on_exit(fn -> :ets.delete(ServerVariables, index) end)
       condition = %Condition{type: :saved_variable, value1: index, value2: 6}
       assign = %ScriptStep{command: :set_server_variable, datalong: index, datalong2: 6}
@@ -183,7 +184,7 @@ defmodule ThistleTea.Game.World.Entity.ScriptRoutingTest do
 
     test "invalid variable assignments honor abort and preserve the previous value", %{world: world} do
       {_source, pid} = start_mob(world)
-      index = System.unique_integer([:positive, :monotonic])
+      index = Unique.integer()
       on_exit(fn -> :ets.delete(ServerVariables, index) end)
       ServerVariables.put(index, 7)
 
@@ -294,9 +295,9 @@ defmodule ThistleTea.Game.World.Entity.ScriptRoutingTest do
   end
 
   defp world(_context) do
-    world = WorldRef.instance(998, System.unique_integer([:positive, :monotonic]))
-    observer = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
-    Entity.register(observer)
+    world = WorldRef.instance(998, Unique.integer())
+    observer = Guid.from_low_guid(:player, Unique.integer())
+    {:ok, _} = Entity.register(observer)
     SpatialHash.update(:players, observer, world, 0.0, 0.0, 0.0)
     on_exit(fn -> SpatialHash.remove(:players, observer) end)
     %{world: world}

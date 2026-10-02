@@ -3,3 +3,4 @@ ExUnit.configure(exclude: [vmangos_db: true, dbc_db: true, namigator_maps: true]
 
 Code.require_file("support/faction_fixtures.exs", __DIR__)
 Code.require_file("support/pet_control_owner.exs", __DIR__)
+Code.require_file("support/unique.exs", __DIR__)

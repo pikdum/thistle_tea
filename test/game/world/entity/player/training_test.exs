@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TrainingTest do
   alias ThistleTea.Game.World.Loader.Trainer
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @entry 999_170
 
@@ -80,7 +81,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TrainingTest do
   end
 
   defp trainer(_context) do
-    owner = System.unique_integer([:positive, :monotonic])
+    owner = Unique.integer()
     guid = Guid.from_low_guid(:mob, @entry, owner)
     {:ok, _} = Entity.register(guid)
     :ets.insert(Gossip, {{:trainer, @entry}, %{type: 2, class: 0, race: 0}})

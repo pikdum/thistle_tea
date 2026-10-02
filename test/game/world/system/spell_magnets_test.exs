@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.World.System.SpellMagnetsTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Spell.SpellTargetResolver
   alias ThistleTea.Game.World.System.SpellMagnets
+  alias ThistleTea.Test.Unique
 
   setup [:world]
 
@@ -182,11 +183,11 @@ defmodule ThistleTea.Game.World.System.SpellMagnetsTest do
   end
 
   defp world(_) do
-    caster_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-    target = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-    ally = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+    caster_guid = Guid.from_low_guid(:player, Unique.integer())
+    target = Guid.from_low_guid(:player, Unique.integer())
+    ally = Guid.from_low_guid(:player, Unique.integer())
     totem = Guid.runtime(:mob, 5925)
-    Entity.register(totem)
+    {:ok, _} = Entity.register(totem)
 
     for {table, guid, x, faction} <- [
           {:players, caster_guid, 0.0, 1},

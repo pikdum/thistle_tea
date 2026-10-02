@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Core.Aura.TriggeredChannelTest do
   alias ThistleTea.Game.Core.Spell.Casting
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Test.Unique
 
   setup [:caster]
 
@@ -79,7 +80,7 @@ defmodule ThistleTea.Game.Core.Aura.TriggeredChannelTest do
   end
 
   defp caster(_context) do
-    guid = System.unique_integer([:positive]) + 80_000_000
+    guid = Unique.integer()
 
     character = %Character{
       object: %Object{guid: guid},

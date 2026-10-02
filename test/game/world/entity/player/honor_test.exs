@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.World.Entity.Player.HonorTest do
   alias ThistleTea.Game.World.Entity.Player.Honor
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Honor, as: HonorSystem
+  alias ThistleTea.Test.Unique
 
   describe "combat credit" do
     test "receives multiple hits in one effect drain and restores totals on reconnect" do
@@ -123,7 +124,7 @@ defmodule ThistleTea.Game.World.Entity.Player.HonorTest do
   end
 
   defp character(race) do
-    id = System.unique_integer([:positive])
+    id = Unique.integer()
 
     %Character{
       id: id,

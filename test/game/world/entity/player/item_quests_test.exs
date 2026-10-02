@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemQuestsTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Test.Unique
 
   setup [:quest_items]
 
@@ -233,7 +234,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemQuestsTest do
     end
 
     test "prompts group members when an item starts a party-accept quest", context do
-      recipient = System.unique_integer([:positive, :monotonic])
+      recipient = Unique.integer()
       Registry.register(recipient)
       :ok = PartySystem.invite(context.state.guid, "Starter", recipient)
       {:ok, _group} = PartySystem.accept(recipient, "Recipient")
@@ -297,7 +298,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemQuestsTest do
   end
 
   defp quest_items(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
     quest_id = 2_000_000 + guid * 10
     starter = %ItemTemplate{entry: quest_id + 1, name: "Quest Starter", start_quest: quest_id, bonding: 1}
     source = %ItemTemplate{entry: quest_id + 2, name: "Quest Source", bonding: 4}

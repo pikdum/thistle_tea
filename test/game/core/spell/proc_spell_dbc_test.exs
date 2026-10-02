@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Core.Spell.ProcSpellDbcTest do
   alias ThistleTea.Game.World.Loader.SpellProcEvent
   alias ThistleTea.Game.World.Loader.Talent
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -77,7 +78,7 @@ defmodule ThistleTea.Game.Core.Spell.ProcSpellDbcTest do
 
     test "a fully overhealing cast shields its actual recipient through owner feedback", %{character: character} do
       caster = with_aura(character, 26_467)
-      target_guid = System.unique_integer([:positive]) + 50_000_000
+      target_guid = Unique.integer()
       target = %{character | object: %Object{guid: target_guid}, unit: %{character.unit | health: 5_000}}
       Metadata.put(target_guid, %{alive?: true, level: 60})
       on_exit(fn -> Metadata.delete(target_guid) end)

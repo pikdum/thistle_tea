@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.World.System.GameEventTest do
   alias ThistleTea.Game.Core.GameEvent.Schedule
   alias ThistleTea.Game.Core.GameEvent.Schedule.Entry
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Test.Unique
 
   describe "start_link/1" do
     test "activates the current schedule and applies its next transition" do
@@ -22,7 +23,7 @@ defmodule ThistleTea.Game.World.System.GameEventTest do
           }
         ])
 
-      name = String.to_atom("game_event_test_#{System.unique_integer([:positive])}")
+      name = String.to_atom("game_event_test_#{Unique.integer()}")
 
       start_supervised!(
         {GameEvent,
@@ -56,7 +57,7 @@ defmodule ThistleTea.Game.World.System.GameEventTest do
   describe "set_active/3" do
     test "publishes before notifying owners and preserves unrelated active events" do
       parent = self()
-      name = String.to_atom("game_event_test_#{System.unique_integer([:positive])}")
+      name = String.to_atom("game_event_test_#{Unique.integer()}")
 
       entries =
         for id <- [2, 7] do

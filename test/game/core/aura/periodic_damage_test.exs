@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Core.Aura.PeriodicDamageTest do
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Test.Unique
 
   setup [:target]
 
@@ -182,7 +183,7 @@ defmodule ThistleTea.Game.Core.Aura.PeriodicDamageTest do
 
   defp with_aura(target, type, amount) do
     holder = %Holder{
-      spell: %Spell{id: System.unique_integer([:positive])},
+      spell: %Spell{id: Unique.integer()},
       auras: [%Aura{type: type, amount: amount, misc_value: 64}]
     }
 

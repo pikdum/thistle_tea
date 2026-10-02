@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Test.Unique
 
   describe "enter_player/1" do
     test "joins current cell and initializes visible entity lists" do
@@ -58,7 +59,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
     test "activates visible cells through the configured cell activator" do
       parent = self()
       loader = fn cell -> send(parent, {:activated, cell}) end
-      name = :"visibility_cell_activator_test_#{System.unique_integer([:positive])}"
+      name = :"visibility_cell_activator_test_#{Unique.integer()}"
       start_supervised!({CellActivator, name: name, loader: loader})
 
       self_guid = Guid.from_low_guid(:player, unique_low())
@@ -81,7 +82,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       transport_guid = Guid.from_low_guid(:mo_transport, unique_low())
       world = WorldRef.open(0)
       publish_transport(transport_guid, world)
-      Entity.register(transport_guid)
+      {:ok, _} = Entity.register(transport_guid)
 
       on_exit(fn ->
         Entity.unregister(transport_guid)
@@ -214,7 +215,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       target = Guid.from_low_guid(:mob, unique_low(), unique_low())
       SpatialHash.insert(:mobs, target, 0, 0, 0, 0)
       Metadata.put(target, %{invisibility: %{0 => 200}})
-      Entity.register(target)
+      {:ok, _} = Entity.register(target)
 
       on_exit(fn ->
         SpatialHash.remove(:mobs, target)
@@ -396,8 +397,8 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       healer_pid = start_member(cell, %{guid: healer_guid, type: :mob})
       Metadata.put(mob_guid, %{alive?: true})
       Metadata.put(healer_guid, %{alive?: true, spirit_service?: true})
-      Entity.register(mob_guid)
-      Entity.register(healer_guid)
+      {:ok, _} = Entity.register(mob_guid)
+      {:ok, _} = Entity.register(healer_guid)
 
       state = %{
         guid: self_guid,
@@ -432,8 +433,8 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       ghost_pid = start_member(cell, %{guid: ghost_guid, type: :player})
       Metadata.put(healer_guid, %{alive?: true, spirit_service?: true})
       Metadata.put(ghost_guid, %{alive?: false, ghost?: true})
-      Entity.register(healer_guid)
-      Entity.register(ghost_guid)
+      {:ok, _} = Entity.register(healer_guid)
+      {:ok, _} = Entity.register(ghost_guid)
 
       state = %{
         guid: self_guid,
@@ -484,7 +485,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
 
       SpatialHash.insert(:players, revived_guid, 0, 0, 0, 0)
       Metadata.put(revived_guid, %{alive?: true, ghost?: false})
-      Entity.register(revived_guid)
+      {:ok, _} = Entity.register(revived_guid)
 
       state = %{
         guid: self_guid,
@@ -564,6 +565,6 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   end
 
   defp unique_low do
-    rem(System.unique_integer([:positive]), 0x00FFFFFF)
+    Unique.integer()
   end
 end

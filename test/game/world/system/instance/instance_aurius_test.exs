@@ -33,9 +33,10 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceAuriusTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Instance.InstanceData
+  alias ThistleTea.Test.Unique
 
   setup do
-    id = System.unique_integer([:positive, :monotonic])
+    id = Unique.integer()
     server = :"aurius_instance_#{id}"
     owner = self()
 
@@ -59,7 +60,7 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceAuriusTest do
     npc_guid = Guid.from_low_guid(:mob, npc_entry, id)
     first = character(first_guid, first_world)
     npc = %{object: %Object{guid: npc_guid}, internal: first.internal, movement_block: first.movement_block}
-    Entity.register(npc_guid)
+    {:ok, _} = Entity.register(npc_guid)
     Metadata.put(npc_guid, %{alive?: true, npc_flags: 2})
     World.update_position(npc, :mobs)
 

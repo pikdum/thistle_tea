@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Inbound.CmsgMoveTimeSkippedTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Test.Unique
 
   defmodule TransportUpdateServer do
     @moduledoc false
@@ -44,8 +45,8 @@ defmodule ThistleTea.Game.Inbound.CmsgMoveTimeSkippedTest do
 
   describe "handle/2" do
     test "recreates a newly boarded transport once" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      transport_guid = Guid.from_low_guid(:mo_transport, System.unique_integer([:positive]))
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      transport_guid = Guid.from_low_guid(:mo_transport, Unique.integer())
 
       transport_update = %UpdateObject{
         update_type: :create_object2,
@@ -91,8 +92,8 @@ defmodule ThistleTea.Game.Inbound.CmsgMoveTimeSkippedTest do
     end
 
     test "broadcasts skipped time to other viewers" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      other_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      other_guid = Guid.from_low_guid(:player, Unique.integer())
       {:ok, _registration} = Entity.register(other_guid)
       on_exit(fn -> Entity.unregister(other_guid) end)
 

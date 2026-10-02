@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Player.LoginTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.World.Entity.Player.Login
+  alias ThistleTea.Test.Unique
 
   defmodule TransportUpdateServer do
     @moduledoc false
@@ -62,8 +63,8 @@ defmodule ThistleTea.Game.World.Entity.Player.LoginTest do
         remaining_nodes: [{100.0, 0.0, 0.0}]
       }
 
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
-      Entity.register(guid)
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      {:ok, _} = Entity.register(guid)
       character = put_in(character(health: 100).object.guid, guid)
 
       character = %{
@@ -113,8 +114,8 @@ defmodule ThistleTea.Game.World.Entity.Player.LoginTest do
 
   describe "worldport_updates/1" do
     test "orders the attached transport before the player" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      transport_guid = Guid.from_low_guid(:mo_transport, System.unique_integer([:positive]))
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      transport_guid = Guid.from_low_guid(:mo_transport, Unique.integer())
 
       transport_update = %UpdateObject{
         update_type: :create_object2,
@@ -150,7 +151,7 @@ defmodule ThistleTea.Game.World.Entity.Player.LoginTest do
     end
 
     test "includes only the player when detached" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
 
       character = %Character{
         object: %Object{guid: player_guid},

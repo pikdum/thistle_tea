@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellEnvironmentMapsTest do
   alias ThistleTea.Game.World.Entity.Player.Spellcasting
   alias ThistleTea.Game.World.Entity.Player.SpellEnvironment
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Test.Unique
 
   @moduletag :namigator_maps
   @outside {-8949.95, -132.49, 83.53, 0.0}
@@ -73,7 +74,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellEnvironmentMapsTest do
   end
 
   defp character(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
     {:ok, _owner} = Entity.register(guid)
     on_exit(fn -> Entity.unregister(guid) end)
 

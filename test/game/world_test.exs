@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.WorldTest do
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   defmodule EntityProcess do
     @moduledoc false
@@ -26,13 +27,13 @@ defmodule ThistleTea.Game.WorldTest do
 
   describe "broadcast_packet/3" do
     test "integer sources retain observer attribution and self-exclusion in their own world" do
-      source = System.unique_integer([:positive])
-      observer = System.unique_integer([:positive])
-      other = System.unique_integer([:positive])
+      source = Unique.integer()
+      observer = Unique.integer()
+      other = Unique.integer()
       world = WorldRef.instance(0, source)
 
       for {guid, copy} <- [{source, world}, {observer, world}, {other, WorldRef.instance(0, other)}] do
-        Entity.register(guid)
+        {:ok, _} = Entity.register(guid)
         SpatialHash.update(:players, guid, copy, 0.0, 0.0, 0.0)
       end
 
@@ -50,7 +51,7 @@ defmodule ThistleTea.Game.WorldTest do
   describe "stop_world_entities/2" do
     test "keeps global transports and stops instanced transports" do
       open_world = WorldRef.open(0)
-      instance_world = WorldRef.instance(47, System.unique_integer([:positive]))
+      instance_world = WorldRef.instance(47, Unique.integer())
       global_guid = Guid.runtime(:transport, 176_080)
       instance_guid = Guid.runtime(:transport, 176_081)
       global_pid = start_tracked_transport(global_guid, open_world)
@@ -77,9 +78,9 @@ defmodule ThistleTea.Game.WorldTest do
 
   describe "spawn_guid/3" do
     test "resolves database identities inside the exact world copy" do
-      db_guid = System.unique_integer([:positive, :monotonic])
-      first_world = WorldRef.instance(329, System.unique_integer([:positive, :monotonic]))
-      second_world = WorldRef.instance(329, System.unique_integer([:positive, :monotonic]))
+      db_guid = Unique.integer()
+      first_world = WorldRef.instance(329, Unique.integer())
+      second_world = WorldRef.instance(329, Unique.integer())
       first_guid = Guid.runtime(:mob, 10_917)
       second_guid = Guid.runtime(:mob, 10_917)
 

@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Player.RaidQuestsTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Test.Unique
 
   setup [:quests]
 
@@ -74,8 +75,8 @@ defmodule ThistleTea.Game.World.Entity.Player.RaidQuestsTest do
   end
 
   defp quests(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
-    other = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
+    other = Unique.integer()
     normal = %Quest{id: 900_000 + guid, required_items: [{0, 900_000 + guid, 1}], required_kills: [{0, 299, 2}]}
     raid = %{normal | id: normal.id + 1, type: 62, required_items: [{0, normal.id + 1, 1}]}
 

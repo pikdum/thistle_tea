@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.World.Visibility.QuestGiversTest do
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.World.Visibility.QuestGivers
   alias ThistleTea.Game.World.Visibility.QuestGivers.Watch
+  alias ThistleTea.Test.Unique
 
   setup [:questgiver]
 
@@ -298,7 +299,7 @@ defmodule ThistleTea.Game.World.Visibility.QuestGiversTest do
   defp questgiver(_context) do
     QuestLoader.init()
     ReputationLoader.init()
-    id = System.unique_integer([:positive, :monotonic])
+    id = Unique.integer()
     entry = 4_000_000 + id
     guid = Guid.from_low_guid(:mob, entry, id)
     quest = %Quest{id: entry, required_skill: 185, required_skill_value: 50}
@@ -315,7 +316,7 @@ defmodule ThistleTea.Game.World.Visibility.QuestGiversTest do
     }
 
     npc = %{object: %Object{guid: guid}, internal: character.internal, movement_block: character.movement_block}
-    Entity.register(guid)
+    {:ok, _} = Entity.register(guid)
     World.update_position(npc, :mobs)
     Metadata.put(guid, %{alive?: true, npc_flags: 2})
 

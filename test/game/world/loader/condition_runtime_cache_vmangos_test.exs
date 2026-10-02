@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.Loader.ConditionRuntimeCacheVmangosTest do
   alias ThistleTea.Game.World.Loader.Gossip
   alias ThistleTea.Game.World.Loader.Loot
   alias ThistleTea.Game.World.Loader.Vendor
+  alias ThistleTea.Test.Unique
 
   @moduletag :vmangos_db
 
@@ -32,7 +33,7 @@ defmodule ThistleTea.Game.World.Loader.ConditionRuntimeCacheVmangosTest do
         Enum.find(:ets.tab2list(Loot), &match?({{:creature, _loot_id}, [_row | _rows]}, &1))
 
       counter = :counters.new(1, [:atomics])
-      handler_id = "condition-runtime-cache-#{System.unique_integer([:positive])}"
+      handler_id = "condition-runtime-cache-#{Unique.integer()}"
       test_pid = self()
 
       :ok =

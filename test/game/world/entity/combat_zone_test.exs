@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.World.Entity.CombatZoneTest do
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   setup [:world]
 
@@ -57,8 +58,8 @@ defmodule ThistleTea.Game.World.Entity.CombatZoneTest do
       pet = put_actor(:mobs, world, 20.0, :pet)
       Metadata.update(player, %{controlled_guid: pet})
       Metadata.update(pet, %{owner_guid: player, pet_kind: :summon})
-      Entity.register(player)
-      Entity.register(pet)
+      {:ok, _} = Entity.register(player)
+      {:ok, _} = Entity.register(pet)
       request = Request.for_script([%ScriptStep{command: :zone_combat_pulse, datalong: 1}])
       context = AIEnvironment.context(mob, 1_000, request)
       fighting = mob |> ZoneCombat.pulse(true, context) |> EventSink.emit_pending()
@@ -95,7 +96,7 @@ defmodule ThistleTea.Game.World.Entity.CombatZoneTest do
     map = 995
     previous = :ets.lookup(MapTemplate, map)
     :ets.insert(MapTemplate, {map, 1, nil})
-    world = WorldRef.instance(map, System.unique_integer([:positive, :monotonic]))
+    world = WorldRef.instance(map, Unique.integer())
     guid = Guid.runtime(:mob, 1)
 
     mob = %Mob{
@@ -128,7 +129,7 @@ defmodule ThistleTea.Game.World.Entity.CombatZoneTest do
   defp put_actor(table, world, x, kind \\ :player) do
     guid =
       if kind == :player,
-        do: Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic])),
+        do: Guid.from_low_guid(:player, Unique.integer()),
         else: Guid.runtime(kind, 1)
 
     SpatialHash.update(table, guid, world, x, 0.0, 0.0)

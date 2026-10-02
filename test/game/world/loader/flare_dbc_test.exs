@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Loader.FlareDbcTest do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -118,9 +119,9 @@ defmodule ThistleTea.Game.World.Loader.FlareDbcTest do
   end
 
   defp casting_scene do
-    guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+    guid = Guid.from_low_guid(:player, Unique.integer())
     target_guid = Guid.runtime(:mob, 721)
-    world = WorldRef.instance(0, System.unique_integer([:positive]))
+    world = WorldRef.instance(0, Unique.integer())
     caster = target()
 
     caster = %{

@@ -2,10 +2,11 @@ defmodule ThistleTea.Game.World.Loader.GossipTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.World.Loader.Gossip
+  alias ThistleTea.Test.Unique
 
   describe "trainer_of?/4" do
     test "allows another race to use a mount trainer at exalted" do
-      entry = System.unique_integer([:positive, :monotonic])
+      entry = Unique.integer()
       key = {:trainer, entry}
       :ets.insert(Gossip, {key, %{type: 1, class: 0, race: 1}})
       on_exit(fn -> :ets.delete(Gossip, key) end)

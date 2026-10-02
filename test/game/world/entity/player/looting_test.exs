@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Player.LootingTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.Looting
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Test.Unique
 
   describe "open/3" do
     test "fear and confusion prevent new loot sessions" do
@@ -32,10 +33,10 @@ defmodule ThistleTea.Game.World.Entity.Player.LootingTest do
 
     test "closes pocket viewing before opening a corpse window" do
       parent = self()
-      guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive, :monotonic]))
+      guid = Guid.from_low_guid(:mob, 1, Unique.integer())
 
       spawn_link(fn ->
-        Entity.register(guid)
+        {:ok, _} = Entity.register(guid)
         send(parent, :registered)
 
         receive do
@@ -79,12 +80,12 @@ defmodule ThistleTea.Game.World.Entity.Player.LootingTest do
   describe "accept_reservation/3" do
     test "releases the slot when inventory placement fails" do
       parent = self()
-      loot_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive, :monotonic]))
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      loot_guid = Guid.from_low_guid(:mob, 1, Unique.integer())
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
 
       owner =
         spawn_link(fn ->
-          Entity.register(loot_guid)
+          {:ok, _} = Entity.register(loot_guid)
           send(parent, :registered)
 
           receive do

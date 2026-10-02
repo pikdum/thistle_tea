@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Spell.SpellAreasTest do
   alias ThistleTea.Game.World.Loader.Exploration
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Spell.SpellAreas
+  alias ThistleTea.Test.Unique
 
   describe "context/2" do
     setup [:controlled_caster]
@@ -39,8 +40,8 @@ defmodule ThistleTea.Game.World.Spell.SpellAreasTest do
   end
 
   defp controlled_caster(_context) do
-    guid = System.unique_integer([:positive])
-    owner = System.unique_integer([:positive])
+    guid = Unique.integer()
+    owner = Unique.integer()
     player = %Subject{kind: :player, race: 1, gender: 1, zone_id: 1519}
     Metadata.put(guid, %{owner_guid: owner})
     Metadata.put(owner, %{condition_subject: player})

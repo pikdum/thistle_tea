@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InstancesTest do
   alias ThistleTea.Game.World.Loader.AreaTrigger
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
+  alias ThistleTea.Test.Unique
 
   describe "refresh/2" do
     setup [:build_countdown_state]
@@ -152,7 +153,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InstancesTest do
         :ets.delete(MapTemplate, map)
       end)
 
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
       state = %State{ready: true, guid: guid, character: %Character{internal: %Internal{world: WorldRef.open(0)}}}
       count = InstanceSystem.count()
       assert PlayerServer.handle_cast({:start_teleport, 1.0, 2.0, 3.0, 0.0, map}, state) == {:noreply, state}

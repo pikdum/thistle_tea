@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.ChargeTest do
   alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @moduletag :namigator_maps
 
@@ -81,8 +82,8 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.ChargeTest do
 
   describe "emit/3" do
     test "both owners receive the same movement and spline id broadcast to observers", context do
-      observer = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      Entity.register(observer)
+      observer = Guid.from_low_guid(:player, Unique.integer())
+      {:ok, _} = Entity.register(observer)
       SpatialHash.update(:players, observer, context.character.internal.world, -8949.95, -132.49, 83.29)
 
       on_exit(fn ->
@@ -123,7 +124,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.ChargeTest do
     }
 
     character = %Character{
-      object: %Object{guid: Guid.from_low_guid(:player, System.unique_integer([:positive]))},
+      object: %Object{guid: Guid.from_low_guid(:player, Unique.integer())},
       unit: unit,
       player: %Player{},
       internal: internal,

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Inbound.CmsgResetInstancesTest do
   alias ThistleTea.Game.Network.Message.SmsgInstanceResetFailed
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
+  alias ThistleTea.Test.Unique
 
   describe "from_binary/1" do
     test "decodes the empty request" do
@@ -18,7 +19,7 @@ defmodule ThistleTea.Game.Inbound.CmsgResetInstancesTest do
 
   describe "handle/2" do
     test "resets an empty owned instance" do
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
       state = %{ready: true, guid: guid}
       assert {:ok, world} = InstanceSystem.enter(389, guid)
       InstanceSystem.leave(guid, world)
@@ -28,7 +29,7 @@ defmodule ThistleTea.Game.Inbound.CmsgResetInstancesTest do
     end
 
     test "reports an occupied instance" do
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
       state = %{ready: true, guid: guid}
       assert {:ok, world} = InstanceSystem.enter(389, guid)
 

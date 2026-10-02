@@ -26,10 +26,11 @@ defmodule ThistleTea.Game.Inbound.CmsgGossipSelectOptionTest do
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   describe "handle/2" do
     test "dispatches a taxi gossip script to the player owner" do
-      player_guid = System.unique_integer([:positive, :monotonic])
+      player_guid = Unique.integer()
       {:ok, _owner} = Entity.register(player_guid)
 
       option = %Option{
@@ -56,8 +57,8 @@ defmodule ThistleTea.Game.Inbound.CmsgGossipSelectOptionTest do
     end
 
     test "closes gossip and runs a replacement-item script on the source creature" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
-      creature_guid = Guid.from_low_guid(:mob, 3701, System.unique_integer([:positive, :monotonic]))
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      creature_guid = Guid.from_low_guid(:mob, 3701, Unique.integer())
       {:ok, _player_owner} = Entity.register(player_guid)
       {:ok, _creature_owner} = Entity.register(creature_guid)
 
@@ -88,9 +89,9 @@ defmodule ThistleTea.Game.Inbound.CmsgGossipSelectOptionTest do
 
     test "opens the flight map for a taxi-vendor option" do
       previous_network = TaxiLoader.get()
-      player_id = System.unique_integer([:positive, :monotonic])
+      player_id = Unique.integer()
       player_guid = Guid.from_low_guid(:player, player_id)
-      flightmaster_guid = Guid.from_low_guid(:mob, 352, System.unique_integer([:positive, :monotonic]))
+      flightmaster_guid = Guid.from_low_guid(:mob, 352, Unique.integer())
 
       network =
         Network.build(
@@ -148,9 +149,9 @@ defmodule ThistleTea.Game.Inbound.CmsgGossipSelectOptionTest do
     end
 
     test "opens the bank for a banker option" do
-      player_id = System.unique_integer([:positive, :monotonic])
+      player_id = Unique.integer()
       player_guid = Guid.from_low_guid(:player, player_id)
-      banker_guid = Guid.from_low_guid(:mob, 54, System.unique_integer([:positive, :monotonic]))
+      banker_guid = Guid.from_low_guid(:mob, 54, Unique.integer())
       {:ok, _owner} = Entity.register(player_guid)
 
       Metadata.put(banker_guid, %{npc_flags: 0x00000100, alive?: true})

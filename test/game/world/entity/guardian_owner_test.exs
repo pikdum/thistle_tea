@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.World.Entity.GuardianOwnerTest do
   alias ThistleTea.Game.World.Loader.Summon
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Test.FactionFixtures
+  alias ThistleTea.Test.Unique
 
   @entries [990_201, 990_202]
 
@@ -252,8 +253,8 @@ defmodule ThistleTea.Game.World.Entity.GuardianOwnerTest do
   end
 
   defp owner(_context) do
-    guid = System.unique_integer([:positive]) + 20_000_000
-    Entity.register(guid)
+    guid = Unique.integer()
+    {:ok, _} = Entity.register(guid)
 
     owner = %Character{
       object: %Object{guid: guid},

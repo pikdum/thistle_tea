@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetUntrainingTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   setup [:build_state]
 
@@ -108,10 +109,10 @@ defmodule ThistleTea.Game.World.Entity.Player.PetUntrainingTest do
   end
 
   defp build_state(_context) do
-    owner = System.unique_integer([:positive, :monotonic]) + 10_000_000
+    owner = Unique.integer()
     trainer = Guid.from_low_guid(:mob, 777_001, owner)
     pet_guid = Guid.runtime(:pet, 69)
-    Entity.register(owner)
+    {:ok, _} = Entity.register(owner)
     family = Map.new([300, 301], &{&1, %Spell{id: &1, attributes: MapSet.new([:passive])}})
     :ets.insert(PetTraining, {{:family_passives, 999}, family})
     :ets.insert(Gossip, {{:trainer, 777_001}, %{type: 3, class: 3}})

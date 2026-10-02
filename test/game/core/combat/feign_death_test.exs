@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Core.Combat.FeignDeathTest do
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   setup [:character]
 
@@ -179,7 +180,7 @@ defmodule ThistleTea.Game.Core.Combat.FeignDeathTest do
   end
 
   defp character(_ctx) do
-    guid = System.unique_integer([:positive])
+    guid = Unique.integer()
     mob = Guid.from_low_guid(:mob, 1, guid)
 
     character = %Character{

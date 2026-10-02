@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.World.Loader.ItemLootVmangosTest do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
+  alias ThistleTea.Test.Unique
 
   @moduletag :vmangos_db
 
@@ -16,7 +17,7 @@ defmodule ThistleTea.Game.World.Loader.ItemLootVmangosTest do
         if !ItemLoader.get_cached_template(row.item), do: refute(Mangos.Repo.get(Mangos.ItemTemplate, row.item))
       end
 
-      handler = "item-loot-#{System.unique_integer([:positive])}"
+      handler = "item-loot-#{Unique.integer()}"
       :telemetry.attach(handler, Mangos.Repo.config()[:telemetry_prefix] ++ [:query], &__MODULE__.query/4, self())
       on_exit(fn -> :telemetry.detach(handler) end)
       :rand.seed(:exsss, {1, 2, 3})

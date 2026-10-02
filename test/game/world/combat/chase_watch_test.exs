@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.Combat.ChaseWatchTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.World.Combat.ChaseWatch
+  alias ThistleTea.Test.Unique
 
   describe "notify_moved/3" do
     test "notifies chasers only after the target crosses their movement threshold" do
@@ -67,6 +68,6 @@ defmodule ThistleTea.Game.World.Combat.ChaseWatchTest do
   end
 
   defp table do
-    :"chase_watch_test_#{System.unique_integer([:positive])}"
+    :"chase_watch_test_#{Unique.integer()}"
   end
 end

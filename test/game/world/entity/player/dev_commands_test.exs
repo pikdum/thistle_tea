@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
   alias ThistleTea.Game.World.System.Instance.InstanceData
   alias ThistleTea.Game.World.System.PostOffice
   alias ThistleTea.Game.World.Transports
+  alias ThistleTea.Test.Unique
 
   describe ".start" do
     test "requires a safe anchor and rejects combat and taxi flight" do
@@ -87,7 +88,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
 
   describe ".debug skill" do
     test "sets only known skills within their cap and refreshes defense fields" do
-      guid = System.unique_integer([:positive, :monotonic])
+      guid = Unique.integer()
 
       character = %{
         debug_character()
@@ -127,7 +128,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
 
   describe ".debug honor" do
     test "changes the ledger and owner projection while retaining the earned rank" do
-      id = System.unique_integer([:positive, :monotonic])
+      id = Unique.integer()
       guid = Guid.from_low_guid(:player, id)
 
       character = %{
@@ -160,7 +161,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
 
   describe ".die" do
     test "bypasses shields without spending mana" do
-      id = System.unique_integer([:positive, :monotonic])
+      id = Unique.integer()
       guid = Guid.from_low_guid(:player, id)
 
       holders =
@@ -197,7 +198,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
 
   describe ".mail" do
     test "posts an immediate letter to an offline character" do
-      id = System.unique_integer([:positive, :monotonic])
+      id = Unique.integer()
       name = "Mailtest#{id}"
       recipient_guid = Guid.from_low_guid(:player, id)
 
@@ -228,7 +229,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
     end
 
     test "rejects a missing message" do
-      state = %{guid: Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))}
+      state = %{guid: Guid.from_low_guid(:player, Unique.integer())}
 
       assert {:handled, ^state} = DevCommands.run(state, ".mail Nobody")
     end
@@ -236,7 +237,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
 
   describe ".debug transport" do
     test "shows and advances the attached transport" do
-      entry = System.unique_integer([:positive, :monotonic])
+      entry = Unique.integer()
       route = TransportCore.build_ship(entry, "Debug Ship", 10, ship_nodes(), 10, 1, 20_000)
       entity = GameObject.build_transport(transport_template(entry), TransportCore.pose_at(route, 0))
       {:ok, pid} = TransportServer.start_link({entity, route, schedule: false, clock: fn -> 1_000 end})
@@ -288,7 +289,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
 
   describe ".debug taxi" do
     test "unlocks the loaded flight network" do
-      id = System.unique_integer([:positive, :monotonic])
+      id = Unique.integer()
       previous_network = TaxiLoader.get()
 
       network =
@@ -338,7 +339,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
 
   describe ".debug reputation" do
     test "finds, sets, and reports faction standing" do
-      id = System.unique_integer([:positive, :monotonic])
+      id = Unique.integer()
       guid = Guid.from_low_guid(:player, id)
       previous_catalog = ReputationLoader.catalog()
 
@@ -383,7 +384,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
 
   describe ".instance data" do
     test "reports registered data without exposing a write path" do
-      world = WorldRef.instance(329, System.unique_integer([:positive, :monotonic]))
+      world = WorldRef.instance(329, Unique.integer())
       state = %{guid: 1, character: %{debug_character() | internal: %Internal{world: world}}}
 
       InstanceData.publish(%Copy{
@@ -418,7 +419,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
 
     test "distinguishes open worlds from destroyed copies" do
       open_state = %{guid: 1, character: debug_character()}
-      missing_world = WorldRef.instance(329, System.unique_integer([:positive, :monotonic]))
+      missing_world = WorldRef.instance(329, Unique.integer())
       missing_state = %{guid: 1, character: %{debug_character() | internal: %Internal{world: missing_world}}}
 
       assert {:handled, ^open_state} = DevCommands.run(open_state, ".instance data 7")
@@ -435,9 +436,9 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
 
   describe ".debug position" do
     test "reports open-world and instance positions with orientation" do
-      open_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive, :monotonic]))
-      instance_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive, :monotonic]))
-      instance = WorldRef.instance(329, System.unique_integer([:positive, :monotonic]))
+      open_guid = Guid.from_low_guid(:mob, 1, Unique.integer())
+      instance_guid = Guid.from_low_guid(:mob, 2, Unique.integer())
+      instance = WorldRef.instance(329, Unique.integer())
       state = %{guid: 1, character: debug_character()}
 
       SpatialHash.insert(:mobs, open_guid, WorldRef.open(0), 1.0, 2.0, 3.0)
@@ -505,7 +506,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
     end
 
     test "preserves the current instance copy when no map is supplied" do
-      world = WorldRef.instance(329, System.unique_integer([:positive, :monotonic]))
+      world = WorldRef.instance(329, Unique.integer())
       character = %{debug_character() | internal: %Internal{world: world}}
       state = %{guid: 1, character: character}
 
@@ -520,7 +521,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
 
   describe ".battleground" do
     test "reports status through the full command and VMangos-style alias" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
       state = %{guid: guid, character: debug_character()}
 
       assert {:handled, ^state} = DevCommands.run(state, ".battleground info")

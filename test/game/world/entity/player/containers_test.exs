@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ContainersTest do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
+  alias ThistleTea.Test.Unique
 
   @source 999_911
   @reward 999_912
@@ -173,7 +174,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ContainersTest do
     end
 
     test "instant key spells consume their charge only when unlocking succeeds", %{state: state, source: source} do
-      Entity.register(state.guid)
+      {:ok, _} = Entity.register(state.guid)
       ItemStore.put(locked(source))
 
       key =
@@ -223,7 +224,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ContainersTest do
   defp locked(source), do: %{source | internal: %{source.internal | template: %{Item.template(source) | lockid: @lock}}}
 
   defp container(_context) do
-    owner = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    owner = Guid.from_low_guid(:player, Unique.integer())
 
     source =
       ItemStore.create(%ItemTemplate{entry: @source, flags: 4, min_money_loot: 25, max_money_loot: 25}, owner: owner)

@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Player.CastMovementMapsTest do
   alias ThistleTea.Game.World.Entity.Player.Movement
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Test.Unique
 
   @moduletag :namigator_maps
   @position {-8949.95, -132.49, 83.53, 0.0}
@@ -60,7 +61,7 @@ defmodule ThistleTea.Game.World.Entity.Player.CastMovementMapsTest do
   end
 
   defp caster(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
     {:ok, _} = Entity.register(guid)
 
     character = %Character{

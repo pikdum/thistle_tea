@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Entity.Player.StateTest do
   alias ThistleTea.Game.World.Entity.Player.CompanionOwner
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.System.CellActivator
+  alias ThistleTea.Test.Unique
 
   defmodule HappinessPet do
     @moduledoc false
@@ -33,7 +34,7 @@ defmodule ThistleTea.Game.World.Entity.Player.StateTest do
 
     @impl true
     def init({guid, happiness}) do
-      Entity.register(guid)
+      {:ok, _} = Entity.register(guid)
       {:ok, happiness}
     end
 
@@ -120,9 +121,9 @@ defmodule ThistleTea.Game.World.Entity.Player.StateTest do
 
   describe "suspend_companion/1" do
     test "clears the possession camera and mover before retaining the character" do
-      guid = System.unique_integer([:positive, :monotonic])
-      target = System.unique_integer([:positive, :monotonic])
-      Entity.register(target)
+      guid = Unique.integer()
+      target = Unique.integer()
+      {:ok, _} = Entity.register(target)
 
       character =
         %Character{
@@ -157,7 +158,7 @@ defmodule ThistleTea.Game.World.Entity.Player.StateTest do
     end
 
     test "captures final happiness and death before stopping the pet process" do
-      guid = Guid.from_low_guid(:pet, 2960, :erlang.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:pet, 2960, Unique.integer())
       pid = start_supervised!({HappinessPet, {guid, 700_000}})
       ref = Process.monitor(pid)
 

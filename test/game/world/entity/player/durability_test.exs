@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @entry 997_930
   @enchant 997_931
@@ -354,7 +355,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DurabilityTest do
   end
 
   defp equipped_character(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
     vendor = Guid.from_low_guid(:mob, 54, guid)
 
     template = %ItemTemplate{

@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.DeferredCooldownTest do
   alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.Entity.Player
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Test.Unique
 
   setup [:owner]
 
@@ -87,8 +88,8 @@ defmodule ThistleTea.Game.World.Entity.DeferredCooldownTest do
   end
 
   defp owner(_context) do
-    guid = System.unique_integer([:positive]) + 70_000_000
-    Entity.register(guid)
+    guid = Unique.integer()
+    {:ok, _} = Entity.register(guid)
     spell = %Spell{id: 18_540, recovery_time_ms: 3_600_000, attributes: MapSet.new([:cooldown_on_event])}
     character = %Character{object: %Object{guid: guid}, unit: %Unit{health: 100, auras: []}, internal: %Internal{}}
     character = Cooldowns.start(character, spell, 100)
@@ -97,7 +98,7 @@ defmodule ThistleTea.Game.World.Entity.DeferredCooldownTest do
   end
 
   defp object(owner, event) do
-    guid = Guid.from_low_guid(:game_object, 900_040, System.unique_integer([:positive]))
+    guid = Guid.from_low_guid(:game_object, 900_040, Unique.integer())
     on_exit(fn -> World.stop_entity(guid) end)
 
     %GameObject{

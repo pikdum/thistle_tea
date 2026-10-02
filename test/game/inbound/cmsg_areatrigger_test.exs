@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Inbound.CmsgAreatriggerTest do
   alias ThistleTea.Game.Network.Message.SmsgAreaTriggerMessage
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Test.Unique
 
   @moduletag :vmangos_db
 
@@ -95,5 +96,5 @@ defmodule ThistleTea.Game.Inbound.CmsgAreatriggerTest do
     }
   end
 
-  defp unique_guid, do: System.unique_integer([:positive])
+  defp unique_guid, do: Unique.integer()
 end

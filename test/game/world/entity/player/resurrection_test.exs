@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ResurrectionTest do
   alias ThistleTea.Game.World.Spell.SpellRequirements
   alias ThistleTea.Game.World.Spell.SpellTargetResolver
   alias ThistleTea.Game.World.System.Instance
+  alias ThistleTea.Test.Unique
 
   @map 900_041
   @dungeon 900_042
@@ -199,7 +200,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ResurrectionTest do
   end
 
   defp spirit_run(_context) do
-    guid = System.unique_integer([:positive]) + 40_000_000
+    guid = Unique.integer()
     world = WorldRef.open(@map)
     :ets.insert(AreaTrigger, {{:instance_map, @map}, false})
 

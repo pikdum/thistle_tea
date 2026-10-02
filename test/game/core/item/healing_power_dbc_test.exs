@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Core.Item.HealingPowerDbcTest do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellChain
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
   @bonuses [28_789, 28_823]
@@ -215,7 +216,7 @@ defmodule ThistleTea.Game.Core.Item.HealingPowerDbcTest do
   end
 
   defp characters(_context) do
-    guid = System.unique_integer([:positive]) + 51_000_000
+    guid = Unique.integer()
 
     caster = %Character{
       object: %Object{guid: guid},

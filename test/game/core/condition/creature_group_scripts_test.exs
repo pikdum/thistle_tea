@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Core.Condition.CreatureGroupScriptsTest do
   alias ThistleTea.Game.World.System.CombatLeashes
   alias ThistleTea.Game.World.System.CreatureGroups
   alias ThistleTea.Game.World.System.ScriptedEvent
+  alias ThistleTea.Test.Unique
 
   setup [:creatures]
 
@@ -123,7 +124,7 @@ defmodule ThistleTea.Game.Core.Condition.CreatureGroupScriptsTest do
   end
 
   defp creatures(_context) do
-    world = WorldRef.instance(36, System.unique_integer([:positive]))
+    world = WorldRef.instance(36, Unique.integer())
     leader = mob(world, 1)
     member = mob(world, 2)
     Enum.each([leader, member], &CreatureGroups.register(&1, self()))
@@ -137,7 +138,7 @@ defmodule ThistleTea.Game.Core.Condition.CreatureGroupScriptsTest do
   end
 
   defp mob(world, id) do
-    guid = Guid.from_low_guid(:mob, 7, System.unique_integer([:positive]))
+    guid = Guid.from_low_guid(:mob, 7, Unique.integer())
 
     %Mob{
       object: %Object{guid: guid},

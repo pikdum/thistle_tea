@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.AreaEffectsTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.World.AreaEffects
+  alias ThistleTea.Test.Unique
 
   describe "register/2" do
     test "tracks the registering process by caster and spell" do
@@ -44,6 +45,6 @@ defmodule ThistleTea.Game.World.AreaEffectsTest do
   end
 
   defp unique_guid do
-    System.unique_integer([:positive, :monotonic])
+    Unique.integer()
   end
 end

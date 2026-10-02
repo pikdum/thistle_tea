@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetTargetingTest do
   alias ThistleTea.Game.World.Entity.Mob, as: MobServer
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   setup [:entities]
 
@@ -28,7 +29,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetTargetingTest do
       target: target,
       other: other
     } do
-      owner = System.unique_integer([:positive]) + 20_000_000
+      owner = Unique.integer()
       pet = %{pet | internal: %{pet.internal | pet: %{pet.internal.pet | owner_guid: owner}}}
       pet = PetBT.command(pet, :attack, target, 1_000)
       Metadata.put(owner, %{in_combat: true, combat_targets: [target, other]})

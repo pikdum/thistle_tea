@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Core.Combat.KillFeedbackTest do
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Test.Unique
 
   setup [:entities]
 
@@ -72,8 +73,8 @@ defmodule ThistleTea.Game.Core.Combat.KillFeedbackTest do
     end
 
     test "delivers the captured outcome to the fatal attacker", %{mob: mob} do
-      killer = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      Entity.register(killer)
+      killer = Guid.from_low_guid(:player, Unique.integer())
+      {:ok, _} = Entity.register(killer)
       dead = EntityCore.take_damage(mob, 100, 0, source: killer)
       [outcome] = outcomes(dead)
       EventSink.emit(dead, outcome)

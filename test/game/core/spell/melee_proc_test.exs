@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Core.Spell.MeleeProcTest do
   alias ThistleTea.Game.Core.Spell.ProcRule
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink.Combat, as: CombatSink
+  alias ThistleTea.Test.Unique
 
   setup [:combatants]
 
@@ -161,8 +162,8 @@ defmodule ThistleTea.Game.Core.Spell.MeleeProcTest do
   end
 
   defp combatants(_context) do
-    attacker_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-    Entity.register(attacker_guid)
+    attacker_guid = Guid.from_low_guid(:player, Unique.integer())
+    {:ok, _} = Entity.register(attacker_guid)
     on_exit(fn -> Entity.unregister(attacker_guid) end)
 
     attacker = entity(attacker_guid, [proc_holder(4, 0x4)])

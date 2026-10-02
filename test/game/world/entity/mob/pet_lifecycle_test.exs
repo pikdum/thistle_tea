@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetLifecycleTest do
   alias ThistleTea.Game.World.Spell.SpellRequirements
   alias ThistleTea.Game.World.Spell.SpellTargetResolver
   alias ThistleTea.Test.FactionFixtures
+  alias ThistleTea.Test.Unique
 
   setup [{FactionFixtures, :seed}, :build_pet]
 
@@ -367,8 +368,8 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetLifecycleTest do
 
   defp build_pet(_context) do
     guid = Guid.runtime(:pet, 2960)
-    owner = System.unique_integer([:positive]) + 10_000_000
-    Entity.register(owner)
+    owner = Unique.integer()
+    {:ok, _} = Entity.register(owner)
 
     pet = %Mob{
       object: %Object{guid: guid, entry: 2960},

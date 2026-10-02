@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.DeliveryHostilityTest do
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.World.Entity.EffectResolver.Spells
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   setup [:entities]
 
@@ -43,13 +44,13 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.DeliveryHostilityTest do
     alliance = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
 
     caster = %Mob{
-      object: %Object{guid: Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))},
+      object: %Object{guid: Guid.from_low_guid(:mob, 1, Unique.integer())},
       unit: %Unit{level: 60, health: 100, max_health: 100, faction_template: 17},
       internal: %Internal{}
     }
 
-    enemy = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-    ally = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+    enemy = Guid.from_low_guid(:player, Unique.integer())
+    ally = Guid.from_low_guid(:mob, 2, Unique.integer())
 
     Metadata.put(caster.object.guid, %{alive?: true, unit_flags: 0, faction_template: horde})
     Metadata.put(enemy, %{alive?: true, unit_flags: 0, faction_template: alliance})

@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestRequiredConditionTest do
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Test.Unique
 
   setup do
     CharacterStore.init()
@@ -40,7 +41,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestRequiredConditionTest do
     QuestLoader.init()
     ReputationLoader.init()
 
-    id = System.unique_integer([:positive, :monotonic])
+    id = Unique.integer()
     quest_id = 900_000 + id * 10
     npc_entry = 800_000 + id
     player_guid = Guid.from_low_guid(:player, id)
@@ -50,7 +51,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestRequiredConditionTest do
     source_item_id = 700_000 + id
     character = character(id, player_guid)
     CharacterStore.put(character)
-    Entity.register(npc_guid)
+    {:ok, _} = Entity.register(npc_guid)
     npc = %{object: %Object{guid: npc_guid}, internal: character.internal, movement_block: character.movement_block}
     World.update_position(npc, :mobs)
     Metadata.put(npc_guid, %{alive?: true, npc_flags: 2})

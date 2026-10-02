@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.System.SingleTargetAurasTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.SingleTargetAuras
+  alias ThistleTea.Test.Unique
 
   setup [:registry]
 
@@ -62,8 +63,8 @@ defmodule ThistleTea.Game.World.System.SingleTargetAurasTest do
     end
 
     test "independent spell groups and casters retain their targets", context do
-      second_caster = System.unique_integer([:positive]) + 10_000_000
-      Entity.register(second_caster)
+      second_caster = Unique.integer()
+      {:ok, _} = Entity.register(second_caster)
       publish(context, context.first)
       other_group = %{context.second | spell_icon: 44, category: nil}
       other_caster = %{context.second | caster_guid: second_caster}
@@ -129,7 +130,7 @@ defmodule ThistleTea.Game.World.System.SingleTargetAurasTest do
 
       pid =
         spawn(fn ->
-          Entity.register(caster)
+          {:ok, _} = Entity.register(caster)
           send(parent, :registered)
 
           receive do
@@ -181,8 +182,8 @@ defmodule ThistleTea.Game.World.System.SingleTargetAurasTest do
 
   defp registry(_context) do
     server = start_supervised!({SingleTargetAuras, name: nil})
-    caster = System.unique_integer([:positive]) + 20_000_000
-    Entity.register(caster)
+    caster = Unique.integer()
+    {:ok, _} = Entity.register(caster)
 
     first = %SingleTargetClaim{
       caster_guid: caster,

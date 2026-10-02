@@ -6,10 +6,11 @@ defmodule ThistleTea.Game.World.System.Party.NotifierTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.World.System.Party.Notifier
+  alias ThistleTea.Test.Unique
 
   describe "send_group_list/2" do
     test "marks the leader before sending the roster" do
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
       {:ok, _owner} = EntityRegistry.register(guid)
       on_exit(fn -> EntityRegistry.unregister(guid) end)
       group = %Group{id: 1, leader: guid, members: [%Member{guid: guid, name: "Leader"}]}
@@ -21,7 +22,7 @@ defmodule ThistleTea.Game.World.System.Party.NotifierTest do
     end
 
     test "clears leadership before sending an empty roster" do
-      guid = System.unique_integer([:positive])
+      guid = Unique.integer()
       {:ok, _owner} = EntityRegistry.register(guid)
       on_exit(fn -> EntityRegistry.unregister(guid) end)
 

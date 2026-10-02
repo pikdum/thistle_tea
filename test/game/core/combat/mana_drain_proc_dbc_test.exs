@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Core.Combat.ManaDrainProcDbcTest do
   alias ThistleTea.Game.World.Loader.SpellChain
   alias ThistleTea.Game.World.Loader.SpellEffectOverride
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -130,7 +131,7 @@ defmodule ThistleTea.Game.Core.Combat.ManaDrainProcDbcTest do
   end
 
   defp combatants(_context) do
-    guid = System.unique_integer([:positive]) + 50_000_000
+    guid = Unique.integer()
 
     caster = %Character{
       object: %Object{guid: guid},

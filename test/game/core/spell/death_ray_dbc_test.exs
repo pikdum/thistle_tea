@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Core.Spell.DeathRayDbcTest do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellScriptName
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
   @scripts [{13_278, "spell_gdr_channel"}, {13_493, "spell_gdr_periodic"}]
@@ -91,8 +92,8 @@ defmodule ThistleTea.Game.Core.Spell.DeathRayDbcTest do
   end
 
   defp entities(_context) do
-    target_guid = Guid.from_low_guid(:mob, System.unique_integer([:positive]), 1)
-    caster_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+    target_guid = Guid.from_low_guid(:mob, Unique.integer(), 1)
+    caster_guid = Guid.from_low_guid(:player, Unique.integer())
     spells = Map.new([13_278, 13_279, 13_493], &{&1, SpellLoader.load(&1)})
     cast = %{Cast.new(spells[13_278], Target.unit(target_guid), 0) | phase: :channel_tick}
     unit = %Unit{health: 5_000, max_health: 5_000, level: 60, auras: [], target: target_guid}

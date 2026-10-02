@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.CustomSpellTest do
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Entity.EffectResolver.Spells
+  alias ThistleTea.Test.Unique
 
   setup [:caster]
 
@@ -60,7 +61,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.CustomSpellTest do
   end
 
   defp caster(_context) do
-    guid = System.unique_integer([:positive]) + 90_000_000
+    guid = Unique.integer()
 
     spell = %Spell{
       id: 90_999_001,

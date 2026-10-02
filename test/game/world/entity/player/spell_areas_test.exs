@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellAreasTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Entity.Player.SpellAreas
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Test.Unique
 
   describe "reconcile/2" do
     setup [:character_and_rules]
@@ -76,7 +77,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellAreasTest do
     child = aura_spell(31_906, rules)
 
     character = %Character{
-      object: %Object{guid: System.unique_integer([:positive])},
+      object: %Object{guid: Unique.integer()},
       unit: %Unit{level: 60, race: 1, gender: 1, health: 100, max_health: 100, auras: []},
       player: %Player{},
       internal: %Internal{world: %WorldRef{map_id: 0}},

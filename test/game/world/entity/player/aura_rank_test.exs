@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AuraRankTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Spell.SpellRequirements
+  alias ThistleTea.Test.Unique
 
   setup [:caster]
 
@@ -116,7 +117,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AuraRankTest do
   end
 
   defp caster(_context) do
-    [guid, target, low_id, high_id] = for _ <- 1..4, do: System.unique_integer([:positive]) + 95_000_000
+    [guid, target, low_id, high_id] = for _ <- 1..4, do: Unique.integer()
     world = WorldRef.instance(999, guid)
     faction = %FactionTemplate{id: 1, faction_group: 1, friend_group: 1, enemy_group: 2}
     Metadata.put(target, %{level: 1, alive?: true, faction_template: faction})

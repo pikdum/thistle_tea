@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Loader.ItemSetDbcTest do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemSet, as: ItemSetLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -109,7 +110,7 @@ defmodule ThistleTea.Game.World.Loader.ItemSetDbcTest do
   defp equipment(_context) do
     table = :ets.new(:item_sets, [:public])
     :ok = ItemSetLoader.load_all(table)
-    set_id = System.unique_integer([:positive]) + 1_000_000
+    set_id = Unique.integer()
     items = for _ <- 1..3, do: ItemStore.create(%ItemTemplate{entry: set_id, item_set: set_id})
 
     player =

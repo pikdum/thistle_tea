@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.World.Entity.WildTrapDbcTest do
   alias ThistleTea.Game.World.Loader.SpellChain
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Spell.SpellTargetResolver
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -33,9 +34,9 @@ defmodule ThistleTea.Game.World.Entity.WildTrapDbcTest do
 
   describe "trap activation" do
     test "owned Frost Trap creates ticking areas with complete caster snapshots" do
-      owner_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      Entity.register(target_guid)
+      owner_guid = Guid.from_low_guid(:player, Unique.integer())
+      target_guid = Guid.from_low_guid(:player, Unique.integer())
+      {:ok, _} = Entity.register(target_guid)
 
       target = %Character{
         object: %Object{guid: target_guid},
@@ -82,8 +83,8 @@ defmodule ThistleTea.Game.World.Entity.WildTrapDbcTest do
     end
 
     test "a world-loaded campfire discovers a nearby player and delivers environmental fire" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      Entity.register(player_guid)
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      {:ok, _} = Entity.register(player_guid)
 
       player = %Character{
         object: %Object{guid: player_guid},
@@ -109,7 +110,7 @@ defmodule ThistleTea.Game.World.Entity.WildTrapDbcTest do
 
       trap =
         GameObjectLoader.build(%Mangos.GameObject{
-          guid: System.unique_integer([:positive]),
+          guid: Unique.integer(),
           id: 2061,
           map: 999,
           game_object_template: template
@@ -145,8 +146,8 @@ defmodule ThistleTea.Game.World.Entity.WildTrapDbcTest do
     end
 
     test "ownerless area traps deliver once with the game object as caster" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      Entity.register(player_guid)
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      {:ok, _} = Entity.register(player_guid)
 
       player = %Character{
         object: %Object{guid: player_guid},

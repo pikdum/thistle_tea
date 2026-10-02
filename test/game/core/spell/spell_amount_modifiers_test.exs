@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellAmountModifiersTest do
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.Spell.SpellEffect
+  alias ThistleTea.Test.Unique
 
   setup [:entities]
 
@@ -185,7 +186,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellAmountModifiersTest do
 
   defp aura(type, amount) do
     %Holder{
-      spell: %Spell{id: System.unique_integer([:positive]), spell_family: 3},
+      spell: %Spell{id: Unique.integer(), spell_family: 3},
       auras: [%Aura{type: type, amount: amount, misc_value: 4}]
     }
   end

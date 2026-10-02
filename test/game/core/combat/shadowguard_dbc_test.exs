@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Core.Combat.ShadowguardDbcTest do
   alias ThistleTea.Game.World.Loader.SpellProcEvent
   alias ThistleTea.Game.World.Loader.SpellThreat
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
   @ranks [
@@ -168,7 +169,7 @@ defmodule ThistleTea.Game.Core.Combat.ShadowguardDbcTest do
       movement_block: movement
     }
 
-    guid = System.unique_integer([:positive]) + 50_000_000
+    guid = Unique.integer()
 
     attacker = %Mob{
       object: %Object{guid: guid},

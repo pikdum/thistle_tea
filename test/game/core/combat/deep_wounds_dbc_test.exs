@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Core.Combat.DeepWoundsDbcTest do
   alias ThistleTea.Game.World.Loader.SpellProcEvent
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -202,7 +203,7 @@ defmodule ThistleTea.Game.Core.Combat.DeepWoundsDbcTest do
   end
 
   defp entities(_context) do
-    world = WorldRef.instance(0, System.unique_integer([:positive]))
+    world = WorldRef.instance(0, Unique.integer())
     target_guid = Guid.runtime(:mob, 1)
     weapon = %{class: 2, subclass: 7, inventory_type: 13}
 

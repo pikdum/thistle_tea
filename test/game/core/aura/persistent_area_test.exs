@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Core.Aura.PersistentAreaTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Spell.SpellReception
+  alias ThistleTea.Test.Unique
 
   setup [:ground_spell]
 
@@ -293,7 +294,7 @@ defmodule ThistleTea.Game.Core.Aura.PersistentAreaTest do
 
       caster = %{caster | unit: %{caster.unit | auras: [bonus]}}
       target_guid = ctx.context.caster_guid
-      EntityRegistry.register(target_guid)
+      {:ok, _} = EntityRegistry.register(target_guid)
       SpatialHash.update(:players, target_guid, ctx.target.internal.world, 0.0, 0.0, 0.0)
 
       Metadata.put(caster.object.guid, %{
@@ -419,9 +420,9 @@ defmodule ThistleTea.Game.Core.Aura.PersistentAreaTest do
   end
 
   defp ground_spell(_context) do
-    guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
-    caster = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-    world = WorldRef.instance(0, System.unique_integer([:positive]))
+    guid = Guid.from_low_guid(:mob, 1, Unique.integer())
+    caster = Guid.from_low_guid(:player, Unique.integer())
+    world = WorldRef.instance(0, Unique.integer())
 
     spell = %Spell{
       id: 991_555,

@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GuildEmblemTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Guild, as: GuildSystem
+  alias ThistleTea.Test.Unique
 
   describe "activate_tabard/2" do
     test "opens only at a nearby tabard designer", %{founder: founder, vendor: vendor} do
@@ -54,7 +55,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GuildEmblemTest do
       assert_receive {:"$gen_cast", {:send_packet, %Message.MsgSaveGuildEmblem{result: :not_in_guild}}}
 
       founder = Guilds.create(founder, name)
-      target = state(System.unique_integer([:positive]), "Member", 200_000)
+      target = state(Unique.integer(), "Member", 200_000)
       {:ok, _group} = GuildSystem.invite(founder.guid, Guilds.member(target.character))
       {:ok, _group} = GuildSystem.accept(Guilds.member(target.character))
       on_exit(fn -> :ets.delete(CharacterStore, target.character.id) end)
@@ -78,7 +79,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GuildEmblemTest do
   end
 
   setup do
-    id = System.unique_integer([:positive])
+    id = Unique.integer()
     vendor = Guid.from_low_guid(:mob, id, id)
     founder = state(id, "Founder#{id}", 200_000)
     name = "Guild#{id}"

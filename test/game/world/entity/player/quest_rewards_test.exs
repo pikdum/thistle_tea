@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestRewardsTest do
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   setup [:character]
 
@@ -57,7 +58,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestRewardsTest do
 
   describe "cast_spell/3" do
     test "prefers the hidden cast reward and dispatches self effects to the player owner", %{state: state, quest: quest} do
-      Entity.register(state.guid)
+      {:ok, _} = Entity.register(state.guid)
       spell = cache_spell(%Spell{id: quest.id, effects: [%Effect{type: :dummy, implicit_target_a: :caster}]})
       quest = %{quest | reward_spell: 999, reward_spell_cast: spell.id}
       assert QuestRewards.cast_spell(state, quest, Guid.from_low_guid(:mob, 1, 1)) == state
@@ -71,7 +72,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestRewardsTest do
       quest: quest
     } do
       npc = Guid.from_low_guid(:mob, 1, state.guid)
-      Entity.register(npc)
+      {:ok, _} = Entity.register(npc)
 
       for effect <- [
             %Effect{type: :learn_spell},
@@ -88,7 +89,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestRewardsTest do
     end
 
     test "game-object reward spells use the player as caster", %{state: state, quest: quest} do
-      Entity.register(state.guid)
+      {:ok, _} = Entity.register(state.guid)
       spell = cache_spell(%Spell{id: quest.id, effects: [%Effect{type: :learn_spell}]})
       QuestRewards.cast_spell(state, %{quest | reward_spell: spell.id}, Guid.from_low_guid(:game_object, 1, 1))
       assert_receive {:"$gen_cast", {:trigger_spell, id, target, []}}
@@ -103,7 +104,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestRewardsTest do
   end
 
   defp character(_context) do
-    id = System.unique_integer([:positive, :monotonic])
+    id = Unique.integer()
     quest = %Quest{id: 98_500_000 + id, flags: 0x400, min_level: 60, reward_money: 123}
     :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
 

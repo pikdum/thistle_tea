@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GroupsTest do
   alias ThistleTea.Game.World.Entity.Player.Groups
   alias ThistleTea.Game.World.Entity.Registry
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Test.Unique
 
   setup [:party]
 
@@ -153,5 +154,5 @@ defmodule ThistleTea.Game.World.Entity.Player.GroupsTest do
     }
   end
 
-  defp unique_guid, do: System.unique_integer([:positive, :monotonic])
+  defp unique_guid, do: Unique.integer()
 end

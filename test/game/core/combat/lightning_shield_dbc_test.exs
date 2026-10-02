@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Core.Combat.LightningShieldDbcTest do
   alias ThistleTea.Game.World.Loader.SpellChain
   alias ThistleTea.Game.World.Loader.SpellProcEvent
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
   @ranks [
@@ -105,7 +106,7 @@ defmodule ThistleTea.Game.Core.Combat.LightningShieldDbcTest do
 
   defp combatants(_context) do
     shaman = %Mob{
-      object: %Object{guid: System.unique_integer([:positive]) + 50_000_000},
+      object: %Object{guid: Unique.integer()},
       unit: %Unit{level: 60, health: 5_000, max_health: 5_000, normal_resistance: 0, auras: []},
       internal: %Internal{world: WorldRef.open(0)},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}

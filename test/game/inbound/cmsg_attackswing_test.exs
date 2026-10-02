@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Inbound.CmsgAttackswingTest do
   alias ThistleTea.Game.Inbound.CmsgAttackswing
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   describe "handle/2" do
     test "sets attack intent but does not enter combat until a swing lands" do
@@ -82,6 +83,6 @@ defmodule ThistleTea.Game.Inbound.CmsgAttackswingTest do
   end
 
   defp unique_guid do
-    System.unique_integer([:positive, :monotonic])
+    Unique.integer()
   end
 end

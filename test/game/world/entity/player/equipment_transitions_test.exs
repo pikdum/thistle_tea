@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EquipmentTransitionsTest do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   setup [:equipment]
 
@@ -264,7 +265,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EquipmentTransitionsTest do
   end
 
   defp equipment(_context) do
-    owner = System.unique_integer([:positive, :monotonic])
+    owner = Unique.integer()
     id = owner + 800_000
     spell = %Spell{id: id, cast_time_ms: 10_000}
     cache_spell(spell)

@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.World.Entity.Player.VendorStockTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.VendorStock
   alias ThistleTea.Game.World.VendorStockStore
+  alias ThistleTea.Test.Unique
 
   setup [:merchant]
 
@@ -291,8 +292,8 @@ defmodule ThistleTea.Game.World.Entity.Player.VendorStockTest do
   end
 
   defp merchant(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
-    entry = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
+    entry = Unique.integer()
     vendor = Guid.from_low_guid(:mob, entry, entry)
     world = WorldRef.open(1)
     Registry.register(guid)

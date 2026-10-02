@@ -22,12 +22,13 @@ defmodule ThistleTea.Game.World.Entity.Player.KnockbackTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   setup [:session]
 
   describe "acknowledge/4" do
     test "relocates, projects the launch, then accepts a normal landing", %{state: state, movement: movement} do
-      observer = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      observer = Guid.from_low_guid(:player, Unique.integer())
       {:ok, _} = Entity.register(observer)
       world = state.character.internal.world
       SpatialHash.insert(:players, observer, world, 0.0, 0.0, 0.0)
@@ -68,7 +69,7 @@ defmodule ThistleTea.Game.World.Entity.Player.KnockbackTest do
     end
 
     test "routes a possessed mover and discards its reply after control ends", %{state: state, movement: movement} do
-      mover = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive, :monotonic]))
+      mover = Guid.from_low_guid(:mob, 1, Unique.integer())
       {:ok, _} = Entity.register(mover)
       character = Companion.activate(state.character, :possession, %EntityRef{guid: mover, entry: 1, spell_id: 126})
       state = %{state | character: character, active_mover_guid: mover}
@@ -86,7 +87,7 @@ defmodule ThistleTea.Game.World.Entity.Player.KnockbackTest do
   end
 
   defp session(_) do
-    guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    guid = Guid.from_low_guid(:player, Unique.integer())
     {:ok, _} = Entity.register(guid)
 
     character = %Character{

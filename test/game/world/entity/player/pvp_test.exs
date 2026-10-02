@@ -17,10 +17,11 @@ defmodule ThistleTea.Game.World.Entity.Player.PvpTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   describe "arrive/2" do
     test "publishes, saves, and schedules a granted aura through its owner" do
-      guid = System.unique_integer([:positive, :monotonic]) + 91_000_000
+      guid = Unique.integer()
 
       character = %Character{
         id: guid,

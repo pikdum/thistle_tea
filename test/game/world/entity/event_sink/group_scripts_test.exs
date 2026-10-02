@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.GroupScriptsTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.System.CreatureGroups
   alias ThistleTea.Game.World.System.Party
+  alias ThistleTea.Test.Unique
 
   setup [:world_and_owner]
 
@@ -30,7 +31,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.GroupScriptsTest do
       other = mob(other_world, 3)
 
       Enum.each([leader, source, member, other], fn mob ->
-        Entity.register(mob.object.guid)
+        {:ok, _} = Entity.register(mob.object.guid)
         CreatureGroups.register(mob, self())
       end)
 
@@ -60,8 +61,8 @@ defmodule ThistleTea.Game.World.Entity.EventSink.GroupScriptsTest do
       source = character(world)
       member = character(WorldRef.instance(world.map_id, world.instance_id + 1))
       offline = character(world)
-      Entity.register(source.object.guid)
-      Entity.register(member.object.guid)
+      {:ok, _} = Entity.register(source.object.guid)
+      {:ok, _} = Entity.register(member.object.guid)
 
       on_exit(fn ->
         Enum.each([source, member, offline], &Party.leave(&1.object.guid))
@@ -85,7 +86,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.GroupScriptsTest do
   end
 
   defp world_and_owner(_context) do
-    world = WorldRef.instance(329, System.unique_integer([:positive]))
+    world = WorldRef.instance(329, Unique.integer())
     parent = self()
 
     owner =
@@ -105,7 +106,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.GroupScriptsTest do
 
   defp mob(world, db_guid) do
     %Mob{
-      object: %Object{guid: Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))},
+      object: %Object{guid: Guid.from_low_guid(:mob, 1, Unique.integer())},
       unit: %Unit{health: 100},
       internal: %Internal{world: world, creature: %Creature{db_guid: db_guid}}
     }
@@ -113,7 +114,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.GroupScriptsTest do
 
   defp character(world) do
     %Character{
-      object: %Object{guid: Guid.from_low_guid(:player, System.unique_integer([:positive]))},
+      object: %Object{guid: Guid.from_low_guid(:player, Unique.integer())},
       internal: %Internal{world: world}
     }
   end

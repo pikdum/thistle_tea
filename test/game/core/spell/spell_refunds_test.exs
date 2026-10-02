@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellRefundsTest do
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Test.Unique
 
   setup [:combatants]
 
@@ -106,7 +107,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellRefundsTest do
   end
 
   defp combatants(_context) do
-    guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    guid = Guid.from_low_guid(:player, Unique.integer())
     {:ok, _owner} = Entity.register(guid)
 
     caster = %Character{
@@ -133,7 +134,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellRefundsTest do
     }
 
     target = %Mob{
-      object: %Object{guid: Guid.from_low_guid(:mob, 1, System.unique_integer([:positive, :monotonic]))},
+      object: %Object{guid: Guid.from_low_guid(:mob, 1, Unique.integer())},
       unit: %Unit{health: 100, max_health: 100, level: 60, stand_state: 0, auras: [immunity]},
       internal: %Internal{world: WorldRef.open(0)},
       movement_block: %MovementBlock{position: {1.0, 0.0, 0.0, 0.0}}

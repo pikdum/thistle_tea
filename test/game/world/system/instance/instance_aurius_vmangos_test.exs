@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceAuriusVmangosTest do
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Instance.InstanceData
   alias ThistleTea.Game.World.System.Instance.InstanceSpawn
+  alias ThistleTea.Test.Unique
 
   @moduletag :vmangos_db
 
@@ -145,7 +146,7 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceAuriusVmangosTest do
 
   test "loaded Baron lifecycle drives field five through the instance owner" do
     owner = self()
-    id = System.unique_integer([:positive, :monotonic])
+    id = Unique.integer()
     server = :"baron_instance_#{id}"
 
     start_supervised!(

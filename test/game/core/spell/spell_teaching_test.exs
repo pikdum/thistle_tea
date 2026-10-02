@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellTeachingTest do
   alias ThistleTea.Game.Core.Spell.SpellTeaching
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.EventSink.Context
+  alias ThistleTea.Test.Unique
 
   setup [:teaching]
 
@@ -81,7 +82,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellTeachingTest do
   defp teaching(_context) do
     %{
       character: %Character{
-        object: %Object{guid: System.unique_integer([:positive, :monotonic])},
+        object: %Object{guid: Unique.integer()},
         unit: %Unit{level: 50},
         player: %Player{},
         internal: %Internal{}

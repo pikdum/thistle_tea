@@ -113,6 +113,17 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
     assert violations == []
   end
 
+  test "tests draw unique integers only from the shared allocator" do
+    minters =
+      [@root, "test/**/*.exs"]
+      |> Path.join()
+      |> Path.wildcard()
+      |> Enum.filter(&(File.read!(&1) =~ ~r/unique_integer\(/))
+      |> MapSet.new(&Path.relative_to(&1, @root))
+
+    assert minters == MapSet.new(["test/support/unique.exs"])
+  end
+
   defp core_outer_references do
     core_files()
     |> Enum.flat_map(fn path ->

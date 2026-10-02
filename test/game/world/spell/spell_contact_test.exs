@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.World.Spell.SpellContactTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Spell.SpellReception
   alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Test.Unique
 
   setup [:actors]
 
@@ -69,7 +70,7 @@ defmodule ThistleTea.Game.World.Spell.SpellContactTest do
     end
 
     test "direct pet damage reports caster contact while ordinary periodic damage does not", ctx do
-      Entity.register(ctx.pet)
+      {:ok, _} = Entity.register(ctx.pet)
       spell = %Spell{id: 3, school: :physical}
 
       damage = %Effects.SpellDamage{
@@ -113,7 +114,7 @@ defmodule ThistleTea.Game.World.Spell.SpellContactTest do
     test "a detected immune Sap engages players and alerts the defensive pet", ctx do
       target = %{ctx.player | unit: %{ctx.player.unit | level: 60}}
       target = Pvp.toggle(target, true, Time.now())
-      Entity.register(ctx.pet)
+      {:ok, _} = Entity.register(ctx.pet)
       on_exit(fn -> Entity.unregister(ctx.pet) end)
       companion = %Companion{kind: :hunter_pet, status: {:active, %EntityRef{guid: ctx.pet, entry: 1, spell_id: 1}}}
       target = %{target | internal: %{target.internal | companion: companion}}
@@ -139,7 +140,7 @@ defmodule ThistleTea.Game.World.Spell.SpellContactTest do
 
     test "an undetected miss neither flags players nor alerts the pet", ctx do
       target = Pvp.toggle(ctx.player, true, Time.now())
-      Entity.register(ctx.pet)
+      {:ok, _} = Entity.register(ctx.pet)
       on_exit(fn -> Entity.unregister(ctx.pet) end)
       companion = %Companion{kind: :hunter_pet, status: {:active, %EntityRef{guid: ctx.pet, entry: 1, spell_id: 1}}}
       target = %{target | internal: %{target.internal | companion: companion}}
@@ -289,10 +290,10 @@ defmodule ThistleTea.Game.World.Spell.SpellContactTest do
   end
 
   defp actors(_context) do
-    source = System.unique_integer([:positive])
-    target = System.unique_integer([:positive])
-    mob_guid = Guid.from_low_guid(:mob, 38, System.unique_integer([:positive]))
-    pet = Guid.from_low_guid(:pet, 1, System.unique_integer([:positive]))
+    source = Unique.integer()
+    target = Unique.integer()
+    mob_guid = Guid.from_low_guid(:mob, 38, Unique.integer())
+    pet = Guid.from_low_guid(:pet, 1, Unique.integer())
     world = WorldRef.open(0)
     stealth = %Holder{spell: %Spell{id: 1786}, auras: [%Aura{type: :mod_stealth, amount: 300}]}
     immune = %Holder{spell: %Spell{id: 1022}, auras: [%Aura{type: :school_immunity, misc_value: 1}]}
@@ -339,7 +340,7 @@ defmodule ThistleTea.Game.World.Spell.SpellContactTest do
       effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_stun, implicit_target_a: :target_enemy, base_points: 0}]
     }
 
-    Entity.register(source)
+    {:ok, _} = Entity.register(source)
 
     on_exit(fn ->
       Entity.unregister(source)

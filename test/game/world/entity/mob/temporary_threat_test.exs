@@ -12,11 +12,12 @@ defmodule ThistleTea.Game.World.Entity.Mob.TemporaryThreatTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Mob, as: MobServer
+  alias ThistleTea.Test.Unique
 
   describe "handle_cast/2" do
     test "delivers the aura effect to its mob owner and schedules victim selection" do
-      guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive, :monotonic]))
-      Entity.register(guid)
+      guid = Guid.from_low_guid(:mob, 1, Unique.integer())
+      {:ok, _} = Entity.register(guid)
       on_exit(fn -> Entity.unregister(guid) end)
       character = %Character{object: %Object{guid: 1}, internal: %Internal{}}
       EventSink.emit(character, Effects.temporary_threat(guid, 7, -600))

@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Combat.DamageSharingTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Spell.SpellReception
+  alias ThistleTea.Test.Unique
 
   setup [:entities]
 
@@ -102,7 +103,7 @@ defmodule ThistleTea.Game.World.Combat.DamageSharingTest do
       refute_received {:"$gen_cast", {:receive_shared_damage, _}}
       EventSink.emit(ctx.target, effect, Context.new(self()))
       assert_received {:"$gen_cast", {:receive_shared_damage, ^effect}}
-      Entity.register(ctx.target.object.guid)
+      {:ok, _} = Entity.register(ctx.target.object.guid)
       on_exit(fn -> Entity.unregister(ctx.target.object.guid) end)
       remote = %{ctx.target | object: %Object{guid: ctx.attacker}}
       EventSink.emit(remote, effect)
@@ -111,7 +112,7 @@ defmodule ThistleTea.Game.World.Combat.DamageSharingTest do
 
     test "projects the actual sharing spell and school without offensive proc feedback", ctx do
       target = ctx.target
-      Entity.register(target.object.guid)
+      {:ok, _} = Entity.register(target.object.guid)
       SpatialHash.update(:players, target.object.guid, target.internal.world, 0.0, 0.0, 0.0)
 
       on_exit(fn ->
@@ -153,7 +154,7 @@ defmodule ThistleTea.Game.World.Combat.DamageSharingTest do
   defp transfers(entity), do: Enum.filter(entity.internal.events, &is_struct(&1, Effects.SharedDamage))
 
   defp entities(_ctx) do
-    [guid, caster, attacker] = guids = for _ <- 1..3, do: System.unique_integer([:positive])
+    [guid, caster, attacker] = guids = for _ <- 1..3, do: Unique.integer()
 
     holder = %Holder{
       spell: %Spell{id: 25_228},

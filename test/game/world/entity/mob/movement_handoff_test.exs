@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.MovementHandoffTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Test.Unique
 
   setup [:released_creature]
 
@@ -36,8 +37,8 @@ defmodule ThistleTea.Game.World.Entity.Mob.MovementHandoffTest do
   end
 
   defp released_creature(_context) do
-    caster = System.unique_integer([:positive, :monotonic])
-    guid = Guid.from_low_guid(:mob, 38, System.unique_integer([:positive, :monotonic]))
+    caster = Unique.integer()
+    guid = Guid.from_low_guid(:mob, 38, Unique.integer())
     world = WorldRef.instance(451, caster)
     holder = %Holder{caster_guid: caster, spell: %Spell{id: 605}, auras: [%Aura{type: :mod_possess}]}
 

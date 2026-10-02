@@ -2,6 +2,7 @@ defmodule ThistleTea.Auth.SessionKeyTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Auth.SessionKey
+  alias ThistleTea.Test.Unique
 
   setup [:session]
 
@@ -21,7 +22,7 @@ defmodule ThistleTea.Auth.SessionKeyTest do
   end
 
   defp session(_context) do
-    username = "SESSION_KEY_TEST_#{System.unique_integer([:positive])}"
+    username = "SESSION_KEY_TEST_#{Unique.integer()}"
     key = :crypto.strong_rand_bytes(40)
     :ok = SessionKey.put(username, key)
     on_exit(fn -> :ets.delete(:session, username) end)

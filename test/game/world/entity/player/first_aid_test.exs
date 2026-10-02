@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.World.Entity.Player.FirstAidTest do
   alias ThistleTea.Game.World.Entity.Player.UsableItems
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   setup [:bandages]
 
@@ -58,7 +59,7 @@ defmodule ThistleTea.Game.World.Entity.Player.FirstAidTest do
   end
 
   defp bandages(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
 
     item =
       ItemStore.create(%ItemTemplate{entry: 998_410, stackable: 20, spellid_1: 18_610, spellcharges_1: -1},

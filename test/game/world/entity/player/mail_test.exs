@@ -27,10 +27,11 @@ defmodule ThistleTea.Game.World.Entity.Player.MailTest do
   alias ThistleTea.Game.World.Loader.Mail, as: MailLoader
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.System.PostOffice
+  alias ThistleTea.Test.Unique
 
   describe "send_mail/2" do
     test "rejects a bound attachment without moving it or charging postage" do
-      id = System.unique_integer([:positive, :monotonic]) + 1_000_000
+      id = Unique.integer()
 
       recipient = %Character{
         id: id,
@@ -104,7 +105,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MailTest do
 
   describe "send_quest_reward/3" do
     test "posts cached quest text and its template attachment" do
-      unique = System.unique_integer([:positive, :monotonic])
+      unique = Unique.integer()
       receiver = Guid.from_low_guid(:player, unique)
       sender = Guid.from_low_guid(:mob, 123, unique)
       template_id = 100_000 + unique

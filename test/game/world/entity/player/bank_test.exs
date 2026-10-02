@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BankTest do
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @bag_0 255
   @backpack_start 23
@@ -36,7 +37,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BankTest do
   @banker_flag 0x00000100
 
   setup do
-    id = System.unique_integer([:positive, :monotonic])
+    id = Unique.integer()
     banker_guid = Guid.from_low_guid(:mob, 54, id)
     character = character(id)
     {:ok, _owner} = Entity.register(character.object.guid)

@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.System.DuelTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
+  alias ThistleTea.Test.Unique
 
   describe "disconnect/2 with controlled units" do
     setup [:controlled_duel]
@@ -133,8 +134,8 @@ defmodule ThistleTea.Game.World.System.DuelTest do
 
   defp controlled_duel(_context) do
     parent = self()
-    caster = System.unique_integer([:positive, :monotonic])
-    victim = System.unique_integer([:positive, :monotonic])
+    caster = Unique.integer()
+    victim = Unique.integer()
     world = WorldRef.open(0)
     table = :ets.new(:controlled_duel_test, [:set, :public])
 

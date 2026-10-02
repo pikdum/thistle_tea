@@ -27,10 +27,11 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.Position.ClientMotion
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Test.Unique
 
   describe "handle/2" do
     test "stationary heartbeats preserve sitting and movement acknowledges standing" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
       {:ok, _} = Entity.register(guid)
       character = moving_character(guid)
 
@@ -62,7 +63,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
     end
 
     test "landing damages the owner, projects health, and broadcasts the combat log once" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
       {:ok, _owner} = Entity.register(guid)
       character = moving_character(guid)
 
@@ -100,7 +101,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
     end
 
     test "routes movement to the active controlled unit without moving the character" do
-      mover_guid = :erlang.unique_integer([:positive])
+      mover_guid = Unique.integer()
       {:ok, _owner} = Entity.register(mover_guid)
 
       session = %State{
@@ -117,7 +118,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
     end
 
     test "rejects a mover that is not the character's charm" do
-      mover_guid = :erlang.unique_integer([:positive])
+      mover_guid = Unique.integer()
       {:ok, _owner} = Entity.register(mover_guid)
 
       session = %State{
@@ -150,7 +151,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
     end
 
     test "publishes forward motion immediately and clears it on stop" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
       character = moving_character(guid)
       on_exit(fn -> Presence.leave(character) end)
 

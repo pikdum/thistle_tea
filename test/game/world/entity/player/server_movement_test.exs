@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ServerMovementTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.Position.Spline
+  alias ThistleTea.Test.Unique
 
   describe "start/3" do
     test "publishes a charge as projected movement until arrival" do
@@ -163,7 +164,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ServerMovementTest do
   end
 
   defp state do
-    guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    guid = Guid.from_low_guid(:player, Unique.integer())
 
     character = %Character{
       object: %Object{guid: guid},

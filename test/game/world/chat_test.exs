@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.ChatTest do
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Test.Unique
 
   describe "handle/5" do
     test "whispers deliver tagged text, sender echoes and current availability replies" do
@@ -149,7 +150,7 @@ defmodule ThistleTea.Game.World.ChatTest do
       receiver = state(unique_guid(), "Listener")
 
       for character <- [sender.character, receiver.character] do
-        EntityRegistry.register(character.object.guid)
+        {:ok, _} = EntityRegistry.register(character.object.guid)
         Presence.enter(character, %{name: character.internal.name})
         on_exit(fn -> Presence.leave(character) end)
       end
@@ -177,8 +178,8 @@ defmodule ThistleTea.Game.World.ChatTest do
     test "keeps addon payloads intact without interpreting commands" do
       first = unique_guid()
       second = unique_guid()
-      EntityRegistry.register(first)
-      EntityRegistry.register(second)
+      {:ok, _} = EntityRegistry.register(first)
+      {:ok, _} = EntityRegistry.register(second)
       :ok = PartySystem.invite(first, "First", second)
       {:ok, _group} = PartySystem.accept(second, "Second")
       on_exit(fn -> PartySystem.leave(first) end)
@@ -210,5 +211,5 @@ defmodule ThistleTea.Game.World.ChatTest do
     }
   end
 
-  defp unique_guid, do: System.unique_integer([:positive, :monotonic])
+  defp unique_guid, do: Unique.integer()
 end

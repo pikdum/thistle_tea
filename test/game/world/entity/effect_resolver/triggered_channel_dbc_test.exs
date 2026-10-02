@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.TriggeredChannelDbcTest do
   alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -87,7 +88,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.TriggeredChannelDbcTest do
   defp caster(_context) do
     %{
       caster: %Character{
-        object: %Object{guid: System.unique_integer([:positive]) + 83_000_000},
+        object: %Object{guid: Unique.integer()},
         player: %Player{},
         unit: %Unit{level: 50, health: 100, max_health: 1_000},
         internal: %Internal{world: WorldRef.instance(999, 203)},

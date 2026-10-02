@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ConditionContextTest do
   alias ThistleTea.Game.World.Entity.Player.ConditionContext
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   describe "build/3" do
     test "collects requested server variables and preserves snapshot semantics" do
@@ -71,7 +72,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ConditionContextTest do
     end
 
     test "uses owner-published rank for swapped player sources" do
-      guid = System.unique_integer([:positive, :monotonic])
+      guid = Unique.integer()
       Metadata.put(guid, %{honor_rank: 18})
       on_exit(fn -> Metadata.delete(guid) end)
       condition = %Condition{type: :pvp_rank, value1: 14, swap_targets?: true}
@@ -175,7 +176,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ConditionContextTest do
     end
 
     test "the default source uses the current owner snapshot before presence catches up" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
       character = %{character() | object: %Object{guid: guid}}
       condition = %Condition{type: :area_id, value1: 12}
       owner = self()
@@ -198,7 +199,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ConditionContextTest do
     end
 
     test "collects planned environmental facts for an interacting world source" do
-      source_guid = Guid.from_low_guid(:mob, 123, System.unique_integer([:positive, :monotonic]))
+      source_guid = Guid.from_low_guid(:mob, 123, Unique.integer())
       source = %Subject{guid: source_guid, kind: :mob, entry: 123}
       condition = %Condition{entry: 77, type: :nearby_creature, value1: 456, value2: 30}
       owner = self()

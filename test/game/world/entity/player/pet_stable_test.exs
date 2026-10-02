@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetStableTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   setup [:build_state]
 
@@ -261,11 +262,11 @@ defmodule ThistleTea.Game.World.Entity.Player.PetStableTest do
   end
 
   defp build_state(_context) do
-    id = System.unique_integer([:positive, :monotonic])
+    id = Unique.integer()
     owner = Guid.from_low_guid(:player, id)
     master = Guid.from_low_guid(:mob, 11_069, id)
     pet_guid = Guid.from_low_guid(:pet, 69, id)
-    Entity.register(owner)
+    {:ok, _} = Entity.register(owner)
     Metadata.put(master, %{alive?: true, npc_flags: 0x2000})
     SpatialHash.update(:mobs, master, WorldRef.open(451), 2.0, 0.0, 0.0)
     SpatialHash.update(:players, owner, WorldRef.open(451), 0.0, 0.0, 0.0)

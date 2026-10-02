@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GiftsTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Test.Unique
 
   @paper 999_921
   @gift 999_922
@@ -93,7 +94,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GiftsTest do
   end
 
   defp gift(_context) do
-    owner = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    owner = Guid.from_low_guid(:player, Unique.integer())
     paper = ItemStore.create(%ItemTemplate{entry: @paper, flags: 512, stackable: 10, wrapped_gift: @gift}, owner: owner)
     target = ItemStore.create(%ItemTemplate{entry: 25, class: 2, max_durability: 20}, owner: owner)
     target = ItemStore.put(%{target | item: %{target.item | gift_creator: 0}})

@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BuybackTest do
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @entry 999_950
 
@@ -178,7 +179,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BuybackTest do
   end
 
   defp vendor_inventory(_context) do
-    owner = System.unique_integer([:positive, :monotonic])
+    owner = Unique.integer()
     vendor = Guid.from_low_guid(:mob, 54, owner)
 
     template = %ItemTemplate{

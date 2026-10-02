@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PossessionOwnerTest do
   alias ThistleTea.Game.World.Entity.Player.Spellcasting
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Test.Unique
 
   setup [:possessed_player]
 
@@ -180,7 +181,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PossessionOwnerTest do
       refute_received {:"$gen_cast", {:sync_pvp, _, _}}
 
       pet = Guid.from_low_guid(:mob, 1, state.guid)
-      Entity.register(pet)
+      {:ok, _} = Entity.register(pet)
       controlled_creature = Companion.activate(controller, :possession, %EntityRef{guid: pet, entry: 1, spell_id: 605})
       EventSink.emit(controlled_creature, %Effects.PvpFlagsChanged{enabled?: true}, Context.new(self()))
       assert_receive {:"$gen_cast", {:sync_pvp, ^caster, true}}
@@ -236,21 +237,21 @@ defmodule ThistleTea.Game.World.Entity.Player.PossessionOwnerTest do
   end
 
   defp possessed_player(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
-    caster = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
+    caster = Unique.integer()
     world = WorldRef.instance(451, guid)
     position = {0.0, 0.0, 0.0, 0.0}
     parent = self()
 
     caster_pid =
       spawn(fn ->
-        Entity.register(caster)
+        {:ok, _} = Entity.register(caster)
         send(parent, :registered)
         forward(parent)
       end)
 
     assert_receive :registered
-    Entity.register(guid)
+    {:ok, _} = Entity.register(guid)
 
     character = %Character{
       object: %Object{guid: guid},

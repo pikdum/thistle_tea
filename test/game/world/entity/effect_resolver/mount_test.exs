@@ -16,10 +16,11 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.MountTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Entity.EffectResolver
   alias ThistleTea.Game.World.Loader.MapTemplate
+  alias ThistleTea.Test.Unique
 
   describe "resolve/2" do
     test "Black Qiraji chooses the destination map variant and replaces the old mount once" do
-      map_id = System.unique_integer([:positive]) + 900_000
+      map_id = Unique.integer()
       :ets.insert(MapTemplate, {map_id, 2, nil})
       on_exit(fn -> :ets.delete(MapTemplate, map_id) end)
 

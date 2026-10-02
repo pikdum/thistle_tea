@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EmotesTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Test.Unique
 
   setup [:catalog, :player]
 
@@ -101,7 +102,7 @@ defmodule ThistleTea.Game.World.Entity.Player.EmotesTest do
   end
 
   defp player(_context) do
-    guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    guid = Guid.from_low_guid(:player, Unique.integer())
     {:ok, _} = Entity.register(guid)
 
     character = %Character{

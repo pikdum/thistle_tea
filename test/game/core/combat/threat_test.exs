@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Core.Combat.ThreatTest do
   alias ThistleTea.Game.World.Combat.ThreatSelection
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @mob_guid 100
   @player_a 1
@@ -327,6 +328,6 @@ defmodule ThistleTea.Game.Core.Combat.ThreatTest do
   end
 
   defp unique_guid do
-    System.unique_integer([:positive, :monotonic])
+    Unique.integer()
   end
 end

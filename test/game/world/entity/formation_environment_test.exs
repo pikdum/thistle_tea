@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.World.Entity.FormationEnvironmentTest do
   alias ThistleTea.Game.World.Entity.FormationEnvironment
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.CreatureGroups
+  alias ThistleTea.Test.Unique
 
   setup [:formation]
 
@@ -59,7 +60,7 @@ defmodule ThistleTea.Game.World.Entity.FormationEnvironmentTest do
   end
 
   defp formation(_context) do
-    world = WorldRef.instance(0, System.unique_integer([:positive]))
+    world = WorldRef.instance(0, Unique.integer())
     leader = mob(world)
     follower = mob(world)
 
@@ -85,7 +86,7 @@ defmodule ThistleTea.Game.World.Entity.FormationEnvironmentTest do
 
   defp mob(world) do
     %Mob{
-      object: %Object{guid: Guid.from_low_guid(:mob, 727, 8_000_000 + System.unique_integer([:positive]))},
+      object: %Object{guid: Guid.from_low_guid(:mob, 727, Unique.integer())},
       unit: %Unit{health: 100},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{world: world, spawn: %Spawn{position: {-5_510.57, -2_000.05, 399.5}}}

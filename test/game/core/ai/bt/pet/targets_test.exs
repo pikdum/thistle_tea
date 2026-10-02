@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet.TargetsTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Test.Unique
 
   setup [:entities]
 
@@ -187,9 +188,9 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet.TargetsTest do
 
   defp entities(_context) do
     world = WorldRef.open(999)
-    owner = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-    ally = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-    outsider = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+    owner = Guid.from_low_guid(:player, Unique.integer())
+    ally = Guid.from_low_guid(:player, Unique.integer())
+    outsider = Guid.from_low_guid(:player, Unique.integer())
     enemy = Guid.runtime(:mob, 2)
     guid = Guid.runtime(:pet, 416)
     friendly = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}

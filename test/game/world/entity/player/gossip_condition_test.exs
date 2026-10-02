@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipConditionTest do
   alias ThistleTea.Game.World.Loader.Gossip.Menu
   alias ThistleTea.Game.World.Loader.Gossip.Option
   alias ThistleTea.Game.World.Loader.Gossip.Text
+  alias ThistleTea.Test.Unique
 
   describe "allows?/3" do
     test "gates a Moonglade taxi option by faction and druid class" do
@@ -86,7 +87,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipConditionTest do
 
   describe "bank item revalidation" do
     test "shows and selects an inclusive option while deposited or withdrawn" do
-      player_guid = System.unique_integer([:positive, :monotonic])
+      player_guid = Unique.integer()
       {:ok, _owner} = Entity.register(player_guid)
       item = ItemStore.create(%ItemTemplate{entry: 9000}, owner: player_guid)
       on_exit(fn -> ItemStore.delete(item.object.guid) end)

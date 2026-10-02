@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Core.Spell.BinarySpellTest do
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   describe "binary?/1" do
     test "classifies magical control effects and preserves the classification after filtering" do
@@ -169,8 +170,8 @@ defmodule ThistleTea.Game.Core.Spell.BinarySpellTest do
 
   describe "complete/3" do
     test "launch reads resistance metadata and observes its removal" do
-      caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
-      target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      caster_guid = Guid.from_low_guid(:mob, 1, Unique.integer())
+      target_guid = Guid.from_low_guid(:player, Unique.integer())
 
       caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
       target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}

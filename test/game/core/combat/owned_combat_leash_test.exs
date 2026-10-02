@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Core.Combat.OwnedCombatLeashTest do
   alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.CombatLeashes
+  alias ThistleTea.Test.Unique
 
   setup [:creatures]
 
@@ -104,11 +105,11 @@ defmodule ThistleTea.Game.Core.Combat.OwnedCombatLeashTest do
   end
 
   defp creatures(_context) do
-    world = WorldRef.instance(0, System.unique_integer([:positive]))
+    world = WorldRef.instance(0, Unique.integer())
     owner = mob(world, 0.0)
     summon = mob(world, 10.0)
     summon = %{summon | unit: %{summon.unit | summoned_by: owner.object.guid}}
-    Entity.register(owner.object.guid)
+    {:ok, _} = Entity.register(owner.object.guid)
     World.update_position(owner)
     Metadata.put(owner.object.guid, %{incarnation_id: owner.internal.spawn.incarnation_id, alive?: true})
 
@@ -122,7 +123,7 @@ defmodule ThistleTea.Game.Core.Combat.OwnedCombatLeashTest do
   end
 
   defp mob(world, x) do
-    incarnation = System.unique_integer([:positive])
+    incarnation = Unique.integer()
 
     %Mob{
       object: %Object{guid: Guid.from_low_guid(:mob, 7, incarnation)},

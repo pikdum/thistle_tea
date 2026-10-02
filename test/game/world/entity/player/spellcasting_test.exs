@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellcastingTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   describe "charm_cast/2" do
     setup [:script_caster]
@@ -197,7 +198,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellcastingTest do
       spell: spell,
       entry: entry
     } do
-      guid = Guid.from_low_guid(:mob, 4952, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:mob, 4952, Unique.integer())
       Metadata.put(guid, %{alive?: true, shapeshift_form: 1})
       on_exit(fn -> Metadata.delete(guid) end)
 
@@ -219,7 +220,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellcastingTest do
     end
 
     test "any-unit casts receive template immunity from metadata", %{state: state, spell: spell, entry: entry} do
-      guid = Guid.from_low_guid(:mob, 4952, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:mob, 4952, Unique.integer())
       Metadata.put(guid, %{alive?: true, unit_flags: 0})
       on_exit(fn -> Metadata.delete(guid) end)
 
@@ -273,7 +274,7 @@ defmodule ThistleTea.Game.World.Entity.Player.SpellcastingTest do
   end
 
   defp script_caster(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
 
     character = %Character{
       object: %Object{guid: guid},

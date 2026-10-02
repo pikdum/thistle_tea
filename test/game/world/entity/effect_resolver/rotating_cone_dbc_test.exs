@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.RotatingConeDbcTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Spell.SpellTargetResolver
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -103,7 +104,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.RotatingConeDbcTest do
   end
 
   defp ring(_context) do
-    world = WorldRef.instance(0, System.unique_integer([:positive]))
+    world = WorldRef.instance(0, Unique.integer())
 
     caster =
       %Mob{
@@ -129,7 +130,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.RotatingConeDbcTest do
     }
   end
 
-  defp player_guid, do: Guid.from_low_guid(:player, System.unique_integer([:positive]))
+  defp player_guid, do: Guid.from_low_guid(:player, Unique.integer())
 
   defp publish(entity) do
     guid = entity.object.guid

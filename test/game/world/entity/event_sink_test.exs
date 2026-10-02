@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Instance.InstanceData
+  alias ThistleTea.Test.Unique
 
   defmodule UnsupportedEffect do
     @moduledoc false
@@ -49,7 +50,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       [owner, observer, other_world] = Enum.map(1..3, fn _ -> Guid.from_low_guid(:player, unique_guid()) end)
 
       for {guid, map} <- [{owner, 0}, {observer, 0}, {other_world, 1}] do
-        Entity.register(guid)
+        {:ok, _} = Entity.register(guid)
         SpatialHash.update(:players, guid, map, 0.0, 0.0, 0.0)
       end
 
@@ -82,7 +83,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
 
     test "controlled contact reaches the explicit player owner" do
       owner = unique_guid()
-      Entity.register(owner)
+      {:ok, _} = Entity.register(owner)
       pet = %Mob{object: %Object{guid: Guid.runtime(:pet, 7)}}
 
       contact = %Effects.ControlledCombatContact{
@@ -149,7 +150,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       refute_received {:"$gen_cast", {:add_combo_points, _award}}
       EventSink.emit(caster, award, Context.new(self()))
       assert_received {:"$gen_cast", {:add_combo_points, ^award}}
-      Entity.register(caster_guid)
+      {:ok, _} = Entity.register(caster_guid)
       on_exit(fn -> Entity.unregister(caster_guid) end)
       EventSink.emit(%Mob{object: %Object{guid: 99}}, award)
       assert_received {:"$gen_cast", {:add_combo_points, ^award}}
@@ -171,7 +172,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       other_world_guid = Guid.from_low_guid(:player, unique_guid())
 
       for {guid, map} <- [{owner_guid, 0}, {observer_guid, 0}, {other_world_guid, 1}] do
-        Entity.register(guid)
+        {:ok, _} = Entity.register(guid)
         SpatialHash.update(:players, guid, map, 0.0, 0.0, 0.0)
       end
 
@@ -213,7 +214,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       [owner, observer, other_world] = Enum.map(1..3, fn _ -> Guid.from_low_guid(:player, unique_guid()) end)
 
       for {guid, map} <- [{owner, 0}, {observer, 0}, {other_world, 1}] do
-        Entity.register(guid)
+        {:ok, _} = Entity.register(guid)
         SpatialHash.update(:players, guid, map, 0.0, 0.0, 0.0)
       end
 
@@ -268,7 +269,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
     test "proc damage resolves from the aura carrier and reaches only a live target" do
       carrier_guid = Guid.from_low_guid(:player, unique_guid())
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
-      Entity.register(target_guid)
+      {:ok, _} = Entity.register(target_guid)
       Metadata.put(target_guid, %{alive?: true, level: 60})
 
       on_exit(fn ->
@@ -308,7 +309,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
     test "spell feedback retains the resolved spell and emitting target's life, resource and class" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
-      Entity.register(caster_guid)
+      {:ok, _} = Entity.register(caster_guid)
       on_exit(fn -> Entity.unregister(caster_guid) end)
 
       target = %Mob{
@@ -354,7 +355,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       observer_guid = Guid.from_low_guid(:player, unique_guid())
 
       for guid <- [owner_guid, observer_guid] do
-        Entity.register(guid)
+        {:ok, _} = Entity.register(guid)
         SpatialHash.update(:players, guid, 0, 0.0, 0.0, 0.0)
       end
 
@@ -395,7 +396,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       observer_guid = Guid.from_low_guid(:player, unique_guid())
 
       for guid <- [owner_guid, observer_guid] do
-        Entity.register(guid)
+        {:ok, _} = Entity.register(guid)
         SpatialHash.update(:players, guid, 0, 0.0, 0.0, 0.0)
       end
 
@@ -454,7 +455,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       observer_guid = Guid.from_low_guid(:player, unique_guid())
 
       for guid <- [owner_guid, observer_guid] do
-        Entity.register(guid)
+        {:ok, _} = Entity.register(guid)
         SpatialHash.update(:players, guid, 0, 0.0, 0.0, 0.0)
       end
 
@@ -507,7 +508,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       observer_guid = Guid.from_low_guid(:player, unique_guid())
 
       for guid <- [owner_guid, observer_guid] do
-        Entity.register(guid)
+        {:ok, _} = Entity.register(guid)
         SpatialHash.update(:players, guid, 0, 0.0, 0.0, 0.0)
       end
 
@@ -540,8 +541,8 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
     test "movement speeds reach nearby observers without duplicating the owner's update" do
       owner_guid = Guid.from_low_guid(:player, unique_guid())
       observer_guid = Guid.from_low_guid(:player, unique_guid())
-      Entity.register(owner_guid)
-      Entity.register(observer_guid)
+      {:ok, _} = Entity.register(owner_guid)
+      {:ok, _} = Entity.register(observer_guid)
       SpatialHash.update(:players, owner_guid, 0, 0.0, 0.0, 0.0)
       SpatialHash.update(:players, observer_guid, 0, 1.0, 0.0, 0.0)
 
@@ -662,7 +663,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       targets = [Guid.from_low_guid(:player, unique_guid()), Guid.runtime(:pet, 1), Guid.runtime(:mob, 1)]
 
       for target_guid <- targets do
-        Entity.register(target_guid)
+        {:ok, _} = Entity.register(target_guid)
         assert ^mob = EventSink.emit(mob, Effects.threat_ref_gained(target_guid))
         assert_receive {:"$gen_cast", {:threat_ref_gained, ^mob_guid, 7}}
         assert ^mob = EventSink.emit(mob, Effects.threat_ref_lost(target_guid))
@@ -743,7 +744,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
     test "spell miss outcomes are delivered to the victim owner" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
-      Entity.register(target_guid)
+      {:ok, _} = Entity.register(target_guid)
 
       on_exit(fn -> Entity.unregister(target_guid) end)
 
@@ -760,7 +761,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
     test "a released judgement trigger delivers its encoded spell to the victim" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
-      Entity.register(target_guid)
+      {:ok, _} = Entity.register(target_guid)
 
       on_exit(fn -> Entity.unregister(target_guid) end)
 
@@ -787,7 +788,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
     @tag :dbc_db
     test "a custom trigger overrides the selected DBC effect points" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
-      Entity.register(caster_guid)
+      {:ok, _} = Entity.register(caster_guid)
       on_exit(fn -> Entity.unregister(caster_guid) end)
 
       caster = %Character{
@@ -809,7 +810,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
     @tag :dbc_db
     test "a resolved party trigger returns to the caster owner" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
-      Entity.register(caster_guid)
+      {:ok, _} = Entity.register(caster_guid)
       on_exit(fn -> Entity.unregister(caster_guid) end)
 
       caster = %Character{
@@ -830,7 +831,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
     test "a DBC area trigger resolves hostile targets around its source" do
       caster_guid = Guid.from_low_guid(:mob, 5879, unique_guid())
       target_guid = Guid.from_low_guid(:player, unique_guid())
-      Entity.register(target_guid)
+      {:ok, _} = Entity.register(target_guid)
       SpatialHash.update(:players, target_guid, 0, 3.0, 0.0, 0.0)
 
       player_faction = %FactionTemplate{
@@ -881,7 +882,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
     test "a remote command trigger stays targeted on the victim" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
-      Entity.register(target_guid)
+      {:ok, _} = Entity.register(target_guid)
 
       on_exit(fn -> Entity.unregister(target_guid) end)
 
@@ -911,7 +912,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
     test "a local command proc snapshots weapon damage" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
-      Entity.register(target_guid)
+      {:ok, _} = Entity.register(target_guid)
 
       on_exit(fn -> Entity.unregister(target_guid) end)
 
@@ -949,7 +950,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
     @tag :dbc_db
     test "a summon-pet event starts an owned pet with the requested health" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
-      Entity.register(caster_guid)
+      {:ok, _} = Entity.register(caster_guid)
 
       on_exit(fn -> Entity.unregister(caster_guid) end)
 
@@ -1011,8 +1012,8 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
 
     test "control transitions notify the controlling entity", %{mob: mob} do
       owner_guid = Guid.from_low_guid(:player, unique_guid())
-      Entity.register(owner_guid)
-      Entity.register(mob.object.guid)
+      {:ok, _} = Entity.register(owner_guid)
+      {:ok, _} = Entity.register(mob.object.guid)
 
       on_exit(fn ->
         Entity.unregister(owner_guid)
@@ -1041,7 +1042,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
     test "drop_nearby_threat reconciles mobs missing from player threat refs" do
       player_guid = Guid.from_low_guid(:player, unique_guid())
       mob_guid = Guid.from_low_guid(:mob, 1, unique_guid())
-      Entity.register(mob_guid)
+      {:ok, _} = Entity.register(mob_guid)
       SpatialHash.update(:mobs, mob_guid, 0, 10.0, 0.0, 0.0)
 
       on_exit(fn ->
@@ -1064,7 +1065,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       player_guid = Guid.from_low_guid(:player, unique_guid())
       mob_guid = Guid.from_low_guid(:mob, 1, unique_guid())
 
-      Entity.register(player_guid)
+      {:ok, _} = Entity.register(player_guid)
       SpatialHash.update(:players, player_guid, 0, 0.0, 0.0, 0.0)
 
       on_exit(fn ->
@@ -1098,7 +1099,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       player_guid = Guid.from_low_guid(:player, unique_guid())
       mob_guid = Guid.from_low_guid(:mob, 1, unique_guid())
 
-      Entity.register(player_guid)
+      {:ok, _} = Entity.register(player_guid)
       SpatialHash.update(:players, player_guid, 0, 0.0, 0.0, 0.0)
 
       on_exit(fn ->
@@ -1128,7 +1129,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
 
     test "periodic heals report a helpful periodic outcome to the caster", %{mob: mob, target_guid: target_guid} do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
-      Entity.register(caster_guid)
+      {:ok, _} = Entity.register(caster_guid)
 
       on_exit(fn -> Entity.unregister(caster_guid) end)
 
@@ -1150,7 +1151,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
   end
 
   defp instance_owner do
-    server = :"event_sink_instance_#{System.unique_integer([:positive])}"
+    server = :"event_sink_instance_#{Unique.integer()}"
     table = :ets.new(:event_sink_instance_data, [:set, :public, read_concurrency: true])
 
     start_supervised!(
@@ -1161,7 +1162,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
        owner: fn guid -> {:player, guid} end}
     )
 
-    guid = System.unique_integer([:positive])
+    guid = Unique.integer()
     {:ok, world} = InstanceSystem.enter(329, guid, server)
     {server, table, world}
   end
@@ -1182,7 +1183,7 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
   end
 
   defp unique_guid do
-    System.unique_integer([:positive, :monotonic])
+    Unique.integer()
   end
 
   defp character_with_pet do

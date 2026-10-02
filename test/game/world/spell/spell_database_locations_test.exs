@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.World.Spell.SpellDatabaseLocationsTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Spell.SpellLocations
   alias ThistleTea.Game.World.Spell.SpellRequirements
+  alias ThistleTea.Test.Unique
 
   setup [:caster, :position]
 
@@ -149,7 +150,7 @@ defmodule ThistleTea.Game.World.Spell.SpellDatabaseLocationsTest do
 
   defp caster(_context) do
     caster = %Character{
-      object: %Object{guid: System.unique_integer([:positive]) + 88_000_000},
+      object: %Object{guid: Unique.integer()},
       unit: %Unit{health: 100, max_health: 100, power1: 100, max_power1: 100, level: 60},
       player: %Player{},
       internal: %Internal{world: WorldRef.instance(999, 881)},
@@ -180,7 +181,7 @@ defmodule ThistleTea.Game.World.Spell.SpellDatabaseLocationsTest do
   end
 
   defp mob(caster, {x, y, z}) do
-    guid = Guid.from_low_guid(:unit, 100, System.unique_integer([:positive]))
+    guid = Guid.from_low_guid(:unit, 100, Unique.integer())
 
     mob = %Mob{
       object: %Object{guid: guid, entry: 100},
@@ -189,7 +190,7 @@ defmodule ThistleTea.Game.World.Spell.SpellDatabaseLocationsTest do
       movement_block: %MovementBlock{position: {x, y, z, 0.0}}
     }
 
-    Entity.register(guid)
+    {:ok, _} = Entity.register(guid)
     World.update_position(mob)
     Metadata.put(guid, %{entry: 100, alive?: true, level: 60, combat_reach: 0.0})
 

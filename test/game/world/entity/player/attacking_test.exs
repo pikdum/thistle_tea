@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AttackingTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   setup [:selected_target]
 
@@ -59,7 +60,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AttackingTest do
   end
 
   defp selected_target(_context) do
-    guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+    guid = Guid.from_low_guid(:player, Unique.integer())
     target_guid = Guid.runtime(:mob, 1)
     alliance = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
 

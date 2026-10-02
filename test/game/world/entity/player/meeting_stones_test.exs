@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MeetingStonesTest do
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Test.Unique
 
   @entry 950_270
 
@@ -102,7 +103,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MeetingStonesTest do
   defp players(_context) do
     states =
       Enum.map([1, 5, 8, 4, 3], fn class ->
-        guid = System.unique_integer([:positive, :monotonic])
+        guid = Unique.integer()
 
         character = %Character{
           id: guid,

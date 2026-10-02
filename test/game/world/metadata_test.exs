@@ -2,9 +2,10 @@ defmodule ThistleTea.Game.World.MetadataTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   setup do
-    table = Metadata.init(:"metadata_test_#{System.unique_integer([:positive])}")
+    table = Metadata.init(:"metadata_test_#{Unique.integer()}")
 
     on_exit(fn ->
       if is_atom(table) and :ets.whereis(table) != :undefined do
@@ -17,14 +18,14 @@ defmodule ThistleTea.Game.World.MetadataTest do
 
   describe "init/1" do
     test "creates a named table" do
-      table = :"metadata_init_test_#{System.unique_integer([:positive])}"
+      table = :"metadata_init_test_#{Unique.integer()}"
       assert Metadata.init(table) == table
       assert :ets.whereis(table) != :undefined
       :ets.delete(table)
     end
 
     test "creates a read and write concurrent table" do
-      table = :"metadata_options_test_#{System.unique_integer([:positive])}"
+      table = :"metadata_options_test_#{Unique.integer()}"
       Metadata.init(table)
 
       assert :ets.info(table, :read_concurrency) == true

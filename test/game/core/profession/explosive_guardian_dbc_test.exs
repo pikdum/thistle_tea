@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Core.Profession.ExplosiveGuardianDbcTest do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
   @spells [3617, 4050, 4051, 13_259, 13_260, 13_261]
@@ -141,7 +142,7 @@ defmodule ThistleTea.Game.Core.Profession.ExplosiveGuardianDbcTest do
   end
 
   defp entity(x, faction, spells) do
-    guid = Guid.from_low_guid(:mob, 2675, rem(System.unique_integer([:positive]), 0xFFFFFF))
+    guid = Guid.from_low_guid(:mob, 2675, Unique.integer())
     world = WorldRef.open(998)
     SpatialHash.update(:mobs, guid, world, x, 0.0, 0.0)
 

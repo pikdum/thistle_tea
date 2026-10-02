@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.Player.FishingMapsTest do
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Player.Fishing
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
+  alias ThistleTea.Test.Unique
 
   @moduletag :namigator_maps
   @bobber_entry 35_591
@@ -75,7 +76,7 @@ defmodule ThistleTea.Game.World.Entity.Player.FishingMapsTest do
   end
 
   defp caster(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
     {:ok, _} = Entity.register(guid)
     on_exit(fn -> Entity.unregister(guid) end)
 

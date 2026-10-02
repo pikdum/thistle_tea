@@ -4,6 +4,7 @@ defmodule ThistleTea.AuthTest do
   alias ThistleTea.Auth
   alias ThistleTea.Auth.Account
   alias ThistleTea.Auth.SessionKey
+  alias ThistleTea.Test.Unique
   alias ThousandIsland.Socket
   alias ThousandIsland.Telemetry
 
@@ -57,7 +58,7 @@ defmodule ThistleTea.AuthTest do
   end
 
   defp connection(_context) do
-    username = "AUTH_TEST_#{System.unique_integer([:positive])}"
+    username = "AUTH_TEST_#{Unique.integer()}"
 
     on_exit(fn ->
       :ets.delete(Account, username)

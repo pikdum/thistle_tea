@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Test.Unique
 
   describe "hostile?/2" do
     test "uses faction template enemy masks" do
@@ -403,8 +404,8 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
   end
 
   defp start_duel do
-    caster_low = System.unique_integer([:positive])
-    target_low = System.unique_integer([:positive])
+    caster_low = Unique.integer()
+    target_low = Unique.integer()
     caster = player(alliance(), caster_low)
     target_guid = Guid.from_low_guid(:player, target_low)
     caster = Map.merge(caster, %{duel_opponent_guid: target_guid, duel_started?: true})
@@ -423,7 +424,7 @@ defmodule ThistleTea.Game.Core.Combat.HostilityTest do
 
   defp mob(faction_template, opts \\ []) do
     %{
-      guid: Guid.from_low_guid(:mob, faction_template.id || 1, System.unique_integer([:positive])),
+      guid: Guid.from_low_guid(:mob, faction_template.id || 1, Unique.integer()),
       faction_template: faction_template,
       faction_can_have_reputation?: Keyword.get(opts, :faction_can_have_reputation?, false),
       unit_flags: 0,

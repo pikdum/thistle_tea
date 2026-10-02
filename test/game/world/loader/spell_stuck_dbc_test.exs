@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Loader.SpellStuckDbcTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Spell.SpellTargetResolver
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -46,7 +47,7 @@ defmodule ThistleTea.Game.World.Loader.SpellStuckDbcTest do
     end
 
     test ".start begins the unlearned recovery spell" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      guid = Guid.from_low_guid(:player, Unique.integer())
 
       character = %Character{
         object: %Object{guid: guid},

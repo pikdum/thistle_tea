@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.World.Entity.Player.LogoutTest do
   alias ThistleTea.Game.World.Entity.Player.Logout
   alias ThistleTea.Game.World.Entity.Player.Movement
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Test.Unique
 
   setup [:player_state]
 
@@ -166,7 +167,7 @@ defmodule ThistleTea.Game.World.Entity.Player.LogoutTest do
   end
 
   defp player_state(_context) do
-    guid = System.unique_integer([:positive])
+    guid = Unique.integer()
 
     character = %Character{
       object: %Object{guid: guid},

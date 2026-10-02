@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentsTest do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellPetAura
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -27,7 +28,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentsTest do
   @spirit_bond_rank_two_aura 24_529
 
   setup do
-    talent_id = System.unique_integer([:positive, :monotonic])
+    talent_id = Unique.integer()
     spell_id = talent_id + 100_000
     rank_two_spell_id = spell_id + 1
     dependent_spell_id = rank_two_spell_id + 1
@@ -82,7 +83,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentsTest do
     end
 
     test "replaces a superseded talent's pet aura link", context do
-      pet_guid = Guid.from_low_guid(:pet, 1, System.unique_integer([:positive, :monotonic]))
+      pet_guid = Guid.from_low_guid(:pet, 1, Unique.integer())
       {:ok, _owner} = Entity.register(pet_guid)
       on_exit(fn -> Entity.unregister(pet_guid) end)
 
@@ -132,7 +133,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentsTest do
   end
 
   defp state_with_spell(spell_id, level) do
-    id = System.unique_integer([:positive, :monotonic])
+    id = Unique.integer()
 
     character = %Character{
       id: id,
@@ -151,7 +152,7 @@ defmodule ThistleTea.Game.World.Entity.Player.TalentsTest do
   end
 
   defp state_without_spells do
-    id = System.unique_integer([:positive, :monotonic])
+    id = Unique.integer()
 
     character = %Character{
       id: id,

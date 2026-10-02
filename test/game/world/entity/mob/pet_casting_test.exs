@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetCastingTest do
   alias ThistleTea.Game.World.Entity.Mob.PetCasting
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   setup [:build_pet]
 
@@ -107,10 +108,10 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetCastingTest do
   end
 
   defp build_pet(_context) do
-    owner = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-    guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+    owner = Guid.from_low_guid(:player, Unique.integer())
+    guid = Guid.from_low_guid(:mob, 1, Unique.integer())
     world = WorldRef.open(0)
-    Entity.register(owner)
+    {:ok, _} = Entity.register(owner)
     Metadata.put(owner, %{alive?: true, controlled_guid: guid})
     SpatialHash.update(:players, owner, world, 0.0, 0.0, 0.0)
 

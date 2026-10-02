@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.SharedSpellDamageTest do
   alias ThistleTea.Game.World.Entity.EffectResolver.Spells
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   setup [:entities]
 
@@ -188,7 +189,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.SharedSpellDamageTest do
   end
 
   defp entities(_context) do
-    world = WorldRef.instance(0, System.unique_integer([:positive]))
+    world = WorldRef.instance(0, Unique.integer())
 
     spell =
       Semantics.compile(%Spell{
@@ -210,7 +211,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.SharedSpellDamageTest do
       })
 
     caster = %Mob{
-      object: %Object{guid: Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))},
+      object: %Object{guid: Guid.from_low_guid(:mob, 1, Unique.integer())},
       unit: %Unit{level: 60, health: 10_000, max_health: 10_000, faction_template: 17, auras: []},
       internal: %Internal{world: world, spellbook: %{spell.id => spell}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
@@ -221,7 +222,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.SharedSpellDamageTest do
     targets =
       for x <- [1.0, 2.0, 3.0] do
         target = %Character{
-          object: %Object{guid: Guid.from_low_guid(:player, System.unique_integer([:positive]))},
+          object: %Object{guid: Guid.from_low_guid(:player, Unique.integer())},
           unit: %Unit{level: 60, health: 10_000, max_health: 10_000, faction_template: 1, auras: []},
           internal: %Internal{world: world},
           movement_block: %MovementBlock{position: {x, 0.0, 0.0, 0.0}}

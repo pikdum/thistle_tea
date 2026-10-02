@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.System.InstanceMembershipTest do
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.System.Instance
   alias ThistleTea.Game.World.System.Party
+  alias ThistleTea.Test.Unique
 
   setup [:build_members]
 
@@ -53,9 +54,9 @@ defmodule ThistleTea.Game.World.System.InstanceMembershipTest do
   defp build_members(_context) do
     map = 900_003
     :ets.insert(MapTemplate, {map, 1, nil})
-    guids = Enum.map(1..3, fn _ -> System.unique_integer([:positive]) + 10_000_000 end)
+    guids = Enum.map(1..3, fn _ -> Unique.integer() end)
     [_leader, member, _third] = guids
-    Entity.register(member)
+    {:ok, _} = Entity.register(member)
     on_exit(fn -> cleanup_members(guids, map) end)
     %{map: map, guids: guids}
   end

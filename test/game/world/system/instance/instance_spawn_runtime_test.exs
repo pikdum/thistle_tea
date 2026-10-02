@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceSpawnRuntimeTest do
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.SpawnPool
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
 
@@ -24,8 +25,8 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceSpawnRuntimeTest do
     end
 
     test "materializes disjoint RFC spawns in copies of the same cell" do
-      first_world = WorldRef.instance(389, System.unique_integer([:positive]))
-      second_world = WorldRef.instance(389, System.unique_integer([:positive]))
+      first_world = WorldRef.instance(389, Unique.integer())
+      second_world = WorldRef.instance(389, Unique.integer())
       position = {-45.0298, -27.7645, -21.2917}
       first_cell = SpatialHash.cell(first_world, elem(position, 0), elem(position, 1), elem(position, 2))
       second_cell = put_elem(first_cell, 0, second_world)

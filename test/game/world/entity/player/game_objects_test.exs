@@ -20,15 +20,16 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectsTest do
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Test.Unique
 
   describe "open_object/2" do
     test "routes an open-lock completion through ordinary door use" do
-      entry = System.unique_integer([:positive])
-      guid = Guid.from_low_guid(:game_object, entry, System.unique_integer([:positive]))
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      entry = Unique.integer()
+      guid = Guid.from_low_guid(:game_object, entry, Unique.integer())
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
       template = %GameObjectTemplate{entry: entry, type: 0, size: 1.0, data: [0, 0]}
       :ets.insert(GameObjectTemplateLoader, {entry, template})
-      Entity.register(player_guid)
+      {:ok, _} = Entity.register(player_guid)
 
       owner = start_game_object_owner(guid)
 
@@ -53,12 +54,12 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectsTest do
 
   describe "use_object/2" do
     test "sits the player in the seat returned by a chair game object" do
-      entry = System.unique_integer([:positive])
-      guid = Guid.from_low_guid(:game_object, entry, System.unique_integer([:positive]))
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      entry = Unique.integer()
+      guid = Guid.from_low_guid(:game_object, entry, Unique.integer())
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
       template = %GameObjectTemplate{entry: entry, type: 7, size: 1.0, data: [1, 1]}
       :ets.insert(GameObjectTemplateLoader, {entry, template})
-      Entity.register(player_guid)
+      {:ok, _} = Entity.register(player_guid)
 
       owner = start_chair_owner(guid, {:ok, {1.0, 2.0, 3.0, 1.5}, 5})
 
@@ -86,7 +87,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectsTest do
   describe "interactable?/2" do
     test "base and dropped flags require a nearby living player in the same world" do
       for type <- [24, 26] do
-        entry = System.unique_integer([:positive])
+        entry = Unique.integer()
         template = %GameObjectTemplate{entry: entry, type: type, size: 1.0, flags: 0}
         GameObjectTemplateLoader.put(template)
         world = WorldRef.instance(489, entry)
@@ -128,7 +129,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectsTest do
     end
 
     test "spellcasting objects require a living nearby player and a nonhostile faction" do
-      entry = System.unique_integer([:positive])
+      entry = Unique.integer()
       template = %GameObjectTemplate{entry: entry, type: 22, size: 1.0, flags: 0, data: [30_238]}
       GameObjectTemplateLoader.put(template)
       object = GameObject.build_summoned(template, WorldRef.open(0), {0.0, 0.0, 0.0, 0.0})
@@ -151,7 +152,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectsTest do
       })
 
       character = %Character{
-        object: %Object{guid: System.unique_integer([:positive])},
+        object: %Object{guid: Unique.integer()},
         player: %Player{},
         unit: %Unit{health: 100, max_health: 100, faction_template: entry},
         internal: %Internal{world: WorldRef.open(0)},

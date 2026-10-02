@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetDiscoveryTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.PetSpells
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Test.Unique
 
   setup [:build_owner]
 
@@ -71,7 +72,7 @@ defmodule ThistleTea.Game.World.Entity.Player.PetDiscoveryTest do
   end
 
   defp build_owner(_context) do
-    guid = System.unique_integer([:positive]) + 10_000_000
+    guid = Unique.integer()
     on_exit(fn -> :ets.delete(CharacterStore, guid) end)
     pet = Guid.runtime(:pet, 113)
 

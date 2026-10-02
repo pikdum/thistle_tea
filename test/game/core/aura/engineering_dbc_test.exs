@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Core.Aura.EngineeringDbcTest do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Spell.SpellTargetResolver
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
   @spells [13_120, 13_099, 16_566, 13_119, 13_139, 13_138]
@@ -124,8 +125,8 @@ defmodule ThistleTea.Game.Core.Aura.EngineeringDbcTest do
   end
 
   defp entities(_context) do
-    target_guid = Guid.from_low_guid(:mob, System.unique_integer([:positive]), 1)
-    caster_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+    target_guid = Guid.from_low_guid(:mob, Unique.integer(), 1)
+    caster_guid = Guid.from_low_guid(:player, Unique.integer())
     spells = Map.new(@spells, &{&1, SpellLoader.load(&1)})
     unit = %Unit{health: 1_000, max_health: 1_000, level: 60, auras: [], target: target_guid}
     internal = %Internal{world: WorldRef.open(0), spellbook: spells}

@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.ConditionalTriggersDbcTest
   alias ThistleTea.Game.World.Loader.SpellScriptName
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   @moduletag :dbc_db
   @spells [6410, 6411, 15_712, 15_752, 15_753]
@@ -111,7 +112,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.ConditionalTriggersDbcTest
   end
 
   defp entities(_context) do
-    world = WorldRef.instance(0, System.unique_integer([:positive]))
+    world = WorldRef.instance(0, Unique.integer())
     spells = Map.new(@spells, &{&1, SpellLoader.load(&1)})
 
     unit =
@@ -131,7 +132,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.ConditionalTriggersDbcTest
 
     characters =
       for _ <- 1..2 do
-        guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+        guid = Guid.from_low_guid(:player, Unique.integer())
 
         character = %Character{
           object: %Object{guid: guid},

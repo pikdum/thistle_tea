@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Inbound.CmsgBuyItemReputationTest do
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   describe "handle/2" do
     test "rejects purchases below the item's required reputation rank" do
@@ -34,7 +35,7 @@ defmodule ThistleTea.Game.Inbound.CmsgBuyItemReputationTest do
       catalog = %Catalog{factions: %{529 => definition}}
       ReputationLoader.put_catalog(catalog)
 
-      vendor_entry = System.unique_integer([:positive, :monotonic])
+      vendor_entry = Unique.integer()
       vendor_guid = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
       publish_vendor(vendor_guid)
 
@@ -80,10 +81,10 @@ defmodule ThistleTea.Game.Inbound.CmsgBuyItemReputationTest do
       catalog = %Catalog{factions: %{72 => definition}}
       ReputationLoader.put_catalog(catalog)
 
-      vendor_entry = System.unique_integer([:positive, :monotonic])
+      vendor_entry = Unique.integer()
       vendor_guid = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
       publish_vendor(vendor_guid)
-      player_id = System.unique_integer([:positive, :monotonic])
+      player_id = Unique.integer()
       player_guid = Guid.from_low_guid(:player, player_id)
       template = %ItemTemplate{entry: 1_235, buy_price: 25, stackable: 20}
 

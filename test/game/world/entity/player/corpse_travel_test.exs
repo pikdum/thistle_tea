@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.Player.CorpseTravelTest do
   alias ThistleTea.Game.World.Loader.AreaTrigger
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.System.Instance
+  alias ThistleTea.Test.Unique
 
   @dungeon 900_021
   @parent 900_022
@@ -153,7 +154,7 @@ defmodule ThistleTea.Game.World.Entity.Player.CorpseTravelTest do
       {{:teleport, @trigger}, teleport}
     ])
 
-    guid = System.unique_integer([:positive]) + 30_000_000
+    guid = Unique.integer()
 
     character = %Character{
       object: %Object{guid: guid},

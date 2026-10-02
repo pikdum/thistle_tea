@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemTransformationTest do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Test.Unique
 
   @entry 998_310
   @spell 998_311
@@ -123,7 +124,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemTransformationTest do
   end
 
   defp inventory(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
 
     source = %ItemTemplate{
       entry: @entry + 10,

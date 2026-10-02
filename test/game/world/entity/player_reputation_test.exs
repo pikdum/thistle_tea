@@ -14,11 +14,12 @@ defmodule ThistleTea.Game.World.Entity.PlayerReputationTest do
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   describe "threat_ref_gained" do
     test "marks the attacking mob faction temporarily at war" do
-      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
-      mob_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive, :monotonic]))
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      mob_guid = Guid.from_low_guid(:mob, 1, Unique.integer())
 
       Metadata.put(mob_guid, %{
         alive?: true,

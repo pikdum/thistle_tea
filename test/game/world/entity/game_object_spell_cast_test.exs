@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSpellCastTest do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Reaction
+  alias ThistleTea.Test.Unique
 
   setup [:object]
 
@@ -244,7 +245,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSpellCastTest do
   end
 
   defp mob(object, entry, x) do
-    guid = Guid.from_low_guid(:unit, entry, rem(System.unique_integer([:positive]), 1_000_000) + 8_000_000)
+    guid = Guid.from_low_guid(:unit, entry, Unique.integer())
 
     publish(%Mob{
       object: %Object{guid: guid, entry: entry},
@@ -256,7 +257,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSpellCastTest do
 
   defp player(object, x) do
     publish(%Character{
-      object: %Object{guid: Guid.from_low_guid(:player, System.unique_integer([:positive]) + 87_000_000)},
+      object: %Object{guid: Guid.from_low_guid(:player, Unique.integer())},
       unit: %Unit{health: 20, max_health: 100, level: 60},
       internal: %Internal{world: object.internal.world},
       movement_block: %MovementBlock{position: {x, 0.0, 0.0, 0.0}}
@@ -265,7 +266,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSpellCastTest do
 
   defp publish(entity) do
     guid = entity.object.guid
-    Entity.register(guid)
+    {:ok, _} = Entity.register(guid)
     World.update_position(entity)
     Metadata.put(guid, %{entry: entity.object.entry, alive?: true, level: 60, combat_reach: 0.0})
 

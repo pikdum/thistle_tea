@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.SpatialHashTest do
 
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Test.Unique
 
   describe "setup_tables/0" do
     test "creates read and write concurrent lookup tables" do
@@ -32,11 +33,11 @@ defmodule ThistleTea.Game.World.SpatialHashTest do
 
   describe "query/6" do
     test "uses 2d cells and keeps 3d distance filtering" do
-      table = :"spatial_hash_test_#{System.unique_integer([:positive])}"
+      table = :"spatial_hash_test_#{Unique.integer()}"
       :ets.new(table, [:named_table, :public, :duplicate_bag])
 
-      near_guid = System.unique_integer([:positive])
-      high_guid = System.unique_integer([:positive])
+      near_guid = Unique.integer()
+      high_guid = Unique.integer()
 
       try do
         SpatialHash.insert(table, near_guid, 0, 0, 0, 0)
@@ -55,8 +56,8 @@ defmodule ThistleTea.Game.World.SpatialHashTest do
       table = :spatial_hash_world_isolation_test
       :ets.new(table, [:named_table, :public, :duplicate_bag])
 
-      first_guid = System.unique_integer([:positive])
-      second_guid = System.unique_integer([:positive])
+      first_guid = Unique.integer()
+      second_guid = Unique.integer()
       first_world = WorldRef.instance(389, 1)
       second_world = WorldRef.instance(389, 2)
 

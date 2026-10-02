@@ -16,11 +16,12 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
   alias ThistleTea.Game.World.Topics
+  alias ThistleTea.Test.Unique
 
   setup do
     :sys.replace_state(ScriptedEventSystem, fn _events -> %{} end)
 
-    id = System.unique_integer([:positive, :monotonic])
+    id = Unique.integer()
     source_guid = Guid.from_low_guid(:mob, 7_784, id)
     target_guid = Guid.from_low_guid(:player, id)
     extra_guid = Guid.from_low_guid(:mob, 4_236, id + 1)
@@ -120,7 +121,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
     start = %ScriptStep{command: :start_map_event, datalong: 5_713, datalong2: 600}
     command(context, start)
 
-    game_object_guid = Guid.from_low_guid(:game_object, 21_145, System.unique_integer([:positive]))
+    game_object_guid = Guid.from_low_guid(:game_object, 21_145, Unique.integer())
     SpatialHash.update(:game_objects, game_object_guid, context.world, 12.0, 0.0, 0.0)
 
     on_exit(fn -> SpatialHash.remove(:game_objects, game_object_guid) end)
@@ -198,7 +199,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
   end
 
   test "object-fit conditions evaluate the referenced game-object snapshot", context do
-    db_guid = System.unique_integer([:positive, :monotonic])
+    db_guid = Unique.integer()
     game_object_guid = Guid.from_low_guid(:game_object, 21_145, db_guid)
 
     Metadata.put(game_object_guid, %{db_guid: db_guid, go_spawned?: true, go_state: 0})
@@ -236,7 +237,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
   end
 
   test "object-fit conditions isolate copies and entity types sharing a database id", context do
-    db_guid = System.unique_integer([:positive, :monotonic])
+    db_guid = Unique.integer()
     first = Guid.from_low_guid(:game_object, 21_145, db_guid)
     second = Guid.from_low_guid(:game_object, 21_145, db_guid + 1)
     creature = Guid.from_low_guid(:mob, 21_145, db_guid)
@@ -323,7 +324,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
   end
 
   test "target results resolve creature database guids within one copy", context do
-    db_guid = System.unique_integer([:positive, :monotonic])
+    db_guid = Unique.integer()
     other_world = WorldRef.instance(context.world.map_id, 2)
     current_guid = Guid.runtime(:mob, 10_917)
     other_guid = Guid.runtime(:mob, 10_917)
@@ -443,7 +444,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
 
   describe "command_result/1" do
     test "global writes need no map event and expired requests cannot overwrite them", context do
-      index = System.unique_integer([:positive, :monotonic])
+      index = Unique.integer()
       on_exit(fn -> :ets.delete(ServerVariables, index) end)
       step = %ScriptStep{command: :set_server_variable, datalong: index, datalong2: 6}
       effect = Effects.scripted_event_command(context.world, context.source_guid, 0, step)

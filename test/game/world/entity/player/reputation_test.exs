@@ -25,10 +25,11 @@ defmodule ThistleTea.Game.World.Entity.Player.ReputationTest do
   alias ThistleTea.Game.World.Entity.Player.Reputation
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   setup do
     previous_catalog = ReputationLoader.catalog()
-    id = System.unique_integer([:positive, :monotonic])
+    id = Unique.integer()
 
     on_exit(fn ->
       ReputationLoader.put_catalog(previous_catalog)
@@ -367,7 +368,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ReputationTest do
   end
 
   defp vendor_guid(faction_id) do
-    guid = Guid.from_low_guid(:mob, faction_id, System.unique_integer([:positive, :monotonic]))
+    guid = Guid.from_low_guid(:mob, faction_id, Unique.integer())
     Metadata.put(guid, %{faction_template: %FactionTemplate{faction: faction_id}})
     on_exit(fn -> Metadata.delete(guid) end)
     guid

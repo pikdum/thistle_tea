@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.PocketsTest do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   @loot_id 999_451
   @item 999_452
@@ -143,7 +144,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.PocketsTest do
           do: %{item: id, chance: chance, groupid: 0, mincount_or_ref: 1, maxcount: 1}
 
     :ets.insert(LootLoader, {{:pickpocket, @loot_id}, rows})
-    guid = Guid.from_low_guid(:mob, 299, System.unique_integer([:positive, :monotonic]))
+    guid = Guid.from_low_guid(:mob, 299, Unique.integer())
     actor = %Actor{guid: 41, group_id: 1, needed_items: MapSet.new([@quest_item]), distance: 2.0}
 
     mob = %Mob{

@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.Loader.FishingIntegrationTest do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Loot
   alias ThistleTea.Game.World.Loader.Trainer, as: TrainerLoader
+  alias ThistleTea.Test.Unique
 
   describe "base_skill/2" do
     @describetag :vmangos_db
@@ -61,7 +62,7 @@ defmodule ThistleTea.Game.World.Loader.FishingIntegrationTest do
   end
 
   defp observe_queries(_context) do
-    handler_id = "fishing-queries-#{System.unique_integer([:positive])}"
+    handler_id = "fishing-queries-#{Unique.integer()}"
     test_pid = self()
 
     :ok =

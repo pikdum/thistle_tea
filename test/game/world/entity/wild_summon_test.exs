@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.World.Entity.WildSummonTest do
   alias ThistleTea.Game.World.Loader.WildSummon
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Test.FactionFixtures
+  alias ThistleTea.Test.Unique
 
   @entries [990_211, 990_212, 2673, 2674, 12_426]
 
@@ -84,8 +85,8 @@ defmodule ThistleTea.Game.World.Entity.WildSummonTest do
 
   describe "EventSink.emit/3" do
     test "possessed spell summons retain separate owners without script proximity limits", %{caster: caster} do
-      second_guid = System.unique_integer([:positive]) + 22_000_000
-      Entity.register(second_guid)
+      second_guid = Unique.integer()
+      {:ok, _} = Entity.register(second_guid)
       second = %{caster | object: %Object{guid: second_guid}}
 
       spell = %Spell{
@@ -168,8 +169,8 @@ defmodule ThistleTea.Game.World.Entity.WildSummonTest do
   end
 
   defp caster(_context) do
-    guid = System.unique_integer([:positive]) + 21_000_000
-    Entity.register(guid)
+    guid = Unique.integer()
+    {:ok, _} = Entity.register(guid)
 
     caster = %Character{
       object: %Object{guid: guid},

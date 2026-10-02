@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.RespawnTest do
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Mob.Respawn
   alias ThistleTea.Game.World.System.CombatLeashes
+  alias ThistleTea.Test.Unique
 
   describe "schedule/1" do
     test "starts the respawn timer and stores the ref" do
@@ -89,8 +90,8 @@ defmodule ThistleTea.Game.World.Entity.Mob.RespawnTest do
   describe "despawn/2" do
     test "ends the engagement and releases its shared clock before hiding the corpse" do
       mob = fixture_mob(health: 10)
-      guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
-      Entity.register(guid)
+      guid = Guid.from_low_guid(:mob, 1, Unique.integer())
+      {:ok, _} = Entity.register(guid)
       on_exit(fn -> Entity.unregister(guid) end)
       mob = %{mob | object: %{mob.object | guid: guid}}
       %{entity: mob} = Engagement.enter(mob, 20, 1_000, selection: :target)

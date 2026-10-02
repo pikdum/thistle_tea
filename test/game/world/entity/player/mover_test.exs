@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MoverTest do
   alias ThistleTea.Game.World.Entity.Player.Mover
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Test.Unique
 
   setup [:player]
 
@@ -97,7 +98,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MoverTest do
     end
 
     test "routes a released remote mover once and never relocates the caster", %{state: state, other: other} do
-      Entity.register(other)
+      {:ok, _} = Entity.register(other)
       state = %{state | client_mover_guid: other}
       payload = payload(state, 1.0)
       released = Mover.release(state, other, payload)
@@ -153,11 +154,11 @@ defmodule ThistleTea.Game.World.Entity.Player.MoverTest do
   defp cancel_tick(_state), do: :ok
 
   defp player(_context) do
-    guid = System.unique_integer([:positive, :monotonic])
-    other = System.unique_integer([:positive, :monotonic])
+    guid = Unique.integer()
+    other = Unique.integer()
     world = WorldRef.instance(451, guid)
     position = {0.0, 0.0, 0.0, 0.0}
-    Entity.register(guid)
+    {:ok, _} = Entity.register(guid)
 
     character = %Character{
       object: %Object{guid: guid},

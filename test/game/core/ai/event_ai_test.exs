@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Core.AI.EventAITest do
   alias ThistleTea.Game.Core.Pet.SummonEvent
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Test.Unique
 
   @talk_step %ScriptStep{command: :talk, texts: [%{text: "!", chat_type: :say, language: 0, emote_id: 0}]}
 
@@ -657,7 +658,7 @@ defmodule ThistleTea.Game.Core.AI.EventAITest do
 
   defp event(event_type, opts \\ []) do
     %AIEvent{
-      id: System.unique_integer([:positive]),
+      id: Unique.integer(),
       event_type: event_type,
       chance: 100,
       repeatable?: Keyword.get(opts, :repeatable?, false),
