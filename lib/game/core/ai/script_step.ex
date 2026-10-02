@@ -5,7 +5,9 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   format): a command with its raw params, decoded target selector and general
   flags, and — for talk steps — the broadcast texts resolved at load time.
   Unsupported commands keep their numeric id as `{:unsupported, id}` so the
-  interpreter can log and skip them.
+  interpreter can log and skip them. Code-built summons may list `positions`
+  instead of one `position`, and the interpreter picks a random one that no
+  living creature stands on.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -33,6 +35,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
             equipment_items: [],
             creature_spell_lists: %{},
             position: nil,
+            positions: [],
             condition_id: 0,
             condition: nil,
             success_condition: nil,

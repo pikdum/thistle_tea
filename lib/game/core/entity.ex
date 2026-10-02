@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.Core.Entity do
   @moduledoc """
   Entity operations generic across all entity types: building update-object
-  payloads, taking damage and dying, healing, mana restoration, and combat
-  tether-range checks for mobs.
+  payloads, taking damage and dying, healing, scripted health changes for
+  creatures, mana restoration, and combat tether-range checks for mobs.
   """
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Chat.Emote
@@ -65,6 +65,36 @@ defmodule ThistleTea.Game.Core.Entity do
       |> prepare_death_state(now)
       |> mark_broadcast_update()
     end
+  end
+
+  def set_health_pct(%Mob{unit: %Unit{max_health: max_health} = unit} = entity, pct)
+      when is_integer(max_health) and max_health > 0 and is_integer(pct) and pct in 1..100 do
+    if dead?(entity) do
+      entity
+    else
+      %{entity | unit: %{unit | health: max(div(max_health * pct, 100), 1)}}
+      |> sync_health()
+      |> mark_broadcast_update()
+    end
+  end
+
+  def set_health_pct(entity, _pct), do: entity
+
+  def lose_health(%Mob{unit: %Unit{health: health} = unit} = entity, amount, now)
+      when is_integer(health) and is_integer(amount) and amount > 0 and is_integer(now) do
+    cond do
+      dead?(entity) -> entity
+      health > amount + 1 -> drain(entity, unit, health - amount)
+      true -> kill(entity, now)
+    end
+  end
+
+  def lose_health(entity, _amount, _now), do: entity
+
+  defp drain(entity, unit, health) do
+    %{entity | unit: %{unit | health: health}}
+    |> sync_health()
+    |> mark_broadcast_update()
   end
 
   def take_damage_with_absorb(entity, damage, now, opts \\ []) do

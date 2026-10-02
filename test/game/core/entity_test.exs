@@ -14,11 +14,13 @@ defmodule ThistleTea.Game.Core.EntityTest do
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Pet.Companion.EntityRef
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Test.Unique
 
   describe "heal/2" do
     test "restores health up to max health" do
@@ -34,6 +36,43 @@ defmodule ThistleTea.Game.Core.EntityTest do
       entity = entity(health: 40, max_health: 100)
 
       assert Entity.heal(entity, 0) == entity
+    end
+  end
+
+  describe "set_health_pct/2" do
+    test "sets a creature's health to a share of its maximum" do
+      mob = scripted_mob(health: 90, max_health: 200)
+
+      mob = Entity.set_health_pct(mob, 25)
+
+      assert mob.unit.health == 50
+      assert mob.internal.broadcast_update? == true
+    end
+
+    test "leaves a dead creature dead" do
+      mob = scripted_mob(health: 0, max_health: 200)
+
+      assert Entity.set_health_pct(mob, 50) == mob
+    end
+  end
+
+  describe "lose_health/3" do
+    test "drains health without killing above the last point" do
+      mob = scripted_mob(health: 52, max_health: 200)
+
+      mob = Entity.lose_health(mob, 50, 0)
+
+      assert mob.unit.health == 2
+      assert mob.internal.killed_by == nil
+    end
+
+    test "kills a creature with no attacker once the drain reaches its last point" do
+      mob = scripted_mob(health: 51, max_health: 200)
+
+      mob = Entity.lose_health(mob, 50, 0)
+
+      assert mob.unit.health == 0
+      assert mob.internal.killed_by == mob.object.guid
     end
   end
 
@@ -485,6 +524,17 @@ defmodule ThistleTea.Game.Core.EntityTest do
       player: %Player{},
       internal: %Internal{in_combat: true},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, spline_nodes: []}
+    }
+  end
+
+  defp scripted_mob(opts) do
+    entity = entity(opts)
+
+    %Mob{
+      object: %Object{guid: Guid.from_low_guid(:mob, 12_937, Unique.integer()), entry: 12_937},
+      unit: entity.unit,
+      internal: entity.internal,
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
   end
 

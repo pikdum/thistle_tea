@@ -22,6 +22,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Auth.SessionKey
   alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos.Repo
+  alias ThistleTea.Game.Core.AI.CreatureScript
   alias ThistleTea.Game.Core.Creature.GuardPost
   alias ThistleTea.Game.Core.InstanceScript
   alias ThistleTea.Game.Core.OutdoorPvp.Plaguelands
@@ -338,6 +339,7 @@ defmodule ThistleTea.Application do
         Logger.info("Loading quests...")
         QuestLoader.load_all()
         QuestEscortLoader.load_all()
+        QuestLoader.append_start_steps(CreatureScript.quest_start_steps())
         QuestGreetingLoader.load_all()
         Logger.info("Loading reputation...")
         ReputationLoader.load_all()
@@ -365,7 +367,8 @@ defmodule ThistleTea.Application do
           InstanceScript.summon_entries() ++
             PlaguelandsRewards.creature_entries() ++
             GuardPost.guard_entries() ++
-            QuestEscortCatalog.summon_entries()
+            QuestEscortCatalog.summon_entries() ++
+            CreatureScript.summon_entries()
         )
 
         Logger.info("Loading templates...")

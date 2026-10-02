@@ -54,6 +54,10 @@ defmodule ThistleTea.Game.World.Loader.Quest do
     :ok
   end
 
+  def append_start_steps(steps_by_quest) when is_map(steps_by_quest) do
+    Enum.each(steps_by_quest, fn {quest_id, steps} -> append_start_steps(quest_id, steps) end)
+  end
+
   def append_start_steps(quest_id, steps) when is_list(steps) do
     case get(quest_id) do
       %Quest{} = quest ->

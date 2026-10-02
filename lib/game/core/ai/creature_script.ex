@@ -10,20 +10,26 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   resolves database script talk steps. Like vmangos, EventAI runs an event's
   actions directly and ignores step delays, so `timed/1` wraps a delayed
   sequence in a `start_script` step, the way the database chains generic
-  scripts.
+  scripts. A script whose creature reacts to a quest being accepted, as
+  vmangos `QuestAccept` hooks do, returns the steps to append to that quest's
+  start script from `quest_start_steps/0`.
   """
 
   alias ThistleTea.Game.Core.AI.AIEvent
   alias ThistleTea.Game.Core.AI.CreatureScript.FelwoodOoze
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
   alias ThistleTea.Game.Core.AI.CreatureScript.SicklyCritter
+  alias ThistleTea.Game.Core.AI.CreatureScript.Triage
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
 
   @callback entries() :: [pos_integer()]
   @callback events(pos_integer()) :: [%AIEvent{}]
+  @callback quest_start_steps() :: %{pos_integer() => [%ScriptStep{}]}
 
-  @scripts [FelwoodOoze, LazyPeon, SicklyCritter]
+  @optional_callbacks quest_start_steps: 0
+
+  @scripts [FelwoodOoze, LazyPeon, SicklyCritter, Triage]
   @timed_script 1
 
   def ported?(entry), do: not is_nil(script(entry))
@@ -37,12 +43,18 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
 
   def entries, do: Enum.flat_map(@scripts, & &1.entries())
 
-  def creature_entries do
-    entries()
-    |> Enum.flat_map(&events/1)
-    |> Enum.flat_map(&List.flatten(&1.actions))
-    |> Script.creature_entries()
+  def creature_entries, do: Script.creature_entries(steps())
+
+  def summon_entries, do: Script.summon_entries(steps() ++ Enum.flat_map(quest_start_steps(), &elem(&1, 1)))
+
+  def quest_start_steps do
+    @scripts
+    |> Enum.filter(&(Code.ensure_loaded?(&1) and function_exported?(&1, :quest_start_steps, 0)))
+    |> Enum.map(& &1.quest_start_steps())
+    |> Enum.reduce(%{}, &Map.merge(&2, &1, fn _quest_id, steps, more -> steps ++ more end))
   end
+
+  defp steps, do: entries() |> Enum.flat_map(&events/1) |> Enum.flat_map(&List.flatten(&1.actions))
 
   def event(entry, index, event_type, steps, opts \\ []) when is_integer(entry) and is_list(steps) do
     struct!(

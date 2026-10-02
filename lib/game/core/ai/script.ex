@@ -52,12 +52,14 @@ defmodule ThistleTea.Game.Core.AI.Script do
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
   alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.GameObject.GameObjectActions
   alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.Core.Movement
   alias ThistleTea.Game.Core.Pet.Guardians
   alias ThistleTea.Game.Core.Spell.Cast
@@ -87,6 +89,8 @@ defmodule ThistleTea.Game.Core.AI.Script do
     :remove_object
   ]
   @default_buddy_radius 30.0
+  @summon_position_radius 40.0
+  @occupied_distance 1.0
   @entry_target_types [
     :nearest_creature_with_entry,
     :random_creature_with_entry,
@@ -463,6 +467,20 @@ defmodule ThistleTea.Game.Core.AI.Script do
   end
 
   defp termination(_state, %ScriptStep{}, _target_guid, %Context{}), do: :continue
+
+  defp occupied_position?(perception, {x, y, z, _orientation}) do
+    perception
+    |> Perception.nearby(:mobs, @summon_position_radius)
+    |> Enum.any?(fn {guid, _distance} ->
+      case Perception.position(perception, guid) do
+        {_world, ox, oy, oz} ->
+          alive_observation?(perception, guid) and Math.distance({x, y, z}, {ox, oy, oz}) < @occupied_distance
+
+        _missing ->
+          false
+      end
+    end)
+  end
 
   defp alive_observation?(perception, guid) do
     case Perception.metadata(perception, guid) do
@@ -843,6 +861,30 @@ defmodule ThistleTea.Game.Core.AI.Script do
 
       nil ->
         {state, blackboard}
+    end
+  end
+
+  defp execute(
+         state,
+         blackboard,
+         %ScriptStep{command: :summon_creature, positions: [_ | _] = positions} = step,
+         target_guid,
+         now,
+         %Context{perception: perception, random: random} = context
+       ) do
+    case Enum.reject(positions, &occupied_position?(perception, &1)) do
+      [] ->
+        {state, blackboard}
+
+      vacant ->
+        execute(
+          state,
+          blackboard,
+          %{step | positions: [], position: Random.choice(random, vacant)},
+          target_guid,
+          now,
+          context
+        )
     end
   end
 
@@ -1271,6 +1313,24 @@ defmodule ThistleTea.Game.Core.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :despawn} = step, _target_guid, _now) do
     {Effects.enqueue(state, Effects.despawn_self(step.datalong, step.datalong2 * 1_000)), blackboard}
+  end
+
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :set_health_pct, datalong: pct}, _target_guid, _now) do
+    {Entity.set_health_pct(state, pct), blackboard}
+  end
+
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :lose_health, datalong: amount}, _target_guid, now) do
+    {Entity.lose_health(state, amount, now), blackboard}
+  end
+
+  defp execute(
+         %Mob{internal: %{creature: %Creature{} = creature} = internal} = state,
+         blackboard,
+         %ScriptStep{command: :set_regeneration, datalong: stats},
+         _target_guid,
+         _now
+       ) do
+    {%{state | internal: %{internal | creature: %{creature | regenerate_stats: stats}}}, blackboard}
   end
 
   @sound_flag_distance_dependent 0x2
@@ -1781,6 +1841,15 @@ defmodule ThistleTea.Game.Core.AI.Script do
     |> Enum.uniq()
   end
 
+  def summon_entries(steps) when is_list(steps) do
+    Enum.flat_map(steps, fn %ScriptStep{} = step ->
+      own = if step.command == :summon_creature, do: [step.datalong], else: []
+      nested = step.sub_scripts |> Map.values() |> List.flatten() |> summon_entries()
+      own ++ nested
+    end)
+    |> Enum.uniq()
+  end
+
   def random_point_requests(steps) when is_list(steps) do
     Enum.flat_map(steps, fn %ScriptStep{} = step ->
       nested = step.sub_scripts |> Map.values() |> List.flatten() |> random_point_requests()
@@ -1841,6 +1910,8 @@ defmodule ThistleTea.Game.Core.AI.Script do
   end
 
   defp step_observation_radius(%ScriptStep{command: :flee, datalong: seek}) when seek != 0, do: Assistance.seek_radius()
+
+  defp step_observation_radius(%ScriptStep{command: :summon_creature, positions: [_ | _]}), do: @summon_position_radius
 
   defp step_observation_radius(%ScriptStep{}), do: 0.0
 
