@@ -30,10 +30,7 @@ defmodule ThistleTea.Game.World.Loader.QuestEscortVmangosTest do
       context = WaypointLoader.context()
 
       for %QuestEscort{} = escort <- Catalog.all() do
-        mob = %Mob{object: %Object{guid: Guid.from_low_guid(:mob, escort.entry, 1), entry: escort.entry}}
-        start = %ScriptStep{command: :start_waypoints, datalong: QuestEscort.waypoint_source()}
-
-        assert %WaypointRoute{points: points} = Waypoints.resolve(context, mob, start)
+        assert %WaypointRoute{points: points} = route(context, escort)
         assert Map.has_key?(points, escort.credit_point)
         assert %Quest{special_flags: flags, start_script_steps: steps} = QuestLoader.get(escort.quest_id)
         assert Bitwise.band(flags, 2) == 2
@@ -45,10 +42,31 @@ defmodule ThistleTea.Game.World.Loader.QuestEscortVmangosTest do
       end
     end
 
+    test "resolves every escort's speech to broadcast texts" do
+      context = WaypointLoader.context()
+
+      for %QuestEscort{} = escort <- Catalog.all() do
+        %WaypointRoute{points: points} = route(context, escort)
+        %Quest{start_script_steps: start_steps} = QuestLoader.get(escort.quest_id)
+
+        steps = Enum.flat_map(points, fn {_point, waypoint} -> waypoint.script_steps end) ++ start_steps
+
+        for %ScriptStep{command: :talk} = talk <- flatten(steps) do
+          assert [_ | _] = talk.texts, "quest #{escort.quest_id} text #{talk.dataint} is missing"
+        end
+      end
+    end
+
+    test "walks Volcor's two quests along their own paths" do
+      context = WaypointLoader.context()
+
+      assert %WaypointRoute{first_point: 1} = route(context, Catalog.get(994))
+      assert %WaypointRoute{first_point: 0, points: points} = route(context, Catalog.get(995))
+      assert map_size(points) == 5
+    end
+
     test "resolves Miran's ambush texts and keeps Ruul's cage script" do
-      mob = %Mob{object: %Object{guid: Guid.from_low_guid(:mob, 1379, 1), entry: 1379}}
-      start = %ScriptStep{command: :start_waypoints, datalong: QuestEscort.waypoint_source()}
-      %WaypointRoute{points: points} = Waypoints.resolve(WaypointLoader.context(), mob, start)
+      %WaypointRoute{points: points} = route(WaypointLoader.context(), Catalog.get(309))
 
       assert [%ScriptStep{command: :talk, texts: [%{text: "Help! I've only one hand" <> _}]}, raider, _raider] =
                points[19].script_steps
@@ -58,5 +76,23 @@ defmodule ThistleTea.Game.World.Loader.QuestEscortVmangosTest do
 
       assert [%ScriptStep{command: :open_door} | _rest] = QuestLoader.get(6482).start_script_steps
     end
+  end
+
+  defp route(context, %QuestEscort{} = escort) do
+    mob = %Mob{object: %Object{guid: Guid.from_low_guid(:mob, escort.entry, 1), entry: escort.entry}}
+
+    start = %ScriptStep{
+      command: :start_waypoints,
+      datalong: QuestEscort.waypoint_source(),
+      dataint3: escort.quest_id
+    }
+
+    Waypoints.resolve(context, mob, start)
+  end
+
+  defp flatten(steps) do
+    Enum.flat_map(steps, fn %ScriptStep{} = step ->
+      [step | step.sub_scripts |> Map.values() |> Enum.flat_map(&flatten/1)]
+    end)
   end
 end

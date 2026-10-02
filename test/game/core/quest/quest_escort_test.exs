@@ -30,7 +30,14 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscortTest do
       assert %ScriptStep{command: :set_faction, datalong: 232, datalong2: 1} = faction
       assert %ScriptStep{command: :set_run, datalong: 1, delay_ms: 3_000} = run
       assert %ScriptStep{command: :modify_flags, datalong: 147, datalong2: 0xFFFF_FFFF, datalong3: 2} = flags
-      assert %ScriptStep{command: :start_waypoints, datalong: 4, datalong3: 2_500, datalong4: 0} = waypoints
+      assert %ScriptStep{command: :start_waypoints, datalong: 4, datalong3: 2_500, dataint3: 4_242} = waypoints
+    end
+
+    test "lifts unit flags until the escortee respawns", %{escort: escort} do
+      escort = %{escort | accept: [{:remove_unit_flags, 0x200}]}
+
+      assert [_event, flags, _npc_flags, _waypoints] = QuestEscort.start_steps(escort)
+      assert %ScriptStep{command: :modify_flags, datalong: 46, datalong2: 0x200, datalong3: 2} = flags
     end
   end
 

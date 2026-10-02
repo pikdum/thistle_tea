@@ -3,7 +3,9 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort do
   An escort quest that vmangos scripts in C++ (`npc_escortAI`), kept as data:
   the escortee walks its `script_waypoint` path once a player accepts the
   quest, acting at chosen points, and credits the quest on reaching
-  `credit_point`.
+  `credit_point`. An escort whose C++ walks its own points instead gives
+  them as `path`, a list of `{x, y, z, wait_ms}` numbered from 0. One
+  escortee can lead several quests, each with its own entry.
 
   `start_steps/1` and `point_steps/3` lower one into the generic script
   commands the creature interpreter already runs. Accepting starts a
@@ -19,7 +21,8 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort do
   `{:say_by, entry, text_id}` (spoken by the nearest creature of that entry),
   `{:emote, emote_id}`, `{:stand, stand_state}`, `{:faction, faction_id}`
   (until respawn), `:run`, `:walk`, `{:add_aura, spell_id}`,
-  `{:remove_aura, spell_id}`, `{:summon, entry, position, opts}`, and
+  `{:remove_aura, spell_id}`, `{:remove_unit_flags, mask}` (until
+  respawn), `{:summon, entry, position, opts}`, and
   `{:after, delay_ms, action}`. A summon despawns per `despawn:
   {type, delay_ms}` (vmangos `TempSummonType` names), attacks the escortee,
   the player, or nothing per `attack:`, and runs the actions in `script:`.
@@ -35,6 +38,7 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort do
     :credit_point,
     accept: [],
     points: %{},
+    path: nil,
     max_distance: 100,
     start_delay_ms: 2_500,
     instant_respawn?: false
@@ -45,6 +49,7 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort do
   @failure_script 1
   @summon_script 2
   @npc_flags_field 147
+  @unit_flags_field 46
   @remove_flags 2
   @all_flags 0xFFFF_FFFF
   @restore_on_respawn 1
@@ -85,7 +90,12 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort do
           datalong2: @all_flags,
           datalong3: @remove_flags
         },
-        %ScriptStep{command: :start_waypoints, datalong: @waypoint_source, datalong3: escort.start_delay_ms}
+        %ScriptStep{
+          command: :start_waypoints,
+          datalong: @waypoint_source,
+          datalong3: escort.start_delay_ms,
+          dataint3: escort.quest_id
+        }
       ]
   end
 
@@ -167,6 +177,10 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort do
   defp steps(:walk, _escort, _phase), do: [%ScriptStep{command: :set_run, datalong: 0}]
   defp steps({:add_aura, spell_id}, _escort, _phase), do: [%ScriptStep{command: :add_aura, datalong: spell_id}]
   defp steps({:remove_aura, spell_id}, _escort, _phase), do: [%ScriptStep{command: :remove_aura, datalong: spell_id}]
+
+  defp steps({:remove_unit_flags, mask}, _escort, _phase) do
+    [%ScriptStep{command: :modify_flags, datalong: @unit_flags_field, datalong2: mask, datalong3: @remove_flags}]
+  end
 
   defp steps({:summon, entry, {_x, _y, _z, _o} = position, opts}, %__MODULE__{} = escort, phase) do
     {despawn_type, despawn_ms} = Keyword.get(opts, :despawn, {:timed_or_dead, 25_000})

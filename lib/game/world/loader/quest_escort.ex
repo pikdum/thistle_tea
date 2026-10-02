@@ -2,10 +2,10 @@ defmodule ThistleTea.Game.World.Loader.QuestEscort do
   @moduledoc """
   Boot loader for the C++-scripted escort quests in
   `Core.Quest.QuestEscort.Catalog`. It reads each escortee's
-  `script_waypoint` path, lowers the escort into script steps with their
-  broadcast texts resolved, registers the path in the waypoint catalog under
-  `{:escort, entry}`, and appends the start steps to the quest's own start
-  script. Runs after the waypoint and quest loaders.
+  `script_waypoint` path, or the escort's own `path`, lowers the escort into
+  script steps with their broadcast texts resolved, registers the path in the
+  waypoint catalog under `{:escort, quest_id}`, and appends the start steps
+  to the quest's own start script. Runs after the waypoint and quest loaders.
   """
   import Ecto.Query, only: [from: 2]
 
@@ -18,15 +18,17 @@ defmodule ThistleTea.Game.World.Loader.QuestEscort do
   alias ThistleTea.Game.World.Loader.Waypoint, as: WaypointLoader
 
   def load_all(escorts \\ Catalog.all()) do
-    rows_by_entry = escorts |> Enum.map(& &1.entry) |> load_rows()
+    rows_by_entry = escorts |> Enum.filter(&is_nil(&1.path)) |> Enum.map(& &1.entry) |> load_rows()
 
     built =
-      for %QuestEscort{} = escort <- escorts, rows = Map.get(rows_by_entry, escort.entry), rows != nil do
+      for %QuestEscort{} = escort <- escorts,
+          rows = Map.get(rows_by_entry, escort.entry, []),
+          escort.path != nil or rows != [] do
         {escort, build(escort, rows)}
       end
 
     built
-    |> Map.new(fn {escort, {route, _start_steps}} -> {{:escort, escort.entry}, route} end)
+    |> Map.new(fn {escort, {route, _start_steps}} -> {{:escort, escort.quest_id}, route} end)
     |> WaypointLoader.put_routes()
 
     Enum.each(built, fn {escort, {_route, start_steps}} ->
@@ -34,7 +36,8 @@ defmodule ThistleTea.Game.World.Loader.QuestEscort do
     end)
   end
 
-  def build(%QuestEscort{} = escort, [_ | _] = rows, resolve_texts \\ &Script.resolve_texts/1) do
+  def build(%QuestEscort{} = escort, rows, resolve_texts \\ &Script.resolve_texts/1) do
+    rows = route_rows(escort, rows)
     last = Enum.max_by(rows, & &1.point)
 
     resolved =
@@ -52,6 +55,16 @@ defmodule ThistleTea.Game.World.Loader.QuestEscort do
 
     {%{route | points: points, pathfind?: true}, resolved.start}
   end
+
+  defp route_rows(%QuestEscort{path: [_ | _] = path, entry: entry}, _rows) do
+    path
+    |> Enum.with_index()
+    |> Enum.map(fn {{x, y, z, wait_ms}, point} ->
+      %Mangos.ScriptWaypoint{entry: entry, point: point, position_x: x, position_y: y, position_z: z, waittime: wait_ms}
+    end)
+  end
+
+  defp route_rows(%QuestEscort{}, [_ | _] = rows), do: rows
 
   defp resolve(steps_by_key, resolve_texts) do
     [%ScriptStep{sub_scripts: resolved}] = resolve_texts.([%ScriptStep{sub_scripts: steps_by_key}])

@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
 
   alias ThistleTea.Game.Core.Quest.QuestEscort
 
+  @immune_to_npc 0x200
+
   def all do
     [
       %QuestEscort{
@@ -43,14 +45,14 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
         quest_id: 945,
         entry: 3584,
         credit_point: 17,
-        accept: [{:say, 1189}, {:faction, 79}],
+        accept: [{:say, 1189}, {:faction, 79}, {:remove_unit_flags, @immune_to_npc}],
         points: %{19 => [{:say, 1188}, :run]}
       },
       %QuestEscort{
         quest_id: 898,
         entry: 3465,
         credit_point: 53,
-        accept: [{:faction, 232}, {:stand, 0}, {:say, 1065}],
+        accept: [{:faction, 232}, {:stand, 0}, {:remove_unit_flags, @immune_to_npc}, {:say, 1065}],
         points: %{
           16 => [{:say, 1066}],
           17 => [{:say, 1067}],
@@ -65,7 +67,7 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
         entry: 2917,
         credit_point: 48,
         instant_respawn?: true,
-        accept: [{:faction, 10}, {:say, 925}, {:emote, 6}],
+        accept: [{:faction, 10}, {:remove_unit_flags, @immune_to_npc}, {:say, 925}, {:emote, 6}],
         points: %{
           5 => [{:say, 926}],
           9 => [{:say, 927}, {:emote, 6}],
@@ -111,7 +113,7 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
         quest_id: 4770,
         entry: 10_427,
         credit_point: 27,
-        accept: [{:say, 5648}, {:faction, 232}],
+        accept: [{:say, 5648}, {:faction, 232}, {:remove_unit_flags, @immune_to_npc}],
         points: %{
           15 => [
             {:say, 5654},
@@ -126,7 +128,7 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
         quest_id: 4904,
         entry: 10_646,
         credit_point: 45,
-        accept: [{:say, 5926}, {:faction, 33}],
+        accept: [{:say, 5926}, {:faction, 33}, {:remove_unit_flags, @immune_to_npc}],
         points: %{
           8 => [{:say, 5927} | bandits([{-4905.479, -2062.733, 84.352}, {-4915.201, -2073.528, 84.733}])],
           14 => [{:say, 5928} | bandits([{-4878.883, -1986.948, 91.966}, {-4877.504, -1966.113, 91.859}])],
@@ -138,7 +140,7 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
         quest_id: 660,
         entry: 2713,
         credit_point: 34,
-        accept: [{:say, 816}],
+        accept: [{:say, 816}, {:remove_unit_flags, @immune_to_npc}],
         points: %{
           9 => [{:say, 817}],
           16 => [{:say, 818}, {:say, 819}],
@@ -151,7 +153,7 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
         quest_id: 1440,
         entry: 5644,
         credit_point: 18,
-        accept: [{:faction, 10}, {:stand, 0}]
+        accept: [{:faction, 10}, {:stand, 0}, {:remove_unit_flags, @immune_to_npc}]
       },
       %QuestEscort{
         quest_id: 665,
@@ -177,11 +179,220 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
         quest_id: 4245,
         entry: 9623,
         credit_point: 37,
-        accept: [{:stand, 0}, {:faction, 113}],
+        accept: [{:stand, 0}, {:faction, 113}, {:remove_unit_flags, @immune_to_npc}],
         points: %{
           0 => [{:say, 5062}],
           19 => [{:say, 5063}],
           37 => [{:say, 5156}]
+        }
+      },
+      %QuestEscort{
+        quest_id: 863,
+        entry: 3439,
+        credit_point: 24,
+        accept: [{:say, 1031}, {:faction, 637}, :run],
+        points: %{
+          0 => [{:say, 1039}],
+          8 => [{:after, 5_000, {:say, 1032}}],
+          9 => [:walk],
+          17 => [
+            {:summon, 3282, {1128.489, -3037.611, 92.701, 1.472}, [script: [{:say, 1040}]] ++ venture_mercenary()},
+            {:summon, 3282, {1160.172, -2980.168, 97.313, 3.690}, venture_mercenary()},
+            {:after, 7_000, {:say, 1033}},
+            {:after, 7_000, :run}
+          ],
+          24 => [
+            {:after, 1_000, {:say, 1043}},
+            {:after, 6_000, {:say, 1041}},
+            {:after, 11_000, {:say, 1044}},
+            {:after, 16_000, {:summon, 3451, {0.0, 0.0, 0.0, 0.0}, despawn: {:timed, 180_000}}},
+            {:after, 16_000, {:stand, 7}},
+            {:after, 16_000, {:faction, 0}}
+          ]
+        }
+      },
+      %QuestEscort{
+        quest_id: 994,
+        entry: 3692,
+        credit_point: 15,
+        accept: [{:stand, 0}, {:remove_unit_flags, @immune_to_npc}],
+        points: %{
+          2 => [{:say, 1237}],
+          5 => [
+            {:summon, 2171, {4630.2, 22.6, 70.1, 2.4}, blackwood()},
+            {:summon, 2170, {4603.8, 53.5, 70.4, 5.4}, blackwood()}
+          ],
+          6 => [{:say, 1250}],
+          11 => [
+            {:summon, 2171, {4627.5, 100.4, 62.7, 5.8}, blackwood()},
+            {:summon, 2170, {4692.8, 75.8, 56.7, 3.1}, blackwood()},
+            {:summon, 2170, {4747.8, 152.8, 54.6, 2.4}, blackwood()},
+            {:summon, 2170, {4711.7, 109.1, 53.5, 2.4}, blackwood()}
+          ],
+          13 => [
+            {:summon, 2170, {4747.8, 152.8, 54.6, 2.4}, blackwood()},
+            {:summon, 2170, {4711.7, 109.1, 53.5, 2.4}, blackwood()}
+          ],
+          15 => [
+            {:after, 3_000, {:say, 1243}},
+            {:after, 7_000, {:say_by, 3695, 1241}},
+            {:after, 9_000, {:say, 1244}}
+          ]
+        }
+      },
+      %QuestEscort{
+        quest_id: 995,
+        entry: 3692,
+        credit_point: 4,
+        start_delay_ms: 9_000,
+        accept: [
+          {:stand, 0},
+          {:faction, 35},
+          :run,
+          {:emote, 2},
+          {:after, 1_000, {:say, 1236}},
+          {:after, 5_000, {:add_aura, 10_849}}
+        ],
+        path: [
+          {4604.54, -5.17, 69.51, 0},
+          {4604.26, -2.02, 69.42, 0},
+          {4607.75, 3.79, 70.13, 0},
+          {4619.77, 27.47, 70.40, 0},
+          {4640.33, 33.74, 68.22, 0}
+        ]
+      },
+      %QuestEscort{
+        quest_id: 976,
+        entry: 4484,
+        credit_point: 30,
+        accept: [{:say, 1292}, {:faction, 10}, {:remove_unit_flags, @immune_to_npc}, :run],
+        points: %{
+          14 => [
+            {:say, 1372},
+            {:summon, 3879, {3525.05, 241.72, 10.87, 0.0}, feero_ambush()},
+            {:summon, 3879, {3542.58, 226.54, 8.52, 0.0}, feero_ambush()},
+            {:summon, 3879, {3544.25, 203.40, 9.53, 0.0}, feero_ambush()},
+            {:summon, 3879, {3529.07, 185.87, 8.63, 0.0}, feero_ambush()}
+          ],
+          20 => [
+            {:say, 1373},
+            {:summon, 3893, {3769.14, 174.96, 8.71, 0.0}, feero_ambush()},
+            {:summon, 3893, {3775.47, 161.02, 8.26, 0.0}, [script: [{:say, 1309}]] ++ feero_ambush()},
+            {:summon, 3893, {3766.57, 148.57, 8.01, 0.0}, feero_ambush()}
+          ],
+          29 => [
+            {:say, 1374},
+            {:summon, 3899, {4243.12, 108.22, 38.12, 3.62}, [script: [{:say, 1313}]] ++ feero_ambush()},
+            {:summon, 3898, {4240.95, 114.04, 38.35, 3.56}, feero_ambush()},
+            {:summon, 3900, {4235.78, 118.09, 38.08, 4.12}, feero_ambush()}
+          ]
+        }
+      },
+      %QuestEscort{
+        quest_id: 6544,
+        entry: 12_858,
+        credit_point: 20,
+        accept: [{:say, 8284}, {:faction, 1174}, :run],
+        points: %{
+          1 => [{:say, 8278}],
+          8 => [{:say, 8282}],
+          19 => [
+            {:summon, 12_860, {1776.73, -2049.06, 109.83, 1.54}, attack: :escort},
+            {:summon, 12_896, {1774.64, -2049.41, 109.83, 1.40}, attack: :escort},
+            {:summon, 12_897, {1778.73, -2049.50, 109.83, 1.67}, attack: :escort}
+          ],
+          20 => [{:say, 8280}],
+          21 => [{:say, 8281}]
+        }
+      },
+      %QuestEscort{
+        quest_id: 1393,
+        entry: 5391,
+        credit_point: 20,
+        accept: [{:faction, 495}, {:say, 1854}],
+        points: %{
+          20 => [{:say, 1855}, {:say, 2076}, :run, {:after, 15_000, {:say, 1856}}]
+        }
+      },
+      %QuestEscort{
+        quest_id: 2742,
+        entry: 7780,
+        credit_point: 17,
+        accept: [{:faction, 33}, {:remove_unit_flags, @immune_to_npc}],
+        points: %{
+          1 => [{:say, 3787}],
+          7 => highvale_ambush({191.296, -2839.329, 107.388, 0.0}),
+          13 => highvale_ambush({70.972, -2848.675, 109.459, 0.0}),
+          17 => [{:say, 3790}, :run, {:after, 3_000, {:say, 3817}}, {:after, 6_000, {:say, 3818}}]
+        }
+      },
+      stinky(1222),
+      stinky(1270),
+      %QuestEscort{
+        quest_id: 4261,
+        entry: 9598,
+        credit_point: 36,
+        accept: [{:faction, 10}, {:say, 5004}],
+        points: %{
+          36 => [
+            {:summon, 7139, {6573.321, -1195.213, 442.489, 0.0}, irontree(script: [{:say_by, 9598, 5473}])},
+            {:summon, 7138, {6573.240, -1213.475, 443.643, 0.0}, irontree()},
+            {:summon, 7138, {6583.354, -1209.811, 444.769, 0.0}, irontree()},
+            {:say, 5008}
+          ]
+        }
+      },
+      %QuestEscort{
+        quest_id: 5203,
+        entry: 11_016,
+        credit_point: 109,
+        accept: [{:stand, 0}, {:remove_unit_flags, @immune_to_npc}],
+        points: %{
+          0 => [{:say, 6433}],
+          14 => [{:say, 6456}],
+          34 => [{:say, 6457}, :run],
+          38 => [{:emote, 16}],
+          39 => [{:add_aura, 18_163}],
+          40 => [{:say, 6458}],
+          41 => [
+            {:say, 6460},
+            {:summon, 9862, {5082.068, -490.084, 296.856, 5.15}, legionnaire()},
+            {:summon, 9862, {5084.135, -489.187, 296.832, 5.15}, legionnaire()},
+            {:summon, 9862, {5085.676, -488.518, 296.824, 5.15}, legionnaire()}
+          ],
+          43 => [:walk],
+          104 => [{:say, 6461}],
+          105 => [
+            {:summon, 11_141, {4844.839, -395.763, 350.603, 6.25},
+             attack: :escort, despawn: {:timed_or_dead, 120_000}, script: [{:say, 6466}]}
+          ],
+          106 => [{:say, 6463}],
+          108 => [{:say, 6468}],
+          109 => [:run]
+        }
+      },
+      %QuestEscort{
+        quest_id: 6132,
+        entry: 12_277,
+        credit_point: 12,
+        points: %{
+          1 => [{:say, 7540}, {:faction, 113}],
+          4 => [
+            {:summon, 4659, {-1289.492, 2646.650, 111.556, 0.0}, attack: :escort},
+            {:summon, 4659, {-1293.492, 2642.650, 111.556, 0.0}, attack: :escort},
+            {:summon, 4659, {-1304.730, 2677.163, 111.561, 0.0}, attack: :escort},
+            {:summon, 4659, {-1308.730, 2673.163, 111.561, 0.0}, attack: :escort}
+          ],
+          9 => [
+            {:summon, 4660, {-1389.194, 2429.465, 88.689, 0.0}, attack: :escort},
+            {:summon, 4655, {-1397.194, 2429.465, 88.689, 0.0}, attack: :escort},
+            {:summon, 4660, {-1391.194, 2432.965, 88.689, 0.0}, attack: :escort},
+            {:summon, 4655, {-1395.194, 2432.965, 88.689, 0.0}, attack: :escort},
+            {:summon, 4660, {-1391.194, 2425.965, 88.689, 0.0}, attack: :escort},
+            {:summon, 4655, {-1395.194, 2425.965, 88.689, 0.0}, attack: :escort}
+          ],
+          12 => [{:say, 7544}, {:faction, 474}, :run],
+          19 => [{:say, 7550}, {:after, 4_000, {:say, 7551}}, {:after, 9_000, {:say, 7552}}]
         }
       }
     ]
@@ -194,6 +405,38 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
   defp gravelflint, do: [attack: :player, despawn: {:timed_out_of_combat, 30_000}]
 
   defp vengeful_surge, do: [attack: :escort, despawn: {:timed_or_corpse, 600_000}]
+
+  defp venture_mercenary, do: [attack: :escort, despawn: {:timed_out_of_combat, 120_000}]
+
+  defp blackwood, do: [attack: :escort, despawn: {:timed_out_of_combat, 20_000}]
+
+  defp feero_ambush, do: [attack: :player, despawn: {:timed_or_dead, 20_000}]
+
+  defp irontree(opts \\ []), do: [attack: :escort, despawn: {:timed_out_of_combat, 60_000}] ++ opts
+
+  defp legionnaire, do: [attack: :escort, despawn: {:timed_or_dead, 120_000}]
+
+  defp highvale_ambush(position) do
+    opts = [attack: :escort, despawn: {:timed_or_corpse, 60_000}]
+    [{:summon, 2694, position, opts}, {:summon, 2691, position, opts}, {:summon, 2691, position, opts}]
+  end
+
+  defp stinky(quest_id) do
+    %QuestEscort{
+      quest_id: quest_id,
+      entry: 4880,
+      credit_point: 24,
+      accept: [{:faction, 113}, {:stand, 0}],
+      points: %{
+        0 => [{:say, 1610}],
+        4 => [{:say, 1611}],
+        8 => [{:say, 1612}],
+        16 => [{:after, 3_000, {:say, 1614}}, {:after, 4_000, {:say, 1615}}],
+        18 => [{:stand, 8}, {:after, 1_000, {:stand, 0}}, {:after, 2_000, {:say, 1617}}],
+        24 => [{:say, 1618}]
+      }
+    }
+  end
 
   defp bandits(positions) do
     Enum.map(positions, fn {x, y, z} ->

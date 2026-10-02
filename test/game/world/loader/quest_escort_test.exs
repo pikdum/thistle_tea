@@ -44,7 +44,26 @@ defmodule ThistleTea.Game.World.Loader.QuestEscortTest do
       step = List.last(start_steps)
 
       assert %WaypointRoute{destination_point: 1, repeat?: false} =
-               Waypoints.resolve(Waypoints.new(%{{:escort, 52} => route}), mob, step)
+               Waypoints.resolve(Waypoints.new(%{{:escort, 51} => route}), mob, step)
+    end
+
+    test "walks the escort's own path in place of its script_waypoint rows" do
+      escort = %QuestEscort{
+        quest_id: 61,
+        entry: 62,
+        credit_point: 1,
+        path: [{1.0, 2.0, 3.0, 0}, {4.0, 5.0, 6.0, 1_500}]
+      }
+
+      {route, [_ | _]} = QuestEscortLoader.build(escort, [], &mark_resolved/1)
+
+      assert %WaypointRoute{first_point: 0, points: points} = route
+
+      assert %Waypoint{
+               position: {4.0, 5.0, 6.0, nil},
+               wait_time: 1_500,
+               script_steps: [%ScriptStep{command: :quest_explored} | _finish]
+             } = points[1]
     end
   end
 
