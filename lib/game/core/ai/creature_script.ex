@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   """
 
   alias ThistleTea.Game.Core.AI.AIEvent
+  alias ThistleTea.Game.Core.AI.CreatureScript.Bartleby
   alias ThistleTea.Game.Core.AI.CreatureScript.ChickenCluck
   alias ThistleTea.Game.Core.AI.CreatureScript.FelwoodOoze
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
@@ -30,7 +31,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
 
   @optional_callbacks quest_start_steps: 0
 
-  @scripts [ChickenCluck, FelwoodOoze, LazyPeon, SicklyCritter, Triage]
+  @scripts [Bartleby, ChickenCluck, FelwoodOoze, LazyPeon, SicklyCritter, Triage]
   @timed_script 1
 
   def ported?(entry), do: not is_nil(script(entry))
