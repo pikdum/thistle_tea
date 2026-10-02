@@ -227,10 +227,15 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   defp scripted_home?(%Mob{}, %Blackboard{navigation: %NavigationMemory{movement_override: :home}}), do: true
   defp scripted_home?(%Mob{}, %Blackboard{}), do: false
 
-  defp wait_for_scripted_home(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
+  defp wait_for_scripted_home(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
     case wait_for_arrival(state, blackboard, context) do
       {:success, state, blackboard} ->
-        {:success, state, Blackboard.clear_movement_override(blackboard)}
+        state = state |> restore_home_orientation(blackboard) |> TemporaryFaction.restore(:reach_home)
+
+        {state, blackboard} =
+          EventAI.on_reached_home(state, Blackboard.clear_movement_override(blackboard), now, context)
+
+        {:success, state, blackboard}
 
       result ->
         result

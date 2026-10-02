@@ -672,6 +672,31 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       assert state.internal.blackboard.navigation.movement_override == nil
       assert state.internal.blackboard.navigation.target == nil
     end
+
+    test "scripted home movement fires reached_home on arrival" do
+      home = {10.0, 0.0, 0.0}
+      talk = %ScriptStep{command: :talk, texts: [%{text: "Back.", chat_type: :say, language: 0, emote_id: 0}]}
+      event = %AIEvent{id: 1, event_type: :reached_home, chance: 100, actions: [[talk]]}
+
+      state =
+        fixture_mob(spline_nodes: [])
+        |> then(fn mob ->
+          internal = mob.internal
+          %{mob | internal: %{internal | spawn: %Spawn{position: home}, creature: %Creature{ai_events: [event]}}}
+        end)
+        |> BT.init(MobBT.tree(), Blackboard.start_home(Blackboard.new(), home))
+
+      {_status, state} = BehaviorRunner.tick(MobBT.tree(), state, Context.new(1_000))
+      refute Enum.any?(state.internal.events, &is_struct(&1, Effects.MonsterTalk))
+
+      state =
+        state
+        |> NavigationResolver.resolve(1_000, fn _map, _from, to, _opts -> [to] end)
+        |> finish_current_move()
+
+      {:success, state} = BehaviorRunner.tick(MobBT.tree(), state, Context.new(1_000))
+      assert Enum.any?(state.internal.events, &match?(%Effects.MonsterTalk{text: "Back."}, &1))
+    end
   end
 
   describe "wait_for_chase_tick/3" do
