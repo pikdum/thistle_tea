@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.GameEvent.ScheduleTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.GameEvent.DarkmoonFaire
   alias ThistleTea.Game.Core.GameEvent.Schedule
   alias ThistleTea.Game.Core.GameEvent.Schedule.Entry
 
@@ -36,6 +37,23 @@ defmodule ThistleTea.Game.Core.GameEvent.ScheduleTest do
 
       assert Schedule.next_transition(continuous, datetime("2026-01-01T12:00:00")) ==
                datetime("2026-01-02T00:00:00")
+    end
+  end
+
+  describe "rule entries" do
+    test "follow their rule's calendar" do
+      schedule = Schedule.new([%Entry{id: 4, rule: DarkmoonFaire}, %Entry{id: 23, rule: DarkmoonFaire}])
+
+      assert Schedule.active_events(schedule, datetime("2026-10-04T23:59:59")) == [23]
+      assert Schedule.active_events(schedule, datetime("2026-10-05T00:00:00")) == [4]
+    end
+
+    test "change at the next midnight their rule disagrees with today" do
+      schedule = Schedule.new([%Entry{id: 4, rule: DarkmoonFaire}])
+
+      assert Schedule.next_transition(schedule, datetime("2026-10-02T13:00:00")) == datetime("2026-10-05T00:00:00")
+      assert Schedule.next_transition(schedule, datetime("2026-10-06T13:00:00")) == datetime("2026-10-12T00:00:00")
+      assert Schedule.next_transition(schedule, datetime("2026-10-12T13:00:00")) == datetime("2026-12-07T00:00:00")
     end
   end
 

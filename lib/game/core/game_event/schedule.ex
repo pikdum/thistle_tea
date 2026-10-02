@@ -1,15 +1,20 @@
 defmodule ThistleTea.Game.Core.GameEvent.Schedule do
   @moduledoc """
-  Pure recurrence calculations for database-backed game events.
+  Pure recurrence calculations for game events. An entry recurs on its
+  database row's start, end, occurrence, and length, unless it carries a
+  `Core.GameEvent.Rule`, whose calendar it follows instead: rule-driven events
+  change state at UTC midnight.
   """
+
+  @rule_horizon_days 92
 
   defstruct entries: []
 
   defmodule Entry do
     @moduledoc false
 
-    @enforce_keys [:id, :starts_at, :ends_at, :occurrence_seconds, :length_seconds]
-    defstruct [:id, :starts_at, :ends_at, :occurrence_seconds, :length_seconds, :description]
+    @enforce_keys [:id]
+    defstruct [:id, :starts_at, :ends_at, :occurrence_seconds, :length_seconds, :description, :rule]
   end
 
   def new(entries) when is_list(entries) do
@@ -29,6 +34,10 @@ defmodule ThistleTea.Game.Core.GameEvent.Schedule do
     |> Enum.min_by(&DateTime.to_unix(&1, :millisecond), fn -> nil end)
   end
 
+  def active?(%Entry{rule: rule} = entry, %DateTime{} = now) when not is_nil(rule) do
+    rule_active?(entry, DateTime.to_date(now))
+  end
+
   def active?(%Entry{} = entry, %DateTime{} = now) do
     now_seconds = DateTime.to_unix(now)
     start_seconds = DateTime.to_unix(entry.starts_at)
@@ -41,6 +50,19 @@ defmodule ThistleTea.Game.Core.GameEvent.Schedule do
   defp active_in_occurrence?(%Entry{} = entry, elapsed_seconds) do
     entry.length_seconds >= entry.occurrence_seconds or
       rem(elapsed_seconds, entry.occurrence_seconds) < entry.length_seconds
+  end
+
+  defp entry_transition(%Entry{rule: rule} = entry, %DateTime{} = now) when not is_nil(rule) do
+    today = DateTime.to_date(now)
+    active? = rule_active?(entry, today)
+
+    1..@rule_horizon_days
+    |> Stream.map(&Date.add(today, &1))
+    |> Enum.find(&(rule_active?(entry, &1) != active?))
+    |> case do
+      %Date{} = date -> DateTime.new!(date, ~T[00:00:00], "Etc/UTC")
+      nil -> nil
+    end
   end
 
   defp entry_transition(%Entry{} = entry, %DateTime{} = now) do
@@ -77,4 +99,6 @@ defmodule ThistleTea.Game.Core.GameEvent.Schedule do
 
     DateTime.from_unix!(next_seconds)
   end
+
+  defp rule_active?(%Entry{id: id, rule: rule}, %Date{} = date), do: id in rule.active_events(date)
 end
