@@ -39,9 +39,36 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscortTest do
       assert [_event, flags, _npc_flags, _waypoints] = QuestEscort.start_steps(escort)
       assert %ScriptStep{command: :modify_flags, datalong: 46, datalong2: 0x200, datalong3: 2} = flags
     end
+
+    test "starts the escort on the escortee near another quest giver", %{escort: escort} do
+      escort = %{escort | giver: 5_151, accept: [{:invincible, 20}]}
+
+      assert [%ScriptStep{command: :start_script_for_all, datalong: script_id} = forward] =
+               QuestEscort.start_steps(escort)
+
+      assert %ScriptStep{datalong2: 2, datalong3: 4_343, datalong4: 20} = forward
+
+      assert [%ScriptStep{command: :start_map_event}, invincible, _flags, _waypoints] =
+               Map.fetch!(forward.sub_scripts, script_id)
+
+      assert %ScriptStep{command: :invincibility, datalong: 20, datalong2: 1} = invincible
+    end
   end
 
   describe "point_steps/3" do
+    test "fails the quest at a point and credits nobody without a credit point", %{escort: escort} do
+      escort = %{escort | credit_point: nil, points: %{3 => [:fail]}}
+
+      assert [%ScriptStep{command: :fail_quest, datalong: 4_242, target_type: :map_event_target}] =
+               escort |> QuestEscort.point_steps(9, 0) |> Map.fetch!(3)
+
+      refute escort
+             |> QuestEscort.point_steps(9, 0)
+             |> Map.values()
+             |> List.flatten()
+             |> Enum.any?(&(&1.command == :quest_explored))
+    end
+
     test "speaks to the escorted player and credits them at the credit point", %{escort: escort} do
       points = QuestEscort.point_steps(escort, 9, 0)
 
@@ -106,7 +133,9 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscortTest do
 
       for %QuestEscort{} = escort <- Catalog.all() do
         assert is_list(QuestEscort.start_steps(escort))
-        assert Map.has_key?(QuestEscort.point_steps(escort, 1_000, 0), escort.credit_point)
+
+        assert is_nil(escort.credit_point) or
+                 Map.has_key?(QuestEscort.point_steps(escort, 1_000, 0), escort.credit_point)
       end
     end
   end

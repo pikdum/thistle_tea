@@ -23,10 +23,12 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.Bartleby
   alias ThistleTea.Game.Core.AI.CreatureScript.ChickenCluck
   alias ThistleTea.Game.Core.AI.CreatureScript.CombatGadgets
+  alias ThistleTea.Game.Core.AI.CreatureScript.DashelStonefist
   alias ThistleTea.Game.Core.AI.CreatureScript.FelwoodOoze
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
   alias ThistleTea.Game.Core.AI.CreatureScript.RabidThistleBear
   alias ThistleTea.Game.Core.AI.CreatureScript.SicklyCritter
+  alias ThistleTea.Game.Core.AI.CreatureScript.TapokeSlimJahn
   alias ThistleTea.Game.Core.AI.CreatureScript.Triage
   alias ThistleTea.Game.Core.AI.CreatureScript.TwiggyFlathead
   alias ThistleTea.Game.Core.AI.CreatureScript.TwilightCorrupter
@@ -45,10 +47,12 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     Bartleby,
     ChickenCluck,
     CombatGadgets,
+    DashelStonefist,
     FelwoodOoze,
     LazyPeon,
     RabidThistleBear,
     SicklyCritter,
+    TapokeSlimJahn,
     Triage,
     TwiggyFlathead,
     TwilightCorrupter

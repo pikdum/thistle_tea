@@ -394,6 +394,15 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
           12 => [{:say, 7544}, {:faction, 474}, :run],
           19 => [{:say, 7550}, {:after, 4_000, {:say, 7551}}, {:after, 9_000, {:say, 7552}}]
         }
+      },
+      %QuestEscort{
+        quest_id: 1249,
+        entry: 4962,
+        giver: 4963,
+        credit_point: nil,
+        start_delay_ms: 750,
+        accept: [{:invincible, 20}, {:add_aura, 6634}],
+        points: %{3 => [:run, {:faction, 189}], 9 => [:fail]}
       }
     ]
   end

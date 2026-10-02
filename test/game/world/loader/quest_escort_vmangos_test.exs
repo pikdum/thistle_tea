@@ -31,12 +31,12 @@ defmodule ThistleTea.Game.World.Loader.QuestEscortVmangosTest do
 
       for %QuestEscort{} = escort <- Catalog.all() do
         assert %WaypointRoute{points: points} = route(context, escort)
-        assert Map.has_key?(points, escort.credit_point)
+        assert is_nil(escort.credit_point) or Map.has_key?(points, escort.credit_point)
         assert %Quest{special_flags: flags, start_script_steps: steps} = QuestLoader.get(escort.quest_id)
         assert Bitwise.band(flags, 2) == 2
 
         assert Enum.any?(
-                 steps,
+                 flatten(steps),
                  &match?(%ScriptStep{command: :start_map_event, datalong: id} when id == escort.quest_id, &1)
                )
       end

@@ -5,7 +5,10 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort do
   quest, acting at chosen points, and credits the quest on reaching
   `credit_point`. An escort whose C++ walks its own points instead gives
   them as `path`, a list of `{x, y, z, wait_ms}` numbered from 0. One
-  escortee can lead several quests, each with its own entry.
+  escortee can lead several quests, each with its own entry. When another
+  creature hands out the quest, it names that `giver`, and accepting starts
+  the escort on the escortee standing near it. An escort whose credit comes
+  from somewhere other than its path leaves `credit_point` empty.
 
   `start_steps/1` and `point_steps/3` lower one into the generic script
   commands the creature interpreter already runs. Accepting starts a
@@ -30,6 +33,7 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort do
     :quest_id,
     :entry,
     :credit_point,
+    :giver,
     accept: [],
     points: %{},
     path: nil,
@@ -45,11 +49,27 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort do
   @remove_flags 2
   @all_flags 0xFFFF_FFFF
   @source_dead 1
+  @escortee_script 1
+  @creatures 2
+  @giver_reach 20
 
   def waypoint_source, do: @waypoint_source
 
   def summon_entries(%__MODULE__{} = escort) do
     EscortAction.summon_entries(escort.accept ++ Enum.flat_map(escort.points, &elem(&1, 1)))
+  end
+
+  def start_steps(%__MODULE__{giver: giver} = escort) when is_integer(giver) do
+    [
+      %ScriptStep{
+        command: :start_script_for_all,
+        datalong: @escortee_script,
+        datalong2: @creatures,
+        datalong3: escort.entry,
+        datalong4: @giver_reach,
+        sub_scripts: %{@escortee_script => start_steps(%{escort | giver: nil})}
+      }
+    ]
   end
 
   def start_steps(%__MODULE__{} = escort) do
@@ -76,11 +96,14 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort do
     |> Map.new(fn {point, actions} ->
       {point, Enum.flat_map(actions, &EscortAction.steps(&1, escort.quest_id, :point))}
     end)
-    |> append(escort.credit_point, [credit(escort)])
+    |> append_credit(escort)
     |> append(last_point, finish(escort, last_wait_ms))
   end
 
   defp append(points, point, steps), do: Map.update(points, point, steps, &(&1 ++ steps))
+
+  defp append_credit(points, %__MODULE__{credit_point: nil}), do: points
+  defp append_credit(points, %__MODULE__{} = escort), do: append(points, escort.credit_point, [credit(escort)])
 
   defp map_event(%__MODULE__{quest_id: quest_id} = escort) do
     %ScriptStep{
