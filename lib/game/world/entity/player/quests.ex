@@ -761,8 +761,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
 
   def credit_cast(%{character: %Character{player: %{quest_log: quest_log}}} = state, target_guids, spell_id)
       when is_map(quest_log) and is_list(target_guids) and is_integer(spell_id) and spell_id > 0 do
-    Enum.reduce(target_guids, state, fn target_guid, state ->
-      credit_entity_objective(state, state.character, target_guid, spell_id, &QuestLog.increment_cast/5)
+    Enum.reduce(target_guids, state, fn target, state ->
+      credit_entity_objective(state, state.character, target, spell_id, &QuestLog.increment_cast/5)
     end)
   end
 
@@ -920,13 +920,13 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   defp credit_entity_objective(
          state,
          %Character{} = character,
-         target_guid,
+         target,
          spell_id,
          increment,
          eligible? \\ fn _ -> true end
        ) do
+    {target_guid, target_entry} = credit_target(target)
     entity_type = quest_entity_type(target_guid)
-    target_entry = World.entry(target_guid)
     player = character.player
     quests = Enum.filter(active_quests(player), eligible?)
 
@@ -955,6 +955,9 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
       state
     end
   end
+
+  defp credit_target({guid, entry}) when is_integer(guid) and is_integer(entry), do: {guid, entry}
+  defp credit_target(guid) when is_integer(guid), do: {guid, World.entry(guid)}
 
   defp send_entity_credit(quest, target_guid, target_entry, credit) do
     entry = if Guid.type_id(target_guid) == :game_object, do: Bitwise.bor(target_entry, 0x80000000), else: target_entry

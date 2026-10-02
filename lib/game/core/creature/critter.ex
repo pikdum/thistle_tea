@@ -6,10 +6,9 @@ defmodule ThistleTea.Game.Core.Creature.Critter do
 
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Blackboard.Critter, as: CritterMemory
+  alias ThistleTea.Game.Core.AI.BT.Flee
   alias ThistleTea.Game.Core.Combat.Engagement
-  alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Mob
-  alias ThistleTea.Game.Core.Movement
   alias ThistleTea.Game.Core.Movement.ControlMovement
   alias ThistleTea.Game.Core.Spell
 
@@ -52,17 +51,12 @@ defmodule ThistleTea.Game.Core.Creature.Critter do
     memory = blackboard.critter || %CritterMemory{escape_at: now + @escape_ms, previous_running: mob.internal.running}
     blackboard = %{blackboard | critter: %{memory | escape_at: now + @escape_ms}}
 
-    {mob, blackboard} =
-      if is_integer(blackboard.combat.flee_until) and now < blackboard.combat.flee_until do
-        {mob, blackboard}
-      else
-        {mob, events} = Movement.stop_with_effects(mob, now)
-        mob = Effects.enqueue(mob, events)
-        blackboard = blackboard |> Blackboard.clear_move_target() |> Blackboard.start_flee(source_guid, @escape_ms, now)
-        {%{mob | internal: %{mob.internal | navigation_intents: []}}, blackboard}
-      end
-
-    %{mob | internal: %{mob.internal | blackboard: blackboard, broadcast_update?: true}}
-    |> ControlMovement.sync_flags()
+    if is_integer(blackboard.combat.flee_until) and now < blackboard.combat.flee_until do
+      %{mob | internal: %{mob.internal | blackboard: blackboard, broadcast_update?: true}}
+      |> ControlMovement.sync_flags()
+    else
+      {mob, _blackboard} = Flee.run_from(mob, blackboard, source_guid, @escape_ms, now)
+      mob
+    end
   end
 end

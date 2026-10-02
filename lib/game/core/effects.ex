@@ -751,8 +751,14 @@ defmodule ThistleTea.Game.Core.Effects do
     %Effects.ReputationChange{faction_id: faction_id, value: value}
   end
 
-  def quest_cast_credit(target_guids, spell_id) when is_list(target_guids) and is_integer(spell_id) and spell_id > 0 do
-    %Effects.QuestCastCredit{target_guids: target_guids, spell_id: spell_id}
+  def quest_cast_credit(target_guids, spell_id, opts \\ [])
+      when is_list(target_guids) and is_integer(spell_id) and spell_id > 0 do
+    %Effects.QuestCastCredit{
+      target_guids: target_guids,
+      spell_id: spell_id,
+      player_guid: Keyword.get(opts, :player_guid),
+      target_entry: Keyword.get(opts, :target_entry)
+    }
   end
 
   def quest_event_credit(player_guid, quest_id, opts \\ [])

@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
   alias ThistleTea.Game.Core.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Core.AI.BT.Context.Waypoints
+  alias ThistleTea.Game.Core.AI.BT.Flee
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Combat.FactionTemplate
@@ -32,6 +33,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Entity.NavigationResolver
+  alias ThistleTea.Test.Unique
 
   setup [:mob]
 
@@ -758,6 +760,28 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
              ] = mob.internal.events
     end
 
+    test "cast_credit credits the player against the creature's current entry", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      step = %ScriptStep{command: :cast_credit, datalong: 19_512}
+
+      {credited, _blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+      {uncredited, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      guid = mob.object.guid
+      entry = mob.object.entry
+
+      assert [
+               %Effects.QuestCastCredit{
+                 target_guids: [^guid],
+                 spell_id: 19_512,
+                 player_guid: ^player_guid,
+                 target_entry: ^entry
+               }
+             ] = credited.internal.events
+
+      assert uncredited.internal.events == []
+    end
+
     test "fail_quest enqueues group quest failure", %{mob: mob} do
       player_guid = Guid.from_low_guid(:player, 9)
       step = %ScriptStep{command: :fail_quest, datalong: 986}
@@ -1271,6 +1295,20 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
 
       assert blackboard.navigation.movement_override == :home
       assert blackboard.navigation.target == {1.0, 2.0, 3.0}
+    end
+
+    test "movement fleeing runs from the target, or from the victim, for its duration", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      victim_guid = Guid.from_low_guid(:player, Unique.integer())
+      mob = %{mob | unit: %{mob.unit | target: victim_guid}}
+      step = %ScriptStep{command: :movement, datalong: 10, datalong3: 10_000}
+
+      {_mob, blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+      assert {blackboard.combat.flee_from, blackboard.combat.flee_until} == {player_guid, 11_000}
+
+      step = %{step | datalong2: 1, datalong3: 0}
+      {_mob, blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+      assert {blackboard.combat.flee_from, blackboard.combat.flee_until} == {victim_guid, 1_000 + Flee.duration_ms()}
     end
 
     test "movement commands are ignored while dead", %{mob: mob} do

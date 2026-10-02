@@ -588,6 +588,22 @@ defmodule ThistleTea.Game.Core.AI.Script do
     {halt_scripted_movement(state, now), Blackboard.start_home(blackboard, {x, y, z})}
   end
 
+  defp execute(
+         %Mob{} = state,
+         blackboard,
+         %ScriptStep{command: :movement, datalong: 10} = step,
+         target,
+         now,
+         %Context{}
+       ) do
+    from_guid = if step.datalong2 == 0, do: target, else: state.unit.target
+    duration_ms = if step.datalong3 > 0, do: step.datalong3, else: Flee.duration_ms()
+
+    if is_integer(from_guid) and from_guid > 0 and from_guid != state.object.guid,
+      do: Flee.run_from(state, blackboard, from_guid, duration_ms, now),
+      else: {state, blackboard}
+  end
+
   defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :movement, datalong: 19} = step, target, _now, context) do
     if step.datalong3 == 0 or (Entity.mana_pct(state) || 0) >= step.datalong3 do
       Distancing.start(state, blackboard, resolve_target(state, step, target, context), elem(step.position, 0), context)
@@ -688,6 +704,27 @@ defmodule ThistleTea.Game.Core.AI.Script do
       player_guid ->
         event = Effects.quest_kill_credit(player_guid, creature_entry, group?: step.datalong2 != 0)
         {Effects.enqueue(state, event), blackboard}
+    end
+  end
+
+  defp execute(
+         %{object: %{guid: source_guid, entry: source_entry}} = state,
+         blackboard,
+         %ScriptStep{command: :cast_credit, datalong: spell_id},
+         target_guid,
+         _now,
+         %Context{}
+       )
+       when is_integer(spell_id) and spell_id > 0 do
+    case script_player_guid(source_guid, target_guid) do
+      player_guid when player_guid in [nil, source_guid] ->
+        {state, blackboard}
+
+      player_guid ->
+        effect =
+          Effects.quest_cast_credit([source_guid], spell_id, player_guid: player_guid, target_entry: source_entry)
+
+        {Effects.enqueue(state, effect), blackboard}
     end
   end
 

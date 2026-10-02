@@ -305,6 +305,16 @@ defmodule ThistleTea.Game.World.Entity.EventSink.ClientProjection do
 
   def emit(entity, %Effects.ReputationChange{}, _context), do: entity
 
+  def emit(entity, %Effects.QuestCastCredit{player_guid: player_guid} = effect, _context)
+      when is_integer(player_guid) do
+    case Entity.pid(player_guid) do
+      pid when is_pid(pid) -> send(pid, {:quest_cast_credit, cast_credit_targets(effect), effect.spell_id})
+      _pid -> :ok
+    end
+
+    entity
+  end
+
   def emit(%Character{} = entity, %Effects.QuestCastCredit{} = effect, context) do
     Context.send(context, {:quest_cast_credit, effect.target_guids, effect.spell_id})
     entity
@@ -370,6 +380,11 @@ defmodule ThistleTea.Game.World.Entity.EventSink.ClientProjection do
 
     entity
   end
+
+  defp cast_credit_targets(%Effects.QuestCastCredit{target_guids: guids, target_entry: nil}), do: guids
+
+  defp cast_credit_targets(%Effects.QuestCastCredit{target_guids: guids, target_entry: entry}),
+    do: Enum.map(guids, &{&1, entry})
 
   defp monster_chat_type(chat_type) when chat_type in [:yell, :zone_yell], do: :monster_yell
   defp monster_chat_type(chat_type) when chat_type in [:text_emote, :boss_emote, :zone_emote], do: :monster_emote

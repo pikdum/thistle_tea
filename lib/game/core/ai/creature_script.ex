@@ -15,12 +15,14 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
 
   alias ThistleTea.Game.Core.AI.AIEvent
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
+  alias ThistleTea.Game.Core.AI.CreatureScript.SicklyCritter
+  alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
 
   @callback entries() :: [pos_integer()]
   @callback events(pos_integer()) :: [%AIEvent{}]
 
-  @scripts [LazyPeon]
+  @scripts [LazyPeon, SicklyCritter]
   @timed_script 1
 
   def ported?(entry), do: not is_nil(script(entry))
@@ -33,6 +35,13 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   end
 
   def entries, do: Enum.flat_map(@scripts, & &1.entries())
+
+  def creature_entries do
+    entries()
+    |> Enum.flat_map(&events/1)
+    |> Enum.flat_map(&List.flatten(&1.actions))
+    |> Script.creature_entries()
+  end
 
   def event(entry, index, event_type, steps, opts \\ []) when is_integer(entry) and is_list(steps) do
     struct!(

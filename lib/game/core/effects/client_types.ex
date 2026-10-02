@@ -43,7 +43,7 @@ defmodule ThistleTea.Game.Core.Effects.ClientTypes do
     {:FactionAtWarChanged, [:index, :enabled], []},
     {:ForcedReactionsChanged, [:reactions, :friendly_faction_ids], []},
     {:ReputationChange, [:faction_id, :value], []},
-    {:QuestCastCredit, [:target_guids, :spell_id], []},
+    {:QuestCastCredit, [:target_guids, :spell_id], [player_guid: nil, target_entry: nil]},
     {:QuestEventCredit, [:player_guid, :quest_id], [group?: false, distance: 0, world_object_guid: nil]},
     {:QuestFail, [:player_guid, :quest_id], [group?: false]},
     {:QuestInteractionCredit, [:player_guid, :target_guid], []},

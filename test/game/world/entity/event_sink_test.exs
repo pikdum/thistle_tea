@@ -97,6 +97,18 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       refute_received {:"$gen_cast", {:send_packet, %Message.SmsgSpellCooldown{}}}
     end
 
+    test "scripted cast credit reaches its player with the creature's reported entry" do
+      player = Guid.from_low_guid(:player, unique_guid())
+      {:ok, _} = Entity.register(player)
+      on_exit(fn -> Entity.unregister(player) end)
+      mob = %Mob{object: %Object{guid: Guid.from_low_guid(:mob, 12_298, unique_guid()), entry: 12_299}}
+      guid = mob.object.guid
+      credit = Effects.quest_cast_credit([guid], 19_512, player_guid: player, target_entry: 12_299)
+
+      assert EventSink.emit(mob, credit) == mob
+      assert_receive {:quest_cast_credit, [{^guid, 12_299}], 19_512}
+    end
+
     test "controlled contact reaches the explicit player owner" do
       owner = unique_guid()
       {:ok, _} = Entity.register(owner)

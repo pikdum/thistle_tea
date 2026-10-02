@@ -49,6 +49,16 @@ defmodule ThistleTea.Game.Core.AI.BT.Flee do
 
   def start(mob, blackboard, _context, _seek?), do: {mob, blackboard}
 
+  def run_from(%Mob{} = mob, %Blackboard{} = blackboard, from_guid, duration_ms, now)
+      when is_integer(from_guid) and from_guid > 0 and is_integer(duration_ms) and duration_ms > 0 do
+    {mob, events} = Movement.stop_with_effects(mob, now)
+    blackboard = blackboard |> Blackboard.clear_move_target() |> Blackboard.start_flee(from_guid, duration_ms, now)
+    internal = %{mob.internal | blackboard: blackboard, navigation_intents: [], broadcast_update?: true}
+    mob = Effects.enqueue(%{mob | internal: internal}, events)
+
+    {ControlMovement.sync_flags(mob), blackboard}
+  end
+
   defp prevented?(mob, blackboard, now) do
     distracted = blackboard.navigation.distracted_until
 

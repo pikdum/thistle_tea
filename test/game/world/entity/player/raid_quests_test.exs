@@ -72,6 +72,17 @@ defmodule ThistleTea.Game.World.Entity.Player.RaidQuestsTest do
       credited = Quests.credit_cast(state, [state.guid, creature], 10_292)
       assert QuestLog.get(credited.character.player.quest_log, quest.id).counts == %{0 => 1}
     end
+
+    test "credits the entry a creature script reports instead of its spawn entry", %{state: state, normal: quest} do
+      quest = %{quest | required_entity_objectives: [{0, :creature, 299, 10_292, 2}]}
+      :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
+      creature = Guid.from_low_guid(:creature, 298, Unique.integer())
+
+      assert Quests.credit_cast(state, [creature], 10_292) == state
+
+      credited = Quests.credit_cast(state, [{creature, 299}], 10_292)
+      assert QuestLog.get(credited.character.player.quest_log, quest.id).counts == %{0 => 1}
+    end
   end
 
   defp quests(_context) do
