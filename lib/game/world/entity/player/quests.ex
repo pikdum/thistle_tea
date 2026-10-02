@@ -655,9 +655,17 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   end
 
   def credit_kill_entry(%{character: %Character{} = character} = state, creature_entry, victim_guid) do
-    player = character.player
     raid? = raid?(character)
-    quests = Enum.filter(active_quests(player), &(not raid? or Quest.allowed_in_raid?(&1)))
+    credit_creature(state, creature_entry, victim_guid, &(not raid? or Quest.allowed_in_raid?(&1)))
+  end
+
+  def credit_talk(%{character: %Character{}} = state, npc_guid) do
+    credit_creature(state, World.entry(npc_guid), npc_guid, &(not Quest.exploration?(&1)))
+  end
+
+  defp credit_creature(%{character: %Character{} = character} = state, creature_entry, source_guid, eligible?) do
+    player = character.player
+    quests = Enum.filter(active_quests(player), eligible?)
 
     {quest_log, credited?} =
       Enum.reduce(quests, {player.quest_log, false}, fn quest, {quest_log, credited?} ->
@@ -668,7 +676,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
               creature_entry: creature_entry,
               count: credit.count,
               required: credit.required,
-              victim_guid: victim_guid
+              victim_guid: source_guid
             })
 
             {quest_log, _event} = complete_check(quest_log, quest, character)

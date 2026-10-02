@@ -44,6 +44,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Gossip.Menu
   alias ThistleTea.Game.World.Loader.Gossip.Option
+  alias ThistleTea.Game.World.Loader.Gossip.Poi
   alias ThistleTea.Game.World.Loader.Gossip.Text
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
@@ -201,9 +202,10 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
          state,
          character,
          guid,
-         %Option{option_id: option_id, action_menu_id: action_menu_id, action_steps: steps},
+         %Option{option_id: option_id, action_menu_id: action_menu_id, action_steps: steps} = option,
          %{gossip: option_id}
        ) do
+    send_poi(option)
     state = dispatch_gossip_menu(state, character, guid, action_menu_id)
 
     if steps != [] do
@@ -277,12 +279,26 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
     end
   end
 
-  defp dispatch_gossip_menu(state, _character, _guid, action_menu_id) when action_menu_id < 0 do
+  defp dispatch_gossip_menu(state, _character, guid, action_menu_id) when action_menu_id < 0 do
     Outbound.send_packet(%Message.SmsgGossipComplete{})
-    %{state | gossip_menu_options: []}
+    state = %{state | gossip_menu_options: []}
+    if Guid.type_id(guid) == :unit, do: Quests.credit_talk(state, guid), else: state
   end
 
   defp dispatch_gossip_menu(state, _character, _guid, _action_menu_id), do: state
+
+  defp send_poi(%Option{poi: %Poi{} = poi}) do
+    Outbound.send_packet(%Message.SmsgGossipPoi{
+      flags: poi.flags,
+      x: poi.x,
+      y: poi.y,
+      icon: poi.icon,
+      data: poi.data,
+      name: poi.name
+    })
+  end
+
+  defp send_poi(_option), do: :ok
 
   defp submenu_quests(guid, menu_id, character) do
     if Guid.type_id(guid) == :game_object do

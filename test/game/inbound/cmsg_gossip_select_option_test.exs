@@ -11,6 +11,8 @@ defmodule ThistleTea.Game.Inbound.CmsgGossipSelectOptionTest do
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Quest
+  alias ThistleTea.Game.Core.Quest.QuestLog
   alias ThistleTea.Game.Core.Reputation
   alias ThistleTea.Game.Core.Travel.Taxi.Network
   alias ThistleTea.Game.Core.Travel.Taxi.Node
@@ -18,11 +20,15 @@ defmodule ThistleTea.Game.Inbound.CmsgGossipSelectOptionTest do
   alias ThistleTea.Game.Inbound
   alias ThistleTea.Game.Inbound.CmsgGossipSelectOption
   alias ThistleTea.Game.Network.Message.SmsgGossipComplete
+  alias ThistleTea.Game.Network.Message.SmsgGossipPoi
+  alias ThistleTea.Game.Network.Message.SmsgQuestupdateAddKill
   alias ThistleTea.Game.Network.Message.SmsgShowBank
   alias ThistleTea.Game.Network.Message.SmsgShowtaxinodes
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.Gossip.Option
+  alias ThistleTea.Game.World.Loader.Gossip.Poi
+  alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -187,6 +193,45 @@ defmodule ThistleTea.Game.Inbound.CmsgGossipSelectOptionTest do
       assert_receive {:"$gen_cast", {:send_packet, %SmsgShowBank{banker_guid: ^banker_guid}}}
     end
 
+    test "marks a guard's directions on the map and keeps the menu open" do
+      poi = %Poi{x: -8885.39, y: 640.052, icon: 6, flags: 99, data: 0, name: "Stormwind Bank"}
+      option = %Option{id: 0, option_id: 1, action_menu_id: 0, poi: poi}
+      character = talker(Guid.from_low_guid(:player, Unique.integer()), %{})
+      guard_guid = Guid.from_low_guid(:mob, 68, Unique.integer())
+      state = %{character: character, gossip_menu_options: [option], gossip_menu_guid: guard_guid}
+
+      assert Inbound.handle(%CmsgGossipSelectOption{guid: guard_guid, gossip_list_id: 0}, state) == state
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgGossipPoi{name: "Stormwind Bank", icon: 6, flags: 99}}}
+      refute_receive {:"$gen_cast", {:send_packet, %SmsgGossipComplete{}}}
+    end
+
+    test "credits talk objectives when an option closes creature gossip" do
+      entry = 900_000 + Unique.integer()
+      quest = %Quest{id: entry, required_kills: [{0, entry, 1}]}
+      :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
+      on_exit(fn -> :ets.delete(QuestLoader, {:quest, quest.id}) end)
+
+      {:ok, log} = QuestLog.add(%{}, quest.id)
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      npc_guid = Guid.from_low_guid(:mob, entry, Unique.integer())
+      option = %Option{id: 0, option_id: 1, action_menu_id: -1}
+
+      state = %State{
+        guid: player_guid,
+        character: talker(player_guid, log),
+        gossip_menu_options: [option],
+        gossip_menu_guid: npc_guid
+      }
+
+      state = Inbound.handle(%CmsgGossipSelectOption{guid: npc_guid, gossip_list_id: 0}, state)
+
+      assert QuestLog.get(state.character.player.quest_log, quest.id).counts == %{0 => 1}
+      quest_id = quest.id
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %SmsgQuestupdateAddKill{quest_id: ^quest_id, victim_guid: ^npc_guid}}}
+    end
+
     test "revalidates a conditioned option after player state changes" do
       option = %Option{
         id: 0,
@@ -224,5 +269,16 @@ defmodule ThistleTea.Game.Inbound.CmsgGossipSelectOptionTest do
       refute_receive %SendTaxiPath{path_id: 315}
       refute_receive {:"$gen_cast", {:send_packet, _packet}}
     end
+  end
+
+  defp talker(guid, quest_log) do
+    %Character{
+      id: Guid.low_guid(guid),
+      object: %Object{guid: guid},
+      unit: %Unit{level: 10, race: 1, class: 1, health: 100, max_health: 100, auras: []},
+      player: %Player{skills: %{}, quest_log: quest_log, rewarded_quests: MapSet.new(), reputation: %Reputation{}},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+      internal: %Internal{world: WorldRef.open(0), spellbook: %{}}
+    }
   end
 end

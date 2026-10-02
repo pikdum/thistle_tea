@@ -55,6 +55,11 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
     defstruct [:text_id, :condition_id, :condition]
   end
 
+  defmodule Poi do
+    @moduledoc false
+    defstruct [:x, :y, :icon, :flags, :data, :name]
+  end
+
   defmodule Option do
     @moduledoc false
     defstruct [
@@ -66,6 +71,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
       :action_menu_id,
       :condition,
       :action,
+      :poi,
       action_steps: [],
       coded: 0,
       taxi_path_steps: []
@@ -100,6 +106,8 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
       (option_rows ++ menu_rows)
       |> Enum.map(& &1.condition_id)
       |> ConditionLoader.load_by_ids()
+
+    pois = load_pois(option_rows)
 
     options_by_menu = Enum.group_by(option_rows, & &1.menu_id)
     option_menu_ids = MapSet.new(all_option_rows, & &1.menu_id)
@@ -142,6 +150,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
             npc_flag: o.npc_option_npcflag,
             action_menu_id: o.action_menu_id,
             condition: Map.get(conditions, o.condition_id),
+            poi: Map.get(pois, o.action_poi_id),
             action_steps: Map.get(action_steps_by_script, o.action_script_id, []),
             coded: o.box_coded,
             taxi_path_steps: Map.get(taxi_steps_by_script, o.action_script_id, [])
@@ -229,4 +238,14 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   def option_battlefield, do: @option_battlefield
   def option_pet_untrain, do: @option_pet_untrain
   def option_talent_reset, do: @option_talent_reset
+
+  defp load_pois(option_rows) do
+    ids = option_rows |> Enum.map(& &1.action_poi_id) |> Enum.filter(&(&1 > 0)) |> Enum.uniq()
+
+    from(p in Mangos.PointOfInterest, where: p.entry in ^ids)
+    |> Mangos.Repo.all()
+    |> Map.new(fn p ->
+      {p.entry, %Poi{x: p.x, y: p.y, icon: p.icon, flags: p.flags, data: p.data, name: p.icon_name || ""}}
+    end)
+  end
 end

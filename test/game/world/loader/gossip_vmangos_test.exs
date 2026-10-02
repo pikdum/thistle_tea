@@ -21,6 +21,14 @@ defmodule ThistleTea.Game.World.Loader.GossipVmangosTest do
   @moduletag :vmangos_db
 
   describe "load_all/0" do
+    test "attaches city guard directions to their gossip options" do
+      assert :ok = Gossip.load_all()
+      assert %Menu{options: options} = Gossip.menu_for_creature(68)
+
+      assert %Option{action_menu_id: 265, poi: %Gossip.Poi{name: "Stormwind Bank", icon: 6, flags: 99}} =
+               Enum.find(options, &(&1.id == 1))
+    end
+
     test "loads class-trainer talent reset options separately from pet trainers" do
       assert :ok = Gossip.load_all()
       assert Gossip.class_trainer?(5515, 3)
