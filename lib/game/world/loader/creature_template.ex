@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.World.Loader.CreatureTemplate do
   gameplay queries answer from running state instead of the Mangos seed.
   """
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Core.Creature.CreatureFlags
   alias ThistleTea.Game.Core.Entity.CreatureTemplate
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
@@ -48,7 +49,7 @@ defmodule ThistleTea.Game.World.Loader.CreatureTemplate do
       entry: ct.entry,
       name: ct.name,
       sub_name: ct.sub_name,
-      type_flags: ct.creature_type_flags,
+      type_flags: CreatureFlags.type_flags(ct.creature_type_flags, ct.static_flags2),
       creature_type: ct.creature_type,
       family: ct.family,
       rank: ct.rank,

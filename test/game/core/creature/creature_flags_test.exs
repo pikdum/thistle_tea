@@ -61,6 +61,28 @@ defmodule ThistleTea.Game.Core.Creature.CreatureFlagsTest do
       refute Hostility.valid_attack_target?(npc, npc_immune)
       refute Hostility.valid_attack_target?(player, unselectable)
     end
+
+    test "derives client type flags instead of sending static flags", %{creature: creature} do
+      assert build(creature, 0x280166).internal.creature.type_flags == 0x02
+    end
+  end
+
+  describe "type_flags/2" do
+    test "maps each static flag to its client type flag" do
+      assert CreatureFlags.type_flags(0x10, 0) == 0x01
+      assert CreatureFlags.type_flags(0x00200000, 0) == 0x02
+      assert CreatureFlags.type_flags(0x00010000, 0) == 0x04
+      assert CreatureFlags.type_flags(0x00800000, 0) == 0x08
+      assert CreatureFlags.type_flags(0x01000000, 0) == 0x10
+      assert CreatureFlags.type_flags(0x40000000, 0) == 0x20
+      assert CreatureFlags.type_flags(0, 0x08) == 0x40
+    end
+
+    test "drops static flags the client has no type flag for" do
+      assert CreatureFlags.type_flags(0x280166, 0) == 0x02
+      assert CreatureFlags.type_flags(0x0F, 0x37) == 0
+      assert CreatureFlags.type_flags(nil, nil) == 0
+    end
   end
 
   describe "Entity.take_damage/4" do

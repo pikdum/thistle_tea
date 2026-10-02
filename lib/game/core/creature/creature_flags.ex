@@ -2,6 +2,11 @@ defmodule ThistleTea.Game.Core.Creature.CreatureFlags do
   @moduledoc """
   Creature-template combat defaults, independent of runtime unit flags and
   script overrides. Static flags remain available on the entity after loading.
+
+  `type_flags/2` derives the creature type flags the client reads from the
+  creature query response out of the template's static flags, the way
+  vmangos `CreatureInfo::GetTypeFlags` does; the raw static flags never go to
+  the client.
   """
 
   import Bitwise
@@ -26,6 +31,16 @@ defmodule ThistleTea.Game.Core.Creature.CreatureFlags do
   }
 
   @unit_flags [immune_to_player: 0x100, immune_to_npc: 0x200, uninteractible: 0x02000000, can_swim: 0x8000]
+
+  @type_flags [
+    {:static_flags, 0x00000010, 0x01},
+    {:static_flags, 0x00200000, 0x02},
+    {:static_flags, 0x00010000, 0x04},
+    {:static_flags, 0x00800000, 0x08},
+    {:static_flags, 0x01000000, 0x10},
+    {:static_flags, 0x40000000, 0x20},
+    {:static_flags2, 0x00000008, 0x40}
+  ]
 
   def has?(%{internal: %Internal{creature: %Creature{static_flags: flags}}}, flag), do: has?(flags, flag)
   def has?(flags, flag) when is_integer(flags), do: (flags &&& Map.fetch!(@flags, flag)) != 0
@@ -64,6 +79,14 @@ defmodule ThistleTea.Game.Core.Creature.CreatureFlags do
   def unit_flags(flags, static_flags) do
     Enum.reduce(@unit_flags, Pvp.unit_flags(flags, has?(static_flags, :pvp_enabling)), fn {flag, mask}, acc ->
       if has?(static_flags, flag), do: acc ||| mask, else: acc &&& bnot(mask)
+    end)
+  end
+
+  def type_flags(static_flags, static_flags2) do
+    flags = %{static_flags: static_flags || 0, static_flags2: static_flags2 || 0}
+
+    Enum.reduce(@type_flags, 0, fn {field, static_flag, type_flag}, acc ->
+      if (Map.fetch!(flags, field) &&& static_flag) == 0, do: acc, else: acc ||| type_flag
     end)
   end
 

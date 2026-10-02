@@ -35,10 +35,6 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
   @update_flag_has_position 0x40
   @default_respawn_delay_ms 120_000
   @static_flag_no_automatic_regen 0x00000400
-  @static_flag_tameable 0x00000010
-  @static_flag_visible_to_ghosts 0x00200000
-  @creature_type_flag_tameable 0x01
-  @creature_type_flag_ghost_visible 0x02
 
   def build(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{} = ct} = c, opts \\ []) do
     event =
@@ -185,7 +181,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
           civilian?: ct.civilian == 1,
           racial_leader?: ct.racial_leader == 1,
           family: ct.family,
-          type_flags: type_flags(ct),
+          type_flags: CreatureFlags.type_flags(ct.creature_type_flags, ct.static_flags2),
           creature_type: ct.creature_type,
           inhabit_type: ct.inhabit_type,
           critter?: ct.creature_type == 8 and ct.ai_name in [nil, "", "CritterAI"] and c.ai_events in [nil, []],
@@ -359,16 +355,6 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
 
   defp unit_flags(%Mangos.CreatureTemplate{unit_flags: flags, creature_type_flags: static_flags}) do
     CreatureFlags.unit_flags(flags, static_flags)
-  end
-
-  defp type_flags(%Mangos.CreatureTemplate{creature_type_flags: flags}) when is_integer(flags) do
-    0
-    |> put_type_flag(flags, @static_flag_tameable, @creature_type_flag_tameable)
-    |> put_type_flag(flags, @static_flag_visible_to_ghosts, @creature_type_flag_ghost_visible)
-  end
-
-  defp put_type_flag(type_flags, static_flags, static_flag, type_flag) do
-    if (static_flags &&& static_flag) == 0, do: type_flags, else: type_flags ||| type_flag
   end
 
   defp regenerate_stats(%Mangos.CreatureTemplate{regenerate_stats: stats}) when is_integer(stats), do: stats
