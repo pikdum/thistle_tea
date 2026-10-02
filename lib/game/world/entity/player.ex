@@ -2315,7 +2315,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   end
 
   defp disengage_for_world_transition(%State{character: %Character{}} = state) do
-    state = PossessionOwner.release(state)
+    state = state |> PossessionOwner.release() |> release_controlled_companion()
 
     character =
       state.character
@@ -2324,6 +2324,17 @@ defmodule ThistleTea.Game.World.Entity.Player do
 
     {character, effects} = PlayerCombat.disengage(character)
     %{state | character: EventSink.emit(character, effects)}
+  end
+
+  defp release_controlled_companion(%State{character: %Character{} = character} = state) do
+    with guid when is_integer(guid) <- Companion.control_guid(character),
+         {:ok, entity_ref, state} <- CompanionOwner.detach(state, guid, :released) do
+      state = project_companion_detachment(state, entity_ref)
+      release = Effects.release_controlled(state.guid, guid, entity_ref.spell_id)
+      maybe_broadcast_update(%{state | character: EventSink.emit(state.character, release)})
+    else
+      _ -> state
+    end
   end
 
   defp destination_zone_and_area(%Character{} = character, map_id, position) do

@@ -1246,8 +1246,10 @@ defmodule ThistleTea.Game.World.Entity.Mob do
 
   def handle_info(
         {:release_control, owner_guid, spell_id},
-        %Mob{internal: %Internal{pet: %Pet{kind: :possessed, owner_guid: owner_guid, control_spell_id: spell_id}}} =
-          state
+        %Mob{
+          unit: %Unit{created_by_spell: spell_id},
+          internal: %Internal{pet: %Pet{kind: :possessed, owner_guid: owner_guid, control_spell_id: spell_id}}
+        } = state
       ) do
     {:noreply, Respawn.despawn(state, nil)}
   end
@@ -1262,10 +1264,10 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   end
 
   def handle_info(
-        {:release_control, owner_guid, nil},
+        {:release_control, owner_guid, requested},
         %Mob{internal: %Internal{pet: %Pet{kind: :charmed, owner_guid: owner_guid, control_spell_id: spell_id}}} = state
       )
-      when is_integer(spell_id) do
+      when is_integer(spell_id) and requested in [nil, spell_id] do
     {state, events} = Aura.remove_source_spell(state, spell_id, owner_guid, Time.now())
     {:noreply, EventSink.emit(state, events), {:continue, :maybe_broadcast}}
   end
@@ -2312,7 +2314,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
           &2,
           killer,
           now,
-          AIEnvironment.context(&1, now, ObservationRequest.actor(killer))
+          AIEnvironment.context(&1, now, ObservationRequest.new(List.wrap(killer)))
         )
       )
       |> NavigationResolver.resolve(now)
