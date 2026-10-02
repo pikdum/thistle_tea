@@ -145,6 +145,25 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScriptTest do
     end
   end
 
+  describe "the Affray ring" do
+    test "calls Twiggy to start the fight for a player on The Affray" do
+      player = character(quests: [{1719, :incomplete}])
+      guid = player.object.guid
+      twiggy = Guid.from_low_guid(:mob, 6248, Unique.integer())
+      perception = Perception.new(0, nil, %{}, %{mobs: [{twiggy, 12.0}], players: [], game_objects: []})
+
+      assert [
+               %Effects.ForwardScriptSteps{
+                 target_guid: ^twiggy,
+                 source_guid: ^guid,
+                 steps: [%ScriptStep{command: :send_script_event, datalong: 1}]
+               }
+             ] = effects(522, player, Context.new(0, perception: perception))
+
+      assert [] = effects(522, character(quests: [{1719, :complete}]), Context.new(0, perception: perception))
+    end
+  end
+
   describe "summon_entries/0" do
     test "lists every creature a trigger can call" do
       assert Enum.sort(AreaTriggerScript.summon_entries()) == [1981, 4967, 9683 | @ancients]
