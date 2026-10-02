@@ -20,12 +20,13 @@ Override defaults only with task-specific variables:
 - `THISTLE_PLAYTEST_CACHE_DIR`
 - `THISTLE_PLAYTEST_RENDERER` (`gpu`, the default, or `software`)
 - `THISTLE_PLAYTEST_DISPLAY_NUMBER` (software sessions only)
+- `THISTLE_PLAYTEST_KEEP_WDB` (any value reuses the client's query cache)
 
 The launcher uses `umu-run`, a new `WINEPREFIX`, dummy audio, and `STEAM_COMPAT_MOUNTS=/storage`. GPU sessions unset inherited software-rendering overrides and run Gamescope with `--backend headless` at 1280×720 and 60 Hz. No window appears on the user's desktop. Required graphics tools are obtained with a one-off Nix shell when missing. A working systemd user manager is required for both rendering modes.
 
 The helper writes the private X display to `display`, the Gamescope socket to `wayland.display`, the selected mode to `renderer`, and GLX hardware details to `renderer.log`. It rejects a software renderer in GPU mode. For native acceptance, also verify WoW's own GPU usage through its `/proc/PID/fdinfo` DRM counters; the compositor's renderer alone is not proof. GPU captures use `gamescopectl screenshot` on the recorded socket and wait for completion before publishing the image. X11 window capture can return an old OpenGL frame even while gameplay continues. Software captures use the game window.
 
-The launcher does not edit `realmlist.wtf` or client files; the game can still save its normal settings. XKB warnings are harmless. A Proton game-drive warning can also be nonfatal; require the WoW window and a screenshot rather than judging launch from that line alone.
+The launcher does not edit `realmlist.wtf` or client settings; the game can still save its normal settings. It does move the client's `WDB` query cache into the session as `wdb-previous`. The client trusts cached creature, NPC text, quest, item, and game object records over the server and never re-queries them. A cache left by an older server build therefore hides server fixes; a stale NPC text once made the spirit healer's gossip fire `GOSSIP_CLOSED` instead of `GOSSIP_SHOW`, because its text sat in the male slot of a female NPC. Sessions are stopped without a clean exit, so the client never writes the cache back. XKB warnings are harmless. A Proton game-drive warning can also be nonfatal; require the WoW window and a screenshot rather than judging launch from that line alone.
 
 ## Session ownership and cleanup
 
@@ -63,6 +64,8 @@ wow-client stop SESSION
 ## Reliable input patterns
 
 Focus before each sequence. Open chat, pause briefly, type with a small per-character delay, then submit. Without the pause, the client may drop the first characters.
+
+Ghosts cannot `/say`, so send dev commands to yourself as a whisper (`/w Debugwarlock .tgm`); the server runs commands from any chat type. Chat input stops at 255 characters, so split long `/script` probes into several lines. `launch` can return before the login screen accepts input; capture first, and rerun `login-debug` if the account fields stayed empty.
 
 Use left button 1 and right button 3. Right-clicking an NPC opens gossip; left-clicking selects quest rows and buttons. Hold right-click and move the mouse to rotate the camera.
 

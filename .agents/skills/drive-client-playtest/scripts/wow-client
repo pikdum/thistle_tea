@@ -226,6 +226,9 @@ launch_client() {
   session_dir="$(mktemp -d "$cache_dir/thistle-wow-playtest.XXXXXX")"
   session_dir="$(realpath -e "$session_dir")"
   mkdir -p "$session_dir/prefix" "$session_dir/screenshots"
+  if [[ -d "$wow_dir/WDB" && -z "${THISTLE_PLAYTEST_KEEP_WDB:-}" ]]; then
+    mv "$wow_dir/WDB" "$session_dir/wdb-previous"
+  fi
   printf 'drive-client-playtest\n' >"$session_dir/session.kind"
   printf '%s\n' "$renderer" >"$session_dir/renderer"
   unit="$(basename "$session_dir").service"
