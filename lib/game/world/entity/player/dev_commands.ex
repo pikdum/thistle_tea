@@ -170,7 +170,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   def run(state, ".help" <> _) do
     commands = [
       ".additem <item_id> [count] - add an item to your inventory",
-      ".addquest <quest_id> - add a quest to your quest log",
+      ".addquest <quest_id> - add a quest to your quest log, as if accepted from the selected creature",
       ".debug random equipment - add a random player-obtainable equipment set",
       ".debug professions - set known professions to 300/300",
       ".debug cooldowns - reset spell and item cooldowns",
@@ -700,6 +700,8 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
       match?({^world, _, _, _}, World.position(target))
   end
 
+  defp selected_creature?(_state), do: false
+
   defp pet_adjustment(kind, delta) do
     case Integer.parse(delta) do
       {amount, ""} when amount in -1_050_000..1_050_000 -> {kind, amount}
@@ -928,8 +930,9 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
 
   defp addquest(state, quest_id_str) do
     with {quest_id, ""} <- Integer.parse(quest_id_str),
-         %Quest{} = quest <- QuestLoader.get(quest_id) do
-      case Quests.force_accept(state, quest_id) do
+         %Quest{} = quest <- QuestLoader.get(quest_id),
+         false <- QuestLog.active?(state.character.player.quest_log, quest_id) do
+      case Quests.force_accept(state, quest_id, quest_source(state)) do
         %{character: %Character{player: %{quest_log: quest_log}}} = state ->
           # credo:disable-for-next-line Credo.Check.Refactor.Nesting
           if QuestLog.active?(quest_log, quest_id) do
@@ -940,8 +943,13 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
       end
     else
       nil -> system_message(state, "Quest #{quest_id_str} not found.")
+      true -> system_message(state, "Quest #{quest_id_str} is already in your quest log.")
       _ -> system_message(state, "Invalid command. Use: .addquest <quest_id>")
     end
+  end
+
+  defp quest_source(state) do
+    if selected_creature?(state), do: state.target
   end
 
   defp send_mail(state, recipient_name, body) do

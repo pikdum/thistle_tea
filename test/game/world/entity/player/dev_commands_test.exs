@@ -15,6 +15,8 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Instance.Copy
   alias ThistleTea.Game.Core.Movement.SafePosition
+  alias ThistleTea.Game.Core.Quest
+  alias ThistleTea.Game.Core.Quest.QuestLog
   alias ThistleTea.Game.Core.Reputation, as: ReputationCore
   alias ThistleTea.Game.Core.Reputation.Catalog
   alias ThistleTea.Game.Core.Reputation.Definition
@@ -32,6 +34,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
   alias ThistleTea.Game.World.Entity.Player.DevCommands
   alias ThistleTea.Game.World.Entity.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.World.Entity.Transport, as: TransportServer
+  alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
@@ -489,6 +492,47 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
     end
   end
 
+  describe ".addquest" do
+    test "accepts as if from the selected creature, starting the quest's script there" do
+      steps = [%ScriptStep{command: :talk, dataint: 1}]
+      quest = %Quest{id: 900_000 + Unique.integer(), title: "Escape", start_script_steps: steps}
+      :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
+      on_exit(fn -> :ets.delete(QuestLoader, {:quest, quest.id}) end)
+
+      creature_guid = Guid.from_low_guid(:mob, 3692, Unique.integer())
+      {:ok, _owner} = Entity.register(creature_guid)
+      SpatialHash.insert(:mobs, creature_guid, WorldRef.open(0), 1.0, 2.0, 3.0)
+      on_exit(fn -> SpatialHash.remove(:mobs, creature_guid) end)
+
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      character = quest_character(player_guid)
+      on_exit(fn -> CharacterStore.delete(character.id) end)
+
+      state = %{guid: player_guid, target: creature_guid, character: character}
+
+      assert {:handled, state} = DevCommands.run(state, ".addquest #{quest.id}")
+      assert QuestLog.active?(state.character.player.quest_log, quest.id)
+      assert_receive {:"$gen_cast", {:start_script, ^steps, ^player_guid}}
+    end
+
+    test "starts no script without a selected creature" do
+      steps = [%ScriptStep{command: :talk, dataint: 1}]
+      quest = %Quest{id: 900_000 + Unique.integer(), title: "Escape", start_script_steps: steps}
+      :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
+      on_exit(fn -> :ets.delete(QuestLoader, {:quest, quest.id}) end)
+
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      character = quest_character(player_guid)
+      on_exit(fn -> CharacterStore.delete(character.id) end)
+
+      state = %{guid: player_guid, target: nil, character: character}
+
+      assert {:handled, state} = DevCommands.run(state, ".addquest #{quest.id}")
+      assert QuestLog.active?(state.character.player.quest_log, quest.id)
+      refute_receive {:"$gen_cast", {:start_script, _steps, _target}}, 50
+    end
+  end
+
   describe ".respawn" do
     test "asks the selected creature in this world to respawn even if alive" do
       guid = Guid.from_low_guid(:mob, 349, Unique.integer())
@@ -613,6 +657,17 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
       object: %Object{guid: 1},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{world: WorldRef.open(0)}
+    }
+  end
+
+  defp quest_character(guid) do
+    %Character{
+      id: Unique.integer(),
+      object: %Object{guid: guid},
+      unit: %Unit{health: 100, max_health: 100, level: 10, auras: []},
+      player: %Player{skills: %{}, quest_log: %{}, rewarded_quests: MapSet.new(), reputation: %ReputationCore{}},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+      internal: %Internal{world: WorldRef.open(0), spellbook: %{}}
     }
   end
 
