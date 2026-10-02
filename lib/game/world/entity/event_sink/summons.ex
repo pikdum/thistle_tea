@@ -219,8 +219,9 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Summons do
          mob = put_summon_owner(mob, summon),
          mob = maybe_possess_summon(mob, entity, summon),
          {:ok, pid} <- MobLoader.start_mob(mob) do
-      if is_integer(effect.target_guid) and effect.target_guid > 0 and summon.attack_target != nil do
-        send(pid, {:force_attack, effect.target_guid})
+      case Map.get(summon, :attack_guid) do
+        attack_guid when is_integer(attack_guid) and attack_guid > 0 -> send(pid, {:force_attack, attack_guid})
+        _none -> :ok
       end
 
       if effect.steps != [] do

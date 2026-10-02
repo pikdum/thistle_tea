@@ -53,7 +53,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.GuardCallTest do
 
       assert %Effects.SummonCreature{
                target_guid: ^enemy,
-               summon: %{entry: 68, despawn_type: 1, despawn_delay_ms: 120_000, attack_target: ^enemy}
+               summon: %{entry: 68, despawn_type: 1, despawn_delay_ms: 120_000, attack_guid: ^enemy}
              } = summon
 
       assert {5.0, +0.0, +0.0, _facing} = summon.summon.position

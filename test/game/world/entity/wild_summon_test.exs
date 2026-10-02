@@ -124,6 +124,35 @@ defmodule ThistleTea.Game.World.Entity.WildSummonTest do
     end
   end
 
+  describe "scripted summons" do
+    test "attack the target their script resolved rather than the script's target", %{caster: caster} do
+      victim = Unique.integer()
+      World.update_position(%{caster | object: %Object{guid: victim}})
+      Metadata.put(victim, %{alive?: true, orientation: 0.0, pvp?: false, faction_template: 1, level: 60})
+
+      on_exit(fn ->
+        World.remove_position(%{caster | object: %Object{guid: victim}})
+        Metadata.delete(victim)
+      end)
+
+      summon = %{
+        entry: 990_211,
+        position: {1.0, 0.0, 0.0, 0.0},
+        despawn_type: 3,
+        despawn_delay_ms: 60_000,
+        run?: false,
+        unique?: false,
+        attack_target: :owner_or_self,
+        attack_guid: victim,
+        script_id: 0
+      }
+
+      assert EventSink.emit(caster, Effects.summon_creature(summon, [], caster.object.guid)) == caster
+      [guid] = World.guids(caster.internal.world) -- [caster.object.guid, victim]
+      assert :sys.get_state(Entity.pid(guid)).unit.target == victim
+    end
+  end
+
   describe "temporary corpse lifecycle" do
     test "scripted timed-death summons initialize the same lifetime", %{caster: caster} do
       mob =

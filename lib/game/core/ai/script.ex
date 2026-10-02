@@ -1755,29 +1755,9 @@ defmodule ThistleTea.Game.Core.AI.Script do
   def target_requests(steps) when is_list(steps) do
     steps
     |> Enum.flat_map(fn
-      %ScriptStep{
-        target_type: :creature_with_guid,
-        target_param1: db_guid,
-        target_param2: param2,
-        sub_scripts: sub_scripts
-      }
-      when is_integer(db_guid) and db_guid > 0 ->
-        [
-          {:creature_with_guid, db_guid, param2}
-          | sub_scripts |> Map.values() |> List.flatten() |> target_requests()
-        ]
-
-      %ScriptStep{
-        target_type: target_type,
-        target_param1: event_id,
-        target_param2: entry,
-        sub_scripts: sub_scripts
-      }
-      when target_type in @map_event_target_types ->
-        [{target_type, event_id, entry} | sub_scripts |> Map.values() |> List.flatten() |> target_requests()]
-
-      %ScriptStep{sub_scripts: sub_scripts} ->
-        sub_scripts |> Map.values() |> List.flatten() |> target_requests()
+      %ScriptStep{sub_scripts: sub_scripts} = step ->
+        nested = sub_scripts |> Map.values() |> List.flatten() |> target_requests()
+        target_request(step) ++ summon_attack_request(step) ++ nested
 
       _step ->
         []
@@ -1786,6 +1766,21 @@ defmodule ThistleTea.Game.Core.AI.Script do
   end
 
   def target_requests(_steps), do: []
+
+  defp target_request(%ScriptStep{target_type: :creature_with_guid, target_param1: db_guid, target_param2: param2})
+       when is_integer(db_guid) and db_guid > 0, do: [{:creature_with_guid, db_guid, param2}]
+
+  defp target_request(%ScriptStep{target_type: target_type, target_param1: event_id, target_param2: entry})
+       when target_type in @map_event_target_types, do: [{target_type, event_id, entry}]
+
+  defp target_request(%ScriptStep{}), do: []
+
+  defp summon_attack_request(%ScriptStep{command: :summon_creature, dataint3: attack_type} = step)
+       when is_integer(attack_type) and attack_type >= 0 do
+    target_request(%{step | target_type: ScriptStep.decode_target_type(attack_type)})
+  end
+
+  defp summon_attack_request(%ScriptStep{}), do: []
 
   defp step_observation_radius(%ScriptStep{target_type: target_type, target_param2: radius})
        when target_type in @entry_target_types do

@@ -1570,6 +1570,18 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
       assert Script.target_requests([step]) == [selector]
     end
 
+    test "summons attack a map event target resolved from immutable context", %{mob: mob} do
+      event_target = Guid.from_low_guid(:player, 56)
+      step = %ScriptStep{command: :summon_creature, datalong: 1_500, dataint3: 23, target_param1: 5_945}
+      selector = {:map_event_target, 5_945, 0}
+      context = Context.new(1_000, script_targets: %{selector => event_target})
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, context)
+
+      assert [%Effects.SummonCreature{summon: %{attack_guid: ^event_target}}] = mob.internal.events
+      assert Script.target_requests([step]) == [selector]
+      assert Script.target_requests([%{step | dataint3: -1}]) == []
+    end
+
     test "creature database targets resolve to the current copy from immutable context", %{mob: mob} do
       blueprint_guid = Guid.from_low_guid(:mob, 10_917, 53_297)
       runtime_guid = Guid.runtime(:mob, 10_917)

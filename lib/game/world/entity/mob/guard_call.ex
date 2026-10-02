@@ -69,7 +69,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.GuardCall do
               despawn_delay_ms: @guard_lifetime_ms,
               run?: true,
               unique?: false,
-              attack_target: enemy,
+              attack_guid: enemy,
               script_id: 0
             }
 
