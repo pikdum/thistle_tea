@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   alias ThistleTea.Game.Core.Combat.KillFeedback
   alias ThistleTea.Game.Core.Combat.Proximity.Announcement
   alias ThistleTea.Game.Core.Combat.Threat
+  alias ThistleTea.Game.Core.Creature.CharmSpells
   alias ThistleTea.Game.Core.Creature.CreatureFlags
   alias ThistleTea.Game.Core.Creature.GuardCall
   alias ThistleTea.Game.Core.Effects
@@ -884,7 +885,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       {:ok, updated} ->
         blackboard = updated.internal.blackboard |> Blackboard.ensure() |> Blackboard.reset_spells()
         updated = %{updated | internal: %{updated.internal | blackboard: blackboard}} |> wake_ai_tick()
-        {:reply, {:ok, Map.values(updated.internal.spellbook), updated.internal.pet}, updated}
+        {:reply, {:ok, Map.values(CharmSpells.control_spells(updated)), updated.internal.pet}, updated}
 
       error ->
         {:reply, error, state}

@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.Pet.PetControls do
   @moduledoc "Validated pet action bars and autocast settings shared by commands and restoration."
 
+  alias ThistleTea.Game.Core.Creature.CharmSpells
   alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Spell
@@ -12,12 +13,12 @@ defmodule ThistleTea.Game.Core.Pet.PetControls do
   @manual 0x01
 
   def update(
-        %Mob{internal: %{pet: %Pet{owner_guid: owner, broken?: false, possessed?: false} = pet, spellbook: spells}} =
-          mob,
+        %Mob{internal: %{pet: %Pet{owner_guid: owner, broken?: false, possessed?: false} = pet}} = mob,
         owner,
         request
       )
-      when is_integer(owner) and owner > 0 and is_map(spells) do
+      when is_integer(owner) and owner > 0 do
+    spells = CharmSpells.control_spells(mob)
     pet = normalize(pet, spells)
 
     case change(pet, spells, request) do

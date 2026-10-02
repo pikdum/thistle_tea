@@ -10,11 +10,14 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
   alias ThistleTea.Game.Core.AI.AIEvent
   alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Creature.CharmSpells
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.CreatureSpellList, as: CreatureSpellListLoader
   alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+
+  @supported_patch 10
 
   def load([]), do: []
 
@@ -30,6 +33,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
     |> attach_conditions()
     |> attach_equipment()
     |> attach_spells()
+    |> attach_charm_spells()
   end
 
   def load_one(%Mangos.Creature{} = creature) do
@@ -366,6 +370,40 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
       | spellbook: creature_spellbook,
         spell_list: spells,
         addon_auras: addon_auras
+    }
+  end
+
+  defp attach_charm_spells(creatures) do
+    entries = creatures |> Enum.map(& &1.creature_template.entry) |> Enum.uniq()
+
+    rows =
+      Mangos.Repo.all(
+        from(row in Mangos.CreatureCharmSpell,
+          where: row.entry in ^entries and row.patch_min <= @supported_patch and row.patch_max >= @supported_patch
+        )
+      )
+
+    spellbook = rows |> Enum.map(& &1.spell_id) |> Enum.uniq() |> SpellLoader.build_spellbook()
+
+    slots =
+      rows
+      |> Enum.filter(&(Map.has_key?(spellbook, &1.spell_id) and &1.slot in 0..3//1 and &1.availability > 0))
+      |> Enum.sort_by(&{&1.entry, &1.slot, &1.spell_id})
+      |> Enum.group_by(& &1.entry, &charm_option(&1, spellbook))
+      |> Map.new(fn {entry, options} -> {entry, Enum.group_by(options, & &1.slot)} end)
+
+    Enum.map(creatures, &%{&1 | charm_spell_slots: Map.get(slots, &1.creature_template.entry, %{})})
+  end
+
+  defp charm_option(%Mangos.CreatureCharmSpell{} = row, spellbook) do
+    {low, high} = Enum.min_max([row.cooldown_min || 0, row.cooldown_max || 0])
+
+    %CharmSpells.Option{
+      slot: row.slot,
+      spell: Map.fetch!(spellbook, row.spell_id),
+      availability: row.availability,
+      cooldown_min_ms: low * 1000,
+      cooldown_max_ms: high * 1000
     }
   end
 

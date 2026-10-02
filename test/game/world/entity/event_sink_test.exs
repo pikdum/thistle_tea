@@ -81,6 +81,22 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       refute_received {:"$gen_cast", {:send_packet, %Message.SmsgSpellFailedOther{}}}
     end
 
+    test "a charmed creature's cooldowns reach its charming player" do
+      charmer = Guid.from_low_guid(:player, unique_guid())
+      {:ok, _} = Entity.register(charmer)
+      on_exit(fn -> Entity.unregister(charmer) end)
+      mob = %Mob{object: %Object{guid: Guid.from_low_guid(:mob, 589, unique_guid())}, unit: %Unit{charmed_by: charmer}}
+      guid = mob.object.guid
+
+      assert EventSink.emit(mob, Effects.spell_cooldown(guid, 12_544, 10_000)) == mob
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgSpellCooldown{guid: ^guid, cooldowns: [{12_544, 10_000}]}}}
+
+      EventSink.emit(%{mob | unit: %Unit{charmed_by: 0}}, Effects.spell_cooldown(guid, 12_544, 10_000))
+      refute_received {:"$gen_cast", {:send_packet, %Message.SmsgSpellCooldown{}}}
+    end
+
     test "controlled contact reaches the explicit player owner" do
       owner = unique_guid()
       {:ok, _} = Entity.register(owner)

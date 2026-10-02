@@ -1,10 +1,11 @@
 defmodule ThistleTea.Game.World.Entity.Mob.PetCasting do
-  @moduledoc "Admits client spell commands against the creature's current owner, spellbook, and world."
+  @moduledoc "Admits client spell commands against the creature's current owner, controllable spells, and world."
 
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Context.Perception.Request
   alias ThistleTea.Game.Core.AI.BT.Mob.Spells
   alias ThistleTea.Game.Core.AI.CreatureSpell
+  alias ThistleTea.Game.Core.Creature.CharmSpells
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
   alias ThistleTea.Game.Core.Entity.Mob
@@ -26,7 +27,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.PetCasting do
       ) do
     with %{controlled_guid: guid, alive?: alive?} when guid == state.object.guid <- Metadata.get(controller),
          {world, _, _, _} when world == state.internal.world <- World.position(controller),
-         %Spell{} = spell <- Map.get(state.internal.spellbook, spell_id),
+         %Spell{} = spell <- Map.get(CharmSpells.control_spells(state), spell_id),
          false <- Spell.attribute?(spell, :passive) do
       now = Time.now()
       result = if alive?, do: attempt(state, spell, targets, now), else: {:error, :caster_dead}

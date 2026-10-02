@@ -2,14 +2,15 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
   @moduledoc """
   Builds mob entities from VMangos `creature` rows and their templates: level,
   class-level stats with template multipliers, model and scale, flags, ranges,
-  virtual items, and waypoint routes. EventAI conditions are specialized to
-  the spawn as it is built.
+  virtual items, waypoint routes, and the abilities rolled for whoever charms
+  it. EventAI conditions are specialized to the spawn as it is built.
   """
   import Bitwise, only: [|||: 2, <<<: 2, &&&: 2]
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.AI.EventAI
   alias ThistleTea.Game.Core.Combat.Reactive
+  alias ThistleTea.Game.Core.Creature.CharmSpells
   alias ThistleTea.Game.Core.Creature.CreatureFlags
   alias ThistleTea.Game.Core.Creature.CreatureMovement
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -21,6 +22,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Rolls
   alias ThistleTea.Game.Core.Stats.CastSpeed
   alias ThistleTea.Game.Core.Stats.MovementStats
   alias ThistleTea.Game.Core.Stats.Resistances
@@ -219,6 +221,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
         spellbook: c.spellbook
       }
     }
+    |> CharmSpells.attach(CharmSpells.select(c.charm_spell_slots || %{}, Rolls.system()))
     |> Reactive.sync_health()
     |> MovementStats.recompute()
     |> CreatureMovement.sync()

@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.EventSink.Summons do
   @moduledoc false
 
+  alias ThistleTea.Game.Core.Creature.CharmSpells
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Commands
@@ -466,11 +467,11 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Summons do
 
   defp maybe_possess_summon(%Mob{} = mob, _entity, _summon), do: mob
 
-  defp notify_possession_granted(entity, %Mob{object: %{guid: guid}, internal: %Internal{spellbook: spellbook}}, %{
+  defp notify_possession_granted(entity, %Mob{object: %{guid: guid}} = mob, %{
          control: :possessed,
          control_spell_id: spell_id
        }) do
-    spells = (spellbook || %{}) |> Map.values() |> Enum.reject(&Spell.attribute?(&1, :passive))
+    spells = CharmSpells.bar_spells(mob)
 
     emit(entity, Effects.control_granted(entity.object.guid, guid, spell_id, spells, kind: :possession), nil)
 

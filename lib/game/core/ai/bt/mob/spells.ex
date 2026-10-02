@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.Spells do
   alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Combat, as: CombatCore
   alias ThistleTea.Game.Core.Combat.Hostility
+  alias ThistleTea.Game.Core.Creature.CharmSpells
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -45,7 +46,9 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.Spells do
   def list_tick_ms, do: @list_tick_ms
 
   def observation_radius(%Mob{internal: %Internal{pet: %Pet{}, spellbook: spellbook}} = state) when is_map(spellbook) do
-    Enum.reduce(spellbook, 0.0, fn {_id, spell}, radius -> max(radius, Range.maximum(state, spell) || 0.0) end)
+    Enum.reduce(CharmSpells.control_spells(state), 0.0, fn {_id, spell}, radius ->
+      max(radius, Range.maximum(state, spell) || 0.0)
+    end)
   end
 
   def observation_radius(%Mob{internal: %Internal{spellbook: spellbook}} = state) when is_map(spellbook) do
@@ -114,8 +117,9 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.Spells do
 
   def entries(%Mob{}, %Blackboard{spells: %{list: %CreatureSpellList{spells: spells}}}), do: spells
 
-  def entries(%Mob{internal: %Internal{creature: %Creature{spells: spells}}}, %Blackboard{}) when is_list(spells) do
-    spells
+  def entries(%Mob{internal: %Internal{creature: %Creature{spells: spells}}} = state, %Blackboard{})
+      when is_list(spells) do
+    if CharmSpells.controlled?(state), do: CharmSpells.entries(state), else: spells
   end
 
   def entries(%Mob{}, %Blackboard{}), do: []

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Core.Aura.ControlSyncTest do
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
   alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Object
@@ -96,6 +97,7 @@ defmodule ThistleTea.Game.Core.Aura.ControlSyncTest do
       assert possessed.internal.pet.reaction_state == :passive
       assert is_struct(grant, Effects.ControlGranted)
       assert grant.kind == :possession
+      assert Enum.map(grant.spells, & &1.id) == [30]
 
       {restored, [release]} = ControlSync.sync(%{possessed | unit: %{possessed.unit | auras: []}})
 
@@ -227,6 +229,29 @@ defmodule ThistleTea.Game.Core.Aura.ControlSyncTest do
                is_struct(event, Effects.ReleaseControlled) and event.source_guid == 10 and event.target_guid == 20 and
                  event.spell_id == 126
              end)
+    end
+  end
+
+  describe "sync/2 charm abilities" do
+    test "offers a charmed creature's rolled abilities in slot order, never its combat spellbook" do
+      spellbook = %{
+        30 => %Spell{id: 30},
+        40 => %Spell{id: 40},
+        50 => %Spell{id: 50},
+        60 => %Spell{id: 60, effects: [%Effect{aura: :mod_charm}]}
+      }
+
+      for type <- [:mod_charm, :mod_possess] do
+        mob = %Mob{
+          object: %Object{guid: 20},
+          unit: %Unit{auras: [holder(type)], faction_template: 14},
+          internal: %Internal{spellbook: spellbook, creature: %Creature{charm_spells: [40, 60, 30]}}
+        }
+
+        {_controlled, events} = ControlSync.sync(mob, 0)
+        assert [%Effects.ControlGranted{spells: spells}] = events
+        assert Enum.map(spells, & &1.id) == [40, 30]
+      end
     end
   end
 

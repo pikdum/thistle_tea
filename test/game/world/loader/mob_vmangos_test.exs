@@ -40,6 +40,14 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
       assert mob.internal.creature.addon_auras == []
     end
 
+    test "rolls Defias Pillager's charm abilities with their cooldown ranges" do
+      mob = mob(589)
+
+      assert mob.internal.creature.charm_spells == [20_793, 12_544]
+      assert mob.internal.spellbook[20_793].recovery_time_ms == 0
+      assert mob.internal.spellbook[12_544].recovery_time_ms in 9_000..12_000
+    end
+
     test "loads Defias Pillager EventAI events with resolved scripts" do
       mob = mob(589)
       events = mob.internal.creature.ai_events

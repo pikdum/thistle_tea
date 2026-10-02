@@ -41,6 +41,7 @@ defmodule ThistleTea.DB.Mangos.Creature do
     field(:spell_list, :any, virtual: true, default: [])
     field(:addon_auras, :any, virtual: true, default: [])
     field(:addon_source, :any, virtual: true, default: :template)
+    field(:charm_spell_slots, :map, virtual: true, default: %{})
 
     belongs_to(:creature_template, Mangos.CreatureTemplate,
       foreign_key: :id,

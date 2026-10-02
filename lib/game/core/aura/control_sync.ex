@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Core.Aura.ControlSync do
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Combat
   alias ThistleTea.Game.Core.Combat.Engagement
+  alias ThistleTea.Game.Core.Creature.CharmSpells
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
@@ -20,7 +21,6 @@ defmodule ThistleTea.Game.Core.Aura.ControlSync do
   alias ThistleTea.Game.Core.Movement.MovementHandoff
   alias ThistleTea.Game.Core.Pet.PlayerPossession
   alias ThistleTea.Game.Core.Pvp
-  alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Casting
 
   @unit_flag_possessed 0x01000000
@@ -95,7 +95,7 @@ defmodule ThistleTea.Game.Core.Aura.ControlSync do
         }
     }
 
-    spells = (mob.internal.spellbook || %{}) |> Map.values() |> Enum.reject(&Spell.attribute?(&1, :passive))
+    spells = CharmSpells.bar_spells(mob)
     event = Effects.control_granted(holder.caster_guid, mob.object.guid, holder.spell.id, spells)
     {mob, events} = halt_for_control(mob, now, events)
     {Entity.mark_broadcast_update(mob), events ++ [event]}
@@ -167,7 +167,7 @@ defmodule ThistleTea.Game.Core.Aura.ControlSync do
         }
     }
 
-    spells = controlled_spells(mob)
+    spells = CharmSpells.bar_spells(mob)
     event = Effects.control_granted(holder.caster_guid, mob.object.guid, holder.spell.id, spells, kind: :possession)
     {mob, events} = halt_for_control(mob, now, events)
     {Entity.mark_broadcast_update(mob), events ++ [event]}
@@ -267,10 +267,6 @@ defmodule ThistleTea.Game.Core.Aura.ControlSync do
     }
 
     Entity.mark_broadcast_update(mob)
-  end
-
-  defp controlled_spells(%Mob{} = mob) do
-    (mob.internal.spellbook || %{}) |> Map.values() |> Enum.reject(&Spell.attribute?(&1, :passive))
   end
 
   defp possession_holder(holders) when is_list(holders) do

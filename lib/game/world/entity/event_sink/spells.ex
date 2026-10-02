@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Spells do
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.Entity.Player.Projectile
+  alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.SingleTargetAuras
   alias ThistleTea.Game.World.System.SpellMagnets
 
@@ -383,6 +384,16 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Spells do
       guid: effect.source_guid,
       cooldowns: [{effect.spell_id, effect.duration_ms}]
     })
+
+    entity
+  end
+
+  def emit(%{unit: %Unit{charmed_by: charmer}} = entity, %Effects.SpellCooldown{} = effect, _context)
+      when is_integer(charmer) and charmer > 0 do
+    if Guid.entity_type(charmer) == :player do
+      %Message.SmsgSpellCooldown{guid: effect.source_guid, cooldowns: [{effect.spell_id, effect.duration_ms}]}
+      |> Outbound.send_packet(charmer)
+    end
 
     entity
   end
