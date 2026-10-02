@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScriptTest do
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Pet.Companion.EntityRef
   alias ThistleTea.Game.Core.Quest.QuestLog.Entry
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Test.Unique
@@ -37,6 +38,16 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScriptTest do
       assert [%Effects.QuestKillCredit{player_guid: ^guid, creature_entry: 13_936}] = effects(3066, player)
       assert [] = effects(3066, character(quests: [{6681, :complete}]))
       assert [] = effects(3066, character())
+    end
+
+    test "a Children's Week sight counts only with the right orphan along" do
+      player = character(quests: [{1479, :incomplete}], mini_pet: 14_305)
+      guid = player.object.guid
+
+      assert [%Effects.QuestEventCredit{player_guid: ^guid, quest_id: 1479}] = effects(3546, player)
+      assert [] = effects(3546, character(quests: [{1479, :incomplete}], mini_pet: 14_444))
+      assert [] = effects(3546, character(quests: [{1479, :incomplete}]))
+      assert [%Effects.QuestEventCredit{quest_id: 910}] = effects(3550, character(mini_pet: 14_444))
     end
 
     test "Lar'korwi's mate answers the scent where the player stepped in" do
@@ -244,7 +255,12 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScriptTest do
       unit: %Unit{race: 1, class: Keyword.get(opts, :class, @warrior), health: 100, max_health: 100, auras: []},
       player: %Player{quest_log: quest_log, rewarded_quests: MapSet.new(Keyword.get(opts, :rewarded, []))},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-      internal: %Internal{world: WorldRef.open(1), spellbook: %{}}
+      internal: %Internal{world: WorldRef.open(1), spellbook: %{}, mini_pet: mini_pet(Keyword.get(opts, :mini_pet))}
     }
   end
+
+  defp mini_pet(nil), do: nil
+
+  defp mini_pet(entry),
+    do: %EntityRef{guid: Guid.from_low_guid(:mob, entry, Unique.integer()), entry: entry, spell_id: 0}
 end

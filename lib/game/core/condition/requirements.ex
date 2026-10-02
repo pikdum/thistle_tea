@@ -55,6 +55,7 @@ defmodule ThistleTea.Game.Core.Condition.Requirements do
     reputation_rank_max: :reputation,
     moving: :moving,
     has_pet: :pet,
+    mini_pet: :mini_pet,
     health_percent: :health,
     mana_percent: :mana,
     in_combat: :combat,

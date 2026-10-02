@@ -14,6 +14,9 @@ defmodule ThistleTea.Game.Core.Pet.MiniPet do
 
   def active_ref(%Character{} = character), do: character.internal.mini_pet
 
+  def entry(%Character{internal: %{mini_pet: %EntityRef{entry: entry}}}), do: entry
+  def entry(%Character{}), do: 0
+
   def removed(%Character{internal: %{mini_pet: %EntityRef{guid: guid}}} = character, guid) do
     %{character | internal: %{character.internal | mini_pet: nil}}
   end

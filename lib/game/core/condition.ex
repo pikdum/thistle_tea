@@ -9,6 +9,10 @@ defmodule ThistleTea.Game.Core.Condition do
   never change (its database guid and the content patch): the leaves those
   facts decide become results, the combinators fold around them, and whatever
   is left is returned as a smaller tree with the same semantics.
+
+  Script ports may also build `:mini_pet` leaves, which have no VMangos id:
+  they hold when the target's noncombat pet is the creature entry in
+  `value1`, or any noncombat pet when it is 0.
   """
   import Bitwise, only: [&&&: 2]
 

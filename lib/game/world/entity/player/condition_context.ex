@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ConditionContext do
   alias ThistleTea.Game.Core.Inventory
   alias ThistleTea.Game.Core.Movement
   alias ThistleTea.Game.Core.Pet.Companion
+  alias ThistleTea.Game.Core.Pet.MiniPet
   alias ThistleTea.Game.Core.Player.Exploration
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Time
@@ -161,7 +162,8 @@ defmodule ThistleTea.Game.World.Entity.Player.ConditionContext do
       item_counts_with_bank: item_counts_with_bank(player, bank_item_ids, item_lookup),
       equipped_item_ids: equipped_item_ids(player, equipped_ids, item_lookup),
       pet_guid: Companion.active_guid(character),
-      has_pet?: Companion.active_guid(character) != nil
+      has_pet?: Companion.active_guid(character) != nil,
+      mini_pet_entry: MiniPet.entry(character)
     }
   end
 

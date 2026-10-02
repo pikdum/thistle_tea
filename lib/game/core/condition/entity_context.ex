@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Core.Condition.EntityContext do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Honor.Rank
   alias ThistleTea.Game.Core.Movement
+  alias ThistleTea.Game.Core.Pet.MiniPet
   alias ThistleTea.Game.Core.Spell
 
   @content_patch 10
@@ -73,7 +74,8 @@ defmodule ThistleTea.Game.Core.Condition.EntityContext do
           reputation_ranks: player.reputation.ranks,
           group?: nil,
           has_pet?: Character.controlled_guid(character) != nil,
-          pet_guid: Character.controlled_guid(character)
+          pet_guid: Character.controlled_guid(character),
+          mini_pet_entry: MiniPet.entry(character)
       }
     end)
   end

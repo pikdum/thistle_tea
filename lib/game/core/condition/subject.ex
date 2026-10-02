@@ -42,6 +42,7 @@ defmodule ThistleTea.Game.Core.Condition.Subject do
             equipped_item_ids: nil,
             pet_guid: nil,
             has_pet?: nil,
+            mini_pet_entry: nil,
             player_owned?: nil,
             last_waypoint: nil,
             go_spawned?: nil,

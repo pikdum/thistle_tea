@@ -43,6 +43,9 @@ defmodule ThistleTea.Game.Core.Condition.Leaf.Unit do
   def evaluate(%Context{target: %Subject{has_pet?: has_pet?}}, %Condition{type: :has_pet}) when is_boolean(has_pet?),
     do: handled(has_pet?)
 
+  def evaluate(%Context{target: %Subject{mini_pet_entry: entry}}, %Condition{type: :mini_pet, value1: wanted})
+      when is_integer(entry), do: handled(entry != 0 and wanted in [0, entry])
+
   def evaluate(
         %Context{target: %Subject{health: health, max_health: maximum}},
         %Condition{type: :health_percent, value1: expected, value2: comparison} = condition

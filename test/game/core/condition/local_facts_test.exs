@@ -217,6 +217,14 @@ defmodule ThistleTea.Game.Core.Condition.LocalFactsTest do
                Condition.evaluate(context(item_counts: %{100 => 10}), condition)
     end
 
+    test "a noncombat pet matches its own entry or any pet" do
+      assert met?(context(mini_pet_entry: 14_305), :mini_pet, 14_305)
+      assert met?(context(mini_pet_entry: 14_305), :mini_pet, 0)
+      refute met?(context(mini_pet_entry: 14_444), :mini_pet, 14_305)
+      refute met?(context(mini_pet_entry: 0), :mini_pet, 0)
+      assert {:unknown, _reasons} = Condition.evaluate(context([]), %Condition{type: :mini_pet})
+    end
+
     test "game-object state uses immutable owner projections" do
       context = context(kind: :game_object, go_spawned?: true, loot_state: 1, go_state: 2)
 
