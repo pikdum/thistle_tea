@@ -208,6 +208,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
       ".instance reset - reset empty owned instances",
       ".instance raid-reset <map> - expire all raid copies and saves for a map",
       ".instance switch <id> - join a copy of the current map",
+      ".damage <amount> - deal damage to the selected creature as if you hit it",
       ".kill - kill the selected creature as if you dealt the blow",
       ".learn <spell_id> - learn a spell",
       ".levelup [levels] - increase player level",
@@ -335,6 +336,17 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
       system_message(state, "Creature reaction: #{String.trim(mode)}.")
     else
       system_message(state, "Select a creature and use: .debug reaction <passive|defensive|aggressive>")
+    end
+    |> handled()
+  end
+
+  def run(state, ".damage" <> params) do
+    with true <- selected_creature?(state),
+         {amount, ""} when amount > 0 <- Integer.parse(String.trim(params)) do
+      Entity.debug_damage(state.target, state.character.object.guid, amount)
+      system_message(state, "Dealing #{amount} damage to the selected creature.")
+    else
+      _ -> system_message(state, "Select a creature and use: .damage <amount>")
     end
     |> handled()
   end

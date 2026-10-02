@@ -854,6 +854,29 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       {:noreply, state}
   end
 
+  def handle_cast({:debug_damage, source, amount}, %Mob{} = state) when is_integer(amount) and amount > 0 do
+    previous = state
+    now = Time.now()
+
+    state =
+      if EntityCore.dead?(state) do
+        state
+      else
+        state
+        |> receive_combat_contact(source, now)
+        |> EntityCore.take_damage(amount, now, source: source)
+        |> EventSink.emit_pending()
+        |> sync_behavior_tree(previous)
+        |> wake_ai_tick()
+      end
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Debug damage failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   def handle_cast({:receive_shared_damage, %Effects.SharedDamage{} = transfer}, %Mob{} = state) do
     previous = state
 

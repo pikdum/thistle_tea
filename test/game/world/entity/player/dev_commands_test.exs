@@ -570,6 +570,35 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
     end
   end
 
+  describe ".damage" do
+    test "hurts the selected creature on the player's behalf" do
+      target = Guid.from_low_guid(:mob, 3_976, Unique.integer())
+      {:ok, _} = Entity.register(target)
+      SpatialHash.insert(:mobs, target, WorldRef.open(0), 1.0, 2.0, 3.0)
+      on_exit(fn -> SpatialHash.remove(:mobs, target) end)
+      character = debug_character()
+      state = %{guid: character.object.guid, target: target, character: character}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".damage 500")
+      assert_receive {:"$gen_cast", {:debug_damage, source, 500}}
+      assert source == character.object.guid
+    end
+
+    test "requires a selected creature and a positive amount" do
+      target = Guid.from_low_guid(:mob, 3_976, Unique.integer())
+
+      for {selected, args} <- [{nil, " 500"}, {target, ""}, {target, " 0"}, {target, " lots"}] do
+        state = %{guid: 1, target: selected, character: debug_character()}
+        assert {:handled, ^state} = DevCommands.run(state, ".damage" <> args)
+
+        assert_receive {:"$gen_cast",
+                        {:send_packet, %Message.SmsgMessagechat{message: "Select a creature and use: .damage <amount>"}}}
+      end
+
+      refute_received {:"$gen_cast", {:debug_damage, _, _}}
+    end
+  end
+
   describe ".go xyz" do
     test "rejects malformed coordinates without teleporting" do
       state = %{guid: 1, character: debug_character()}

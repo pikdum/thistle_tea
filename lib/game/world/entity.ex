@@ -145,6 +145,8 @@ defmodule ThistleTea.Game.World.Entity do
 
   def receive_shared_damage(entity, effect), do: dispatch_cast(entity, {:receive_shared_damage, effect})
 
+  def debug_damage(entity, source, amount), do: dispatch_cast(entity, {:debug_damage, source, amount})
+
   def attack_outcome(entity, payload) do
     dispatch_cast(entity, {:attack_outcome, payload})
   end
