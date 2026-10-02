@@ -308,6 +308,10 @@ defmodule ThistleTea.Game.Core.Effects do
     %Effects.CallForHelp{target_guid: target_guid, radius: radius}
   end
 
+  def call_guards(enemy_guid) when is_integer(enemy_guid) do
+    %Effects.CallGuards{enemy_guid: enemy_guid}
+  end
+
   def attack_stop(source_guid, target_guid) when is_integer(source_guid) and is_integer(target_guid) do
     %Effects.AttackStop{source_guid: source_guid, target_guid: target_guid}
   end

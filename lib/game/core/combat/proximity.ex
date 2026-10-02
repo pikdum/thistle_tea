@@ -4,8 +4,9 @@ defmodule ThistleTea.Game.Core.Combat.Proximity do
 
   A unit announces itself when it moves, appears, or changes how others react
   to it: where it stands, the path it is walking, the level aggro radii are
-  judged against, and, for an idle creature that aggroes on sight, the
-  detection it notices targets with. An announcement reaches every unit that
+  judged against, for an idle creature that aggroes on sight, the detection
+  it notices targets with, and, for a civilian that calls the guards, the
+  range it watches for enemies. An announcement reaches every unit that
   could care: the widest aggro radius or out-of-combat line-of-sight event
   range. Every unit that hears one decides for itself in both directions,
   whether it notices the announcer and whether the announcer should notice it.
@@ -20,6 +21,7 @@ defmodule ThistleTea.Game.Core.Combat.Proximity do
 
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.Combat.Aggro
+  alias ThistleTea.Game.Core.Creature.GuardCall
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
@@ -48,7 +50,7 @@ defmodule ThistleTea.Game.Core.Combat.Proximity do
   defmodule Announcement do
     @moduledoc false
     @enforce_keys [:guid, :world, :position, :level]
-    defstruct [:guid, :world, :position, :level, :path, :aggressor, :incarnation_id, hidden?: false]
+    defstruct [:guid, :world, :position, :level, :path, :aggressor, :watch, :incarnation_id, hidden?: false]
   end
 
   def announcement(
@@ -66,6 +68,7 @@ defmodule ThistleTea.Game.Core.Combat.Proximity do
       level: level,
       path: path(entity, now),
       aggressor: aggressor(entity),
+      watch: watch(entity),
       incarnation_id: incarnation(entity),
       hidden?: hidden?
     }
@@ -127,13 +130,17 @@ defmodule ThistleTea.Game.Core.Combat.Proximity do
 
   def aggressor(_entity), do: nil
 
+  def watch(%Mob{} = mob), do: GuardCall.watch_range(mob)
+  def watch(_entity), do: nil
+
   def radius(%Aggressor{detection_range: range, level: level, modifier: modifier}, target_level),
     do: Aggro.radius_for(range, level, target_level || 1, modifier)
 
-  def reach(%Announcement{aggressor: %Aggressor{detection_range: range, modifier: modifier}}),
-    do: Enum.max([Aggro.max_radius(), @max_sight_range, Aggro.reach(range, modifier)])
+  def reach(%Announcement{aggressor: %Aggressor{detection_range: range, modifier: modifier}} = announcement),
+    do: Enum.max([Aggro.max_radius(), @max_sight_range, Aggro.reach(range, modifier), announcement.watch || 0.0])
 
-  def reach(%Announcement{}), do: max(Aggro.max_radius(), @max_sight_range)
+  def reach(%Announcement{} = announcement),
+    do: Enum.max([Aggro.max_radius(), @max_sight_range, announcement.watch || 0.0])
 
   def extent(%Announcement{} = announcement) do
     reach = reach(announcement)

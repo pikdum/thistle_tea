@@ -22,6 +22,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Auth.SessionKey
   alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos.Repo
+  alias ThistleTea.Game.Core.Creature.GuardPost
   alias ThistleTea.Game.Core.InstanceScript
   alias ThistleTea.Game.Core.OutdoorPvp.Plaguelands
   alias ThistleTea.Game.Core.OutdoorPvp.PlaguelandsRewards
@@ -120,6 +121,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.System.CreatureGroups
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
+  alias ThistleTea.Game.World.System.GuardPosts
   alias ThistleTea.Game.World.System.Guild, as: GuildSystem
   alias ThistleTea.Game.World.System.Honor, as: HonorSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
@@ -199,6 +201,7 @@ defmodule ThistleTea.Application do
         VendorStock,
         AreaEffects,
         SpellMagnets,
+        GuardPosts,
         SingleTargetAuras,
         DBC,
         Repo,
@@ -350,10 +353,13 @@ defmodule ThistleTea.Application do
 
         BroadcastTextLoader.load_all(
           InstanceScript.broadcast_text_ids() ++
-            BattlegroundLoader.broadcast_text_ids() ++ Plaguelands.broadcast_text_ids()
+            BattlegroundLoader.broadcast_text_ids() ++ Plaguelands.broadcast_text_ids() ++ GuardPost.text_ids()
         )
 
-        SummonLoader.preload(InstanceScript.summon_entries() ++ PlaguelandsRewards.creature_entries())
+        SummonLoader.preload(
+          InstanceScript.summon_entries() ++ PlaguelandsRewards.creature_entries() ++ GuardPost.guard_entries()
+        )
+
         Logger.info("Loading templates...")
         CreatureTemplateLoader.load_all()
         ExplorationLoader.load_all()

@@ -74,6 +74,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink do
     Effects.AttackerLost,
     Effects.AttackerStateUpdate,
     Effects.CallAssistance,
+    Effects.CallGuards,
     Effects.CallForHelp,
     Effects.DeliverAttack,
     Effects.SharedDamage,

@@ -46,6 +46,11 @@ defmodule ThistleTea.Game.Core.Creature.CreatureFlags do
 
   def no_threat_list?(_entity), do: false
 
+  def guard?(%{internal: %Internal{creature: %Creature{extra_flags: flags}}}) when is_integer(flags),
+    do: (flags &&& 0x400) != 0
+
+  def guard?(_entity), do: false
+
   def locks_raid?(%{internal: %Internal{creature: %Creature{static_flags2: flags}}}) when is_integer(flags),
     do: (flags &&& 0x4) != 0
 

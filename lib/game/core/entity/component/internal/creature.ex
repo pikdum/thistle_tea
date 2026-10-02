@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.Creature do
   guid-scoped script conditions), the XP reward inputs (multiplier, extra
   flags, elite rank), static combat defaults, the type flags driving visibility rules, the
   regeneration flags, the spell list driving combat casts, the addon auras
-  applied at spawn, and the aggro/assist/leash ranges.
+  applied at spawn, the aggro/assist/leash ranges, and the civilian's outstanding guard call.
   """
   defstruct [
     :db_guid,
@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.Creature do
     :script_faction_value,
     :script_faction_flags,
     :reaction_state,
+    :guard_call,
     stationary?: false,
     critter?: false,
     civilian?: false,

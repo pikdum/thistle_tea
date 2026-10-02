@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   alias ThistleTea.Game.Core.Combat.Proximity.Announcement
   alias ThistleTea.Game.Core.Combat.Threat
   alias ThistleTea.Game.Core.Creature.CreatureFlags
+  alias ThistleTea.Game.Core.Creature.GuardCall
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Effects.BoundaryResult
   alias ThistleTea.Game.Core.Entity, as: EntityCore
@@ -337,6 +338,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
 
     state =
       state
+      |> GuardCall.summon_ended(event)
       |> SummonLifecycle.receive_event(event, now)
       |> NavigationResolver.resolve(now)
       |> EventSink.emit_pending()
@@ -414,6 +416,26 @@ defmodule ThistleTea.Game.World.Entity.Mob do
 
   def handle_cast({:aggro_probe, _target}, state) do
     {:noreply, state}
+  end
+
+  def handle_cast({:guard_probe, enemy}, %Mob{} = state) when is_integer(enemy) do
+    if GuardCall.ready?(state) do
+      now = Time.now()
+      context = AIEnvironment.context(state, now, ObservationRequest.actor(enemy))
+
+      state =
+        if GuardCall.sees?(state, enemy, context),
+          do: state |> GuardCall.request(enemy) |> EventSink.emit_pending(),
+          else: state
+
+      {:noreply, state, {:continue, :maybe_broadcast}}
+    else
+      {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Guard probe failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   @impl GenServer
@@ -1394,6 +1416,10 @@ defmodule ThistleTea.Game.World.Entity.Mob do
 
       {:noreply, state, {:continue, :maybe_broadcast}}
     end
+  end
+
+  def handle_info({:guard_call_answered, answer}, %Mob{} = state) do
+    {:noreply, GuardCall.answered(state, answer), {:continue, :maybe_broadcast}}
   end
 
   def handle_info({:call_assistance, target_guid, helpers, source}, %Mob{} = state) do

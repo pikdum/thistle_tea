@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
   alias ThistleTea.Game.Core.Creature.CreatureFlags
   alias ThistleTea.Game.Core.Creature.CreatureMovement
   alias ThistleTea.Game.Core.Creature.CreatureReaction
+  alias ThistleTea.Game.Core.Creature.GuardCall
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
   alias ThistleTea.Game.Core.Entity.Component.Internal.Loot
@@ -74,11 +75,13 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
 
   def proximity_aggro?(%__MODULE__{} = mob), do: CreatureReaction.mode(mob) == :aggressive
 
-  def visibility_metadata(%__MODULE__{
-        object: object,
-        unit: %Unit{} = unit,
-        internal: %Internal{creature: %Creature{} = creature, loot: loot, name: name}
-      }) do
+  def visibility_metadata(
+        %__MODULE__{
+          object: object,
+          unit: %Unit{} = unit,
+          internal: %Internal{creature: %Creature{} = creature, loot: loot, name: name}
+        } = mob
+      ) do
     %{
       entry: object.entry,
       name: name,
@@ -93,6 +96,7 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
       ghost_visible?: ((creature.type_flags || 0) &&& @creature_type_flag_ghost_visible) != 0,
       creature_type: creature.creature_type,
       civilian?: creature.civilian?,
+      guard?: CreatureFlags.guard?(mob),
       pickpocket_id: if(loot, do: loot.pickpocket_id),
       skinning_id: if(loot, do: loot.skinning_id),
       skinned?: loot && loot.skinned?,
@@ -135,6 +139,7 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
       Engagement.reset(%{mob | unit: unit, movement_block: movement_block, internal: internal})
 
     mob
+    |> GuardCall.reset()
     |> Reactive.sync_health()
     |> MovementStats.recompute()
     |> CreatureMovement.sync()

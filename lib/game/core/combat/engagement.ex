@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Core.Combat.Engagement do
   alias ThistleTea.Game.Core.Combat.Threat
   alias ThistleTea.Game.Core.Combat.ZoneCombat
   alias ThistleTea.Game.Core.Creature.CreatureReaction
+  alias ThistleTea.Game.Core.Creature.GuardCall
   alias ThistleTea.Game.Core.Creature.TemporaryFaction
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -156,7 +157,11 @@ defmodule ThistleTea.Game.Core.Combat.Engagement do
             Effects.creature_group_event({:attack, victim(entity), CombatLeash.reference(entity)})
           )
 
-    entity = if previous.internal.in_combat == true, do: entity, else: ZoneCombat.on_enter(entity, target_guid)
+    entity =
+      if previous.internal.in_combat == true,
+        do: entity,
+        else: entity |> ZoneCombat.on_enter(target_guid) |> GuardCall.on_enter_combat(target_guid)
+
     result(previous, entity, :enter, decision)
   end
 

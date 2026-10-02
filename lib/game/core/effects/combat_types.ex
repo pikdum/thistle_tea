@@ -63,7 +63,8 @@ defmodule ThistleTea.Game.Core.Effects.CombatTypes do
     {:KillOutcome, [:target_guid, :victim], []},
     {:AttackerStateUpdate, [:source_guid, :target_guid, :damage, :attack], []},
     {:CallAssistance, [:target_guid], []},
-    {:CallForHelp, [:target_guid], [:radius]}
+    {:CallForHelp, [:target_guid], [:radius]},
+    {:CallGuards, [:enemy_guid], []}
   ]
 
   for {name, required, optional} <- effects do

@@ -10,6 +10,9 @@ defmodule ThistleTea.Game.World.Proximity do
   radius, and a unit inside an announcing creature's radius asks that
   creature to notice it. A creature with an out-of-combat line-of-sight
   EventAI event also wakes for any announcer within that event's range. A
+  civilian that calls the guards watches its detection range in both
+  directions too, probing itself about an enemy player that comes near and
+  being probed by an enemy player its walk brings near. A
   walking announcer's path becomes one scheduled check at the moment of
   contact, rechecked against the authoritative position when it fires.
 
@@ -38,6 +41,7 @@ defmodule ThistleTea.Game.World.Proximity do
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.SpatialGrid
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
@@ -130,7 +134,7 @@ defmodule ThistleTea.Game.World.Proximity do
   def reaction_changed?(%{internal: %Internal{proximity: previous}}, %{internal: %Internal{proximity: current}}),
     do: reaction_changed?(previous, current)
 
-  def reaction_changed?({_world, _motion, previous, _aggressor}, {_, _, current, _}),
+  def reaction_changed?({_world, _motion, previous, _aggressor, _watch}, {_, _, current, _, _}),
     do: Map.take(previous, Reaction.actor_keys()) != Map.take(current, Reaction.actor_keys())
 
   def reaction_changed?(_previous, _current), do: false
@@ -145,7 +149,10 @@ defmodule ThistleTea.Game.World.Proximity do
       {world, x, y, z} ->
         facts = facts(guid)
         hidden? = Map.get(facts, :stealthed?) == true
-        current = {world, motion(entity, {x, y, z}, now), facts, ProximityCore.aggressor(entity)}
+
+        current =
+          {world, motion(entity, {x, y, z}, now), facts, ProximityCore.aggressor(entity), ProximityCore.watch(entity)}
+
         entity = list_hidden(entity, hidden?, cell)
         entity = if Map.get(facts, :alive?) == false, do: Checks.clear(entity), else: entity
 
@@ -162,7 +169,7 @@ defmodule ThistleTea.Game.World.Proximity do
 
   defp publish(
          %{object: %{guid: guid}, internal: internal} = entity,
-         {_, _, facts, _} = current,
+         {_, _, facts, _, _} = current,
          position,
          hidden?,
          now
@@ -208,17 +215,16 @@ defmodule ThistleTea.Game.World.Proximity do
 
   def hear(%{object: %{guid: guid}} = listener, %Announcement{guid: guid}, _now), do: {listener, :ignore}
 
-  def hear(
-        %{internal: %Internal{world: world}} = listener,
-        %Announcement{world: world, aggressor: announcer} = announcement,
-        now
-      ) do
+  def hear(%{internal: %Internal{world: world}} = listener, %Announcement{world: world} = announcement, now) do
     aggressor = ProximityCore.aggressor(listener)
+    watch = ProximityCore.watch(listener)
     sight_range = sight_range(listener, now)
 
-    with true <- not is_nil(announcer) or not is_nil(aggressor) or sight_range > 0,
+    with true <- listening?(announcement, aggressor, watch, sight_range),
          {^world, x, y, z} <- World.position(listener, now) do
       {listener, _result} = alert(listener, announcement, {x, y, z}, now)
+      {listener, _result} = watched(listener, announcement, {x, y, z}, now)
+      {listener, _result} = watch(listener, watch, announcement, {x, y, z}, now)
 
       case notice(listener, aggressor, announcement, {x, y, z}, now) do
         {listener, :notice} -> {Checks.cancel(listener, announcement.guid, :sight), :notice}
@@ -230,6 +236,17 @@ defmodule ThistleTea.Game.World.Proximity do
   end
 
   def hear(listener, _announcement, _now), do: {listener, :ignore}
+
+  defp listening?(%Announcement{aggressor: announcer, watch: announcer_watch}, aggressor, watch, sight_range),
+    do:
+      not is_nil(announcer) or not is_nil(announcer_watch) or not is_nil(aggressor) or not is_nil(watch) or
+        sight_range > 0
+
+  def due(listener, guid, :watched, ref, _now) when is_integer(guid) do
+    {listener, current?} = Checks.take(listener, guid, :watched, ref)
+    if current? and watches?(guid, listener.object.guid), do: Entity.guard_probe(guid, listener.object.guid)
+    {listener, :ignore}
+  end
 
   def due(%{internal: %Internal{world: world}} = listener, guid, role, ref, now) when is_integer(guid) do
     {listener, current?} = Checks.take(listener, guid, role, ref)
@@ -243,6 +260,9 @@ defmodule ThistleTea.Game.World.Proximity do
 
         :notice ->
           notice(listener, ProximityCore.aggressor(listener), observed, {x, y, z}, now)
+
+        :watch ->
+          watch(listener, ProximityCore.watch(listener), observed, {x, y, z}, now)
 
         :sight ->
           sight(listener, sight_range(listener, now), observed, {x, y, z}, now)
@@ -265,6 +285,28 @@ defmodule ThistleTea.Game.World.Proximity do
   end
 
   defp alert(listener, announcement, _center, _now), do: {Checks.cancel(listener, announcement.guid, :alert), :ignore}
+
+  defp watched(listener, %Announcement{watch: range} = announcement, center, now) when is_number(range) do
+    react(listener, announcement, center, range, :watched, now, fn _distance ->
+      enemy = listener.object.guid
+      if watches?(announcement.guid, enemy), do: Entity.guard_probe(announcement.guid, enemy)
+      :ignore
+    end)
+  end
+
+  defp watched(listener, announcement, _center, _now),
+    do: {Checks.cancel(listener, announcement.guid, :watched), :ignore}
+
+  defp watch(listener, range, %Announcement{} = announcement, center, now) when is_number(range) do
+    react(listener, announcement, center, range, :watch, now, fn _distance ->
+      watcher = listener.object.guid
+      if watches?(watcher, announcement.guid), do: Entity.guard_probe(watcher, announcement.guid)
+      :ignore
+    end)
+  end
+
+  defp watch(listener, _range, announcement, _center, _now),
+    do: {Checks.cancel(listener, announcement.guid, :watch), :ignore}
 
   defp notice(listener, %Aggressor{} = aggressor, %Announcement{} = announcement, center, now) do
     radius = ProximityCore.radius(aggressor, announcement.level)
@@ -316,6 +358,9 @@ defmodule ThistleTea.Game.World.Proximity do
       _ -> false
     end
   end
+
+  defp watches?(watcher_guid, enemy_guid),
+    do: Guid.entity_type(enemy_guid) == :player and Reaction.valid_hostile_target?(watcher_guid, enemy_guid)
 
   defp observed(guid, world, now) do
     with {^world, x, y, z} <- World.position(guid, now),
@@ -369,8 +414,8 @@ defmodule ThistleTea.Game.World.Proximity do
     end
   end
 
-  defp changed?({world, from, facts, aggressor}, {world, to, facts, aggressor}) do
-    (not is_nil(aggressor) or Hostility.proximity_target?(facts)) and moved?(from, to)
+  defp changed?({world, from, facts, aggressor, watch}, {world, to, facts, aggressor, watch}) do
+    (not is_nil(aggressor) or not is_nil(watch) or Hostility.proximity_target?(facts)) and moved?(from, to)
   end
 
   defp changed?(previous, current), do: previous != current

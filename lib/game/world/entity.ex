@@ -36,6 +36,10 @@ defmodule ThistleTea.Game.World.Entity do
     dispatch_cast(entity, {:aggro_probe, target_guid})
   end
 
+  def guard_probe(entity, enemy_guid) do
+    dispatch_cast(entity, {:guard_probe, enemy_guid})
+  end
+
   def assist_attack(entity, target_guid) do
     dispatch_cast(entity, {:assist_attack, target_guid})
   end

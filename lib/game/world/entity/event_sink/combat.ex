@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Combat do
   alias ThistleTea.Game.World.Combat.CallForHelp
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink.Context
+  alias ThistleTea.Game.World.Entity.Mob.GuardCall
   alias ThistleTea.Game.World.Entity.Mob.Incarnation
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
@@ -344,4 +345,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Combat do
   end
 
   def emit(entity, %Effects.CallForHelp{}, _context), do: entity
+
+  def emit(%Mob{} = entity, %Effects.CallGuards{} = effect, context), do: GuardCall.answer(entity, effect, context)
+  def emit(entity, %Effects.CallGuards{}, _context), do: entity
 end

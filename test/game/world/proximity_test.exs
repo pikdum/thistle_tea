@@ -183,9 +183,52 @@ defmodule ThistleTea.Game.World.ProximityTest do
       refute_received {:timeout, _ref, {:proximity_due, _guid, _role}}
       assert_receive {:timeout, _ref, {:proximity_due, ^player_guid, :notice}}, 1_000
     end
+
+    test "a guard-calling civilian probes itself about enemy players inside its watch range" do
+      player_guid = put_player(player_guid())
+      civilian = civilian(put_mob(mob_guid(), {0.0, 0.0, 0.0}, proximity_aggro?: false))
+
+      assert hear(civilian, player_announcement(player_guid, {15.0, 0.0, 0.0}), Time.now()) == :ignore
+      assert_receive {:"$gen_cast", {:guard_probe, ^player_guid}}
+
+      hear(civilian, player_announcement(player_guid, {25.0, 0.0, 0.0}), Time.now())
+      hear(civilian, creature_announcement(put_mob(mob_guid(), {5.0, 0.0, 0.0}), {5.0, 0.0, 0.0}), Time.now())
+
+      neutral = civilian(put_mob(mob_guid(), {0.0, 0.0, 0.0}, faction_template: wolf(), proximity_aggro?: false))
+      hear(neutral, player_announcement(player_guid, {5.0, 0.0, 0.0}), Time.now())
+
+      called = %{
+        civilian
+        | internal: %{civilian.internal | creature: %{civilian.internal.creature | guard_call: :held}}
+      }
+
+      hear(called, player_announcement(player_guid, {5.0, 0.0, 0.0}), Time.now())
+
+      refute_receive {:"$gen_cast", {:guard_probe, _guid}}
+    end
+
+    test "an enemy player inside a walking civilian's watch range probes the civilian" do
+      {player, civilian_guid} = hostile_pair({10.0, 0.0, 0.0})
+      announcement = %Announcement{guid: civilian_guid, world: WorldRef.open(0), position: {10.0, 0.0, 0.0}, level: 5}
+
+      hear(player, %{announcement | watch: 8.0}, Time.now())
+      refute_receive {:"$gen_cast", {:guard_probe, _guid}}
+
+      hear(player, %{announcement | watch: 18.0}, Time.now())
+      assert_receive {:"$gen_cast", {:guard_probe, guid}}
+      assert guid == player.object.guid
+    end
   end
 
   describe "due/5" do
+    test "a civilian's walk into an enemy player probes the civilian" do
+      {player, civilian_guid} = hostile_pair({8.0, 0.0, 0.0})
+
+      assert due(player, civilian_guid, :watched, Time.now()) == :ignore
+      assert_receive {:"$gen_cast", {:guard_probe, guid}}
+      assert guid == player.object.guid
+    end
+
     test "rejects a different incarnation even when the same process still owns the guid" do
       {player, guid} = hostile_pair({8.0, 0.0, 0.0})
       now = Time.now()
@@ -474,6 +517,12 @@ defmodule ThistleTea.Game.World.ProximityTest do
       internal: %Internal{world: WorldRef.open(0), in_combat: false, creature: %Creature{detection_range: 20.0}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
+  end
+
+  defp civilian(guid) do
+    mob = mob(guid)
+    creature = %{mob.internal.creature | static_flags: 0x08000000, extra_flags: 0x2, detection_range: 18.0}
+    %{mob | internal: %{mob.internal | creature: creature}}
   end
 
   defp put_player(guid, opts \\ []) do
