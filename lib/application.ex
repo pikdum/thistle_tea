@@ -22,6 +22,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Auth.SessionKey
   alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos.Repo
+  alias ThistleTea.Game.Core.AI.AreaTriggerScript
   alias ThistleTea.Game.Core.AI.CreatureScript
   alias ThistleTea.Game.Core.Creature.GuardPost
   alias ThistleTea.Game.Core.InstanceScript
@@ -35,6 +36,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AccountDataStore
   alias ThistleTea.Game.World.AreaEffects
+  alias ThistleTea.Game.World.AreaTriggerCooldown
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Combat.ChaseWatch
   alias ThistleTea.Game.World.Entity.EntitySupervisor
@@ -294,6 +296,7 @@ defmodule ThistleTea.Application do
     PageTextLoader.init()
     EventScriptLoader.init()
     AreaTriggerLoader.init()
+    AreaTriggerCooldown.init()
     BankBagSlotPriceLoader.init()
     StableSlotPriceLoader.init()
     BattlegroundLoader.init()
@@ -368,7 +371,8 @@ defmodule ThistleTea.Application do
             PlaguelandsRewards.creature_entries() ++
             GuardPost.guard_entries() ++
             QuestEscortCatalog.summon_entries() ++
-            CreatureScript.summon_entries()
+            CreatureScript.summon_entries() ++
+            AreaTriggerScript.summon_entries()
         )
 
         Logger.info("Loading templates...")

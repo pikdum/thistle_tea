@@ -1,13 +1,18 @@
 defmodule ThistleTea.Game.World.Entity.Player.AreaTriggers do
   @moduledoc """
-  Validates area-trigger proximity and applies quest, rest, and cached portal
-  behavior for a player.
+  Validates area-trigger proximity and applies quest, script, rest, and
+  cached portal behavior for a player. A living player who enters a scripted
+  trigger runs its script on themselves, unless the trigger is still resting
+  from its cooldown in their world.
   """
 
   alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Death
   alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.AreaTriggerCooldown
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.ConditionContext
   alias ThistleTea.Game.World.Entity.Player.Corpses
   alias ThistleTea.Game.World.Entity.Player.Instances
@@ -46,6 +51,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AreaTriggers do
           state
           |> OutdoorPvp.area_trigger(trigger_id)
           |> maybe_explore_quest(trigger_id)
+          |> maybe_run_script(trigger)
           |> enter_tavern_or_teleport(trigger_id)
       end
     else
@@ -63,6 +69,16 @@ defmodule ThistleTea.Game.World.Entity.Player.AreaTriggers do
     else
       state
     end
+  end
+
+  defp maybe_run_script(%{guid: guid, character: %Character{} = character} = state, trigger) do
+    with true <- Death.alive?(character),
+         [_ | _] = steps <- AreaTriggerLoader.script(trigger),
+         true <- AreaTriggerCooldown.claim(character.internal.world, trigger, Time.now()) do
+      Entity.start_script(guid, steps, guid)
+    end
+
+    state
   end
 
   defp enter_tavern_or_teleport(state, trigger_id) do

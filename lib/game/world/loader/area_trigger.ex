@@ -2,15 +2,21 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
   @moduledoc """
   ETS-cached area trigger data from vmangos: trigger geometry (highest build
   at or below the supported client), quest involvement, taverns, teleport
-  destinations, and instance map metadata. `inside?/4` ports the vmangos
-  point-in-trigger check (sphere radius or oriented box).
+  destinations, scripts, and instance map metadata. `inside?/4` ports the
+  vmangos point-in-trigger check (sphere radius or oriented box).
+
+  `script/1` returns the steps a trigger runs on the player who enters it:
+  its ported C++ script when there is one, as vmangos prefers, and its
+  `areatrigger_scripts` rows otherwise.
   """
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Core.AI.AreaTriggerScript
   alias ThistleTea.Game.Core.Travel.AreaTriggerTeleport
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
+  alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
 
   @supported_build 5875
   @supported_patch 10
@@ -25,9 +31,17 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
   end
 
   def load_all do
-    Mangos.Repo.all(from(t in Mangos.AreaTriggerTemplate, where: t.build <= @supported_build))
-    |> latest_by(& &1.id, & &1.build)
-    |> Enum.each(&:ets.insert(__MODULE__, {{:trigger, &1.id}, trigger(&1)}))
+    triggers =
+      Mangos.Repo.all(from(t in Mangos.AreaTriggerTemplate, where: t.build <= @supported_build))
+      |> latest_by(& &1.id, & &1.build)
+
+    Enum.each(triggers, &:ets.insert(__MODULE__, {{:trigger, &1.id}, trigger(&1)}))
+
+    triggers
+    |> Enum.map(&positive(&1.script_id))
+    |> Enum.filter(& &1)
+    |> then(&ScriptLoader.load_by_ids(Mangos.AreaTriggerScript, &1))
+    |> Enum.each(fn {script_id, steps} -> :ets.insert(__MODULE__, {{:script, script_id}, steps}) end)
 
     Mangos.Repo.all(Mangos.AreaTriggerInvolvedRelation)
     |> Enum.each(&:ets.insert(__MODULE__, {{:quest, &1.id}, positive(&1.quest)}))
@@ -75,6 +89,21 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
   end
 
   def tavern?(_id), do: false
+
+  def script(%{id: id, x: x, y: y, z: z} = trigger) do
+    case AreaTriggerScript.steps(id, {x, y, z}) do
+      nil -> database_script(Map.get(trigger, :script_id))
+      steps -> steps
+    end
+  end
+
+  def script(_trigger), do: []
+
+  defp database_script(script_id) when is_integer(script_id) and script_id > 0 do
+    lookup({:script, script_id}, fn -> load_script(script_id) end) || []
+  end
+
+  defp database_script(_script_id), do: []
 
   def teleport(id) when is_integer(id) and id > 0 do
     lookup({:teleport, id}, fn -> load_teleport(id) end)
@@ -179,6 +208,12 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
     end
   end
 
+  defp load_script(script_id) do
+    Mangos.AreaTriggerScript
+    |> ScriptLoader.load_by_ids([script_id])
+    |> Map.get(script_id, [])
+  end
+
   defp load_teleport(id) do
     row =
       Mangos.Repo.one(
@@ -223,7 +258,9 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
       box_x: t.box_x,
       box_y: t.box_y,
       box_z: t.box_z,
-      box_orientation: t.box_orientation
+      box_orientation: t.box_orientation,
+      cooldown_ms: max(t.cooldown || 0, 0) * 1_000,
+      script_id: positive(t.script_id)
     }
   end
 

@@ -1,8 +1,10 @@
 defmodule ThistleTea.Game.World.Loader.AreaTriggerTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.AreaTrigger
+  alias ThistleTea.Test.Unique
 
   describe "inside?/4" do
     test "checks distance against radius triggers" do
@@ -54,6 +56,35 @@ defmodule ThistleTea.Game.World.Loader.AreaTriggerTest do
 
       assert AreaTrigger.inside?(trigger, 0, {0.0, 4.0, 0.0})
       refute AreaTrigger.inside?(trigger, 0, {4.0, 0.0, 0.0})
+    end
+  end
+
+  describe "script/1" do
+    test "prefers a ported C++ script" do
+      assert [%ScriptStep{command: :kill_credit, datalong: 13_936}] =
+               AreaTrigger.script(%{id: 3066, x: 0.0, y: 0.0, z: 0.0, script_id: nil})
+    end
+
+    test "falls back to the trigger's cached database script" do
+      script_id = Unique.integer()
+      steps = [%ScriptStep{script_id: script_id, command: :talk}]
+      :ets.insert(AreaTrigger, {{:script, script_id}, steps})
+
+      assert AreaTrigger.script(%{id: Unique.integer(), x: 0.0, y: 0.0, z: 0.0, script_id: script_id}) == steps
+
+      :ets.delete(AreaTrigger, {:script, script_id})
+    end
+
+    test "has nothing for an unscripted trigger" do
+      assert AreaTrigger.script(%{id: Unique.integer(), x: 0.0, y: 0.0, z: 0.0, script_id: nil}) == []
+    end
+
+    @tag :vmangos_db
+    test "loads Brother Sarno's greeting at the cathedral doors" do
+      trigger = AreaTrigger.get(1125)
+
+      assert %{cooldown_ms: 30_000, script_id: 1125} = trigger
+      assert [%ScriptStep{command: :talk, dataint: 3988, swap_final?: true}] = AreaTrigger.script(trigger)
     end
   end
 

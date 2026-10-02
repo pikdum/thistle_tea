@@ -15,5 +15,7 @@ defmodule ThistleTea.DB.Mangos.AreaTriggerTemplate do
     field(:box_y, :float)
     field(:box_z, :float)
     field(:box_orientation, :float)
+    field(:cooldown, :integer, default: 0)
+    field(:script_id, :integer, default: 0)
   end
 end
