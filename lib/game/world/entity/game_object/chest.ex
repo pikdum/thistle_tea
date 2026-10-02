@@ -222,8 +222,8 @@ defmodule ThistleTea.Game.World.Entity.GameObject.Chest do
   defp put_gathering(state, gathering), do: %{state | internal: %{state.internal | gathering: gathering}}
 
   defp despawn(%GameObject{internal: %Internal{loot: %InternalLoot{} = loot}} = state) do
-    state = Visibility.leave_entity(state)
     World.remove_position(state)
+    state = Visibility.leave_entity(state)
 
     if match?(%Summon{}, state.internal.summon),
       do: send(self(), :despawn),

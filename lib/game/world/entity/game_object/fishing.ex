@@ -71,8 +71,8 @@ defmodule ThistleTea.Game.World.Entity.GameObject.Fishing do
   end
 
   def deplete(%GameObject{} = state) do
-    Visibility.leave_entity(state)
     World.remove_position(state)
+    state = Visibility.leave_entity(state)
     Process.send_after(self(), :fishing_hole_respawn, respawn_ms(state))
     state
   end

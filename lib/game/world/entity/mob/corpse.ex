@@ -150,8 +150,8 @@ defmodule ThistleTea.Game.World.Entity.Mob.Corpse do
         {state, monitors} = GameObjectSummons.dismiss(state, state.internal.game_object_monitors)
         state = %{state | internal: %{state.internal | game_object_monitors: monitors}}
         state = EventSink.emit_pending(state)
-        state = Visibility.leave_entity(state)
         World.remove_position(state)
+        state = Visibility.leave_entity(state)
         loot = state.internal.loot || %InternalLoot{}
 
         state

@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CorpseTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.Mob.Corpse
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -28,6 +29,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.CorpseTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.World.Visibility.Tap
   alias ThistleTea.Test.Unique
 
@@ -237,6 +239,34 @@ defmodule ThistleTea.Game.World.Entity.Mob.CorpseTest do
       assert Corpse.removed?(removed)
       assert Corpse.remove(removed) == removed
       assert removed.internal.loot.session == nil
+    end
+
+    test "observers that see the corpse leave find it already gone", %{killer: killer} do
+      corpse = mob(killer)
+      guid = corpse.object.guid
+      corpse = %{corpse | movement_block: %{corpse.movement_block | position: {9_000.0, 9_000.0, 0.0, 0.0}}}
+      World.update_position(corpse)
+      corpse = Visibility.join_entity(corpse)
+      key = Visibility.cell_key(corpse.internal.visibility_cell)
+      test_pid = self()
+
+      observer =
+        spawn_link(fn ->
+          :ok = Group.monitor(Visibility.group_name(), key)
+          send(test_pid, :watching)
+
+          receive do
+            {:group, [%{type: :left, meta: %{guid: ^guid}}], _info} -> send(test_pid, {:left, World.cell_for(guid)})
+          end
+        end)
+
+      assert_receive :watching
+      on_exit(fn -> World.remove_position(corpse) end)
+
+      Corpse.remove(corpse)
+
+      assert_receive {:left, nil}
+      refute Process.alive?(observer)
     end
 
     test "ignores a decay timer from a previous creature life", %{killer: killer} do
