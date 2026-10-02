@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Network.UpdateBatcherTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Network.UpdateBatcher
@@ -51,6 +52,28 @@ defmodule ThistleTea.Game.Network.UpdateBatcherTest do
 
       assert [%UpdateObject{unit: %Unit{dynamic_flags: 7}}] = updates
     end
+
+    test "folds values queued behind a create into that create" do
+      create = create_update(1)
+      GenServer.cast(self(), {:send_packet, values_update(2)})
+      GenServer.cast(self(), {:send_packet, values_update(1, dynamic_flags: 7)})
+      GenServer.cast(self(), {:send_packet, values_update(1, dynamic_flags: 9)})
+
+      {_packet, updates} = UpdateBatcher.batch(create, 99)
+
+      assert [
+               %UpdateObject{update_type: :create_object2, object: %Object{guid: 1}, unit: %Unit{dynamic_flags: 9}},
+               %UpdateObject{update_type: :values, object: %Object{guid: 2}}
+             ] = updates
+    end
+
+    test "drops values that precede a create for the same guid" do
+      GenServer.cast(self(), {:send_packet, create_update(1)})
+
+      {_packet, updates} = UpdateBatcher.batch(values_update(1, dynamic_flags: 7), 99)
+
+      assert [%UpdateObject{update_type: :create_object2, unit: %Unit{dynamic_flags: 5}}] = updates
+    end
   end
 
   describe "batch/4" do
@@ -70,6 +93,10 @@ defmodule ThistleTea.Game.Network.UpdateBatcherTest do
       object: %Object{guid: guid},
       unit: %Unit{dynamic_flags: Keyword.get(opts, :dynamic_flags, 5)}
     }
+  end
+
+  defp create_update(guid) do
+    %{values_update(guid) | update_type: :create_object2, movement_block: %MovementBlock{update_flag: 0}}
   end
 
   defp clear_dynamic_flags(%UpdateObject{unit: %Unit{} = unit} = update) do
