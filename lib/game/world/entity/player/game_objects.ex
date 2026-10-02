@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjects do
   alias ThistleTea.Game.Core.GameObject.GameObjectInteraction
   alias ThistleTea.Game.Core.GameObject.Goober
   alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.InstanceScript
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Network.Message.SmsgGameobjectPagetext
   alias ThistleTea.Game.Network.UpdateObject
@@ -27,6 +28,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjects do
   alias ThistleTea.Game.World.Entity.Player.ObjectTarget
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
+  alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
@@ -57,8 +59,14 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjects do
     metadata = Metadata.get(guid) || %{}
     enabled? = ((Map.get(metadata, :go_flags) || 0) &&& 0x10) == 0
 
-    enabled? and interactable_template?(character, guid, GameObjectTemplateLoader.cached(Guid.entry(guid)), metadata)
+    enabled? and not scripted_door?(character, guid) and
+      interactable_template?(character, guid, GameObjectTemplateLoader.cached(Guid.entry(guid)), metadata)
   end
+
+  defp scripted_door?(%Character{internal: %{world: %{map_id: map_id, instance_id: id}}}, guid) when is_integer(id),
+    do: InstanceScript.scripted_door?(MapTemplateLoader.instance_script_name(map_id), Guid.entry(guid))
+
+  defp scripted_door?(_character, _guid), do: false
 
   defp interactable_template?(character, guid, %GameObjectTemplate{type: type} = template, metadata)
        when type in [24, 26],

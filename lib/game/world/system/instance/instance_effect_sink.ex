@@ -10,10 +10,26 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSink do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Loader.BroadcastText
+  alias ThistleTea.Game.World.Loader.GameObject, as: GameObjectLoader
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
+  alias ThistleTea.Game.World.System.SpawnPool
 
-  def emit(%WorldRef{} = world, effect, options \\ []) do
+  def emit(world, effect, options \\ [])
+
+  def emit(%WorldRef{} = world, %Effects.RespawnGameObject{} = effect, options) do
+    blueprint = Keyword.get(options, :game_object_blueprint, &GameObjectLoader.cached_blueprint/1)
+    respawn = Keyword.get(options, :respawn_game_object, &SpawnPool.respawn_game_object/3)
+
+    case blueprint.(effect.db_guid) do
+      nil -> :ok
+      found -> respawn.(world, found, effect.duration_ms)
+    end
+
+    :ok
+  end
+
+  def emit(%WorldRef{} = world, effect, options) do
     guids = Keyword.get(options, :guids, &World.guids/1)
     dispatch = Keyword.get(options, :dispatch, &dispatch/1)
     summon = Keyword.get(options, :summon, &summon/5)
@@ -88,6 +104,12 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSink do
     |> Enum.each(&dispatch.({:trigger_creature_spell, &1, effect.spell_id}))
   end
 
+  defp project(world, %Effects.RunCreatureScript{} = effect, guids, dispatch, _summon, spawn_guid, _text) do
+    world
+    |> targeted_creature_guids(effect, guids, spawn_guid)
+    |> Enum.each(&dispatch.({:run_creature_script, &1, effect.steps, world}))
+  end
+
   defp targeted_creature_guids(_world, %{creature_guid: guid}, _guids, _spawn_guid) when is_integer(guid), do: [guid]
 
   defp targeted_creature_guids(world, %{creature_db_guid: db_guid}, _guids, spawn_guid)
@@ -126,6 +148,8 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSink do
 
   defp dispatch({:trigger_creature_spell, guid, spell_id}),
     do: Entity.trigger_spell(guid, spell_id, guid, triggered: true)
+
+  defp dispatch({:run_creature_script, guid, steps, world}), do: Entity.start_script(guid, steps, guid, world)
 
   defp summon(world, entry, position, despawn_delay_ms, move_to) do
     with %Mob{} = mob <-

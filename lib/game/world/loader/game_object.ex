@@ -30,6 +30,26 @@ defmodule ThistleTea.Game.World.Loader.GameObject do
     |> Map.new(fn game_object -> {{:game_object, game_object.guid}, build(game_object)} end)
   end
 
+  @table_options [:named_table, :public, read_concurrency: true]
+
+  def init(table \\ __MODULE__) do
+    case :ets.whereis(table) do
+      :undefined -> :ets.new(table, @table_options)
+      _table_id -> table
+    end
+  end
+
+  def preload_blueprints(guids, table \\ __MODULE__) when is_list(guids) do
+    guids |> all_blueprints() |> Enum.each(fn {guid, blueprint} -> :ets.insert(table, {guid, blueprint}) end)
+  end
+
+  def cached_blueprint(guid, table \\ __MODULE__) when is_integer(guid) do
+    case :ets.lookup(table, guid) do
+      [{^guid, blueprint}] -> blueprint
+      [] -> nil
+    end
+  end
+
   def all_blueprints(guids) when is_list(guids) do
     Mangos.GameObject.query_guids_all(guids)
     |> Mangos.Repo.all()

@@ -63,6 +63,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Fishing, as: FishingLoader
+  alias ThistleTea.Game.World.Loader.GameObject, as: GameObjectLoader
   alias ThistleTea.Game.World.Loader.GameObjectScript, as: GameObjectScriptLoader
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
@@ -305,6 +306,7 @@ defmodule ThistleTea.Application do
     Spawns.init()
     BroadcastTextLoader.init()
     SummonLoader.init()
+    GameObjectLoader.init()
     PetLevelLoader.init()
     PetNameLoader.init()
     PetSpellsLoader.init()
@@ -379,6 +381,8 @@ defmodule ThistleTea.Application do
             CreatureScript.summon_entries() ++
             AreaTriggerScript.summon_entries()
         )
+
+        GameObjectLoader.preload_blueprints(InstanceScript.game_object_db_guids())
 
         Logger.info("Loading templates...")
         CreatureTemplateLoader.load_all()

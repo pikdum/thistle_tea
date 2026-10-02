@@ -72,4 +72,16 @@ defmodule ThistleTea.Game.Core.InstanceScript.Effects do
     @enforce_keys [:creature_entry, :spell_id]
     defstruct [:creature_entry, :spell_id, :creature_guid, :creature_db_guid]
   end
+
+  defmodule RunCreatureScript do
+    @moduledoc false
+    @enforce_keys [:creature_entry, :steps]
+    defstruct [:creature_entry, :steps, :creature_guid, :creature_db_guid]
+  end
+
+  defmodule RespawnGameObject do
+    @moduledoc false
+    @enforce_keys [:db_guid, :duration_ms]
+    defstruct [:db_guid, :duration_ms]
+  end
 end

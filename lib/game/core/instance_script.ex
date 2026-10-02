@@ -3,10 +3,11 @@ defmodule ThistleTea.Game.Core.InstanceScript do
   Registry for audited instance-script data adapters.
   """
 
+  alias ThistleTea.Game.Core.InstanceScript.BlackrockDepths
   alias ThistleTea.Game.Core.InstanceScript.Deadmines
   alias ThistleTea.Game.Core.InstanceScript.Stratholme
 
-  @adapters [Deadmines, Stratholme]
+  @adapters [BlackrockDepths, Deadmines, Stratholme]
 
   def broadcast_text_ids do
     @adapters |> Enum.flat_map(& &1.broadcast_text_ids()) |> Enum.uniq()
@@ -14,6 +15,17 @@ defmodule ThistleTea.Game.Core.InstanceScript do
 
   def summon_entries do
     @adapters |> Enum.flat_map(& &1.summon_entries()) |> Enum.uniq()
+  end
+
+  def game_object_db_guids do
+    @adapters |> Enum.flat_map(& &1.game_object_db_guids()) |> Enum.uniq()
+  end
+
+  def scripted_door?(script_name, entry) do
+    case adapter(script_name) do
+      nil -> false
+      adapter -> entry in adapter.door_entries()
+    end
   end
 
   def registered_fields(script_name) do
@@ -43,10 +55,10 @@ defmodule ThistleTea.Game.Core.InstanceScript do
     end
   end
 
-  def game_object_used(script_name, data, entry) do
+  def game_object_used(script_name, data, script_state, entry) do
     case adapter(script_name) do
       nil -> {:error, {:unsupported_script, script_name}}
-      adapter -> adapter.game_object_used(data, entry)
+      adapter -> adapter.game_object_used(data, script_state, entry)
     end
   end
 
@@ -71,6 +83,7 @@ defmodule ThistleTea.Game.Core.InstanceScript do
     end
   end
 
+  defp adapter("instance_blackrock_depths"), do: BlackrockDepths
   defp adapter("instance_deadmines"), do: Deadmines
   defp adapter("instance_stratholme"), do: Stratholme
   defp adapter(_script_name), do: nil

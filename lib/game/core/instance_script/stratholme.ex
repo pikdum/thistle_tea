@@ -78,6 +78,8 @@ defmodule ThistleTea.Game.Core.InstanceScript.Stratholme do
     do: [6_289, 6_398, 6_401, 6_415, 6_425, 6_527, 11_812, 11_813, 11_814, 11_815, 11_816, 11_817, 11_931]
 
   def summon_entries, do: [@black_guard_entry, @ramstein_entry, @mindless_undead_entry, @ysida_entry]
+  def game_object_db_guids, do: []
+  def door_entries, do: []
 
   def registered_fields,
     do: [@baron_run, @baroness, @nerub, @pallid, @ramstein, @baron, @crystal_all_die, @aurius_event, @ramstein_event]
@@ -113,18 +115,18 @@ defmodule ThistleTea.Game.Core.InstanceScript.Stratholme do
   def set_data(data, @crystal_all_die, value), do: {:ok, value, Map.put(data, @crystal_all_die, value), []}
   def set_data(data, @ramstein_event, value), do: {:ok, value, Map.put(data, @ramstein_event, value), []}
 
-  def game_object_used(data, @gauntlet_gate_entry) do
+  def game_object_used(data, script_state, @gauntlet_gate_entry) do
     case Map.get(data, @baron_run, @not_started) do
       @not_started ->
         {:ok, _stored, data, effects} = set_baron_run(data, @in_progress)
-        {:ok, data, effects}
+        {:ok, data, script_state, effects}
 
       _started ->
-        {:ok, data, []}
+        {:ok, data, script_state, []}
     end
   end
 
-  def game_object_used(data, _entry), do: {:ok, data, []}
+  def game_object_used(data, script_state, _entry), do: {:ok, data, script_state, []}
 
   def game_object_spawned(data, script_state, entry) do
     {:ok, game_object_spawn_effects(data, ensure_script_state(script_state), entry)}

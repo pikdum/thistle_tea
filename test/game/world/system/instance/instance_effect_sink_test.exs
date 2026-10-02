@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSinkTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.InstanceScript.Effects
   alias ThistleTea.Game.Core.WorldRef
@@ -68,6 +69,39 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSinkTest do
       options = Keyword.put(context.options, :spawn_guid, fn _, _, _ -> nil end)
       assert :ok = InstanceEffectSink.emit(context.world, effect, options)
       refute_receive {:move_creature, _, _}
+    end
+
+    test "runs a script on every loaded creature of the entry", context do
+      steps = [%ScriptStep{command: :set_faction, datalong: 54}]
+      effect = %Effects.RunCreatureScript{creature_entry: 10_440, steps: steps}
+
+      assert :ok = InstanceEffectSink.emit(context.world, effect, context.options)
+      assert_receive {:run_creature_script, guid, ^steps, world}
+      assert guid == context.baron
+      assert world == context.world
+      refute_receive {:run_creature_script, _, _, _}
+    end
+
+    test "respawns a cached game object spawn in the exact copy", context do
+      owner = self()
+
+      options =
+        context.options
+        |> Keyword.put(:game_object_blueprint, fn
+          399_065 -> :chest
+          _guid -> nil
+        end)
+        |> Keyword.put(:respawn_game_object, fn world, blueprint, duration_ms ->
+          send(owner, {:respawn, world, blueprint, duration_ms})
+        end)
+
+      effect = %Effects.RespawnGameObject{db_guid: 399_065, duration_ms: 3_600_000}
+      assert :ok = InstanceEffectSink.emit(context.world, effect, options)
+      assert_receive {:respawn, world, :chest, 3_600_000}
+      assert world == context.world
+
+      assert :ok = InstanceEffectSink.emit(context.world, %{effect | db_guid: 1}, options)
+      refute_receive {:respawn, _, _, _}
     end
   end
 

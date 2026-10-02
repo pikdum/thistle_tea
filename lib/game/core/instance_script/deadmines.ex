@@ -13,6 +13,8 @@ defmodule ThistleTea.Game.Core.InstanceScript.Deadmines do
 
   def broadcast_text_ids, do: [1_148, 1_149]
   def summon_entries, do: [634]
+  def game_object_db_guids, do: []
+  def door_entries, do: []
   def registered_fields, do: [@end_door, @gunpowder, 10, 11, 12]
   def initial_value(_field), do: 0
 
@@ -32,7 +34,7 @@ defmodule ThistleTea.Game.Core.InstanceScript.Deadmines do
 
   def set_data(data, field, value), do: {:ok, value, Map.put(data, field, value), []}
 
-  def game_object_used(data, 17_155) do
+  def game_object_used(data, script_state, 17_155) do
     if Map.get(data, @gunpowder, 0) == 0 do
       effect = %Effects.SummonCreature{
         entry: 634,
@@ -41,20 +43,20 @@ defmodule ThistleTea.Game.Core.InstanceScript.Deadmines do
         despawn_delay_ms: 310_000
       }
 
-      {:ok, Map.put(data, @gunpowder, 1), [effect]}
+      {:ok, Map.put(data, @gunpowder, 1), script_state, [effect]}
     else
-      {:ok, data, []}
+      {:ok, data, script_state, []}
     end
   end
 
-  def game_object_used(data, 16_398) do
+  def game_object_used(data, script_state, 16_398) do
     case set_data(data, @end_door, 1) do
-      {:ok, _stored, data, effects} -> {:ok, data, effects}
-      {:error, :already_started} -> {:ok, data, []}
+      {:ok, _stored, data, effects} -> {:ok, data, script_state, effects}
+      {:error, :already_started} -> {:ok, data, script_state, []}
     end
   end
 
-  def game_object_used(data, _entry), do: {:ok, data, []}
+  def game_object_used(data, script_state, _entry), do: {:ok, data, script_state, []}
 
   def game_object_spawned(data, _script_state, entry) do
     effects =
