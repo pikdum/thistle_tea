@@ -31,7 +31,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.SicklyCritterTest do
     end
 
     test "names the cured entries so their archetypes are preloaded" do
-      assert Enum.sort(CreatureScript.creature_entries()) == [12_297, 12_299]
+      assert [12_297, 12_299] -- CreatureScript.creature_entries() == []
     end
   end
 

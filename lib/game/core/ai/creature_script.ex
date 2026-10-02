@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.ChickenCluck
   alias ThistleTea.Game.Core.AI.CreatureScript.FelwoodOoze
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
+  alias ThistleTea.Game.Core.AI.CreatureScript.RabidThistleBear
   alias ThistleTea.Game.Core.AI.CreatureScript.SicklyCritter
   alias ThistleTea.Game.Core.AI.CreatureScript.Triage
   alias ThistleTea.Game.Core.AI.CreatureScript.TwiggyFlathead
@@ -44,6 +45,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     ChickenCluck,
     FelwoodOoze,
     LazyPeon,
+    RabidThistleBear,
     SicklyCritter,
     Triage,
     TwiggyFlathead,
