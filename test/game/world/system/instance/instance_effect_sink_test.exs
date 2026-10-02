@@ -82,6 +82,26 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSinkTest do
       refute_receive {:run_creature_script, _, _, _}
     end
 
+    test "runs a script only on the creatures of the entry within reach", context do
+      near = Guid.from_low_guid(:mob, 10_440, 17)
+      world = context.world
+
+      options =
+        context.options
+        |> Keyword.put(:guids, fn ^world -> [context.baron, near, context.ysida] end)
+        |> Keyword.put(:position, fn
+          guid when guid == near -> {world, 10.0, 0.0, 0.0}
+          _far -> {world, 90.0, 0.0, 0.0}
+        end)
+
+      steps = [%ScriptStep{command: :zone_combat_pulse, datalong: 1}]
+      effect = %Effects.RunCreatureScript{creature_entry: 10_440, steps: steps, within: {{0.0, 0.0, 0.0}, 82.0}}
+
+      assert :ok = InstanceEffectSink.emit(world, effect, options)
+      assert_receive {:run_creature_script, ^near, ^steps, ^world}
+      refute_receive {:run_creature_script, _, _, _}
+    end
+
     test "respawns a cached game object spawn in the exact copy", context do
       owner = self()
 

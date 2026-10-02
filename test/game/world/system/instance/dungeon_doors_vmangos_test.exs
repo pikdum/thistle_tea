@@ -51,6 +51,29 @@ defmodule ThistleTea.Game.World.System.Instance.DungeonDoorsVmangosTest do
     assert rows("SELECT count(*) FROM broadcast_text WHERE entry = 4490") == [[1]]
   end
 
+  test "the Scarlet Cathedral's bosses report each stage of their fight" do
+    assert rows("SELECT script_name FROM map_template WHERE entry = 189") == [["instance_scarlet_monastery"]]
+    assert rows("SELECT guid, id, state FROM gameobject WHERE id = 104600") == [[11_877, 104_600, 1]]
+
+    assert rows("SELECT guid, id FROM creature WHERE guid IN (40029, 39946) ORDER BY guid") == [
+             [39_946, 3_977],
+             [40_029, 3_976]
+           ]
+
+    assert rows("""
+           SELECT DISTINCT s.datalong2 FROM creature_ai_events e
+           JOIN creature_ai_scripts s ON s.id IN (e.action1_script, e.action2_script, e.action3_script)
+           WHERE e.creature_id = 3976 AND s.command = 37 AND s.datalong = 1 ORDER BY s.datalong2
+           """) == [[0], [1], [2]]
+
+    assert rows("SELECT datalong, datalong2 FROM generic_scripts WHERE id = 9232 AND command = 37") == [[1, 3]]
+
+    assert rows("SELECT target_type, target_param1, dataint FROM creature_ai_scripts WHERE id = 397702 AND command = 3") ==
+             [[12, 2, 101]]
+
+    assert rows("SELECT count(*) FROM broadcast_text WHERE entry = 2973") == [[1]]
+  end
+
   defp death_writes(creatures) do
     rows("""
     SELECT e.creature_id, s.datalong, s.datalong2

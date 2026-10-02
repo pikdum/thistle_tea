@@ -29,6 +29,22 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSink do
     :ok
   end
 
+  def emit(%WorldRef{} = world, %Effects.RunCreatureScript{within: {center, radius}} = effect, options) do
+    guids = Keyword.get(options, :guids, &World.guids/1)
+    position = Keyword.get(options, :position, &World.position/1)
+
+    nearby = fn world ->
+      world
+      |> guids.()
+      |> Enum.filter(fn guid ->
+        Guid.entity_type(guid) == :mob and World.entry(guid) == effect.creature_entry and
+          within?(position.(guid), world, center, radius)
+      end)
+    end
+
+    emit(world, %{effect | within: nil}, Keyword.put(options, :guids, nearby))
+  end
+
   def emit(%WorldRef{} = world, effect, options) do
     guids = Keyword.get(options, :guids, &World.guids/1)
     dispatch = Keyword.get(options, :dispatch, &dispatch/1)
@@ -122,6 +138,11 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSink do
 
   defp targeted_creature_guids(world, effect, guids, _spawn_guid),
     do: entity_guids(world, :mob, effect.creature_entry, guids)
+
+  defp within?({world, x, y, z}, world, {cx, cy, cz}, radius),
+    do: (x - cx) * (x - cx) + (y - cy) * (y - cy) + (z - cz) * (z - cz) <= radius * radius
+
+  defp within?(_position, _world, _center, _radius), do: false
 
   defp entity_guids(world, entity_type, entry, guids) do
     world
