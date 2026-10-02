@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Stats do
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Item.Keyring
   alias ThistleTea.Game.Core.Player.Experience
   alias ThistleTea.Game.Core.Player.PlayedTime
   alias ThistleTea.Game.Core.Player.Rest
@@ -105,7 +106,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Stats do
     player = %{
       player
       | next_level_xp: stats.next_level_xp,
-        skills: Skills.on_level_up(player.skills, stats.level)
+        skills: Skills.on_level_up(player.skills, stats.level),
+        keyring_slots: Keyring.size(stats.level)
     }
 
     %{character | unit: unit, player: player}

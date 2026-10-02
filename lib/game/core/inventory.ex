@@ -3,7 +3,9 @@ defmodule ThistleTea.Game.Core.Inventory do
   Pure player inventory logic over player/unit update fields: equipping,
   storing, swapping, splitting, and destroying items, stack merging, slot
   classification, and equip-slot resolution with class/level/proficiency
-  checks. Item lookups are injected as functions so the core stays DB-free.
+  checks. Keys store on the keyring first, and specialized bags hold only
+  their own bag family. Item lookups are injected as functions so the core
+  stays DB-free.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -17,6 +19,7 @@ defmodule ThistleTea.Game.Core.Inventory do
   alias ThistleTea.Game.Core.Inventory.Batch.Removal
   alias ThistleTea.Game.Core.Inventory.ChangeSet
   alias ThistleTea.Game.Core.Item.ItemEligibility
+  alias ThistleTea.Game.Core.Item.Keyring
   alias ThistleTea.Game.Core.Item.Proficiency
 
   @bag_0 255
@@ -47,12 +50,18 @@ defmodule ThistleTea.Game.Core.Inventory do
   @backpack_fields Enum.map(1..16, fn i -> String.to_atom("inv#{i}") end)
   @bank_fields Enum.map(1..24, fn i -> String.to_atom("bank#{i}") end)
   @bank_bag_fields Enum.map(1..6, fn i -> String.to_atom("bank_bag#{i}") end)
+  @keyring_fields Enum.map(1..Keyring.max_slots(), fn i -> String.to_atom("keyring#{i}") end)
   @carried_fields @equipment_fields ++ @bag_fields ++ @backpack_fields
   @bank_storage_fields @bank_fields ++ @bank_bag_fields
   @slot_fields @carried_fields ++ @bank_storage_fields
+  @owned_fields @slot_fields ++ @keyring_fields
 
-  @field_by_slot @slot_fields |> Enum.with_index() |> Map.new(fn {field, index} -> {index, field} end)
-  @slot_by_field @slot_fields |> Enum.with_index() |> Map.new()
+  @keyring_slot_start Keyring.first_slot()
+  @slot_by_field @slot_fields
+                 |> Enum.with_index()
+                 |> Map.new()
+                 |> Map.merge(@keyring_fields |> Enum.with_index(@keyring_slot_start) |> Map.new())
+  @field_by_slot Map.new(@slot_by_field, fn {field, index} -> {index, field} end)
 
   @equipment_slot_count length(@equipment_fields)
   @bag_slot_start @equipment_slot_count
@@ -65,6 +74,7 @@ defmodule ThistleTea.Game.Core.Inventory do
   @bag_slots Enum.to_list(@bag_slot_start..(@backpack_slot_start - 1))
   @bank_slots Enum.to_list(@bank_slot_start..(@bank_bag_slot_start - 1))
   @bank_bag_slots Enum.to_list(@bank_bag_slot_start..(@bank_slot_count - 1))
+  @keyring_slots Enum.to_list(@keyring_slot_start..(@keyring_slot_start + Keyring.max_slots() - 1))
 
   @mainhand_slot @slot_by_field[:mainhand]
   @offhand_slot @slot_by_field[:offhand]
@@ -83,6 +93,8 @@ defmodule ThistleTea.Game.Core.Inventory do
     cant_equip_level_i: 1,
     only_ammo_can_go_here: 7,
     item_doesnt_go_to_slot: 3,
+    item_doesnt_go_into_bag: 15,
+    item_doesnt_go_into_bag2: 16,
     nonempty_bag_over_other_bag: 5,
     cant_trade_equip_bags: 6,
     no_required_proficiency: 8,
@@ -143,7 +155,10 @@ defmodule ThistleTea.Game.Core.Inventory do
 
   def bank_bag_slot?(slot), do: is_integer(slot) and slot >= @bank_bag_slot_start and slot < @bank_slot_count
 
-  def carried_position?({@bag_0, slot}), do: is_integer(slot) and slot >= 0 and slot < @carried_slot_count
+  def keyring_slot?(slot), do: Keyring.slot?(slot)
+
+  def carried_position?({@bag_0, slot}),
+    do: (is_integer(slot) and slot >= 0 and slot < @carried_slot_count) or keyring_slot?(slot)
 
   def carried_position?({bag, slot}), do: bag_slot?(bag) and is_integer(slot) and slot >= 0
 
@@ -426,7 +441,7 @@ defmodule ThistleTea.Game.Core.Inventory do
   end
 
   def owned_items(%Player{} = player, get_item) do
-    items_in_fields(player, @carried_fields, get_item)
+    items_in_fields(player, @carried_fields ++ @keyring_fields, get_item)
   end
 
   def bank_items(%Player{} = player, get_item) do
@@ -434,7 +449,7 @@ defmodule ThistleTea.Game.Core.Inventory do
   end
 
   def all_owned_items(%Player{} = player, get_item) do
-    items_in_fields(player, @slot_fields, get_item)
+    items_in_fields(player, @owned_fields, get_item)
   end
 
   def positions(%Player{} = player, scope, get_item) when scope in [:carried, :bank, :all_owned] do
@@ -894,7 +909,8 @@ defmodule ThistleTea.Game.Core.Inventory do
   end
 
   defp stack_positions(ctx, :carried, item_or_template) do
-    carried_storage_positions(ctx)
+    ctx
+    |> carried_storage_positions(item_or_template)
     |> Enum.filter(&accepts_item?(ctx, &1, item_or_template))
   end
 
@@ -909,16 +925,28 @@ defmodule ThistleTea.Game.Core.Inventory do
   defp stack_positions(ctx, {:bag, bag}, item_or_template) do
     positions =
       if bag == @bag_0,
-        do: Enum.map(@backpack_slot_start..(@carried_slot_count - 1), &{@bag_0, &1}),
+        do: keyring_positions(ctx, item_or_template) ++ backpack_positions(),
         else: container_positions(ctx, [bag])
 
     Enum.filter(positions, &accepts_item?(ctx, &1, item_or_template))
   end
 
-  defp carried_storage_positions(ctx) do
-    backpack = Enum.map(@backpack_slot_start..(@carried_slot_count - 1), &{@bag_0, &1})
-    backpack ++ container_positions(ctx, @bag_slots)
+  defp carried_storage_positions(ctx, item_or_template) do
+    keyring_positions(ctx, item_or_template) ++ backpack_positions() ++ container_positions(ctx, @bag_slots)
   end
+
+  defp backpack_positions, do: Enum.map(@backpack_slot_start..(@carried_slot_count - 1), &{@bag_0, &1})
+
+  defp keyring_positions(ctx, item_or_template) do
+    if Keyring.key?(item_template(item_or_template)),
+      do: @keyring_slots |> Enum.take(keyring_capacity(ctx.player)) |> Enum.map(&{@bag_0, &1}),
+      else: []
+  end
+
+  defp keyring_capacity(%Player{keyring_slots: count}) when is_integer(count),
+    do: count |> max(0) |> min(Keyring.max_slots())
+
+  defp keyring_capacity(%Player{}), do: 0
 
   defp carried_container_positions(ctx), do: container_positions(ctx, @bag_slots)
 
@@ -1106,6 +1134,9 @@ defmodule ThistleTea.Game.Core.Inventory do
       backpack_slot?(slot) or base_bank_slot?(slot) ->
         validate_bag_empty_if_bag(ctx, item)
 
+      keyring_slot?(slot) ->
+        if Keyring.key?(template), do: :ok, else: {:error, :item_doesnt_go_into_bag2}
+
       true ->
         {:error, :item_doesnt_go_to_slot}
     end
@@ -1209,11 +1240,12 @@ defmodule ThistleTea.Game.Core.Inventory do
     free_position(after_swap, :carried, offhand_item) != nil
   end
 
-  defp storage_pos?({@bag_0, slot}), do: backpack_slot?(slot) or base_bank_slot?(slot)
+  defp storage_pos?({@bag_0, slot}), do: backpack_slot?(slot) or base_bank_slot?(slot) or keyring_slot?(slot)
   defp storage_pos?({bag, _slot}), do: bag_slot?(bag) or bank_bag_slot?(bag)
 
   defp free_position(ctx, :carried, item_or_template) do
-    carried_storage_positions(ctx)
+    ctx
+    |> carried_storage_positions(item_or_template)
     |> Enum.find(fn position ->
       guid_at(ctx, position) == nil and accepts_item?(ctx, position, item_or_template)
     end)
@@ -1260,6 +1292,12 @@ defmodule ThistleTea.Game.Core.Inventory do
     else
       {:ok, position}
     end
+  end
+
+  defp valid_destination(ctx, {@bag_0, slot} = position) when is_integer(slot) and slot >= @keyring_slot_start do
+    if slot < @keyring_slot_start + keyring_capacity(ctx.player),
+      do: {:ok, position},
+      else: {:error, :item_doesnt_go_to_slot}
   end
 
   defp valid_destination(ctx, {bag, slot} = pos) when is_integer(bag) and is_integer(slot) do
@@ -1369,9 +1407,13 @@ defmodule ThistleTea.Game.Core.Inventory do
 
   defp put_visible_entry(player, slot, item), do: sync_visible_item(player, slot, item)
 
-  defp direct_positions(:carried), do: Enum.map(0..(@carried_slot_count - 1), &{@bag_0, &1})
+  defp direct_positions(:carried),
+    do: Enum.map(Enum.to_list(0..(@carried_slot_count - 1)) ++ @keyring_slots, &{@bag_0, &1})
+
   defp direct_positions(:bank), do: Enum.map(@bank_slots ++ @bank_bag_slots, &{@bag_0, &1})
-  defp direct_positions(:all_owned), do: Enum.map(0..(@bank_slot_count - 1), &{@bag_0, &1})
+
+  defp direct_positions(:all_owned),
+    do: Enum.map(Enum.to_list(0..(@bank_slot_count - 1)) ++ @keyring_slots, &{@bag_0, &1})
 
   defp purchased_bank_bag_slots(%Player{bank_bag_slots: count}) when is_integer(count), do: count |> max(0) |> min(6)
   defp purchased_bank_bag_slots(%Player{}), do: 0
@@ -1395,9 +1437,10 @@ defmodule ThistleTea.Game.Core.Inventory do
   end
 
   defp bag_accepts?(%Item{} = bag, %ItemTemplate{} = template) do
-    bag_family = Item.template(bag).bag_family || 0
-    item_family = template.bag_family || 0
-    bag_family == 0 or (bag_family &&& item_family) != 0
+    case Item.template(bag).bag_family || 0 do
+      0 -> true
+      family -> family == (template.bag_family || 0) and (template.container_slots || 0) == 0
+    end
   end
 
   defp specialized_bag_accepts?(%Item{} = bag, %ItemTemplate{} = template) do

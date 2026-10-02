@@ -1640,4 +1640,93 @@ defmodule ThistleTea.Game.Core.InventoryTest do
       assert {:error, :item_not_found} = Inventory.plan(batch, lookup)
     end
   end
+
+  describe "keyring" do
+    test "stores keys in the first keyring slot the player's level unlocks" do
+      key = build_item(40, key_template(4000))
+
+      assert {:ok, %{player: player}, {:placed, {@bag_0, 81}, _placed}} =
+               Inventory.store(%Player{keyring_slots: 4}, @owner, key, get_item_fn([key]))
+
+      assert player.keyring1 == key.object.guid
+      assert player.inv1 in [nil, 0]
+    end
+
+    test "falls back to the backpack once the keyring is full" do
+      keys = Enum.map(1..4, &build_item(40 + &1, key_template(4000 + &1)))
+      incoming = build_item(50, key_template(5000))
+      player = keys |> Enum.with_index(1) |> Enum.reduce(%Player{keyring_slots: 4}, &put_key/2)
+
+      assert {:ok, %{player: player}, {:placed, {@bag_0, @backpack_start}, _placed}} =
+               Inventory.store(player, @owner, incoming, get_item_fn([incoming | keys]))
+
+      assert player.inv1 == incoming.object.guid
+    end
+
+    test "keeps non-keys and players without a keyring out of it", %{chest: chest} do
+      key = build_item(40, key_template(4000))
+
+      assert {:ok, _result, {:placed, {@bag_0, @backpack_start}, _}} =
+               Inventory.store(%Player{keyring_slots: 4}, @owner, chest, get_item_fn([chest]))
+
+      assert {:ok, _result, {:placed, {@bag_0, @backpack_start}, _}} =
+               Inventory.store(%Player{}, @owner, key, get_item_fn([key]))
+    end
+
+    test "auto-stores a key dropped on the inventory into the keyring" do
+      key = build_item(40, key_template(4000))
+      player = %Player{inv1: key.object.guid, keyring_slots: 4}
+
+      assert {:ok, result} =
+               Inventory.auto_store_in_bag(player, @owner, {@bag_0, @backpack_start}, @bag_0, get_item_fn([key]))
+
+      assert result.player.keyring1 == key.object.guid
+      assert result.player.inv1 == 0
+    end
+
+    test "only accepts keys within the unlocked slots", %{unit: unit, chest: chest} do
+      key = build_item(40, key_template(4000))
+      player = %Player{inv1: chest.object.guid, inv2: key.object.guid, keyring_slots: 4}
+      get_item = get_item_fn([chest, key])
+      swap = &Inventory.swap(player, unit, @prof, @owner, &1, &2, get_item)
+
+      assert {:error, :item_doesnt_go_into_bag2, _, _} = swap.({@bag_0, @backpack_start}, {@bag_0, 81})
+      assert {:error, :item_doesnt_go_to_slot, _, _} = swap.({@bag_0, @backpack_start + 1}, {@bag_0, 85})
+      assert {:ok, %{player: moved}} = swap.({@bag_0, @backpack_start + 1}, {@bag_0, 84})
+      assert moved.keyring4 == key.object.guid
+    end
+
+    test "counts and finds keys on the keyring as carried items" do
+      key = build_item(40, key_template(4000))
+      player = %Player{keyring2: key.object.guid, keyring_slots: 4}
+      get_item = get_item_fn([key])
+
+      assert Inventory.count_entry(player, 4000, get_item) == 1
+      assert Inventory.find_position(player, key.object.guid, get_item) == {@bag_0, 82}
+      assert Inventory.carried_position?({@bag_0, 82})
+      assert [%Item{}] = Inventory.all_owned_items(player, get_item)
+    end
+  end
+
+  describe "specialized bags" do
+    test "hold only their own family and never another bag" do
+      soul_bag =
+        build_item(60, %ItemTemplate{entry: 6000, inventory_type: 18, container_slots: 6, class: 1, bag_family: 3})
+
+      arrows = %ItemTemplate{entry: 6001, bag_family: 1, stackable: 200}
+      shards = %ItemTemplate{entry: 6002, bag_family: 3}
+      pouch = %ItemTemplate{entry: 6003, inventory_type: 18, container_slots: 4, class: 1, bag_family: 3}
+      filler = build_item(61, %ItemTemplate{entry: 6004})
+      player = Enum.reduce(0..15, %Player{bag1: soul_bag.object.guid}, &store(&2, @backpack_start + &1, filler))
+      lookup = get_item_fn([soul_bag, filler])
+
+      assert Inventory.storable_count(player, arrows, 10, lookup) == 0
+      assert Inventory.storable_count(player, pouch, 1, lookup) == 0
+      assert Inventory.storable_count(player, shards, 10, lookup) == 6
+    end
+  end
+
+  defp key_template(entry), do: %ItemTemplate{entry: entry, class: 13, bag_family: 9}
+
+  defp put_key({key, index}, player), do: Map.put(player, :"keyring#{index}", key.object.guid)
 end
