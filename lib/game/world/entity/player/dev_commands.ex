@@ -216,6 +216,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
       ".move [x y z] - move target to you or coordinates",
       ".pid - show target pid",
       ".pos - show current position",
+      ".respawn - respawn the selected creature at its spawn point",
       ".talents reset - unlearn all talents and refund points",
       ".rested [amount] - add rested xp",
       ".start - return to your last safe ground position",
@@ -311,12 +312,9 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   end
 
   def run(state, ".debug combatpulse" <> _) do
-    target = state.target
-
-    if is_integer(target) && Guid.entity_type(target) in [:mob, :pet] &&
-         match?({world, _, _, _} when world == state.character.internal.world, World.position(target)) do
+    if selected_creature?(state) do
       step = %ScriptStep{command: :zone_combat_pulse, datalong: 1}
-      Entity.start_script(target, [step], state.character.object.guid, state.character.internal.world)
+      Entity.start_script(state.target, [step], state.character.object.guid, state.character.internal.world)
       system_message(state, "Requested dungeon combat pulse from selected creature.")
     else
       system_message(state, "Select a creature and use: .debug combatpulse")
@@ -326,15 +324,24 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
 
   def run(state, ".debug reaction " <> mode) do
     reaction = Enum.find_index(["passive", "defensive", "aggressive"], &(&1 == String.trim(mode)))
-    target = state.target
 
-    if reaction && is_integer(target) && Guid.entity_type(target) in [:mob, :pet] &&
-         match?({world, _, _, _} when world == state.character.internal.world, World.position(target)) do
+    if reaction && selected_creature?(state) do
       step = %ScriptStep{command: :set_react_state, datalong: reaction}
-      Entity.start_script(target, [step], state.character.object.guid, state.character.internal.world)
+      Entity.start_script(state.target, [step], state.character.object.guid, state.character.internal.world)
       system_message(state, "Creature reaction: #{String.trim(mode)}.")
     else
       system_message(state, "Select a creature and use: .debug reaction <passive|defensive|aggressive>")
+    end
+    |> handled()
+  end
+
+  def run(state, ".respawn" <> _) do
+    if selected_creature?(state) do
+      step = %ScriptStep{command: :respawn_creature, datalong: 1}
+      Entity.start_script(state.target, [step], state.character.object.guid, state.character.internal.world)
+      system_message(state, "Respawning selected creature.")
+    else
+      system_message(state, "Select a creature and use: .respawn")
     end
     |> handled()
   end
@@ -661,6 +668,11 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   def run(_state, _message), do: :unhandled
 
   defp handled(state), do: {:handled, state}
+
+  defp selected_creature?(%{target: target, character: %Character{internal: %{world: world}}}) do
+    is_integer(target) and Guid.entity_type(target) in [:mob, :pet] and
+      match?({^world, _, _, _}, World.position(target))
+  end
 
   defp pet_adjustment(kind, delta) do
     case Integer.parse(delta) do

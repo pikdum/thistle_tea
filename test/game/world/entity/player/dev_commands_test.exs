@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Entity.Character
@@ -27,6 +28,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.DevCommands
   alias ThistleTea.Game.World.Entity.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.World.Entity.Transport, as: TransportServer
@@ -480,6 +482,32 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
 
       assert_receive {:"$gen_cast",
                       {:send_packet, %Message.SmsgMessagechat{message: "Invalid command. Use: .debug position <guid>"}}}
+    end
+  end
+
+  describe ".respawn" do
+    test "asks the selected creature in this world to respawn even if alive" do
+      guid = Guid.from_low_guid(:mob, 349, Unique.integer())
+      {:ok, _} = Entity.register(guid)
+      world = WorldRef.open(0)
+      SpatialHash.insert(:mobs, guid, world, 1.0, 2.0, 3.0)
+      on_exit(fn -> SpatialHash.remove(:mobs, guid) end)
+      state = %{guid: 1, target: guid, character: debug_character()}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".respawn")
+
+      assert_receive {:"$gen_cast", {:start_script, [%ScriptStep{command: :respawn_creature, datalong: 1}], 1, ^world}}
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "Respawning selected creature."}}}
+    end
+
+    test "requires a selected creature" do
+      state = %{guid: 1, target: nil, character: debug_character()}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".respawn")
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgMessagechat{message: "Select a creature and use: .respawn"}}}
     end
   end
 
