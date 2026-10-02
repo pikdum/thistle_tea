@@ -668,7 +668,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   def run(state, ".move " <> coordinates) do
     case parse_coords(String.split(coordinates, " ", trim: true)) do
       {:ok, x, y, z} ->
-        Entity.move_to(Map.get(state, :target), {x, y, z})
+        Entity.move_to(Map.get(state, :target), {x, y, z}, stop_patrol?: true)
         state
 
       _ ->
@@ -682,7 +682,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
 
     case state.character.movement_block.position do
       {x, y, z, _o} ->
-        Entity.move_to(target, {x, y, z})
+        Entity.move_to(target, {x, y, z}, stop_patrol?: true)
         state
 
       _ ->
