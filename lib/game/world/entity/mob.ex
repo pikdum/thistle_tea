@@ -1730,7 +1730,6 @@ defmodule ThistleTea.Game.World.Entity.Mob do
           victim_guid: state.unit.target,
           combat_victim_guid: state.unit.target,
           combat_targets: Threat.targets(state),
-          evading?: evading?(state.internal.blackboard),
           charmed_by: state.unit.charmed_by,
           detect_range_modifier: Aura.flat_amount(state, :mod_detect_range),
           level: state.unit.level,
@@ -1784,6 +1783,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
        when is_integer(guid) and is_number(orientation) do
     Metadata.update(guid, %{
       orientation: orientation,
+      evading?: evading?(state.internal.blackboard),
       lateral_speed: MovementBlock.lateral_speed(state.movement_block),
       assistance_available?: Assistance.available?(state),
       flee_from_help_available?: Assistance.flee_available?(state)
