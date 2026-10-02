@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Core.InstanceScript.Deadmines do
   def summon_entries, do: [634]
   def game_object_db_guids, do: []
   def door_entries, do: []
+  def data64(_index), do: nil
   def registered_fields, do: [@end_door, @gunpowder, 10, 11, 12]
   def initial_value(_field), do: 0
 

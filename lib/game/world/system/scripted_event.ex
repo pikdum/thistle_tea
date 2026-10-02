@@ -18,12 +18,14 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   alias ThistleTea.Game.Core.Condition.Subject
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.InstanceScript
   alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.Core.Reputation
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Reaction
@@ -292,6 +294,16 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   defp event_target(_events, world, {:creature_with_guid, db_guid, _param2}) do
     World.spawn_guid(world, :mob, db_guid)
   end
+
+  defp event_target(_events, %WorldRef{instance_id: id} = world, {:creature_from_instance_data, index, _param2})
+       when is_integer(id) do
+    case InstanceScript.data64(MapTemplateLoader.instance_script_name(world.map_id), index) do
+      db_guid when is_integer(db_guid) -> World.spawn_guid(world, :mob, db_guid)
+      nil -> nil
+    end
+  end
+
+  defp event_target(_events, _world, {:creature_from_instance_data, _index, _param2}), do: nil
 
   defp event_target(events, world, {target_type, event_id, entry}) do
     case Map.get(events, event_key(world, event_id)) do

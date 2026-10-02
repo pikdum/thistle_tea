@@ -80,6 +80,7 @@ defmodule ThistleTea.Game.Core.InstanceScript.Stratholme do
   def summon_entries, do: [@black_guard_entry, @ramstein_entry, @mindless_undead_entry, @ysida_entry]
   def game_object_db_guids, do: []
   def door_entries, do: []
+  def data64(_index), do: nil
 
   def registered_fields,
     do: [@baron_run, @baroness, @nerub, @pallid, @ramstein, @baron, @crystal_all_die, @aurius_event, @ramstein_event]

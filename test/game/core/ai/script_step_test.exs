@@ -16,6 +16,11 @@ defmodule ThistleTea.Game.Core.AI.ScriptStepTest do
       assert row(56) |> ScriptStep.build() |> Map.fetch!(:command) == :remove_guardians
     end
 
+    test "decodes creatures named by instance data" do
+      step = 3 |> row() |> Map.merge(%{target_type: 12, target_param1: 2}) |> ScriptStep.build()
+      assert {step.target_type, step.target_param1} == {:creature_from_instance_data, 2}
+    end
+
     test "decodes creature entry changes" do
       assert row(27) |> ScriptStep.build() |> Map.fetch!(:command) == :update_entry
     end

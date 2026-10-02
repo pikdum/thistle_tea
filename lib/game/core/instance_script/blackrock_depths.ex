@@ -58,6 +58,7 @@ defmodule ThistleTea.Game.Core.InstanceScript.BlackrockDepths do
   def game_object_db_guids, do: [@chest_of_seven]
   def registered_fields, do: [@tomb_of_seven, @lyceum, @iron_hall, @flamelash]
   def door_entries, do: Enum.map(doors(), &elem(&1, 0))
+  def data64(_index), do: nil
   def initial_value(_field), do: @not_started
 
   def set_data(data, @lyceum, value) do

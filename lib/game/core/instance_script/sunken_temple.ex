@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.Core.InstanceScript.SunkenTemple do
     do: [@secret_circle, @protectors_field, @jammalan_field, @malfurion, @avatar, @eranikus_field, @eternal_flame]
 
   def door_entries, do: [@barrier]
+  def data64(_index), do: nil
   def initial_value(_field), do: 0
 
   def set_data(data, @protectors_field, _value), do: {:ok, Encounter.value(data, @protectors_field), data, []}

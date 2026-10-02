@@ -1667,6 +1667,24 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
       assert mob.internal.events == []
     end
 
+    test "a creature named by the copy's instance data resolves from immutable context", %{mob: mob} do
+      mograine = Guid.runtime(:mob, 3_976)
+
+      step = %ScriptStep{
+        command: :talk,
+        target_type: :creature_from_instance_data,
+        target_param1: 2,
+        texts: [%{text: "Arise, my champion!", chat_type: :yell, language: 0, emote_id: 0}]
+      }
+
+      selector = {:creature_from_instance_data, 2, 0}
+      context = Context.new(1_000, script_targets: %{selector => mograine})
+      {talked, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, context)
+
+      assert [%Effects.MonsterTalk{target_guid: ^mograine}] = talked.internal.events
+      assert Script.target_requests([step]) == [selector]
+    end
+
     test "unsupported commands are skipped", %{mob: mob} do
       step = %ScriptStep{command: {:unsupported, 10}}
 

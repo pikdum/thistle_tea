@@ -328,6 +328,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   defp target_type(9), do: :owner
   defp target_type(10), do: :nearest_creature_with_entry
   defp target_type(11), do: :creature_with_guid
+  defp target_type(12), do: :creature_from_instance_data
   defp target_type(13), do: :nearest_game_object_with_entry
   defp target_type(14), do: :game_object_with_guid
   defp target_type(16), do: :friendly

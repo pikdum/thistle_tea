@@ -31,6 +31,13 @@ defmodule ThistleTea.Game.Core.InstanceScript do
     end
   end
 
+  def data64(script_name, index) do
+    case adapter(script_name) do
+      nil -> nil
+      adapter -> adapter.data64(index)
+    end
+  end
+
   def registered_fields(script_name) do
     case adapter(script_name) do
       nil -> []

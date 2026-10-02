@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Core.InstanceScript.RazorfenKraul do
   def game_object_db_guids, do: []
   def registered_fields, do: [@agathelos_field]
   def door_entries, do: [@ward]
+  def data64(_index), do: nil
   def initial_value(_field), do: 0
 
   def set_data(data, @agathelos_field, value) do

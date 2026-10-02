@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Core.InstanceScript.ShadowfangKeep do
   def game_object_db_guids, do: []
   def registered_fields, do: [@free_npc, @rethilgore, @fenrus, @nandos, @intro, @voidwalkers]
   def door_entries, do: Enum.map(doors(), &elem(&1, 0))
+  def data64(_index), do: nil
   def initial_value(_field), do: 0
 
   def set_data(data, @voidwalkers, @done),

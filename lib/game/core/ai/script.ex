@@ -100,6 +100,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
   @null_source_target_types @entry_target_types ++
                               [
                                 :creature_with_guid,
+                                :creature_from_instance_data,
                                 :game_object_with_guid,
                                 :map_event_source,
                                 :map_event_target,
@@ -1788,6 +1789,15 @@ defmodule ThistleTea.Game.Core.AI.Script do
     end
   end
 
+  defp resolve_target(
+         _state,
+         %ScriptStep{target_type: :creature_from_instance_data, target_param1: index, target_param2: param2},
+         _provided,
+         %Context{script_targets: targets}
+       ) do
+    Map.get(targets, {:creature_from_instance_data, index, param2})
+  end
+
   defp resolve_target(state, %ScriptStep{} = step, provided, %Context{}) do
     resolve_target(state, step, provided)
   end
@@ -1895,6 +1905,13 @@ defmodule ThistleTea.Game.Core.AI.Script do
 
   defp target_request(%ScriptStep{target_type: :creature_with_guid, target_param1: db_guid, target_param2: param2})
        when is_integer(db_guid) and db_guid > 0, do: [{:creature_with_guid, db_guid, param2}]
+
+  defp target_request(%ScriptStep{
+         target_type: :creature_from_instance_data,
+         target_param1: index,
+         target_param2: param2
+       })
+       when is_integer(index) and index >= 0, do: [{:creature_from_instance_data, index, param2}]
 
   defp target_request(%ScriptStep{target_type: target_type, target_param1: event_id, target_param2: entry})
        when target_type in @map_event_target_types, do: [{target_type, event_id, entry}]
