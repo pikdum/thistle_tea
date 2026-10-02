@@ -96,12 +96,12 @@ defmodule ThistleTea.Game.Core.InstanceTest do
 
     test "rejects unsupported and invalid commands without mutation" do
       {supported, nil, instances} = Instance.enter(%Instance{}, 329, {:player, 100}, 100, @stratholme)
-      {unsupported, nil, instances} = Instance.enter(instances, 33, {:player, 200}, 200, "instance_shadowfang_keep")
+      {unsupported, nil, instances} = Instance.enter(instances, 33, {:player, 200}, 200, "instance_unscripted")
       {no_script, nil, instances} = Instance.enter(instances, 389, {:player, 300}, 300)
 
       failures = [
         {supported, 9, 1, :raw, {:unsupported_field, 9}},
-        {unsupported, 7, 1, :raw, {:unsupported_script, "instance_shadowfang_keep"}},
+        {unsupported, 7, 1, :raw, {:unsupported_script, "instance_unscripted"}},
         {no_script, 7, 1, :raw, :no_instance_script},
         {WorldRef.instance(329, 999), 7, 1, :raw, :missing_copy},
         {WorldRef.open(329), 7, 1, :raw, :open_world},

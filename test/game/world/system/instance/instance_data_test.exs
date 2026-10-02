@@ -33,12 +33,12 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceDataTest do
       InstanceData.publish(table, %Copy{
         world: unsupported,
         owner: {:player, 2},
-        script_name: "instance_shadowfang_keep"
+        script_name: "instance_unscripted"
       })
 
       assert %Snapshot{status: :no_instance_script} = InstanceData.read(no_script, [7], table)
 
-      assert %Snapshot{status: {:unsupported_script, "instance_shadowfang_keep"}} =
+      assert %Snapshot{status: {:unsupported_script, "instance_unscripted"}} =
                InstanceData.read(unsupported, [7], table)
 
       assert %Snapshot{status: :missing_copy} = InstanceData.read(WorldRef.instance(329, 99), [7], table)
