@@ -4,7 +4,9 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScriptTest do
   alias ThistleTea.Game.Core.AI.AreaTriggerScript
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Context
+  alias ThistleTea.Game.Core.AI.BT.Context.Perception
   alias ThistleTea.Game.Core.AI.Script
+  alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -81,17 +83,93 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScriptTest do
     end
   end
 
-  describe "summon_entries/0" do
-    test "lists every creature a trigger can call" do
-      assert Enum.sort(AreaTriggerScript.summon_entries()) == [9683 | @ancients]
+  describe "Huldar and Miran's camp" do
+    setup do
+      %{saean: Guid.from_low_guid(:mob, 1380, Unique.integer())}
+    end
+
+    test "credits the delivery and turns Saean on Miran", %{saean: saean} do
+      player = character(quests: [{273, :incomplete}])
+      guid = player.object.guid
+
+      assert [
+               %Effects.QuestEventCredit{player_guid: ^guid, quest_id: 273},
+               %Effects.ForwardScriptSteps{target_guid: ^saean, source_guid: ^guid, steps: [saean_turns]}
+             ] = effects(171, player, ambush_context(saean, :met))
+
+      assert %ScriptStep{command: :start_script, condition: nil} = saean_turns
+
+      assert [
+               %ScriptStep{command: :set_faction, datalong: 54, datalong2: 1},
+               %ScriptStep{command: :summon_creature, datalong: 1981, dataint3: 10, target_param1: 1379},
+               %ScriptStep{command: :summon_creature, datalong: 1981, dataint3: 10, target_param1: 1379},
+               %ScriptStep{command: :attack_start, target_type: :nearest_creature_with_entry, target_param1: 1379}
+             ] = Map.fetch!(saean_turns.sub_scripts, saean_turns.datalong)
+    end
+
+    test "only credits the delivery when the camp is not ready", %{saean: saean} do
+      player = character(quests: [{273, :incomplete}])
+
+      assert [%Effects.QuestEventCredit{quest_id: 273}] = effects(171, player, ambush_context(saean, :unmet))
+    end
+
+    test "leaves the camp alone for players without the delivery", %{saean: saean} do
+      assert [] = effects(171, character(quests: [{273, :complete}]), ambush_context(saean, :unmet))
     end
   end
 
-  defp effects(trigger_id, %Character{object: %Object{guid: guid}} = player) do
-    steps = AreaTriggerScript.steps(trigger_id, @position)
-    {player, _blackboard} = Script.run(player, Blackboard.new(), steps, guid, Context.new(0))
+  describe "Sentry Point" do
+    test "credits the report and brings Tervosh in from Theramore" do
+      player = character(quests: [{1265, :incomplete}])
+      guid = player.object.guid
 
-    Enum.filter(player.internal.events, &(&1.__struct__ in [Effects.QuestKillCredit, Effects.SummonCreature]))
+      assert [
+               %Effects.SummonCreature{summon: summon, steps: visit, target_guid: ^guid},
+               %Effects.QuestEventCredit{player_guid: ^guid, quest_id: 1265}
+             ] = effects(1667, player)
+
+      assert %{entry: 4967, despawn_type: 3, despawn_delay_ms: 63_000, unique?: true, attack_guid: nil} = summon
+
+      assert [
+               %ScriptStep{command: :modify_flags, datalong: 46, datalong2: 0x280, datalong3: 1},
+               %ScriptStep{command: :cast_spell, datalong: 7141, delay_ms: 1_000},
+               %ScriptStep{command: :emote, datalong: 66, target_param1: 5085, swap_final?: true},
+               %ScriptStep{command: :cast_spell, datalong: 7077, delay_ms: 61_000}
+             ] = visit
+
+      assert [] = effects(1667, character())
+    end
+
+    test "answers the tower entrance the door reports" do
+      assert AreaTriggerScript.steps(302, @position) == AreaTriggerScript.steps(1667, @position)
+    end
+  end
+
+  describe "summon_entries/0" do
+    test "lists every creature a trigger can call" do
+      assert Enum.sort(AreaTriggerScript.summon_entries()) == [1981, 4967, 9683 | @ancients]
+    end
+  end
+
+  defp ambush_context(saean, ready) do
+    [_credit, ambush] = AreaTriggerScript.steps(171, @position)
+    perception = Perception.new(0, nil, %{}, %{mobs: [{saean, 20.0}], players: [], game_objects: []})
+    Context.new(0, perception: perception, script_conditions: %{ambush.condition => ready})
+  end
+
+  defp effects(trigger_id, %Character{object: %Object{guid: guid}} = player, context \\ Context.new(0)) do
+    steps = AreaTriggerScript.steps(trigger_id, @position)
+    {player, _blackboard} = Script.run(player, Blackboard.new(), steps, guid, context)
+
+    Enum.filter(
+      player.internal.events,
+      &(&1.__struct__ in [
+          Effects.QuestKillCredit,
+          Effects.QuestEventCredit,
+          Effects.SummonCreature,
+          Effects.ForwardScriptSteps
+        ])
+    )
   end
 
   defp character(opts \\ []) do

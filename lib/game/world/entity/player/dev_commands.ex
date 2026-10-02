@@ -198,7 +198,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
       ".character level <level> - set player level",
       ".die - kill your character",
       ".weather [fine|auto|step] or <rain|snow|storm> <0..1> [permanent] - zone weather",
-      ".go xyz <x> <y> <z> [map] - teleport",
+      ".go xyz <x> <y> <z> [map] [facing] - teleport, optionally facing an angle in radians",
       ".guid - show target guid",
       ".help - show help",
       ".instance info - show instance ownership and membership",
@@ -592,9 +592,10 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
     |> String.split(" ", trim: true)
     |> parse_coords()
     |> case do
+      {:ok, x, y, z, map, facing} -> teleport_player(state, {x, y, z, facing}, map)
       {:ok, x, y, z, map} -> teleport_player(state, x, y, z, map)
       {:ok, x, y, z} -> teleport_player(state, x, y, z, state.character.internal.world)
-      :error -> system_message(state, "Invalid command. Use: .go xyz <x> <y> <z> [map]")
+      :error -> system_message(state, "Invalid command. Use: .go xyz <x> <y> <z> [map] [facing]")
     end
     |> handled()
   end
@@ -964,6 +965,14 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
     state
   end
 
+  defp teleport_player(state, {x, y, z, facing}, map) do
+    system_message(state, "Teleporting to #{x}, #{y}, #{z} facing #{facing} on #{destination_label(map)}")
+
+    GenServer.cast(self(), {:start_teleport, x, y, z, facing, map})
+
+    state
+  end
+
   defp battleground_command(state, ["join"]), do: battleground_command(state, ["join", "warsong"])
 
   defp battleground_command(state, ["list", name]) when name in ["warsong", "arathi", "alterac"] do
@@ -1148,6 +1157,15 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
 
   defp owner_label({:party, id}), do: "party #{id}"
   defp owner_label({:player, guid}), do: "player #{guid}"
+
+  defp parse_coords([x, y, z, map, facing]) do
+    with {:ok, x, y, z, map} <- parse_coords([x, y, z, map]),
+         {facing, ""} <- Float.parse(facing) do
+      {:ok, x, y, z, map, facing}
+    else
+      _ -> :error
+    end
+  end
 
   defp parse_coords([x, y, z, map]) do
     with {:ok, x, y, z} <- parse_coords([x, y, z]),

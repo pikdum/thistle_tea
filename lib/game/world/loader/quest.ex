@@ -55,13 +55,26 @@ defmodule ThistleTea.Game.World.Loader.Quest do
   end
 
   def append_start_steps(steps_by_quest) when is_map(steps_by_quest) do
-    Enum.each(steps_by_quest, fn {quest_id, steps} -> append_start_steps(quest_id, steps) end)
+    Enum.each(steps_by_quest, fn {quest_id, steps} ->
+      append_start_steps(quest_id, Script.resolve_texts(steps))
+    end)
   end
 
   def append_start_steps(quest_id, steps) when is_list(steps) do
+    update_quest(quest_id, &%{&1 | start_script_steps: &1.start_script_steps ++ steps})
+  end
+
+  def append_complete_steps(steps_by_quest) when is_map(steps_by_quest) do
+    Enum.each(steps_by_quest, fn {quest_id, steps} ->
+      steps = Script.resolve_texts(steps)
+      update_quest(quest_id, &%{&1 | complete_script_steps: &1.complete_script_steps ++ steps})
+    end)
+  end
+
+  defp update_quest(quest_id, update) do
     case get(quest_id) do
       %Quest{} = quest ->
-        :ets.insert(__MODULE__, {{:quest, quest_id}, %{quest | start_script_steps: quest.start_script_steps ++ steps}})
+        :ets.insert(__MODULE__, {{:quest, quest_id}, update.(quest)})
         :ok
 
       nil ->

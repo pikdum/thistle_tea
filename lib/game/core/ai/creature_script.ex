@@ -12,10 +12,14 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   sequence in a `start_script` step, the way the database chains generic
   scripts. A script whose creature reacts to a quest being accepted, as
   vmangos `QuestAccept` hooks do, returns the steps to append to that quest's
-  start script from `quest_start_steps/0`.
+  start script from `quest_start_steps/0`, and one that reacts to a quest
+  being turned in, as `QuestRewarded` hooks do, returns the steps to append
+  to its completion script from `quest_end_steps/0`. A script that only
+  reacts to quests claims no entries, so its creature keeps its EventAI.
   """
 
   alias ThistleTea.Game.Core.AI.AIEvent
+  alias ThistleTea.Game.Core.AI.CreatureScript.ArchmageTervosh
   alias ThistleTea.Game.Core.AI.CreatureScript.Bartleby
   alias ThistleTea.Game.Core.AI.CreatureScript.ChickenCluck
   alias ThistleTea.Game.Core.AI.CreatureScript.FelwoodOoze
@@ -28,10 +32,11 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   @callback entries() :: [pos_integer()]
   @callback events(pos_integer()) :: [%AIEvent{}]
   @callback quest_start_steps() :: %{pos_integer() => [%ScriptStep{}]}
+  @callback quest_end_steps() :: %{pos_integer() => [%ScriptStep{}]}
 
-  @optional_callbacks quest_start_steps: 0
+  @optional_callbacks quest_start_steps: 0, quest_end_steps: 0
 
-  @scripts [Bartleby, ChickenCluck, FelwoodOoze, LazyPeon, SicklyCritter, Triage]
+  @scripts [ArchmageTervosh, Bartleby, ChickenCluck, FelwoodOoze, LazyPeon, SicklyCritter, Triage]
   @timed_script 1
 
   def ported?(entry), do: not is_nil(script(entry))
@@ -47,12 +52,19 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
 
   def creature_entries, do: Script.creature_entries(steps())
 
-  def summon_entries, do: Script.summon_entries(steps() ++ Enum.flat_map(quest_start_steps(), &elem(&1, 1)))
+  def summon_entries do
+    quest_steps = Enum.flat_map(Map.values(quest_start_steps()) ++ Map.values(quest_end_steps()), & &1)
+    Script.summon_entries(steps() ++ quest_steps)
+  end
 
-  def quest_start_steps do
+  def quest_start_steps, do: quest_steps(:quest_start_steps)
+
+  def quest_end_steps, do: quest_steps(:quest_end_steps)
+
+  defp quest_steps(callback) do
     @scripts
-    |> Enum.filter(&(Code.ensure_loaded?(&1) and function_exported?(&1, :quest_start_steps, 0)))
-    |> Enum.map(& &1.quest_start_steps())
+    |> Enum.filter(&(Code.ensure_loaded?(&1) and function_exported?(&1, callback, 0)))
+    |> Enum.map(&apply(&1, callback, []))
     |> Enum.reduce(%{}, &Map.merge(&2, &1, fn _quest_id, steps, more -> steps ++ more end))
   end
 

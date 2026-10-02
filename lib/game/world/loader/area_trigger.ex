@@ -38,6 +38,10 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
     Enum.each(triggers, &:ets.insert(__MODULE__, {{:trigger, &1.id}, trigger(&1)}))
 
     triggers
+    |> Enum.filter(&AreaTriggerScript.ported?(&1.id))
+    |> Enum.each(&:ets.insert(__MODULE__, {{:ported_script, &1.id}, ported_script(&1.id, {&1.x, &1.y, &1.z})}))
+
+    triggers
     |> Enum.map(&positive(&1.script_id))
     |> Enum.filter(& &1)
     |> then(&ScriptLoader.load_by_ids(Mangos.AreaTriggerScript, &1))
@@ -91,9 +95,10 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
   def tavern?(_id), do: false
 
   def script(%{id: id, x: x, y: y, z: z} = trigger) do
-    case AreaTriggerScript.steps(id, {x, y, z}) do
-      nil -> database_script(Map.get(trigger, :script_id))
-      steps -> steps
+    if AreaTriggerScript.ported?(id) do
+      lookup({:ported_script, id}, fn -> ported_script(id, {x, y, z}) end) || []
+    else
+      database_script(Map.get(trigger, :script_id))
     end
   end
 
@@ -207,6 +212,8 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
       _missing -> false
     end
   end
+
+  defp ported_script(id, position), do: id |> AreaTriggerScript.steps(position) |> ScriptLoader.resolve_texts()
 
   defp load_script(script_id) do
     Mangos.AreaTriggerScript

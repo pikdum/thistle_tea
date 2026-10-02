@@ -11,16 +11,18 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScript do
   triggers and act where the player stands.
   """
 
+  alias ThistleTea.Game.Core.AI.AreaTriggerScript.HuldarMiran
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.IrontreeWood
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.Ravenholdt
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.ScentOfLarkorwi
+  alias ThistleTea.Game.Core.AI.AreaTriggerScript.SentryPoint
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
 
   @callback triggers() :: [pos_integer()]
   @callback steps(pos_integer(), {number(), number(), number()}) :: [%ScriptStep{}]
 
-  @scripts [IrontreeWood, Ravenholdt, ScentOfLarkorwi]
+  @scripts [HuldarMiran, IrontreeWood, Ravenholdt, ScentOfLarkorwi, SentryPoint]
   @origin {0.0, 0.0, 0.0}
 
   def ported?(trigger_id), do: not is_nil(script(trigger_id))

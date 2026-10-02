@@ -343,6 +343,7 @@ defmodule ThistleTea.Application do
         QuestLoader.load_all()
         QuestEscortLoader.load_all()
         QuestLoader.append_start_steps(CreatureScript.quest_start_steps())
+        QuestLoader.append_complete_steps(CreatureScript.quest_end_steps())
         QuestGreetingLoader.load_all()
         Logger.info("Loading reputation...")
         ReputationLoader.load_all()

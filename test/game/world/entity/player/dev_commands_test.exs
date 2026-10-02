@@ -526,12 +526,25 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
     test "rejects malformed coordinates without teleporting" do
       state = %{guid: 1, character: debug_character()}
 
-      for args <- ["", "1", "1 2", "1 2 3 0 extra", "bad 2 3", "1 2m 3", "1 2 3m", "1 2 3 -1", "1 2 3 0x"] do
+      for args <- [
+            "",
+            "1",
+            "1 2",
+            "1 2 3 0 extra",
+            "1 2 3 0 1 2",
+            "bad 2 3",
+            "1 2m 3",
+            "1 2 3m",
+            "1 2 3 -1",
+            "1 2 3 0x"
+          ] do
         assert {:handled, ^state} = DevCommands.run(state, ".go xyz " <> args)
 
         assert_received {:"$gen_cast",
                          {:send_packet,
-                          %Message.SmsgMessagechat{message: "Invalid command. Use: .go xyz <x> <y> <z> [map]"}}}
+                          %Message.SmsgMessagechat{
+                            message: "Invalid command. Use: .go xyz <x> <y> <z> [map] [facing]"
+                          }}}
       end
 
       refute_received {:"$gen_cast", {:start_teleport, _, _, _, _}}
@@ -542,6 +555,13 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
 
       assert {:handled, ^state} = DevCommands.run(state, ".go xyz 16342 16279 69.44 451")
       assert_receive {:"$gen_cast", {:start_teleport, 16_342.0, 16_279.0, 69.44, 451}}
+    end
+
+    test "faces the given angle when one follows the map" do
+      state = %{guid: 1, character: debug_character()}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".go xyz -3440 -4130 25 1 2.79")
+      assert_receive {:"$gen_cast", {:start_teleport, -3440.0, -4130.0, 25.0, 2.79, 1}}
     end
 
     test "preserves the current instance copy when no map is supplied" do
