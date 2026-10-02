@@ -243,6 +243,14 @@ defmodule ThistleTea.Game.Core.Quest.QuestLog do
     end)
   end
 
+  def swap(quest_log, slot, other) when slot in 0..(@max_slots - 1)//1 and other in 0..(@max_slots - 1)//1 do
+    first = Map.get(quest_log, slot, :empty)
+    second = Map.get(quest_log, other, :empty)
+    quest_log |> Map.put(slot, second) |> Map.put(other, first)
+  end
+
+  def swap(quest_log, _slot, _other), do: quest_log
+
   def full?(quest_log), do: free_slot(quest_log) == nil
 
   def slot_binary(nil), do: nil

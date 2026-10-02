@@ -131,6 +131,23 @@ defmodule ThistleTea.Game.Core.Quest.QuestLogTest do
     end
   end
 
+  describe "swap/3" do
+    test "exchanges two slots, filling an unused one" do
+      {:ok, quest_log} = QuestLog.add(%{}, 33)
+      {:ok, quest_log} = QuestLog.add(quest_log, 34)
+
+      quest_log = QuestLog.swap(quest_log, 0, 1)
+      assert %{0 => %Entry{quest_id: 34}, 1 => %Entry{quest_id: 33}} = quest_log
+
+      assert %{0 => :empty, 5 => %Entry{quest_id: 34}} = QuestLog.swap(quest_log, 0, 5)
+    end
+
+    test "ignores slots outside the log" do
+      {:ok, quest_log} = QuestLog.add(%{}, 33)
+      assert QuestLog.swap(quest_log, 0, 20) == quest_log
+    end
+  end
+
   describe "increment_kill/3" do
     setup do
       quest = %Quest{

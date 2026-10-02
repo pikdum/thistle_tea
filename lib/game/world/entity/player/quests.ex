@@ -324,6 +324,13 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
     end
   end
 
+  def swap_slots(%{character: %Character{player: player} = character} = state, slot, other) do
+    case QuestLog.swap(player.quest_log, slot, other) do
+      quest_log when quest_log == player.quest_log -> state
+      quest_log -> put_character(state, %{character | player: %{player | quest_log: quest_log}})
+    end
+  end
+
   def abandon(%{character: %Character{player: player}} = state, slot) do
     case Map.get(player.quest_log, slot) do
       %Entry{quest_id: quest_id} ->
