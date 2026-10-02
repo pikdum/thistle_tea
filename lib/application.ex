@@ -121,6 +121,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.System.CreatureGroups
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
+  alias ThistleTea.Game.World.System.GmTickets
   alias ThistleTea.Game.World.System.GuardPosts
   alias ThistleTea.Game.World.System.Guild, as: GuildSystem
   alias ThistleTea.Game.World.System.Honor, as: HonorSystem
@@ -202,6 +203,7 @@ defmodule ThistleTea.Application do
         AreaEffects,
         SpellMagnets,
         GuardPosts,
+        GmTickets,
         SingleTargetAuras,
         DBC,
         Repo,

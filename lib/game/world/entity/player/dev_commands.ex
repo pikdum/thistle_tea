@@ -56,6 +56,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   alias ThistleTea.Game.World.Entity.Player.Stats
   alias ThistleTea.Game.World.Entity.Player.Talents
   alias ThistleTea.Game.World.Entity.Player.Taxi, as: PlayerTaxi
+  alias ThistleTea.Game.World.Entity.Player.Tickets
   alias ThistleTea.Game.World.Entity.Player.Weather
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ClassSpell
@@ -71,6 +72,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   alias ThistleTea.Game.World.System.Auction, as: AuctionSystem
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.World.System.GmTickets
   alias ThistleTea.Game.World.System.Honor, as: HonorSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Instance.InstanceData
@@ -109,6 +111,26 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
     |> case do
       [quest_id] -> addquest(state, quest_id)
       _ -> system_message(state, "Invalid command. Use: .addquest <quest_id>")
+    end
+    |> handled()
+  end
+
+  def run(state, ".ticket list" <> _rest) do
+    case GmTickets.list() do
+      [] -> system_message(state, "No open help tickets.")
+      tickets -> Enum.reduce(tickets, state, &system_message(&2, ticket_line(&1)))
+    end
+    |> handled()
+  end
+
+  def run(state, ".ticket respond" <> params) do
+    with [id, answer] <- String.split(params, ~r/\s+/, parts: 2, trim: true),
+         {id, ""} <- Integer.parse(id),
+         {:ok, ticket} <- GmTickets.respond(id, answer) do
+      Tickets.answered(ticket)
+      system_message(state, "Answered help ticket ##{id}.")
+    else
+      _ -> system_message(state, "Invalid command. Use: .ticket respond <id> <answer>")
     end
     |> handled()
   end
@@ -199,6 +221,8 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
       ".start - return to your last safe ground position",
       ".speed <rate> - modify player speed from 0.1 to 10",
       ".tgm - toggle god mode (no damage taken)",
+      ".ticket list - list open help tickets",
+      ".ticket respond <id> <answer> - answer and complete a help ticket",
       ".threat - show the targeted mob's threat table"
     ]
 
@@ -1542,6 +1566,11 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
       {value, ""} when value > 0 -> {:ok, value}
       _ -> :error
     end
+  end
+
+  defp ticket_line(ticket) do
+    status = if ticket.completed?, do: "answered", else: "open"
+    "##{ticket.id} #{ticket.player_name} [#{status}] #{ticket.message}"
   end
 
   defp system_message(state, message) do
