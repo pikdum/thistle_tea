@@ -148,6 +148,19 @@ defmodule ThistleTea.Game.World.Loader.GossipVmangosTest do
       assert Bitwise.band(Gossip.npc_flags(14_981), 2048) != 0
     end
 
+    test "keeps the Tamed Kodo's quest-credit script on its greeting" do
+      assert :ok = Gossip.load_all()
+
+      assert %Menu{texts: [%Gossip.Text{text_id: 4449, script_steps: steps}]} = Gossip.menu_for_creature(11_627)
+
+      assert [
+               %ScriptStep{command: :quest_credit, swap_initial?: true, condition: condition},
+               %ScriptStep{command: :remove_aura, datalong: 18_172, swap_initial?: true}
+             ] = steps
+
+      refute condition == nil
+    end
+
     test "loads Tharnariun's conditioned replacement-item option" do
       assert :ok = Gossip.load_all()
 

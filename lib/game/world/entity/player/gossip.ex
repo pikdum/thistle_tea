@@ -142,15 +142,24 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
         %GossipItem{id: option.id, item_icon: option.icon, coded: option.coded, message: option.text}
       end)
 
+    text = context_title_text(menu, context)
+
     Outbound.send_packet(%Message.SmsgGossipMessage{
       guid: npc_guid,
-      title_text_id: context_title_text_id(menu, context),
+      title_text_id: text.text_id,
       gossips: gossips,
       quests: quests
     })
 
+    start_text_script(text, npc_guid, character)
     put_menu(state, npc_guid, options)
   end
+
+  defp start_text_script(%Text{script_steps: [_ | _] = steps}, npc_guid, %Character{} = character) do
+    Entity.start_script(npc_guid, steps, character.object.guid)
+  end
+
+  defp start_text_script(%Text{}, _npc_guid, _character), do: :ok
 
   defp put_menu(%State{} = state, guid, options), do: %{state | gossip_menu_guid: guid, gossip_menu_options: options}
   defp put_menu(state, guid, options), do: Map.merge(state, %{gossip_menu_guid: guid, gossip_menu_options: options})
@@ -172,21 +181,20 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
 
   def title_text_id(%Menu{} = menu, %Character{} = character, npc_guid) do
     context = condition_context(character, npc_guid, Enum.map(menu.texts, & &1.condition))
-    context_title_text_id(menu, context)
+    context_title_text(menu, context).text_id
   end
 
-  defp context_title_text_id(%Menu{texts: texts}, context) when texts != [] do
+  defp context_title_text(%Menu{texts: texts}, context) when texts != [] do
     texts
     |> Enum.filter(fn
       %Text{condition_id: 0} -> true
       %Text{condition: condition} -> GossipCondition.allows?(context, condition, :deny_unknown)
     end)
     |> Enum.max_by(& &1.condition_id, fn -> %Text{text_id: @default_gossip_text_id} end)
-    |> then(& &1.text_id)
   end
 
-  defp context_title_text_id(%Menu{text_id: text_id}, _context) when is_integer(text_id), do: text_id
-  defp context_title_text_id(%Menu{}, _context), do: @default_gossip_text_id
+  defp context_title_text(%Menu{text_id: text_id}, _context) when is_integer(text_id), do: %Text{text_id: text_id}
+  defp context_title_text(%Menu{}, _context), do: %Text{text_id: @default_gossip_text_id}
 
   def run_taxi_script(%{character: %Character{} = character} = state, steps) when is_list(steps) do
     Outbound.send_packet(%Message.SmsgGossipComplete{})

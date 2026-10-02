@@ -1,7 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.Gossip do
   @moduledoc """
   Loads gossip menus and options from Mangos into ETS, filtered to the option
-  types the server supports, with creature-to-menu and trainer lookups.
+  types the server supports, with creature-to-menu and trainer lookups. Each
+  greeting text keeps the gossip script vmangos starts whenever it is shown.
   """
   import Ecto.Query
 
@@ -52,7 +53,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
 
   defmodule Text do
     @moduledoc false
-    defstruct [:text_id, :condition_id, :condition]
+    defstruct [:text_id, :condition_id, :condition, script_steps: []]
   end
 
   defmodule Poi do
@@ -97,6 +98,12 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
       |> Enum.filter(&(&1 > 0))
       |> then(&Script.load_by_ids(Mangos.GossipScript, &1))
 
+    menu_steps_by_script =
+      menu_rows
+      |> Enum.map(& &1.script_id)
+      |> Enum.filter(&(&1 > 0))
+      |> then(&Script.load_by_ids(Mangos.GossipScript, &1))
+
     taxi_steps_by_script =
       Map.new(action_steps_by_script, fn {script_id, steps} ->
         {script_id, Enum.filter(steps, &match?(%ScriptStep{command: :send_taxi_path}, &1))}
@@ -123,7 +130,8 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
           %Text{
             text_id: row.text_id,
             condition_id: row.condition_id,
-            condition: Map.get(conditions, row.condition_id)
+            condition: Map.get(conditions, row.condition_id),
+            script_steps: Map.get(menu_steps_by_script, row.script_id, [])
           }
         end)
 
