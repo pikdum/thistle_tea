@@ -93,15 +93,18 @@ defmodule ThistleTea.Game.World.Entity.Player.PacketSink do
 
   defp send_update(%UpdateObject{} = update, %State{} = state) do
     viewer = state.guid
-    {packet, updates} = UpdateBatcher.batch(update, viewer, &personalize(&1, state), &visible_update?(state, &1))
+    {packet, updates, held} = UpdateBatcher.batch(update, viewer, &personalize(&1, state), &visible_update?(state, &1))
 
-    if updates == [] do
-      state
-    else
-      state
-      |> send_packet(packet)
-      |> track_updates(updates)
-    end
+    state =
+      if updates == [] do
+        state
+      else
+        state
+        |> send_packet(packet)
+        |> track_updates(updates)
+      end
+
+    Enum.reduce(held, state, fn {message, opts}, state -> send(state, message, opts) end)
   end
 
   defp personalize(update, %State{} = state) do

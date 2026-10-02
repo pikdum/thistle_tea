@@ -206,19 +206,23 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
       send(self(), {:"$gen_cast", {:send_packet, mob_update}})
       send(self(), {:"$gen_cast", {:send_packet, next_player_update}})
 
-      {packet, updates} = UpdateBatcher.batch(player_update, nil)
+      {packet, updates, []} = UpdateBatcher.batch(player_update, nil)
 
       assert object_count(packet) == 3
       assert length(updates) == 3
     end
 
-    test "only drains UpdateObject casts; leaves other messages in the mailbox" do
-      send(self(), {:"$gen_cast", {:send_packet, %Packet{opcode: 0x123, payload: <<>>}}})
+    test "stops draining at the first other packet and leaves the rest queued" do
+      other = %Packet{opcode: 0x123, payload: <<>>}
+      later = update_object(:unit, 2)
+      send(self(), {:"$gen_cast", {:send_packet, other}})
+      send(self(), {:"$gen_cast", {:send_packet, later}})
 
-      {packet, _updates} = UpdateBatcher.batch(update_object(:player, 1), nil)
+      {packet, _updates, held} = UpdateBatcher.batch(update_object(:player, 1), nil)
       assert object_count(packet) == 1
+      assert held == [{other, []}]
 
-      assert_received {:"$gen_cast", {:send_packet, %Packet{opcode: 0x123}}}
+      assert_received {:"$gen_cast", {:send_packet, ^later}}
     end
 
     test "dedupes values blocks for the same guid keeping the newest" do
@@ -227,7 +231,7 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
 
       send(self(), {:"$gen_cast", {:send_packet, fresh}})
 
-      {packet, updates} = UpdateBatcher.batch(stale, nil)
+      {packet, updates, []} = UpdateBatcher.batch(stale, nil)
 
       assert object_count(packet) == 1
       assert [%UpdateObject{update_type: :values}] = updates
@@ -266,6 +270,23 @@ defmodule ThistleTea.Game.World.Entity.PlayerTest do
       assert object_count(packet) == 3
       assert <<3::little-size(32), 0, 4, 1::little-size(32), _rest::binary>> = packet.payload
       assert MapSet.member?(state.tracked_entities, target)
+    end
+
+    test "writes a packet queued between updates before the update behind it" do
+      guid = Guid.from_low_guid(:player, Unique.integer())
+      target = Guid.from_low_guid(:mob, Unique.integer(), 721)
+      state = %State{guid: guid, character: character(guid, []), connection_pid: self()}
+      progress = %Packet{opcode: 0x123, payload: <<>>}
+      later = update_object(:unit, target)
+      GenServer.cast(self(), {:send_packet, progress})
+      GenServer.cast(self(), {:send_packet, later})
+
+      {:noreply, _state} = PlayerServer.handle_cast({:send_packet, update_object(:player, guid)}, state)
+
+      assert_receive {:"$gen_cast", {:write_packet, packet}}
+      assert object_count(packet) == 1
+      assert_receive {:"$gen_cast", {:write_packet, ^progress}}
+      assert_received {:"$gen_cast", {:send_packet, ^later}}
     end
 
     test "drops stale queued creates for invisible units" do

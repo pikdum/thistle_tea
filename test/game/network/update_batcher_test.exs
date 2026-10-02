@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.UpdateBatcherTest do
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateBatcher
   alias ThistleTea.Game.Network.UpdateObject
 
@@ -13,7 +14,7 @@ defmodule ThistleTea.Game.Network.UpdateBatcherTest do
       removal = UpdateObject.out_of_range([0x1FC0000000028427, 0xF12002AFE800496A], has_transport: true)
       GenServer.cast(self(), {:send_packet, removal})
 
-      {packet, updates} = UpdateBatcher.batch(update, 99)
+      {packet, updates, []} = UpdateBatcher.batch(update, 99)
       <<1::little-size(32), 0, values_body::binary>> = UpdateObject.to_packet(update, 99).payload
       <<1::little-size(32), 1, removal_body::binary>> = UpdateObject.to_packet(removal, 99).payload
 
@@ -28,7 +29,7 @@ defmodule ThistleTea.Game.Network.UpdateBatcherTest do
       GenServer.cast(self(), {:send_packet, second})
       GenServer.cast(self(), {:send_packet, UpdateObject.out_of_range([4, 3], has_transport: true)})
 
-      {packet, updates} = UpdateBatcher.batch(first, 99)
+      {packet, updates, []} = UpdateBatcher.batch(first, 99)
 
       assert [removal, ^first, ^second] = updates
       assert removal == UpdateObject.out_of_range([3, 4], has_transport: true)
@@ -39,7 +40,7 @@ defmodule ThistleTea.Game.Network.UpdateBatcherTest do
       GenServer.cast(self(), {:send_packet, values_update(2)})
       GenServer.cast(self(), {:send_packet, values_update(3)})
 
-      {_packet, updates} = UpdateBatcher.batch(values_update(1), 99, &clear_dynamic_flags/1)
+      {_packet, updates, []} = UpdateBatcher.batch(values_update(1), 99, &clear_dynamic_flags/1)
 
       assert Enum.map(updates, & &1.object.guid) == [1, 2, 3]
       assert Enum.all?(updates, &(&1.unit.dynamic_flags == 0))
@@ -48,7 +49,7 @@ defmodule ThistleTea.Game.Network.UpdateBatcherTest do
     test "keeps only the newest values block per guid" do
       GenServer.cast(self(), {:send_packet, values_update(1, dynamic_flags: 7)})
 
-      {_packet, updates} = UpdateBatcher.batch(values_update(1), 99)
+      {_packet, updates, []} = UpdateBatcher.batch(values_update(1), 99)
 
       assert [%UpdateObject{unit: %Unit{dynamic_flags: 7}}] = updates
     end
@@ -59,7 +60,7 @@ defmodule ThistleTea.Game.Network.UpdateBatcherTest do
       GenServer.cast(self(), {:send_packet, values_update(1, dynamic_flags: 7)})
       GenServer.cast(self(), {:send_packet, values_update(1, dynamic_flags: 9)})
 
-      {_packet, updates} = UpdateBatcher.batch(create, 99)
+      {_packet, updates, []} = UpdateBatcher.batch(create, 99)
 
       assert [
                %UpdateObject{update_type: :create_object2, object: %Object{guid: 1}, unit: %Unit{dynamic_flags: 9}},
@@ -70,9 +71,31 @@ defmodule ThistleTea.Game.Network.UpdateBatcherTest do
     test "drops values that precede a create for the same guid" do
       GenServer.cast(self(), {:send_packet, create_update(1)})
 
-      {_packet, updates} = UpdateBatcher.batch(values_update(1, dynamic_flags: 7), 99)
+      {_packet, updates, []} = UpdateBatcher.batch(values_update(1, dynamic_flags: 7), 99)
 
       assert [%UpdateObject{update_type: :create_object2, unit: %Unit{dynamic_flags: 5}}] = updates
+    end
+
+    test "stops at the first other queued send and hands it back" do
+      progress = %Message.SmsgQuestupdateAddItem{item_id: 11_947, count: 1}
+      create = create_update(2)
+      GenServer.cast(self(), {:send_packet, progress})
+      GenServer.cast(self(), {:send_packet, create})
+
+      {_packet, updates, held} = UpdateBatcher.batch(values_update(1), 99)
+
+      assert [%UpdateObject{object: %Object{guid: 1}}] = updates
+      assert held == [{progress, []}]
+      assert_received {:"$gen_cast", {:send_packet, ^create}}
+    end
+
+    test "hands back queued sends that carry options" do
+      GenServer.cast(self(), {:send_packet, values_update(2), source_guid: 2})
+
+      {_packet, updates, held} = UpdateBatcher.batch(values_update(1), 99)
+
+      assert [%UpdateObject{object: %Object{guid: 1}}] = updates
+      assert [{%UpdateObject{object: %Object{guid: 2}}, [source_guid: 2]}] = held
     end
   end
 
@@ -81,7 +104,7 @@ defmodule ThistleTea.Game.Network.UpdateBatcherTest do
       GenServer.cast(self(), {:send_packet, values_update(2)})
       GenServer.cast(self(), {:send_packet, values_update(3)})
 
-      {_packet, updates} = UpdateBatcher.batch(values_update(1), 99, & &1, &(&1.object.guid == 2))
+      {_packet, updates, []} = UpdateBatcher.batch(values_update(1), 99, & &1, &(&1.object.guid == 2))
       assert [%UpdateObject{object: %Object{guid: 2}}] = updates
     end
   end

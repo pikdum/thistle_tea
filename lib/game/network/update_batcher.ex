@@ -10,19 +10,25 @@ defmodule ThistleTea.Game.Network.UpdateBatcher do
   Every update — including the ones drained out of the mailbox — goes through
   the caller's `personalize` function, so per-recipient field rewrites cannot
   be skipped by coalescing.
+
+  Draining stops at the first other queued send and hands it back to the
+  caller to deliver right after the batch, so packets keep the order they were
+  sent in. A quest progress packet queued between two updates must reach the
+  client before the item create behind it, or the client counts the new item
+  twice in its "Item: x/y" popup.
   """
   alias ThistleTea.Game.Network.UpdateObject
 
   @update_batch_max 100
 
   def batch(%UpdateObject{} = update, recipient_guid, personalize \\ & &1, visible? \\ fn _ -> true end) do
-    updates = accumulate(update, personalize, visible?)
-    {UpdateObject.to_packet(updates, recipient_guid), updates}
+    {queued, held} = drain_pending([update], 1)
+    updates = accumulate(queued, personalize, visible?)
+    {UpdateObject.to_packet(updates, recipient_guid), updates, held}
   end
 
-  defp accumulate(%UpdateObject{} = update, personalize, visible?) do
-    [update]
-    |> drain_pending(1)
+  defp accumulate(queued, personalize, visible?) do
+    queued
     |> Enum.reverse()
     |> Enum.filter(visible?)
     |> Enum.map(personalize)
@@ -73,12 +79,13 @@ defmodule ThistleTea.Game.Network.UpdateBatcher do
 
   defp drain_pending(updates, count) when count < @update_batch_max do
     receive do
-      {:"$gen_cast", {:send_packet, %UpdateObject{} = update}} ->
-        drain_pending([update | updates], count + 1)
+      {:"$gen_cast", {:send_packet, %UpdateObject{} = update}} -> drain_pending([update | updates], count + 1)
+      {:"$gen_cast", {:send_packet, message}} -> {updates, [{message, []}]}
+      {:"$gen_cast", {:send_packet, message, opts}} -> {updates, [{message, opts}]}
     after
-      0 -> updates
+      0 -> {updates, []}
     end
   end
 
-  defp drain_pending(updates, _count), do: updates
+  defp drain_pending(updates, _count), do: {updates, []}
 end
