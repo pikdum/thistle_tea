@@ -227,6 +227,9 @@ defmodule ThistleTea.Game.World.System.ChatChannels do
         notify_join(channel, outcome)
         {:reply, :ok, %{state | channels: channels}}
 
+      {:error, :already_member} when definition.kind != :custom ->
+        {:reply, {:error, :already_member}, state}
+
       {:error, reason} ->
         send_error(actor.guid, name, reason)
         {:reply, {:error, reason}, state}

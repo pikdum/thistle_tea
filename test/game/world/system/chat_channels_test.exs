@@ -25,6 +25,32 @@ defmodule ThistleTea.Game.World.System.ChatChannelsTest do
       cleanup([actor], [receiver])
     end
 
+    test "repeated joins are silent for built-in channels and rejected for custom ones" do
+      actor = member("Repeat")
+      receiver = start_receiver(actor.guid, :actor)
+      custom = unique_name("Repeat")
+
+      replies =
+        for name <- ["GuildRecruitment - City", custom] do
+          assert :ok = ChatChannels.join(actor, name, "")
+          assert_receive {:actor, {:"$gen_cast", {:send_packet, %Message.SmsgChannelNotify{}}}}
+          drain_mailbox()
+          assert {:error, :already_member} = ChatChannels.join(actor, name, "")
+
+          receive do
+            {:actor, {:"$gen_cast", {:send_packet, %Message.SmsgChannelNotify{} = packet}}} -> packet
+          after
+            100 -> nil
+          end
+        end
+
+      assert [nil, packet] = replies
+      assert packet.channel_name == custom
+      assert packet.notify_type == Message.SmsgChannelNotify.notice(:player_already_member)
+
+      cleanup([actor], [receiver])
+    end
+
     test "enforces custom-channel passwords" do
       owner = member("Owner")
       guest = member("Guest")
