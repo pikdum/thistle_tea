@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.ClientProjection do
   alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.Entity.ScriptDelivery
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
+  alias ThistleTea.Game.World.Outbound
 
   @listen_range_say 25.0
   @listen_range_yell 300.0
@@ -175,6 +176,23 @@ defmodule ThistleTea.Game.World.Entity.EventSink.ClientProjection do
   end
 
   def emit(entity, %Effects.LaunchRanged{}, _context), do: entity
+
+  def emit(
+        %{object: %{guid: guid}, internal: %Internal{name: name}} = entity,
+        %Effects.MonsterTalk{chat_type: chat_type, target_guid: target_guid} = effect,
+        _context
+      )
+      when chat_type in [:whisper, :boss_whisper] and is_integer(target_guid) do
+    chat_type
+    |> monster_chat_type()
+    |> Message.SmsgMessagechat.monster(effect.text, guid, name, target_guid)
+    |> Outbound.send_packet(target_guid)
+
+    entity
+  end
+
+  def emit(entity, %Effects.MonsterTalk{chat_type: chat_type}, _context) when chat_type in [:whisper, :boss_whisper],
+    do: entity
 
   def emit(
         %{object: %{guid: guid}, internal: %Internal{name: name}} = entity,
@@ -387,9 +405,12 @@ defmodule ThistleTea.Game.World.Entity.EventSink.ClientProjection do
     do: Enum.map(guids, &{&1, entry})
 
   defp monster_chat_type(chat_type) when chat_type in [:yell, :zone_yell], do: :monster_yell
-  defp monster_chat_type(chat_type) when chat_type in [:text_emote, :boss_emote, :zone_emote], do: :monster_emote
+  defp monster_chat_type(chat_type) when chat_type in [:text_emote, :zone_emote], do: :monster_emote
+  defp monster_chat_type(:boss_emote), do: :raid_boss_emote
+  defp monster_chat_type(:whisper), do: :monster_whisper
+  defp monster_chat_type(:boss_whisper), do: :raid_boss_whisper
   defp monster_chat_type(_chat_type), do: :monster_say
 
-  defp listen_range(chat_type) when chat_type in [:yell, :zone_yell], do: @listen_range_yell
+  defp listen_range(chat_type) when chat_type in [:yell, :zone_yell, :boss_emote], do: @listen_range_yell
   defp listen_range(_chat_type), do: @listen_range_say
 end

@@ -203,11 +203,17 @@ defmodule ThistleTea.Game.World.Loader.Script do
       step
       |> ScriptStep.talk_text_ids()
       |> Enum.flat_map(&List.wrap(Map.get(texts_by_id, &1)))
+      |> Enum.map(&override_chat_type(&1, step.datalong))
 
     %{step | texts: texts}
   end
 
   defp attach_step_texts(%ScriptStep{} = step, _texts_by_id), do: step
+
+  defp override_chat_type(text, chat_type) when is_integer(chat_type) and chat_type > 0,
+    do: %{text | chat_type: chat_type(chat_type)}
+
+  defp override_chat_type(text, _chat_type), do: text
 
   defp load_broadcast_texts([]), do: %{}
 

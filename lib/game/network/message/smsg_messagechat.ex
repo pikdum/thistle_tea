@@ -11,9 +11,12 @@ defmodule ThistleTea.Game.Network.Message.SmsgMessagechat do
   @chat_type_monster_yell 0x0C
   @chat_type_monster_emote 0x0D
   @chat_type_channel 0x0E
+  @chat_type_monster_whisper 0x1A
   @chat_type_battleground_neutral 0x52
   @chat_type_battleground_alliance 0x53
   @chat_type_battleground_horde 0x54
+  @chat_type_raid_boss_whisper 0x59
+  @chat_type_raid_boss_emote 0x5A
 
   @chat_type %{
     say: @chat_type_say,
@@ -24,6 +27,9 @@ defmodule ThistleTea.Game.Network.Message.SmsgMessagechat do
     monster_say: @chat_type_monster_say,
     monster_yell: @chat_type_monster_yell,
     monster_emote: @chat_type_monster_emote,
+    monster_whisper: @chat_type_monster_whisper,
+    raid_boss_whisper: @chat_type_raid_boss_whisper,
+    raid_boss_emote: @chat_type_raid_boss_emote,
     battleground_neutral: @chat_type_battleground_neutral,
     battleground_alliance: @chat_type_battleground_alliance,
     battleground_horde: @chat_type_battleground_horde
@@ -106,7 +112,13 @@ defmodule ThistleTea.Game.Network.Message.SmsgMessagechat do
       sender_name <> <<0, target_guid::little-size(64)>>
   end
 
-  defp sender_block(@chat_type_monster_emote, msg, _sender_guid, _channel_name, _player_rank) do
+  defp sender_block(chat_type, msg, _sender_guid, _channel_name, _player_rank)
+       when chat_type in [
+              @chat_type_monster_emote,
+              @chat_type_monster_whisper,
+              @chat_type_raid_boss_whisper,
+              @chat_type_raid_boss_emote
+            ] do
     sender_name = msg.sender_name || ""
     target_guid = msg.target_guid || 0
 

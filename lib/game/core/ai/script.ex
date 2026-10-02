@@ -1470,9 +1470,10 @@ defmodule ThistleTea.Game.Core.AI.Script do
 
   defp home_position(%Mob{}, %ScriptStep{}), do: nil
 
-  defp talk(state, %{chat_type: chat_type}, _target_guid) when chat_type in [:whisper, :boss_whisper] do
-    Logger.debug("Script talk: whisper chat type unsupported, skipping")
-    state
+  defp talk(state, %{chat_type: chat_type} = text, target_guid) when chat_type in [:whisper, :boss_whisper] do
+    if is_integer(target_guid) and Guid.entity_type(target_guid) == :player,
+      do: Effects.enqueue(state, Effects.monster_talk(text.text, chat_type, target_guid)),
+      else: state
   end
 
   defp talk(state, text, target_guid) do

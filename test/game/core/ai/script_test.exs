@@ -202,6 +202,24 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
              ] = mob.internal.events
     end
 
+    test "whispers reach a player target and are dropped without one", %{mob: mob} do
+      player = Guid.from_low_guid(:player, Unique.integer())
+      creature = Guid.from_low_guid(:mob, 1_380, Unique.integer())
+
+      for chat_type <- [:whisper, :boss_whisper] do
+        step = %ScriptStep{command: :talk, texts: [%{text: "Come, $n.", chat_type: chat_type, language: 0}]}
+
+        {whispered, _blackboard} = Script.run(mob, Blackboard.new(), [step], player, 1_000)
+
+        assert [%Effects.MonsterTalk{chat_type: ^chat_type, target_guid: ^player}] = whispered.internal.events
+
+        for target <- [creature, nil] do
+          {silent, _blackboard} = Script.run(mob, Blackboard.new(), [step], target, 1_000)
+          assert silent.internal.events == []
+        end
+      end
+    end
+
     test "emote enqueues an emote event", %{mob: mob} do
       step = %ScriptStep{command: :emote, datalong: 11}
 

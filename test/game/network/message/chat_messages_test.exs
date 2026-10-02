@@ -26,6 +26,18 @@ defmodule ThistleTea.Game.Network.Message.ChatMessagesTest do
       end
     end
 
+    test "encodes monster whispers and boss text with the sender's name and target" do
+      for chat_type <- [:monster_whisper, :raid_boss_whisper, :raid_boss_emote] do
+        packet = SmsgMessagechat.monster(chat_type, "Come, $n.", 42, "Corrupter", 7)
+        type = packet.chat_type
+
+        assert type in [0x1A, 0x59, 0x5A]
+
+        assert SmsgMessagechat.to_binary(packet) ==
+                 <<type, 0::little-32, 10::little-32, "Corrupter", 0, 7::little-64, 10::little-32, "Come, $n.", 0, 0>>
+      end
+    end
+
     test "preserves spoken and addon languages" do
       for language <- [7, 0xFFFFFFFF] do
         packet = %SmsgMessagechat{chat_type: 1, language: language, sender_guid: 42, message: "Hi", tag: 1}

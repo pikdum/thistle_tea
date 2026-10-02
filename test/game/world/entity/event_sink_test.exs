@@ -598,6 +598,48 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       refute_receive {:"$gen_cast", {:send_packet, %Message.MsgMoveSetSwimSpeed{}, _opts}}
     end
 
+    test "monster whispers reach only their target while boss emotes carry to nearby players" do
+      [target_guid, observer_guid] = Enum.map(1..2, fn _ -> Guid.from_low_guid(:player, unique_guid()) end)
+
+      for {guid, x} <- [{target_guid, 1.0}, {observer_guid, 100.0}] do
+        {:ok, _} = Entity.register(guid)
+        SpatialHash.update(:players, guid, 0, x, 0.0, 0.0)
+      end
+
+      on_exit(fn ->
+        for guid <- [target_guid, observer_guid] do
+          Entity.unregister(guid)
+          SpatialHash.remove(:players, guid)
+        end
+      end)
+
+      mob = %Mob{
+        object: %Object{guid: Guid.from_low_guid(:mob, 15_625, unique_guid())},
+        internal: %Internal{world: WorldRef.open(0), name: "Twilight Corrupter"},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      for {chat_type, type_id} <- [whisper: 0x1A, boss_whisper: 0x59] do
+        EventSink.emit(mob, Effects.monster_talk("Come, $n.", chat_type, target_guid))
+
+        assert_receive {:"$gen_cast",
+                        {:send_packet,
+                         %Message.SmsgMessagechat{chat_type: ^type_id, target_guid: ^target_guid, message: "Come, $n."}}}
+
+        refute_received {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{}}}
+        refute_received {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{}, _opts}}
+      end
+
+      EventSink.emit(mob, Effects.monster_talk("Come, $n.", :whisper, nil))
+      refute_received {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{}}}
+
+      EventSink.emit(mob, Effects.monster_talk("The Nightmare stirs.", :boss_emote, nil))
+
+      for _player <- 1..2 do
+        assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{chat_type: 0x5A}, _opts}}
+      end
+    end
+
     test "raises for unsupported effects", %{mob: mob} do
       assert_raise FunctionClauseError, fn ->
         # credo:disable-for-next-line Credo.Check.Refactor.Apply
