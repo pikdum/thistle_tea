@@ -121,6 +121,16 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard do
     %{blackboard | navigation: navigation}
   end
 
+  def pause_idle_movement(%__MODULE__{navigation: navigation} = blackboard, :wander, until) when is_integer(until) do
+    navigation = %{navigation | target: nil, move_target: nil, next_wander_at: max(navigation.next_wander_at, until)}
+    %{blackboard | navigation: navigation}
+  end
+
+  def pause_idle_movement(%__MODULE__{navigation: navigation} = blackboard, :waypoint, until) when is_integer(until) do
+    navigation = %{navigation | move_target: nil, next_waypoint_at: max(navigation.next_waypoint_at, until)}
+    %{blackboard | navigation: navigation}
+  end
+
   def idle_movement(%__MODULE__{navigation: navigation} = blackboard) do
     navigation = %{
       navigation

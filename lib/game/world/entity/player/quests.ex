@@ -89,6 +89,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
 
   def hello(state, npc_guid) do
     if QuestGiver.interactable?(state.character, npc_guid) do
+      Entity.pause_for_talk(npc_guid)
+
       case Battlegrounds.gossip_menu(state.character, npc_guid) do
         nil -> do_hello(state, npc_guid)
         menu -> Gossip.send_menu(npc_guid, menu, Gossip.quest_items(npc_guid, state.character), state)

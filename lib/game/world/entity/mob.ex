@@ -63,6 +63,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   alias ThistleTea.Game.Core.Movement
   alias ThistleTea.Game.Core.Movement.ControlMovement
   alias ThistleTea.Game.Core.Movement.MovementHandoff
+  alias ThistleTea.Game.Core.Movement.TalkPause
   alias ThistleTea.Game.Core.Party
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Pet.ControlledCombat
@@ -370,6 +371,16 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   rescue
     error ->
       Logger.error("movement inform crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_cast(:pause_for_talk, %Mob{} = state) do
+    {state, events} = TalkPause.apply(state, Time.now())
+    state = state |> Effects.enqueue(events) |> EventSink.emit_pending() |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("talk pause crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, state}
   end
 

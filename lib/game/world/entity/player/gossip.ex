@@ -55,6 +55,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
 
   def hello(%{character: %Character{} = character} = state, guid) do
     if Reputation.can_interact?(character, guid) do
+      Entity.pause_for_talk(guid)
       quests = quest_items(guid, character)
 
       case Battlegrounds.gossip_menu(character, guid) || GossipLoader.menu_for_creature(World.entry(guid)) do
@@ -115,6 +116,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
     context = condition_context(character, guid, option_conditions(option))
 
     if source_allowed?(character, guid) and option_allowed?(context, option, :deny_unknown) do
+      Entity.pause_for_talk(guid)
       dispatch(state, character, guid, option, option_ids)
     else
       state

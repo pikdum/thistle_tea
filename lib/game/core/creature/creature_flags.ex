@@ -56,6 +56,11 @@ defmodule ThistleTea.Game.Core.Creature.CreatureFlags do
 
   def no_owner_threat?(_entity), do: false
 
+  def no_movement_pause?(%{internal: %Internal{creature: %Creature{extra_flags: flags}}}) when is_integer(flags),
+    do: (flags &&& 0x20) != 0
+
+  def no_movement_pause?(_entity), do: false
+
   def no_threat_list?(%{internal: %Internal{creature: %Creature{extra_flags: flags}}}) when is_integer(flags),
     do: (flags &&& 0x800) != 0
 
