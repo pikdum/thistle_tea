@@ -1085,6 +1085,34 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffectTest do
       assert [%Effects.CreateItem{item_id: 5350, count: 2, spell_id: 5504}] = events
     end
 
+    test "an item filled from an enemy corpse is created for the caster, not the corpse" do
+      spell = %Spell{
+        id: 15_698,
+        name: "Filling Empty Jar",
+        school: :physical,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :create_item,
+            base_points: 0,
+            die_sides: 1,
+            base_dice: 1,
+            misc_value: 11_947,
+            implicit_target_a: :target_enemy,
+            implicit_target_b: :caster
+          }
+        ]
+      }
+
+      corpse = %{target_fixture() | object: %Object{guid: 2}, unit: %{target_fixture().unit | health: 0}}
+      context = %CastContext{caster_guid: 1, caster_level: 50}
+
+      assert {_caster, [%Effects.CreateItem{item_id: 11_947, count: 1}]} =
+               SpellEffect.receive(character_fixture(), context, spell, 1_000)
+
+      assert {_corpse, []} = SpellEffect.receive(corpse, context, spell, 1_000)
+    end
+
     test "reputation effect emits a typed standing change for players" do
       spell = %Spell{
         id: 21_187,

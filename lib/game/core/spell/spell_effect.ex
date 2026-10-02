@@ -323,6 +323,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect do
   defp caster_execution_effect?(%Effect{type: :summon_guardian}), do: true
   defp caster_execution_effect?(%Effect{type: :summon}), do: true
   defp caster_execution_effect?(%Effect{type: :summon_wild}), do: true
+  defp caster_execution_effect?(%Effect{implicit_target_b: :caster}), do: true
   defp caster_execution_effect?(effect), do: PetTraining.training_effect?(effect)
 
   defp pet_target_effect?(%Effect{} = effect) do
