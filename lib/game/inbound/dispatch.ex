@@ -226,6 +226,8 @@ defmodule ThistleTea.Game.Inbound.Dispatch do
               CMSG_TOGGLE_HELM: Inbound.CmsgToggleHelm,
               CMSG_TOGGLE_CLOAK: Inbound.CmsgToggleCloak,
               CMSG_TUTORIAL_FLAG: Inbound.CmsgTutorialFlag,
+              CMSG_UPDATE_ACCOUNT_DATA: Inbound.CmsgUpdateAccountData,
+              CMSG_REQUEST_ACCOUNT_DATA: Inbound.CmsgRequestAccountData,
               CMSG_TUTORIAL_CLEAR: Inbound.CmsgTutorialClear,
               CMSG_TUTORIAL_RESET: Inbound.CmsgTutorialReset,
               CMSG_NEXT_CINEMATIC_CAMERA: Inbound.CmsgNextCinematicCamera,

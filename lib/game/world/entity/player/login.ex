@@ -57,6 +57,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink
+  alias ThistleTea.Game.World.Entity.Player.AccountCaches
   alias ThistleTea.Game.World.Entity.Player.Auction
   alias ThistleTea.Game.World.Entity.Player.Buyback
   alias ThistleTea.Game.World.Entity.Player.ConditionContext
@@ -357,7 +358,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
     Corpses.send_reclaim_delay(c)
 
     # needed for no white chatbox + keybinds
-    Outbound.send_packet(%Message.SmsgAccountDataTimes{})
+    Outbound.send_packet(AccountCaches.digests(c.account_id, c.object.guid))
 
     # maybe useless? mangos sends it, though
     Outbound.send_packet(%Message.SmsgSetRestStart{unknown1: 0})

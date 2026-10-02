@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Inbound.CmsgPlayerLogin do
 
     case PlayerServer.login(account, self(), character_guid) do
       {:ok, player_pid} ->
-        ConnectionState.attach_player(state, player_pid)
+        ConnectionState.attach_player(state, player_pid, character_guid)
 
       {:error, reason} ->
         Logger.error("CMSG_PLAYER_LOGIN failed character_guid=#{character_guid} reason=#{inspect(reason)}")
