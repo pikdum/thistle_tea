@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
   alias ThistleTea.Game.Core.Pet.PetProgression
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
+  alias ThistleTea.Game.World.Loader.PetName, as: PetNameLoader
   alias ThistleTea.Game.World.Loader.PetSpells
   alias ThistleTea.Game.World.Loader.PetTraining
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -80,6 +81,25 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
       assert restored.unit.pet_number == pet.unit.pet_number
       assert (restored.unit.flags &&& 0x10) == 0
       assert (Summon.build_pet(416, owner).unit.flags &&& 0x10) == 0
+    end
+
+    test "draws a fresh demon name on every summon" do
+      previous = :ets.lookup(PetNameLoader, 416)
+      PetNameLoader.put(416, ["Zig"], ["zag"])
+
+      on_exit(fn ->
+        :ets.delete(PetNameLoader, 416)
+        :ets.insert(PetNameLoader, previous)
+      end)
+
+      owner = %Character{
+        object: %Object{guid: Guid.from_low_guid(:player, 1)},
+        unit: %Unit{level: 50, faction_template: 1},
+        internal: %Internal{world: WorldRef.open(0)},
+        movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}}
+      }
+
+      assert Summon.build_pet(416, owner).internal.name == "Zigzag"
     end
 
     test "restores only family passives after untraining and retains the reset price history" do

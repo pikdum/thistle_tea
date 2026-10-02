@@ -75,6 +75,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.PageText, as: PageTextLoader
   alias ThistleTea.Game.World.Loader.PassiveSpell, as: PassiveSpellLoader
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
+  alias ThistleTea.Game.World.Loader.PetName, as: PetNameLoader
   alias ThistleTea.Game.World.Loader.PetSpells, as: PetSpellsLoader
   alias ThistleTea.Game.World.Loader.PetTraining, as: PetTrainingLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
@@ -290,6 +291,7 @@ defmodule ThistleTea.Application do
     BroadcastTextLoader.init()
     SummonLoader.init()
     PetLevelLoader.init()
+    PetNameLoader.init()
     PetSpellsLoader.init()
     PetTrainingLoader.init()
     TaxiLoader.init()
@@ -340,6 +342,7 @@ defmodule ThistleTea.Application do
         LockLoader.load_all()
         SkillLoader.load_all()
         PetLevelLoader.load_all()
+        PetNameLoader.load_all()
         BattlegroundLoader.load_all()
 
         BroadcastTextLoader.load_all(

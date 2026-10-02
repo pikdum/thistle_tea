@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
+  alias ThistleTea.Game.World.Loader.PetName, as: PetNameLoader
   alias ThistleTea.Game.World.Loader.PetSpells
   alias ThistleTea.Game.World.Loader.PetTraining, as: PetTrainingLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -148,6 +149,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       %{mob | object: %{mob.object | guid: guid}, unit: unit, internal: internal}
       |> CreatureMovement.sync()
       |> PetNaming.initialize(if(Companion.entry(owner) == entry, do: Companion.relationship(owner).name))
+      |> name_demon(entry)
       |> PetProgression.initialize(progress, PetLevelLoader.levels())
       |> restore_happiness(owner, entry)
       |> attach_owner(owner_guid)
@@ -160,6 +162,15 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   end
 
   def build_pet(_entry, _owner), do: nil
+
+  defp name_demon(%Mob{internal: %{pet: %Pet{kind: :summon}} = internal} = pet, entry) do
+    case PetNameLoader.generate(entry) do
+      name when is_binary(name) -> %{pet | internal: %{internal | name: name}}
+      nil -> pet
+    end
+  end
+
+  defp name_demon(pet, _entry), do: pet
 
   def build_mini_pet(entry, %Character{} = owner, spell_id, duration_ms, position \\ nil)
       when is_integer(entry) and entry > 0 and is_integer(spell_id) and is_integer(duration_ms) do
