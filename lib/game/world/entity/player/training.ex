@@ -28,17 +28,18 @@ defmodule ThistleTea.Game.World.Entity.Player.Training do
 
   def send_list(%{character: %Character{} = character} = state, trainer_guid) do
     if valid_trainer?(character, trainer_guid) do
-      %{trainer_type: type, spells: spells} = TrainerLoader.trainer_info(World.entry(trainer_guid))
+      %{trainer_type: type, spells: spells} = info = TrainerLoader.trainer_info(World.entry(trainer_guid))
 
-      Outbound.send_packet(%SmsgTrainerList{
-        guid: trainer_guid,
-        trainer_type: type,
-        spells: list_spells(spells, character, trainer_guid)
-      })
+      %SmsgTrainerList{guid: trainer_guid, trainer_type: type, spells: list_spells(spells, character, trainer_guid)}
+      |> with_greeting(info[:greeting])
+      |> Outbound.send_packet()
     end
 
     state
   end
+
+  defp with_greeting(%SmsgTrainerList{} = list, greeting) when is_binary(greeting), do: %{list | title: greeting}
+  defp with_greeting(%SmsgTrainerList{} = list, _greeting), do: list
 
   def buy(%{character: %Character{} = character} = state, trainer_guid, spell_id) do
     with true <- valid_trainer?(character, trainer_guid),

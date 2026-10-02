@@ -2,7 +2,8 @@ defmodule ThistleTea.Game.World.Loader.Trainer do
   @moduledoc """
   Loads the spells a trainer creature teaches from Mangos, resolving each
   teaching spell to the spell it grants plus the rank-chain, level, and
-  class/race requirement metadata needed to offer it to a player.
+  class/race requirement metadata needed to offer it to a player, along with
+  the trainer's own greeting.
   """
   import Ecto.Query
 
@@ -32,8 +33,16 @@ defmodule ThistleTea.Game.World.Loader.Trainer do
 
     %{
       trainer_type: trainer_type(template),
-      spells: spells(creature_entry, template)
+      spells: spells(creature_entry, template),
+      greeting: greeting(creature_entry)
     }
+  end
+
+  defp greeting(creature_entry) do
+    case Mangos.Repo.get(Mangos.NpcTrainerGreeting, creature_entry) do
+      %Mangos.NpcTrainerGreeting{content_default: text} when is_binary(text) and text != "" -> text
+      _ -> nil
+    end
   end
 
   defp cache(creature_entry, info) do

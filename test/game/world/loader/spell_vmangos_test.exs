@@ -267,6 +267,13 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       refute 12_320 in spell_ids
     end
 
+    test "trainers greet with their own text when vmangos has one" do
+      assert TrainerLoader.trainer_info(198).greeting == "Hello, mage!  Ready for some training?"
+      assert TrainerLoader.trainer_info(223).greeting =~ "beast hides into armor"
+      assert TrainerLoader.trainer_info(913).greeting == "Hello, warrior!  Ready for some training?"
+      assert TrainerLoader.trainer_info(2870).greeting == nil
+    end
+
     test "trained talent ranks require the talent spell" do
       mortal_strike_rank_2 =
         913
