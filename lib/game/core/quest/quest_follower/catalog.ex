@@ -5,13 +5,23 @@ defmodule ThistleTea.Game.Core.Quest.QuestFollower.Catalog do
   chatter is left out, and so are the lapses a player must tend to on the
   way: Shay wandering off until her bell rings, Kerlonian falling asleep
   until the horn wakes him, and Ringo fainting until he drinks from the
-  canteen. Kernobee walks out of Gnomeregan without the Alarm-a-bomb.
+  canteen. Kernobee walks out of Gnomeregan without the Alarm-a-bomb. Mist's
+  script is missing from vmangos, so her return to Sentinel Arynia
+  Cloudsbreak follows the ScriptDev2 `npc_mist` it came from.
   """
 
   alias ThistleTea.Game.Core.Quest.QuestFollower
 
   def all do
     [
+      %QuestFollower{
+        quest_id: 938,
+        entry: 3568,
+        goal: {3519, 10},
+        accept: [{:faction, 79}],
+        arrive: [{:say_by, 3519, 1330}, {:say, 1340}],
+        despawn_ms: 3_000
+      },
       %QuestFollower{
         quest_id: 1560,
         entry: 5955,
