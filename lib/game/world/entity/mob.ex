@@ -834,6 +834,16 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       state
       |> KillFeedback.receive(victim, now)
       |> pet_victim_died(victim.guid, now)
+      |> EventAI.with_blackboard(
+        &EventAI.on_kill(
+          &1,
+          &2,
+          victim.guid,
+          now,
+          AIEnvironment.context(&1, now, ObservationRequest.actor(victim.guid))
+        )
+      )
+      |> NavigationResolver.resolve(now)
       |> EventSink.emit_pending()
       |> wake_ai_tick()
 

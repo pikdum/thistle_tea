@@ -264,7 +264,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
          %Context{now: now} = context
        )
        when is_integer(target) and target > 0 do
-    {state, blackboard} = EventAI.on_kill(state, blackboard, target, now, context)
     {state, blackboard} = EventAI.on_leave_combat(state, blackboard, now, context)
     {:success, state, blackboard}
   end
@@ -383,12 +382,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
 
   defp select_victim(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
     case Engagement.select(state, victim_selection(state, context)) do
-      %Engagement.Result{
-        entity: state,
-        decision: {:switch, _new_guid},
-        previous_victim: previous_victim
-      } ->
-        {state, blackboard} = maybe_on_kill(state, blackboard, previous_victim, context)
+      %Engagement.Result{entity: state, decision: {:switch, _new_guid}} ->
         {:success, state, Blackboard.clear_attack_started(blackboard)}
 
       %Engagement.Result{entity: %Mob{unit: %{target: target}} = state, decision: :keep}
@@ -398,27 +392,9 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
       %Engagement.Result{entity: state, decision: :keep} ->
         {:success, state, blackboard}
 
-      %Engagement.Result{
-        entity: state,
-        decision: :none,
-        previous_victim: previous_victim
-      } ->
-        {state, blackboard} = maybe_on_kill(state, blackboard, previous_victim, context)
+      %Engagement.Result{entity: state, decision: :none} ->
         state = reset_after_combat(state, blackboard, context)
         {BT.running(0, :return_home), state, Blackboard.ensure(state.internal.blackboard)}
-    end
-  end
-
-  defp maybe_on_kill(
-         %Mob{} = state,
-         %Blackboard{} = blackboard,
-         target,
-         %Context{now: now, perception: perception} = context
-       ) do
-    if target_dead_in_perception?(target, perception) do
-      EventAI.on_kill(state, blackboard, target, now, context)
-    else
-      {state, blackboard}
     end
   end
 
