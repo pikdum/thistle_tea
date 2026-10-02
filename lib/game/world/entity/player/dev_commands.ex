@@ -85,6 +85,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   @speed_max 10.0
   @max_coinage 0x7FFFFFFF
   @warsong_gulch_map_id 489
+  @death_touch 5
 
   def run(state, ".additem" <> params) do
     params
@@ -205,6 +206,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
       ".instance reset - reset empty owned instances",
       ".instance raid-reset <map> - expire all raid copies and saves for a map",
       ".instance switch <id> - join a copy of the current map",
+      ".kill - kill the selected creature as if you dealt the blow",
       ".learn <spell_id> - learn a spell",
       ".levelup [levels] - increase player level",
       ".mail <recipient> <message> - send an immediate debug letter",
@@ -331,6 +333,18 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
       system_message(state, "Creature reaction: #{String.trim(mode)}.")
     else
       system_message(state, "Select a creature and use: .debug reaction <passive|defensive|aggressive>")
+    end
+    |> handled()
+  end
+
+  def run(state, ".kill" <> _) do
+    with true <- selected_creature?(state),
+         %Spell{} = spell <- SpellLoader.load(@death_touch) do
+      state
+      |> Spellcasting.scripted_cast(spell, %CreatureSpell{spell_id: @death_touch}, state.target)
+      |> system_message("Killing selected creature.")
+    else
+      _ -> system_message(state, "Select a creature and use: .kill")
     end
     |> handled()
   end

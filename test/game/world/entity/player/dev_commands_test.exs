@@ -511,6 +511,17 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
     end
   end
 
+  describe ".kill" do
+    test "requires a selected creature" do
+      state = %{guid: 1, target: nil, character: debug_character()}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".kill")
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgMessagechat{message: "Select a creature and use: .kill"}}}
+    end
+  end
+
   describe ".go xyz" do
     test "rejects malformed coordinates without teleporting" do
       state = %{guid: 1, character: debug_character()}
