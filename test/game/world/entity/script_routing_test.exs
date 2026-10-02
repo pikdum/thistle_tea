@@ -125,6 +125,21 @@ defmodule ThistleTea.Game.World.Entity.ScriptRoutingTest do
       assert state.character.unit.stand_state == 0
     end
 
+    test "scripts wake a dormant creature to act on the movement they start", %{world: world} do
+      creature = mob(world, 0.0, 0.0)
+      step = %ScriptStep{command: :movement, datalong: 1, position: {5.0, 0.0, 0.0, 0.0}}
+
+      for run <- [
+            &MobServer.handle_cast({:start_script, [step], 0, world}, &1),
+            &MobServer.handle_info({:ai_script_steps, [step], 0, world}, &1)
+          ] do
+        assert {:noreply, woken, {:continue, :maybe_broadcast}} = run.(creature)
+        assert woken.internal.blackboard.navigation.movement_override == :random
+        token = woken.internal.ai_tick_token
+        assert_receive {:ai_tick, ^token}
+      end
+    end
+
     test "receivers reject scripts from another instance", %{world: world} do
       other = WorldRef.instance(world.map_id, world.instance_id + 1)
       step = %ScriptStep{command: :emote, datalong: 1}

@@ -256,6 +256,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       )
       |> NavigationResolver.resolve(now)
       |> EventSink.emit_pending()
+      |> wake_ai_tick()
 
     {:noreply, state, {:continue, :maybe_broadcast}}
   rescue
@@ -284,6 +285,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       )
       |> NavigationResolver.resolve(now)
       |> EventSink.emit_pending()
+      |> wake_ai_tick()
 
     {:noreply, state, {:continue, :maybe_broadcast}}
   rescue
@@ -310,6 +312,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       )
       |> NavigationResolver.resolve(now)
       |> EventSink.emit_pending()
+      |> wake_ai_tick()
 
     {:noreply, state, {:continue, :maybe_broadcast}}
   rescue
@@ -1312,7 +1315,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   end
 
   def handle_info({:script_command, %ScriptRequest{} = request}, %Mob{} = state) do
-    state = state |> ScriptExecution.command(request) |> EventSink.emit_pending()
+    state = state |> ScriptExecution.command(request) |> EventSink.emit_pending() |> wake_ai_tick()
     {:noreply, state, {:continue, :maybe_broadcast}}
   rescue
     error ->
@@ -1322,7 +1325,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   end
 
   def handle_info({:script_resume, id, receipt, world, result}, %Mob{} = state) do
-    state = state |> ScriptExecution.resume(id, receipt, world, result) |> EventSink.emit_pending()
+    state = state |> ScriptExecution.resume(id, receipt, world, result) |> EventSink.emit_pending() |> wake_ai_tick()
     {:noreply, state, {:continue, :maybe_broadcast}}
   rescue
     error ->
@@ -1369,6 +1372,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
         )
         |> NavigationResolver.resolve(now)
         |> EventSink.emit_pending()
+        |> wake_ai_tick()
 
       {:noreply, state, {:continue, :maybe_broadcast}}
     end
