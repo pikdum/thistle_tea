@@ -350,7 +350,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
          batch = Enum.reduce(rewards, batch, fn {item, _count}, acc -> Batch.add(acc, item) end),
          {:ok, changes} <- Inventory.plan(batch, &ItemStore.get/1) do
       state = InventoryUpdate.apply(state, {:ok, changes})
-      send_reward_pushes(state, changes, rewards)
+      send_reward_pushes(state, changes, rewards, true)
       character = state.character
       {:ok, quest_log} = QuestLog.remove(character.player.quest_log, quest_id)
       put_character(state, %{character | player: %{character.player | quest_log: quest_log}})
@@ -414,7 +414,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
     player = %{change_set.player | quest_log: quest_log, rewarded_quests: rewarded, coinage: coinage}
     change_set = ChangeSet.put_player(change_set, player)
     state = InventoryUpdate.apply(state, {:ok, change_set})
-    send_reward_pushes(state, change_set, rewards)
+    send_reward_pushes(state, change_set, rewards, false)
 
     {character, level_ups} = PlayerStats.gain_xp(state.character, xp)
     Enum.each(level_ups, fn level_up -> Outbound.send_packet(struct(Message.SmsgLevelupInfo, level_up)) end)
@@ -528,7 +528,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
     end
   end
 
-  defp send_reward_pushes(state, %ChangeSet{} = change_set, rewards) do
+  defp send_reward_pushes(state, %ChangeSet{} = change_set, rewards, show_in_chat?) do
     Enum.each(rewards, fn {%ItemCore{} = item, count} ->
       placed_at =
         case ChangeSet.placement(change_set, item.object.guid) do
@@ -536,7 +536,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
           %Placement{status: :merged} -> {Inventory.bag_0(), 0xFFFFFFFF}
         end
 
-      send_item_push(state, item, placed_at, count)
+      send_item_push(state, item, placed_at, count, show_in_chat?)
     end)
   end
 
@@ -1095,7 +1095,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
         {:ok, state}
       else
         state = InventoryUpdate.apply(state, {:ok, changes})
-        send_reward_pushes(state, changes, rewards)
+        send_reward_pushes(state, changes, rewards, true)
         {:ok, state}
       end
     else
@@ -1115,7 +1115,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
     end
   end
 
-  defp send_item_push(state, %ItemCore{} = item, {bag_slot, item_slot}, count) do
+  defp send_item_push(state, %ItemCore{} = item, {bag_slot, item_slot}, count, show_in_chat?) do
     Outbound.send_packet(%Message.SmsgItemPushResult{
       player_guid: state.guid,
       item_id: item.object.entry,
@@ -1123,7 +1123,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
       bag_slot: bag_slot,
       item_slot: item_slot,
       count: count,
-      created: 1
+      received: 1,
+      show_in_chat: if(show_in_chat?, do: 1, else: 0)
     })
   end
 

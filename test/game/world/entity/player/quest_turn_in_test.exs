@@ -142,7 +142,8 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestTurnInTest do
     assert Inventory.count_entry(result.character.player, @reward2_entry, &ItemStore.get/1) == 1
     assert ItemStore.get(required1.object.guid) == nil
     assert ItemStore.get(required2.object.guid) == nil
-    assert_receive {:"$gen_cast", {:send_packet, %SmsgItemPushResult{random_property_id: 59_004}}}
+    assert_receive {:"$gen_cast", {:send_packet, %SmsgItemPushResult{random_property_id: 59_004} = push}}
+    assert {push.received, push.created, push.show_in_chat} == {1, 0, 0}
   end
 
   describe "hello/2" do
