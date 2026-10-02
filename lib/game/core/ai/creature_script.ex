@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   """
 
   alias ThistleTea.Game.Core.AI.AIEvent
+  alias ThistleTea.Game.Core.AI.CreatureScript.FelwoodOoze
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
   alias ThistleTea.Game.Core.AI.CreatureScript.SicklyCritter
   alias ThistleTea.Game.Core.AI.Script
@@ -22,7 +23,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   @callback entries() :: [pos_integer()]
   @callback events(pos_integer()) :: [%AIEvent{}]
 
-  @scripts [LazyPeon, SicklyCritter]
+  @scripts [FelwoodOoze, LazyPeon, SicklyCritter]
   @timed_script 1
 
   def ported?(entry), do: not is_nil(script(entry))
