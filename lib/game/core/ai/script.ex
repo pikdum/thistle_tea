@@ -76,6 +76,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
   @hold_release_script 1
   @signal_hold 1
   @unit_flag_player_controlled 0x00000008
+  @mana_power 0
   @scripted_event_commands [
     :set_server_variable,
     :start_map_event,
@@ -919,6 +920,49 @@ defmodule ThistleTea.Game.Core.AI.Script do
   defp execute(
          state,
          blackboard,
+         %ScriptStep{command: :summon_creature, count: count} = step,
+         target_guid,
+         now,
+         %Context{} = context
+       )
+       when count != 1 do
+    state
+    |> summon_count(count, context)
+    |> then(&Enum.to_list(1..&1//1))
+    |> Enum.reduce({state, blackboard}, fn _index, {state, blackboard} ->
+      execute(state, blackboard, %{step | count: 1}, target_guid, now, context)
+    end)
+  end
+
+  defp execute(
+         %{internal: %{world: world}} = state,
+         blackboard,
+         %ScriptStep{command: :summon_creature, at_target?: true} = step,
+         target_guid,
+         now,
+         %Context{perception: perception} = context
+       ) do
+    {_x, _y, _z, orientation} = state.movement_block.position
+
+    case Perception.position(perception, resolve_target(state, step, target_guid, context)) do
+      {^world, x, y, z} ->
+        execute(
+          state,
+          blackboard,
+          %{step | at_target?: false, position: {x, y, z, orientation}},
+          target_guid,
+          now,
+          context
+        )
+
+      _missing ->
+        {state, blackboard}
+    end
+  end
+
+  defp execute(
+         state,
+         blackboard,
          %ScriptStep{command: :summon_creature, positions: [_ | _] = positions} = step,
          target_guid,
          now,
@@ -1588,6 +1632,17 @@ defmodule ThistleTea.Game.Core.AI.Script do
     resolve_target(state, attack_step, target_guid, context)
   end
 
+  defp summon_count(_state, count, %Context{}) when is_integer(count), do: max(count, 0)
+
+  defp summon_count(state, {:threat_players, ratio, least, most}, %Context{perception: perception}) do
+    players =
+      Enum.count(Threat.targets(state), fn guid ->
+        Guid.entity_type(guid) == :player and match?(%{alive?: true}, Perception.metadata(perception, guid))
+      end)
+
+    (players * ratio) |> trunc() |> max(least) |> min(most)
+  end
+
   defp choose_start_script(%ScriptStep{} = step, random) do
     step
     |> ScriptStep.start_script_options()
@@ -1773,6 +1828,25 @@ defmodule ThistleTea.Game.Core.AI.Script do
        })
        when target_type in [:nearest_game_object_with_entry, :random_game_object_with_entry] do
     find_game_object_with_entry(state, step, target_type, perception, random)
+  end
+
+  defp resolve_target(
+         %{internal: %{pet: %Pet{owner_guid: owner}}} = state,
+         %ScriptStep{target_type: :owner_hostile_random, target_param1: flags},
+         _provided,
+         %Context{perception: perception, random: random}
+       ) do
+    victim = victim(state)
+
+    perception
+    |> Perception.metadata(owner)
+    |> Kernel.||(%{})
+    |> Map.get(:combat_targets, [])
+    |> Enum.filter(&(&1 != victim and target_flags_allow?(&1, flags, perception)))
+    |> case do
+      [] -> nil
+      candidates -> Random.choice(random, candidates)
+    end
   end
 
   defp resolve_target(_state, %ScriptStep{target_type: :nearest_player, target_param1: radius}, _provided, %Context{
@@ -2135,6 +2209,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
   defp target_flags_allow?(guid, flags, perception) do
     (!flag?(flags, 0x001) or Perception.line_of_sight?(perception, guid)) and
       (!flag?(flags, 0x002) or Guid.entity_type(guid) == :player) and
+      (!flag?(flags, 0x004) or match?(%{power_type: @mana_power}, Perception.metadata(perception, guid))) and
       (!flag?(flags, 0x200) or Guid.entity_type(guid) == :player)
   end
 

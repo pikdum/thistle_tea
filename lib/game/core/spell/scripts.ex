@@ -27,6 +27,8 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
   @defensive_stance_form 18
   @berserker_stance_form 19
 
+  @dream_dragon_mark_stuns [{25_040, 25_043}, {23_182, 23_186}]
+
   @shapeshift_passives %{
     1 => [3025],
     3 => [5419],
@@ -177,6 +179,7 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
   def dummy_effect(%Spell{id: 23_448}), do: :transporter_arrival
   def dummy_effect(%Spell{id: 25_860}), do: :reindeer_transformation
   def dummy_effect(%Spell{id: 28_006}), do: {:trigger_spell, 29_296}
+  def dummy_effect(%Spell{id: id}) when id in [23_185, 25_044], do: {:dream_dragon_aura, @dream_dragon_mark_stuns}
   def dummy_effect(%Spell{id: id}) when id in [11_885, 11_886, 11_887, 11_888, 11_889, 12_699], do: :capture_corpse
   def dummy_effect(%Spell{id: 8593}), do: {:restore_to_life, 120_000}
   def dummy_effect(%Spell{id: 15_998}), do: :capture_creature

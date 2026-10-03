@@ -7,7 +7,10 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   Unsupported commands keep their numeric id as `{:unsupported, id}` so the
   interpreter can log and skip them. Code-built summons may list `positions`
   instead of one `position`, and the interpreter picks a random one that no
-  living creature stands on.
+  living creature stands on. They may also appear at their target's feet
+  (`at_target?`) and come several at once: `count` is a number, or
+  `{:threat_players, ratio, min, max}` to scale with the living players on
+  the summoner's threat list, as C++ bosses size their adds to the raid.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -36,6 +39,8 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
             creature_spell_lists: %{},
             position: nil,
             positions: [],
+            at_target?: false,
+            count: 1,
             condition_id: 0,
             condition: nil,
             success_condition: nil,

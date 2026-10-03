@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Core.Aura.Script do
   @whirlwind 1680
   @melee_radius 5.0
   @whirlwind_radius 8.0
+  @death_casts %{23_183 => 23_182, 24_906 => 24_904, 25_042 => 25_040}
 
   def instant_application(entity, context, %Spell{id: 13_139}), do: Engineering.net_backfire(entity, context)
   def instant_application(_entity, _context, _spell), do: nil
@@ -277,6 +278,15 @@ defmodule ThistleTea.Game.Core.Aura.Script do
   def cancel_linked_spell_ids(_holder), do: []
 
   @leader_of_the_pack_aura 24_932
+
+  defp after_remove_holder(%{object: %{guid: guid}, unit: unit}, %Holder{spell: %Spell{id: spell_id}}, :death)
+       when is_map_key(@death_casts, spell_id) do
+    [
+      Effects.trigger_spell(guid, unit.level || 1, guid, Map.fetch!(@death_casts, spell_id),
+        triggered_by_spell_id: spell_id
+      )
+    ]
+  end
 
   defp after_remove_holder(
          %{object: %{guid: target_guid}},

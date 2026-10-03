@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Core.GameEvent.ScheduleTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Core.GameEvent.DarkmoonFaire
+  alias ThistleTea.Game.Core.GameEvent.DragonsOfNightmare
   alias ThistleTea.Game.Core.GameEvent.FireworksShow
   alias ThistleTea.Game.Core.GameEvent.Schedule
   alias ThistleTea.Game.Core.GameEvent.Schedule.Entry
@@ -55,6 +56,13 @@ defmodule ThistleTea.Game.Core.GameEvent.ScheduleTest do
       assert Schedule.next_transition(schedule, datetime("2026-10-02T13:00:00")) == datetime("2026-10-05T00:00:00")
       assert Schedule.next_transition(schedule, datetime("2026-10-06T13:00:00")) == datetime("2026-10-12T00:00:00")
       assert Schedule.next_transition(schedule, datetime("2026-10-12T13:00:00")) == datetime("2026-12-07T00:00:00")
+    end
+
+    test "keep the dragons of Nightmare out for the life of the world" do
+      schedule = Schedule.new([%Entry{id: 66, rule: DragonsOfNightmare}])
+
+      assert Schedule.active_events(schedule, datetime("2026-10-03T12:00:00")) == [66]
+      assert Schedule.next_transition(schedule, datetime("2026-10-03T12:00:00")) == nil
     end
 
     test "follow the database-scheduled events active at the moment" do

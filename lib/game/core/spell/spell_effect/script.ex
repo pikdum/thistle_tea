@@ -320,6 +320,18 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
     end
   end
 
+  defp apply_class_dummy(state, _context, _spell, _effect, {:dream_dragon_aura, mark_stuns}, now) do
+    guid = state.object.guid
+    {state, events} = Aura.remove_aura_types(state, [:mod_stealth], now)
+
+    stuns =
+      for {mark_id, stun_id} <- mark_stuns,
+          Aura.has_spell?(state, mark_id),
+          do: Effects.trigger_spell(guid, state.unit.level || 1, guid, stun_id)
+
+    {state, events ++ stuns}
+  end
+
   defp apply_class_dummy(state, _context, _spell, _effect, _unscripted, _now), do: {state, []}
 
   defp pet_aura_events(%Character{} = state, %CastContext{} = context, %Spell{id: spell_id} = spell) do
