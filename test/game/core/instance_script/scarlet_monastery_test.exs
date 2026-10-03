@@ -92,6 +92,15 @@ defmodule ThistleTea.Game.Core.InstanceScript.ScarletMonasteryTest do
       assert {:ok, 2, [%Effects.OperateGameObject{entry: @door, action: :open}], _} = stage(instances, context, 2)
     end
 
+    test "Herod's death opens the door behind him for good", context do
+      herods_door = 101_854
+      assert {:ok, [], _} = Instance.game_object_spawned(context.instances, context.world, herods_door)
+
+      assert {:ok, [open], instances} = death(context.instances, context, 3_975)
+      assert open == %Effects.OperateGameObject{entry: herods_door, action: :open}
+      assert {:ok, [^open], _} = Instance.game_object_spawned(instances, context.world, herods_door)
+    end
+
     test "a boss that spawns again is no longer counted dead", context do
       {:ok, [], instances} = death(context.instances, context, @mograine)
 

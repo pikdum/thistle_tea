@@ -12,6 +12,9 @@ defmodule ThistleTea.Game.Core.InstanceScript.ScarletMonastery do
   removes the survivor and settles the encounter, and the door shuts again
   when it resets.
 
+  Herod's death in the Armory opens the door behind him, which stays open
+  if it respawns.
+
   The Ashbringer event is recorded but not played.
   """
 
@@ -38,6 +41,9 @@ defmodule ThistleTea.Game.Core.InstanceScript.ScarletMonastery do
   @slain :cathedral_slain
 
   @high_inquisitors_door 104_600
+  @herods_door 101_854
+  @herod 3_975
+  @herod_slain :herod_slain
   @yell_whitemane 2_973
   @defenders [4_299, 4_300, 4_301, 4_302, 4_303, 4_540]
   @defender_reach {{1_153.87, 1_398.39, 32.61}, 82.0}
@@ -80,6 +86,11 @@ defmodule ThistleTea.Game.Core.InstanceScript.ScarletMonastery do
     else
       {:ok, data, script_state, []}
     end
+  end
+
+  def creature_event(data, script_state, %{creature_entry: @herod, event: :death}) do
+    {:ok, _stored, data, effects} = Doors.put(doors(), data, @herod_slain, true)
+    {:ok, data, script_state, effects}
   end
 
   def creature_event(data, script_state, %{creature_entry: entry, event: :spawned})
@@ -157,6 +168,10 @@ defmodule ThistleTea.Game.Core.InstanceScript.ScarletMonastery do
 
   defp slain(data), do: Map.get(data, @slain, [])
 
-  defp doors,
-    do: [{@high_inquisitors_door, &(Encounter.value(&1, @mograine_and_whitemane) in [@died_once, @revived, @done])}]
+  defp doors do
+    [
+      {@high_inquisitors_door, &(Encounter.value(&1, @mograine_and_whitemane) in [@died_once, @revived, @done])},
+      {@herods_door, &Map.get(&1, @herod_slain, false)}
+    ]
+  end
 end
