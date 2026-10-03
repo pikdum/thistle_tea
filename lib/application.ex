@@ -419,7 +419,6 @@ defmodule ThistleTea.Application do
         ModelGeometryLoader.load_all_addons()
         TransportLoader.load_all()
         GameObjectScriptLoader.load_all()
-        EventScriptLoader.load_all()
         PageTextLoader.load_all()
         TotemLoader.preload()
         PetTrainingLoader.load_all()
@@ -445,6 +444,7 @@ defmodule ThistleTea.Application do
   end
 
   defp load_spell_data do
+    EventScriptLoader.load_all()
     PassiveSpellLoader.load_all()
     SpellAreaLoader.load_all()
     SpellChainLoader.load_abilities()

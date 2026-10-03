@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.EventScript do
   @moduledoc """
-  Preloads VMangos `event_scripts` commands by event ID for object-use dispatch.
+  Preloads VMangos `event_scripts` commands by event ID for object use and
+  send-event spell effects.
   """
   import Ecto.Query
 

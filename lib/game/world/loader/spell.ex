@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.Game.Core.Spell.Scripts
   alias ThistleTea.Game.Core.Spell.Semantics
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
+  alias ThistleTea.Game.World.Loader.EventScript, as: EventScriptLoader
   alias ThistleTea.Game.World.Loader.PassiveSpell, as: PassiveSpellLoader
   alias ThistleTea.Game.World.Loader.SpellAppearance
   alias ThistleTea.Game.World.Loader.SpellArea, as: SpellAreaLoader
@@ -476,7 +477,13 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     0..2
     |> Enum.map(&build_effect(row, &1, radius_lookup, Map.get(mods, &1)))
     |> Enum.reject(&is_nil/1)
+    |> Enum.map(&attach_event_steps/1)
   end
+
+  defp attach_event_steps(%Effect{type: :send_event, misc_value: event_id} = effect),
+    do: %{effect | event_steps: EventScriptLoader.get(event_id)}
+
+  defp attach_event_steps(effect), do: effect
 
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defp build_effect(row, index, radius_lookup, mod) do

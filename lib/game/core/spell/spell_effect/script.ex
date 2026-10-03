@@ -115,6 +115,12 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
     end
   end
 
+  def apply(state, _context, _spell, %Effect{type: :send_event, implicit_target_a: nil, implicit_target_b: nil}, _now),
+    do: {state, []}
+
+  def apply(state, %CastContext{} = context, _spell, %Effect{type: :send_event, event_steps: steps}, _now),
+    do: {state, database_script_events(state, context, steps)}
+
   def apply(%Mob{internal: %{concealed?: true} = internal} = state, _context, _spell, %Effect{type: :spawn}, _now),
     do: {Entity.mark_broadcast_update(%{state | internal: %{internal | concealed?: false}}), []}
 

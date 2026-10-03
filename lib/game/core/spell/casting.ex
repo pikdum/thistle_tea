@@ -58,6 +58,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
   alias ThistleTea.Game.Core.Spell.Requirements
   alias ThistleTea.Game.Core.Spell.Scripts
   alias ThistleTea.Game.Core.Spell.Semantics
+  alias ThistleTea.Game.Core.Spell.SendEvent
   alias ThistleTea.Game.Core.Spell.SharedDamage
   alias ThistleTea.Game.Core.Spell.SpellEffect
   alias ThistleTea.Game.Core.Spell.SpellMagnet
@@ -366,6 +367,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
       |> queue_feed_pet(casting)
       |> queue_open_object(casting)
       |> queue_object_actions(casting)
+      |> queue_send_events(casting)
       |> queue_pickpocket(casting)
       |> queue_skinning(casting)
       |> queue_remove_insignia(casting)
@@ -703,6 +705,21 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
     do: Effects.enqueue(entity, ObjectTargets.actions(spell, objects))
 
   defp queue_object_actions(entity, _cast), do: entity
+
+  defp queue_send_events(%{object: %{guid: guid}} = entity, %Cast{spell: spell} = casting),
+    do: Effects.enqueue(entity, SendEvent.cast_events(spell, guid, guid, send_event_target(entity, casting)))
+
+  defp send_event_target(entity, %Cast{requirements: requirements, resolution: %CastResolution{followups: followups}}) do
+    SendEvent.target(
+      focus_guid(requirements),
+      [followups.object_guid],
+      followups.selected_unit_guid,
+      entity.object.guid
+    )
+  end
+
+  defp focus_guid(%Requirements{focus: %{guid: guid}}), do: guid
+  defp focus_guid(_requirements), do: nil
 
   defp queue_feed_pet(%Character{} = character, %Cast{
          spell: %Spell{range_yards: range_yards, effects: effects},

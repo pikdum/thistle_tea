@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Core.Spell.ObjectTargets
   alias ThistleTea.Game.Core.Spell.ProcOrigin
   alias ThistleTea.Game.Core.Spell.Scripts
+  alias ThistleTea.Game.Core.Spell.SendEvent
   alias ThistleTea.Game.Core.Spell.SharedDamage
   alias ThistleTea.Game.Core.Spell.SpellResist
   alias ThistleTea.Game.Core.Spell.SpellTarget
@@ -453,7 +454,19 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
         effect_indices: UnitTargets.indices(units, Target.unit_guid(selection))
       })
 
-    [launch | launch_combat ++ movement ++ deliveries ++ actions ++ [completion]]
+    events = triggered_send_events(entity, spell, objects, selection, context.caster_guid || entity.object.guid)
+
+    [launch | launch_combat ++ movement ++ deliveries ++ actions ++ events ++ [completion]]
+  end
+
+  defp triggered_send_events(entity, spell, objects, selection, caster_guid) do
+    if SendEvent.cast_level?(spell) do
+      focus_guid = with %Focus{guid: guid} <- SpellFocus.find(entity, spell), do: guid
+      target_guid = SendEvent.target(focus_guid, ObjectTargets.guids(objects), Target.unit_guid(selection), caster_guid)
+      SendEvent.cast_events(spell, entity.object.guid, caster_guid, target_guid)
+    else
+      []
+    end
   end
 
   defp living_target?(%{object: %{guid: guid}, unit: %Unit{health: health}}, guid),
