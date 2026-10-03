@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.World.Entity.NavigationResolver do
   @moduledoc """
-  Resolves navigation intents at the entity-owner boundary.
+  Resolves navigation intents at the entity-owner boundary. A creature headed
+  home that has no path there, such as one left in the air or knocked off the
+  mesh, takes the straight line, as the vmangos path finder's shortcut does.
   """
 
   alias ThistleTea.Game.Core.AI.NavigationIntent
@@ -58,6 +60,7 @@ defmodule ThistleTea.Game.World.Entity.NavigationResolver do
     {max_distance, opts} = Keyword.pop(opts, :max_distance)
     {within_radius, opts} = Keyword.pop(opts, :within_radius)
     {pathfind?, opts} = Keyword.pop(opts, :pathfind?, true)
+    {shortcut?, opts} = Keyword.pop(opts, :shortcut?, false)
     {chase_target, opts} = Keyword.pop(opts, :chase_target)
     start = {start_x, start_y, start_z}
     opts = travel_velocity(opts, start, destination)
@@ -68,7 +71,7 @@ defmodule ThistleTea.Game.World.Entity.NavigationResolver do
     path =
       cond do
         is_list(requested_path) -> requested_path
-        pathfind? -> find_path.(world.map_id, start, destination, path_opts)
+        pathfind? -> shortcut(find_path.(world.map_id, start, destination, path_opts), shortcut?, destination)
         true -> [destination]
       end
 
@@ -86,6 +89,9 @@ defmodule ThistleTea.Game.World.Entity.NavigationResolver do
         UnreachableTarget.record(entity, chase_target, false, now)
     end
   end
+
+  defp shortcut(nil, true, destination), do: [destination]
+  defp shortcut(path, _shortcut?, _destination), do: path
 
   defp replace_point_movement(entity, opts, now) do
     if Keyword.has_key?(opts, :movement_inform), do: Movement.stop(entity, now), else: entity

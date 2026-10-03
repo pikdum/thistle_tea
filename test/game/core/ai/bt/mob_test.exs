@@ -650,6 +650,24 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       end
     end
 
+    test "a creature with no path home takes the straight line there" do
+      home = {0.0, 0.0, 0.0}
+      aloft = fixture_mob(position: {30.0, 0.0, 20.0, 0.0}, spline_nodes: [])
+      no_path = fn _map_id, _start, _destination, _opts -> nil end
+
+      for navigation <- [
+            %Blackboard.Navigation{returning_home?: true, target: home},
+            Blackboard.start_home(Blackboard.new(), home).navigation
+          ] do
+        {:success, requested, _} = MobBT.move_to_target(aloft, %Blackboard{navigation: navigation}, Context.new(1_000))
+        assert NavigationResolver.resolve(requested, 1_000, no_path).movement_block.spline_nodes == [home]
+      end
+
+      wandering = %Blackboard{navigation: %Blackboard.Navigation{target: {10.0, 0.0, 0.0}}}
+      {:success, requested, _} = MobBT.move_to_target(aloft, wandering, Context.new(1_000))
+      assert NavigationResolver.resolve(requested, 1_000, no_path).movement_block.spline_nodes == []
+    end
+
     test "arrival reports the original point once and failed paths cannot advance it" do
       route = %WaypointRoute{
         first_point: 37,

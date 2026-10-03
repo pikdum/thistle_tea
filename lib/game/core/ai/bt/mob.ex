@@ -1253,14 +1253,15 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
 
   defp sessile_home?(_state, _target), do: false
 
-  defp navigation_options(state, %Blackboard{navigation: %{returning_home?: false}} = blackboard) do
+  defp navigation_options(_state, %Blackboard{navigation: %{returning_home?: true}}), do: [shortcut?: true]
+  defp navigation_options(_state, %Blackboard{navigation: %{movement_override: :home}}), do: [shortcut?: true]
+
+  defp navigation_options(state, %Blackboard{} = blackboard) do
     case {waypoint_route(state, blackboard), waypoint_destination(state, blackboard), blackboard.navigation.target} do
       {%WaypointRoute{pathfind?: false}, %Waypoint{position: {x, y, z, _}}, {x, y, z}} -> [pathfind?: false]
       _route -> []
     end
   end
-
-  defp navigation_options(_state, _blackboard), do: []
 
   defp wait_for_arrival_with_context(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
     wait_for_arrival(state, blackboard, context)
