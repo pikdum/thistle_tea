@@ -1778,6 +1778,31 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
       assert mob.internal.events == []
     end
 
+    test "game object database targets resolve to the current copy from immutable context", %{mob: mob} do
+      blueprint_guid = Guid.from_low_guid(:game_object, 177_377, 43_203)
+      runtime_guid = Guid.runtime(:game_object, 177_377)
+
+      step = %ScriptStep{
+        command: :set_game_object_state,
+        datalong: 1,
+        target_type: :game_object_with_guid,
+        target_param1: 43_203,
+        buddy_guid: blueprint_guid
+      }
+
+      selector = {:game_object_with_guid, 43_203, 0}
+      assert Script.target_requests([step]) == [selector]
+
+      context = Context.new(1_000, script_targets: %{selector => runtime_guid})
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, context)
+      assert [%Effects.ForwardScriptSteps{target_guid: ^runtime_guid}] = mob.internal.events
+
+      {mob, _blackboard} =
+        Script.run(%{mob | internal: %{mob.internal | events: []}}, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Effects.ForwardScriptSteps{target_guid: ^blueprint_guid}] = mob.internal.events
+    end
+
     test "a creature named by the copy's instance data resolves from immutable context", %{mob: mob} do
       mograine = Guid.runtime(:mob, 3_976)
 

@@ -295,6 +295,10 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
     World.spawn_guid(world, :mob, db_guid)
   end
 
+  defp event_target(_events, world, {:game_object_with_guid, db_guid, _param2}) do
+    World.spawn_guid(world, :game_object, db_guid)
+  end
+
   defp event_target(_events, %WorldRef{instance_id: id} = world, {:creature_from_instance_data, index, _param2})
        when is_integer(id) do
     case InstanceScript.data64(MapTemplateLoader.instance_script_name(world.map_id), index) do

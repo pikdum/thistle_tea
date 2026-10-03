@@ -1807,10 +1807,6 @@ defmodule ThistleTea.Game.Core.AI.Script do
     owner_guid
   end
 
-  defp resolve_target(_state, %ScriptStep{target_type: :game_object_with_guid, buddy_guid: buddy_guid}, _provided) do
-    buddy_guid
-  end
-
   defp resolve_target(_state, %ScriptStep{target_type: :provided}, provided), do: provided
 
   defp resolve_target(state, %ScriptStep{target_type: target_type}, _provided)
@@ -1963,6 +1959,23 @@ defmodule ThistleTea.Game.Core.AI.Script do
     Map.get(targets, {:creature_from_instance_data, index, param2})
   end
 
+  defp resolve_target(
+         _state,
+         %ScriptStep{
+           target_type: :game_object_with_guid,
+           target_param1: db_guid,
+           target_param2: param2,
+           buddy_guid: buddy_guid
+         },
+         _provided,
+         %Context{script_targets: targets}
+       ) do
+    case Map.fetch(targets, {:game_object_with_guid, db_guid, param2}) do
+      {:ok, guid} when is_integer(guid) -> guid
+      _unresolved -> buddy_guid
+    end
+  end
+
   defp resolve_target(state, %ScriptStep{} = step, provided, %Context{}) do
     resolve_target(state, step, provided)
   end
@@ -2070,6 +2083,9 @@ defmodule ThistleTea.Game.Core.AI.Script do
 
   defp target_request(%ScriptStep{target_type: :creature_with_guid, target_param1: db_guid, target_param2: param2})
        when is_integer(db_guid) and db_guid > 0, do: [{:creature_with_guid, db_guid, param2}]
+
+  defp target_request(%ScriptStep{target_type: :game_object_with_guid, target_param1: db_guid, target_param2: param2})
+       when is_integer(db_guid) and db_guid > 0, do: [{:game_object_with_guid, db_guid, param2}]
 
   defp target_request(%ScriptStep{
          target_type: :creature_from_instance_data,
