@@ -1,5 +1,9 @@
 defmodule ThistleTea.Game.Core.Creature.CreatureMovement do
-  @moduledoc "Derives creature habitat capabilities and idle flight paths from template and ownership state."
+  @moduledoc """
+  Derives creature habitat capabilities and idle flight paths from template,
+  ownership, and script flight state. A script that sets a creature flying or
+  grounded overrides its template until it respawns.
+  """
 
   import Bitwise, only: [&&&: 2, |||: 2, bnot: 1]
 
@@ -24,6 +28,8 @@ defmodule ThistleTea.Game.Core.Creature.CreatureMovement do
   def random?(_entity, _blackboard), do: false
 
   def can_fly?(%{internal: %Internal{pet: %Pet{kind: kind}}}) when kind in [:hunter, :summon], do: false
+
+  def can_fly?(%{internal: %Internal{creature: %Creature{script_flight: flight}}}) when is_boolean(flight), do: flight
 
   def can_fly?(%{internal: %Internal{creature: %Creature{inhabit_type: inhabit_type}}}) when is_integer(inhabit_type),
     do: (inhabit_type &&& @inhabit_air) != 0

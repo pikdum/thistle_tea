@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Condition
+  alias ThistleTea.Game.Core.Creature.CreatureMovement
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.GameObject, as: GameObjectComponent
@@ -476,6 +477,22 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
 
       refute mob.internal.running
       refute Blackboard.run_mode?(blackboard)
+    end
+
+    test "set_fly takes a creature into the air and sets it down until it respawns", %{mob: mob} do
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [%ScriptStep{command: :set_fly, datalong: 1}], nil, 1_000)
+
+      assert CreatureMovement.flying?(mob)
+      assert Bitwise.band(mob.movement_block.movement_flags, 0x01000000) != 0
+
+      {grounded, _blackboard} = Script.run(mob, blackboard, [%ScriptStep{command: :set_fly, datalong: 0}], nil, 1_000)
+      refute CreatureMovement.flying?(grounded)
+      assert Bitwise.band(grounded.movement_block.movement_flags, 0x01000000) == 0
+
+      flyer = put_in(grounded.internal.creature.inhabit_type, 4)
+      refute CreatureMovement.flying?(flyer)
+      assert CreatureMovement.flying?(Mob.respawn(flyer))
+      refute CreatureMovement.flying?(Mob.respawn(mob))
     end
 
     test "steps with a failing condition are skipped", %{mob: mob} do

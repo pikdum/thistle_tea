@@ -11,7 +11,7 @@ This inventory covers the VMangos data in `db/vmangos.sqlite` as of August 8,
 - Implemented direct rows: 2,351.
 - Blocked direct rows: 4 across three quests.
 - Combined quest, generic, and movement data: 7,142 rows.
-- Commands with no numeric runtime mapping in that combined set: 111 rows.
+- Commands with no numeric runtime mapping in that combined set: 104 rows.
 
 The direct-row number describes command availability, not a claim that every
 quest is end-to-end complete. A quest can enter generic or waypoint scripts
@@ -22,8 +22,9 @@ that use a partial target selector or an unsupported secondary command.
 - Presentation: talk, emote, sound, stand state, sheath state, facing, morph by
   display ID, mount, custom game-object animation, and game-object state.
 - Movement and escort control: point movement, idle/random/waypoint/home
-  movement modes, run/walk, flee, home position, waypoint routes, same-world
-  server-controlled creature teleports, and map-event escort lifecycle.
+  movement modes, run/walk, flight, flee, home position, waypoint routes,
+  same-world server-controlled creature teleports, and map-event escort
+  lifecycle.
 - Combat and unit state: attack start, combat stop, cast interruption, aura
   add/remove, spell casts, temporary faction, typed flag changes, melee and
   combat-movement capabilities, phase changes, and invincibility health floors.
@@ -65,7 +66,6 @@ The combined quest/generic/movement data contains these unmapped commands:
 | 59 react state | 8 | Canonical aggressive/defensive/passive AI state in behavior context. |
 | 78 join creature group | 8 | Runtime creature formations and ownership. |
 | 75 add threat | 7 | Remote semantic threat delivery to the target owner. |
-| 77 set fly | 7 | Flight movement capability and spline flag projection. |
 | 79 leave creature group | 5 | Runtime creature formations and ownership. |
 | 92 start script on zone | 5 | Zone membership index and player/pet fanout. |
 | 55 creature spells | 4 | Unified preloaded spell cache and runtime list replacement. |

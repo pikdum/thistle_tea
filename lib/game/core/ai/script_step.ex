@@ -289,6 +289,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   defp command(73), do: :combat_stop
   defp command(74), do: :add_aura
   defp command(76), do: :summon_object
+  defp command(77), do: :set_fly
   defp command(78), do: :join_creature_group
   defp command(79), do: :leave_creature_group
   defp command(80), do: :set_game_object_state

@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
   queries. `World.Loader.Mob.Builder` builds it from VMangos `creature` rows.
   A spawn that is dead by default spawns and respawns as a corpse whose death
   is already settled, so it drops no loot and schedules no respawn; reviving
-  it respawns it alive in place.
+  it respawns it alive in place. A respawn hands flight back to the template.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -143,6 +143,7 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
         movement_options: nil,
         behavior_tree: nil,
         broadcast_update?: false,
+        creature: grounded(internal.creature),
         spawn: %{spawn_state | respawn_ref: nil, respawn_pending?: false, event_data: nil},
         loot: %{loot | session: nil, pockets: nil, skinned?: false, corpse_removed?: false, corpse_token: nil}
     }
@@ -166,6 +167,9 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
 
   defp rest(%Unit{} = unit, true), do: %{unit | health: 0}
   defp rest(%Unit{} = unit, false), do: unit
+
+  defp grounded(%Creature{} = creature), do: %{creature | script_flight: nil}
+  defp grounded(creature), do: creature
 
   defp respawn_unit(%Spawn{unit: %Unit{} = unit}, _current_unit), do: unit
 

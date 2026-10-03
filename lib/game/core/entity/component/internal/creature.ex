@@ -5,7 +5,9 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.Creature do
   flags, elite rank), static combat defaults, the type flags driving visibility rules, the
   regeneration flags, the spell list driving combat casts, the abilities offered to
   whoever controls it, the addon auras applied at spawn, the aggro/assist/leash
-  ranges, and the civilian's outstanding guard call.
+  ranges, the civilian's outstanding guard call, and whether a script has
+  taken it into the air or set it down (`script_flight`, nil while its
+  template decides).
   """
   defstruct [
     :db_guid,
@@ -37,6 +39,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.Creature do
     :script_faction_flags,
     :reaction_state,
     :guard_call,
+    :script_flight,
     stationary?: false,
     critter?: false,
     civilian?: false,

@@ -50,6 +50,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
   alias ThistleTea.Game.Core.Condition.EntityContext
   alias ThistleTea.Game.Core.Creature.CreatureEntry
   alias ThistleTea.Game.Core.Creature.CreatureGroup.Member
+  alias ThistleTea.Game.Core.Creature.CreatureMovement
   alias ThistleTea.Game.Core.Creature.CreatureReaction
   alias ThistleTea.Game.Core.Creature.ScriptEquipment
   alias ThistleTea.Game.Core.Creature.TemporaryFaction
@@ -1415,6 +1416,17 @@ defmodule ThistleTea.Game.Core.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :morph} = step, _target_guid, _now) do
     {morph(state, morph_display_id(state, step)), blackboard}
+  end
+
+  defp execute(
+         %Mob{internal: %{creature: %Creature{} = creature} = internal} = state,
+         blackboard,
+         %ScriptStep{command: :set_fly, datalong: enabled},
+         _target_guid,
+         _now
+       ) do
+    creature = %{creature | script_flight: enabled != 0}
+    {CreatureMovement.sync(%{state | internal: %{internal | creature: creature}}), blackboard}
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :set_run, datalong: datalong}, _target_guid, _now) do
