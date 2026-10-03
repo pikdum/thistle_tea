@@ -56,6 +56,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.Triage
   alias ThistleTea.Game.Core.AI.CreatureScript.TwiggyFlathead
   alias ThistleTea.Game.Core.AI.CreatureScript.TwilightCorrupter
+  alias ThistleTea.Game.Core.AI.CreatureScript.WesternPlaguelands
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
 
@@ -96,7 +97,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     TapokeSlimJahn,
     Triage,
     TwiggyFlathead,
-    TwilightCorrupter
+    TwilightCorrupter,
+    WesternPlaguelands
   ]
   @timed_script 1
   @restore_on_respawn 0x01
