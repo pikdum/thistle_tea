@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.World.System.ElementalInvasionTest do
     test "closes its rifts, leaves once looted, and the last one rests the invasion", ctx do
       %{server: server, events: events, variables: variables} = ctx
       for _hour <- 1..4, do: send(server, :hour)
+      :sys.get_state(server)
 
       fall(server, variables, 30_008)
       assert GameEvent.get_events(events) == [13, 69, 70, 71, 72, 73, 74, 75]
@@ -79,8 +80,8 @@ defmodule ThistleTea.Game.World.System.ElementalInvasionTest do
        variables: variables,
        game_events: events,
        hour_ms: to_timeout(hour: 1),
-       looting_ms: 20,
-       rest_ms: fn -> 40 end}
+       looting_ms: 100,
+       rest_ms: fn -> 150 end}
     )
 
     %{server: server, events: events, variables: variables}
