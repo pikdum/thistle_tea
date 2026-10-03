@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.DashelStonefist
   alias ThistleTea.Game.Core.AI.CreatureScript.FelwoodOoze
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
+  alias ThistleTea.Game.Core.AI.CreatureScript.Piznik
   alias ThistleTea.Game.Core.AI.CreatureScript.RabidThistleBear
   alias ThistleTea.Game.Core.AI.CreatureScript.SicklyCritter
   alias ThistleTea.Game.Core.AI.CreatureScript.TapokeSlimJahn
@@ -52,6 +53,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     DashelStonefist,
     FelwoodOoze,
     LazyPeon,
+    Piznik,
     RabidThistleBear,
     SicklyCritter,
     TapokeSlimJahn,
