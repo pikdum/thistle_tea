@@ -344,6 +344,10 @@ defmodule ThistleTea.Game.Core.Effects do
     %Effects.DropThreat{target_guid: target_guid}
   end
 
+  def modify_threat_percent(target_guid, percent) when is_integer(target_guid) and is_number(percent) do
+    %Effects.ModifyThreatPercent{target_guid: target_guid, percent: percent}
+  end
+
   def temporary_threat(target_guid, incarnation_id, amount)
       when is_integer(target_guid) and is_integer(incarnation_id) and is_number(amount) do
     %Effects.TemporaryThreat{target_guid: target_guid, incarnation_id: incarnation_id, amount: amount}

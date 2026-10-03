@@ -332,6 +332,19 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
     {state, events ++ stuns}
   end
 
+  defp apply_class_dummy(
+         state,
+         %CastContext{caster_guid: caster} = context,
+         _spell,
+         _effect,
+         {:arcane_vacuum, summon},
+         _now
+       )
+       when is_integer(caster) do
+    summon = Effects.trigger_spell(caster, context.caster_level || 1, state.object.guid, summon, resolve_targets?: true)
+    {state, [Effects.modify_threat_percent(caster, -100), summon]}
+  end
+
   defp apply_class_dummy(state, _context, _spell, _effect, _unscripted, _now), do: {state, []}
 
   defp pet_aura_events(%Character{} = state, %CastContext{} = context, %Spell{id: spell_id} = spell) do

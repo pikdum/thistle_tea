@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Core.Aura.Script do
   core spell-id branches because the spell data cannot express it.
   """
 
+  alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Aura.ProcChance
   alias ThistleTea.Game.Core.Aura.StackingProc
@@ -14,6 +15,7 @@ defmodule ThistleTea.Game.Core.Aura.Script do
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.Core.OutdoorPvp.Silithyst
+  alias ThistleTea.Game.Core.Power.Resources
   alias ThistleTea.Game.Core.Profession.Engineering
   alias ThistleTea.Game.Core.Profession.Engineering.DeathRay
   alias ThistleTea.Game.Core.Spell
@@ -32,6 +34,10 @@ defmodule ThistleTea.Game.Core.Aura.Script do
   @melee_radius 5.0
   @whirlwind_radius 8.0
   @death_casts %{23_183 => 23_182, 24_906 => 24_904, 25_042 => 25_040}
+  @mark_of_kazzak 21_056
+  @mark_of_kazzak_explosion 21_058
+  @twisted_reflection 21_063
+  @twisted_reflection_heal 21_064
 
   def instant_application(entity, context, %Spell{id: 13_139}), do: Engineering.net_backfire(entity, context)
   def instant_application(_entity, _context, _spell), do: nil
@@ -69,6 +75,26 @@ defmodule ThistleTea.Game.Core.Aura.Script do
   end
 
   def periodic_trigger_events(_entity, _holder), do: []
+
+  def periodic_leech_events(
+        %{object: %{guid: guid}, unit: %{health: health, power_type: power} = unit} = entity,
+        %Holder{spell: %Spell{id: @mark_of_kazzak}} = holder,
+        %Aura{misc_value: power}
+      )
+      when is_integer(health) and health > 0 do
+    if Resources.current_power(entity, power) == 0 do
+      [
+        Effects.trigger_spell(guid, unit.level || 1, guid, @mark_of_kazzak_explosion,
+          triggered_by_spell_id: @mark_of_kazzak
+        ),
+        Effects.remove_aura(holder.caster_guid, guid, @mark_of_kazzak)
+      ]
+    else
+      []
+    end
+  end
+
+  def periodic_leech_events(_entity, _holder, _aura), do: []
 
   @ignite_pct %{11_119 => 4, 11_120 => 8, 12_846 => 12, 12_847 => 16, 12_848 => 20}
   @ignite_dot 12_654
@@ -196,11 +222,27 @@ defmodule ThistleTea.Game.Core.Aura.Script do
     end
   end
 
+  def incoming_melee(
+        entity,
+        %Holder{spell: %Spell{id: @twisted_reflection}} = holder,
+        owner_guid,
+        attacker_guid,
+        context
+      )
+      when is_integer(owner_guid) and is_integer(attacker_guid) do
+    proc? =
+      Proc.eligible?(holder.spell, Map.get(context, :spell), Map.get(context, :proc_type), context) and
+        ProcChance.roll?(entity, holder.spell, :incoming, context)
+
+    if proc?, do: twisted_reflection_proc(holder, owner_guid, attacker_guid), else: {:handled, holder, []}
+  end
+
   def incoming_melee(_entity, _holder, _owner_guid, _attacker_guid, _context), do: :unhandled
 
   def incoming_spell(%Holder{spell: %Spell{} = spell} = holder, owner_guid, attacker_guid, context) do
     cond do
       spell.id in @magic_absorption -> magic_absorption_proc(holder, owner_guid, context)
+      spell.id == @twisted_reflection -> twisted_reflection_proc(holder, owner_guid, attacker_guid)
       Priest.vampiric_embrace?(spell) -> vampiric_embrace_proc(holder, attacker_guid, context)
       Paladin.eye_for_an_eye?(spell) -> eye_for_an_eye_proc(holder, owner_guid, attacker_guid, context)
       true -> :unhandled
@@ -208,6 +250,18 @@ defmodule ThistleTea.Game.Core.Aura.Script do
   end
 
   def incoming_spell(_holder, _owner_guid, _attacker_guid, _context), do: :unhandled
+
+  defp twisted_reflection_proc(%Holder{} = holder, owner_guid, attacker_guid)
+       when is_integer(owner_guid) and is_integer(attacker_guid) do
+    event =
+      Effects.trigger_spell(owner_guid, holder.caster_level || 1, attacker_guid, @twisted_reflection_heal,
+        triggered_by_spell_id: @twisted_reflection
+      )
+
+    {:handled, holder, [event]}
+  end
+
+  defp twisted_reflection_proc(holder, _owner_guid, _attacker_guid), do: {:handled, holder, []}
 
   defp magic_absorption_proc(%Holder{} = holder, owner_guid, context) do
     restored = trunc((Map.get(context, :owner_max_mana) || 0) * dummy_amount(holder, 0) / 100)

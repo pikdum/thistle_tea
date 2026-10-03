@@ -738,6 +738,10 @@ defmodule ThistleTea.Game.World.Entity.Mob do
     {:noreply, state}
   end
 
+  def handle_cast({:modify_threat_percent, source_guid, percent}, %Mob{} = state) do
+    {:noreply, state |> Threat.modify_percent(source_guid, percent) |> wake_ai_tick()}
+  end
+
   def handle_cast({:feign_death_target_lost, source_guid}, %Mob{} = state) do
     state = FeignDeath.target_lost(state, source_guid, Time.now())
     {:noreply, state, {:continue, :maybe_broadcast}}

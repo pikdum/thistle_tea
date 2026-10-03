@@ -51,6 +51,7 @@ defmodule ThistleTea.Game.Core.Effects.CombatTypes do
     {:ThreatRefLost, [:target_guid], []},
     {:TemporaryThreat, [:target_guid, :incarnation_id, :amount], []},
     {:DropThreat, [:target_guid], []},
+    {:ModifyThreatPercent, [:target_guid, :percent], []},
     {:DropNearbyThreat, [], []},
     {:FeignDeathApplied, [], []},
     {:FeignDeathAppliedResolved, [:target_guids], []},

@@ -384,6 +384,7 @@ defmodule ThistleTea.Game.Core.Aura.Periodic do
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_mana_leech, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
     {entity, events} = PowerLeech.periodic(entity, cast_context(holder), holder.spell, aura)
+    events = events ++ Script.periodic_leech_events(entity, holder, aura)
 
     {entity, interrupted} =
       if events == [],

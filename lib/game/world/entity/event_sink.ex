@@ -86,6 +86,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink do
     Effects.DropNearbyThreatResolved,
     Effects.FeignDeathAppliedResolved,
     Effects.DropThreat,
+    Effects.ModifyThreatPercent,
     Effects.DuelDefeat,
     Effects.DuelInterrupted,
     Effects.DuelRequest,

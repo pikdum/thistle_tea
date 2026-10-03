@@ -197,6 +197,10 @@ defmodule ThistleTea.Game.World.Entity do
     dispatch_cast(entity, {:drop_threat, source_guid})
   end
 
+  def modify_threat_percent(entity, source_guid, percent) do
+    dispatch_cast(entity, {:modify_threat_percent, source_guid, percent})
+  end
+
   def feign_death_target_lost(entity, source_guid) do
     dispatch_cast(entity, {:feign_death_target_lost, source_guid})
   end

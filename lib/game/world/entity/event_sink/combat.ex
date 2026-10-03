@@ -265,6 +265,11 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Combat do
 
   def emit(entity, %Effects.DropThreat{}, _context), do: entity
 
+  def emit(%{object: %{guid: guid}} = entity, %Effects.ModifyThreatPercent{} = effect, _context) do
+    Entity.modify_threat_percent(effect.target_guid, guid, effect.percent)
+    entity
+  end
+
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.TemporaryThreat{} = effect, _context) do
     Entity.temporary_threat(effect.target_guid, guid, effect.incarnation_id, effect.amount)
     entity
