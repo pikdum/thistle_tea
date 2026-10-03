@@ -18,6 +18,8 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSummons do
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Pathfinding
 
+  require Logger
+
   defmodule Entry do
     @moduledoc false
     @enforce_keys [:guid, :pid]
@@ -123,7 +125,8 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSummons do
         track_channel(game_object, context)
         {:ok, game_object, pid}
 
-      _failure ->
+      failure ->
+        Logger.warning("Summoned object #{game_object.object.entry} failed to start: #{inspect(failure, limit: 5)}")
         Enum.each(game_object.internal.summon.linked_guids, &World.stop_entity/1)
         cancel_cooldown(game_object.internal.summon.cooldown_event, context)
         :error

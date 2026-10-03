@@ -48,6 +48,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   alias ThistleTea.Game.World.Entity.GameObject.Chest
   alias ThistleTea.Game.World.Entity.GameObject.ElementalRift
   alias ThistleTea.Game.World.Entity.GameObject.Fishing
+  alias ThistleTea.Game.World.Entity.GameObject.GhostMagnet
   alias ThistleTea.Game.World.Entity.GameObject.Goober, as: GooberServer
   alias ThistleTea.Game.World.Entity.GameObject.NecroticCamp
   alias ThistleTea.Game.World.Entity.GameObject.OmenLauncher
@@ -97,6 +98,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
       |> arm_trap()
       |> CheerSpeaker.start()
       |> ElementalRift.start()
+      |> GhostMagnet.start()
       |> NecroticCamp.start()
       |> EventSink.emit_pending(Context.new(self()))
 
@@ -263,6 +265,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
     state =
       state
       |> ElementalRift.summon_event(event)
+      |> GhostMagnet.summon_event(event)
       |> OmenLauncher.summon_event(event)
       |> NecroticCamp.summon_event(event)
       |> EventSink.emit_pending(Context.new(self()))
@@ -587,6 +590,14 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
 
   def handle_info(:rift_upkeep, %GameObject{} = state) do
     {:noreply, state |> ElementalRift.upkeep() |> EventSink.emit_pending(Context.new(self()))}
+  end
+
+  def handle_info(:ghost_magnet_call, %GameObject{} = state) do
+    {:noreply, state |> GhostMagnet.call() |> EventSink.emit_pending(Context.new(self()))}
+  end
+
+  def handle_info(:ghost_magnet_replace, %GameObject{} = state) do
+    {:noreply, state |> GhostMagnet.replace() |> EventSink.emit_pending(Context.new(self()))}
   end
 
   def handle_info(:camp_raise, %GameObject{} = state) do
