@@ -11,6 +11,8 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   (`at_target?`) and come several at once: `count` is a number, or
   `{:threat_players, ratio, min, max}` to scale with the living players on
   the summoner's threat list, as C++ bosses size their adds to the raid.
+  A summon with a `scatter` radius lands on a random walkable point that far
+  around its position, as C++ scripts place adds with `GetRandomPoint`.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -40,6 +42,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
             position: nil,
             positions: [],
             at_target?: false,
+            scatter: 0.0,
             count: 1,
             condition_id: 0,
             condition: nil,
@@ -214,7 +217,8 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
       script_id: step.dataint2,
       attack_target: decode_target_type(step.dataint3),
       despawn_type: step.dataint4,
-      position: step.position
+      position: step.position,
+      scatter: step.scatter
     }
   end
 

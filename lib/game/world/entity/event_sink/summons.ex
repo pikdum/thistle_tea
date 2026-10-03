@@ -220,7 +220,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Summons do
   def emit(%{internal: %Internal{world: world}} = entity, %Effects.SummonCreature{summon: summon} = effect, _context) do
     with true <- summon_allowed?(world, summon),
          %Mob{} = mob <-
-           SummonLoader.build(summon.entry, world, summon.position,
+           SummonLoader.build(summon.entry, world, scattered_position(world, summon),
              summoner_guid: entity.object.guid,
              despawn_type: summon.despawn_type,
              despawn_delay_ms: summon.despawn_delay_ms,
@@ -515,6 +515,16 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Summons do
   end
 
   defp cast_post_spawn_spells(_entity, _summon_guid, _summon), do: :ok
+
+  defp scattered_position(world, %{position: {x, y, z, orientation}, scatter: radius} = summon)
+       when is_number(radius) and radius > 0 do
+    case Pathfinding.find_random_point_around_circle(world.map_id, {x, y, z}, radius) do
+      {px, py, pz} -> {px, py, pz, orientation}
+      _ -> summon.position
+    end
+  end
+
+  defp scattered_position(_world, summon), do: summon.position
 
   defp wild_position(entity, %Effects.SummonWild{scatter?: true, radius_yards: radius} = effect, index)
        when index > 0 and radius > 0 do

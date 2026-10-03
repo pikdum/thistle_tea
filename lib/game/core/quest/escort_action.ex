@@ -7,27 +7,32 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   `{:say_by, entry, text_id}` (spoken by the nearest creature of that entry),
   `{:emote, emote_id}`, `{:emote_by, entry, emote_id}` (played by the
   nearest creature of that entry), `{:stand, stand_state}`,
-  `{:faction, faction_id}`
-  (until respawn), `:run`, `:walk`, `{:add_aura, spell_id}`,
-  `{:remove_aura, spell_id}`, `{:remove_unit_flags, mask}` (until
-  respawn), `{:npc_flags, mask}` (sets npc flags back, as a questgiver that
-  ends its own escort does), `{:pause, duration_ms}` (stops the escort at
-  its point for that long, vmangos `SetEscortPaused`), `{:cast, spell_id}`
-  (cast on itself, triggered), `{:invincible, health_pct}` (never falls below that share of its
-  health), `{:attack, :player}` (turns on the player, given a hostile
-  faction first), `:fail` (fails the quest for the player and their group),
-  `:die` (ends the quest's map event, then kills the escortee),
-  `{:event_phase, phase}` (the escortee's EventAI phase, for a script port
-  that reacts to it), `{:summon, entry, position, opts}`, and
+  `{:faction, faction_id}` (until respawn), `:run`, `:walk`,
+  `{:add_aura, spell_id}`, `{:remove_aura, spell_id}`, `{:unit_flags, mask}`
+  and `{:remove_unit_flags, mask}` (set or cleared until respawn),
+  `{:npc_flags, mask}` (sets npc flags back, as a questgiver that ends its own
+  escort does), `{:pause, duration_ms}` (stops the escort at its point for
+  that long, vmangos `SetEscortPaused`), `{:cast, spell_id}` (cast on itself,
+  triggered; `{:cast, spell_id, triggered?: false}` casts it with its cast
+  time), `{:face, entry}` (turns to the nearest creature of that entry),
+  `{:signal, entry, event_id}` (sends that creature a script event, for a
+  script port that reacts to it), `{:invincible, health_pct}` (never falls
+  below that share of its health), `{:attack, :player}` (turns on the
+  player, given a hostile faction first), `:fail` (fails the quest for the
+  player and their group), `:die` (ends the quest's map event, then kills
+  the escortee), `{:event_phase, phase}` (the escortee's EventAI phase, for
+  a script port that reacts to it), `{:summon, entry, position, opts}`, and
   `{:after, delay_ms, action}`. `{:hold, actions}` stops the escort at its
   point until every creature the escortee summoned from then on is gone, for
   at most 400 s, then runs `actions`. It must not be delayed, and it must
   come before the summons it waits for and before any action another
-  creature performs (`say_by`, `emote_by`), which holds back the escortee's
-  remaining steps until that creature answers. A summon despawns per
+  creature performs (`say_by`, `emote_by`, `signal`), which holds back the
+  escortee's remaining steps until that creature answers. A summon despawns per
   `despawn: {type, delay_ms}` (vmangos `TempSummonType` names), attacks the
   escortee, the player, or nothing per `attack:`, and runs the actions in
-  `script:`.
+  `script:`. It comes `count:` at once, each on a random walkable point within
+  `scatter:` yards of its position, which may be `:player` for the player's
+  feet.
 
   The phase says where the steps run: `:accept` and `:arrival` steps are
   given the player as their target, `:point` steps reach the player through
@@ -42,7 +47,7 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   @set_flags 1
   @remove_flags 2
   @restore_on_respawn 1
-  @speaker_radius 30
+  @speaker_radius 150
   @percent 1
   @attack_none -1
   @attack_provided 0
@@ -122,6 +127,10 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   def steps({:add_aura, spell_id}, _quest_id, _phase), do: [%ScriptStep{command: :add_aura, datalong: spell_id}]
   def steps({:remove_aura, spell_id}, _quest_id, _phase), do: [%ScriptStep{command: :remove_aura, datalong: spell_id}]
 
+  def steps({:unit_flags, mask}, _quest_id, _phase) do
+    [%ScriptStep{command: :modify_flags, datalong: @unit_flags_field, datalong2: mask, datalong3: @set_flags}]
+  end
+
   def steps({:remove_unit_flags, mask}, _quest_id, _phase) do
     [%ScriptStep{command: :modify_flags, datalong: @unit_flags_field, datalong2: mask, datalong3: @remove_flags}]
   end
@@ -132,8 +141,35 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   def steps({:pause, duration_ms}, _quest_id, _phase),
     do: [%ScriptStep{command: :hold_waypoints, datalong: duration_ms, datalong2: @signal_hold}]
 
-  def steps({:cast, spell_id}, _quest_id, _phase),
-    do: [%ScriptStep{command: :cast_spell, datalong: spell_id, datalong2: @triggered, target_self?: true}]
+  def steps({:cast, spell_id}, quest_id, phase), do: steps({:cast, spell_id, []}, quest_id, phase)
+
+  def steps({:cast, spell_id, opts}, _quest_id, _phase) do
+    flags = if Keyword.get(opts, :triggered?, true), do: @triggered, else: 0
+    [%ScriptStep{command: :cast_spell, datalong: spell_id, datalong2: flags, target_self?: true}]
+  end
+
+  def steps({:face, entry}, _quest_id, _phase),
+    do: [
+      %ScriptStep{
+        command: :turn_to,
+        target_type: :nearest_creature_with_entry,
+        target_param1: entry,
+        target_param2: @speaker_radius
+      }
+    ]
+
+  def steps({:signal, entry, event_id}, _quest_id, _phase) do
+    [
+      %ScriptStep{
+        command: :send_script_event,
+        datalong: event_id,
+        target_type: :nearest_creature_with_entry,
+        target_param1: entry,
+        target_param2: @speaker_radius,
+        swap_final?: true
+      }
+    ]
+  end
 
   def steps({:invincible, health_pct}, _quest_id, _phase),
     do: [%ScriptStep{command: :invincibility, datalong: health_pct, datalong2: @percent}]
@@ -163,23 +199,29 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   def steps(:fail, quest_id, phase),
     do: [player_target(%ScriptStep{command: :fail_quest, datalong: quest_id}, quest_id, phase)]
 
-  def steps({:summon, entry, {_x, _y, _z, _o} = position, opts}, quest_id, phase) do
+  def steps({:summon, entry, :player, opts}, quest_id, phase),
+    do: [player_target(%{summon(entry, nil, opts, quest_id, phase) | at_target?: true}, quest_id, phase)]
+
+  def steps({:summon, entry, {_x, _y, _z, _o} = position, opts}, quest_id, phase),
+    do: [summon(entry, position, opts, quest_id, phase)]
+
+  defp summon(entry, position, opts, quest_id, phase) do
     {despawn_type, despawn_ms} = Keyword.get(opts, :despawn, {:timed_or_dead, 25_000})
     script = Enum.flat_map(Keyword.get(opts, :script, []), &steps(&1, quest_id, :summon))
 
-    [
-      %ScriptStep{
-        command: :summon_creature,
-        datalong: entry,
-        datalong2: despawn_ms,
-        dataint2: if(script == [], do: 0, else: @summon_script),
-        dataint3: attack_type(Keyword.get(opts, :attack), phase),
-        dataint4: Map.fetch!(@despawn_types, despawn_type),
-        target_param1: quest_id,
-        position: position,
-        sub_scripts: if(script == [], do: %{}, else: %{@summon_script => script})
-      }
-    ]
+    %ScriptStep{
+      command: :summon_creature,
+      datalong: entry,
+      datalong2: despawn_ms,
+      dataint2: if(script == [], do: 0, else: @summon_script),
+      dataint3: attack_type(Keyword.get(opts, :attack), phase),
+      dataint4: Map.fetch!(@despawn_types, despawn_type),
+      target_param1: quest_id,
+      position: position,
+      count: Keyword.get(opts, :count, 1),
+      scatter: Keyword.get(opts, :scatter, 0.0),
+      sub_scripts: if(script == [], do: %{}, else: %{@summon_script => script})
+    }
   end
 
   defp attack_type(nil, _phase), do: @attack_none

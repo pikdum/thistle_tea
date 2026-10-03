@@ -4,13 +4,18 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
   by quest id. Willix the Importer, the one inside a dungeon, rests at the
   mouth of Razorfen Kraul for ten minutes as the quest's ender rather than
   waiting there for good. Keeper Remulos takes Waking Legends down to the
-  lake on his own path, where Malfurion appears for their talk. Each keeps the script's accept actions,
-  waypoint actions, credit point, and summons; aggro chatter and
-  dead-summon reactions are left out. Grark Lorkrub holds at each ambush
+  lake on his own path, where Malfurion appears for their talk, and leads
+  The Nightmare Manifests to his shrine, where he summons Eranikus
+  (`Core.AI.CreatureScript.Eranikus`, which credits the quest) and holds off
+  ten waves of Nightmare Phantasms that alternate between the shrine's
+  approaches and the player instead of rolling where to come from. Each keeps
+  the script's accept actions, waypoint actions, credit point, and summons;
+  aggro chatter and dead-summon reactions are left out. Grark Lorkrub holds at each ambush
   until every summon is gone rather than counting kills, and his Searscale
   drakes appear where they strike instead of waiting there two points early.
   """
 
+  alias ThistleTea.Game.Core.AI.CreatureScript.Eranikus
   alias ThistleTea.Game.Core.Quest.QuestEscort
 
   @immune_to_npc 0x200
@@ -18,6 +23,33 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
   @willix_rest_ms 600_000
   @malfurion 15_362
   @malfurion_arrival {7734.575684, -2312.118652, 452.679504, 0.068726}
+  @pvp 0x1000
+  @conjure_dream_rift 25_813
+  @eranikus 15_491
+  @eranikus_rift {7881.72, -2651.23, 493.29, 0.40}
+  @nightmare_phantasm 15_629
+  @nightmare_hold_ms 1_800_000
+  @shrine_shades [
+    {7832.78, -2604.57, 489.29, 0.0},
+    {7826.68, -2538.46, 489.30, 0.0},
+    {7811.48, -2573.20, 488.49, 0.0}
+  ]
+  @shrine_approaches [
+    {7888.32, -2566.25, 487.02, 0.0},
+    {7946.12, -2577.10, 489.97, 0.0},
+    {7963.00, -2492.03, 487.84, 0.0}
+  ]
+  @nightmare_waves [
+    {5_000, 0, 3},
+    {30_000, :player, 4},
+    {52_000, 1, 3},
+    {80_000, :player, 3},
+    {104_000, 2, 4},
+    {131_000, :player, 3},
+    {152_000, 0, 4},
+    {181_000, :player, 4},
+    {207_000, 1, 3}
+  ]
 
   @defias_raider_positions [
     {-11_450.836, 1_569.755, 54.267, 4.230},
@@ -216,6 +248,7 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
         ],
         points: %{4 => waking_legends()}
       },
+      nightmare_manifests(),
       %QuestEscort{
         quest_id: 665,
         entry: 2768,
@@ -564,6 +597,65 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
       {:after, 116_000, {:say, 10_877}},
       {:after, 125_000, {:say, 10_879}}
     ]
+  end
+
+  defp nightmare_manifests do
+    %QuestEscort{
+      quest_id: 8736,
+      entry: 11_832,
+      credit_point: nil,
+      max_distance: 0,
+      points: %{
+        0 => [{:say, 11_282}, {:unit_flags, @pvp}, :walk, {:event_phase, Eranikus.nightmare_phase()}],
+        1 => [{:faction, 1254}, {:say, 11_283}],
+        13 => [{:say, 11_290}],
+        14 => [{:say, 11_291}],
+        15 => [{:say, 11_292}],
+        16 => [
+          {:cast, @conjure_dream_rift, triggered?: false},
+          {:after, 10_000, {:summon, @eranikus, @eranikus_rift, despawn: {:timed_or_dead, 600_000}}}
+        ],
+        17 => [{:say_by, @eranikus, 11_030}],
+        18 => [{:say, 11_293}],
+        19 => [{:say_by, @eranikus, 11_296}],
+        20 => [{:say_by, @eranikus, 11_294}],
+        21 => [{:say, 11_295}],
+        22 => [{:say_by, @eranikus, 11_297}],
+        23 => [{:say_by, @eranikus, 11_298}],
+        24 => [{:say, 11_300}, {:signal, @eranikus, Eranikus.fly_up()}],
+        28 => [{:say, 11_301}, {:face, @eranikus}],
+        29 => [{:say_by, @eranikus, 11_299}],
+        30 => [{:say, 11_302}, {:face, @eranikus}, {:pause, 5_000}] ++ nightmare_waves(),
+        31 => [{:pause, @nightmare_hold_ms}]
+      }
+    }
+  end
+
+  defp nightmare_waves do
+    shrine =
+      Enum.map(
+        @shrine_shades,
+        &{:after, 5_000, {:summon, @nightmare_phantasm, &1, attack: :escort, despawn: {:dead, 0}}}
+      )
+
+    waves =
+      Enum.map(@nightmare_waves, fn
+        {delay_ms, :player, count} ->
+          {:after, delay_ms, phantasms(:player, count, 20.0, 30_000)}
+
+        {delay_ms, approach, count} ->
+          {:after, delay_ms, phantasms(Enum.at(@shrine_approaches, approach), count, 10.0, 50_000)}
+      end)
+
+    {last_wave_ms, _where, _count} = List.last(@nightmare_waves)
+
+    [{:after, 5_000, {:say_by, @eranikus, 11_304}}] ++
+      shrine ++ waves ++ [{:after, last_wave_ms, {:signal, @eranikus, Eranikus.descend()}}]
+  end
+
+  defp phantasms(position, count, scatter, despawn_ms) do
+    {:summon, @nightmare_phantasm, position, attack: :escort, despawn: {:timed_out_of_combat, despawn_ms}, count: count,
+     scatter: scatter}
   end
 
   defp agamar, do: [attack: :escort, despawn: {:timed_out_of_combat, 25_000}]

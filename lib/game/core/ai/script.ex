@@ -9,11 +9,13 @@ defmodule ThistleTea.Game.Core.AI.Script do
   generic scripts for start-script steps, and mutating the blackboard phase,
   gait, flee state, or waypoint hold (`hold_waypoints` holds the path until the
   summons spawned since are gone, or with `datalong2` 1 until
-  `release_waypoints` lets it go) — steps with a failing condition are skipped, and
-  unsupported commands are logged and skipped. Initial target swaps move
-  execution to the supplied owner before selection; final swaps move it to the
-  selected owner. Conditions and commands then use the final source and target.
-  Triggered casts use the trigger-spell pipeline; normal casts use the caster's
+  `release_waypoints` lets it go) — steps with a failing condition are skipped,
+  and unsupported commands are logged and skipped. The code-built
+  `clear_auras` sheds the auras an evade would, for a script that ends a fight
+  without one. Initial target swaps move execution to the supplied owner
+  before selection; final swaps move it to the selected owner. Conditions and
+  commands then use the final source and target. Triggered casts use the
+  trigger-spell pipeline; normal casts use the caster's
   mob or player casting machinery, and a game object casts every spell at once
   as vmangos objects do. Failed local target selection, conditions,
   and normal mob casts honor the abort flag. World-event commands and commands
@@ -1283,6 +1285,11 @@ defmodule ThistleTea.Game.Core.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :remove_aura}, _target_guid, _now) do
     {state, blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :clear_auras}, _target_guid, now) do
+    {state, events} = AuraCore.remove_on_evade(state, now)
+    {Effects.enqueue(state, events), blackboard}
   end
 
   defp execute(%Mob{internal: internal} = state, blackboard, %ScriptStep{command: :set_concealed} = step, _target, _now) do

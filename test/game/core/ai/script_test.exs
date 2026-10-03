@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
   alias ThistleTea.Game.Core.AI.BT.WaypointHold
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Creature.CreatureMovement
@@ -1138,6 +1139,18 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
 
       guid = mob.object.guid
       assert [%Effects.TriggerSpell{source_guid: ^guid, target_guid: ^guid, spell_id: 11_048}] = mob.internal.events
+    end
+
+    test "clear_auras sheds what an evade would, keeping players' timed buffs", %{mob: mob} do
+      player = Guid.from_low_guid(:player, 9)
+      own = %Holder{spell: %Spell{id: 10}, caster_guid: mob.object.guid, expires_at: -1, negative?: false}
+      dot = %Holder{spell: %Spell{id: 11}, caster_guid: player, expires_at: 60_000, negative?: true}
+      buff = %Holder{spell: %Spell{id: 12}, caster_guid: player, expires_at: 60_000, negative?: false}
+      mob = %{mob | unit: %{mob.unit | auras: [own, dot, buff]}}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [%ScriptStep{command: :clear_auras}], nil, 1_000)
+
+      assert Enum.map(mob.unit.auras, & &1.spell.id) == [12]
     end
 
     test "respawn_creature enqueues an owner lifecycle request", %{mob: mob} do

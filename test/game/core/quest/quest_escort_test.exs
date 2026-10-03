@@ -170,6 +170,55 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscortTest do
                escort |> QuestEscort.point_steps(9, 0) |> Map.fetch!(4)
     end
 
+    test "cast a spell with its cast time, flag the escortee, and turn to and signal another creature",
+         %{escort: escort} do
+      escort = %{
+        escort
+        | points: %{
+            4 => [{:cast, 25_813, triggered?: false}, {:unit_flags, 0x1000}, {:face, 15_491}, {:signal, 15_491, 2}]
+          }
+      }
+
+      assert [cast, flags, face, signal] = escort |> QuestEscort.point_steps(9, 0) |> Map.fetch!(4)
+      assert %ScriptStep{command: :cast_spell, datalong: 25_813, datalong2: 0, target_self?: true} = cast
+      assert %ScriptStep{command: :modify_flags, datalong: 46, datalong2: 0x1000, datalong3: 1} = flags
+
+      assert %ScriptStep{command: :turn_to, target_type: :nearest_creature_with_entry, target_param1: 15_491} = face
+      refute face.swap_final?
+
+      assert %ScriptStep{
+               command: :send_script_event,
+               datalong: 2,
+               target_type: :nearest_creature_with_entry,
+               target_param1: 15_491,
+               swap_final?: true
+             } = signal
+    end
+
+    test "summon several at once, scattered around a point or the player", %{escort: escort} do
+      escort = %{
+        escort
+        | points: %{
+            4 => [
+              {:summon, 77, {1.0, 2.0, 3.0, 0.5}, count: 3, scatter: 10.0},
+              {:summon, 77, :player, attack: :escort, count: 4, scatter: 20.0}
+            ]
+          }
+      }
+
+      assert [around_point, around_player] = escort |> QuestEscort.point_steps(9, 0) |> Map.fetch!(4)
+      assert %ScriptStep{count: 3, scatter: 10.0, at_target?: false, position: {1.0, 2.0, 3.0, 0.5}} = around_point
+
+      assert %ScriptStep{
+               count: 4,
+               scatter: 20.0,
+               at_target?: true,
+               dataint3: 8,
+               target_type: :map_event_target,
+               target_param1: 4_242
+             } = around_player
+    end
+
     test "credit at the end of a scene", %{escort: escort} do
       assert [_say, %ScriptStep{command: :quest_explored, delay_ms: 23_000}] =
                %{escort | credit_delay_ms: 23_000} |> QuestEscort.point_steps(9, 0) |> Map.fetch!(3)
@@ -188,6 +237,9 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscortTest do
       assert %QuestEscort{entry: 4508, credit_point: 45} = Catalog.get(1144)
       assert %QuestEscort{entry: 11_832, credit_point: 9, path: [_ | _]} = Catalog.get(8447)
       assert 15_362 in Catalog.summon_entries()
+      assert %QuestEscort{entry: 11_832, credit_point: nil, max_distance: 0, path: nil} = Catalog.get(8736)
+      assert 15_491 in Catalog.summon_entries()
+      assert 15_629 in Catalog.summon_entries()
       assert Catalog.get(1) == nil
       assert 2149 in Catalog.summon_entries()
 
@@ -197,6 +249,24 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscortTest do
         assert is_nil(escort.credit_point) or
                  Map.has_key?(QuestEscort.point_steps(escort, 1_000, 0), escort.credit_point)
       end
+    end
+
+    test "The Nightmare Manifests summons Eranikus, holds off ten phantasm waves, then brings him down" do
+      points = 8736 |> Catalog.get() |> QuestEscort.point_steps(32, 0)
+
+      assert %ScriptStep{command: :summon_creature, datalong: 15_491, delay_ms: 10_000, dataint4: 1} =
+               Enum.find(points[16], &(&1.command == :summon_creature))
+
+      assert Enum.any?(points[24], &match?(%ScriptStep{command: :send_script_event, datalong: 1}, &1))
+
+      waves = Enum.filter(points[30], &(&1.command == :summon_creature))
+      assert length(waves) == 12
+      assert Enum.count(waves, & &1.at_target?) == 4
+      assert waves |> Enum.map(& &1.count) |> Enum.sum() == 34
+
+      descend = Enum.find(points[30], &(&1.command == :send_script_event))
+      assert %ScriptStep{datalong: 2, delay_ms: 207_000} = descend
+      assert Enum.all?(waves, &(&1.delay_ms <= descend.delay_ms))
     end
   end
 
