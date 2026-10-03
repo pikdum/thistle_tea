@@ -24,6 +24,14 @@ defmodule ThistleTea.Game.World.Loader.CreatureSpellListVmangosTest do
       assert fury.delay_repeat_max_ms == 35_000
       assert CreatureSpellListLoader.load([0, 0xFFFFFFFF]) == %{}
     end
+
+    test "attaches the spell scripts a successful cast runs" do
+      assert %{61_090 => %CreatureSpellList{spells: spells}} = CreatureSpellListLoader.load([61_090])
+      vacuum = Enum.find(spells, &(&1.spell_id == 21_147))
+      assert %CreatureSpell{script_id: 21_147, script: [%ScriptStep{command: :talk} = say]} = vacuum
+      assert ScriptStep.talk_text_ids(say) == [9071]
+      assert spells |> Enum.reject(&(&1 == vacuum)) |> Enum.all?(&(&1.script == []))
+    end
   end
 
   describe "load_by_ids/2" do

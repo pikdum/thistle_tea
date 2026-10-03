@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.Spells do
   alias ThistleTea.Game.Core.AI.BT.Pet.Autocast
   alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.AI.CreatureSpellList
+  alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Combat, as: CombatCore
   alias ThistleTea.Game.Core.Combat.Hostility
@@ -327,8 +328,17 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.Spells do
       |> prepare_to_cast(spell, target_guid, context)
       |> Effects.enqueue(Effects.spell_start(state.object.guid, spell.id, spell.cast_time_ms || 0, targets))
       |> Casting.start(spell, targets, now)
+      |> run_cast_script(entry, target_guid, context)
 
     finish_or_schedule(state, spell, now)
+  end
+
+  defp run_cast_script(%Mob{internal: %Internal{casting: nil}} = state, _entry, _target_guid, _context), do: state
+  defp run_cast_script(%Mob{} = state, %CreatureSpell{script: []}, _target_guid, _context), do: state
+
+  defp run_cast_script(%Mob{} = state, %CreatureSpell{script: steps}, target_guid, %Context{} = context) do
+    {state, blackboard} = Script.run(state, state.internal.blackboard, steps, target_guid, context)
+    %{state | internal: %{state.internal | blackboard: blackboard}}
   end
 
   defp finish_or_schedule(%Mob{internal: %Internal{casting: nil}} = state, _spell, _now) do

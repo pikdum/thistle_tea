@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.SpellsTest do
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Core.AI.CreatureSpell
+  alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Combat.FactionTemplate
@@ -135,6 +136,21 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.SpellsTest do
       assert %{spell: %Spell{id: 20_793}} = state.internal.casting
       assert blackboard.spells.timers == %{0 => 3_000}
       assert Enum.any?(state.internal.events, &match?(%Effects.SpellStart{spell_id: 20_793}, &1))
+    end
+
+    test "runs the entry's spell script once the cast starts" do
+      target_guid = hostile_player(30.0)
+      spell = fireball()
+      script = [%ScriptStep{script_id: 21_147, command: :emote, datalong: 15}]
+
+      for {range, emotes?} <- [{30.0, true}, {100.0, false}] do
+        state =
+          fixture_mob(spells: [entry(spell.id, script_id: 21_147, script: script)], spellbook: %{spell.id => spell})
+          |> with_target(if range == 30.0, do: target_guid, else: hostile_player(range))
+
+        {_status, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, context(state))
+        assert Enum.any?(state.internal.events, &match?(%Effects.Emote{emote_id: 15}, &1)) == emotes?
+      end
     end
 
     test "skips casting when the target is out of range" do

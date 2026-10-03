@@ -19,6 +19,7 @@ defmodule ThistleTea.DB.Mangos.CreatureSpells do
       field(:"delayInitialMax_#{slot}", :integer)
       field(:"delayRepeatMin_#{slot}", :integer)
       field(:"delayRepeatMax_#{slot}", :integer)
+      field(:"scriptId_#{slot}", :integer)
     end
   end
 
@@ -36,7 +37,8 @@ defmodule ThistleTea.DB.Mangos.CreatureSpells do
         delay_initial_min: Map.get(row, :"delayInitialMin_#{slot}"),
         delay_initial_max: Map.get(row, :"delayInitialMax_#{slot}"),
         delay_repeat_min: Map.get(row, :"delayRepeatMin_#{slot}"),
-        delay_repeat_max: Map.get(row, :"delayRepeatMax_#{slot}")
+        delay_repeat_max: Map.get(row, :"delayRepeatMax_#{slot}"),
+        script_id: Map.get(row, :"scriptId_#{slot}")
       }
     end
   end

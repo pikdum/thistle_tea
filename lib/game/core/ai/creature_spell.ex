@@ -2,7 +2,9 @@ defmodule ThistleTea.Game.Core.AI.CreatureSpell do
   @moduledoc """
   One entry of a creature's spell list (vmangos `creature_spells` semantics):
   which spell to cast, at whom, how often, and the cast flags that shape
-  caster behavior. Delays are converted from DB seconds to milliseconds.
+  caster behavior. Delays are converted from DB seconds to milliseconds. A
+  successful cast runs the entry's `creature_spells_scripts` steps against the
+  spell target.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -15,7 +17,9 @@ defmodule ThistleTea.Game.Core.AI.CreatureSpell do
             delay_initial_min_ms: 0,
             delay_initial_max_ms: 0,
             delay_repeat_min_ms: 0,
-            delay_repeat_max_ms: 0
+            delay_repeat_max_ms: 0,
+            script_id: 0,
+            script: []
 
   @cast_flag_bits [
     {0x001, :interrupt_previous},
@@ -40,7 +44,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureSpell do
       delay_initial_min_ms: seconds_to_ms(slot.delay_initial_min),
       delay_initial_max_ms: seconds_to_ms(slot.delay_initial_max),
       delay_repeat_min_ms: seconds_to_ms(slot.delay_repeat_min),
-      delay_repeat_max_ms: seconds_to_ms(slot.delay_repeat_max)
+      delay_repeat_max_ms: seconds_to_ms(slot.delay_repeat_max),
+      script_id: Map.get(slot, :script_id) || 0
     }
   end
 
