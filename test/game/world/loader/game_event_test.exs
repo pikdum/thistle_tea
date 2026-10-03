@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.Loader.GameEventTest do
   alias ThistleTea.Game.Core.GameEvent.DragonsOfNightmare
   alias ThistleTea.Game.Core.GameEvent.ElementalInvasion
   alias ThistleTea.Game.Core.GameEvent.FireworksShow
+  alias ThistleTea.Game.Core.GameEvent.WarEffort
   alias ThistleTea.Game.World.Loader.GameEvent
 
   describe "from_rows/1" do
@@ -51,6 +52,7 @@ defmodule ThistleTea.Game.World.Loader.GameEventTest do
       assert [4, 5, 23, 24] == for(%{rule: DarkmoonFaire, id: id} <- schedule.entries, do: id)
       assert [6, 39] == for(%{rule: FireworksShow, id: id} <- schedule.entries, do: id)
       assert [66] == for(%{rule: DragonsOfNightmare, id: id} <- schedule.entries, do: id)
+      assert [84, 85, 86] == for(%{rule: WarEffort, id: id} <- schedule.entries, do: id)
 
       assert Enum.sort(ElementalInvasion.events()) ==
                for(%{rule: ElementalInvasion, id: id} <- schedule.entries, do: id)
