@@ -1642,6 +1642,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   end
 
   def handle_info(:totem_stop, %Mob{internal: %Internal{totem: %Totem{}}} = state) do
+    World.broadcast_packet(%Message.SmsgGameobjectDespawnAnim{guid: state.object.guid}, state)
     {:stop, :normal, state}
   end
 

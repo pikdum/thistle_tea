@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.World.Entity.DynamicObject do
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.Spell.PersistentArea
   alias ThistleTea.Game.Core.Time
+  alias ThistleTea.Game.Network.Message.SmsgGameobjectDespawnAnim
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AreaEffects
@@ -107,12 +108,15 @@ defmodule ThistleTea.Game.World.Entity.DynamicObject do
 
   @impl GenServer
   def terminate(_reason, %{entity: entity, farsight_owner_guid: owner_guid}) do
+    send_despawn_animation(entity)
     notify_farsight_owner(entity, owner_guid)
     World.remove_position(entity)
     Visibility.leave_entity(entity)
   end
 
   def terminate(_reason, %{entity: entity, recipients: recipients, expires_at: expires_at}) do
+    send_despawn_animation(entity)
+
     if Time.now() < expires_at do
       Enum.each(recipients, &Entity.remove_area_aura(&1, entity.object.guid))
     end
@@ -120,6 +124,9 @@ defmodule ThistleTea.Game.World.Entity.DynamicObject do
     World.remove_position(entity)
     Visibility.leave_entity(entity)
   end
+
+  defp send_despawn_animation(%DynamicObject{object: %{guid: guid}} = entity),
+    do: World.broadcast_packet(%SmsgGameobjectDespawnAnim{guid: guid}, entity)
 
   defp notify_farsight_owner(%DynamicObject{object: %{guid: guid}}, owner_guid) when is_integer(owner_guid) do
     case Entity.pid(owner_guid) do
