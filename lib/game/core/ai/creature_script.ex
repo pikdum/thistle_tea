@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.Piznik
   alias ThistleTea.Game.Core.AI.CreatureScript.RabidThistleBear
   alias ThistleTea.Game.Core.AI.CreatureScript.Route
+  alias ThistleTea.Game.Core.AI.CreatureScript.Scholomance
   alias ThistleTea.Game.Core.AI.CreatureScript.ScourgeInvasion
   alias ThistleTea.Game.Core.AI.CreatureScript.ShakesOBreen
   alias ThistleTea.Game.Core.AI.CreatureScript.SicklyCritter
@@ -85,6 +86,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     Onyxia,
     Piznik,
     RabidThistleBear,
+    Scholomance,
     ScourgeInvasion,
     ShakesOBreen,
     SicklyCritter,

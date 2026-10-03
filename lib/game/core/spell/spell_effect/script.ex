@@ -359,12 +359,18 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
          %CastContext{caster_guid: caster} = context,
          _spell,
          _effect,
-         {:arcane_vacuum, summon},
+         {:threat_wipe_cast, spell_ids},
          _now
        )
        when is_integer(caster) do
-    summon = Effects.trigger_spell(caster, context.caster_level || 1, state.object.guid, summon, resolve_targets?: true)
-    {state, [Effects.modify_threat_percent(caster, -100), summon]}
+    casts =
+      Enum.map(
+        spell_ids,
+        &Effects.trigger_spell(caster, context.caster_level || 1, state.object.guid, &1, resolve_targets?: true)
+      )
+
+    cast = if match?([_], casts), do: hd(casts), else: %Effects.RandomChoice{choices: Enum.map(casts, &{1, [&1]})}
+    {state, [Effects.modify_threat_percent(caster, -100), cast]}
   end
 
   defp apply_class_dummy(state, _context, _spell, _effect, _unscripted, _now), do: {state, []}

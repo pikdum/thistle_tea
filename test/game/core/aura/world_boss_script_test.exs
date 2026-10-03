@@ -35,6 +35,21 @@ defmodule ThistleTea.Game.Core.Aura.WorldBossScriptTest do
     end
   end
 
+  describe "Shadow Portal" do
+    test "forgets the victim's threat and sends them to a random room", %{player: player} do
+      gandling = Unique.integer()
+      context = %CastContext{caster_guid: gandling, caster_level: 61}
+      portal = %Spell{id: 17_950, effects: [%Effect{index: 0, type: :dummy, implicit_target_a: :target_enemy}]}
+
+      assert {_player, [threat, %Effects.RandomChoice{choices: choices}]} =
+               SpellEffect.receive(player, context, portal, 1_000)
+
+      assert threat == Effects.modify_threat_percent(gandling, -100)
+      assert Enum.map(choices, fn {1, [cast]} -> cast.spell_id end) == [17_863, 17_939, 17_943, 17_944, 17_946, 17_948]
+      assert Enum.all?(choices, fn {1, [cast]} -> cast.source_guid == gandling and cast.resolve_targets? end)
+    end
+  end
+
   describe "Mark of Kazzak" do
     test "explodes and fades once its victim runs out of mana", %{player: player} do
       for {mana, explodes?} <- [{150, true}, {600, false}] do
