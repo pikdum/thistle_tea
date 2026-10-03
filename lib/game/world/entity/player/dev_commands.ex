@@ -1659,7 +1659,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   end
 
   defp system_message(state, message) do
-    Outbound.send_packet(Message.SmsgMessagechat.system(message, state.guid))
+    Outbound.send_packet(Message.SmsgMessagechat.system(String.replace(message, "|", "||"), state.guid))
     state
   end
 end

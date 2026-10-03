@@ -116,7 +116,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
   end
 
   describe ".debug events" do
-    test "parses status and event changes without terminating the player" do
+    test "parses status and event changes without terminating the player, escaping pipes for the chat frame" do
       state = %{guid: 1, character: debug_character()}
       assert {:handled, ^state} = DevCommands.run(state, ".debug events")
       assert_received {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "Active events:" <> _}}}
@@ -127,7 +127,9 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
       end
 
       assert {:handled, ^state} = DevCommands.run(state, ".debug events invalid")
-      assert_received {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "Usage: .debug events" <> _}}}
+
+      assert_received {:"$gen_cast",
+                       {:send_packet, %Message.SmsgMessagechat{message: "Usage: .debug events [start||stop <id>]"}}}
     end
   end
 
@@ -622,7 +624,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
         assert_received {:"$gen_cast",
                          {:send_packet,
                           %Message.SmsgMessagechat{
-                            message: "Invalid command. Use: .go xyz <x> <y> <z> [map|here] [facing]"
+                            message: "Invalid command. Use: .go xyz <x> <y> <z> [map||here] [facing]"
                           }}}
       end
 
@@ -687,7 +689,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
                       {:send_packet,
                        %Message.SmsgMessagechat{
                          message:
-                           "Invalid command. Use: .battleground <join|list> [warsong|arathi|alterac], start, info, or leave"
+                           "Invalid command. Use: .battleground <join||list> [warsong||arathi||alterac], start, info, or leave"
                        }}}
     end
   end
