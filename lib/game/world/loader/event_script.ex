@@ -1,12 +1,14 @@
 defmodule ThistleTea.Game.World.Loader.EventScript do
   @moduledoc """
   Preloads VMangos `event_scripts` commands by event ID for object use and
-  send-event spell effects.
+  send-event spell effects. Ported C++ event scripts replace the database
+  rows of the events they claim, with their talk texts resolved.
   """
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.EventScript
+  alias ThistleTea.Game.Core.AI.EventScript, as: EventScriptCore
   alias ThistleTea.Game.World.Loader.Script
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
@@ -24,6 +26,10 @@ defmodule ThistleTea.Game.World.Loader.EventScript do
     EventScript
     |> Script.load_by_ids(script_ids)
     |> Enum.each(fn {event_id, steps} -> :ets.insert(__MODULE__, {event_id, steps}) end)
+
+    Enum.each(EventScriptCore.steps_by_event(), fn {event_id, steps} ->
+      :ets.insert(__MODULE__, {event_id, Script.resolve_texts(steps)})
+    end)
 
     :ok
   end

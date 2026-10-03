@@ -54,6 +54,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.ShakesOBreen
   alias ThistleTea.Game.Core.AI.CreatureScript.SicklyCritter
   alias ThistleTea.Game.Core.AI.CreatureScript.TapokeSlimJahn
+  alias ThistleTea.Game.Core.AI.CreatureScript.TestOfEndurance
   alias ThistleTea.Game.Core.AI.CreatureScript.Triage
   alias ThistleTea.Game.Core.AI.CreatureScript.TwiggyFlathead
   alias ThistleTea.Game.Core.AI.CreatureScript.TwilightCorrupter
@@ -98,6 +99,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     SicklyCritter,
     KindalMoonweaver,
     TapokeSlimJahn,
+    TestOfEndurance,
     Triage,
     TwiggyFlathead,
     TwilightCorrupter,

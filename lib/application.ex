@@ -24,6 +24,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.Core.AI.AreaTriggerScript
   alias ThistleTea.Game.Core.AI.CreatureScript
+  alias ThistleTea.Game.Core.AI.EventScript
   alias ThistleTea.Game.Core.AI.GameObjectScript
   alias ThistleTea.Game.Core.Creature.FireworkGuy
   alias ThistleTea.Game.Core.Creature.GuardPost
@@ -391,6 +392,7 @@ defmodule ThistleTea.Application do
             QuestEscortCatalog.summon_entries() ++
             QuestFollowerCatalog.summon_entries() ++
             CreatureScript.summon_entries() ++
+            EventScript.summon_entries() ++
             AreaTriggerScript.summon_entries() ++
             GameObjectScript.summon_entries() ++
             ElementalInvasion.summon_entries() ++

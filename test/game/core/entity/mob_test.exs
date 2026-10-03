@@ -414,6 +414,17 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
       standing = Mob.prepare_summon(mob, home: {10.0, 20.0, 30.0, 1.5})
       assert %Spawn{position: {1.0, 2.0, 3.0}, movement_type: 0, temporary?: true} = standing.internal.spawn
     end
+
+    test "a concealed summon arrives hidden from players" do
+      mob = %Mob{
+        object: %Object{entry: 4_490},
+        unit: %Unit{},
+        internal: %Internal{creature: %Creature{}, spawn: %Spawn{}}
+      }
+
+      assert %Internal{concealed?: true} = Mob.prepare_summon(mob, concealed?: true).internal
+      assert %Internal{concealed?: false} = Mob.prepare_summon(mob, concealed?: nil).internal
+    end
   end
 
   describe "apply_addon_auras/2" do

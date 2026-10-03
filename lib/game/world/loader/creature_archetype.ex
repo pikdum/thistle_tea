@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.Loader.CreatureArchetype do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.AI.CreatureScript
+  alias ThistleTea.Game.Core.AI.EventScript
   alias ThistleTea.Game.Core.Creature.CreatureArchetype
   alias ThistleTea.Game.World.Loader.Mob.Batch
   alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
@@ -26,7 +27,7 @@ defmodule ThistleTea.Game.World.Loader.CreatureArchetype do
         Mangos.Repo.all(
           from(step in table, where: field(step, :command) == 27, distinct: true, select: field(step, :datalong))
         )
-      end) ++ CreatureScript.creature_entries()
+      end) ++ CreatureScript.creature_entries() ++ EventScript.creature_entries()
 
     :ets.insert(__MODULE__, entries |> Enum.uniq() |> load() |> Map.to_list())
     :ok

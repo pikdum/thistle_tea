@@ -12,7 +12,9 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   `{:threat_players, ratio, min, max}` to scale with the living players on
   the summoner's threat list, as C++ bosses size their adds to the raid.
   A summon with a `scatter` radius lands on a random walkable point that far
-  around its position, as C++ scripts place adds with `GetRandomPoint`.
+  around its position, as C++ scripts place adds with `GetRandomPoint`. A
+  `concealed?` summon arrives hidden from players until a script reveals it,
+  as C++ scripts summon a creature with its visibility turned off.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -44,6 +46,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
             at_target?: false,
             scatter: 0.0,
             count: 1,
+            concealed?: false,
             condition_id: 0,
             condition: nil,
             success_condition: nil,
@@ -218,7 +221,8 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
       attack_target: decode_target_type(step.dataint3),
       despawn_type: step.dataint4,
       position: step.position,
-      scatter: step.scatter
+      scatter: step.scatter,
+      concealed?: step.concealed?
     }
   end
 

@@ -82,7 +82,8 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
       internal
       | spawn: spawn_state,
         creature: creature,
-        running: Keyword.get(opts, :run?, false) == true
+        running: Keyword.get(opts, :run?, false) == true,
+        concealed?: internal.concealed? or Keyword.get(opts, :concealed?) == true
     }
 
     %{mob | internal: internal}

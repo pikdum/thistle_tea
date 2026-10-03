@@ -225,6 +225,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Summons do
              despawn_type: summon.despawn_type,
              despawn_delay_ms: summon.despawn_delay_ms,
              run?: summon.run?,
+             concealed?: Map.get(summon, :concealed?),
              home: Map.get(summon, :home),
              wander_distance: Map.get(summon, :wander_distance)
            ),
