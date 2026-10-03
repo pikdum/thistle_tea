@@ -636,8 +636,35 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       EventSink.emit(mob, Effects.monster_talk("The Nightmare stirs.", :boss_emote, nil))
 
       for _player <- 1..2 do
-        assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{chat_type: 0x5A}, _opts}}
+        assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{chat_type: 0x5A}}}
       end
+    end
+
+    test "monster yells reach players in range who cannot see the speaker yet" do
+      [near, far] = Enum.map(1..2, fn _ -> Guid.from_low_guid(:player, unique_guid()) end)
+
+      for {guid, x} <- [{near, 200.0}, {far, 320.0}] do
+        {:ok, _} = Entity.register(guid)
+        SpatialHash.update(:players, guid, 0, x, 0.0, 0.0)
+      end
+
+      on_exit(fn ->
+        for guid <- [near, far] do
+          Entity.unregister(guid)
+          SpatialHash.remove(:players, guid)
+        end
+      end)
+
+      mob = %Mob{
+        object: %Object{guid: Guid.from_low_guid(:mob, 15_633, unique_guid())},
+        internal: %Internal{world: WorldRef.open(0), name: "Tyrande"},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      EventSink.emit(mob, Effects.monster_talk("Elune, hear my prayers.", :yell, nil))
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "Elune, hear my prayers."}}}
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{}}}
     end
 
     test "raises for unsupported effects", %{mob: mob} do

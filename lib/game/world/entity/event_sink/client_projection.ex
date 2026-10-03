@@ -224,10 +224,18 @@ defmodule ThistleTea.Game.World.Entity.EventSink.ClientProjection do
         %Effects.MonsterTalk{} = effect,
         _context
       ) do
-    effect.chat_type
-    |> monster_chat_type()
-    |> Message.SmsgMessagechat.monster(effect.text, guid, name, effect.target_guid)
-    |> World.broadcast_packet(entity, range: listen_range(effect.chat_type))
+    packet =
+      effect.chat_type
+      |> monster_chat_type()
+      |> Message.SmsgMessagechat.monster(effect.text, guid, name, effect.target_guid)
+
+    if effect.chat_type in [:yell, :boss_emote] do
+      entity
+      |> World.nearby_players(@listen_range_yell)
+      |> Enum.each(fn {player, _distance} -> Outbound.send_packet(packet, player) end)
+    else
+      World.broadcast_packet(packet, entity, range: @listen_range_say)
+    end
 
     entity
   end
@@ -435,7 +443,4 @@ defmodule ThistleTea.Game.World.Entity.EventSink.ClientProjection do
   defp monster_chat_type(:whisper), do: :monster_whisper
   defp monster_chat_type(:boss_whisper), do: :raid_boss_whisper
   defp monster_chat_type(_chat_type), do: :monster_say
-
-  defp listen_range(chat_type) when chat_type in [:yell, :boss_emote], do: @listen_range_yell
-  defp listen_range(_chat_type), do: @listen_range_say
 end
