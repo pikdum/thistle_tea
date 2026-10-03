@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Core.Combat.EngagementTest do
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Loot
   alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Spawn
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.Mob
@@ -166,6 +167,21 @@ defmodule ThistleTea.Game.Core.Combat.EngagementTest do
       assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.AttackStop))
       assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.ThreatRefLost))
       assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.TapCleared))
+    end
+
+    test "starts a timed-or-dead summon's timer over when its fight ends" do
+      summon = %{mob() | internal: %{mob().internal | spawn: %Spawn{temporary?: true, despawn_type: 1}}}
+      %Engagement.Result{entity: summon} = Engagement.enter(summon, 20, 1_000, selection())
+
+      %Engagement.Result{entity: evaded} = Engagement.leave(summon, :evade, 2_000)
+      assert Enum.any?(evaded.internal.events, &is_struct(&1, Effects.RestartSummonTimer))
+
+      %Engagement.Result{entity: dead} = Engagement.leave(summon, :death, 2_000)
+      refute Enum.any?(dead.internal.events, &is_struct(&1, Effects.RestartSummonTimer))
+
+      timed = %{summon | internal: %{summon.internal | spawn: %Spawn{temporary?: true, despawn_type: 3}}}
+      %Engagement.Result{entity: timed} = Engagement.leave(timed, :evade, 2_000)
+      refute Enum.any?(timed.internal.events, &is_struct(&1, Effects.RestartSummonTimer))
     end
   end
 

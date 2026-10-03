@@ -20,11 +20,13 @@ defmodule ThistleTea.Game.Core.Combat.Engagement do
   alias ThistleTea.Game.Core.Combat.ZoneCombat
   alias ThistleTea.Game.Core.Creature.CreatureReaction
   alias ThistleTea.Game.Core.Creature.GuardCall
+  alias ThistleTea.Game.Core.Creature.SummonDespawn
   alias ThistleTea.Game.Core.Creature.TemporaryFaction
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Loot
   alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Spawn
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
@@ -232,12 +234,26 @@ defmodule ThistleTea.Game.Core.Combat.Engagement do
       |> Effects.enqueue(leave_effects(entity.object.guid, target, clear_tap?))
       |> mark_broadcast_update()
       |> TemporaryFaction.restore(:combat_stop)
+      |> restart_summon_timer(previous, reason)
 
     group_event = if reason in [:death, :evade], do: reason, else: :combat_stop
     entity = Effects.enqueue(entity, Effects.creature_group_event(group_event))
 
     result(previous, entity, reason)
   end
+
+  defp restart_summon_timer(
+         entity,
+         %Mob{internal: %Internal{in_combat: true, spawn: %Spawn{temporary?: true, despawn_type: type}}},
+         reason
+       )
+       when reason not in [:death, :despawn, :pet_command] do
+    if SummonDespawn.restart_after_combat?(type),
+      do: Effects.enqueue(entity, Effects.restart_summon_timer()),
+      else: entity
+  end
+
+  defp restart_summon_timer(entity, _previous, _reason), do: entity
 
   defp clear_combat_timer(entity, :pet_command), do: entity
   defp clear_combat_timer(entity, _reason), do: CombatTimer.clear(entity)

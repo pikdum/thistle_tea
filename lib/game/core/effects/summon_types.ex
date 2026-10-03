@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.Core.Effects.SummonTypes do
     {:PetBroke, [:source_guid, :target_guid], []},
     {:SummonTotem, [:entry, :slot, :duration_ms], [spell_id: 0, health: 0]},
     {:DespawnSelf, [:duration_ms, :respawn_delay_ms], []},
+    {:RestartSummonTimer, [], []},
     {:RespawnSelf, [:even_if_alive?], []},
     {:ReviveSelf, [:life_ms], []}
   ]

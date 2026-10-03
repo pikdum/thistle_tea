@@ -269,6 +269,16 @@ defmodule ThistleTea.Game.World.Entity.EventSinkTest do
       refute_receive {:"$gen_cast", {:send_packet, ^packet, _opts}}
     end
 
+    test "a restarted summon timer comes due again after the summon's full lifetime" do
+      summon = %Mob{internal: %Internal{spawn: %Spawn{temporary?: true, despawn_type: 1, despawn_delay_ms: 1}}}
+
+      restarted = EventSink.emit(summon, Effects.restart_summon_timer(), Context.new(self()))
+
+      ref = restarted.internal.spawn.despawn_ref
+      assert is_reference(ref)
+      assert_receive {:summon_despawn, ^ref}
+    end
+
     test "delivers item transformation only to the explicit player owner" do
       character = %Character{object: %Object{guid: unique_guid()}}
       spell = %Spell{id: 21_180}

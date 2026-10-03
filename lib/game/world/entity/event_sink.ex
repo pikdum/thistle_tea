@@ -182,6 +182,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink do
     Effects.DespawnEntity,
     Effects.DespawnSelf,
     Effects.RemoveSelf,
+    Effects.RestartSummonTimer,
     Effects.ActivateGameObject,
     Effects.ApplyGameObjectAction,
     Effects.RestoreGameObject,

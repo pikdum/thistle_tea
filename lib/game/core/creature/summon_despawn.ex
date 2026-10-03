@@ -13,8 +13,9 @@ defmodule ThistleTea.Game.Core.Creature.SummonDespawn do
   decays.
 
   vmangos holds an in-combat timer at its full length and lets it run once
-  the fight ends. Here a timer that comes due mid-fight looks again a little
-  later.
+  the fight ends, so such a summon starts its timer over whenever it leaves
+  a fight. A timer that comes due mid-fight looks again a little later, in
+  case the fight ends some way that does not start it over.
   """
 
   @timed_or_dead 1
@@ -36,6 +37,8 @@ defmodule ThistleTea.Game.Core.Creature.SummonDespawn do
   def typed?(type), do: is_integer(type) and type > 0
 
   def timer_at_spawn?(type), do: type in @timed_while_alive
+
+  def restart_after_combat?(type), do: type in @waits_out_combat
 
   def at_death(type) when type in @gone_at_death, do: :despawn
   def at_death(type) when type in @timer_from_death, do: :restart_timer

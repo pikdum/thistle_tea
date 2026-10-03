@@ -733,6 +733,8 @@ defmodule ThistleTea.Game.Core.Effects do
     %Effects.DespawnSelf{duration_ms: despawn_delay_ms, respawn_delay_ms: respawn_delay_ms}
   end
 
+  def restart_summon_timer, do: %Effects.RestartSummonTimer{}
+
   def respawn_self(even_if_alive?) when is_boolean(even_if_alive?) do
     %Effects.RespawnSelf{even_if_alive?: even_if_alive?}
   end

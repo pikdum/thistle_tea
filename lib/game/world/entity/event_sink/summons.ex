@@ -440,6 +440,19 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Summons do
     entity
   end
 
+  def emit(
+        %Mob{internal: %Internal{spawn: %{despawn_delay_ms: delay} = spawn} = internal} = entity,
+        %Effects.RestartSummonTimer{},
+        context
+      )
+      when is_integer(delay) and delay > 0 do
+    ref = make_ref()
+    Context.send_after(context, {:summon_despawn, ref}, delay)
+    %{entity | internal: %{internal | spawn: %{spawn | despawn_ref: ref}}}
+  end
+
+  def emit(entity, %Effects.RestartSummonTimer{}, _context), do: entity
+
   def emit(entity, %Effects.RespawnSelf{even_if_alive?: even_if_alive?}, context) do
     Context.send(context, {:script_respawn, even_if_alive?})
     entity

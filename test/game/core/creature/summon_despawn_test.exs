@@ -23,6 +23,13 @@ defmodule ThistleTea.Game.Core.Creature.SummonDespawnTest do
     end
   end
 
+  describe "restart_after_combat?/1" do
+    test "starts the timer over after a fight for the types that wait one out" do
+      assert Enum.filter(1..11, &SummonDespawn.restart_after_combat?/1) ==
+               [@timed_or_dead, @timed_or_corpse, @timed_out_of_combat]
+    end
+  end
+
   describe "at_death/1" do
     test "removes the body of summons that vanish when they die" do
       for type <- [@timed_or_corpse, @corpse, @timed_combat_or_corpse],
