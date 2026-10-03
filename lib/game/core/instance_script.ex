@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Core.InstanceScript do
   Registry for audited instance-script data adapters.
   """
 
+  alias ThistleTea.Game.Core.InstanceScript.BlackfathomDeeps
   alias ThistleTea.Game.Core.InstanceScript.BlackrockDepths
   alias ThistleTea.Game.Core.InstanceScript.Deadmines
   alias ThistleTea.Game.Core.InstanceScript.RazorfenKraul
@@ -13,6 +14,7 @@ defmodule ThistleTea.Game.Core.InstanceScript do
   alias ThistleTea.Game.Core.InstanceScript.SunkenTemple
 
   @adapters [
+    BlackfathomDeeps,
     BlackrockDepths,
     Deadmines,
     RazorfenKraul,
@@ -104,6 +106,7 @@ defmodule ThistleTea.Game.Core.InstanceScript do
     end
   end
 
+  defp adapter("instance_blackfathom_deeps"), do: BlackfathomDeeps
   defp adapter("instance_blackrock_depths"), do: BlackrockDepths
   defp adapter("instance_deadmines"), do: Deadmines
   defp adapter("instance_razorfen_kraul"), do: RazorfenKraul

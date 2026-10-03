@@ -60,7 +60,7 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSink do
   def emit(%WorldRef{} = world, effect, options) do
     guids = Keyword.get(options, :guids, &World.guids/1)
     dispatch = Keyword.get(options, :dispatch, &dispatch/1)
-    summon = Keyword.get(options, :summon, &summon/5)
+    summon = Keyword.get(options, :summon, &summon/2)
     spawn_guid = Keyword.get(options, :spawn_guid, &World.spawn_guid/3)
     broadcast_text = Keyword.get(options, :broadcast_text, &BroadcastText.get/1)
 
@@ -74,7 +74,7 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSink do
   end
 
   defp project(world, %Effects.SummonCreature{} = effect, _guids, _dispatch, summon, _spawn_guid, _text) do
-    summon.(world, effect.entry, effect.position, effect.despawn_delay_ms, effect.move_to)
+    summon.(world, effect)
     :ok
   end
 
@@ -184,11 +184,13 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSink do
 
   defp dispatch({:run_creature_script, guid, steps, world}), do: Entity.start_script(guid, steps, guid, world)
 
-  defp summon(world, entry, position, despawn_delay_ms, move_to) do
-    with %Mob{} = mob <-
-           SummonLoader.build(entry, world, position, despawn_type: 3, despawn_delay_ms: despawn_delay_ms),
+  defp summon(world, %Effects.SummonCreature{} = effect) do
+    opts = [despawn_type: effect.despawn_type, despawn_delay_ms: effect.despawn_delay_ms]
+
+    with %Mob{object: %{guid: guid}} = mob <- SummonLoader.build(effect.entry, world, effect.position, opts),
          {:ok, _pid} <- MobLoader.start_mob(mob) do
-      if is_tuple(move_to), do: Entity.move_to(mob.object.guid, move_to)
+      if is_tuple(effect.move_to), do: Entity.move_to(guid, effect.move_to)
+      if effect.steps != [], do: Entity.start_script(guid, effect.steps, guid, world)
       :ok
     else
       _error -> :ok

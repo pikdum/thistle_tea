@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.Core.InstanceScript.Effects do
   defmodule SummonCreature do
     @moduledoc false
     @enforce_keys [:entry, :position, :despawn_delay_ms]
-    defstruct [:entry, :position, :despawn_delay_ms, :move_to]
+    defstruct [:entry, :position, :despawn_delay_ms, :move_to, despawn_type: 3, steps: []]
   end
 
   defmodule MonsterTalk do

@@ -22,9 +22,7 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSinkTest do
     options = [
       guids: fn ^world -> all_guids end,
       dispatch: fn command -> send(owner, command) end,
-      summon: fn summoned_world, entry, position, despawn_delay_ms, move_to ->
-        send(owner, {:summon, summoned_world, entry, position, despawn_delay_ms, move_to})
-      end,
+      summon: fn summoned_world, effect -> send(owner, {:summon, summoned_world, effect}) end,
       spawn_guid: fn ^world, :mob, 53_955 -> crystal end,
       broadcast_text: fn 11_812 -> %{text: "Intruders!", chat_type: :zone_yell} end
     ]
@@ -209,7 +207,7 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSinkTest do
   test "builds summons in the exact copy", context do
     effect = %Effects.SummonCreature{entry: 16_031, position: {1.0, 2.0, 3.0, 4.0}, despawn_delay_ms: 5_000}
     assert :ok = InstanceEffectSink.emit(context.world, effect, context.options)
-    assert_receive {:summon, world, 16_031, {1.0, 2.0, 3.0, 4.0}, 5_000, nil}
+    assert_receive {:summon, world, ^effect}
     assert world == context.world
   end
 
