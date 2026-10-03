@@ -2,45 +2,58 @@ defmodule ThistleTea.Game.Inbound.CmsgWho do
   @moduledoc false
   use ThistleTea.Game.Inbound.ClientMessage, :CMSG_WHO
 
-  alias ThistleTea.Game.Network.Message.SmsgWho.WhoPlayer
-  alias ThistleTea.Game.World.CharacterStore
-  alias ThistleTea.Game.World.Entity
-  alias ThistleTea.Game.World.Outbound
+  alias ThistleTea.Game.Core.Who.Query
+  alias ThistleTea.Game.World.Entity.Player.WhoList
 
-  defstruct []
+  @max_zones 10
+  @max_terms 4
+
+  defstruct [:query]
 
   @impl ClientMessage
-  def from_binary(_payload) do
-    %__MODULE__{}
+  def from_binary(<<level_min::little-size(32), level_max::little-size(32), rest::binary>>) do
+    {:ok, name, rest} = BinaryUtils.parse_string(rest)
+    {:ok, guild, rest} = BinaryUtils.parse_string(rest)
+    <<race_mask::little-size(32), class_mask::little-size(32), rest::binary>> = rest
+
+    with {:ok, zones, rest} <- take_zones(rest),
+         {:ok, terms} <- take_terms(rest) do
+      %__MODULE__{
+        query: %Query{
+          level_min: level_min,
+          level_max: level_max,
+          name: name,
+          guild: guild,
+          race_mask: race_mask,
+          class_mask: class_mask,
+          zones: zones,
+          terms: terms
+        }
+      }
+    else
+      :too_many -> %__MODULE__{}
+    end
   end
 
   @impl ClientMessage
-  def handle(%__MODULE__{}, state) do
-    characters =
-      CharacterStore.all()
-      |> Enum.filter(fn c -> Entity.online?(c.id) end)
+  def handle(%__MODULE__{query: %Query{} = query}, state), do: WhoList.send(state, query)
+  def handle(%__MODULE__{}, state), do: state
 
-    count = Enum.count(characters)
+  defp take_zones(<<count::little-size(32), _rest::binary>>) when count > @max_zones, do: :too_many
 
-    players =
-      characters
-      |> Enum.map(fn c ->
-        %WhoPlayer{
-          name: c.internal.name,
-          guild: "Test Guild",
-          level: c.unit.level,
-          class: c.unit.class,
-          race: c.unit.race,
-          area: c.internal.area
-        }
-      end)
+  defp take_zones(<<count::little-size(32), rest::binary>>) do
+    bytes = count * 4
+    <<zones::binary-size(^bytes), rest::binary>> = rest
+    {:ok, for(<<zone::little-size(32) <- zones>>, do: zone), rest}
+  end
 
-    Outbound.send_packet(%Message.SmsgWho{
-      listed_players: count,
-      online_players: count,
-      players: players
-    })
+  defp take_terms(<<count::little-size(32), _rest::binary>>) when count > @max_terms, do: :too_many
+  defp take_terms(<<count::little-size(32), rest::binary>>), do: {:ok, read_terms(rest, count)}
 
-    state
+  defp read_terms(_rest, 0), do: []
+
+  defp read_terms(rest, count) do
+    {:ok, term, rest} = BinaryUtils.parse_string(rest)
+    [term | read_terms(rest, count - 1)]
   end
 end

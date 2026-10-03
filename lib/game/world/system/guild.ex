@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.World.System.Guild do
   def invited?(guid), do: GenServer.call(__MODULE__, {:invited?, guid})
   def group(id), do: GenServer.call(__MODULE__, {:group, id})
   def group_by_name(name), do: GenServer.call(__MODULE__, {:group_by_name, name})
+  def names_of(guids), do: GenServer.call(__MODULE__, {:names_of, guids})
 
   defp change(action, args), do: GenServer.call(__MODULE__, {:change, action, args})
 
@@ -51,6 +52,7 @@ defmodule ThistleTea.Game.World.System.Guild do
   def handle_call({:invited?, guid}, _from, guilds), do: {:reply, Guild.invited?(guilds, guid), guilds}
   def handle_call({:group, id}, _from, guilds), do: {:reply, Map.get(guilds.groups, id), guilds}
   def handle_call({:group_by_name, name}, _from, guilds), do: {:reply, Guild.group_by_name(guilds, name), guilds}
+  def handle_call({:names_of, guids}, _from, guilds), do: {:reply, Guild.names_of(guilds, guids), guilds}
 
   def handle_call({:change, action, args}, _from, guilds) do
     case apply(Guild, action, [guilds | args]) do

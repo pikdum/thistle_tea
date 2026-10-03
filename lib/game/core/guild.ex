@@ -82,6 +82,10 @@ defmodule ThistleTea.Game.Core.Guild do
 
   def invited?(%__MODULE__{} = guilds, guid), do: Map.has_key?(guilds.invites, guid)
 
+  def names_of(%__MODULE__{} = guilds, guids) when is_list(guids) do
+    for guid <- guids, %Group{name: name} <- [group_of(guilds, guid)], into: %{}, do: {guid, name}
+  end
+
   def group_by_name(%__MODULE__{} = guilds, name) when is_binary(name) do
     case Map.fetch(guilds.name_index, String.downcase(name)) do
       {:ok, id} -> Map.get(guilds.groups, id)

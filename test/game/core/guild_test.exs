@@ -38,6 +38,13 @@ defmodule ThistleTea.Game.Core.GuildTest do
     end
   end
 
+  describe "names_of/2" do
+    test "names the guild of each member and leaves out the guildless" do
+      guilds = guild_with_members()
+      assert Guild.names_of(guilds, [1, 2, 3]) == %{1 => "Fellowship", 2 => "Fellowship"}
+    end
+  end
+
   describe "set_leader/3" do
     test "transfers the sole leader rank and preserves permission ordering" do
       guilds = guild_with_members()
