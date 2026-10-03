@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Core.Spell.CastValidationTest do
   alias ThistleTea.Game.Core.Spell.CastValidation
   alias ThistleTea.Game.Core.Spell.Cooldowns
   alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.ObjectTargets
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.WorldRef
 
@@ -146,6 +147,38 @@ defmodule ThistleTea.Game.Core.Spell.CastValidationTest do
              ) == :ok
 
       assert source.unit.power1 == 100
+    end
+  end
+
+  describe "validate/6 game-object targets" do
+    test "leaves unresolved object targets to launch but holds a resolved snapshot to its error" do
+      roar =
+        helpful_spell(
+          id: 18_431,
+          effects: [
+            %Effect{
+              index: 0,
+              type: :apply_aura,
+              implicit_target_a: :caster_source,
+              implicit_target_b: :aoe_enemy_at_caster
+            },
+            %Effect{
+              index: 1,
+              type: :activate_object,
+              implicit_target_a: :caster_destination,
+              implicit_target_b: :game_objects_at_destination
+            }
+          ]
+        )
+
+      assert CastValidation.validate(caster(), roar, Target.unit(100), :self, @now) == :ok
+
+      assert CastValidation.validate(caster(), roar, Target.unit(100), :self, @now, spell_objects: %ObjectTargets{}) ==
+               :ok
+
+      assert CastValidation.validate(caster(), roar, Target.unit(100), :self, @now,
+               spell_objects: %ObjectTargets{error: :bad_targets}
+             ) == {:error, :bad_targets}
     end
   end
 

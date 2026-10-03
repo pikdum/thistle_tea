@@ -5,7 +5,9 @@ defmodule ThistleTea.Game.Core.Spell.CastValidation do
   (hostile/friendly, alive/dead), and range. Target facts are passed in as a
   snapshot built at the boundary, so this module never touches processes or
   the database. Returns `:ok` or `{:error, reason}` where the reason maps to a
-  1.12 `SMSG_CAST_RESULT` code.
+  1.12 `SMSG_CAST_RESULT` code. A caller that resolves no game-object targets
+  up front, such as a creature, leaves them to the launch-time requirement
+  check.
   """
   import Bitwise, only: [&&&: 2, <<<: 2]
 
@@ -81,7 +83,7 @@ defmodule ThistleTea.Game.Core.Spell.CastValidation do
            ),
          :ok <- check_tools(spell, Keyword.get(opts, :count_item)),
          :ok <- Focus.validate(caster, spell, Keyword.get(opts, :spell_focus)),
-         :ok <- ObjectTargets.validate(spell, Keyword.get(opts, :spell_objects)),
+         :ok <- check_objects(spell, opts),
          :ok <- Mount.validate(caster, spell, opts),
          :ok <- check_stance(caster, spell),
          :ok <- check_caster_aura_state(caster, spell, now),
@@ -412,6 +414,13 @@ defmodule ThistleTea.Game.Core.Spell.CastValidation do
   end
 
   defp check_tools(_spell, _count_item), do: :ok
+
+  defp check_objects(spell, opts) do
+    case Keyword.fetch(opts, :spell_objects) do
+      {:ok, objects} -> ObjectTargets.validate(spell, objects)
+      :error -> :ok
+    end
+  end
 
   defp check_target_flags(%{object: %{guid: guid}}, _spell, %{guid: guid}), do: :ok
 
