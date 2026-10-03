@@ -5,14 +5,19 @@ defmodule ThistleTea.Game.Core.Quest.QuestFollower do
   its goal, then credits the player's group and plays its arrival.
 
   `start_steps/1` lowers one into the generic script commands the creature
-  interpreter already runs. Accepting starts a scripted map event keyed by
+  interpreter already runs. Starting it begins a scripted map event keyed by
   the quest, runs the accept actions, clears the npc flags, and follows the
   player at `distance` and `angle`. The event fails the quest and respawns
   the follower if it dies or strays further than `max_distance` from the
   player. It succeeds once the follower reaches its `goal`, either a live
   creature (`{entry, radius}`) or a place (`{:point, {x, y, z}, radius}`):
-  the follower stops, credits the player, runs the arrival actions, and
-  despawns after `despawn_ms`, respawning at home later.
+  the follower stops, credits the player unless `credit?` is false, runs the
+  arrival actions, and despawns after `despawn_ms` (never when nil),
+  respawning at home later.
+
+  Most followers start when their quest is accepted. One with a `gossip`
+  text starts instead from a gossip option of that text, offered while the
+  quest is in the player's log and incomplete.
 
   Accept and arrival actions are written in the `Core.Quest.EscortAction`
   vocabulary.
@@ -27,10 +32,12 @@ defmodule ThistleTea.Game.Core.Quest.QuestFollower do
     :quest_id,
     :entry,
     :goal,
+    :gossip,
     accept: [],
     arrive: [],
     distance: 2.0,
     angle: :math.pi() / 2,
+    credit?: true,
     despawn_ms: 0,
     max_distance: 100
   ]
@@ -44,8 +51,12 @@ defmodule ThistleTea.Game.Core.Quest.QuestFollower do
   @source_dead 1
   @idle_motion 0
   @follow_motion 15
+  @quest_incomplete 1
 
   def summon_entries(%__MODULE__{} = follower), do: EscortAction.summon_entries(follower.accept ++ follower.arrive)
+
+  def gossip_condition(%__MODULE__{quest_id: quest_id}),
+    do: %Condition{type: :quest_taken, value1: quest_id, value2: @quest_incomplete}
 
   def start_steps(%__MODULE__{} = follower) do
     [map_event(follower) | Enum.flat_map(follower.accept, &EscortAction.steps(&1, follower.quest_id, :accept))] ++
@@ -93,11 +104,17 @@ defmodule ThistleTea.Game.Core.Quest.QuestFollower do
   end
 
   defp arrival(%__MODULE__{quest_id: quest_id} = follower) do
-    [
-      %ScriptStep{command: :movement, datalong: @idle_motion},
-      %ScriptStep{command: :quest_explored, datalong: quest_id, datalong2: follower.max_distance, datalong3: 1}
-    ] ++
+    [%ScriptStep{command: :movement, datalong: @idle_motion}] ++
+      credit(follower) ++
       Enum.flat_map(follower.arrive, &EscortAction.steps(&1, quest_id, :arrival)) ++
-      [%ScriptStep{command: :despawn, delay_ms: max(follower.despawn_ms, 0)}]
+      despawn(follower.despawn_ms)
   end
+
+  defp credit(%__MODULE__{credit?: false}), do: []
+
+  defp credit(%__MODULE__{quest_id: quest_id, max_distance: max_distance}),
+    do: [%ScriptStep{command: :quest_explored, datalong: quest_id, datalong2: max_distance, datalong3: 1}]
+
+  defp despawn(nil), do: []
+  defp despawn(despawn_ms), do: [%ScriptStep{command: :despawn, delay_ms: max(despawn_ms, 0)}]
 end

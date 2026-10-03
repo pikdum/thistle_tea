@@ -9,13 +9,20 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipTest do
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Quest
+  alias ThistleTea.Game.Core.Quest.QuestLog
   alias ThistleTea.Game.Core.Reputation
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Network.Message.SmsgGossipComplete
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.Gossip
+  alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.Gossip.Menu
+  alias ThistleTea.Game.World.Loader.Gossip.Option
   alias ThistleTea.Game.World.Loader.Gossip.Text
+  alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Test.Unique
 
   describe "send_menu/4" do
@@ -44,6 +51,37 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipTest do
 
       assert_receive {:"$gen_cast", {:send_packet, %SmsgGossipMessage{title_text_id: 2}}}
       refute_receive {:"$gen_cast", {:start_script, _steps, _target}}, 50
+    end
+  end
+
+  describe "select/3" do
+    test "credits talking to the speaker only when its closing option asks to" do
+      id = Unique.integer()
+      player_guid = Guid.from_low_guid(:player, id)
+      creature_guid = Guid.from_low_guid(:mob, 6669, Unique.integer())
+      {:ok, _owner} = Entity.register(creature_guid)
+      quest = %Quest{id: 900_000 + Unique.integer(), required_kills: [{0, 6669, 1}]}
+      :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
+      {:ok, log} = QuestLog.add(%{}, quest.id)
+      character = character(player_guid)
+      character = %{character | id: id, player: %{character.player | quest_log: log}}
+
+      on_exit(fn ->
+        :ets.delete(QuestLoader, {:quest, quest.id})
+        CharacterStore.delete(id)
+      end)
+
+      scripted = %Option{id: 0, option_id: 1, action_menu_id: -1, talk_credit?: false}
+      options = [scripted, %{scripted | id: 1, talk_credit?: true}]
+      state = %State{guid: player_guid, character: character, gossip_menu_guid: creature_guid}
+      state = %{state | gossip_menu_options: options}
+
+      closed = Gossip.select(state, creature_guid, 0)
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgGossipComplete{}}}
+      assert QuestLog.get(closed.character.player.quest_log, quest.id).counts == %{}
+
+      talked = Gossip.select(state, creature_guid, 1)
+      assert QuestLog.get(talked.character.player.quest_log, quest.id).counts == %{0 => 1}
     end
   end
 

@@ -3,6 +3,10 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   Loads gossip menus and options from Mangos into ETS, filtered to the option
   types the server supports, with creature-to-menu and trainer lookups. Each
   greeting text keeps the gossip script vmangos starts whenever it is shown.
+  Options that vmangos adds in C++ gossip scripts are appended per creature
+  with `add_creature_option/2` once the menus are loaded. Closing the window
+  from a database option credits the creature as talked to; a scripted option
+  sets `talk_credit?` false, since its C++ handler closes the window itself.
   """
   import Ecto.Query
 
@@ -75,7 +79,8 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
       :poi,
       action_steps: [],
       coded: 0,
-      taxi_path_steps: []
+      taxi_path_steps: [],
+      talk_credit?: true
     ]
   end
 
@@ -223,6 +228,15 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
       [{_key, menu_id}] -> get_menu(menu_id)
       _ -> nil
     end
+  end
+
+  def add_creature_option(creature_entry, %Option{} = option) do
+    menu = menu_for_creature(creature_entry) || %Menu{}
+    id = menu.options |> Enum.map(& &1.id) |> Enum.max(fn -> -1 end)
+    menu_id = {:creature, creature_entry}
+    menu = %{menu | menu_id: menu_id, options: menu.options ++ [%{option | id: id + 1}]}
+    :ets.insert(__MODULE__, [{{:menu, menu_id}, menu}, {{:creature_menu, creature_entry}, menu_id}])
+    :ok
   end
 
   def npc_flags(creature_entry) do

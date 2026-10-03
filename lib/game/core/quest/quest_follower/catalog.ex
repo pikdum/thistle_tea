@@ -5,8 +5,10 @@ defmodule ThistleTea.Game.Core.Quest.QuestFollower.Catalog do
   chatter is left out, and so are the lapses a player must tend to on the
   way: Shay wandering off until her bell rings, Kerlonian falling asleep
   until the horn wakes him, and Ringo fainting until he drinks from the
-  canteen. Kernobee walks out of Gnomeregan without the Alarm-a-bomb. Mist's
-  script is missing from vmangos, so her return to Sentinel Arynia
+  canteen. Kernobee walks out of Gnomeregan without the Alarm-a-bomb. The
+  Threshwackonator starts from its key gossip and, once it reaches Gelkak,
+  turns on the player instead of crediting them: killing it is the quest.
+  Mist's script is missing from vmangos, so her return to Sentinel Arynia
   Cloudsbreak follows the ScriptDev2 `npc_mist` it came from.
   """
 
@@ -77,6 +79,16 @@ defmodule ThistleTea.Game.Core.Quest.QuestFollower.Catalog do
         accept: [{:say, 3881}, {:stand, 0}, {:remove_unit_flags, 0x200}],
         arrive: [{:say, 3929}],
         despawn_ms: 2_700
+      },
+      %QuestFollower{
+        quest_id: 2078,
+        entry: 6669,
+        goal: {6667, 10},
+        gossip: "[PH] Insert key",
+        accept: [{:say, 3012}],
+        arrive: [{:say_by, 6667, 2704}, {:faction, 14}, {:attack, :player}],
+        credit?: false,
+        despawn_ms: nil
       }
     ]
   end

@@ -210,15 +210,11 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   defp dispatch(state, _character, guid, %Option{action: {:battleground, action}}, _option_ids),
     do: Battlegrounds.select_gossip(state, guid, action)
 
-  defp dispatch(
-         state,
-         character,
-         guid,
-         %Option{option_id: option_id, action_menu_id: action_menu_id, action_steps: steps} = option,
-         %{gossip: option_id}
-       ) do
+  defp dispatch(state, character, guid, %Option{option_id: option_id, action_steps: steps} = option, %{
+         gossip: option_id
+       }) do
     send_poi(option)
-    state = dispatch_gossip_menu(state, character, guid, action_menu_id)
+    state = dispatch_gossip_menu(state, character, guid, option)
 
     if steps != [] do
       if Guid.type_id(guid) == :game_object do
@@ -284,20 +280,21 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
     end
   end
 
-  defp dispatch_gossip_menu(state, character, guid, action_menu_id) when action_menu_id > 0 do
+  defp dispatch_gossip_menu(state, character, guid, %Option{action_menu_id: action_menu_id}) when action_menu_id > 0 do
     case GossipLoader.get_menu(action_menu_id) do
       %Menu{} = menu -> send_menu(guid, menu, quest_items(guid, character), state)
       nil -> state
     end
   end
 
-  defp dispatch_gossip_menu(state, _character, guid, action_menu_id) when action_menu_id < 0 do
+  defp dispatch_gossip_menu(state, _character, guid, %Option{action_menu_id: action_menu_id} = option)
+       when action_menu_id < 0 do
     Outbound.send_packet(%Message.SmsgGossipComplete{})
     state = %{state | gossip_menu_options: []}
-    if Guid.type_id(guid) == :unit, do: Quests.credit_talk(state, guid), else: state
+    if option.talk_credit? and Guid.type_id(guid) == :unit, do: Quests.credit_talk(state, guid), else: state
   end
 
-  defp dispatch_gossip_menu(state, _character, _guid, _action_menu_id), do: state
+  defp dispatch_gossip_menu(state, _character, _guid, _option), do: state
 
   defp send_poi(%Option{poi: %Poi{} = poi}) do
     Outbound.send_packet(%Message.SmsgGossipPoi{

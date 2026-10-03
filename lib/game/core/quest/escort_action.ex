@@ -9,7 +9,8 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   (until respawn), `:run`, `:walk`, `{:add_aura, spell_id}`,
   `{:remove_aura, spell_id}`, `{:remove_unit_flags, mask}` (until
   respawn), `{:invincible, health_pct}` (never falls below that share of its
-  health), `:fail` (fails the quest for the player and their group),
+  health), `{:attack, :player}` (turns on the player, given a hostile
+  faction first), `:fail` (fails the quest for the player and their group),
   `{:event_phase, phase}` (the escortee's EventAI phase, for a script port
   that reacts to it), `{:summon, entry, position, opts}`, and
   `{:after, delay_ms, action}`. A summon despawns per
@@ -94,6 +95,9 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
 
   def steps({:invincible, health_pct}, _quest_id, _phase),
     do: [%ScriptStep{command: :invincibility, datalong: health_pct, datalong2: @percent}]
+
+  def steps({:attack, :player}, quest_id, phase),
+    do: [player_target(%ScriptStep{command: :attack_start}, quest_id, phase)]
 
   def steps(:fail, quest_id, phase),
     do: [player_target(%ScriptStep{command: :fail_quest, datalong: quest_id}, quest_id, phase)]

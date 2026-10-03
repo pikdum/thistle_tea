@@ -44,6 +44,17 @@ defmodule ThistleTea.Game.Core.Quest.QuestFollowerTest do
              ] = Map.fetch!(event.sub_scripts, event.dataint2)
     end
 
+    test "can turn on the player at its goal instead of crediting them", %{follower: follower} do
+      follower = %{follower | credit?: false, despawn_ms: nil, arrive: [{:faction, 14}, {:attack, :player}]}
+      [event | _rest] = QuestFollower.start_steps(follower)
+
+      assert [
+               %ScriptStep{command: :movement, datalong: 0},
+               %ScriptStep{command: :set_faction, datalong: 14},
+               %ScriptStep{command: :attack_start, target_type: :provided}
+             ] = Map.fetch!(event.sub_scripts, event.dataint2)
+    end
+
     test "can head for a place instead of a creature", %{follower: follower} do
       follower = %{follower | goal: {:point, {1.0, 2.0, 3.0}, 10}}
       [event | _rest] = QuestFollower.start_steps(follower)
@@ -56,6 +67,12 @@ defmodule ThistleTea.Game.Core.Quest.QuestFollowerTest do
                value4: 10,
                swap_targets?: true
              }
+    end
+  end
+
+  describe "gossip_condition/1" do
+    test "offers the gossip start while the quest is incomplete in the log", %{follower: follower} do
+      assert QuestFollower.gossip_condition(follower) == %Condition{type: :quest_taken, value1: 4_242, value2: 1}
     end
   end
 
