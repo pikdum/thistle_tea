@@ -406,6 +406,7 @@ defmodule ThistleTea.Game.Core.Aura.Periodic do
           [
             Effects.trigger_spell(holder.caster_guid, holder.caster_level, entity.object.guid, spell_id,
               hit_context: holder.cast_context,
+              triggered_by_spell_id: holder.spell.id,
               pays_reagents?: holder.spell.reagents in [nil, []]
             )
           ]
