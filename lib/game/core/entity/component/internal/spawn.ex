@@ -4,7 +4,8 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.Spawn do
   to restore on respawn, the home position with wander/waypoint movement
   config, and the pending respawn timer. Temporary summons carry their timed
   despawn config here and are stopped instead of respawned. A spawn that is
-  dead by default comes back as a corpse unless it is revived.
+  dead by default comes back as a corpse unless it is revived. An active
+  spawn keeps running once loaded, even after players leave its cells.
   """
   defstruct [
     :unit,
@@ -27,6 +28,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.Spawn do
     :pool_group,
     :pool_member,
     temporary?: false,
+    active?: false,
     dead?: false,
     death_in_combat?: false,
     respawn_pending?: false

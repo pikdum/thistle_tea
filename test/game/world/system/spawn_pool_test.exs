@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.System.SpawnPoolTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Entity.Component.GameObject, as: GameObjectComponent
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -15,6 +16,7 @@ defmodule ThistleTea.Game.World.System.SpawnPoolTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
+  alias ThistleTea.Game.World.Loader.Mob.Builder, as: MobBuilder
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Battleground.Spawns, as: BattlegroundSpawns
@@ -459,6 +461,27 @@ defmodule ThistleTea.Game.World.System.SpawnPoolTest do
 
       stop_pool(key)
     end
+
+    test "keeps an active spawn running after its cells deactivate" do
+      low_guid = Unique.integer()
+      world = WorldRef.open(0)
+      group = {:singleton, :creature, low_guid}
+      cell = SpatialHash.cell(world, 1.0, 1.0, 1.0)
+      mob = active_mob(low_guid)
+
+      assert mob.internal.spawn.active?
+
+      :ok = SpawnPool.activate(group, cell, mob)
+      pid = await_entity(mob.object.guid)
+
+      :ok = SpawnPool.deactivate_cells({world, group}, [cell], MapSet.new())
+      [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, {world, group})
+      send(pool_pid, :drain_tick)
+      Process.sleep(50)
+      assert EntityRegistry.whereis(mob.object.guid) == pid
+
+      stop_pool({world, group})
+    end
   end
 
   defp singleton_fixture do
@@ -473,6 +496,31 @@ defmodule ThistleTea.Game.World.System.SpawnPoolTest do
   defp stop_pool(key) do
     [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, key)
     SpawnPoolSupervisor.terminate_child(pool_pid)
+  end
+
+  defp active_mob(low_guid) do
+    %Mangos.Creature{
+      guid: low_guid,
+      id: 11_625,
+      map: 0,
+      position_x: 1.0,
+      position_y: 1.0,
+      position_z: 1.0,
+      spawn_flags: 1,
+      selected_level: 1,
+      curhealth: 100,
+      creature_movement: [],
+      creature_template: %Mangos.CreatureTemplate{
+        entry: 11_625,
+        name: "Cork Gizelton",
+        min_level: 1,
+        max_level: 1,
+        faction_alliance: 35,
+        melee_base_attack_time: 2_000
+      }
+    }
+    |> MobBuilder.build()
+    |> then(&%{&1 | internal: %{&1.internal | world: WorldRef.open(0)}})
   end
 
   defp game_object(guid) do

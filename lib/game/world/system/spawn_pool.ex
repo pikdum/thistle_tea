@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.World.System.SpawnPool do
   @moduledoc """
   Owns one root VMangos pool or singleton spawn and its entity incarnations.
+  Members stop when their cells deactivate, except active spawns (vmangos
+  `SPAWN_FLAG_ACTIVE`), which keep running until their world spins down.
   """
   use GenServer
 
@@ -586,7 +588,7 @@ defmodule ThistleTea.Game.World.System.SpawnPool do
   defp drain_inactive(state, wanted \\ nil) do
     stragglers =
       Enum.filter(state.running, fn {member, {_pid, _ref}} ->
-        not selected_cell_active?(state, member)
+        not selected_cell_active?(state, member) and not active_spawn?(Map.get(state.blueprints, member))
       end)
 
     {state, remaining} =
@@ -614,6 +616,9 @@ defmodule ThistleTea.Game.World.System.SpawnPool do
       true -> not observed?(guid, wanted)
     end
   end
+
+  defp active_spawn?(%Mob{internal: %{spawn: %Spawn{active?: active?}}}), do: active?
+  defp active_spawn?(_blueprint), do: false
 
   defp player_controlled?(metadata) do
     Bitwise.band(Map.get(metadata, :unit_flags) || 0, @unit_flag_player_controlled) != 0

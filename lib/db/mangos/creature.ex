@@ -7,6 +7,7 @@ defmodule ThistleTea.DB.Mangos.Creature do
   alias ThistleTea.DB.Mangos
 
   @primary_key {:guid, :integer, autogenerate: false}
+  @spawn_flag_active 0x01
   @spawn_flag_disabled 0x02
   @spawn_flag_not_visible 0x40
   @spawn_flag_dead 0x80
@@ -65,6 +66,8 @@ defmodule ThistleTea.DB.Mangos.Creature do
   def held_back?(%__MODULE__{spawn_flags: flags}), do: band(flags || 0, @spawn_flag_disabled) != 0
 
   def concealed?(%__MODULE__{spawn_flags: flags}), do: band(flags || 0, @spawn_flag_not_visible) != 0
+
+  def active?(%__MODULE__{spawn_flags: flags}), do: band(flags || 0, @spawn_flag_active) != 0
 
   def dead?(%__MODULE__{spawn_flags: flags, health_percent: health_percent}),
     do: band(flags || 0, @spawn_flag_dead) != 0 or health_percent == 0.0

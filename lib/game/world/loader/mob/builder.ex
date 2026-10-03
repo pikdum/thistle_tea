@@ -204,6 +204,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
           movement_type: c.movement_type,
           waypoint_route: WaypointLoader.build(c),
           respawn_delay_ms: respawn_delay_ms(c),
+          active?: Mangos.Creature.active?(c),
           dead?: Mangos.Creature.dead?(c)
         },
         loot: %Loot{
