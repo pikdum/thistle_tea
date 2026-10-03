@@ -36,6 +36,11 @@ defmodule ThistleTea.Game.Core.Spell.ScriptsTest do
       assert Scripts.successful_finish_trigger(%Spell{id: 27_801, script_name: script}) == 27_805
       assert Scripts.successful_finish_trigger(%Spell{id: 15_237}) == nil
     end
+
+    test "Wolfshead Helm's cat form trigger grants its energy" do
+      assert Scripts.successful_finish_trigger(%Spell{id: 17_770, script_name: "spell_wolfshead_helm"}) == 29_940
+      assert Scripts.successful_finish_trigger(%Spell{id: 20_577, script_name: "spell_cannibalize"}) == 20_578
+    end
   end
 
   describe "exclusive_category/1" do

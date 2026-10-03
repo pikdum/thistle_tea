@@ -120,9 +120,12 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
     if Spell.vmangos_script?(spell, "spell_gdr_channel"), do: 13_493
   end
 
-  def successful_finish_trigger(%Spell{} = spell) do
-    if Spell.vmangos_script?(spell, "spell_cannibalize"), do: 20_578, else: Priest.holy_nova_heal_id(spell)
-  end
+  @script_finish_triggers %{"spell_cannibalize" => 20_578, "spell_wolfshead_helm" => 29_940}
+
+  def successful_finish_trigger(%Spell{script_name: script_name}) when is_map_key(@script_finish_triggers, script_name),
+    do: Map.fetch!(@script_finish_triggers, script_name)
+
+  def successful_finish_trigger(%Spell{} = spell), do: Priest.holy_nova_heal_id(spell)
 
   def successful_finish_trigger(_spell), do: nil
 
