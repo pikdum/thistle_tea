@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.EventSink.Summons do
   @moduledoc false
 
+  alias ThistleTea.Game.Core.AI.BT.WaypointHold
   alias ThistleTea.Game.Core.Creature.CharmSpells
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
@@ -239,9 +240,10 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Summons do
 
       cast_post_spawn_spells(entity, mob.object.guid, summon)
       notify_possession_granted(entity, mob, summon)
+      WaypointHold.track(entity, mob.object.guid)
+    else
+      _not_summoned -> entity
     end
-
-    entity
   end
 
   def emit(entity, %Effects.SummonCreature{}, _context), do: entity

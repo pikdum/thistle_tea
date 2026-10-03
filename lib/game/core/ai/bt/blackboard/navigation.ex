@@ -19,5 +19,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard.Navigation do
             run_mode: false,
             next_chase_at: 0,
             next_wander_at: 0,
-            next_waypoint_at: 0
+            next_waypoint_at: 0,
+            waypoint_hold: nil
 end

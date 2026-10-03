@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
   act on the pure entity state — enqueueing chat/emote/cast/summon/despawn
   events, swapping the unit display id for morphs, recursing into resolved
   generic scripts for start-script steps, and mutating the blackboard phase,
-  gait, or flee state — steps with a failing condition are skipped, and
+  gait, flee state, or waypoint hold — steps with a failing condition are skipped, and
   unsupported commands are logged and skipped. Initial target swaps move
   execution to the supplied owner before selection; final swaps move it to the
   selected owner. Conditions and commands then use the final source and target.
@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
   alias ThistleTea.Game.Core.AI.BT.Distancing
   alias ThistleTea.Game.Core.AI.BT.Flee
   alias ThistleTea.Game.Core.AI.BT.Mob.Spells, as: MobSpells
+  alias ThistleTea.Game.Core.AI.BT.WaypointHold
   alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.AI.CreatureSpellList
   alias ThistleTea.Game.Core.AI.Script.PetCommand
@@ -70,6 +71,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
   require Logger
 
   @max_phase 31
+  @hold_release_script 1
   @unit_flag_player_controlled 0x00000008
   @scripted_event_commands [
     :set_server_variable,
@@ -545,6 +547,10 @@ defmodule ThistleTea.Game.Core.AI.Script do
     else
       _unsupported -> {state, blackboard}
     end
+  end
+
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :hold_waypoints} = step, _target_guid, now, %Context{}) do
+    {state, WaypointHold.start(blackboard, now, step.datalong, Map.get(step.sub_scripts, @hold_release_script, []))}
   end
 
   defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :start_waypoints} = step, _target_guid, now, %Context{
@@ -1439,6 +1445,20 @@ defmodule ThistleTea.Game.Core.AI.Script do
     threshold = if is_percent == 0, do: health, else: div(unit.max_health * health, 100)
     {%{state | internal: %{internal | invincibility_health_threshold: max(threshold, 0)}}, blackboard}
   end
+
+  defp execute(
+         %Mob{object: %{guid: guid}, unit: %Unit{max_health: max_health}} = state,
+         blackboard,
+         %ScriptStep{command: :deal_damage, datalong: damage, datalong2: is_percent},
+         guid,
+         now
+       )
+       when is_integer(max_health) do
+    amount = if is_percent == 0, do: damage, else: ceil(max_health * damage / 100)
+    {Entity.lose_health(state, amount, now), blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :deal_damage}, _target_guid, _now), do: {state, blackboard}
 
   defp execute(state, blackboard, %ScriptStep{command: :turn_to, position: {_x, _y, _z, o}}, _target_guid, _now) do
     state =

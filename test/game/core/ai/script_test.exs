@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
   alias ThistleTea.Game.Core.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Core.AI.BT.Context.Waypoints
   alias ThistleTea.Game.Core.AI.BT.Flee
+  alias ThistleTea.Game.Core.AI.BT.WaypointHold
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Combat.FactionTemplate
@@ -1466,6 +1467,29 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
         )
 
       assert mob.internal.invincibility_health_threshold == 10
+    end
+
+    test "deal_damage wounds or kills only the creature itself", %{mob: mob} do
+      wound = %ScriptStep{command: :deal_damage, datalong: 30, datalong2: 1, target_self?: true}
+
+      {wounded, _blackboard} = Script.run(mob, Blackboard.new(), [wound], nil, 1_000)
+      assert wounded.unit.health == 70
+
+      {dead, _blackboard} = Script.run(mob, Blackboard.new(), [%{wound | datalong: 100}], nil, 1_000)
+      assert dead.unit.health == 0
+
+      player = Guid.from_low_guid(:player, 55)
+      {untouched, _blackboard} = Script.run(mob, Blackboard.new(), [%{wound | target_self?: false}], player, 1_000)
+      assert untouched.unit.health == 100
+    end
+
+    test "hold_waypoints holds the path with its release steps", %{mob: mob} do
+      release = [%ScriptStep{command: :set_run, datalong: 1}]
+      hold = %ScriptStep{command: :hold_waypoints, datalong: 5_000, sub_scripts: %{1 => release}}
+
+      {_mob, blackboard} = Script.run(mob, Blackboard.new(), [hold], nil, 1_000)
+
+      assert %WaypointHold{until: 6_000, ready_at: 1_001, steps: ^release} = blackboard.navigation.waypoint_hold
     end
 
     test "combat_stop clears mob combat ownership", %{mob: mob} do

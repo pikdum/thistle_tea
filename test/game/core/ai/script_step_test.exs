@@ -126,6 +126,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptStepTest do
       assert ScriptStep.build(row(42)).command == :set_melee_attack
       assert ScriptStep.build(row(43)).command == :set_combat_movement
       assert ScriptStep.build(row(50)).command == :call_for_help
+      assert ScriptStep.build(row(48)).command == :deal_damage
       assert ScriptStep.build(row(51)).command == :set_sheath
       assert ScriptStep.build(row(52)).command == :invincibility
       assert ScriptStep.build(row(60)).command == :start_waypoints

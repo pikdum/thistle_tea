@@ -101,7 +101,8 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard do
         move_target: nil,
         orientation: nil,
         wait_time: nil,
-        next_waypoint_at: now + max(initial_delay, 0)
+        next_waypoint_at: now + max(initial_delay, 0),
+        waypoint_hold: nil
     }
 
     %{blackboard | navigation: navigation}

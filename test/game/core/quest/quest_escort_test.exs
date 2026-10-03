@@ -119,6 +119,39 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscortTest do
     end
   end
 
+  describe "point actions" do
+    test "hold the path until the escortee's summons are gone, then run the release", %{escort: escort} do
+      escort = %{escort | points: %{4 => [{:hold, [{:say, 104}]}]}}
+
+      assert [%ScriptStep{command: :hold_waypoints, datalong: 400_000, sub_scripts: %{1 => [release]}}] =
+               escort |> QuestEscort.point_steps(9, 0) |> Map.fetch!(4)
+
+      assert %ScriptStep{command: :talk, dataint: 104, target_type: :map_event_target, target_param1: 4_242} = release
+    end
+
+    test "end the event before the escortee dies, and emote through another creature", %{escort: escort} do
+      escort = %{escort | points: %{4 => [{:emote_by, 9538, 37}, :die]}}
+
+      assert [emote, end_event, die] = escort |> QuestEscort.point_steps(9, 0) |> Map.fetch!(4)
+
+      assert %ScriptStep{
+               command: :emote,
+               datalong: 37,
+               target_type: :nearest_creature_with_entry,
+               target_param1: 9538,
+               swap_final?: true
+             } = emote
+
+      assert %ScriptStep{command: :end_map_event, datalong: 4_242, datalong2: 1} = end_event
+      assert %ScriptStep{command: :deal_damage, datalong: 100, datalong2: 1, target_self?: true} = die
+    end
+
+    test "credit at the end of a scene", %{escort: escort} do
+      assert [_say, %ScriptStep{command: :quest_explored, delay_ms: 23_000}] =
+               %{escort | credit_delay_ms: 23_000} |> QuestEscort.point_steps(9, 0) |> Map.fetch!(3)
+    end
+  end
+
   describe "summon_entries/1" do
     test "lists each summoned entry once", %{escort: escort} do
       assert QuestEscort.summon_entries(escort) == [77, 78]

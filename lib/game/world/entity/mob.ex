@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   alias ThistleTea.Game.Core.AI.BT.Pet.Targeting, as: PetTargeting
   alias ThistleTea.Game.Core.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Core.AI.BT.Totem, as: TotemBT
+  alias ThistleTea.Game.Core.AI.BT.WaypointHold
   alias ThistleTea.Game.Core.AI.EventAI
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.Script.Request, as: ScriptRequest
@@ -345,6 +346,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
     state =
       state
       |> GuardCall.summon_ended(event)
+      |> WaypointHold.forget(event)
       |> SummonLifecycle.receive_event(event, now)
       |> NavigationResolver.resolve(now)
       |> EventSink.emit_pending()

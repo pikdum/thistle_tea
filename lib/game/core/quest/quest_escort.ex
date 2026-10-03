@@ -15,7 +15,8 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort do
   scripted map event keyed by the quest that fails the quest and respawns
   the escortee if it dies or strays further than `max_distance` from the
   player, clears the npc flags, and starts the path after `start_delay_ms`.
-  Reaching the credit point credits the player. The event stays open until
+  Reaching the credit point credits the player, after `credit_delay_ms`
+  when the C++ credits at the end of a scene there. The event stays open until
   the last point's wait runs out, so later points still speak to the player
   and a lost escort still respawns; then the event ends and the escortee
   despawns, respawning at once when `instant_respawn?` is set.
@@ -38,6 +39,7 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort do
     points: %{},
     path: nil,
     max_distance: 100,
+    credit_delay_ms: 0,
     start_delay_ms: 2_500,
     instant_respawn?: false
   ]
@@ -128,6 +130,7 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort do
       datalong: quest_id,
       datalong2: escort.max_distance,
       datalong3: 1,
+      delay_ms: max(escort.credit_delay_ms, 0),
       target_type: :map_event_target,
       target_param1: quest_id
     }

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
   alias ThistleTea.Game.Core.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Core.AI.BT.Mob, as: MobBT
+  alias ThistleTea.Game.Core.AI.BT.WaypointHold
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
@@ -30,6 +31,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Movement
+  alias ThistleTea.Game.Core.Pet.SummonEvent
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
@@ -523,6 +525,34 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
 
       assert {{:running, 4_000, :waypoint}, ^state, ^blackboard} =
                MobBT.wait_until_waypoint_ready(state, blackboard, 1_000)
+    end
+
+    test "holds until the creature's summons are gone, then runs the release steps" do
+      summon = Guid.from_low_guid(:mob, 9522, Unique.integer())
+      release = [%ScriptStep{command: :set_run, datalong: 1}]
+      blackboard = WaypointHold.start(%Blackboard{}, 1_000, 400_000, release)
+      state = WaypointHold.track(fixture_mob(), summon)
+
+      assert {{:running, 1, :waypoint}, _state, _blackboard} =
+               MobBT.wait_until_waypoint_ready(state, blackboard, Context.new(1_000))
+
+      assert {{:running, 399_000, :waypoint}, _state, _blackboard} =
+               MobBT.wait_until_waypoint_ready(state, blackboard, Context.new(2_000))
+
+      ended = %SummonEvent{event: :summoned_just_died, entry: 9522, world: nil, observation: %{guid: summon}}
+      state = WaypointHold.forget(state, ended)
+
+      assert {:success, _state, released} = MobBT.wait_until_waypoint_ready(state, blackboard, Context.new(2_000))
+      assert released.navigation.waypoint_hold == nil
+      assert released.navigation.run_mode
+    end
+
+    test "gives up holding once the hold runs out" do
+      state = WaypointHold.track(fixture_mob(), Guid.from_low_guid(:mob, 9522, Unique.integer()))
+      blackboard = WaypointHold.start(%Blackboard{}, 1_000, 5_000, [])
+
+      assert {:success, _state, %Blackboard{navigation: %{waypoint_hold: nil}}} =
+               MobBT.wait_until_waypoint_ready(state, blackboard, Context.new(6_000))
     end
   end
 

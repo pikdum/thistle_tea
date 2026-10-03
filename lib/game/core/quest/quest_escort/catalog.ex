@@ -3,7 +3,9 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
   Open-world escort quests ported from the vmangos `npc_escortAI` C++
   scripts, keyed by quest id. Each keeps the script's accept actions,
   waypoint actions, credit point, and summons; aggro chatter and
-  dead-summon reactions are left out.
+  dead-summon reactions are left out. Grark Lorkrub holds at each ambush
+  until every summon is gone rather than counting kills, and his Searscale
+  drakes appear where they strike instead of waiting there two points early.
   """
 
   alias ThistleTea.Game.Core.Quest.QuestEscort
@@ -425,6 +427,56 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
           10 => [:walk],
           11 => [{:say, 3090}]
         }
+      },
+      %QuestEscort{
+        quest_id: 4121,
+        entry: 9520,
+        credit_point: 45,
+        credit_delay_ms: 23_000,
+        points: %{
+          1 => [{:say, 4903}],
+          7 => [{:say, 4904}],
+          12 =>
+            [{:say, 4905}] ++
+              blackrock_ambush([
+                {9522, {-7844.3, -1521.6, 139.2, 0.0}},
+                {9522, {-7860.4, -1507.8, 141.0, 6.0}},
+                {9605, {-7845.6, -1508.1, 138.8, 6.1}},
+                {9605, {-7859.8, -1521.8, 139.2, 6.2}}
+              ]) ++ [{:hold, [{:say, 4906}]}],
+          24 =>
+            [{:say, 4907}] ++
+              blackrock_ambush([
+                {9522, {-8035.3, -1222.2, 135.5, 5.1}},
+                {9522, {-8009.5, -1222.1, 139.2, 3.9}},
+                {7042, {-8037.5, -1216.9, 135.8, 5.1}},
+                {7042, {-8007.1, -1219.4, 140.1, 3.9}}
+              ]) ++ [{:hold, [{:say, 4908}]}],
+          30 =>
+            [{:say, 4909}] ++
+              blackrock_ambush([
+                {7046, {-7900.1, -1133.14, 193.98, 3.0}},
+                {7046, {-7898.8, -1125.1, 193.9, 3.0}},
+                {7046, {-7895.6, -1119.5, 194.5, 3.1}}
+              ]) ++ [{:hold, [{:say, 4911}]}],
+          36 => [{:say, 4912}],
+          45 => [
+            {:say, 4913},
+            {:summon, 9538, {-7532.3, -1029.4, 258.0, 2.7}, despawn: {:timed, 40_000}},
+            {:summon, 9539, {-7532.8, -1032.9, 258.2, 2.5}, despawn: {:timed, 40_000}},
+            {:hold, []},
+            {:after, 3_000, {:say_by, 9539, 4928}},
+            {:after, 3_000, {:stand, 8}},
+            {:after, 8_000, {:say_by, 9539, 4929}},
+            {:after, 12_000, {:say_by, 9538, 4930}},
+            {:after, 15_000, {:say_by, 9539, 4932}},
+            {:after, 18_000, {:say_by, 9539, 4931}},
+            {:after, 18_000, {:emote_by, 9538, 37}},
+            {:after, 23_000, {:stand, 7}},
+            {:after, 23_000, {:say_by, 9539, 4933}},
+            {:after, 23_500, :die}
+          ]
+        }
       }
     ]
   end
@@ -434,6 +486,12 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
   def summon_entries, do: all() |> Enum.flat_map(&QuestEscort.summon_entries/1) |> Enum.uniq()
 
   defp gravelflint, do: [attack: :player, despawn: {:timed_out_of_combat, 30_000}]
+
+  defp blackrock_ambush(summons) do
+    Enum.map(summons, fn {entry, position} ->
+      {:summon, entry, position, attack: :player, despawn: {:timed_out_of_combat, 200_000}}
+    end)
+  end
 
   defp vengeful_surge, do: [attack: :escort, despawn: {:timed_or_corpse, 600_000}]
 

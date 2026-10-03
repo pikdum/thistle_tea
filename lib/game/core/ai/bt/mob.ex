@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   alias ThistleTea.Game.Core.AI.BT.Pet, as: PetBT
   alias ThistleTea.Game.Core.AI.BT.SeekAssistance
   alias ThistleTea.Game.Core.AI.BT.Spell, as: SpellBT
+  alias ThistleTea.Game.Core.AI.BT.WaypointHold
   alias ThistleTea.Game.Core.AI.EventAI
   alias ThistleTea.Game.Core.AI.NavigationIntent
   alias ThistleTea.Game.Core.AI.Script
@@ -1115,8 +1116,18 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
     end
   end
 
-  def wait_until_waypoint_ready(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
-    wait_until_waypoint_ready(state, blackboard, now)
+  def wait_until_waypoint_ready(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
+    case WaypointHold.status(state, blackboard, now) do
+      {:hold, delay_ms} ->
+        {BT.running(delay_ms, :waypoint), state, blackboard}
+
+      {:release, steps} ->
+        {state, blackboard} = Script.run(state, WaypointHold.clear(blackboard), steps, nil, context)
+        wait_until_waypoint_ready(state, blackboard, now)
+
+      :none ->
+        wait_until_waypoint_ready(state, blackboard, now)
+    end
   end
 
   def wait_until_waypoint_ready(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do

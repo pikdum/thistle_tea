@@ -117,6 +117,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal do
     corpse_reclaim: %CorpseReclaim{},
     guardians: %{},
     guardian_monitors: %{},
+    live_summons: MapSet.new(),
     game_object_monitors: %{},
     pet_stable: %PetStable{},
     pvp: %Pvp{},

@@ -260,6 +260,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   defp command(45), do: :set_phase_random
   defp command(46), do: :set_phase_range
   defp command(47), do: :flee
+  defp command(48), do: :deal_damage
   defp command(49), do: :zone_combat_pulse
   defp command(50), do: :call_for_help
   defp command(51), do: :set_sheath

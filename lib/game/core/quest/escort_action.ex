@@ -5,15 +5,21 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
 
   Actions are `{:say, text_id}` (spoken to the player),
   `{:say_by, entry, text_id}` (spoken by the nearest creature of that entry),
-  `{:emote, emote_id}`, `{:stand, stand_state}`, `{:faction, faction_id}`
+  `{:emote, emote_id}`, `{:emote_by, entry, emote_id}` (played by the
+  nearest creature of that entry), `{:stand, stand_state}`,
+  `{:faction, faction_id}`
   (until respawn), `:run`, `:walk`, `{:add_aura, spell_id}`,
   `{:remove_aura, spell_id}`, `{:remove_unit_flags, mask}` (until
   respawn), `{:invincible, health_pct}` (never falls below that share of its
   health), `{:attack, :player}` (turns on the player, given a hostile
   faction first), `:fail` (fails the quest for the player and their group),
+  `:die` (ends the quest's map event, then kills the escortee),
   `{:event_phase, phase}` (the escortee's EventAI phase, for a script port
   that reacts to it), `{:summon, entry, position, opts}`, and
-  `{:after, delay_ms, action}`. A summon despawns per
+  `{:after, delay_ms, action}`. `{:hold, actions}` stops the escort at its
+  point until every creature the escortee summoned is gone, for at most
+  400 s, then runs `actions`; it must not be delayed, so the summons beside
+  it are counted. A summon despawns per
   `despawn: {type, delay_ms}` (vmangos `TempSummonType` names), attacks the
   escortee, the player, or nothing per `attack:`, and runs the actions in
   `script:`.
@@ -35,6 +41,9 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   @attack_provided 0
   @attack_self 8
   @attack_event_target 23
+  @hold_ms 400_000
+  @event_success 1
+  @hold_release_script 1
 
   @despawn_types %{
     timed_or_dead: 1,
@@ -51,6 +60,7 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   end
 
   defp summon_entry({:after, _delay_ms, action}), do: summon_entry(action)
+  defp summon_entry({:hold, actions}), do: Enum.flat_map(actions, &summon_entry/1)
   defp summon_entry({:summon, entry, _position, _opts}), do: [entry]
   defp summon_entry(_action), do: []
 
@@ -75,6 +85,20 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   end
 
   def steps({:emote, emote_id}, _quest_id, _phase), do: [%ScriptStep{command: :emote, datalong: emote_id}]
+
+  def steps({:emote_by, entry, emote_id}, _quest_id, _phase) do
+    [
+      %ScriptStep{
+        command: :emote,
+        datalong: emote_id,
+        target_type: :nearest_creature_with_entry,
+        target_param1: entry,
+        target_param2: @speaker_radius,
+        swap_final?: true
+      }
+    ]
+  end
+
   def steps({:stand, stand_state}, _quest_id, _phase), do: [%ScriptStep{command: :stand_state, datalong: stand_state}]
 
   def steps({:faction, faction_id}, _quest_id, _phase) do
@@ -96,8 +120,27 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   def steps({:invincible, health_pct}, _quest_id, _phase),
     do: [%ScriptStep{command: :invincibility, datalong: health_pct, datalong2: @percent}]
 
+  def steps({:hold, actions}, quest_id, phase) when is_list(actions) do
+    release = Enum.flat_map(actions, &steps(&1, quest_id, phase))
+
+    [
+      %ScriptStep{
+        command: :hold_waypoints,
+        datalong: @hold_ms,
+        sub_scripts: %{@hold_release_script => release}
+      }
+    ]
+  end
+
   def steps({:attack, :player}, quest_id, phase),
     do: [player_target(%ScriptStep{command: :attack_start}, quest_id, phase)]
+
+  def steps(:die, quest_id, _phase) do
+    [
+      %ScriptStep{command: :end_map_event, datalong: quest_id, datalong2: @event_success},
+      %ScriptStep{command: :deal_damage, datalong: 100, datalong2: @percent, target_self?: true}
+    ]
+  end
 
   def steps(:fail, quest_id, phase),
     do: [player_target(%ScriptStep{command: :fail_quest, datalong: quest_id}, quest_id, phase)]
