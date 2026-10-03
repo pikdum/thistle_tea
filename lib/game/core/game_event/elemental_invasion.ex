@@ -78,6 +78,8 @@ defmodule ThistleTea.Game.Core.GameEvent.ElementalInvasion do
 
   def elements, do: @elements
 
+  def summon_entries, do: Enum.map(@elements, & &1.invader)
+
   def first_stage, do: @first_stage
 
   def rest_ms, do: @rest_ms

@@ -11,7 +11,9 @@ defmodule ThistleTea.Game.Core.Spell.Holiday do
   mistletoe makes its target respond, Greatfather Winter's mistletoe gives
   mistletoe or holly, and a PX-238 Winter Wondervolt swaps the costume of
   whoever stands at its heart for a random one. A Bag of Heart Candies gives
-  one of its candies.
+  one of its candies. In the Lunar Festival, Elune's Candle sends one of its
+  flames at Omen, a chosen flame at his minions, and a harmless spark at
+  anything else.
   """
 
   alias ThistleTea.Game.Core.Aura
@@ -56,6 +58,12 @@ defmodule ThistleTea.Game.Core.Spell.Holiday do
   @wondervolt_reach 1.0
   @bag_of_candies 26_678
   @heart_candies [26_668, 26_670, 26_671, 26_672, 26_673, 26_674, 26_675, 26_676]
+  @elunes_candle 26_374
+  @candle_fizzle 26_636
+  @omen 15_467
+  @omen_candles [26_622, 26_623, 26_624, 26_625, 26_649]
+  @minion_of_omen 15_466
+  @minion_candle 26_624
 
   @spells [
             @trick_or_treat,
@@ -66,7 +74,8 @@ defmodule ThistleTea.Game.Core.Spell.Holiday do
             @mistletoe,
             @greatfather_mistletoe,
             @wondervolt,
-            @bag_of_candies
+            @bag_of_candies,
+            @elunes_candle
           ] ++ Map.keys(@wands)
 
   def spell?(%Spell{id: id}), do: id in @spells
@@ -126,6 +135,19 @@ defmodule ThistleTea.Game.Core.Spell.Holiday do
   def apply(state, %CastContext{caster_guid: guid} = context, %Spell{id: @bag_of_candies}, _now)
       when guid == state.object.guid do
     {state, [pick(Enum.map(@heart_candies, &trigger(context, guid, &1)))]}
+  end
+
+  def apply(
+        %{object: %{guid: target, entry: entry}} = state,
+        %CastContext{} = context,
+        %Spell{id: @elunes_candle},
+        _now
+      ) do
+    case entry do
+      @omen -> {state, [pick(Enum.map(@omen_candles, &trigger(context, target, &1)))]}
+      @minion_of_omen -> {state, [trigger(context, target, @minion_candle)]}
+      _other -> {state, [trigger(context, target, @candle_fizzle)]}
+    end
   end
 
   def apply(state, _context, _spell, _now), do: {state, []}

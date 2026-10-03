@@ -107,6 +107,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   alias ThistleTea.Game.World.Entity.Mob.Corpse
   alias ThistleTea.Game.World.Entity.Mob.CreatureEventEnvironment
   alias ThistleTea.Game.World.Entity.Mob.CreaturePetOwner
+  alias ThistleTea.Game.World.Entity.Mob.FireworkGuy
   alias ThistleTea.Game.World.Entity.Mob.Flight
   alias ThistleTea.Game.World.Entity.Mob.Incarnation
   alias ThistleTea.Game.World.Entity.Mob.PetCasting
@@ -1752,6 +1753,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   def handle_continue({:spawned, now}, %Mob{} = state) do
     state =
       state
+      |> FireworkGuy.launch()
       |> EventSink.emit_pending()
       |> EventAI.with_blackboard(&EventAI.on_spawned(&1, &2, now, AIEnvironment.context(&1, now)))
       |> NavigationResolver.resolve(now)

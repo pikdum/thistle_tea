@@ -49,6 +49,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   alias ThistleTea.Game.World.Entity.GameObject.ElementalRift
   alias ThistleTea.Game.World.Entity.GameObject.Fishing
   alias ThistleTea.Game.World.Entity.GameObject.Goober, as: GooberServer
+  alias ThistleTea.Game.World.Entity.GameObject.OmenLauncher
   alias ThistleTea.Game.World.Entity.GameObject.Ritual, as: RitualServer
   alias ThistleTea.Game.World.Entity.GameObject.SpellCast
   alias ThistleTea.Game.World.Entity.GameObject.Trap, as: TrapServer
@@ -257,7 +258,11 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   end
 
   def handle_cast(%SummonEvent{} = event, %GameObject{} = state) do
-    {:noreply, ElementalRift.summon_event(state, event)}
+    {:noreply, state |> ElementalRift.summon_event(event) |> OmenLauncher.summon_event(event)}
+  end
+
+  def handle_cast(:firework_launched, %GameObject{} = state) do
+    {:noreply, state |> OmenLauncher.firework_launched() |> EventSink.emit_pending(Context.new(self()))}
   end
 
   @impl GenServer

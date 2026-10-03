@@ -147,6 +147,8 @@ defmodule ThistleTea.Game.World.Entity do
 
   def debug_damage(entity, source, amount), do: dispatch_cast(entity, {:debug_damage, source, amount})
 
+  def firework_launched(entity), do: dispatch_cast(entity, :firework_launched)
+
   def attack_outcome(entity, payload) do
     dispatch_cast(entity, {:attack_outcome, payload})
   end

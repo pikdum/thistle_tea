@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.KindalMoonweaver
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
   alias ThistleTea.Game.Core.AI.CreatureScript.Murkdeep
+  alias ThistleTea.Game.Core.AI.CreatureScript.Omen
   alias ThistleTea.Game.Core.AI.CreatureScript.Piznik
   alias ThistleTea.Game.Core.AI.CreatureScript.RabidThistleBear
   alias ThistleTea.Game.Core.AI.CreatureScript.Route
@@ -75,6 +76,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     GizeltonCaravan,
     LazyPeon,
     Murkdeep,
+    Omen,
     Piznik,
     RabidThistleBear,
     ShakesOBreen,

@@ -25,7 +25,10 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.Core.AI.AreaTriggerScript
   alias ThistleTea.Game.Core.AI.CreatureScript
   alias ThistleTea.Game.Core.AI.GameObjectScript
+  alias ThistleTea.Game.Core.Creature.FireworkGuy
   alias ThistleTea.Game.Core.Creature.GuardPost
+  alias ThistleTea.Game.Core.GameEvent.ElementalInvasion
+  alias ThistleTea.Game.Core.GameEvent.MinionsOfOmen
   alias ThistleTea.Game.Core.InstanceScript
   alias ThistleTea.Game.Core.OutdoorPvp.Plaguelands
   alias ThistleTea.Game.Core.OutdoorPvp.PlaguelandsRewards
@@ -139,6 +142,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Instance.InstanceData
   alias ThistleTea.Game.World.System.LocalDefense, as: LocalDefenseSystem
+  alias ThistleTea.Game.World.System.MinionsOfOmen, as: MinionsOfOmenSystem
   alias ThistleTea.Game.World.System.OutdoorPvp, as: OutdoorPvpSystem
   alias ThistleTea.Game.World.System.OutdoorPvp.CaptureEnvironment
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -240,7 +244,8 @@ defmodule ThistleTea.Application do
         {SpawnPool.Supervisor, partitions: 8},
         {CellActivator, sweep: !test},
         {GameEventSystem, load_schedule: !test},
-        !test && ElementalInvasionSystem
+        !test && ElementalInvasionSystem,
+        !test && MinionsOfOmenSystem
       ]
       |> Enum.filter(& &1)
 
@@ -385,7 +390,10 @@ defmodule ThistleTea.Application do
             QuestFollowerCatalog.summon_entries() ++
             CreatureScript.summon_entries() ++
             AreaTriggerScript.summon_entries() ++
-            GameObjectScript.summon_entries()
+            GameObjectScript.summon_entries() ++
+            ElementalInvasion.summon_entries() ++
+            MinionsOfOmen.summon_entries() ++
+            FireworkGuy.entries()
         )
 
         GameObjectLoader.preload_blueprints(InstanceScript.game_object_db_guids())

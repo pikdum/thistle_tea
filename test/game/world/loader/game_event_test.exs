@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.Loader.GameEventTest do
   alias ThistleTea.Game.Core.GameEvent.DragonsOfNightmare
   alias ThistleTea.Game.Core.GameEvent.ElementalInvasion
   alias ThistleTea.Game.Core.GameEvent.FireworksShow
+  alias ThistleTea.Game.Core.GameEvent.MinionsOfOmen
   alias ThistleTea.Game.Core.GameEvent.WarEffort
   alias ThistleTea.Game.World.Loader.GameEvent
 
@@ -34,7 +35,7 @@ defmodule ThistleTea.Game.World.Loader.GameEventTest do
       schedule =
         GameEvent.from_rows([
           %GameEventRow{entry: 4, hardcoded: 1, description: "Darkmoon Faire (Elwynn)"},
-          %GameEventRow{entry: 43, hardcoded: 1, description: "Lunar Festival: Minions of Omen"}
+          %GameEventRow{entry: 17, hardcoded: 1, description: "Scourge Invasion"}
         ])
 
       assert [%{id: 4, rule: DarkmoonFaire, description: "Darkmoon Faire (Elwynn)"}] = schedule.entries
@@ -47,12 +48,13 @@ defmodule ThistleTea.Game.World.Loader.GameEventTest do
       schedule = GameEvent.load_schedule()
 
       assert schedule.entries != []
-      assert Enum.all?(schedule.entries, &(&1.id not in [17, 43]))
+      assert Enum.all?(schedule.entries, &(&1.id != 17))
       assert Enum.any?(schedule.entries, &(&1.id == 103))
       assert [4, 5, 23, 24] == for(%{rule: DarkmoonFaire, id: id} <- schedule.entries, do: id)
       assert [6, 39] == for(%{rule: FireworksShow, id: id} <- schedule.entries, do: id)
       assert [66] == for(%{rule: DragonsOfNightmare, id: id} <- schedule.entries, do: id)
       assert [84, 85, 86] == for(%{rule: WarEffort, id: id} <- schedule.entries, do: id)
+      assert [43] == for(%{rule: MinionsOfOmen, id: id} <- schedule.entries, do: id)
 
       assert Enum.sort(ElementalInvasion.events()) ==
                for(%{rule: ElementalInvasion, id: id} <- schedule.entries, do: id)

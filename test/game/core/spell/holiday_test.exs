@@ -108,6 +108,21 @@ defmodule ThistleTea.Game.Core.Spell.HolidayTest do
       assert {_, [_ | _]} = SpellEffect.receive(put_in(dressed.unit.bounding_radius, 0.6), far, script(26_275), 0)
       assert {^dressed, []} = SpellEffect.receive(dressed, far, script(26_275), 0)
     end
+
+    test "Elune's Candle flames Omen and his minions and only sparks at anything else", %{player: player} do
+      omen = %{mob() | object: %Object{guid: 1, entry: 15_467}}
+      {_, [choice]} = SpellEffect.receive(omen, from(7, :player), dummy(26_374), 0)
+      assert spell_ids(choice) == [26_622, 26_623, 26_624, 26_625, 26_649]
+      assert Enum.all?(sources(choice), &(&1 == {7, 1}))
+
+      minion = %{mob() | object: %Object{guid: 1, entry: 15_466}}
+
+      assert {_, [%Effects.TriggerSpell{source_guid: 7, target_guid: 1, spell_id: 26_624}]} =
+               SpellEffect.receive(minion, from(7, :player), dummy(26_374), 0)
+
+      assert {_, [%Effects.TriggerSpell{source_guid: 7, target_guid: 1, spell_id: 26_636}]} =
+               SpellEffect.receive(player, from(7, :player), dummy(26_374), 0)
+    end
   end
 
   defp spell_ids(%RandomChoice{choices: choices}),

@@ -15,13 +15,14 @@ defmodule ThistleTea.Game.Core.GameEvent.Rule do
   alias ThistleTea.Game.Core.GameEvent.DragonsOfNightmare
   alias ThistleTea.Game.Core.GameEvent.ElementalInvasion
   alias ThistleTea.Game.Core.GameEvent.FireworksShow
+  alias ThistleTea.Game.Core.GameEvent.MinionsOfOmen
   alias ThistleTea.Game.Core.GameEvent.WarEffort
 
   @callback events() :: [integer()]
   @callback active_events(DateTime.t(), MapSet.t(integer())) :: [integer()]
   @callback boundaries(DateTime.t()) :: Enumerable.t(DateTime.t())
 
-  @rules [DarkmoonFaire, DragonsOfNightmare, ElementalInvasion, FireworksShow, WarEffort]
+  @rules [DarkmoonFaire, DragonsOfNightmare, ElementalInvasion, FireworksShow, MinionsOfOmen, WarEffort]
 
   def for_event(id) when is_integer(id), do: Enum.find(@rules, &(id in &1.events()))
 
