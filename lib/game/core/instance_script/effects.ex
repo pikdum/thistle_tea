@@ -84,4 +84,10 @@ defmodule ThistleTea.Game.Core.InstanceScript.Effects do
     @enforce_keys [:db_guid, :duration_ms]
     defstruct [:db_guid, :duration_ms]
   end
+
+  defmodule LoadCreatureSpawns do
+    @moduledoc false
+    @enforce_keys [:db_guids]
+    defstruct [:db_guids]
+  end
 end

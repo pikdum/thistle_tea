@@ -29,6 +29,18 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSink do
     :ok
   end
 
+  def emit(%WorldRef{} = world, %Effects.LoadCreatureSpawns{db_guids: db_guids}, options) do
+    blueprints = Keyword.get(options, :creature_blueprints, &MobLoader.blueprints/1)
+    load = Keyword.get(options, :load_creature, &SpawnPool.load_creature/2)
+
+    db_guids
+    |> blueprints.()
+    |> Map.values()
+    |> Enum.each(&load.(world, &1))
+
+    :ok
+  end
+
   def emit(%WorldRef{} = world, %Effects.RunCreatureScript{within: {center, radius}} = effect, options) do
     guids = Keyword.get(options, :guids, &World.guids/1)
     position = Keyword.get(options, :position, &World.position/1)

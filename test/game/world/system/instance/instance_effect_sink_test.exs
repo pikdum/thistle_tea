@@ -123,6 +123,24 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSinkTest do
       assert :ok = InstanceEffectSink.emit(context.world, %{effect | db_guid: 1}, options)
       refute_receive {:respawn, _, _, _}
     end
+
+    test "loads held-back creature spawns into the exact copy", context do
+      owner = self()
+
+      options =
+        context.options
+        |> Keyword.put(:creature_blueprints, fn [301_311, 301_312] ->
+          %{{:creature, 301_311} => :andorov, {:creature, 301_312} => :elite}
+        end)
+        |> Keyword.put(:load_creature, fn world, blueprint -> send(owner, {:load, world, blueprint}) end)
+
+      effect = %Effects.LoadCreatureSpawns{db_guids: [301_311, 301_312]}
+      assert :ok = InstanceEffectSink.emit(context.world, effect, options)
+
+      world = context.world
+      assert_receive {:load, ^world, :andorov}
+      assert_receive {:load, ^world, :elite}
+    end
   end
 
   test "fans player effects out to every player in the exact copy", context do

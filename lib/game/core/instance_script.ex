@@ -6,12 +6,22 @@ defmodule ThistleTea.Game.Core.InstanceScript do
   alias ThistleTea.Game.Core.InstanceScript.BlackrockDepths
   alias ThistleTea.Game.Core.InstanceScript.Deadmines
   alias ThistleTea.Game.Core.InstanceScript.RazorfenKraul
+  alias ThistleTea.Game.Core.InstanceScript.RuinsOfAhnQiraj
   alias ThistleTea.Game.Core.InstanceScript.ScarletMonastery
   alias ThistleTea.Game.Core.InstanceScript.ShadowfangKeep
   alias ThistleTea.Game.Core.InstanceScript.Stratholme
   alias ThistleTea.Game.Core.InstanceScript.SunkenTemple
 
-  @adapters [BlackrockDepths, Deadmines, RazorfenKraul, ScarletMonastery, ShadowfangKeep, Stratholme, SunkenTemple]
+  @adapters [
+    BlackrockDepths,
+    Deadmines,
+    RazorfenKraul,
+    RuinsOfAhnQiraj,
+    ScarletMonastery,
+    ShadowfangKeep,
+    Stratholme,
+    SunkenTemple
+  ]
 
   def broadcast_text_ids do
     @adapters |> Enum.flat_map(& &1.broadcast_text_ids()) |> Enum.uniq()
@@ -97,6 +107,7 @@ defmodule ThistleTea.Game.Core.InstanceScript do
   defp adapter("instance_blackrock_depths"), do: BlackrockDepths
   defp adapter("instance_deadmines"), do: Deadmines
   defp adapter("instance_razorfen_kraul"), do: RazorfenKraul
+  defp adapter("instance_ruins_of_ahnqiraj"), do: RuinsOfAhnQiraj
   defp adapter("instance_scarlet_monastery"), do: ScarletMonastery
   defp adapter("instance_shadowfang_keep"), do: ShadowfangKeep
   defp adapter("instance_stratholme"), do: Stratholme

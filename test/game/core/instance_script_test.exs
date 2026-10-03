@@ -5,6 +5,16 @@ defmodule ThistleTea.Game.Core.InstanceScriptTest do
   alias ThistleTea.Game.Core.InstanceScript.Effects
 
   @stratholme "instance_stratholme"
+  @script_names ~w(
+    instance_blackrock_depths
+    instance_deadmines
+    instance_razorfen_kraul
+    instance_ruins_of_ahnqiraj
+    instance_scarlet_monastery
+    instance_shadowfang_keep
+    instance_stratholme
+    instance_sunken_temple
+  )
 
   setup do
     {world, nil, instances} = Instance.enter(%Instance{}, 329, {:player, 100}, 100, @stratholme)
@@ -263,6 +273,21 @@ defmodule ThistleTea.Game.Core.InstanceScriptTest do
 
       assert {:ok, [], _instances} =
                Instance.creature_event(instances, context.world, creature_event(10_394, :death, guid: 205))
+    end
+  end
+
+  describe "adapter callbacks" do
+    test "every adapter answers the copy without disturbing it" do
+      for script_name <- @script_names do
+        {world, nil, instances} = Instance.enter(%Instance{}, 1, {:player, 100}, 100, script_name)
+
+        assert {:ok, effects, %Instance{}} = Instance.game_object_spawned(instances, world, 0), script_name
+        assert is_list(effects)
+        assert {:ok, effects, %Instance{}} = Instance.game_object_used(instances, world, 0), script_name
+        assert is_list(effects)
+        assert {:ok, effects, %Instance{}} = Instance.creature_event(instances, world, creature_event(0, :spawned))
+        assert is_list(effects)
+      end
     end
   end
 

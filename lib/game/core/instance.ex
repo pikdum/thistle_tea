@@ -255,6 +255,8 @@ defmodule ThistleTea.Game.Core.Instance do
       copy = %{copy | data: data}
       instances = %{instances | copies: Map.put(instances.copies, world, copy)}
       {:ok, stored, effects, instances}
+    else
+      {:error, _reason} = error -> error
     end
   end
 
@@ -268,6 +270,8 @@ defmodule ThistleTea.Game.Core.Instance do
       copy = %{copy | data: data, script_state: script_state}
       instances = %{instances | copies: Map.put(instances.copies, world, copy)}
       {:ok, effects, instances}
+    else
+      {:error, _reason} = error -> error
     end
   end
 
@@ -278,6 +282,8 @@ defmodule ThistleTea.Game.Core.Instance do
          {:ok, copy} <- fetch_copy(instances, world),
          {:ok, effects} <- InstanceScript.game_object_spawned(copy.script_name, copy.data, copy.script_state, entry) do
       {:ok, effects, instances}
+    else
+      {:error, _reason} = error -> error
     end
   end
 
@@ -291,6 +297,8 @@ defmodule ThistleTea.Game.Core.Instance do
       copy = %{copy | data: data, script_state: script_state}
       instances = %{instances | copies: Map.put(instances.copies, world, copy)}
       {:ok, effects, instances}
+    else
+      {:error, _reason} = error -> error
     end
   end
 
@@ -304,6 +312,8 @@ defmodule ThistleTea.Game.Core.Instance do
       copy = %{copy | data: data, script_state: script_state}
       instances = %{instances | copies: Map.put(instances.copies, world, copy)}
       {:ok, effects, instances}
+    else
+      {:error, _reason} = error -> error
     end
   end
 
