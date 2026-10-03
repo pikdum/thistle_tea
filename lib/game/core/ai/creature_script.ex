@@ -10,7 +10,9 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   resolves database script talk steps. Like vmangos, EventAI runs an event's
   actions directly and ignores step delays, so `timed/1` wraps a delayed
   sequence in a `start_script` step, the way the database chains generic
-  scripts. A script whose creature reacts to a quest being accepted, as
+  scripts. A C++ AI puts its creature back on its own faction in `Reset` when
+  it respawns, so ports change factions with `faction/1`, which restores on
+  respawn. A script whose creature reacts to a quest being accepted, as
   vmangos `QuestAccept` hooks do, returns the steps to append to that quest's
   start script from `quest_start_steps/0`, and one that reacts to a quest
   being turned in, as `QuestRewarded` hooks do, returns the steps to append
@@ -58,6 +60,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     TwilightCorrupter
   ]
   @timed_script 1
+  @restore_on_respawn 0x01
 
   def ported?(entry), do: not is_nil(script(entry))
 
@@ -100,6 +103,9 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   def timed(steps) when is_list(steps) do
     %ScriptStep{command: :start_script, datalong: @timed_script, dataint: 100, sub_scripts: %{@timed_script => steps}}
   end
+
+  def faction(faction_id) when is_integer(faction_id),
+    do: %ScriptStep{command: :set_faction, datalong: faction_id, datalong2: @restore_on_respawn}
 
   def only_in_phases(phases) when is_list(phases) do
     Enum.reduce(0..31, 0, fn phase, mask ->

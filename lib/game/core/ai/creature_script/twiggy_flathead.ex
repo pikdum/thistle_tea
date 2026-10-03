@@ -102,9 +102,9 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.TwiggyFlathead do
     |> Enum.with_index(1)
     |> Enum.map(fn {position, script_id} ->
       summon(@challenger, position, @challenger_stay_ms, script_id, [
-        %ScriptStep{command: :set_faction, datalong: @friendly},
+        CreatureScript.faction(@friendly),
         roar(),
-        %ScriptStep{command: :set_faction, datalong: @monster, delay_ms: fray_ms(script_id - 1)},
+        %{CreatureScript.faction(@monster) | delay_ms: fray_ms(script_id - 1)},
         %{roar() | delay_ms: fray_ms(script_id - 1)}
       ])
       |> Map.put(:delay_ms, @gather_ms)
@@ -113,9 +113,9 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.TwiggyFlathead do
 
   defp big_will do
     summon(@big_will, @big_will_arrival, @big_will_stay_ms, 1, [
-      %ScriptStep{command: :set_faction, datalong: @friendly},
+      CreatureScript.faction(@friendly),
       %ScriptStep{command: :move_to, datalong3: @pathfind, position: @ring},
-      %ScriptStep{command: :set_faction, datalong: @creature, delay_ms: @big_will_wait_ms},
+      %{CreatureScript.faction(@creature) | delay_ms: @big_will_wait_ms},
       %{talk(@ready_when_you_are) | delay_ms: @big_will_wait_ms}
     ])
   end

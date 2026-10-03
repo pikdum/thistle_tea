@@ -116,7 +116,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.DashelStonefist do
           %ScriptStep{command: :start_map_event, datalong: @missing_diplomat, datalong2: @event_limit_s},
           %ScriptStep{command: :set_phase, datalong: @fighting},
           talk(@gonna_get_it),
-          %ScriptStep{command: :set_faction, datalong: @brawler},
+          CreatureScript.faction(@brawler),
           npc_flags(@remove_flags),
           %ScriptStep{command: :invincibility, datalong: @yield_pct, datalong2: @percent}
         ] ++ Enum.map(@thugs, &summon_thug/1) ++ [%ScriptStep{command: :attack_start}]
@@ -127,7 +127,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.DashelStonefist do
     [
       %ScriptStep{command: :set_phase, datalong: @yielded},
       talk(@enough_fighting),
-      %ScriptStep{command: :set_faction, datalong: @friendly_to_all},
+      CreatureScript.faction(@friendly_to_all),
       thugs(@stand_down_script),
       %ScriptStep{command: :enter_evade}
     ]
@@ -147,7 +147,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.DashelStonefist do
 
   defp reset do
     [
-      %ScriptStep{command: :set_faction, datalong: @template_faction},
+      CreatureScript.faction(@template_faction),
       npc_flags(@add_flags),
       %ScriptStep{command: :invincibility, datalong: 0},
       %ScriptStep{command: :set_phase, datalong: @idle},
@@ -187,7 +187,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.DashelStonefist do
       datalong4: @thug_reach,
       sub_scripts: %{
         @stand_down_script => [
-          %ScriptStep{command: :set_faction, datalong: @friendly_to_all},
+          CreatureScript.faction(@friendly_to_all),
           %ScriptStep{command: :enter_evade}
         ],
         @leave_script => [%ScriptStep{command: :send_script_event, datalong: @leave, target_self?: true}],

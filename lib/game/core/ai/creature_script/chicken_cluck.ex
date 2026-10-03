@@ -56,13 +56,13 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.ChickenCluck do
   defp offer(text_id) do
     [
       questgiver(@set_flags),
-      %ScriptStep{command: :set_faction, datalong: @friendly},
+      CreatureScript.faction(@friendly),
       %ScriptStep{command: :talk, dataint: text_id},
       CreatureScript.timed(Enum.map(reset(), &%{&1 | delay_ms: @reset_ms}))
     ]
   end
 
-  defp reset, do: [questgiver(@remove_flags), %ScriptStep{command: :set_faction, datalong: @template_faction}]
+  defp reset, do: [questgiver(@remove_flags), CreatureScript.faction(@template_faction)]
 
   defp questgiver(mode) do
     %ScriptStep{command: :modify_flags, datalong: @npc_flags, datalong2: @questgiver, datalong3: mode}

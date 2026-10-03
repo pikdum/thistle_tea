@@ -87,7 +87,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.TapokeSlimJahn do
   defp give_up do
     [
       friend(@stand_down_script),
-      %ScriptStep{command: :set_faction, datalong: @friendly_to_all},
+      CreatureScript.faction(@friendly_to_all),
       %ScriptStep{command: :combat_stop},
       %ScriptStep{command: :movement, datalong: 0},
       %ScriptStep{command: :set_run, datalong: 0},
@@ -132,7 +132,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.TapokeSlimJahn do
       datalong4: @friend_reach,
       sub_scripts: %{
         @stand_down_script => [
-          %ScriptStep{command: :set_faction, datalong: @friendly_to_all},
+          CreatureScript.faction(@friendly_to_all),
           %ScriptStep{command: :combat_stop},
           talk(@more_than_i_bargained_for)
         ],

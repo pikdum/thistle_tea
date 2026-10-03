@@ -36,12 +36,12 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.Bartleby do
 
   @impl CreatureScript
   def quest_start_steps do
-    %{@beat_bartleby => [%ScriptStep{command: :set_faction, datalong: @enemy}, %ScriptStep{command: :attack_start}]}
+    %{@beat_bartleby => [CreatureScript.faction(@enemy), %ScriptStep{command: :attack_start}]}
   end
 
   defp yield do
     [%ScriptStep{command: :quest_explored, datalong: @beat_bartleby}, befriend(), %ScriptStep{command: :enter_evade}]
   end
 
-  defp befriend, do: %ScriptStep{command: :set_faction, datalong: @template_faction}
+  defp befriend, do: CreatureScript.faction(@template_faction)
 end
