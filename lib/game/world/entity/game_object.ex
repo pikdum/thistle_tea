@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Network.Message.SmsgFishNotHooked
   alias ThistleTea.Game.Network.Message.SmsgGameobjectCustomAnim
+  alias ThistleTea.Game.Network.Message.SmsgGameobjectDespawnAnim
   alias ThistleTea.Game.Network.Message.SmsgGameobjectResetState
   alias ThistleTea.Game.Network.Message.SmsgPlayObjectSound
   alias ThistleTea.Game.Network.UpdateObject
@@ -42,6 +43,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.Entity.GameObject.Chair
+  alias ThistleTea.Game.World.Entity.GameObject.CheerSpeaker
   alias ThistleTea.Game.World.Entity.GameObject.Chest
   alias ThistleTea.Game.World.Entity.GameObject.Fishing
   alias ThistleTea.Game.World.Entity.GameObject.Goober, as: GooberServer
@@ -67,6 +69,9 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
 
   require Logger
 
+  @summoning_ritual 18
+  @active 0
+
   def start_link(%GameObject{} = state) do
     GenServer.start_link(__MODULE__, state, name: EntityRegistry.via(state.object.guid))
   end
@@ -82,7 +87,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
     notify_instance_spawn(state)
     schedule_despawn(state)
     schedule_fishing_bite(state)
-    state = arm_trap(state)
+    state = state |> arm_trap() |> CheerSpeaker.start() |> EventSink.emit_pending(Context.new(self()))
     {:ok, state}
   end
 
@@ -378,6 +383,8 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
 
   @impl GenServer
   def handle_info({:event_stop, _event}, state) do
+    state = state |> CheerSpeaker.stop() |> EventSink.emit_pending(Context.new(self()))
+
     case SpawnPool.deactivate(state) do
       :pooled -> {:noreply, state}
       :unpooled -> despawn(state)
@@ -547,6 +554,10 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
     {:noreply, state |> Fishing.respawn() |> publish_condition_metadata()}
   end
 
+  def handle_info(:launch_firework, %GameObject{} = state) do
+    {:noreply, state |> CheerSpeaker.launch() |> EventSink.emit_pending(Context.new(self()))}
+  end
+
   def handle_info(:chest_respawn, %GameObject{} = state) do
     case SpawnPool.recycle(state) do
       :pooled -> {:noreply, state}
@@ -584,6 +595,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   defp cooldown_release(_state), do: nil
 
   defp despawn(state) do
+    send_despawn_animation(state)
     pid = self()
 
     Task.start(fn ->
@@ -592,6 +604,15 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
 
     {:noreply, state}
   end
+
+  defp send_despawn_animation(
+         %GameObject{internal: %Internal{summon: %Summon{}}, game_object: %{type_id: type, state: go_state}} = state
+       )
+       when type != @summoning_ritual or go_state == @active do
+    World.broadcast_packet(%SmsgGameobjectDespawnAnim{guid: state.object.guid}, state)
+  end
+
+  defp send_despawn_animation(_state), do: :ok
 
   defp schedule_despawn(%GameObject{internal: %Internal{fishing: %{bite_delay_ms: delay}}})
        when is_integer(delay) and delay > 0 do

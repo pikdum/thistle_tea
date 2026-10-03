@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.Loader.GameEventTest do
 
   alias ThistleTea.DB.Mangos.GameEvent, as: GameEventRow
   alias ThistleTea.Game.Core.GameEvent.DarkmoonFaire
+  alias ThistleTea.Game.Core.GameEvent.FireworksShow
   alias ThistleTea.Game.World.Loader.GameEvent
 
   describe "from_rows/1" do
@@ -46,6 +47,8 @@ defmodule ThistleTea.Game.World.Loader.GameEventTest do
       assert Enum.all?(schedule.entries, &(&1.id not in [13, 17]))
       assert Enum.any?(schedule.entries, &(&1.id == 103))
       assert [4, 5, 23, 24] == for(%{rule: DarkmoonFaire, id: id} <- schedule.entries, do: id)
+      assert [6, 39] == for(%{rule: FireworksShow, id: id} <- schedule.entries, do: id)
+      assert Enum.any?(schedule.entries, &(&1.id == 34))
     end
   end
 end

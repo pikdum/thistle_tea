@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectTest do
   alias ThistleTea.Game.Core.Profession.Lock
   alias ThistleTea.Game.Core.Profession.Lock.Requirement
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.Network.Message.SmsgGameobjectDespawnAnim
   alias ThistleTea.Game.Network.Message.SmsgGameobjectResetState
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.Entity
@@ -20,6 +21,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectTest do
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Test.Unique
 
   test "caught bobbers survive their cast expiry while loot is open" do
@@ -122,5 +124,44 @@ defmodule ThistleTea.Game.World.Entity.GameObjectTest do
       Entity.operate_game_object(guid, :reset)
       assert :sys.get_state(pid).game_object.state == 1
     end
+  end
+
+  describe "despawning" do
+    setup [:watcher]
+
+    test "a summoned object plays its despawn animation as it goes", %{world: world} do
+      template = %GameObjectTemplate{entry: 180_703, type: 1, flags: 0, size: 1.0, data: []}
+      firework = GameObject.build_summoned(template, world, {1.0, 2.0, 3.0, 0.0}, despawn_in_ms: 10)
+      guid = firework.object.guid
+      start_supervised!({GameObjectServer, firework})
+
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgGameobjectDespawnAnim{guid: ^guid}, _opts}}, 1_000
+    end
+
+    test "a database spawn leaves without one when its event ends", %{world: world} do
+      guid = Guid.from_low_guid(:game_object, 180_754, Unique.integer())
+
+      state = %GameObject{
+        object: %Object{guid: guid, entry: 180_754},
+        game_object: %GameObjectComponent{state: 1},
+        movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}},
+        internal: %Internal{world: world, event: 39}
+      }
+
+      pid = start_supervised!({GameObjectServer, state})
+      send(pid, {:event_stop, 39})
+      :sys.get_state(pid)
+
+      refute_received {:"$gen_cast", {:send_packet, %SmsgGameobjectDespawnAnim{}, _opts}}
+    end
+  end
+
+  defp watcher(_context) do
+    map_id = Unique.integer()
+    watcher = Unique.integer()
+    {:ok, _} = Entity.register(watcher)
+    SpatialHash.update(:players, watcher, map_id, 1.0, 2.0, 3.0)
+    on_exit(fn -> SpatialHash.remove(:players, watcher) end)
+    %{world: WorldRef.open(map_id)}
   end
 end

@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Core.GameEvent.ScheduleTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Core.GameEvent.DarkmoonFaire
+  alias ThistleTea.Game.Core.GameEvent.FireworksShow
   alias ThistleTea.Game.Core.GameEvent.Schedule
   alias ThistleTea.Game.Core.GameEvent.Schedule.Entry
 
@@ -54,6 +55,18 @@ defmodule ThistleTea.Game.Core.GameEvent.ScheduleTest do
       assert Schedule.next_transition(schedule, datetime("2026-10-02T13:00:00")) == datetime("2026-10-05T00:00:00")
       assert Schedule.next_transition(schedule, datetime("2026-10-06T13:00:00")) == datetime("2026-10-12T00:00:00")
       assert Schedule.next_transition(schedule, datetime("2026-10-12T13:00:00")) == datetime("2026-12-07T00:00:00")
+    end
+
+    test "follow the database-scheduled events active at the moment" do
+      new_year = entry(34, "2026-12-31T06:00:00", "2027-01-02T06:00:00", 24 * 365, 24)
+      schedule = Schedule.new([new_year, %Entry{id: 6, rule: FireworksShow}, %Entry{id: 39, rule: FireworksShow}])
+
+      assert Schedule.active_events(schedule, datetime("2026-12-31T05:05:00")) == []
+      assert Schedule.active_events(schedule, datetime("2026-12-31T06:05:00")) == [6, 34]
+      assert Schedule.active_events(schedule, datetime("2026-12-31T06:15:00")) == [34, 39]
+      assert Schedule.next_transition(schedule, datetime("2026-12-31T05:05:00")) == datetime("2026-12-31T06:00:00")
+      assert Schedule.next_transition(schedule, datetime("2026-12-31T06:15:00")) == datetime("2026-12-31T06:21:00")
+      assert Schedule.next_transition(schedule, datetime("2026-12-31T06:21:00")) == datetime("2026-12-31T18:00:00")
     end
   end
 

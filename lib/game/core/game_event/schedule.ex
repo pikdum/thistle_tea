@@ -2,11 +2,11 @@ defmodule ThistleTea.Game.Core.GameEvent.Schedule do
   @moduledoc """
   Pure recurrence calculations for game events. An entry recurs on its
   database row's start, end, occurrence, and length, unless it carries a
-  `Core.GameEvent.Rule`, whose calendar it follows instead: rule-driven events
-  change state at UTC midnight.
+  `Core.GameEvent.Rule`, whose calendar it follows instead. A rule sees the
+  moment and the database-scheduled events active at it, so a fireworks show
+  can follow the holidays it belongs to, and it names the moments its answer
+  can change.
   """
-
-  @rule_horizon_days 92
 
   defstruct entries: []
 
@@ -22,23 +22,28 @@ defmodule ThistleTea.Game.Core.GameEvent.Schedule do
   end
 
   def active_events(%__MODULE__{entries: entries}, %DateTime{} = now) do
+    scheduled = scheduled_events(entries, now)
+
     entries
-    |> Enum.filter(&active?(&1, now))
+    |> Enum.filter(&active?(&1, now, scheduled))
     |> Enum.map(& &1.id)
   end
 
   def next_transition(%__MODULE__{entries: entries}, %DateTime{} = now) do
     entries
-    |> Enum.map(&entry_transition(&1, now))
+    |> Enum.map(&entry_transition(&1, entries, now))
     |> Enum.reject(&is_nil/1)
     |> Enum.min_by(&DateTime.to_unix(&1, :millisecond), fn -> nil end)
   end
 
-  def active?(%Entry{rule: rule} = entry, %DateTime{} = now) when not is_nil(rule) do
-    rule_active?(entry, DateTime.to_date(now))
+  defp scheduled_events(entries, now) do
+    for %Entry{rule: nil} = entry <- entries, recurring_active?(entry, now), into: MapSet.new(), do: entry.id
   end
 
-  def active?(%Entry{} = entry, %DateTime{} = now) do
+  defp active?(%Entry{rule: nil} = entry, now, _scheduled), do: recurring_active?(entry, now)
+  defp active?(%Entry{id: id, rule: rule}, now, scheduled), do: id in rule.active_events(now, scheduled)
+
+  defp recurring_active?(%Entry{} = entry, %DateTime{} = now) do
     now_seconds = DateTime.to_unix(now)
     start_seconds = DateTime.to_unix(entry.starts_at)
     end_seconds = DateTime.to_unix(entry.ends_at)
@@ -52,20 +57,7 @@ defmodule ThistleTea.Game.Core.GameEvent.Schedule do
       rem(elapsed_seconds, entry.occurrence_seconds) < entry.length_seconds
   end
 
-  defp entry_transition(%Entry{rule: rule} = entry, %DateTime{} = now) when not is_nil(rule) do
-    today = DateTime.to_date(now)
-    active? = rule_active?(entry, today)
-
-    1..@rule_horizon_days
-    |> Stream.map(&Date.add(today, &1))
-    |> Enum.find(&(rule_active?(entry, &1) != active?))
-    |> case do
-      %Date{} = date -> DateTime.new!(date, ~T[00:00:00], "Etc/UTC")
-      nil -> nil
-    end
-  end
-
-  defp entry_transition(%Entry{} = entry, %DateTime{} = now) do
+  defp entry_transition(%Entry{rule: nil} = entry, _entries, %DateTime{} = now) do
     now_seconds = DateTime.to_unix(now)
     start_seconds = DateTime.to_unix(entry.starts_at)
     end_seconds = DateTime.to_unix(entry.ends_at)
@@ -85,6 +77,14 @@ defmodule ThistleTea.Game.Core.GameEvent.Schedule do
     end
   end
 
+  defp entry_transition(%Entry{rule: rule} = entry, entries, %DateTime{} = now) do
+    active? = active?(entry, now, scheduled_events(entries, now))
+
+    now
+    |> rule.boundaries()
+    |> Enum.find(&(active?(entry, &1, scheduled_events(entries, &1)) != active?))
+  end
+
   defp recurring_transition(%Entry{} = entry, now_seconds, start_seconds, end_seconds) do
     elapsed_seconds = now_seconds - start_seconds
     occurrence_start = start_seconds + div(elapsed_seconds, entry.occurrence_seconds) * entry.occurrence_seconds
@@ -99,6 +99,4 @@ defmodule ThistleTea.Game.Core.GameEvent.Schedule do
 
     DateTime.from_unix!(next_seconds)
   end
-
-  defp rule_active?(%Entry{id: id, rule: rule}, %Date{} = date), do: id in rule.active_events(date)
 end

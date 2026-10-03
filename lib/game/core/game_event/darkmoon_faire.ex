@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Core.GameEvent.DarkmoonFaire do
   Elwynn Forest in even-numbered months and in Mulgore in odd ones. For the
   three days before it opens, carnies put it up on the same site. Like
   vmangos, a month whose first Monday falls on the 1st, 2nd, or 3rd keeps only
-  the build days that fall within it.
+  the build days that fall within it. The faire changes at UTC midnight.
   """
 
   @behaviour ThistleTea.Game.Core.GameEvent.Rule
@@ -20,12 +20,21 @@ defmodule ThistleTea.Game.Core.GameEvent.DarkmoonFaire do
   @mulgore_building 24
   @building_days 3
   @open_days 7
+  @horizon_days 92
 
   @impl Rule
   def events, do: [@elwynn, @mulgore, @elwynn_building, @mulgore_building]
 
   @impl Rule
-  def active_events(%Date{day: day} = date) do
+  def active_events(%DateTime{} = now, _scheduled), do: on(DateTime.to_date(now))
+
+  @impl Rule
+  def boundaries(%DateTime{} = now) do
+    today = DateTime.to_date(now)
+    Stream.map(1..@horizon_days, &DateTime.new!(Date.add(today, &1), ~T[00:00:00], "Etc/UTC"))
+  end
+
+  def on(%Date{day: day} = date) do
     opening = first_monday(date)
 
     cond do

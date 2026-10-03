@@ -2,15 +2,21 @@ defmodule ThistleTea.Game.Core.GameEvent.Rule do
   @moduledoc """
   The calendar of a hardcoded game event. vmangos starts and stops these from
   code instead of from their `game_event` rows' recurrence, so a rule names the
-  events it owns and says which of them a calendar day keeps active.
+  events it owns and says which of them are active at a moment, given the
+  database-scheduled events active then. `boundaries/1` lists, in order, the
+  coming moments its answer can change at; a change the scheduled events
+  cause is found through their own transitions, so a rule that follows them
+  only needs to look as far ahead as its own clock reaches.
   """
 
   alias ThistleTea.Game.Core.GameEvent.DarkmoonFaire
+  alias ThistleTea.Game.Core.GameEvent.FireworksShow
 
   @callback events() :: [integer()]
-  @callback active_events(Date.t()) :: [integer()]
+  @callback active_events(DateTime.t(), MapSet.t(integer())) :: [integer()]
+  @callback boundaries(DateTime.t()) :: Enumerable.t(DateTime.t())
 
-  @rules [DarkmoonFaire]
+  @rules [DarkmoonFaire, FireworksShow]
 
   def for_event(id) when is_integer(id), do: Enum.find(@rules, &(id in &1.events()))
 
