@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.Spell.SpellEffectTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Death.ResurrectionOffer
@@ -13,6 +14,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffectTest do
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Pet.Companion.EntityRef
   alias ThistleTea.Game.Core.Spell
@@ -26,6 +28,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffectTest do
   alias ThistleTea.Game.Core.Spell.UnitTargets.Selector
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Test.Unique
 
   defp target_fixture do
     %Mob{
@@ -383,6 +386,26 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffectTest do
 
       assert {_pup, [%Effects.DespawnSelf{duration_ms: 0, respawn_delay_ms: 0}]} =
                SpellEffect.receive(target_fixture(), context, spell, 1_000)
+    end
+
+    test "merging oozes takes the primal ooze away and has the captured ooze raise a gargantuan one" do
+      spell = %Spell{id: 16_032, effects: [%Effect{index: 0, type: :dummy, implicit_target_a: :script}]}
+      captured_ooze = Guid.from_low_guid(:mob, 10_290, Unique.integer())
+      context = %CastContext{caster_guid: captured_ooze, caster_level: 50}
+
+      assert {_primal_ooze, [%Effects.ForwardScriptSteps{target_guid: ^captured_ooze, steps: steps}, despawn]} =
+               SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert %Effects.DespawnSelf{duration_ms: 0, respawn_delay_ms: 0} = despawn
+
+      assert [
+               %ScriptStep{command: :summon_creature, datalong: 9_621, datalong2: 420_000, dataint4: 1},
+               %ScriptStep{command: :despawn}
+             ] =
+               steps
+
+      player_context = %{context | caster_guid: Guid.from_low_guid(:player, Unique.integer())}
+      assert {_primal_ooze, []} = SpellEffect.receive(target_fixture(), player_context, spell, 1_000)
     end
 
     test "credits the recipient of quest-complete effects" do

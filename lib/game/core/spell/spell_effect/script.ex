@@ -36,6 +36,9 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
   alias ThistleTea.Game.Core.Spell.SpellTeaching
 
   @spirit_spawn_out 17_680
+  @gargantuan_ooze 9_621
+  @gargantuan_ooze_lifetime_ms 420_000
+  @timed_or_dead_despawn 1
 
   def apply(%Character{} = state, %CastContext{} = context, spell, %Effect{type: type} = effect, _now)
       when type in [:learn_spell, :learn_pet_spell, :skill_step] do
@@ -149,6 +152,19 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
 
   defp trigger_target_guid(state, _context, _effect), do: state.object.guid
 
+  defp merged_ooze do
+    [
+      %ScriptStep{
+        command: :summon_creature,
+        datalong: @gargantuan_ooze,
+        datalong2: @gargantuan_ooze_lifetime_ms,
+        dataint3: -1,
+        dataint4: @timed_or_dead_despawn
+      },
+      %ScriptStep{command: :despawn}
+    ]
+  end
+
   defp apply_class_dummy(state, context, _spell, %Effect{index: 0}, :six_demon_bag, _now) do
     ItemSpell.six_demon_bag(state, context)
   end
@@ -198,6 +214,15 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
 
   defp apply_class_dummy(%Mob{} = state, _context, _spell, %Effect{index: 0}, :capture_creature, _now) do
     {state, [Effects.despawn_self(0, 0)]}
+  end
+
+  defp apply_class_dummy(%Mob{} = state, context, _spell, %Effect{index: 0}, :merge_oozes, _now) do
+    if Guid.entity_type(context.caster_guid) == :mob do
+      {state,
+       [Effects.forward_script_steps(context.caster_guid, merged_ooze(), state.object.guid), Effects.despawn_self(0, 0)]}
+    else
+      {state, []}
+    end
   end
 
   defp apply_class_dummy(state, context, spell, %Effect{index: 0}, :item_self_outcome, _now) do
