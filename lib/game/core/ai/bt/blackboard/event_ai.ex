@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard.EventAI do
 
   defmodule Actions do
     @moduledoc false
-    defstruct [:token, :event_id, runs: MapSet.new(), failed?: false]
+    defstruct [:token, :event_id, checked?: false, runs: MapSet.new(), failed?: false]
   end
 
   defstruct phase: 0, timers: nil, disabled: nil, next_at: 0, sequence: 0, pending: %{}

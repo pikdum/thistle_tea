@@ -67,7 +67,7 @@ defmodule ThistleTea.Game.Core.AI.Script.Run do
   end
 
   defp completion_active?(blackboard, %__MODULE__{id: id, completion: {:event_ai, index, token}}) do
-    case Map.get(blackboard.event_ai.pending, index) do
+    case Map.get(blackboard.event_ai.pending, {index, token}) do
       %Actions{token: ^token, runs: runs} -> MapSet.member?(runs, id)
       _stale -> false
     end

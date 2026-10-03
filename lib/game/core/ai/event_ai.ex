@@ -16,9 +16,11 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
   state and the script-controlled phase live on the blackboard: non-repeatable
   events disable until the next combat entry, event timers re-roll from their
   repeat params, and out-of-combat timers re-initialize on evade, matching
-  vmangos `CreatureEventAI` reset semantics. Result-checked events re-enable
-  immediately when an action terminates, retrying on the next eligible tick
-  or edge. Each action group still runs independently of earlier failures.
+  vmangos `CreatureEventAI` reset semantics. Result-checked events wait for
+  their asynchronous actions and re-enable immediately when one terminates,
+  retrying on the next eligible tick or edge; every other event may fire
+  again while earlier actions are still out, so a burst of edges each runs.
+  Each action group still runs independently of earlier failures.
   An idle creature ticks only for its out-of-combat timers and friendly
   missing-buff polls; out-of-combat line-of-sight events wait for a unit to
   announce itself within `ooc_los_radius/3`, as vmangos evaluates them from
@@ -497,7 +499,7 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
     target_guid = invoker_guid || victim(state)
     token = blackboard.event_ai.sequence + 1
     blackboard = %{blackboard | event_ai: %{blackboard.event_ai | sequence: token}}
-    pending = %EventAIMemory.Actions{token: token, event_id: event.id}
+    pending = %EventAIMemory.Actions{token: token, event_id: event.id, checked?: event.check_result?}
 
     {state, blackboard, pending} =
       Enum.reduce(actions, {state, blackboard, pending}, fn steps, {state, blackboard, pending} ->
@@ -522,7 +524,7 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
   defp select_actions(%AIEvent{actions: actions}, _random), do: actions
 
   def complete_script(state, blackboard, %Effects.ScriptCompleted{completion: {:event_ai, index, token}} = effect, now) do
-    case {Map.get(blackboard.event_ai.pending, index), Enum.at(events(state), index)} do
+    case {Map.get(blackboard.event_ai.pending, {index, token}), Enum.at(events(state), index)} do
       {%EventAIMemory.Actions{token: ^token, event_id: event_id} = pending, %AIEvent{id: event_id} = event} ->
         if MapSet.member?(pending.runs, effect.run_id) do
           pending = %{
@@ -542,15 +544,17 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
   end
 
   defp finish_actions(blackboard, event, index, pending, now) do
+    key = {index, pending.token}
+
     if MapSet.size(pending.runs) == 0 do
       blackboard = %{
         blackboard
-        | event_ai: %{blackboard.event_ai | pending: Map.delete(blackboard.event_ai.pending, index)}
+        | event_ai: %{blackboard.event_ai | pending: Map.delete(blackboard.event_ai.pending, key)}
       }
 
       retry_failed_event(blackboard, event, index, now, pending.failed?)
     else
-      %{blackboard | event_ai: %{blackboard.event_ai | pending: Map.put(blackboard.event_ai.pending, index, pending)}}
+      %{blackboard | event_ai: %{blackboard.event_ai | pending: Map.put(blackboard.event_ai.pending, key, pending)}}
     end
   end
 
@@ -910,10 +914,16 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
   defp reset_ooc(%Blackboard{} = blackboard, _events, _now, %Context{}), do: blackboard
 
   defp enabled?(%Blackboard{event_ai: %EventAIMemory{disabled: %MapSet{} = disabled}} = blackboard, index) do
-    not MapSet.member?(disabled, index) and not Map.has_key?(blackboard.event_ai.pending, index)
+    not MapSet.member?(disabled, index) and not awaiting_result?(blackboard.event_ai.pending, index)
   end
 
   defp enabled?(%Blackboard{}, _index), do: true
+
+  defp awaiting_result?(pending, index) do
+    Enum.any?(pending, fn {{pending_index, _token}, %EventAIMemory.Actions{checked?: checked?}} ->
+      pending_index == index and checked?
+    end)
+  end
 
   defp disable(%Blackboard{event_ai: %EventAIMemory{disabled: %MapSet{} = disabled}} = blackboard, index) do
     %{blackboard | event_ai: %{blackboard.event_ai | disabled: MapSet.put(disabled, index)}}

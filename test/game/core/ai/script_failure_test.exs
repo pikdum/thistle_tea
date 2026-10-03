@@ -183,6 +183,27 @@ defmodule ThistleTea.Game.Core.AI.ScriptFailureTest do
       end
     end
 
+    test "unchecked events fire again while earlier asynchronous actions are out", %{mob: mob} do
+      gate = %ScriptStep{command: :start_map_event}
+      unchecked = %{event([[gate]], repeatable?: true) | check_result?: false, param3: 0, param4: 0}
+      mob = with_event(mob, unchecked)
+
+      {waiting, blackboard} = EventAI.tick(mob, Blackboard.new(), 0, Context.new(0))
+      assert [first] = waiting.internal.events
+
+      {again, blackboard} = EventAI.tick(clear_effects(waiting), blackboard, 1_000, Context.new(1_000))
+      assert [second] = again.internal.events
+      assert map_size(blackboard.event_ai.pending) == 2
+
+      {resumed, blackboard} = resume(again, blackboard, first.reply, :continue, 1_010)
+      assert [%Effects.ScriptCompleted{} = completed] = resumed.internal.events
+      {resumed, blackboard} = EventAI.complete_script(clear_effects(resumed), blackboard, completed, 1_010)
+      assert map_size(blackboard.event_ai.pending) == 1
+
+      {finished, _blackboard} = resume(resumed, blackboard, second.reply, :continue, 1_020)
+      assert [%Effects.ScriptCompleted{}] = finished.internal.events
+    end
+
     test "combat entry and evade invalidate pending tails", %{mob: mob} do
       gate = %ScriptStep{command: :start_map_event, abort_on_failure?: true}
       mob = with_event(mob, event([[gate, phase(9)]]))
