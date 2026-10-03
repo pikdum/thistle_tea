@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Spell.SpellObjectsTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
@@ -11,6 +12,7 @@ defmodule ThistleTea.Game.World.Spell.SpellObjectsTest do
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Entity.GameObjectTemplate
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Casting
@@ -26,6 +28,8 @@ defmodule ThistleTea.Game.World.Spell.SpellObjectsTest do
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.Entity.GameObject, as: GameObjectServer
+  alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.GameObjectScript, as: GameObjectScriptLoader
   alias ThistleTea.Game.World.Loader.SpellObjectTarget
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Spell.SpellObjects
@@ -188,6 +192,85 @@ defmodule ThistleTea.Game.World.Spell.SpellObjectsTest do
                  spell_id: 18_655,
                  target_guid: caster.object.guid
                })
+    end
+
+    test "the bearer of an aura from an object resolves its object targets itself", %{caster: caster, spell: spell} do
+      guid = spawn_object(100, caster.internal.world, {1.0, 0.0, 0.0})
+      stone = Guid.from_low_guid(:game_object, 100, Unique.integer())
+      caster_guid = caster.object.guid
+      bearer = %{caster | internal: %{caster.internal | spellbook: %{spell.id => spell}}}
+
+      assert [
+               %Effects.SpellGo{hit_guids: [^guid]},
+               %Effects.ApplyGameObjectAction{target_guid: ^guid, source_guid: ^caster_guid, spell_id: 100, action: 7},
+               %Effects.SpellCastCompleted{}
+             ] =
+               EffectResolver.resolve(bearer, %Effects.TriggerSpell{
+                 source_guid: stone,
+                 source_level: 1,
+                 spell_id: spell.id,
+                 target_guid: caster_guid
+               })
+    end
+
+    test "a trigger from an aura without reagents spends the worn reagents of the triggered spell", %{
+      caster: caster,
+      spell: spell
+    } do
+      guid = spawn_object(100, caster.internal.world, {1.0, 0.0, 0.0})
+      stone = Guid.from_low_guid(:game_object, 100, Unique.integer())
+      reagents = [{20_406, 1}, {20_408, 1}, {20_407, 1}]
+
+      [mantle, cowl, robe] =
+        for {entry, 1} <- reagents, do: ItemStore.create(%ItemTemplate{entry: entry}, owner: caster.object.guid)
+
+      spell = %{spell | reagents: reagents}
+      player = %{caster.player | shoulders: mantle.object.guid, head: cowl.object.guid, chest: robe.object.guid}
+      bearer = %{caster | player: player, internal: %{caster.internal | spellbook: %{spell.id => spell}}}
+
+      trigger = %Effects.TriggerSpell{
+        source_guid: stone,
+        source_level: 1,
+        spell_id: spell.id,
+        target_guid: caster.object.guid,
+        pays_reagents?: true
+      }
+
+      effects = EffectResolver.resolve(bearer, trigger)
+      assert Enum.any?(effects, &match?(%Effects.ApplyGameObjectAction{target_guid: ^guid}, &1))
+      assert %Effects.ConsumeReagents{reagents: ^reagents} = List.last(effects)
+
+      refute Enum.any?(
+               EffectResolver.resolve(bearer, %{trigger | pays_reagents?: false}),
+               &match?(%Effects.ConsumeReagents{}, &1)
+             )
+
+      unrobed = %{bearer | player: %{player | chest: nil}}
+      assert [%Effects.SpellCastFailed{reason: :reagents}] = EffectResolver.resolve(unrobed, trigger)
+    end
+
+    test "a script claiming the activating spell runs on the caster in place of the object action", %{
+      caster: caster
+    } do
+      guid = spawn_object(100, caster.internal.world, {1.0, 0.0, 0.0})
+      caster_guid = caster.object.guid
+      {:ok, _} = Entity.register(caster_guid)
+      steps = [%ScriptStep{command: :talk}]
+      key = {:activated, 180_456, 24_734, {1.0, 0.0, 0.0, 0.0}}
+      :ets.insert(GameObjectScriptLoader, {key, {:claim, steps, 16}})
+      on_exit(fn -> :ets.delete(GameObjectScriptLoader, key) end)
+      :sys.replace_state(Entity.pid(guid), &%{&1 | object: %{&1.object | entry: 180_456}})
+
+      Entity.apply_game_object_action(guid, %Effects.ApplyGameObjectAction{
+        target_guid: guid,
+        source_guid: caster_guid,
+        world: caster.internal.world,
+        spell_id: 24_734,
+        action: 7
+      })
+
+      assert_receive {:"$gen_cast", {:start_script, ^steps, ^caster_guid}}
+      assert :sys.get_state(Entity.pid(guid)).game_object.flags == 0x10
     end
 
     test "delivery rejects a caster who changed copies after resolution", %{caster: caster} do

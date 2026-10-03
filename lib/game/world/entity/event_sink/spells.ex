@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Spells do
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Unit
+  alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Casting
@@ -594,7 +595,8 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Spells do
     entity
   end
 
-  def emit(%Character{} = entity, %Effects.ScriptedCast{} = effect, context) do
+  def emit(entity, %Effects.ScriptedCast{} = effect, context)
+      when is_struct(entity, Character) or is_struct(entity, GameObject) do
     Context.send(context, {:scripted_cast, effect.entry, effect.target_guid})
     entity
   end

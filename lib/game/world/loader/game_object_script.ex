@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.Loader.GameObjectScript do
   @moduledoc """
   Preloads VMangos `gameobject_scripts` commands by spawn ID for object-use
   dispatch, and caches the steps of ported C++ object scripts by entry and
+  position, and their claims on spell activations by entry, spell, and
   position, with their talk texts resolved.
   """
   import Ecto.Query
@@ -62,4 +63,28 @@ defmodule ThistleTea.Game.World.Loader.GameObjectScript do
   end
 
   def ported(_entry, _position), do: []
+
+  def activated(entry, spell_id, {_x, _y, _z, _o} = position) when is_integer(entry) and is_integer(spell_id) do
+    key = {:activated, entry, spell_id, position}
+
+    case GameObjectScriptCore.ported?(entry) and :ets.lookup(__MODULE__, key) do
+      false ->
+        :pass
+
+      [{^key, claim}] ->
+        claim
+
+      [] ->
+        claim = entry |> GameObjectScriptCore.activated(spell_id, position) |> resolve_claim_texts()
+        :ets.insert(__MODULE__, {key, claim})
+        claim
+    end
+  rescue
+    ArgumentError -> :pass
+  end
+
+  def activated(_entry, _spell_id, _position), do: :pass
+
+  defp resolve_claim_texts({:claim, steps, action}), do: {:claim, Script.resolve_texts(steps), action}
+  defp resolve_claim_texts(:pass), do: :pass
 end

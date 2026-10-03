@@ -12,7 +12,8 @@ defmodule ThistleTea.Game.Core.AI.Script do
   execution to the supplied owner before selection; final swaps move it to the
   selected owner. Conditions and commands then use the final source and target.
   Triggered casts use the trigger-spell pipeline; normal casts use the caster's
-  mob or player casting machinery. Failed local target selection, conditions,
+  mob or player casting machinery, and a game object casts every spell at once
+  as vmangos objects do. Failed local target selection, conditions,
   and normal mob casts honor the abort flag. World-event commands and commands
   forwarded to another owner suspend their remaining steps until acknowledged.
   Continuations retain original due times and resume against current state.
@@ -212,6 +213,21 @@ defmodule ThistleTea.Game.Core.AI.Script do
 
   defp failed(state, blackboard, %ScriptStep{abort_on_failure?: true}), do: {state, blackboard, :terminated}
   defp failed(state, blackboard, %ScriptStep{}), do: {state, blackboard, :continue}
+
+  defp execute_command(
+         %GameObject{} = state,
+         blackboard,
+         %ScriptStep{command: :cast_spell} = step,
+         target_guid,
+         _now,
+         _
+       ) do
+    entry = CreatureSpell.from_script_step(step)
+
+    if target_guid in [nil, 0] or entry.spell_id <= 0,
+      do: failed(state, blackboard, step),
+      else: {Effects.enqueue(state, Effects.scripted_cast(entry, target_guid)), blackboard, :continue}
+  end
 
   defp execute_command(state, blackboard, %ScriptStep{command: :cast_spell} = step, target_guid, _now, context) do
     entry = CreatureSpell.from_script_step(step)

@@ -27,6 +27,12 @@ defmodule ThistleTea.Game.Core.AI.GameObjectScriptTest do
   @panther_cage 176_195
   @landmark 142_189
   @treasure_hunters [7_899, 7_901, 7_902]
+  @stone_position {-7_959.77, 1_824.89, 3.53474, 1.2}
+  @lesser_wind_stone 180_456
+  @wind_stone 180_461
+  @greater_wind_stone 180_466
+  @templars [15_209, 15_211, 15_212, 15_307]
+  @abyssal_council @templars ++ [15_206, 15_207, 15_208, 15_220, 15_203, 15_204, 15_205, 15_305]
 
   describe "steps/2" do
     test "leaves unported objects to their database scripts" do
@@ -131,10 +137,76 @@ defmodule ThistleTea.Game.Core.AI.GameObjectScriptTest do
     end
   end
 
+  describe "activated/3" do
+    test "leaves spells no script claims to the object action" do
+      assert GameObjectScript.activated(1_234, 24_734, @stone_position) == :pass
+      assert GameObjectScript.activated(@lesser_wind_stone, 12_345, @stone_position) == :pass
+      assert GameObjectScript.activated(@resonite_cask, 24_734, @stone_position) == :pass
+    end
+
+    test "a lesser wind stone calls a random templar in its place and vanishes" do
+      player = character()
+      guid = player.object.guid
+      assert {:claim, steps, 15} = GameObjectScript.activated(@lesser_wind_stone, 24_734, @stone_position)
+
+      for {roll, templar} <- Enum.zip([1, 26, 51, 76], @templars) do
+        context = Context.new(0, random: Random.fixed(0.5, roll))
+
+        assert [
+                 %Effects.SummonCreature{
+                   summon: %{entry: ^templar, despawn_type: 1, despawn_delay_ms: 60_000, attack_guid: nil},
+                   target_guid: ^guid
+                 } = summon
+               ] = run_on(player, steps, context)
+
+        assert summon.summon.position == @stone_position
+      end
+    end
+
+    test "a crest, signet, or scepter calls the lord of its element" do
+      player = character()
+
+      for {stone, spell_id, lord, position} <- [
+            {@lesser_wind_stone, 24_744, 15_209, @stone_position},
+            {@wind_stone, 24_765, 15_206, {-7_927.48, 1_935.30, 5.61, 4.76475}},
+            {@greater_wind_stone, 24_790, 15_305, @stone_position}
+          ] do
+        assert {:claim, steps, 15} = GameObjectScript.activated(stone, spell_id, @stone_position)
+
+        assert [%Effects.SummonCreature{summon: %{entry: ^lord, position: ^position}}] =
+                 run_on(player, steps, Context.new(0))
+      end
+    end
+
+    test "the summoned lord faces its summoner, denounces them, then attacks after eight seconds" do
+      player = character()
+      guid = player.object.guid
+      {:claim, steps, _action} = GameObjectScript.activated(@greater_wind_stone, 24_786, @stone_position)
+
+      assert [%Effects.SummonCreature{summon: %{entry: 15_203}, steps: challenge, target_guid: ^guid}] =
+               run_on(player, steps, Context.new(0))
+
+      assert [
+               %ScriptStep{command: :turn_to, delay_ms: 1_500},
+               %ScriptStep{command: :talk, delay_ms: 1_600} = talk,
+               %ScriptStep{command: :modify_flags, datalong: 46, datalong2: 0x100, datalong3: 2, delay_ms: 8_000},
+               %ScriptStep{command: :attack_start, delay_ms: 8_000}
+             ] = challenge
+
+      assert ScriptStep.talk_text_ids(talk) == [10_805, 10_806, 10_807, 10_810]
+    end
+  end
+
   describe "summon_entries/0" do
     test "lists every creature an object can call" do
-      assert Enum.sort(GameObjectScript.summon_entries()) == Enum.sort([11_876, 11_920, 14_748 | @treasure_hunters])
+      assert Enum.sort(GameObjectScript.summon_entries()) ==
+               Enum.sort([11_876, 11_920, 14_748 | @treasure_hunters] ++ @abyssal_council)
     end
+  end
+
+  defp run_on(%Character{object: %Object{guid: guid}} = player, steps, context) do
+    {player, _blackboard} = Script.run(player, Blackboard.new(), steps, guid, context)
+    Enum.filter(player.internal.events, &match?(%Effects.SummonCreature{}, &1))
   end
 
   defp effects(entry, %Character{object: %Object{guid: guid}} = player, context \\ Context.new(0)) do

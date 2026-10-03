@@ -182,12 +182,6 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
       assert [%Effects.TriggerSpell{source_guid: 2, target_guid: 2, spell_id: 15_065}] = character.internal.events
     end
 
-    test "rejects script casts whose source has no unit" do
-      object = %GameObjectEntity{object: %Object{guid: 123}, internal: %Internal{}}
-      step = %ScriptStep{command: :cast_spell, datalong: 15_065, target_self?: true}
-      assert {^object, _} = Script.run(object, Blackboard.new(), [step], 2, 1_000)
-    end
-
     test "talk enqueues a monster talk event plus the text emote", %{mob: mob} do
       step = %ScriptStep{
         command: :talk,
@@ -974,6 +968,21 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
         )
 
       assert [%Effects.ActivateGameObject{user_guid: ^user_guid}] = game_object.internal.events
+    end
+
+    test "a game object casts its scripted spells at the script target" do
+      user_guid = Guid.from_low_guid(:player, Unique.integer())
+
+      game_object = %GameObjectEntity{
+        object: %Object{guid: Guid.from_low_guid(:game_object, 1, Unique.integer())},
+        game_object: %GameObjectComponent{state: 0},
+        internal: %Internal{}
+      }
+
+      steps = [%ScriptStep{command: :cast_spell, datalong: 24_745}, %ScriptStep{command: :cast_spell, datalong: 0}]
+      {game_object, _blackboard} = Script.run(game_object, Blackboard.new(), steps, user_guid, 1_000)
+
+      assert [%Effects.ScriptedCast{entry: %{spell_id: 24_745}, target_guid: ^user_guid}] = game_object.internal.events
     end
 
     test "game object spawn lifecycle commands enqueue boundary effects", %{mob: mob} do

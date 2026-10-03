@@ -88,7 +88,8 @@ defmodule ThistleTea.Game.Core.Effects.SpellTypes do
        duration_ms: nil,
        hit_context: nil,
        resolve_targets?: false,
-       requires_living_target?: false
+       requires_living_target?: false,
+       pays_reagents?: false
      ]}
   ]
 

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
 
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Context.Perception.Request, as: ObservationRequest
+  alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.Script.Request, as: ScriptRequest
   alias ThistleTea.Game.Core.Effects
@@ -213,11 +214,11 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   end
 
   def handle_cast(
-        %Effects.ApplyGameObjectAction{world: world, source_guid: source, action: action},
+        %Effects.ApplyGameObjectAction{world: world, source_guid: source, spell_id: spell_id, action: action},
         %GameObject{internal: %{world: world}} = state
       ) do
     case World.position(source) do
-      {^world, _, _, _} -> {:noreply, state |> GameObjectActions.apply(action, source) |> flush_actions()}
+      {^world, _, _, _} -> {:noreply, state |> activate_by_spell(spell_id, action, source) |> flush_actions()}
       _ -> {:noreply, state}
     end
   rescue
@@ -455,6 +456,17 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
       {:noreply, state}
   end
 
+  def handle_info({:scripted_cast, %CreatureSpell{spell_id: spell_id}, target_guid}, %GameObject{} = state) do
+    case SpellLoader.cached(spell_id) do
+      %Spell{} = spell -> {:noreply, state |> GooberServer.finish_spell(spell, target_guid) |> flush_actions()}
+      _missing -> {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Scripted object cast failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_info({:script_command, %ScriptRequest{} = request}, %GameObject{} = state) do
     state = state |> ScriptExecution.command(request) |> EventSink.emit_pending() |> broadcast_if_pending()
     {:noreply, state}
@@ -653,6 +665,20 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
     {state, _blackboard} = Script.run(state, Blackboard.new(), steps, target_guid, context)
     state |> EventSink.emit_pending() |> broadcast_if_pending()
   end
+
+  defp activate_by_spell(%GameObject{} = state, spell_id, action, caster_guid) when is_integer(spell_id) do
+    case GameObjectScriptLoader.activated(state.object.entry, spell_id, state.movement_block.position) do
+      {:claim, steps, claimed_action} ->
+        Entity.start_script(caster_guid, steps, caster_guid)
+        GameObjectActions.apply(state, claimed_action, caster_guid)
+
+      :pass ->
+        GameObjectActions.apply(state, action, caster_guid)
+    end
+  end
+
+  defp activate_by_spell(%GameObject{} = state, _spell_id, action, caster_guid),
+    do: GameObjectActions.apply(state, action, caster_guid)
 
   defp operate_game_object(%GameObject{} = state, action, reset_delay_ms) do
     state |> GameObjectActions.operate(action, reset_delay_ms) |> flush_actions()

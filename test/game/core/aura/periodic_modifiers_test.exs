@@ -119,6 +119,17 @@ defmodule ThistleTea.Game.Core.Aura.PeriodicModifiersTest do
       assert target.unit.auras == []
       assert Aura.next_event_at(target) == nil
     end
+
+    test "a triggered spell pays its own reagents only when the aura spell has none", %{caster: caster} do
+      for {reagents, pays?} <- [{[], true}, {[{20_406, 1}], false}] do
+        spell = %{spell() | reagents: reagents}
+        {target, _events} = Aura.apply_spell(target(), CastContext.from_caster(caster, spell, 2), spell, 1_000)
+        {_target, events} = Aura.tick(target, 3_000)
+
+        assert [%Effects.TriggerSpell{pays_reagents?: ^pays?}] =
+                 Enum.filter(events, &is_struct(&1, Effects.TriggerSpell))
+      end
+    end
   end
 
   describe "complete/2" do

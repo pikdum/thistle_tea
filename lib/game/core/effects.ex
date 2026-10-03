@@ -596,7 +596,8 @@ defmodule ThistleTea.Game.Core.Effects do
       duration_ms: Keyword.get(opts, :duration_ms),
       hit_context: Keyword.get(opts, :hit_context),
       resolve_targets?: Keyword.get(opts, :resolve_targets?, false),
-      requires_living_target?: Keyword.get(opts, :requires_living_target?, false)
+      requires_living_target?: Keyword.get(opts, :requires_living_target?, false),
+      pays_reagents?: Keyword.get(opts, :pays_reagents?, false)
     }
   end
 

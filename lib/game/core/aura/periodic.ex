@@ -2,7 +2,9 @@ defmodule ThistleTea.Game.Core.Aura.Periodic do
   @moduledoc """
   Ticks periodic auras (damage, heal, mana recovery, leech, trigger-spell) when their
   next-tick time comes due, expires elapsed holders afterwards, and reports
-  the earliest upcoming tick or expiry for tick scheduling.
+  the earliest upcoming tick or expiry for tick scheduling. As in vmangos, a
+  spell triggered by an aura without reagents of its own pays the triggered
+  spell's reagents.
   """
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.AreaSources
@@ -403,7 +405,8 @@ defmodule ThistleTea.Game.Core.Aura.Periodic do
         {true, spell_id} when is_integer(spell_id) and spell_id > 0 ->
           [
             Effects.trigger_spell(holder.caster_guid, holder.caster_level, entity.object.guid, spell_id,
-              hit_context: holder.cast_context
+              hit_context: holder.cast_context,
+              pays_reagents?: holder.spell.reagents in [nil, []]
             )
           ]
 

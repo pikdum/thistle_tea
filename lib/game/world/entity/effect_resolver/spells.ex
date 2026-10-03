@@ -8,8 +8,10 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Core.Combat.CombatTimer
   alias ThistleTea.Game.Core.Combat.ExtraAttacks
   alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Inventory
   alias ThistleTea.Game.Core.Movement.Charge
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Area
@@ -31,6 +33,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.World.Entity.EffectResolver.Movement
   alias ThistleTea.Game.World.Entity.EffectResolver.Pvp
   alias ThistleTea.Game.World.Entity.EffectResolver.SpellLaunch
+  alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
@@ -235,12 +238,16 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
     )
   end
 
-  defp foreign_owner_required?(entity, effect, spell) do
-    is_integer(effect.source_guid) and effect.source_guid != entity.object.guid and
-      (Enum.any?(spell.effects, &(&1.type == :charge)) or
-         Spell.attribute?(spell, :channeled) or Chain.spell?(spell) or ObjectTargets.required?(spell) or
-         target_requirements?(spell) or
-         (Focus.required?(spell) and Guid.entity_type(effect.source_guid) == :player))
+  defp foreign_owner_required?(entity, effect, spell),
+    do: casting_owner?(entity, effect.source_guid) and owner_requirements?(spell, effect.source_guid)
+
+  defp casting_owner?(%{object: %{guid: guid}}, source_guid),
+    do: is_integer(source_guid) and source_guid != guid and Guid.entity_type(source_guid) != :game_object
+
+  defp owner_requirements?(spell, source_guid) do
+    Enum.any?(spell.effects, &(&1.type == :charge)) or Spell.attribute?(spell, :channeled) or Chain.spell?(spell) or
+      ObjectTargets.required?(spell) or target_requirements?(spell) or
+      (Focus.required?(spell) and Guid.entity_type(source_guid) == :player)
   end
 
   defp target_requirements?(spell),
@@ -250,13 +257,32 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
 
   defp validate_trigger_focus(entity, effect, spell) do
     with :ok <- Focus.validate(entity, spell, SpellFocus.find(entity, spell)),
-         :ok <- Area.validate(spell, SpellAreas.context(entity, spell)) do
-      resolve_trigger_delivery(entity, effect, spell)
+         :ok <- Area.validate(spell, SpellAreas.context(entity, spell)),
+         :ok <- validate_trigger_reagents(entity, effect, spell) do
+      entity |> resolve_trigger_delivery(effect, spell) |> pay_trigger_reagents(effect, spell)
     else
       {:error, reason} ->
         [Effects.spell_cast_failed(spell, reason)]
     end
   end
+
+  defp validate_trigger_reagents(%Character{player: player}, %Effects.TriggerSpell{pays_reagents?: true}, %Spell{
+         reagents: [_ | _] = reagents
+       }) do
+    if Enum.all?(reagents, fn {entry, count} -> Inventory.count_entry(player, entry, &ItemStore.get/1) >= count end),
+      do: :ok,
+      else: {:error, :reagents}
+  end
+
+  defp validate_trigger_reagents(_entity, _effect, _spell), do: :ok
+
+  defp pay_trigger_reagents(effects, %Effects.TriggerSpell{pays_reagents?: true}, %Spell{reagents: [_ | _] = reagents}) do
+    if Enum.any?(effects, &match?(%Effects.SpellGo{}, &1)),
+      do: effects ++ [Effects.consume_reagents(reagents)],
+      else: effects
+  end
+
+  defp pay_trigger_reagents(effects, _effect, _spell), do: effects
 
   defp resolve_trigger_delivery(entity, effect, spell) do
     cond do
