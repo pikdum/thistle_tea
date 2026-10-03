@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.CombatGadgets
   alias ThistleTea.Game.Core.AI.CreatureScript.DaphneStilwell
   alias ThistleTea.Game.Core.AI.CreatureScript.DashelStonefist
+  alias ThistleTea.Game.Core.AI.CreatureScript.Faulk
   alias ThistleTea.Game.Core.AI.CreatureScript.FelwoodOoze
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
   alias ThistleTea.Game.Core.AI.CreatureScript.Murkdeep
@@ -55,6 +56,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     CombatGadgets,
     DaphneStilwell,
     DashelStonefist,
+    Faulk,
     FelwoodOoze,
     LazyPeon,
     Murkdeep,

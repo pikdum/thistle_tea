@@ -527,6 +527,10 @@ defmodule ThistleTea.Game.Core.Effects do
     %Effects.LoadGameObjectSpawn{blueprint: blueprint}
   end
 
+  def load_creature_spawn(db_guid) when is_integer(db_guid) and db_guid > 0 do
+    %Effects.LoadCreatureSpawn{db_guid: db_guid}
+  end
+
   def operate_game_object(action, reset_delay_ms, opts \\ [])
       when action in [:open, :close, :reset] and is_integer(reset_delay_ms) do
     %Effects.OperateGameObject{
@@ -722,6 +726,10 @@ defmodule ThistleTea.Game.Core.Effects do
 
   def respawn_self(even_if_alive?) when is_boolean(even_if_alive?) do
     %Effects.RespawnSelf{even_if_alive?: even_if_alive?}
+  end
+
+  def revive_self(life_ms) when is_nil(life_ms) or (is_integer(life_ms) and life_ms > 0) do
+    %Effects.ReviveSelf{life_ms: life_ms}
   end
 
   def attack_start(target_guid) when is_integer(target_guid) do

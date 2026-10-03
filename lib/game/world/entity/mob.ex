@@ -1339,6 +1339,22 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       {:noreply, state}
   end
 
+  def handle_info({:revive_self, life_ms}, %Mob{} = state) do
+    {:noreply, Respawn.revive(state, life_ms)}
+  rescue
+    error ->
+      Logger.error("revive crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:return_to_rest, incarnation_id}, %Mob{} = state) do
+    {:noreply, Respawn.return_to_rest(state, incarnation_id)}
+  rescue
+    error ->
+      Logger.error("return to rest crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_info({:script_respawn, even_if_alive?}, %Mob{} = state) when is_boolean(even_if_alive?) do
     {:noreply, Respawn.force(state, even_if_alive?)}
   rescue

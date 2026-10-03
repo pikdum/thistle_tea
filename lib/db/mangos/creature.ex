@@ -1,11 +1,16 @@
 defmodule ThistleTea.DB.Mangos.Creature do
   use Ecto.Schema
 
+  import Bitwise
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
 
   @primary_key {:guid, :integer, autogenerate: false}
+  @spawn_flag_disabled 0x02
+  @spawn_flag_not_visible 0x40
+  @spawn_flag_dead 0x80
+  @held_back @spawn_flag_disabled ||| @spawn_flag_not_visible
 
   schema "creature" do
     field(:id, :integer, default: 0)
@@ -24,6 +29,7 @@ defmodule ThistleTea.DB.Mangos.Creature do
     field(:health_percent, :float, default: 100.0)
     field(:mana_percent, :float, default: 100.0)
     field(:movement_type, :integer, default: 0)
+    field(:spawn_flags, :integer, default: 0)
     field(:modelid, :integer, virtual: true, default: 0)
     field(:spawntimesecs, :integer, virtual: true)
     field(:spawndist, :float, virtual: true)
@@ -57,11 +63,17 @@ defmodule ThistleTea.DB.Mangos.Creature do
     )
   end
 
+  def held_back?(%__MODULE__{spawn_flags: flags}), do: band(flags || 0, @held_back) != 0
+
+  def dead?(%__MODULE__{spawn_flags: flags, health_percent: health_percent}),
+    do: band(flags || 0, @spawn_flag_dead) != 0 or health_percent == 0.0
+
   def query_bounds(map, {{x1, x2}, {y1, y2}}, events \\ []) do
     from(c in __MODULE__,
       where:
         c.map == ^map and c.position_x >= ^x1 and c.position_x < ^x2 and c.position_y >= ^y1 and
           c.position_y < ^y2,
+      where: fragment("(? & ?) = 0", c.spawn_flags, ^@held_back),
       left_join: ce in assoc(c, :game_event_creature),
       where: ce.event in ^events or is_nil(ce.event),
       preload: [game_event_creature: ce],

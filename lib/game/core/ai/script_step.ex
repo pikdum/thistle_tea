@@ -294,6 +294,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   defp command(88), do: :set_command_state
   defp command(89), do: :play_custom_animation
   defp command(90), do: :start_script_on_group
+  defp command(91), do: :load_creature_spawn
   defp command(other), do: {:unsupported, other}
 
   defp instance_data_mode(0), do: {:ok, :raw}

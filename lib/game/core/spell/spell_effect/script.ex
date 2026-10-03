@@ -173,6 +173,17 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
     {state, [Effects.despawn_self(1_000, 0)]}
   end
 
+  defp apply_class_dummy(
+         %Mob{unit: %{health: 0}} = state,
+         _context,
+         _spell,
+         %Effect{index: 0},
+         {:restore_to_life, life_ms},
+         _now
+       ) do
+    {state, [Effects.revive_self(life_ms)]}
+  end
+
   defp apply_class_dummy(%Mob{} = state, _context, _spell, %Effect{index: 0}, :capture_creature, _now) do
     {state, [Effects.despawn_self(0, 0)]}
   end

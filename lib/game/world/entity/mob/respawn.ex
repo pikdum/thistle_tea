@@ -6,7 +6,8 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
   Temporary summons stop instead of respawning: a typed summon follows its
   despawn timer and `SummonDespawn` rules, and stops once its corpse is gone.
   Script-driven despawns hide the mob immediately and ride the same respawn
-  timer back in.
+  timer back in. Reviving a corpse respawns it alive in place; a spawn that is
+  dead by default lies back down once its life runs out.
   """
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Mob, as: MobBT
@@ -112,6 +113,25 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
     if Entity.dead?(state) or even_if_alive?, do: respawn(state), else: state
   end
 
+  def revive(%Mob{} = state, life_ms) do
+    if Entity.dead?(state) and not temporary?(state),
+      do: state |> respawn(nil, revive?: true) |> schedule_rest(life_ms),
+      else: state
+  end
+
+  def return_to_rest(%Mob{internal: %Internal{spawn: %Spawn{dead?: true}}} = state, incarnation_id) do
+    if Incarnation.id(state) == incarnation_id and not Entity.dead?(state), do: respawn(state), else: state
+  end
+
+  def return_to_rest(%Mob{} = state, _incarnation_id), do: state
+
+  defp schedule_rest(%Mob{} = state, life_ms) when is_integer(life_ms) do
+    Process.send_after(self(), {:return_to_rest, Incarnation.id(state)}, life_ms)
+    state
+  end
+
+  defp schedule_rest(%Mob{} = state, nil), do: state
+
   def force_group_member(%Mob{} = state) do
     if Entity.dead?(state), do: respawn(state, FormationEnvironment.respawn_position(state, Time.now())), else: state
   end
@@ -171,7 +191,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
 
   def maybe_continue(%Mob{} = _state), do: :ok
 
-  defp respawn(%Mob{} = state, position \\ nil) do
+  defp respawn(%Mob{} = state, position \\ nil, opts \\ []) do
     now = Time.now()
 
     state =
@@ -182,7 +202,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
       |> SingleTarget.detach(now, keep_self?: false)
       |> EventSink.emit_pending()
       |> Incarnation.renew()
-      |> Mob.respawn()
+      |> Mob.respawn(opts)
       |> CreatureEventEnvironment.reconcile(now)
       |> at_position(position)
       |> TemporaryFaction.after_respawn()

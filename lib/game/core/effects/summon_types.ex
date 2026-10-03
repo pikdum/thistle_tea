@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Core.Effects.SummonTypes do
     {:RespawnGameObject, [:blueprint, :duration_ms], []},
     {:DespawnGameObject, [:blueprint, :respawn_delay_ms], []},
     {:LoadGameObjectSpawn, [:blueprint], []},
+    {:LoadCreatureSpawn, [:db_guid], []},
     {:OperateGameObject, [:action, :reset_delay_ms], [blueprint: nil]},
     {:LeaveRitual, [:target_guid, :source_guid], []},
     {:SummonGameObject, [:entry, :duration_ms],
@@ -46,7 +47,8 @@ defmodule ThistleTea.Game.Core.Effects.SummonTypes do
     {:PetBroke, [:source_guid, :target_guid], []},
     {:SummonTotem, [:entry, :slot, :duration_ms], [spell_id: 0, health: 0]},
     {:DespawnSelf, [:duration_ms, :respawn_delay_ms], []},
-    {:RespawnSelf, [:even_if_alive?], []}
+    {:RespawnSelf, [:even_if_alive?], []},
+    {:ReviveSelf, [:life_ms], []}
   ]
 
   for {name, required, optional} <- effects do

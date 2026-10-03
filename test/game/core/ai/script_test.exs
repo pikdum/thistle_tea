@@ -985,7 +985,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
       assert [%Effects.ScriptedCast{entry: %{spell_id: 24_745}, target_guid: ^user_guid}] = game_object.internal.events
     end
 
-    test "game object spawn lifecycle commands enqueue boundary effects", %{mob: mob} do
+    test "spawn lifecycle commands enqueue boundary effects", %{mob: mob} do
       blueprint = %GameObjectEntity{
         object: %Object{guid: Guid.from_low_guid(:game_object, 1_000, 22)},
         game_object: %GameObjectComponent{state: 0},
@@ -1007,7 +1007,8 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
         %ScriptStep{
           command: :load_game_object_spawn,
           game_object_spawn: blueprint
-        }
+        },
+        %ScriptStep{command: :load_creature_spawn, datalong: 52_124}
       ]
 
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), steps, nil, 1_000)
@@ -1015,7 +1016,8 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
       assert [
                %Effects.RespawnGameObject{blueprint: ^blueprint, duration_ms: 5_000},
                %Effects.DespawnGameObject{blueprint: ^blueprint, respawn_delay_ms: 30_000},
-               %Effects.LoadGameObjectSpawn{blueprint: ^blueprint}
+               %Effects.LoadGameObjectSpawn{blueprint: ^blueprint},
+               %Effects.LoadCreatureSpawn{db_guid: 52_124}
              ] = mob.internal.events
     end
 

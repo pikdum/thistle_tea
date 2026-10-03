@@ -2,6 +2,9 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
   @moduledoc """
   Mob entity, including respawn reset and the metadata used for visibility
   queries. `World.Loader.Mob.Builder` builds it from VMangos `creature` rows.
+  A spawn that is dead by default spawns and respawns as a corpse whose death
+  is already settled, so it drops no loot and schedules no respawn; reviving
+  it respawns it alive in place.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -106,13 +109,14 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
 
   def visibility_metadata(%__MODULE__{}), do: %{}
 
-  def respawn(%__MODULE__{} = mob) do
+  def respawn(%__MODULE__{} = mob, opts \\ []) do
     mob = CreatureEntry.restore(mob)
     internal = mob.internal
     spawn_state = internal.spawn || %Spawn{}
     loot = internal.loot || %Loot{}
+    resting? = spawn_state.dead? and not Keyword.get(opts, :revive?, false)
 
-    unit = respawn_unit(spawn_state, mob.unit)
+    unit = spawn_state |> respawn_unit(mob.unit) |> rest(resting?)
     movement_block = respawn_movement_block(spawn_state, mob.movement_block)
 
     internal = %{
@@ -124,7 +128,7 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
         running: false,
         killed_by: nil,
         pve_reward_eligible?: nil,
-        death_finalized?: false,
+        death_finalized?: resting?,
         movement_start_time: nil,
         movement_start_position: nil,
         movement_speed: nil,
@@ -146,6 +150,14 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
     |> Companion.project()
     |> Skinning.sync()
   end
+
+  def spawn_dead(%__MODULE__{internal: %{spawn: %Spawn{dead?: true}} = internal} = mob),
+    do: %{mob | unit: rest(mob.unit, true), internal: %{internal | death_finalized?: true}}
+
+  def spawn_dead(%__MODULE__{} = mob), do: mob
+
+  defp rest(%Unit{} = unit, true), do: %{unit | health: 0}
+  defp rest(%Unit{} = unit, false), do: unit
 
   defp respawn_unit(%Spawn{unit: %Unit{} = unit}, _current_unit), do: unit
 

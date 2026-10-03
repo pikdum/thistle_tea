@@ -6,6 +6,7 @@ defmodule ThistleTea.DB.Mangos.GameObject do
   alias ThistleTea.DB.Mangos
 
   @primary_key {:guid, :integer, autogenerate: false}
+  @spawn_flag_disabled 0x02
   schema "gameobject" do
     field(:id, :integer, default: 0)
     field(:map, :integer, default: 0)
@@ -22,6 +23,7 @@ defmodule ThistleTea.DB.Mangos.GameObject do
     field(:spawntimesecs, :integer, virtual: true, default: 0)
     field(:animprogress, :integer, default: 0)
     field(:state, :integer, default: 0)
+    field(:spawn_flags, :integer, default: 0)
 
     belongs_to(:game_object_template, Mangos.GameObjectTemplate,
       foreign_key: :id,
@@ -40,6 +42,7 @@ defmodule ThistleTea.DB.Mangos.GameObject do
       where:
         g.map == ^map and g.position_x >= ^x1 and g.position_x < ^x2 and g.position_y >= ^y1 and
           g.position_y < ^y2,
+      where: fragment("(? & ?) = 0", g.spawn_flags, ^@spawn_flag_disabled),
       join: gt in assoc(g, :game_object_template),
       left_join: ge in assoc(g, :game_event_game_object),
       where: ge.event in ^events or is_nil(ge.event),

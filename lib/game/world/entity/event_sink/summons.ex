@@ -158,6 +158,15 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Summons do
     entity
   end
 
+  def emit(%{internal: %Internal{world: world}} = entity, %Effects.LoadCreatureSpawn{db_guid: db_guid}, _context) do
+    case MobLoader.blueprints([db_guid]) do
+      %{{:creature, ^db_guid} => %Mob{} = blueprint} -> SpawnPool.load_creature(world, blueprint)
+      _missing -> :ok
+    end
+
+    entity
+  end
+
   def emit(
         %{internal: %Internal{world: world}} = entity,
         %Effects.OperateGameObject{
@@ -429,6 +438,11 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Summons do
 
   def emit(entity, %Effects.RespawnSelf{even_if_alive?: even_if_alive?}, context) do
     Context.send(context, {:script_respawn, even_if_alive?})
+    entity
+  end
+
+  def emit(entity, %Effects.ReviveSelf{life_ms: life_ms}, context) do
+    Context.send(context, {:revive_self, life_ms})
     entity
   end
 

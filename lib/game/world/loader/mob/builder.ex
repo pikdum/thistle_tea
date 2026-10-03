@@ -202,7 +202,8 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
           distance: spawn_distance(c),
           movement_type: c.movement_type,
           waypoint_route: WaypointLoader.build(c),
-          respawn_delay_ms: respawn_delay_ms(c)
+          respawn_delay_ms: respawn_delay_ms(c),
+          dead?: Mangos.Creature.dead?(c)
         },
         loot: %Loot{
           id: ct.loot_id,
@@ -217,6 +218,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
         spellbook: c.spellbook
       }
     }
+    |> Mob.spawn_dead()
     |> CharmSpells.attach(CharmSpells.select(c.charm_spell_slots || %{}, Rolls.system()))
     |> Reactive.sync_health()
     |> MovementStats.recompute()

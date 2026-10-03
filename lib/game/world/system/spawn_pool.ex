@@ -62,6 +62,19 @@ defmodule ThistleTea.Game.World.System.SpawnPool do
     activate(group, game_object_cell(world, blueprint), blueprint)
   end
 
+  def load_creature(world, %Mob{internal: %Internal{creature: creature, world: home}} = blueprint) do
+    world = WorldRef.coerce(world)
+
+    if WorldRef.map_id(home) == WorldRef.map_id(world),
+      do:
+        activate(
+          Catalog.group_for(:creature, creature.db_guid),
+          cell(%{blueprint | internal: %{blueprint.internal | world: world}}),
+          blueprint
+        ),
+      else: :ok
+  end
+
   def respawn_game_object(world, %GameObject{} = blueprint, duration_ms)
       when is_integer(duration_ms) and duration_ms > 0 do
     world = WorldRef.coerce(world)

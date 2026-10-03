@@ -1121,6 +1121,18 @@ defmodule ThistleTea.Game.Core.AI.Script do
   end
 
   defp execute(
+         state,
+         blackboard,
+         %ScriptStep{command: :load_creature_spawn, datalong: db_guid},
+         _target_guid,
+         _now,
+         %Context{}
+       )
+       when is_integer(db_guid) and db_guid > 0 do
+    {Effects.enqueue(state, Effects.load_creature_spawn(db_guid)), blackboard}
+  end
+
+  defp execute(
          %Mob{} = state,
          blackboard,
          %ScriptStep{command: :modify_threat, datalong: 8, position: {percent, _y, _z, _o}},

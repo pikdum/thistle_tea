@@ -143,6 +143,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptStepTest do
       assert ScriptStep.build(row(85)).command == :send_script_event
       assert ScriptStep.build(row(87)).command == :reset_door_or_button
       assert ScriptStep.build(row(89)).command == :play_custom_animation
+      assert ScriptStep.build(row(91)).command == :load_creature_spawn
     end
 
     test "decodes instance data command modes and rejects invalid modes" do

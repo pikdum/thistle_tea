@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffectTest do
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.Spell.ProcRule
   alias ThistleTea.Game.Core.Spell.SpellEffect
+  alias ThistleTea.Game.Core.Spell.UnitTargets.Selector
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
@@ -348,6 +349,20 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffectTest do
       assert result.unit.health == 0
       assert [%Effects.DespawnSelf{duration_ms: 1_000, respawn_delay_ms: 0}] = events
       assert {^target, []} = SpellEffect.receive(target, context, %{spell | attributes: MapSet.new()}, 1_000)
+    end
+
+    test "Symbol of Life raises a fallen creature for two minutes" do
+      spell = %Spell{
+        id: 8593,
+        unit_targets: [%Selector{entry: 6172, alive?: false, inverse_effect_mask: 0}],
+        effects: [%Effect{index: 0, type: :dummy, implicit_target_a: :creature_near_caster}]
+      }
+
+      context = %CastContext{caster_guid: 99, caster_level: 12}
+      faulk = %{target_fixture() | object: %Object{guid: 1, entry: 6172}}
+      corpse = %{faulk | unit: %{faulk.unit | health: 0}}
+      assert {^corpse, [%Effects.ReviveSelf{life_ms: 120_000}]} = SpellEffect.receive(corpse, context, spell, 1_000)
+      assert {_living, []} = SpellEffect.receive(faulk, context, spell, 1_000)
     end
 
     test "capturing a worg pup takes the pup away at once" do

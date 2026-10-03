@@ -62,7 +62,11 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     if missing == [] do
       creatures
     else
-      creatures ++ (missing |> Mangos.Creature.query_guids(events) |> Mangos.Repo.all())
+      creatures ++
+        (missing
+         |> Mangos.Creature.query_guids(events)
+         |> Mangos.Repo.all()
+         |> Enum.reject(&Mangos.Creature.held_back?/1))
     end
   end
 
