@@ -94,6 +94,27 @@ defmodule ThistleTea.Game.Core.AI.BT.PetTest do
     end
   end
 
+  describe "melee" do
+    test "a guardian that cannot melee holds beside its victim instead of swinging" do
+      victim = Guid.from_low_guid(:player, Unique.integer())
+
+      observation = %Observation{
+        guid: victim,
+        position: {world(), 1.0, 2.0, 0.0},
+        distance: 1.0,
+        metadata: %{alive?: true}
+      }
+
+      context = Context.new(@now, perception: Perception.new(@now, nil, %{victim => observation}, %{}))
+
+      for {static_flags, swings?} <- [{0, true}, {0x00100000, false}] do
+        state = fighting_guardian(victim, static_flags)
+        {_status, after_tick} = BT.tick(PetBT.tree(), state, context)
+        assert Enum.any?(after_tick.internal.events, &is_struct(&1, Effects.DeliverAttack)) == swings?
+      end
+    end
+  end
+
   describe "follow_owner/3" do
     test "stays put while a stationary owner turns in place" do
       owner_guid = stationary_owner(orientation: :math.pi())
@@ -215,6 +236,31 @@ defmodule ThistleTea.Game.Core.AI.BT.PetTest do
       | object: %{state.object | entry: 8_836},
         unit: %{state.unit | health: 100, max_health: 100, level: 60, flags: 0, auras: []},
         internal: %{state.internal | creature: %Internal.Creature{ai_events: CreatureScript.events(8_836)}}
+    }
+  end
+
+  defp fighting_guardian(victim, static_flags) do
+    state = pet_beside_owner(Guid.from_low_guid(:mob, 1, Unique.integer()))
+
+    %{
+      state
+      | unit: %{
+          state.unit
+          | health: 100,
+            max_health: 100,
+            level: 60,
+            target: victim,
+            auras: [],
+            min_damage: 10,
+            max_damage: 10,
+            base_attack_time: 2_000
+        },
+        internal: %{
+          state.internal
+          | in_combat: true,
+            creature: %Internal.Creature{static_flags: static_flags},
+            pet: %{state.internal.pet | kind: :guardian, command_state: :follow}
+        }
     }
   end
 

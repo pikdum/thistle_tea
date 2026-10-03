@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
           BT.sequence([
             BT.condition(&CombatBT.in_combat_range?/3),
             BT.action(&halt_for_melee/3),
-            CombatBT.melee_sequence()
+            BT.selector([BT.sequence([BT.condition(&melee_enabled?/2), CombatBT.melee_sequence()]), BT.action(&idle/2)])
           ]),
           BT.action(&chase_target/3)
         ])
@@ -296,6 +296,8 @@ defmodule ThistleTea.Game.Core.AI.BT.Pet do
   end
 
   defp idle(state, blackboard), do: {{:running, @idle_delay_ms}, state, blackboard}
+
+  defp melee_enabled?(state, blackboard), do: Blackboard.melee_enabled?(blackboard, state)
 
   defp halt_for_melee(state, blackboard, %Context{now: now}) do
     {:success, Movement.stop(state, now), blackboard}
