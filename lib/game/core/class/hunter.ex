@@ -1,6 +1,10 @@
 defmodule ThistleTea.Game.Core.Class.Hunter do
   @moduledoc """
   Pure Hunter pet, reactive ability, and combat lifecycle rules.
+
+  Each Taming the Beast rod channels on its beast. When the channel runs its
+  full course the hunter casts the matching tame spell, which charms the beast
+  and completes the quest, after vmangos `Aura::HandleAuraDummy`.
   """
   import Bitwise, only: [&&&: 2, <<<: 2]
 
@@ -13,6 +17,20 @@ defmodule ThistleTea.Game.Core.Class.Hunter do
   @hunter_family 9
   @auto_shot_family_mask 0x00000001
   @refocus_family_mask 0x00023800
+  @taming_rod_tames %{
+    19_548 => 19_597,
+    19_674 => 19_677,
+    19_687 => 19_676,
+    19_688 => 19_678,
+    19_689 => 19_679,
+    19_692 => 19_680,
+    19_693 => 19_684,
+    19_694 => 19_681,
+    19_696 => 19_682,
+    19_697 => 19_683,
+    19_699 => 19_685,
+    19_700 => 19_686
+  }
 
   def validate_tame(caster, %Spell{} = spell, target) do
     if tame_creature?(spell), do: validate_tame_target(caster, target), else: :ok
@@ -85,6 +103,8 @@ defmodule ThistleTea.Game.Core.Class.Hunter do
   end
 
   def apply_food_benefit(%Spell{} = spell, _benefit), do: spell
+
+  def taming_rod_tame(%Spell{id: id}), do: Map.get(@taming_rod_tames, id)
 
   def auto_shot?(%Spell{} = spell) do
     Spell.family_flag?(spell, @hunter_family, @auto_shot_family_mask) and

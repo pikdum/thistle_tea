@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
   alias ThistleTea.Game.Core.Aura.Heartbeat
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Battleground.Insignia
+  alias ThistleTea.Game.Core.Class.Hunter
   alias ThistleTea.Game.Core.Class.Paladin
   alias ThistleTea.Game.Core.Combat.Disarm
   alias ThistleTea.Game.Core.Combat.FeignDeath
@@ -412,6 +413,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
     entity =
       entity
       |> queue_successful_finish_trigger(casting)
+      |> queue_taming_rod_tame(casting)
       |> queue_quest_cast_credit(casting, resolution)
       |> CastingCombat.finish(casting.spell, Target.unit_guid(casting.targets))
       |> consume_unavoidable_finisher(casting, now)
@@ -577,6 +579,25 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
   end
 
   defp queue_successful_finish_trigger(character, _casting), do: character
+
+  defp queue_taming_rod_tame(
+         %{object: %{guid: guid}, unit: %{level: level}} = character,
+         %Cast{spell: %Spell{} = spell} = casting
+       ) do
+    with true <- Cast.channeled?(casting),
+         tame_id when is_integer(tame_id) <- Hunter.taming_rod_tame(spell),
+         beast_guid when beast_guid > 0 and beast_guid != guid <- channel_cleanup_target_guid(character, casting) do
+      Effects.enqueue(
+        character,
+        Effects.trigger_spell(guid, level || 1, beast_guid, tame_id,
+          resolve_targets?: true,
+          requires_living_target?: true
+        )
+      )
+    else
+      _not_taming -> character
+    end
+  end
 
   defp release_paladin_seal(character, %Cast{spell: %Spell{} = spell}, [target_guid | _rest], now) do
     Paladin.release_seal(character, spell, target_guid, now)

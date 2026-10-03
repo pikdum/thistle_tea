@@ -1768,6 +1768,27 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
     end
   end
 
+  describe "taming rods" do
+    test "a full taming rod channel tames its beast" do
+      assert {:finished, hunter} = Casting.advance(taming_rod_fixture(), 21_000)
+
+      assert [
+               %Effects.TriggerSpell{
+                 source_guid: 1,
+                 target_guid: 50,
+                 spell_id: 19_678,
+                 resolve_targets?: true,
+                 requires_living_target?: true
+               }
+             ] = Enum.filter(hunter.internal.events, &is_struct(&1, Effects.TriggerSpell))
+    end
+
+    test "an interrupted taming rod channel leaves the beast wild" do
+      cancelled = Casting.cancel(taming_rod_fixture(), 10_000)
+      refute Enum.any?(cancelled.internal.events, &is_struct(&1, Effects.TriggerSpell))
+    end
+  end
+
   describe "channel auras" do
     test "a completed self channel leaves its aura to expire after the final tick" do
       spell = %Spell{
@@ -1817,6 +1838,24 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
     }
 
     %{mob | unit: %{mob.unit | auras: [holder]}}
+  end
+
+  defp taming_rod_fixture do
+    spell = %Spell{
+      id: 19_688,
+      duration_ms: 20_000,
+      attributes: MapSet.new([:channeled]),
+      effects: [%Effect{type: :apply_aura, aura: :dummy, implicit_target_a: :target_enemy}]
+    }
+
+    casting = %{Cast.new(spell, Target.unit(50), 1_000) | phase: :channel_tick, resolution: channel_resolution()}
+
+    %Character{
+      object: %Object{guid: 1},
+      unit: %Unit{level: 10, health: 100, max_health: 100, channel_object: 50, channel_spell: 19_688},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+      internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+    }
   end
 
   defp final_channel_tick_fixture do
