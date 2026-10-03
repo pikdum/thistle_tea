@@ -545,6 +545,11 @@ defmodule ThistleTea.Game.Core.Spell.CastValidationTest do
                CastValidation.validate(caster(health: 0), harmful_spell(), Target.unit(7), hostile_target(), @now)
     end
 
+    test "lets the dead cast a spell castable while dead" do
+      spell = %{harmful_spell() | attributes: MapSet.new([:castable_while_dead])}
+      assert :ok = CastValidation.validate(caster(health: 0), spell, Target.unit(7), hostile_target(), @now)
+    end
+
     test "allows only healing spells in Spirit of Redemption" do
       spirit = %Holder{spell: %Spell{id: 27_827}}
       caster = caster(auras: [spirit])

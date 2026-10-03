@@ -45,6 +45,15 @@ defmodule ThistleTea.Game.Core.Pet.WildSummonTest do
       assert effect.duration_ms == 0
       refute effect.scatter?
     end
+
+    test "a corpse calls up a creature only with a spell castable while dead", %{mob: mob} do
+      corpse = %{mob | unit: %{mob.unit | health: 0}}
+      context = %CastContext{caster_guid: 7, caster_level: 20}
+      assert {_, []} = SpellEffect.receive(corpse, context, spell(), 1000)
+
+      spell = %{spell() | attributes: MapSet.new([:castable_while_dead])}
+      assert {_, [%Effects.SummonWild{entry: 123}]} = SpellEffect.receive(corpse, context, spell, 1000)
+    end
   end
 
   describe "TemporarySummon.tick/2" do

@@ -6,7 +6,9 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect do
   A dead target takes only resurrection, durability loss, corpse scripts, and,
   as vmangos `AddSpellAuraHolder` allows, auras that persist through death or
   may target the dead. A corpse may still raise an object at its own feet, so
-  the Putrid Mushroom grows where an Emeriss-touched player fell.
+  the Putrid Mushroom grows where an Emeriss-touched player fell, and with a
+  spell castable while dead it may call up a creature there too, so Omen's
+  Giant Spotlight shines where he fell.
   """
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.EffectImmunity
@@ -460,6 +462,10 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect do
 
   defp dead_target_effect?(%Effect{type: :summon_object_wild}, %CastContext{caster_guid: guid}, %{object: %{guid: guid}}),
        do: true
+
+  defp dead_target_effect?(%Effect{type: :summon_wild}, %CastContext{} = context, %{object: object}) do
+    object.guid == context.caster_guid and Spell.attribute?(context.spell, :castable_while_dead)
+  end
 
   defp dead_target_effect?(%Effect{type: type} = effect, %CastContext{spell: spell}, target) do
     type in @dead_target_effects or

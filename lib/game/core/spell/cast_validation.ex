@@ -57,7 +57,7 @@ defmodule ThistleTea.Game.Core.Spell.CastValidation do
   alias ThistleTea.Game.Core.Spell.UnitTargets
 
   def validate(caster, %Spell{} = spell, %Target{} = targets, target_info, now, opts \\ []) do
-    with :ok <- check_caster_alive(caster),
+    with :ok <- check_caster_alive(caster, spell),
          :ok <- Posture.validate(caster, spell, opts),
          :ok <- check_spirit_of_redemption(caster, spell),
          :ok <- CasterState.validate(caster, spell, now, opts),
@@ -197,8 +197,10 @@ defmodule ThistleTea.Game.Core.Spell.CastValidation do
     end
   end
 
-  defp check_caster_alive(caster) do
-    if Entity.dead?(caster), do: {:error, :caster_dead}, else: :ok
+  defp check_caster_alive(caster, %Spell{} = spell) do
+    if Entity.dead?(caster) and not Spell.attribute?(spell, :castable_while_dead),
+      do: {:error, :caster_dead},
+      else: :ok
   end
 
   defp check_spirit_of_redemption(caster, %Spell{} = spell) do
