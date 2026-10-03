@@ -175,6 +175,8 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
   def dummy_effect(%Spell{id: 25_860}), do: :reindeer_transformation
   def dummy_effect(%Spell{id: 28_006}), do: {:trigger_spell, 29_296}
   def dummy_effect(%Spell{id: id}) when id in [11_885, 11_886, 11_887, 11_888, 11_889, 12_699], do: :capture_corpse
+  def dummy_effect(%Spell{id: 15_998}), do: :capture_creature
+  def dummy_effect(%Spell{id: 17_271}), do: :item_self_outcome
 
   @guardian_trinkets %{23_074 => 19_804, 23_075 => 12_749, 23_076 => 4073, 23_133 => 13_166}
 

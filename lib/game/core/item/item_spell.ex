@@ -1,5 +1,11 @@
 defmodule ThistleTea.Game.Core.Item.ItemSpell do
-  @moduledoc "Scripted item outcomes selected before their effects change gameplay state."
+  @moduledoc """
+  Scripted item outcomes selected before their effects change gameplay state.
+
+  Self outcomes are items whose use picks one of several spells for the user
+  to cast on themselves, like a Dragonmaw Shinbone that usually breaks when
+  bent or a Mystic Crystal that tells a resonating skull from bone dust.
+  """
 
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Spell
@@ -34,6 +40,26 @@ defmodule ThistleTea.Game.Core.Item.ItemSpell do
   end
 
   def resurrection_outcome(_offer), do: nil
+
+  @self_outcomes %{
+    8856 => [{1, 8854}, {4, 8855}],
+    17_271 => [{1, 17_269}, {1, 17_270}]
+  }
+
+  def self_outcome?(%Spell{id: id}), do: is_map_key(@self_outcomes, id)
+  def self_outcome?(_spell), do: false
+
+  def self_outcome(target, %CastContext{caster_guid: guid} = context, %Spell{id: id})
+      when is_map_key(@self_outcomes, id) and guid == target.object.guid do
+    choices =
+      Enum.map(Map.fetch!(@self_outcomes, id), fn {weight, spell_id} ->
+        {weight, [Effects.trigger_spell(guid, context.caster_level, guid, spell_id)]}
+      end)
+
+    [%Effects.RandomChoice{choices: choices}]
+  end
+
+  def self_outcome(_target, _context, _spell), do: []
 
   defp trigger(context, target_guid, spell_id) do
     Effects.trigger_spell(context.caster_guid, context.caster_level, target_guid, spell_id,

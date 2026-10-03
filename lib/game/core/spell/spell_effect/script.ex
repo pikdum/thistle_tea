@@ -105,6 +105,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
   def apply(state, %CastContext{} = context, spell, %Effect{type: :script_effect}, now) do
     cond do
       Holiday.spell?(spell) -> Holiday.apply(state, context, spell, now)
+      ItemSpell.self_outcome?(spell) -> {state, ItemSpell.self_outcome(state, context, spell)}
       aura_id = StackingProc.removal_spell(spell) -> Aura.remove_stack(state, aura_id, now)
       item_id = Warlock.healthstone_item(state, spell) -> {state, [Effects.create_item(item_id, 1)]}
       true -> {state, database_script_events(state, context, spell.script_steps)}
@@ -170,6 +171,14 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
 
   defp apply_class_dummy(%Mob{unit: %{health: 0}} = state, _context, _spell, _effect, :capture_corpse, _now) do
     {state, [Effects.despawn_self(1_000, 0)]}
+  end
+
+  defp apply_class_dummy(%Mob{} = state, _context, _spell, %Effect{index: 0}, :capture_creature, _now) do
+    {state, [Effects.despawn_self(0, 0)]}
+  end
+
+  defp apply_class_dummy(state, context, spell, %Effect{index: 0}, :item_self_outcome, _now) do
+    {state, ItemSpell.self_outcome(state, context, spell)}
   end
 
   defp apply_class_dummy(state, context, spell, effect, :execute, now) do

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Core.Item.ItemSpellTest do
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Item.ItemSpell
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.Core.Spell.Effect
@@ -85,6 +86,27 @@ defmodule ThistleTea.Game.Core.Item.ItemSpellTest do
         refute_received {:"$gen_cast", {:send_packet, %Message.SmsgResurrectRequest{}}}
         assert {^alive, []} = SpellEffect.receive(alive, context, spell, 0)
       end
+    end
+  end
+
+  describe "self_outcome/3" do
+    test "Dragonmaw Shinbones usually break and Mystic Crystals split skulls from bone dust", %{context: context} do
+      user = %Character{object: %Object{guid: 1}, unit: %Unit{health: 100, auras: []}, internal: %Internal{}}
+
+      for {id, type, expected} <- [
+            {8856, :script_effect, [{1, 8854}, {4, 8855}]},
+            {17_271, :dummy, [{1, 17_269}, {1, 17_270}]}
+          ] do
+        spell = %Spell{id: id, effects: [%Effect{index: 0, type: type, implicit_target_a: :caster}]}
+        assert {^user, [%RandomChoice{choices: choices}]} = SpellEffect.receive(user, context, spell, 0)
+
+        assert Enum.map(choices, fn {weight, [%Effects.TriggerSpell{source_guid: 1, target_guid: 1} = trigger]} ->
+                 {weight, trigger.spell_id}
+               end) == expected
+      end
+
+      other = %{user | object: %Object{guid: 3}}
+      assert ItemSpell.self_outcome(other, context, %Spell{id: 8856}) == []
     end
   end
 

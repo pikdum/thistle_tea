@@ -350,6 +350,14 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffectTest do
       assert {^target, []} = SpellEffect.receive(target, context, %{spell | attributes: MapSet.new()}, 1_000)
     end
 
+    test "capturing a worg pup takes the pup away at once" do
+      spell = %Spell{id: 15_998, effects: [%Effect{index: 0, type: :dummy, implicit_target_a: :creature_near_caster}]}
+      context = %CastContext{caster_guid: 99, caster_level: 10}
+
+      assert {_pup, [%Effects.DespawnSelf{duration_ms: 0, respawn_delay_ms: 0}]} =
+               SpellEffect.receive(target_fixture(), context, spell, 1_000)
+    end
+
     test "credits the recipient of quest-complete effects" do
       spell = %Spell{
         id: 10_617,
