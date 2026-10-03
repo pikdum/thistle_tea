@@ -279,6 +279,7 @@ defmodule ThistleTea.Game.Core.Creature.CritterTest do
     end
 
     test "escape restores health, tap, gait, and home navigation", %{mob: mob} do
+      mob = %{mob | internal: %{mob.internal | creature: %{mob.internal.creature | regenerate_stats: 0x3}}}
       mob = mob |> Engagement.claim(%Tap{player: 1}) |> Entity.take_damage(3, 1_000, source: 1)
       mob = %{mob | movement_block: %{mob.movement_block | position: {15.0, 0.0, 0.0, 0.0}}}
       assert {{:running, 0, :return_home}, escaped} = BT.tick(MobBT.tree(), mob, context(31_000))

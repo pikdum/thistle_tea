@@ -650,6 +650,23 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       end
     end
 
+    test "an evading creature heals only if it regenerates" do
+      for {regenerate_stats, health} <- [{0x3, 100}, {0x0, 40}] do
+        mob = fixture_mob(position: {0.0, 0.0, 0.0, 0.0}, spline_nodes: [])
+        creature = %{mob.internal.creature | regenerate_stats: regenerate_stats}
+
+        mob = %{
+          mob
+          | unit: %{mob.unit | health: 40, max_health: 100},
+            internal: %{mob.internal | creature: creature, spawn: %Spawn{position: {0.0, 0.0, 0.0}}}
+        }
+
+        %{entity: mob} = Engagement.enter(mob, player_guid(), 0, selection: :target)
+
+        assert MobBT.reset_after_combat(mob, Context.new(1_000)).unit.health == health
+      end
+    end
+
     test "a creature with no path home takes the straight line there" do
       home = {0.0, 0.0, 0.0}
       aloft = fixture_mob(position: {30.0, 0.0, 20.0, 0.0}, spline_nodes: [])

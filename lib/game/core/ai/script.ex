@@ -1414,6 +1414,16 @@ defmodule ThistleTea.Game.Core.AI.Script do
     end
   end
 
+  defp execute(state, blackboard, %ScriptStep{command: :remove_item} = step, target_guid, _now) do
+    case script_player_guid(state.object.guid, target_guid) do
+      nil ->
+        {state, blackboard}
+
+      player_guid ->
+        {Effects.enqueue(state, Effects.take_item(player_guid, step.datalong, max(step.datalong2, 1))), blackboard}
+    end
+  end
+
   defp execute(state, blackboard, %ScriptStep{command: :morph} = step, _target_guid, _now) do
     {morph(state, morph_display_id(state, step)), blackboard}
   end

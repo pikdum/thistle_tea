@@ -58,6 +58,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.Core.Movement
   alias ThistleTea.Game.Core.Movement.Distraction
+  alias ThistleTea.Game.Core.Power.Regen
 
   @chase_tick_delay 1_000
 
@@ -234,7 +235,11 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
     case wait_for_arrival(state, blackboard, context) do
       {:success, state, blackboard} ->
         state =
-          state |> restore_home_orientation(blackboard) |> TemporaryFaction.restore(:reach_home) |> Posture.restore()
+          state
+          |> restore_home_orientation(blackboard)
+          |> TemporaryFaction.restore(:reach_home)
+          |> Posture.restore()
+          |> Mob.restore_addon_auras(now)
 
         {state, blackboard} =
           EventAI.on_reached_home(state, Blackboard.clear_movement_override(blackboard), now, context)
@@ -501,7 +506,11 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
       {BT.running(delay_ms, :movement), state, blackboard}
     else
       state =
-        state |> restore_home_orientation(blackboard) |> TemporaryFaction.restore(:reach_home) |> Posture.restore()
+        state
+        |> restore_home_orientation(blackboard)
+        |> TemporaryFaction.restore(:reach_home)
+        |> Posture.restore()
+        |> Mob.restore_addon_auras(now)
 
       {state, blackboard} = EventAI.on_reached_home(state, blackboard, now, context)
       {:success, state, Blackboard.clear_move_target(blackboard)}
@@ -609,7 +618,9 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
 
   defp heal_to_full(%Mob{unit: %Unit{health: health, max_health: max_health}} = state, %Blackboard{} = blackboard)
        when is_number(max_health) and is_number(health) and health < max_health do
-    {:success, Entity.heal(state, max_health - health), blackboard}
+    if Regen.regenerates_health?(state),
+      do: {:success, Entity.heal(state, max_health - health), blackboard},
+      else: {:success, state, blackboard}
   end
 
   defp heal_to_full(state, %Blackboard{} = blackboard) do

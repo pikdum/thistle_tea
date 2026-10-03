@@ -491,6 +491,11 @@ defmodule ThistleTea.Game.Core.Effects do
     %Effects.GiveItem{target_guid: target_guid, item_id: item_id, count: count}
   end
 
+  def take_item(target_guid, item_id, count)
+      when is_integer(target_guid) and is_integer(item_id) and is_integer(count) do
+    %Effects.TakeItem{target_guid: target_guid, item_id: item_id, count: count}
+  end
+
   def spawn_area_effect(spell, effect, {_x, _y, _z} = position, duration_ms) when is_integer(duration_ms) do
     %Effects.SpawnAreaEffect{spell: spell, effect: effect, position: position, duration_ms: duration_ms}
   end

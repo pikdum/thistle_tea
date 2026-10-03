@@ -110,6 +110,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   alias ThistleTea.Game.World.Entity.Mob.FireworkGuy
   alias ThistleTea.Game.World.Entity.Mob.Flight
   alias ThistleTea.Game.World.Entity.Mob.Incarnation
+  alias ThistleTea.Game.World.Entity.Mob.NecropolisHealth
   alias ThistleTea.Game.World.Entity.Mob.PetCasting
   alias ThistleTea.Game.World.Entity.Mob.PetCommands
   alias ThistleTea.Game.World.Entity.Mob.Pockets
@@ -2395,6 +2396,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
 
       state
       |> mark_death_finalized()
+      |> NecropolisHealth.fell()
       |> EventAI.with_blackboard(
         &EventAI.on_death(
           &1,

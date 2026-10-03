@@ -156,6 +156,16 @@ defmodule ThistleTea.Game.World.Entity.EventSink.ClientProjection do
     entity
   end
 
+  def emit(entity, %Effects.TakeItem{target_guid: target_guid, item_id: item_id, count: count}, _context)
+      when is_integer(target_guid) do
+    case Entity.pid(target_guid) do
+      pid when is_pid(pid) -> send(pid, {:consume_reagents, [{item_id, count}]})
+      _pid -> :ok
+    end
+
+    entity
+  end
+
   def emit(%Character{} = entity, %Effects.CreateItem{item_id: item_id, count: count, spell_id: spell_id}, context) do
     Context.send(context, {:create_item, item_id, count, spell_id})
     entity

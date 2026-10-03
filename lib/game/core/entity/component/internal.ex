@@ -49,6 +49,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal do
     :trap,
     :ritual,
     :rift,
+    :camp,
     :totem,
     :duel,
     :auto_shot,

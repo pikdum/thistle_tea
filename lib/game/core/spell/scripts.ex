@@ -179,6 +179,8 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
   def dummy_effect(%Spell{id: 23_448}), do: :transporter_arrival
   def dummy_effect(%Spell{id: 25_860}), do: :reindeer_transformation
   def dummy_effect(%Spell{id: 28_006}), do: {:trigger_spell, 29_296}
+  def dummy_effect(%Spell{id: 28_091}), do: :spirit_spawn_out
+  def dummy_effect(%Spell{id: 28_345}), do: {:trigger_spell, 28_281}
   def dummy_effect(%Spell{id: id}) when id in [23_185, 25_044], do: {:dream_dragon_aura, @dream_dragon_mark_stuns}
   def dummy_effect(%Spell{id: 21_147}), do: {:arcane_vacuum, 21_150}
   def dummy_effect(%Spell{id: id}) when id in [11_885, 11_886, 11_887, 11_888, 11_889, 12_699], do: :capture_corpse

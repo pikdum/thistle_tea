@@ -258,6 +258,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   defp command(35), do: :turn_to
   defp command(36), do: :meeting_stone
   defp command(39), do: :start_script
+  defp command(40), do: :remove_item
   defp command(41), do: :remove_object
   defp command(42), do: :set_melee_attack
   defp command(43), do: :set_combat_movement

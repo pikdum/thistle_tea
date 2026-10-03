@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Core.Effects.ClientTypes do
     {:DisenchantItem, [:target_guid, :spell_id], []},
     {:CreateItem, [:item_id, :count], [spell_id: nil]},
     {:GiveItem, [:target_guid, :item_id, :count], [partial?: false]},
+    {:TakeItem, [:target_guid, :item_id, :count], []},
     {:ConsumeReagents, [:reagents], []},
     {:LaunchRanged, [:kind, :request, :now], []},
     {:MonsterTalk, [:text, :chat_type, :target_guid], []},

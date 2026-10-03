@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.System.ScourgeInvasion do
 
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.GameEvent.ScourgeInvasion, as: Invasion
+  alias ThistleTea.Game.Core.GameEvent.ScourgeInvasion.Camp
   alias ThistleTea.Game.Core.GameEvent.ScourgeInvasion.Zone
   alias ThistleTea.Game.Core.Rolls
   alias ThistleTea.Game.Core.WorldRef
@@ -55,7 +56,7 @@ defmodule ThistleTea.Game.World.System.ScourgeInvasion do
       else: []
   end
 
-  def summon_entries, do: [@mouth]
+  def summon_entries, do: [@mouth | Camp.summon_entries()]
 
   @impl GenServer
   def init(opts) do

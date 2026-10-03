@@ -35,6 +35,8 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
   alias ThistleTea.Game.Core.Spell.SpellEffect.DamageHeal
   alias ThistleTea.Game.Core.Spell.SpellTeaching
 
+  @spirit_spawn_out 17_680
+
   def apply(%Character{} = state, %CastContext{} = context, spell, %Effect{type: type} = effect, _now)
       when type in [:learn_spell, :learn_pet_spell, :skill_step] do
     pet_guid = Companion.summon_guid(state)
@@ -198,6 +200,20 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
 
   defp apply_class_dummy(state, context, spell, effect, :execute, now) do
     DamageHeal.execute(state, context, spell, effect, now)
+  end
+
+  defp apply_class_dummy(
+         %Mob{internal: %{in_combat: true}} = state,
+         _context,
+         _spell,
+         _effect,
+         :spirit_spawn_out,
+         _now
+       ), do: {state, []}
+
+  defp apply_class_dummy(%Mob{} = state, _context, _spell, %Effect{index: 0}, :spirit_spawn_out, _now) do
+    guid = state.object.guid
+    {state, [Effects.trigger_spell(guid, state.unit.level || 1, guid, @spirit_spawn_out)]}
   end
 
   defp apply_class_dummy(state, context, _spell, %Effect{index: 0}, {:random_consumable, kind}, _now) do

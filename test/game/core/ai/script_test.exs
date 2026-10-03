@@ -154,6 +154,17 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
   end
 
   describe "run/5" do
+    test "remove_item takes the items from the player the script targets", %{mob: mob} do
+      player = Guid.from_low_guid(:player, Unique.integer())
+      step = %ScriptStep{command: :remove_item, datalong: 22_484, datalong2: 8}
+
+      {taken, _} = Script.run(mob, Blackboard.new(), [step], player, 0)
+      assert [%Effects.TakeItem{target_guid: ^player, item_id: 22_484, count: 8}] = taken.internal.events
+
+      {unchanged, _} = Script.run(mob, Blackboard.new(), [step], mob.object.guid, 0)
+      assert unchanged.internal.events == []
+    end
+
     test "enter_evade selects a living creature source or falls back to the creature target", %{mob: mob} do
       step = %ScriptStep{command: :enter_evade}
       {requested, _} = Script.run(mob, Blackboard.new(), [step], 2, 0)

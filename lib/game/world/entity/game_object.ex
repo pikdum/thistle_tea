@@ -49,6 +49,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   alias ThistleTea.Game.World.Entity.GameObject.ElementalRift
   alias ThistleTea.Game.World.Entity.GameObject.Fishing
   alias ThistleTea.Game.World.Entity.GameObject.Goober, as: GooberServer
+  alias ThistleTea.Game.World.Entity.GameObject.NecroticCamp
   alias ThistleTea.Game.World.Entity.GameObject.OmenLauncher
   alias ThistleTea.Game.World.Entity.GameObject.Ritual, as: RitualServer
   alias ThistleTea.Game.World.Entity.GameObject.SpellCast
@@ -96,6 +97,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
       |> arm_trap()
       |> CheerSpeaker.start()
       |> ElementalRift.start()
+      |> NecroticCamp.start()
       |> EventSink.emit_pending(Context.new(self()))
 
     {:ok, state}
@@ -258,7 +260,14 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   end
 
   def handle_cast(%SummonEvent{} = event, %GameObject{} = state) do
-    {:noreply, state |> ElementalRift.summon_event(event) |> OmenLauncher.summon_event(event)}
+    state =
+      state
+      |> ElementalRift.summon_event(event)
+      |> OmenLauncher.summon_event(event)
+      |> NecroticCamp.summon_event(event)
+      |> EventSink.emit_pending(Context.new(self()))
+
+    {:noreply, state}
   end
 
   def handle_cast(:firework_launched, %GameObject{} = state) do
@@ -578,6 +587,18 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
 
   def handle_info(:rift_upkeep, %GameObject{} = state) do
     {:noreply, state |> ElementalRift.upkeep() |> EventSink.emit_pending(Context.new(self()))}
+  end
+
+  def handle_info(:camp_raise, %GameObject{} = state) do
+    {:noreply, state |> NecroticCamp.raise_shard() |> EventSink.emit_pending(Context.new(self()))}
+  end
+
+  def handle_info(:camp_upkeep, %GameObject{} = state) do
+    {:noreply, state |> NecroticCamp.upkeep() |> EventSink.emit_pending(Context.new(self()))}
+  end
+
+  def handle_info(:camp_buttress, %GameObject{} = state) do
+    {:noreply, state |> NecroticCamp.buttress() |> EventSink.emit_pending(Context.new(self()))}
   end
 
   def handle_info(:chest_respawn, %GameObject{} = state) do

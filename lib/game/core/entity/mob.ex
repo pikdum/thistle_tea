@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
   A spawn that is dead by default spawns and respawns as a corpse whose death
   is already settled, so it drops no loot and schedules no respawn; reviving
   it respawns it alive in place. A respawn hands flight back to the template.
+  A creature that reaches home after evading takes back its addon auras.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -16,6 +17,7 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
   alias ThistleTea.Game.Core.Creature.CreatureMovement
   alias ThistleTea.Game.Core.Creature.CreatureReaction
   alias ThistleTea.Game.Core.Creature.GuardCall
+  alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
   alias ThistleTea.Game.Core.Entity.Component.Internal.Loot
@@ -44,6 +46,21 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
   end
 
   def apply_addon_auras(%__MODULE__{} = mob, _now), do: mob
+
+  def restore_addon_auras(
+        %__MODULE__{internal: %Internal{creature: %Creature{addon_auras: [_ | _] = spells}}} = mob,
+        now
+      )
+      when is_integer(now) do
+    spells
+    |> Enum.reject(&AuraCore.has_spell?(mob, &1.id))
+    |> Enum.reduce(mob, fn spell, acc ->
+      {acc, events} = AuraCore.apply_spell(acc, acc.object.guid, acc.unit.level, spell, now)
+      Effects.enqueue(acc, events)
+    end)
+  end
+
+  def restore_addon_auras(%__MODULE__{} = mob, _now), do: mob
 
   def prepare_summon(%__MODULE__{internal: %Internal{spawn: %Spawn{} = spawn_state} = internal} = mob, opts)
       when is_list(opts) do

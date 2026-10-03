@@ -172,6 +172,9 @@ defmodule ThistleTea.Game.Core.Power.Regen do
 
   defp creature_missing_mana?(_entity), do: false
 
+  def regenerates_health?(%Mob{} = entity), do: creature_regenerates?(entity, @regen_flag_health)
+  def regenerates_health?(_entity), do: true
+
   defp creature_regenerates?(%{internal: %Internal{creature: %Creature{regenerate_stats: stats}}}, flag)
        when is_integer(stats) do
     (stats &&& flag) != 0
