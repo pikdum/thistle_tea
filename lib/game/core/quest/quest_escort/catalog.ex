@@ -1,7 +1,9 @@
 defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
   @moduledoc """
-  Open-world escort quests ported from the vmangos `npc_escortAI` C++
-  scripts, keyed by quest id. Each keeps the script's accept actions,
+  Escort quests ported from the vmangos `npc_escortAI` C++ scripts, keyed
+  by quest id. Willix the Importer, the one inside a dungeon, rests at the
+  mouth of Razorfen Kraul for ten minutes as the quest's ender rather than
+  waiting there for good. Each keeps the script's accept actions,
   waypoint actions, credit point, and summons; aggro chatter and
   dead-summon reactions are left out. Grark Lorkrub holds at each ambush
   until every summon is gone rather than counting kills, and his Searscale
@@ -11,6 +13,8 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
   alias ThistleTea.Game.Core.Quest.QuestEscort
 
   @immune_to_npc 0x200
+  @questgiver 0x2
+  @willix_rest_ms 600_000
 
   @defias_raider_positions [
     {-11_450.836, 1_569.755, 54.267, 4.230},
@@ -164,6 +168,30 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
         entry: 5644,
         credit_point: 18,
         accept: [{:faction, 10}, {:stand, 0}, {:remove_unit_flags, @immune_to_npc}]
+      },
+      %QuestEscort{
+        quest_id: 1144,
+        entry: 4508,
+        credit_point: 45,
+        accept: [{:say, 1482}, {:faction, 113}, {:remove_unit_flags, @immune_to_npc}],
+        points: %{
+          2 => [{:say, 1483}],
+          6 => [{:say, 1484}],
+          9 => [{:say, 1485}],
+          14 => [
+            {:say, 1486},
+            {:summon, 4514, {2151.420, 1733.18, 52.10, 0.0}, agamar()},
+            {:summon, 4514, {2144.463, 1726.89, 51.93, 0.0}, agamar()}
+          ],
+          25 => [{:say, 1487}],
+          33 => [{:say, 1488}],
+          44 => [
+            {:say, 1490},
+            {:summon, 4514, {1956.433, 1597.97, 81.75, 0.0}, agamar()},
+            {:summon, 4514, {1958.971, 1599.01, 81.44, 0.0}, agamar()}
+          ],
+          45 => [{:pause, @willix_rest_ms}, {:say, 1493}, {:npc_flags, @questgiver}]
+        }
       },
       %QuestEscort{
         quest_id: 665,
@@ -492,6 +520,8 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
       {:summon, entry, position, attack: :player, despawn: {:timed_out_of_combat, 200_000}}
     end)
   end
+
+  defp agamar, do: [attack: :escort, despawn: {:timed_out_of_combat, 25_000}]
 
   defp vengeful_surge, do: [attack: :escort, despawn: {:timed_or_corpse, 600_000}]
 

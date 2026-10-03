@@ -146,6 +146,15 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscortTest do
       assert %ScriptStep{command: :deal_damage, datalong: 100, datalong2: 1, target_self?: true} = die
     end
 
+    test "pause the path and restore the escortee as a quest ender", %{escort: escort} do
+      escort = %{escort | points: %{4 => [{:pause, 600_000}, {:npc_flags, 0x2}]}}
+
+      assert [pause, flags] = escort |> QuestEscort.point_steps(9, 0) |> Map.fetch!(4)
+      assert %ScriptStep{command: :hold_waypoints, datalong: 600_000, datalong2: 1, sub_scripts: subs} = pause
+      assert subs == %{}
+      assert %ScriptStep{command: :modify_flags, datalong: 147, datalong2: 0x2, datalong3: 1} = flags
+    end
+
     test "credit at the end of a scene", %{escort: escort} do
       assert [_say, %ScriptStep{command: :quest_explored, delay_ms: 23_000}] =
                %{escort | credit_delay_ms: 23_000} |> QuestEscort.point_steps(9, 0) |> Map.fetch!(3)
@@ -161,6 +170,7 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscortTest do
   describe "Catalog" do
     test "ports open-world escorts keyed by quest" do
       assert %QuestEscort{entry: 1379, credit_point: 23} = Catalog.get(309)
+      assert %QuestEscort{entry: 4508, credit_point: 45} = Catalog.get(1144)
       assert Catalog.get(1) == nil
       assert 2149 in Catalog.summon_entries()
 
