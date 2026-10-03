@@ -92,7 +92,11 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
     notify_instance_spawn(state)
     schedule_despawn(state)
     schedule_fishing_bite(state)
+    {:ok, state, {:continue, :start_behaviors}}
+  end
 
+  @impl GenServer
+  def handle_continue(:start_behaviors, %GameObject{} = state) do
     state =
       state
       |> arm_trap()
@@ -102,7 +106,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
       |> NecroticCamp.start()
       |> EventSink.emit_pending(Context.new(self()))
 
-    {:ok, state}
+    {:noreply, state}
   end
 
   defp notify_instance_spawn(
