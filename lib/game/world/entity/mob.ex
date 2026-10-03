@@ -190,21 +190,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
     World.update_position(state)
     state = Visibility.join_entity(state)
     CreatureGroups.register(state, self())
-
-    state =
-      state
-      |> EventSink.emit_pending()
-      |> EventAI.with_blackboard(&EventAI.on_spawned(&1, &2, now, AIEnvironment.context(&1, now)))
-      |> NavigationResolver.resolve(now)
-      |> EventSink.emit_pending()
-
-    state =
-      state
-      |> schedule_summon_despawn()
-      |> schedule_ai_tick(0)
-      |> SummonLifecycle.notify(:summoned_unit)
-
-    {:ok, state}
+    {:ok, state, {:continue, {:spawned, now}}}
   end
 
   @impl GenServer
@@ -1763,6 +1749,20 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   end
 
   @impl GenServer
+  def handle_continue({:spawned, now}, %Mob{} = state) do
+    state =
+      state
+      |> EventSink.emit_pending()
+      |> EventAI.with_blackboard(&EventAI.on_spawned(&1, &2, now, AIEnvironment.context(&1, now)))
+      |> NavigationResolver.resolve(now)
+      |> EventSink.emit_pending()
+      |> schedule_summon_despawn()
+      |> schedule_ai_tick(0)
+      |> SummonLifecycle.notify(:summoned_unit)
+
+    {:noreply, state}
+  end
+
   def handle_continue(:maybe_broadcast, %Mob{} = state) do
     state =
       state
