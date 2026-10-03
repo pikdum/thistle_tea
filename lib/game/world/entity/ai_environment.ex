@@ -1,7 +1,10 @@
 defmodule ThistleTea.Game.World.Entity.AIEnvironment do
   @moduledoc """
   Builds the world, navigation, time, and randomness environment consumed by
-  one entity behavior-tree tick.
+  one entity behavior-tree tick. A panic run aims at a point some way off and
+  stops where the walkable ground toward it ends, then lands on a random
+  point near there, as vmangos fleeing walks to its `GetWalkHitPosition`. A
+  swimmer aims straight at its point through the water.
   """
 
   alias ThistleTea.Game.Core.AI.BT.Blackboard
@@ -711,9 +714,22 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
 
     if Fear.ready?(entity, now) do
       {map_id, anchor, radius} = Fear.destination_request(entity, perception, random)
-      %{navigation | fear_point: Aquatic.random_point(map_id, anchor, radius, NavigationResolver.path_options(entity))}
+      %{navigation | fear_point: fear_point(entity, map_id, anchor, radius)}
     else
       navigation
+    end
+  end
+
+  defp fear_point(%{movement_block: %{position: {x, y, z, _o}}} = entity, map_id, anchor, radius) do
+    opts = NavigationResolver.path_options(entity)
+    Aquatic.random_point(map_id, reachable_anchor(map_id, {x, y, z}, anchor, opts), radius, opts)
+  end
+
+  defp reachable_anchor(map_id, origin, anchor, opts) do
+    if Keyword.get(opts, :swim_animation?, false) and Aquatic.water(map_id, origin) do
+      anchor
+    else
+      Pathfinding.walk_hit_position(map_id, origin, anchor) || anchor
     end
   end
 
