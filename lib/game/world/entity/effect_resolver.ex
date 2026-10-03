@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver do
   alias ThistleTea.Game.Core.Chat.Emote
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Effects.RandomChoice
+  alias ThistleTea.Game.Core.Effects.WhenGrouped
   alias ThistleTea.Game.World.Entity.EffectResolver.Battleground
   alias ThistleTea.Game.World.Entity.EffectResolver.Combat
   alias ThistleTea.Game.World.Entity.EffectResolver.DeathItem
@@ -17,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver do
   alias ThistleTea.Game.World.Entity.EffectResolver.SpellLaunch
   alias ThistleTea.Game.World.Entity.EffectResolver.Spells
   alias ThistleTea.Game.World.Loader.Emote, as: EmoteLoader
+  alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   @combat_requests [
     Effects.BladeFlurry,
@@ -53,6 +55,13 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver do
     case RandomChoice.total_weight(choice) do
       0 -> []
       total -> resolve(entity, RandomChoice.select(choice, :rand.uniform(total)))
+    end
+  end
+
+  def resolve(entity, %WhenGrouped{guids: [first, second], effects: effects}) do
+    case PartySystem.group_of(first) do
+      %{members: members} -> if Enum.any?(members, &(&1.guid == second)), do: resolve(entity, effects), else: []
+      _ungrouped -> []
     end
   end
 

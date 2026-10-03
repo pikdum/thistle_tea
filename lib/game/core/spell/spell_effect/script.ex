@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.Core.Spell.Cooldowns
   alias ThistleTea.Game.Core.Spell.Effect
+  alias ThistleTea.Game.Core.Spell.Holiday
   alias ThistleTea.Game.Core.Spell.Mount
   alias ThistleTea.Game.Core.Spell.Scripts
   alias ThistleTea.Game.Core.Spell.Semantics
@@ -84,13 +85,15 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
   end
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :dummy} = effect, now) do
-    with [] <- pet_aura_events(state, context, spell),
+    with false <- Holiday.spell?(spell),
+         [] <- pet_aura_events(state, context, spell),
          [] <- vmangos_script_events(state, context, spell) do
       case Semantics.rules(spell).dummy do
         :life_tap -> Warlock.life_tap(state, context, spell, effect, now)
         dummy_effect -> apply_class_dummy(state, context, spell, effect, dummy_effect, now)
       end
     else
+      true -> Holiday.apply(state, context, spell, now)
       events -> {state, events}
     end
   end
@@ -101,6 +104,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :script_effect}, now) do
     cond do
+      Holiday.spell?(spell) -> Holiday.apply(state, context, spell, now)
       aura_id = StackingProc.removal_spell(spell) -> Aura.remove_stack(state, aura_id, now)
       item_id = Warlock.healthstone_item(state, spell) -> {state, [Effects.create_item(item_id, 1)]}
       true -> {state, database_script_events(state, context, spell.script_steps)}
