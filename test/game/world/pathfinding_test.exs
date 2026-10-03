@@ -38,6 +38,16 @@ defmodule ThistleTea.Game.World.PathfindingTest do
       assert Aquatic.water(0, {-2183.26, -1867.59, -20.0}) == nil
     end
 
+    test "land-only creatures walk to the water's edge toward a submerged target" do
+      shore = {-2183.26, -1907.59, 4.16}
+      land = [can_walk?: true, can_swim?: false, swim_animation?: false]
+
+      assert [_ | _] = path = Pathfinding.find_path(0, shore, {-2183.26, -1857.59, -3.0}, land)
+      assert Enum.all?(path, &is_nil(Aquatic.water(0, &1)))
+      assert {_x, y, _z} = List.last(path)
+      assert y > -1890.0
+    end
+
     test "underwater wandering retains depth instead of choosing the seabed" do
       origin = {-2183.26, -1867.59, -5.0}
       opts = [can_walk?: false, can_swim?: true, swim_animation?: true]

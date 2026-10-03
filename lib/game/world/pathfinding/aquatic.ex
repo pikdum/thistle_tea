@@ -1,5 +1,10 @@
 defmodule ThistleTea.Game.World.Pathfinding.Aquatic do
-  @moduledoc "Resolves underwater travel and checks creature habitat constraints against terrain and liquid surfaces."
+  @moduledoc """
+  Resolves underwater travel and checks creature habitat constraints against
+  terrain and liquid surfaces. A creature that walks but cannot swim, sent
+  into or across deep water, walks as far as the water's edge instead, the
+  way a vmangos path that excludes water ends short of its destination.
+  """
 
   alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.World.Pathfinding
@@ -27,7 +32,7 @@ defmodule ThistleTea.Game.World.Pathfinding.Aquatic do
     destination_water = water_for(map_id, destination, opts)
 
     cond do
-      destination_water && not can_swim? ->
+      not can_swim? and not can_walk? ->
         nil
 
       is_nil(destination_water) and not can_walk? ->
@@ -70,10 +75,37 @@ defmodule ThistleTea.Game.World.Pathfinding.Aquatic do
     case ground_path.(map_id, start, destination, opts) do
       [_ | _] = points ->
         points = finish_underwater(map_id, points, destination, opts)
-        if permitted_path?(map_id, [start | points], opts) and clear_arrival?(map_id, points, opts), do: points
+
+        cond do
+          not clear_arrival?(map_id, points, opts) -> nil
+          permitted_path?(map_id, [start | points], opts) -> points
+          land_only?(opts) -> dry_prefix(map_id, [start | points], opts)
+          true -> nil
+        end
 
       _ ->
         nil
+    end
+  end
+
+  defp land_only?(opts), do: Keyword.get(opts, :can_walk?, true) and not Keyword.get(opts, :can_swim?, true)
+
+  defp dry_prefix(map_id, points, opts) do
+    points
+    |> segments()
+    |> Enum.reduce_while([], fn [start, destination], kept ->
+      samples = samples(start, destination)
+      dry = Enum.take_while(samples, &is_nil(water_for(map_id, &1, opts)))
+
+      cond do
+        length(dry) == length(samples) -> {:cont, [destination | kept]}
+        length(dry) > 1 -> {:halt, [List.last(dry) | kept]}
+        true -> {:halt, kept}
+      end
+    end)
+    |> case do
+      [] -> nil
+      kept -> Enum.reverse(kept)
     end
   end
 
