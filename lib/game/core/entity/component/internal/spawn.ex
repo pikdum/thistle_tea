@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.Spawn do
     :incarnation_id,
     :despawn_type,
     :despawn_delay_ms,
+    :despawn_ref,
     :summoner_guid,
     :death_at,
     :pool_group,

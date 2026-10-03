@@ -3,8 +3,10 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
   Post-death respawn lifecycle for a mob: schedules the respawn timer when
   the mob dies, defers while loot rolls are pending, and rebuilds the mob at
   its spawn point (fresh tree, position, metadata) when the timer fires.
-  Temporary summons stop instead of respawning, and script-driven despawns
-  hide the mob immediately and ride the same respawn timer back in.
+  Temporary summons stop instead of respawning: a typed summon follows its
+  despawn timer and `SummonDespawn` rules, and stops once its corpse is gone.
+  Script-driven despawns hide the mob immediately and ride the same respawn
+  timer back in.
   """
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Mob, as: MobBT
@@ -16,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
   alias ThistleTea.Game.Core.Combat.Engagement
   alias ThistleTea.Game.Core.Combat.FeignDeath
   alias ThistleTea.Game.Core.Creature.CreatureFlags
+  alias ThistleTea.Game.Core.Creature.SummonDespawn
   alias ThistleTea.Game.Core.Creature.TemporaryFaction
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -40,20 +43,35 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
   alias ThistleTea.Game.World.Visibility
 
   @default_delay_ms 120_000
-  @ooc_gated_despawn_types [1, 2, 4]
 
-  def summon_despawn_blocked?(%Mob{internal: %Internal{} = internal}) do
-    charm_suspends_despawn?(internal.pet) or (internal.in_combat == true and ooc_gated_despawn?(internal.spawn))
+  def start_summon_timer(%Mob{internal: %Internal{spawn: %Spawn{despawn_delay_ms: delay} = spawn_state}} = state)
+      when is_integer(delay) and delay > 0 do
+    ref = make_ref()
+    Process.send_after(self(), {:summon_despawn, ref}, delay)
+    put_spawn(state, %{spawn_state | despawn_ref: ref})
+  end
+
+  def start_summon_timer(%Mob{} = state), do: state
+
+  def summon_despawn_due(%Mob{internal: %Internal{spawn: %Spawn{despawn_type: type}} = internal} = state) do
+    cond do
+      charm_suspends_despawn?(internal.pet) -> :wait
+      SummonDespawn.typed?(type) -> SummonDespawn.when_due(type, Entity.dead?(state), internal.in_combat == true)
+      true -> :despawn
+    end
   end
 
   defp charm_suspends_despawn?(%Pet{kind: :charmed}), do: true
   defp charm_suspends_despawn?(_pet), do: false
 
-  defp ooc_gated_despawn?(%Spawn{despawn_type: despawn_type}), do: despawn_type in @ooc_gated_despawn_types
-  defp ooc_gated_despawn?(_spawn), do: false
-
-  def schedule(%Mob{internal: %{spawn: %Spawn{temporary?: true, despawn_type: type}}} = state) when type in [7, 11],
-    do: state
+  def schedule(%Mob{internal: %{spawn: %Spawn{temporary?: true, despawn_type: type}}} = state)
+      when is_integer(type) and type > 0 do
+    case SummonDespawn.at_death(type) do
+      :despawn -> remove_and_stop(state)
+      :restart_timer -> start_summon_timer(state)
+      :keep_corpse -> state
+    end
+  end
 
   def schedule(%Mob{internal: %Internal{spawn: %Spawn{respawn_ref: ref}}} = state) when is_reference(ref) do
     state
@@ -67,7 +85,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
   def schedule(%Mob{} = state), do: state
 
   def after_corpse_removed(%Mob{internal: %{spawn: %Spawn{temporary?: true, despawn_type: type}}} = state)
-      when type in [7, 11] do
+      when is_integer(type) and type > 0 do
     if Corpse.removed?(state), do: remove_and_stop(state), else: state
   end
 

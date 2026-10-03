@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   alias ThistleTea.Game.Core.Creature.CharmSpells
   alias ThistleTea.Game.Core.Creature.CreatureFlags
   alias ThistleTea.Game.Core.Creature.GuardCall
+  alias ThistleTea.Game.Core.Creature.SummonDespawn
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Effects.BoundaryResult
   alias ThistleTea.Game.Core.Entity, as: EntityCore
@@ -1572,14 +1573,22 @@ defmodule ThistleTea.Game.World.Entity.Mob do
       {:noreply, state}
   end
 
-  def handle_info(:summon_despawn, %Mob{} = state) do
-    if Respawn.summon_despawn_blocked?(state) do
-      Process.send_after(self(), :summon_despawn, @summon_despawn_retry_ms)
-      {:noreply, state}
-    else
-      {:noreply, Respawn.despawn(state, nil)}
+  def handle_info({:summon_despawn, ref}, %Mob{internal: %Internal{spawn: %Spawn{despawn_ref: ref}}} = state)
+      when is_reference(ref) do
+    case Respawn.summon_despawn_due(state) do
+      :despawn ->
+        {:noreply, Respawn.despawn(state, nil)}
+
+      :wait ->
+        Process.send_after(self(), {:summon_despawn, ref}, @summon_despawn_retry_ms)
+        {:noreply, state}
+
+      :ignore ->
+        {:noreply, state}
     end
   end
+
+  def handle_info({:summon_despawn, _stale_ref}, %Mob{} = state), do: {:noreply, state}
 
   def handle_info({:despawn_creature, respawn_delay_ms}, %Mob{} = state) do
     {:noreply, Respawn.despawn(state, respawn_delay_ms)}
@@ -1907,15 +1916,10 @@ defmodule ThistleTea.Game.World.Entity.Mob do
     %{state | internal: %{internal | spawn: %{spawn | death_at: Time.now() + delay}}}
   end
 
-  defp schedule_summon_despawn(%Mob{internal: %{spawn: %Spawn{despawn_type: type}}} = state) when type in [7, 11],
-    do: state
-
-  defp schedule_summon_despawn(
-         %Mob{internal: %Internal{spawn: %Spawn{temporary?: true, despawn_delay_ms: delay}}} = state
-       )
-       when is_integer(delay) and delay > 0 do
-    Process.send_after(self(), :summon_despawn, delay)
-    state
+  defp schedule_summon_despawn(%Mob{internal: %Internal{spawn: %Spawn{temporary?: true, despawn_type: type}}} = state) do
+    if SummonDespawn.typed?(type) and not SummonDespawn.timer_at_spawn?(type),
+      do: state,
+      else: Respawn.start_summon_timer(state)
   end
 
   defp schedule_summon_despawn(%Mob{} = state), do: state
