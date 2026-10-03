@@ -31,7 +31,8 @@ defmodule ThistleTea.Game.World.Entity.GameObject.Goober do
         GameObjectScriptLoader.get(GameObject.db_guid(object))
       end
 
-    Entity.start_script(user_guid, steps, object.object.guid)
+    ported = GameObjectScriptLoader.ported(object.object.entry, object.movement_block.position)
+    Entity.start_script(user_guid, ported ++ steps, object.object.guid)
   end
 
   def start_spell(%GameObject{internal: %{goober: %{spell_id: id}}} = object, user_guid) when id > 0 do

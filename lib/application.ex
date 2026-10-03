@@ -24,6 +24,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.Core.AI.AreaTriggerScript
   alias ThistleTea.Game.Core.AI.CreatureScript
+  alias ThistleTea.Game.Core.AI.GameObjectScript
   alias ThistleTea.Game.Core.Creature.GuardPost
   alias ThistleTea.Game.Core.InstanceScript
   alias ThistleTea.Game.Core.OutdoorPvp.Plaguelands
@@ -379,7 +380,8 @@ defmodule ThistleTea.Application do
             QuestEscortCatalog.summon_entries() ++
             QuestFollowerCatalog.summon_entries() ++
             CreatureScript.summon_entries() ++
-            AreaTriggerScript.summon_entries()
+            AreaTriggerScript.summon_entries() ++
+            GameObjectScript.summon_entries()
         )
 
         GameObjectLoader.preload_blueprints(InstanceScript.game_object_db_guids())

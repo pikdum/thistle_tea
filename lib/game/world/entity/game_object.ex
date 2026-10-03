@@ -670,7 +670,8 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
 
   defp use_object(%GameObject{game_object: %{type_id: type}} = state, user_guid) when type in [0, 1] do
     trigger_linked_objects(state, user_guid)
-    Entity.start_script(user_guid, GameObjectScriptLoader.get(GameObject.db_guid(state)), state.object.guid)
+    ported = GameObjectScriptLoader.ported(state.object.entry, state.movement_block.position)
+    Entity.start_script(user_guid, ported ++ GameObjectScriptLoader.get(GameObject.db_guid(state)), state.object.guid)
     {:noreply, state |> GameObjectActions.activate() |> flush_actions()}
   end
 
