@@ -37,6 +37,7 @@ defmodule ThistleTea.DB.Mangos.Creature do
     field(:curmana, :integer, virtual: true)
     field(:selected_level, :integer, virtual: true)
     field(:display_scale, :float, virtual: true)
+    field(:native_display_scale, :float, virtual: true)
     field(:display_model_id, :integer, virtual: true)
     field(:creature_display_info_addon, :any, virtual: true)
     field(:creature_addon, :any, virtual: true)

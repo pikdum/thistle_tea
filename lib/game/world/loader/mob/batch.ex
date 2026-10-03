@@ -143,6 +143,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
       %{
         creature
         | display_scale: scale,
+          native_display_scale: model.scale,
           display_model_id: model.model_id,
           creature_display_info_addon: Map.get(addons, creature.modelid)
       }

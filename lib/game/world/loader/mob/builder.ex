@@ -3,7 +3,9 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
   Builds mob entities from VMangos `creature` rows and their templates: level,
   class-level stats with template multipliers, model and scale, flags, ranges,
   virtual items, waypoint routes, and the abilities rolled for whoever charms
-  it. EventAI conditions are specialized to the spawn as it is built. Its
+  it. Model reach and radius are measured at the model's native scale and grow
+  only by how much larger than that the creature is drawn.
+  EventAI conditions are specialized to the spawn as it is built. Its
   `creature_addon` row sets how it stands, sheathes its weapons, idles, and
   rides; the spawn snapshot keeps that posture for respawns and returns home.
   """
@@ -47,6 +49,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
 
     display_info_addon = c.creature_display_info_addon
     effective_scale = effective_scale(ct, c.display_scale)
+    geometry_scale = effective_scale / native_scale(c.native_display_scale)
     {virtual_item_slot_display, virtual_item_info} = virtual_items(c.equip_items)
     level = level(c)
     stats = c.creature_class_level_stats
@@ -73,10 +76,10 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
       npc_emote_state: emote_state(c.creature_addon),
       mount_display_id: mount_display_id(c.creature_addon, ct),
       misc_flags: 0x10,
-      bounding_radius: mob_bounding_radius(display_info_addon, effective_scale),
-      combat_reach: mob_combat_reach(display_info_addon, effective_scale),
-      base_bounding_radius: mob_bounding_radius(display_info_addon, effective_scale),
-      base_combat_reach: mob_combat_reach(display_info_addon, effective_scale),
+      bounding_radius: mob_bounding_radius(display_info_addon, geometry_scale),
+      combat_reach: mob_combat_reach(display_info_addon, geometry_scale),
+      base_bounding_radius: mob_bounding_radius(display_info_addon, geometry_scale),
+      base_combat_reach: mob_combat_reach(display_info_addon, geometry_scale),
       display_id: c.modelid,
       native_display_id: c.modelid,
       native_model_id: c.display_model_id,
@@ -277,6 +280,9 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
   defp effective_scale(_template, display_scale) when is_number(display_scale) and display_scale > 0, do: display_scale
 
   defp effective_scale(_template, _display_scale), do: 1.0
+
+  defp native_scale(scale) when is_number(scale) and scale > 0, do: scale
+  defp native_scale(_scale), do: 1.0
 
   defp display_gender(%Mangos.CreatureDisplayInfoAddon{gender: gender}) when gender in 0..2, do: gender
 
