@@ -155,6 +155,21 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscortTest do
       assert %ScriptStep{command: :modify_flags, datalong: 147, datalong2: 0x2, datalong3: 1} = flags
     end
 
+    test "cast a triggered spell on the escortee", %{escort: escort} do
+      escort = %{escort | points: %{4 => [{:after, 11_000, {:cast, 25_004}}]}}
+
+      assert [
+               %ScriptStep{
+                 command: :cast_spell,
+                 datalong: 25_004,
+                 datalong2: 0x02,
+                 target_self?: true,
+                 delay_ms: 11_000
+               }
+             ] =
+               escort |> QuestEscort.point_steps(9, 0) |> Map.fetch!(4)
+    end
+
     test "credit at the end of a scene", %{escort: escort} do
       assert [_say, %ScriptStep{command: :quest_explored, delay_ms: 23_000}] =
                %{escort | credit_delay_ms: 23_000} |> QuestEscort.point_steps(9, 0) |> Map.fetch!(3)
@@ -171,6 +186,8 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscortTest do
     test "ports open-world escorts keyed by quest" do
       assert %QuestEscort{entry: 1379, credit_point: 23} = Catalog.get(309)
       assert %QuestEscort{entry: 4508, credit_point: 45} = Catalog.get(1144)
+      assert %QuestEscort{entry: 11_832, credit_point: 9, path: [_ | _]} = Catalog.get(8447)
+      assert 15_362 in Catalog.summon_entries()
       assert Catalog.get(1) == nil
       assert 2149 in Catalog.summon_entries()
 

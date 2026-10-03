@@ -12,7 +12,8 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   `{:remove_aura, spell_id}`, `{:remove_unit_flags, mask}` (until
   respawn), `{:npc_flags, mask}` (sets npc flags back, as a questgiver that
   ends its own escort does), `{:pause, duration_ms}` (stops the escort at
-  its point for that long, vmangos `SetEscortPaused`), `{:invincible, health_pct}` (never falls below that share of its
+  its point for that long, vmangos `SetEscortPaused`), `{:cast, spell_id}`
+  (cast on itself, triggered), `{:invincible, health_pct}` (never falls below that share of its
   health), `{:attack, :player}` (turns on the player, given a hostile
   faction first), `:fail` (fails the quest for the player and their group),
   `:die` (ends the quest's map event, then kills the escortee),
@@ -51,6 +52,7 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   @event_success 1
   @hold_release_script 1
   @signal_hold 1
+  @triggered 0x02
 
   @despawn_types %{
     timed_or_dead: 1,
@@ -129,6 +131,9 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
 
   def steps({:pause, duration_ms}, _quest_id, _phase),
     do: [%ScriptStep{command: :hold_waypoints, datalong: duration_ms, datalong2: @signal_hold}]
+
+  def steps({:cast, spell_id}, _quest_id, _phase),
+    do: [%ScriptStep{command: :cast_spell, datalong: spell_id, datalong2: @triggered, target_self?: true}]
 
   def steps({:invincible, health_pct}, _quest_id, _phase),
     do: [%ScriptStep{command: :invincibility, datalong: health_pct, datalong2: @percent}]

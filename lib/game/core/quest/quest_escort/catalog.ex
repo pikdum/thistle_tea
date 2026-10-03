@@ -3,7 +3,8 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
   Escort quests ported from the vmangos `npc_escortAI` C++ scripts, keyed
   by quest id. Willix the Importer, the one inside a dungeon, rests at the
   mouth of Razorfen Kraul for ten minutes as the quest's ender rather than
-  waiting there for good. Each keeps the script's accept actions,
+  waiting there for good. Keeper Remulos takes Waking Legends down to the
+  lake on his own path, where Malfurion appears for their talk. Each keeps the script's accept actions,
   waypoint actions, credit point, and summons; aggro chatter and
   dead-summon reactions are left out. Grark Lorkrub holds at each ambush
   until every summon is gone rather than counting kills, and his Searscale
@@ -15,6 +16,8 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
   @immune_to_npc 0x200
   @questgiver 0x2
   @willix_rest_ms 600_000
+  @malfurion 15_362
+  @malfurion_arrival {7734.575684, -2312.118652, 452.679504, 0.068726}
 
   @defias_raider_positions [
     {-11_450.836, 1_569.755, 54.267, 4.230},
@@ -192,6 +195,26 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
           ],
           45 => [{:pause, @willix_rest_ms}, {:say, 1493}, {:npc_flags, @questgiver}]
         }
+      },
+      %QuestEscort{
+        quest_id: 8447,
+        entry: 11_832,
+        credit_point: 9,
+        instant_respawn?: true,
+        accept: [{:say, 10_866}],
+        path: [
+          {7828.18, -2246.51, 463.57, 1_800},
+          {7817.91, -2303.47, 456.03, 700},
+          {7772.03, -2325.16, 454.41, 800},
+          {7753.64, -2305.02, 457.00, 1_100},
+          {7749.48, -2304.86, 455.89, 131_000},
+          {7753.64, -2305.02, 457.00, 400},
+          {7772.03, -2325.16, 454.41, 4_000},
+          {7817.91, -2303.47, 456.03, 0},
+          {7828.18, -2246.51, 463.57, 0},
+          {7848.30, -2216.35, 470.89, 6_000}
+        ],
+        points: %{4 => waking_legends()}
       },
       %QuestEscort{
         quest_id: 665,
@@ -519,6 +542,28 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
     Enum.map(summons, fn {entry, position} ->
       {:summon, entry, position, attack: :player, despawn: {:timed_out_of_combat, 200_000}}
     end)
+  end
+
+  defp waking_legends do
+    malfurion =
+      {:summon, @malfurion, @malfurion_arrival, despawn: {:timed, 96_000},
+       script: [{:add_aura, 10_665}, {:add_aura, 24_999}]}
+
+    [
+      {:after, 4_000, {:say, 10_867}},
+      {:after, 11_000, {:cast, 25_004}},
+      {:after, 19_000, malfurion},
+      {:after, 22_000, {:say, 10_868}},
+      {:after, 25_000, {:say_by, @malfurion, 10_869}},
+      {:after, 33_000, {:say, 10_870}},
+      {:after, 46_000, {:say_by, @malfurion, 10_871}},
+      {:after, 62_000, {:say, 10_872}},
+      {:after, 72_000, {:say_by, @malfurion, 10_873}},
+      {:after, 83_000, {:say_by, @malfurion, 10_876}},
+      {:after, 104_000, {:say_by, @malfurion, 10_878}},
+      {:after, 116_000, {:say, 10_877}},
+      {:after, 125_000, {:say, 10_879}}
+    ]
   end
 
   defp agamar, do: [attack: :escort, despawn: {:timed_out_of_combat, 25_000}]
