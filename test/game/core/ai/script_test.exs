@@ -1489,7 +1489,42 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
 
       {_mob, blackboard} = Script.run(mob, Blackboard.new(), [hold], nil, 1_000)
 
-      assert %WaypointHold{until: 6_000, ready_at: 1_001, steps: ^release} = blackboard.navigation.waypoint_hold
+      assert %WaypointHold{until: 6_000, ready_at: 1_001, steps: ^release, mode: :summons} =
+               blackboard.navigation.waypoint_hold
+    end
+
+    test "hold_waypoints remembers the summons alive before it", %{mob: mob} do
+      companion = Guid.from_low_guid(:mob, 11_564, 77)
+      mob = WaypointHold.track(mob, companion)
+      hold = %ScriptStep{command: :hold_waypoints, datalong: 5_000}
+
+      {_mob, blackboard} = Script.run(mob, Blackboard.new(), [hold], nil, 1_000)
+
+      assert blackboard.navigation.waypoint_hold.earlier_summons == MapSet.new([companion])
+    end
+
+    test "set_concealed hides and reveals the creature", %{mob: mob} do
+      {hidden, _blackboard} =
+        Script.run(mob, Blackboard.new(), [%ScriptStep{command: :set_concealed, datalong: 1}], nil, 1)
+
+      assert hidden.internal.concealed?
+      assert hidden.internal.broadcast_update?
+
+      {shown, _blackboard} = Script.run(hidden, Blackboard.new(), [%ScriptStep{command: :set_concealed}], nil, 2)
+
+      refute shown.internal.concealed?
+    end
+
+    test "release_waypoints lets a signal hold go", %{mob: mob} do
+      hold = %ScriptStep{command: :hold_waypoints, datalong: 600_000, datalong2: 1}
+
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [hold], nil, 1_000)
+      assert %WaypointHold{mode: :signal, until: 601_000} = blackboard.navigation.waypoint_hold
+
+      mob = %{mob | internal: %{mob.internal | blackboard: blackboard}}
+      {_mob, blackboard} = Script.run(mob, blackboard, [%ScriptStep{command: :release_waypoints}], nil, 5_000)
+
+      assert %WaypointHold{until: 5_000} = blackboard.navigation.waypoint_hold
     end
 
     test "combat_stop clears mob combat ownership", %{mob: mob} do

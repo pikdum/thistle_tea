@@ -23,6 +23,9 @@ defmodule ThistleTea.Game.Core.Condition.EntityContext do
   alias ThistleTea.Game.Core.Spell
 
   @content_patch 10
+  @unit_flags 46
+  @npc_flags 147
+  @game_object_flags 9
 
   def build(entity, %AIContext{} = ai_context, target_guid \\ nil) do
     source = entity |> subject(ai_context.now) |> put_condition_area(ai_context.condition_area)
@@ -105,7 +108,8 @@ defmodule ThistleTea.Game.Core.Condition.EntityContext do
       owner_guid: game_object.created_by,
       player_owned?: nil,
       go_spawned?: true,
-      go_state: game_object.state
+      go_state: game_object.state,
+      flags: %{@game_object_flags => game_object.flags || 0}
     }
   end
 
@@ -128,7 +132,8 @@ defmodule ThistleTea.Game.Core.Condition.EntityContext do
       mana: unit.power1,
       max_mana: unit.max_power1,
       aura_ids: MapSet.new(Aura.spell_stacks(%{unit: unit}), &elem(&1, 0)),
-      aura_effects: aura_effects(holders)
+      aura_effects: aura_effects(holders),
+      flags: %{@unit_flags => unit.flags || 0, @npc_flags => unit.npc_flags || 0}
     }
   end
 

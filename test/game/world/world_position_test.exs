@@ -1,10 +1,12 @@
 defmodule ThistleTea.Game.World.WorldPositionTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.DBC
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Loader.Exploration
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position.Spline
   alias ThistleTea.Game.World.SpatialHash
@@ -20,6 +22,30 @@ defmodule ThistleTea.Game.World.WorldPositionTest do
       World.broadcast_packet(packet, %{object: %{guid: guid}}, recipients: [guid])
 
       assert_receive {:"$gen_cast", {:send_packet, ^packet}}
+    end
+  end
+
+  describe "players_in_zone/2" do
+    test "finds the players whose area lies in the zone" do
+      map_id = Unique.integer()
+      zone = Unique.integer()
+      subzone = Unique.integer()
+      [in_zone, in_subzone, elsewhere] = Enum.map(1..3, fn _ -> Unique.integer() end)
+
+      :ets.insert(Exploration, {{:area, subzone}, %DBC.AreaTable{id: subzone, parent_area_table: zone}})
+
+      for {guid, area} <- [{in_zone, zone}, {in_subzone, subzone}, {elsewhere, Unique.integer()}] do
+        SpatialHash.update(:players, guid, map_id, 1.0, 2.0, 3.0)
+        Metadata.put(guid, %{area: area})
+      end
+
+      on_exit(fn ->
+        :ets.delete(Exploration, {:area, subzone})
+        Enum.each([in_zone, in_subzone, elsewhere], &SpatialHash.remove(:players, &1))
+        Enum.each([in_zone, in_subzone, elsewhere], &Metadata.delete/1)
+      end)
+
+      assert Enum.sort(World.players_in_zone(WorldRef.open(map_id), zone)) == Enum.sort([in_zone, in_subzone])
     end
   end
 

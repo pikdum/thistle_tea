@@ -57,6 +57,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.CreatureArchetype, as: CreatureArchetypeLoader
   alias ThistleTea.Game.World.Loader.CreatureEvent, as: CreatureEventLoader
   alias ThistleTea.Game.World.Loader.CreatureGroup, as: CreatureGroupLoader
+  alias ThistleTea.Game.World.Loader.CreatureScriptRoute, as: CreatureScriptRouteLoader
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
   alias ThistleTea.Game.World.Loader.Emote, as: EmoteLoader
@@ -347,6 +348,7 @@ defmodule ThistleTea.Application do
         Logger.info("Loading quests...")
         QuestLoader.load_all()
         QuestEscortLoader.load_all()
+        CreatureScriptRouteLoader.load_all()
         QuestLoader.append_start_steps(CreatureScript.quest_start_steps())
         QuestLoader.append_complete_steps(CreatureScript.quest_end_steps())
         QuestGreetingLoader.load_all()

@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.World.Entity.GameObject, as: GameObjectServer
   alias ThistleTea.Game.World.Entity.Mob, as: MobServer
   alias ThistleTea.Game.World.Entity.Transport, as: TransportServer
+  alias ThistleTea.Game.World.Loader.Exploration
   alias ThistleTea.Game.World.Loader.Transport, as: TransportLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
@@ -102,6 +103,33 @@ defmodule ThistleTea.Game.World do
     |> WorldRef.coerce()
     |> SpatialHash.guids()
     |> Enum.filter(&(Guid.entity_type(&1) == :player))
+  end
+
+  def players_in_zone(world, zone_id) when is_integer(zone_id) do
+    world
+    |> players_in()
+    |> Enum.filter(fn guid ->
+      case Metadata.query(guid, [:area]) do
+        %{area: area} -> zone_of(area) == zone_id
+        _missing -> false
+      end
+    end)
+  end
+
+  def zone_players(entity) do
+    with {world, x, y, z} <- position(entity, Time.now()),
+         {zone_id, _area_id} <- Pathfinding.get_zone_and_area(world.map_id, {x, y, z}) do
+      players_in_zone(world, zone_id)
+    else
+      _unknown_zone -> nil
+    end
+  end
+
+  def zone_of(area_id) do
+    case Exploration.area(area_id) do
+      %{parent_area_table: parent} when is_integer(parent) and parent > 0 -> parent
+      _zone_or_unknown -> area_id
+    end
   end
 
   def mobs_in(world) do

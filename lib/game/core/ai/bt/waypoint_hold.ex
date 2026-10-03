@@ -1,13 +1,16 @@
 defmodule ThistleTea.Game.Core.AI.BT.WaypointHold do
   @moduledoc """
-  Holds a creature at its current waypoint until every creature it summoned
-  is gone, the way vmangos escort scripts pause (`SetEscortPaused`) until
-  their ambushers are dead. A creature counts its own summons from the
+  Holds a creature at its current waypoint, the way vmangos escort scripts
+  pause (`SetEscortPaused`). A creature counts its own summons from the
   moment each one spawns until that summon dies or despawns.
 
-  A hold set at a waypoint never releases on the tick that set it, so the
-  summons spawned beside it are counted first. It releases on a later tick
-  once no summon is left, or when it runs out at `until`, and then runs its
+  A `:summons` hold waits until the creature's summons are dead, as escorts
+  pause until their ambushers die. It counts only the summons that spawned
+  after the hold began, so a creature that leads summoned companions still
+  stops for the next ambush. It never releases on the tick that set it, so
+  the summons spawned beside it are counted first. A `:signal` hold waits
+  until a script releases it, which also makes a timed pause when nothing
+  does. Either hold releases once it runs out at `until`, and then runs its
   release steps.
   """
 
@@ -17,7 +20,7 @@ defmodule ThistleTea.Game.Core.AI.BT.WaypointHold do
   alias ThistleTea.Game.Core.Pet.SummonEvent
 
   @enforce_keys [:until, :ready_at]
-  defstruct [:until, :ready_at, steps: []]
+  defstruct [:until, :ready_at, steps: [], mode: :summons, earlier_summons: MapSet.new()]
 
   @summon_endings [:summoned_just_died, :summoned_just_despawn]
 
@@ -33,11 +36,25 @@ defmodule ThistleTea.Game.Core.AI.BT.WaypointHold do
 
   def forget(entity, _event), do: entity
 
-  def start(%Blackboard{navigation: navigation} = blackboard, now, duration_ms, steps)
+  def start(%Blackboard{navigation: navigation} = blackboard, now, duration_ms, steps, opts \\ [])
       when is_integer(now) and is_integer(duration_ms) and is_list(steps) do
-    hold = %__MODULE__{until: now + max(duration_ms, 0), ready_at: now + 1, steps: steps}
+    hold = %__MODULE__{
+      until: now + max(duration_ms, 0),
+      ready_at: now + 1,
+      steps: steps,
+      mode: Keyword.get(opts, :mode, :summons),
+      earlier_summons: Keyword.get(opts, :earlier_summons, MapSet.new())
+    }
+
     %{blackboard | navigation: %{navigation | waypoint_hold: hold}}
   end
+
+  def release(%Blackboard{navigation: %{waypoint_hold: %__MODULE__{} = hold} = navigation} = blackboard, now)
+      when is_integer(now) do
+    %{blackboard | navigation: %{navigation | waypoint_hold: %{hold | until: min(hold.until, now)}}}
+  end
+
+  def release(%Blackboard{} = blackboard, _now), do: blackboard
 
   def clear(%Blackboard{navigation: navigation} = blackboard),
     do: %{blackboard | navigation: %{navigation | waypoint_hold: nil}}
@@ -47,8 +64,9 @@ defmodule ThistleTea.Game.Core.AI.BT.WaypointHold do
       %__MODULE__{} = hold ->
         cond do
           now >= hold.until -> {:release, hold.steps}
+          hold.mode == :signal -> {:hold, hold.until - now}
           now < hold.ready_at -> {:hold, hold.ready_at - now}
-          MapSet.size(summons) == 0 -> {:release, hold.steps}
+          MapSet.subset?(summons, hold.earlier_summons) -> {:release, hold.steps}
           true -> {:hold, hold.until - now}
         end
 

@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Core.Condition.Subject do
   @moduledoc """
   Immutable projection of actor facts understood by VMangos conditions.
+  `flags` maps the update field indexes scripts can flip (unit and npc
+  flags, game object flags) to their current values.
   """
 
   defstruct guid: nil,
@@ -49,7 +51,8 @@ defmodule ThistleTea.Game.Core.Condition.Subject do
             loot_state: nil,
             go_state: nil,
             formation_leader_guid: nil,
-            formation_dead?: nil
+            formation_dead?: nil,
+            flags: nil
 
   def new(options \\ []) when is_list(options), do: struct!(__MODULE__, options)
 

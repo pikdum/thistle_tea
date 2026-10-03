@@ -70,6 +70,9 @@ defmodule ThistleTea.Game.Core.Condition.Leaf.World do
   def evaluate(%Context{source: %Subject{entry: entry}}, %Condition{type: :source_entry} = condition)
       when is_integer(entry), do: handled(matches_any_value?(entry, condition))
 
+  def evaluate(%Context{source: %Subject{flags: flags}}, %Condition{type: :has_flag, value1: field, value2: flag})
+      when is_map_key(flags, field) and is_integer(flag), do: handled(Bitwise.band(Map.fetch!(flags, field), flag) != 0)
+
   def evaluate(%Context{source: %Subject{db_guid: db_guid}}, %Condition{type: :db_guid} = condition)
       when is_integer(db_guid) and db_guid > 0, do: handled(matches_any_value?(db_guid, condition))
 

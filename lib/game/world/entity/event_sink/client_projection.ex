@@ -196,6 +196,21 @@ defmodule ThistleTea.Game.World.Entity.EventSink.ClientProjection do
 
   def emit(
         %{object: %{guid: guid}, internal: %Internal{name: name}} = entity,
+        %Effects.MonsterTalk{chat_type: :zone_yell} = effect,
+        _context
+      ) do
+    packet = Message.SmsgMessagechat.monster(:monster_yell, effect.text, guid, name, effect.target_guid)
+
+    case World.zone_players(entity) do
+      nil -> World.broadcast_packet(packet, entity, range: @listen_range_yell)
+      players -> Enum.each(players, &Outbound.send_packet(packet, &1))
+    end
+
+    entity
+  end
+
+  def emit(
+        %{object: %{guid: guid}, internal: %Internal{name: name}} = entity,
         %Effects.MonsterTalk{} = effect,
         _context
       ) do
@@ -404,13 +419,13 @@ defmodule ThistleTea.Game.World.Entity.EventSink.ClientProjection do
   defp cast_credit_targets(%Effects.QuestCastCredit{target_guids: guids, target_entry: entry}),
     do: Enum.map(guids, &{&1, entry})
 
-  defp monster_chat_type(chat_type) when chat_type in [:yell, :zone_yell], do: :monster_yell
+  defp monster_chat_type(:yell), do: :monster_yell
   defp monster_chat_type(chat_type) when chat_type in [:text_emote, :zone_emote], do: :monster_emote
   defp monster_chat_type(:boss_emote), do: :raid_boss_emote
   defp monster_chat_type(:whisper), do: :monster_whisper
   defp monster_chat_type(:boss_whisper), do: :raid_boss_whisper
   defp monster_chat_type(_chat_type), do: :monster_say
 
-  defp listen_range(chat_type) when chat_type in [:yell, :zone_yell, :boss_emote], do: @listen_range_yell
+  defp listen_range(chat_type) when chat_type in [:yell, :boss_emote], do: @listen_range_yell
   defp listen_range(_chat_type), do: @listen_range_say
 end

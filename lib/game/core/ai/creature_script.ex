@@ -18,6 +18,9 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   being turned in, as `QuestRewarded` hooks do, returns the steps to append
   to its completion script from `quest_end_steps/0`. A script that only
   reacts to quests claims no entries, so its creature keeps its EventAI.
+  A creature that walks its `script_waypoint` path, as `npc_escortAI`
+  creatures do, gets the steps to run at each point of it from `routes/0`,
+  keyed by its entry and then by point; `start_waypoints` source 5 starts it.
   """
 
   alias ThistleTea.Game.Core.AI.AIEvent
@@ -29,6 +32,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.DashelStonefist
   alias ThistleTea.Game.Core.AI.CreatureScript.Faulk
   alias ThistleTea.Game.Core.AI.CreatureScript.FelwoodOoze
+  alias ThistleTea.Game.Core.AI.CreatureScript.GizeltonCaravan
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
   alias ThistleTea.Game.Core.AI.CreatureScript.Murkdeep
   alias ThistleTea.Game.Core.AI.CreatureScript.Piznik
@@ -47,7 +51,9 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   @callback quest_start_steps() :: %{pos_integer() => [%ScriptStep{}]}
   @callback quest_end_steps() :: %{pos_integer() => [%ScriptStep{}]}
 
-  @optional_callbacks quest_start_steps: 0, quest_end_steps: 0
+  @callback routes() :: %{pos_integer() => %{non_neg_integer() => [%ScriptStep{}]}}
+
+  @optional_callbacks quest_start_steps: 0, quest_end_steps: 0, routes: 0
 
   @scripts [
     ArchmageTervosh,
@@ -58,6 +64,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     DashelStonefist,
     Faulk,
     FelwoodOoze,
+    GizeltonCaravan,
     LazyPeon,
     Murkdeep,
     Piznik,
@@ -94,14 +101,24 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
 
   def quest_end_steps, do: quest_steps(:quest_end_steps)
 
+  def routes, do: Enum.reduce(implementations(:routes), %{}, &Map.merge(&2, &1))
+
   defp quest_steps(callback) do
-    @scripts
-    |> Enum.filter(&(Code.ensure_loaded?(&1) and function_exported?(&1, callback, 0)))
-    |> Enum.map(&apply(&1, callback, []))
+    callback
+    |> implementations()
     |> Enum.reduce(%{}, &Map.merge(&2, &1, fn _quest_id, steps, more -> steps ++ more end))
   end
 
-  defp steps, do: entries() |> Enum.flat_map(&events/1) |> Enum.flat_map(&List.flatten(&1.actions))
+  defp implementations(callback) do
+    @scripts
+    |> Enum.filter(&(Code.ensure_loaded?(&1) and function_exported?(&1, callback, 0)))
+    |> Enum.map(&apply(&1, callback, []))
+  end
+
+  defp steps do
+    route_steps = routes() |> Map.values() |> Enum.flat_map(&Map.values/1) |> List.flatten()
+    (entries() |> Enum.flat_map(&events/1) |> Enum.flat_map(&List.flatten(&1.actions))) ++ route_steps
+  end
 
   def event(entry, index, event_type, steps, opts \\ []) when is_integer(entry) and is_list(steps) do
     struct!(

@@ -301,6 +301,7 @@ defmodule ThistleTea.Game.Core.Condition do
 
   defp missing_capability(:source_entry), do: {:missing_fact, :source, :entry}
   defp missing_capability(:db_guid), do: {:missing_fact, :source, :db_guid}
+  defp missing_capability(:has_flag), do: {:missing_fact, :source, :flags}
 
   defp missing_capability(type) when is_map_key(@target_facts, type),
     do: {:missing_fact, :target, Map.fetch!(@target_facts, type)}

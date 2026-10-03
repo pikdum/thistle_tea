@@ -547,6 +547,39 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       assert released.navigation.run_mode
     end
 
+    test "ignores the summons that were already alive when the hold began" do
+      companion = Guid.from_low_guid(:mob, 11_564, Unique.integer())
+      state = WaypointHold.track(fixture_mob(), companion)
+
+      blackboard =
+        WaypointHold.start(%Blackboard{}, 1_000, 400_000, [], earlier_summons: state.internal.live_summons)
+
+      assert {:success, _state, %Blackboard{navigation: %{waypoint_hold: nil}}} =
+               MobBT.wait_until_waypoint_ready(state, blackboard, Context.new(2_000))
+
+      ambusher = Guid.from_low_guid(:mob, 4_677, Unique.integer())
+      blackboard = WaypointHold.start(%Blackboard{}, 1_000, 400_000, [], earlier_summons: state.internal.live_summons)
+      state = WaypointHold.track(state, ambusher)
+
+      assert {{:running, 399_000, :waypoint}, _state, _blackboard} =
+               MobBT.wait_until_waypoint_ready(state, blackboard, Context.new(2_000))
+    end
+
+    test "holds a signal hold until it is released" do
+      release = [%ScriptStep{command: :set_run, datalong: 1}]
+      blackboard = WaypointHold.start(%Blackboard{}, 1_000, 600_000, release, mode: :signal)
+      state = fixture_mob()
+
+      assert {{:running, 599_000, :waypoint}, _state, _blackboard} =
+               MobBT.wait_until_waypoint_ready(state, blackboard, Context.new(2_000))
+
+      blackboard = WaypointHold.release(blackboard, 3_000)
+
+      assert {:success, _state, released} = MobBT.wait_until_waypoint_ready(state, blackboard, Context.new(3_000))
+      assert released.navigation.waypoint_hold == nil
+      assert released.navigation.run_mode
+    end
+
     test "gives up holding once the hold runs out" do
       state = WaypointHold.track(fixture_mob(), Guid.from_low_guid(:mob, 9522, Unique.integer()))
       blackboard = WaypointHold.start(%Blackboard{}, 1_000, 5_000, [])

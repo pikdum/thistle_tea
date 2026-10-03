@@ -84,6 +84,16 @@ defmodule ThistleTea.Game.Core.ConditionTest do
       assert Condition.evaluate(context, %Condition{type: :db_guid, value1: 1, value2: 80_152}) == :met
     end
 
+    test "has flag checks a flag field of the source" do
+      context = Context.new(source: Subject.new(flags: %{147 => 0x3}))
+
+      assert Condition.evaluate(context, %Condition{type: :has_flag, value1: 147, value2: 0x2}) == :met
+      assert Condition.evaluate(context, %Condition{type: :has_flag, value1: 147, value2: 0x4}) == :unmet
+
+      assert {:unknown, [%Reason{capability: {:missing_fact, :source, :flags}}]} =
+               Condition.evaluate(context, %Condition{type: :has_flag, value1: 46, value2: 0x2})
+    end
+
     test "missing facts are explicit unknown reasons" do
       condition = %Condition{entry: 42, type: :db_guid, value1: 80_152}
 

@@ -17,9 +17,11 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   `{:event_phase, phase}` (the escortee's EventAI phase, for a script port
   that reacts to it), `{:summon, entry, position, opts}`, and
   `{:after, delay_ms, action}`. `{:hold, actions}` stops the escort at its
-  point until every creature the escortee summoned is gone, for at most
-  400 s, then runs `actions`; it must not be delayed, so the summons beside
-  it are counted. A summon despawns per
+  point until every creature the escortee summoned from then on is gone, for
+  at most 400 s, then runs `actions`. It must not be delayed, and it must
+  come before the summons it waits for and before any action another
+  creature performs (`say_by`, `emote_by`), which holds back the escortee's
+  remaining steps until that creature answers. A summon despawns per
   `despawn: {type, delay_ms}` (vmangos `TempSummonType` names), attacks the
   escortee, the player, or nothing per `attack:`, and runs the actions in
   `script:`.

@@ -47,6 +47,21 @@ defmodule ThistleTea.Game.Core.Condition.EntityContextTest do
       assert Condition.evaluate(context, %Condition{type: :area_id, value1: 56}) == :unmet
     end
 
+    test "projects the source's unit and npc flags for has flag" do
+      mob = %Mob{
+        object: %Object{guid: Guid.from_low_guid(:mob, 1, 1), entry: 1},
+        unit: %Unit{health: 100, max_health: 100, auras: [], flags: 0x200, npc_flags: 0x2},
+        movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0), creature: %Creature{db_guid: 1}}
+      }
+
+      context = EntityContext.build(mob, AIContext.new(1_000))
+
+      assert Condition.evaluate(context, %Condition{type: :has_flag, value1: 147, value2: 0x2}) == :met
+      assert Condition.evaluate(context, %Condition{type: :has_flag, value1: 46, value2: 0x200}) == :met
+      assert Condition.evaluate(context, %Condition{type: :has_flag, value1: 46, value2: 0x100}) == :unmet
+    end
+
     test "purely projects the boundary-supplied instance snapshot" do
       world = WorldRef.instance(329, 7)
       mob = mob(world)

@@ -7,7 +7,9 @@ defmodule ThistleTea.Game.Core.AI.Script do
   act on the pure entity state — enqueueing chat/emote/cast/summon/despawn
   events, swapping the unit display id for morphs, recursing into resolved
   generic scripts for start-script steps, and mutating the blackboard phase,
-  gait, flee state, or waypoint hold — steps with a failing condition are skipped, and
+  gait, flee state, or waypoint hold (`hold_waypoints` holds the path until the
+  summons spawned since are gone, or with `datalong2` 1 until
+  `release_waypoints` lets it go) — steps with a failing condition are skipped, and
   unsupported commands are logged and skipped. Initial target swaps move
   execution to the supplied owner before selection; final swaps move it to the
   selected owner. Conditions and commands then use the final source and target.
@@ -72,6 +74,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
 
   @max_phase 31
   @hold_release_script 1
+  @signal_hold 1
   @unit_flag_player_controlled 0x00000008
   @scripted_event_commands [
     :set_server_variable,
@@ -550,7 +553,14 @@ defmodule ThistleTea.Game.Core.AI.Script do
   end
 
   defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :hold_waypoints} = step, _target_guid, now, %Context{}) do
-    {state, WaypointHold.start(blackboard, now, step.datalong, Map.get(step.sub_scripts, @hold_release_script, []))}
+    steps = Map.get(step.sub_scripts, @hold_release_script, [])
+    mode = if step.datalong2 == @signal_hold, do: :signal, else: :summons
+    opts = [mode: mode, earlier_summons: state.internal.live_summons]
+    {state, WaypointHold.start(blackboard, now, step.datalong, steps, opts)}
+  end
+
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :release_waypoints}, _target_guid, now, %Context{}) do
+    {state, WaypointHold.release(blackboard, now)}
   end
 
   defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :start_waypoints} = step, _target_guid, now, %Context{
@@ -1228,6 +1238,10 @@ defmodule ThistleTea.Game.Core.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :remove_aura}, _target_guid, _now) do
     {state, blackboard}
+  end
+
+  defp execute(%Mob{internal: internal} = state, blackboard, %ScriptStep{command: :set_concealed} = step, _target, _now) do
+    {Entity.mark_broadcast_update(%{state | internal: %{internal | concealed?: step.datalong != 0}}), blackboard}
   end
 
   defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :modify_flags} = step, _target_guid, _now) do
