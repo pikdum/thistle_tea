@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.System.GameEventTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.GameEvent.ElementalInvasion
   alias ThistleTea.Game.Core.GameEvent.Schedule
   alias ThistleTea.Game.Core.GameEvent.Schedule.Entry
   alias ThistleTea.Game.World.System.GameEvent
@@ -90,6 +91,46 @@ defmodule ThistleTea.Game.World.System.GameEventTest do
       assert GameEvent.active_events(name) == [2, 7]
       stop_supervised(GameEvent)
       assert GameEvent.active_events(name) == []
+    end
+  end
+
+  describe "drive/2" do
+    test "driven events hold their state across schedule transitions" do
+      parent = self()
+      clock = start_supervised!({Agent, fn -> ~U[2026-01-01 00:00:00Z] end})
+      name = String.to_atom("game_event_test_#{Unique.integer()}")
+
+      schedule =
+        Schedule.new([
+          %Entry{id: 4, rule: ElementalInvasion},
+          %Entry{
+            id: 9,
+            starts_at: ~U[2026-01-01 00:00:00Z],
+            ends_at: ~U[2026-01-01 00:00:06Z],
+            occurrence_seconds: 60,
+            length_seconds: 2
+          }
+        ])
+
+      start_supervised!(
+        {GameEvent,
+         name: name,
+         schedule: schedule,
+         now: fn -> Agent.get(clock, & &1) end,
+         on_change: fn new_events, _old -> send(parent, {:changed, new_events}) end}
+      )
+
+      assert_receive {:changed, scheduled}
+      assert scheduled == MapSet.new([9])
+      assert GameEvent.drive(%{4 => true, 9 => false, 99 => true}, name) == :ok
+      assert_receive {:changed, driven}
+      assert driven == MapSet.new([4])
+
+      Agent.update(clock, fn _ -> ~U[2026-01-01 00:01:00Z] end)
+      send(name, :scheduled_game_event_transition)
+      assert GameEvent.get_events(name) == [4]
+      assert GameEvent.drive(%{4 => false}, name) == :ok
+      assert GameEvent.get_events(name) == []
     end
   end
 end

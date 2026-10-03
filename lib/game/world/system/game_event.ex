@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.World.System.GameEvent do
   Tracks which seasonal/world game events are active and publishes each change
   through `World.Topics`: starts and stops to the spawns gated on that event,
   and the new active set to subscribers of the aggregate game-events key.
+  Events a world system drives (`drive/2`) hold their driven state across
+  schedule transitions.
   """
   use GenServer
 
@@ -51,6 +53,8 @@ defmodule ThistleTea.Game.World.System.GameEvent do
     GenServer.call(server, {:set_active, event, active?})
   end
 
+  def drive(events, server \\ __MODULE__) when is_map(events), do: GenServer.call(server, {:drive, events})
+
   def subscribe(%{internal: %Internal{event: event}}), do: subscribe(event)
 
   def subscribe(event) when is_integer(event) do
@@ -73,6 +77,7 @@ defmodule ThistleTea.Game.World.System.GameEvent do
       schedule: schedule,
       now: now,
       on_change: on_change,
+      driven: %{},
       timer_ref: nil
     }
 
@@ -93,6 +98,16 @@ defmodule ThistleTea.Game.World.System.GameEvent do
   def handle_call({:set_events, new_events}, _from, %{events: old_events} = state) do
     state = publish_events(%{state | events: new_events})
     state.on_change.(new_events, old_events)
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:drive, driven}, _from, state) do
+    known = MapSet.new(state.schedule.entries, & &1.id)
+    driven = Map.filter(driven, fn {event, active?} -> event in known and is_boolean(active?) end)
+    previous = state.events
+    events = apply_driven(previous, driven)
+    state = publish_events(%{state | events: events, driven: Map.merge(state.driven, driven)})
+    if events != previous, do: state.on_change.(events, previous)
     {:reply, :ok, state}
   end
 
@@ -126,13 +141,20 @@ defmodule ThistleTea.Game.World.System.GameEvent do
 
   defp sync_schedule(%{schedule: %Schedule{} = schedule, now: now} = state) do
     current_time = now.()
-    scheduled_events = MapSet.new(Schedule.active_events(schedule, current_time))
+    scheduled_events = schedule |> Schedule.active_events(current_time) |> MapSet.new() |> apply_driven(state.driven)
 
     previous = state.events
     state = publish_events(%{state | events: scheduled_events})
     if scheduled_events != previous, do: state.on_change.(scheduled_events, previous)
 
     schedule_next_transition(state, current_time)
+  end
+
+  defp apply_driven(events, driven) do
+    Enum.reduce(driven, events, fn
+      {event, true}, events -> MapSet.put(events, event)
+      {event, false}, events -> MapSet.delete(events, event)
+    end)
   end
 
   defp publish_events(state) do

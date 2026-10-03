@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   alias ThistleTea.Game.Core.Loot.LootSession
   alias ThistleTea.Game.Core.Loot.Release
   alias ThistleTea.Game.Core.Party
+  alias ThistleTea.Game.Core.Pet.SummonEvent
   alias ThistleTea.Game.Core.Profession.Lock
   alias ThistleTea.Game.Core.Profession.Lock.Requirement
   alias ThistleTea.Game.Core.Spell
@@ -45,6 +46,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   alias ThistleTea.Game.World.Entity.GameObject.Chair
   alias ThistleTea.Game.World.Entity.GameObject.CheerSpeaker
   alias ThistleTea.Game.World.Entity.GameObject.Chest
+  alias ThistleTea.Game.World.Entity.GameObject.ElementalRift
   alias ThistleTea.Game.World.Entity.GameObject.Fishing
   alias ThistleTea.Game.World.Entity.GameObject.Goober, as: GooberServer
   alias ThistleTea.Game.World.Entity.GameObject.Ritual, as: RitualServer
@@ -87,7 +89,14 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
     notify_instance_spawn(state)
     schedule_despawn(state)
     schedule_fishing_bite(state)
-    state = state |> arm_trap() |> CheerSpeaker.start() |> EventSink.emit_pending(Context.new(self()))
+
+    state =
+      state
+      |> arm_trap()
+      |> CheerSpeaker.start()
+      |> ElementalRift.start()
+      |> EventSink.emit_pending(Context.new(self()))
+
     {:ok, state}
   end
 
@@ -245,6 +254,10 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   def handle_cast({:operate_game_object, action, reset_delay_ms}, %GameObject{} = state)
       when action in [:open, :close, :reset, :destroy] and is_integer(reset_delay_ms) do
     {:noreply, operate_game_object(state, action, reset_delay_ms)}
+  end
+
+  def handle_cast(%SummonEvent{} = event, %GameObject{} = state) do
+    {:noreply, ElementalRift.summon_event(state, event)}
   end
 
   @impl GenServer
@@ -556,6 +569,10 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
 
   def handle_info(:launch_firework, %GameObject{} = state) do
     {:noreply, state |> CheerSpeaker.launch() |> EventSink.emit_pending(Context.new(self()))}
+  end
+
+  def handle_info(:rift_upkeep, %GameObject{} = state) do
+    {:noreply, state |> ElementalRift.upkeep() |> EventSink.emit_pending(Context.new(self()))}
   end
 
   def handle_info(:chest_respawn, %GameObject{} = state) do

@@ -399,6 +399,23 @@ defmodule ThistleTea.Game.Core.Entity.MobTest do
     end
   end
 
+  describe "prepare_summon/2" do
+    test "a summon given a home roams around it instead of standing where it was called" do
+      mob = %Mob{
+        object: %Object{entry: 14_460},
+        unit: %Unit{},
+        internal: %Internal{creature: %Creature{}, spawn: %Spawn{position: {1.0, 2.0, 3.0}, movement_type: 2}}
+      }
+
+      roaming = Mob.prepare_summon(mob, home: {10.0, 20.0, 30.0, 1.5}, wander_distance: 30.0)
+      assert %Spawn{position: {10.0, 20.0, 30.0}, home_orientation: 1.5, distance: 30.0} = roaming.internal.spawn
+      assert roaming.internal.spawn.movement_type == 1
+
+      standing = Mob.prepare_summon(mob, home: {10.0, 20.0, 30.0, 1.5})
+      assert %Spawn{position: {1.0, 2.0, 3.0}, movement_type: 0, temporary?: true} = standing.internal.spawn
+    end
+  end
+
   describe "apply_addon_auras/2" do
     test "build applies addon auras to the unit but not the spawn snapshot" do
       creature =

@@ -190,7 +190,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
       ".debug reaction <passive|defensive|aggressive> - set the selected creature's scripted reaction",
       ".debug spells - learn class trainer spells up to your level",
       ".debug events [start|stop <id>] - inspect or temporarily change world events",
-      ".debug variable <index> - inspect a runtime server variable",
+      ".debug variable <index> [value] - inspect or set a runtime server variable",
       ".debug explore - unlock every world-map area",
       ".debug taxi - unlock every flight path",
       ".debug transport - show the attached or nearest transport",
@@ -426,12 +426,21 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   end
 
   def run(state, ".debug variable" <> params) do
-    case Integer.parse(String.trim(params)) do
-      {index, ""} when index >= 0 and index <= 0xFFFFFFFF ->
+    params
+    |> String.split(" ", trim: true)
+    |> Enum.map(&Integer.parse/1)
+    |> case do
+      [{index, ""}] when index >= 0 and index <= 0xFFFFFFFF ->
         system_message(state, "Server variable #{index}: #{ServerVariables.get(index)}")
 
+      [{index, ""}, {value, ""}] ->
+        case ServerVariables.put(index, value) do
+          :ok -> system_message(state, "Server variable #{index} set to #{value}.")
+          {:error, :invalid_variable} -> system_message(state, "Server variables hold unsigned 32-bit values.")
+        end
+
       _invalid ->
-        system_message(state, "Usage: .debug variable <index>")
+        system_message(state, "Usage: .debug variable <index> [value]")
     end
     |> handled()
   end

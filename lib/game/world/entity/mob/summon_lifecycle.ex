@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.World.Entity.Mob.SummonLifecycle do
   @moduledoc """
-  Delivers summon lifecycle edges to the creating creature and restores the
+  Delivers summon lifecycle edges to the creating creature or game object and restores the
   departing summon's observation for data-driven EventAI conditions and targets.
   """
 
@@ -20,7 +20,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.SummonLifecycle do
 
   def notify(%Mob{internal: %{spawn: %Spawn{summoner_guid: summoner}}} = mob, event)
       when is_integer(summoner) and summoner > 0 do
-    if Guid.entity_type(summoner) in [:mob, :pet] do
+    if Guid.entity_type(summoner) in [:mob, :pet, :game_object] do
       Entity.summon_event(summoner, %SummonEvent{
         event: event,
         entry: mob.object.entry,

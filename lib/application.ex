@@ -130,6 +130,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.System.CombatLeashes
   alias ThistleTea.Game.World.System.CreatureGroups
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
+  alias ThistleTea.Game.World.System.ElementalInvasion, as: ElementalInvasionSystem
   alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
   alias ThistleTea.Game.World.System.GmTickets
   alias ThistleTea.Game.World.System.GuardPosts
@@ -238,7 +239,8 @@ defmodule ThistleTea.Application do
         SpawnPoolCatalog,
         {SpawnPool.Supervisor, partitions: 8},
         {CellActivator, sweep: !test},
-        {GameEventSystem, load_schedule: !test}
+        {GameEventSystem, load_schedule: !test},
+        !test && ElementalInvasionSystem
       ]
       |> Enum.filter(& &1)
 

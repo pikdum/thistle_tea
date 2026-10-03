@@ -57,6 +57,8 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
         waypoint_route: nil
     }
 
+    spawn_state = roam_home(spawn_state, Keyword.get(opts, :home), Keyword.get(opts, :wander_distance))
+
     creature = %{internal.creature | db_guid: nil}
 
     internal = %{
@@ -68,6 +70,11 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
 
     %{mob | internal: internal}
   end
+
+  defp roam_home(%Spawn{} = spawn_state, {x, y, z, o}, distance) when is_number(distance) and distance > 0,
+    do: %{spawn_state | position: {x, y, z}, home_orientation: o, distance: distance, movement_type: 1}
+
+  defp roam_home(%Spawn{} = spawn_state, _home, _distance), do: spawn_state
 
   @npc_flag_spirit_service 0x60
 

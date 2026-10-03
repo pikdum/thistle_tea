@@ -224,7 +224,9 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Summons do
              summoner_guid: entity.object.guid,
              despawn_type: summon.despawn_type,
              despawn_delay_ms: summon.despawn_delay_ms,
-             run?: summon.run?
+             run?: summon.run?,
+             home: Map.get(summon, :home),
+             wander_distance: Map.get(summon, :wander_distance)
            ),
          mob = put_summon_owner(mob, summon),
          mob = maybe_possess_summon(mob, entity, summon),
