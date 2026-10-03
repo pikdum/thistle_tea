@@ -183,6 +183,15 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
       assert Enum.any?(texts, &String.starts_with?(&1.text, "Daylight is still upon us"))
     end
 
+    test "a spawn's addon sets its posture, model, and equipment" do
+      onyxia = spawn_mob(47_572, 10_184)
+      assert onyxia.unit.stand_state == 3
+
+      assert spawn_mob(18_583, 15_917).unit.display_id == 15_863
+
+      assert spawn_mob(90_658, 8_895).unit.virtual_item_slot_display != mob(8_895).unit.virtual_item_slot_display
+    end
+
     test "loads template auras from creature_template" do
       mob = mob(619)
 
@@ -248,9 +257,11 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
 
   defp mob(entry), do: entry |> creature() |> MobBuilder.build()
 
-  defp creature(entry) do
+  defp spawn_mob(guid, entry), do: entry |> creature(guid) |> MobBuilder.build()
+
+  defp creature(entry, guid \\ nil) do
     %Mangos.Creature{
-      guid: entry,
+      guid: guid || entry,
       id: entry,
       map: 0,
       position_x: 0.0,

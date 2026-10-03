@@ -3,11 +3,13 @@ defmodule ThistleTea.Game.Core.Combat.Engagement do
   Canonical combat lifecycle transitions for mobs.
 
   Victim, threat, tap, combat flags, casting cancellation, and combat behavior
-  memory change together here. Callers handle boundary concerns such as party
+  memory change together here. A creature that enters combat stands up and
+  stops its idle emote, as vmangos `OnEnterCombat` does. Callers handle boundary concerns such as party
   lookup, EventAI callbacks, healing, and movement back to a spawn.
   """
 
   alias ThistleTea.Game.Core.AI.BT.Blackboard
+  alias ThistleTea.Game.Core.Chat.Emote
   alias ThistleTea.Game.Core.Combat
   alias ThistleTea.Game.Core.Combat.CombatLeash
   alias ThistleTea.Game.Core.Combat.CombatState
@@ -160,7 +162,7 @@ defmodule ThistleTea.Game.Core.Combat.Engagement do
     entity =
       if previous.internal.in_combat == true,
         do: entity,
-        else: entity |> ZoneCombat.on_enter(target_guid) |> GuardCall.on_enter_combat(target_guid)
+        else: entity |> Emote.reset() |> ZoneCombat.on_enter(target_guid) |> GuardCall.on_enter_combat(target_guid)
 
     result(previous, entity, :enter, decision)
   end

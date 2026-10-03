@@ -6,6 +6,12 @@ defmodule ThistleTea.DB.Mangos.CreatureAddon do
 
   @primary_key {:guid, :integer, autogenerate: false}
   schema "creature_addon" do
+    field(:display_id, :integer, default: 0)
+    field(:mount_display_id, :integer, default: -1)
+    field(:equipment_id, :integer, default: -1)
+    field(:stand_state, :integer, default: 0)
+    field(:sheath_state, :integer, default: 1)
+    field(:emote_state, :integer, default: 0)
     field(:auras, :string)
   end
 

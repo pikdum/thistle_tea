@@ -42,6 +42,15 @@ defmodule ThistleTea.Game.Core.Combat.EngagementTest do
       assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.AttackerGained))
     end
 
+    test "a resting creature stands up and stops its idle emote when it is pulled" do
+      resting = %{mob() | unit: %{mob().unit | stand_state: 3, npc_emote_state: 69}}
+
+      %Engagement.Result{entity: mob} = Engagement.enter(resting, 20, 1_000, selection())
+
+      assert mob.unit.stand_state == 0
+      assert mob.unit.npc_emote_state == 0
+    end
+
     test "keeps an explicitly commanded pet victim while tracking another attacker" do
       commanded_target = 20
       other_attacker = 30

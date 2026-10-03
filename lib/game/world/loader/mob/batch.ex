@@ -1,6 +1,9 @@
 defmodule ThistleTea.Game.World.Loader.Mob.Batch do
   @moduledoc """
   Batch-loads immutable VMangos and DBC data needed to build mob blueprints.
+  A spawn's `creature_addon` row overrides its template's model, equipment,
+  and auras, as vmangos `ChooseDisplayId`, `LoadEquipment`, and
+  `LoadCreatureAddon` do; its posture and mount reach the builder with it.
   """
   import Ecto.Query
 
@@ -27,6 +30,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
     |> select_template_entries()
     |> attach_templates()
     |> select_levels_and_displays()
+    |> attach_addons()
     |> attach_class_level_stats()
     |> attach_display_data()
     |> attach_movement()
@@ -83,6 +87,20 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
           modelid: display_id,
           display_scale: display_scale
       }
+    end)
+  end
+
+  defp attach_addons(creatures) do
+    addons = creatures |> Enum.map(& &1.guid) |> fetch_by_ids(Mangos.CreatureAddon, :guid)
+
+    Enum.map(creatures, fn creature ->
+      case Map.get(addons, creature.guid) do
+        %Mangos.CreatureAddon{display_id: display_id} = addon when is_integer(display_id) and display_id > 0 ->
+          %{creature | creature_addon: addon, modelid: display_id, display_scale: nil}
+
+        addon ->
+          %{creature | creature_addon: addon}
+      end
     end)
   end
 
@@ -290,7 +308,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
   defp attach_equipment(creatures) do
     equipment_ids =
       creatures
-      |> Enum.map(& &1.creature_template.equipment_template_id)
+      |> Enum.map(&equipment_template_id/1)
       |> Enum.filter(&positive?/1)
       |> Enum.uniq()
 
@@ -304,7 +322,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
 
     selections =
       Map.new(creatures, fn creature ->
-        rows = Map.get(equipment, creature.creature_template.equipment_template_id, [])
+        rows = Map.get(equipment, equipment_template_id(creature), [])
         {creature.guid, select_equipment(rows)}
       end)
 
@@ -331,6 +349,11 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
     end)
   end
 
+  defp equipment_template_id(%Mangos.Creature{creature_addon: %Mangos.CreatureAddon{equipment_id: id}})
+       when is_integer(id) and id >= 0, do: id
+
+  defp equipment_template_id(%Mangos.Creature{creature_template: template}), do: template.equipment_template_id
+
   defp attach_spells(creatures) do
     list_ids =
       creatures
@@ -342,15 +365,10 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
       |> CreatureSpellListLoader.load()
       |> Map.new(fn {entry, list} -> {entry, list.spells} end)
 
-    addons =
-      creatures
-      |> Enum.map(& &1.guid)
-      |> fetch_by_ids(Mangos.CreatureAddon, :guid)
-
     prepared =
       Enum.map(creatures, fn creature ->
         list = Map.get(lists, creature.creature_template.spell_list_id, [])
-        {addon_source, addon_ids} = addon_auras(creature, addons)
+        {addon_source, addon_ids} = addon_auras(creature)
 
         %{
           creature: %{creature | addon_source: addon_source},
@@ -482,8 +500,8 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
     }
   end
 
-  defp addon_auras(creature, addons) do
-    case Map.get(addons, creature.guid) do
+  defp addon_auras(creature) do
+    case creature.creature_addon do
       %Mangos.CreatureAddon{auras: auras} = row when is_binary(auras) and auras != "" ->
         {:spawn, Enum.uniq(Mangos.CreatureAddon.aura_ids(row))}
 

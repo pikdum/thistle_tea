@@ -39,6 +39,7 @@ defmodule ThistleTea.DB.Mangos.Creature do
     field(:display_scale, :float, virtual: true)
     field(:display_model_id, :integer, virtual: true)
     field(:creature_display_info_addon, :any, virtual: true)
+    field(:creature_addon, :any, virtual: true)
     field(:creature_class_level_stats, :any, virtual: true)
     field(:equip_items, :any, virtual: true, default: [nil, nil, nil])
     field(:movement_scripts, :map, virtual: true, default: %{})

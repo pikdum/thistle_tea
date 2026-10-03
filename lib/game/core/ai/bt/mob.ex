@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   alias ThistleTea.Game.Core.Creature.CreatureFlags
   alias ThistleTea.Game.Core.Creature.CreatureMovement
   alias ThistleTea.Game.Core.Creature.Critter
+  alias ThistleTea.Game.Core.Creature.Posture
   alias ThistleTea.Game.Core.Creature.TemporaryFaction
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity
@@ -232,7 +233,8 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   defp wait_for_scripted_home(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
     case wait_for_arrival(state, blackboard, context) do
       {:success, state, blackboard} ->
-        state = state |> restore_home_orientation(blackboard) |> TemporaryFaction.restore(:reach_home)
+        state =
+          state |> restore_home_orientation(blackboard) |> TemporaryFaction.restore(:reach_home) |> Posture.restore()
 
         {state, blackboard} =
           EventAI.on_reached_home(state, Blackboard.clear_movement_override(blackboard), now, context)
@@ -498,7 +500,9 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
       delay_ms = Movement.next_spatial_update_delay(state, now)
       {BT.running(delay_ms, :movement), state, blackboard}
     else
-      state = state |> restore_home_orientation(blackboard) |> TemporaryFaction.restore(:reach_home)
+      state =
+        state |> restore_home_orientation(blackboard) |> TemporaryFaction.restore(:reach_home) |> Posture.restore()
+
       {state, blackboard} = EventAI.on_reached_home(state, blackboard, now, context)
       {:success, state, Blackboard.clear_move_target(blackboard)}
     end

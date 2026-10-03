@@ -96,6 +96,7 @@ defmodule ThistleTea.DB.Mangos.CreatureTemplate do
     field(:vendor_template_id, :integer, source: :vendor_id, default: 0)
     field(:gossip_menu_id, :integer, default: 0)
     field(:equipment_template_id, :integer, source: :equipment_id, default: 0)
+    field(:mount_display_id, :integer, default: 0)
     field(:civilian, :integer, default: 0)
     field(:ai_name, :string, default: "")
     field(:auras, :string)

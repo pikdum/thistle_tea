@@ -3,7 +3,9 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
   Builds mob entities from VMangos `creature` rows and their templates: level,
   class-level stats with template multipliers, model and scale, flags, ranges,
   virtual items, waypoint routes, and the abilities rolled for whoever charms
-  it. EventAI conditions are specialized to the spawn as it is built.
+  it. EventAI conditions are specialized to the spawn as it is built. Its
+  `creature_addon` row sets how it stands, sheathes its weapons, idles, and
+  rides; the spawn snapshot keeps that posture for respawns and returns home.
   """
   import Bitwise, only: [|||: 2, <<<: 2, &&&: 2]
 
@@ -66,7 +68,10 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
       flags: unit_flags(ct),
       npc_flags: ct.npc_flags,
       dynamic_flags: ct.dynamic_flags || 0,
-      sheath_state: 1,
+      sheath_state: sheath_state(c.creature_addon),
+      stand_state: stand_state(c.creature_addon),
+      npc_emote_state: emote_state(c.creature_addon),
+      mount_display_id: mount_display_id(c.creature_addon, ct),
       misc_flags: 0x10,
       bounding_radius: mob_bounding_radius(display_info_addon, effective_scale),
       combat_reach: mob_combat_reach(display_info_addon, effective_scale),
@@ -230,6 +235,23 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
       if Keyword.get(opts, :apply_addon_auras?, true), do: Mob.apply_addon_auras(mob, Time.now()), else: mob
     end)
   end
+
+  defp sheath_state(%Mangos.CreatureAddon{sheath_state: sheath}) when is_integer(sheath), do: sheath
+  defp sheath_state(_addon), do: 1
+
+  defp stand_state(%Mangos.CreatureAddon{stand_state: stand}), do: positive_or_nil(stand)
+  defp stand_state(_addon), do: nil
+
+  defp emote_state(%Mangos.CreatureAddon{emote_state: emote}), do: positive_or_nil(emote)
+  defp emote_state(_addon), do: nil
+
+  defp mount_display_id(%Mangos.CreatureAddon{mount_display_id: mount}, _template)
+       when is_integer(mount) and mount >= 0, do: positive_or_nil(mount)
+
+  defp mount_display_id(_addon, %Mangos.CreatureTemplate{mount_display_id: mount}), do: positive_or_nil(mount)
+
+  defp positive_or_nil(value) when is_integer(value) and value > 0, do: value
+  defp positive_or_nil(_value), do: nil
 
   defp stat_inputs(%Unit{} = unit, template, %Mangos.CreatureClassLevelStats{} = stats, :creature) do
     %{
