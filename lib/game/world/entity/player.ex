@@ -153,6 +153,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   alias ThistleTea.Game.World.Entity.Player.Trade
   alias ThistleTea.Game.World.Entity.Player.WeaponProcs
   alias ThistleTea.Game.World.Entity.Player.Weather
+  alias ThistleTea.Game.World.Entity.Player.WorldStates
   alias ThistleTea.Game.World.Entity.PlayerSupervisor
   alias ThistleTea.Game.World.Entity.ScriptDelivery
   alias ThistleTea.Game.World.Entity.ScriptExecution
@@ -1813,6 +1814,15 @@ defmodule ThistleTea.Game.World.Entity.Player do
   rescue
     error ->
       Logger.error("Outdoor PvP credit failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:world_states_changed, states}, %State{} = state) do
+    WorldStates.update(states)
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("World state projection failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 

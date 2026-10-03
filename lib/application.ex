@@ -148,6 +148,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.System.Petition, as: PetitionSystem
   alias ThistleTea.Game.World.System.PostOffice
+  alias ThistleTea.Game.World.System.ScourgeInvasion, as: ScourgeInvasionSystem
   alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
   alias ThistleTea.Game.World.System.SingleTargetAuras
   alias ThistleTea.Game.World.System.SpawnPool
@@ -245,7 +246,8 @@ defmodule ThistleTea.Application do
         {CellActivator, sweep: !test},
         {GameEventSystem, load_schedule: !test},
         !test && ElementalInvasionSystem,
-        !test && MinionsOfOmenSystem
+        !test && MinionsOfOmenSystem,
+        !test && ScourgeInvasionSystem
       ]
       |> Enum.filter(& &1)
 
@@ -393,6 +395,7 @@ defmodule ThistleTea.Application do
             GameObjectScript.summon_entries() ++
             ElementalInvasion.summon_entries() ++
             MinionsOfOmen.summon_entries() ++
+            ScourgeInvasionSystem.summon_entries() ++
             FireworkGuy.entries()
         )
 

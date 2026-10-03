@@ -2,7 +2,8 @@ defmodule ThistleTea.Game.World.Loader.GameEvent do
   @moduledoc """
   Loads schedulable VMangos game events into the runtime schedule model:
   dated recurring events, and the hardcoded events whose calendar a
-  `Core.GameEvent.Rule` keeps.
+  `Core.GameEvent.Rule` keeps. A hardcoded event loads even when its row is
+  disabled, since its rule's driver decides whether it runs.
   """
   import Ecto.Query
 
@@ -25,6 +26,7 @@ defmodule ThistleTea.Game.World.Loader.GameEvent do
 
   defp dated_rows do
     supported_rows()
+    |> where([event], event.disabled == 0)
     |> where([event], event.hardcoded == 0)
     |> where([event], fragment("? != '0000-00-00 00:00:00'", event.start_time))
     |> where([event], fragment("? != '0000-00-00 00:00:00'", event.end_time))
@@ -40,7 +42,6 @@ defmodule ThistleTea.Game.World.Loader.GameEvent do
 
   defp supported_rows do
     Mangos.GameEvent
-    |> where([event], event.disabled == 0)
     |> where([event], event.patch_min <= @supported_patch and event.patch_max >= @supported_patch)
   end
 

@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.GameEvent.ScourgeInvasion
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Honor.Rank
   alias ThistleTea.Game.Core.Inventory
@@ -78,6 +79,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Instance.InstanceData
   alias ThistleTea.Game.World.System.PostOffice
+  alias ThistleTea.Game.World.System.ScourgeInvasion, as: ScourgeInvasionSystem
   alias ThistleTea.Game.World.Transports
 
   require Logger
@@ -200,6 +202,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
       ".die - kill your character",
       ".revive - bring your character back to life at full health",
       ".weather [fine|auto|step] or <rain|snow|storm> <0..1> [permanent] - zone weather",
+      ".invasion [on|off|attack <zone>|fell <zone>] - drive the Scourge Invasion",
       ".go xyz <x> <y> <z> [map|here] [facing] - teleport, optionally facing an angle in radians",
       ".guid - show target guid",
       ".help - show help",
@@ -636,6 +639,10 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   def run(state, ".weather" <> params) do
     {state, message} = Weather.command(state, String.split(params, " ", trim: true))
     state |> system_message(message) |> handled()
+  end
+
+  def run(state, ".invasion" <> params) do
+    state |> invasion_command(String.split(params, " ", trim: true)) |> handled()
   end
 
   def run(state, ".battleground" <> params) do
@@ -1571,6 +1578,55 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   end
 
   defp debug_spell_ids(_state), do: []
+
+  defp invasion_command(state, []) do
+    status = ScourgeInvasionSystem.status()
+
+    zones =
+      Enum.map_join(status.zones, ", ", fn
+        %{attacked?: true} = zone -> "#{zone.name} attacked (#{zone.remaining} left)"
+        zone -> "#{zone.name} clear (next in #{div(zone.next_attack_s, 60)} min)"
+      end)
+
+    state_word = if status.enabled?, do: "on", else: "off"
+    system_message(state, "Scourge Invasion #{state_word}, #{status.victories} victories: #{zones}")
+  end
+
+  defp invasion_command(state, ["on"]) do
+    :ok = ScourgeInvasionSystem.enable()
+    system_message(state, "The Scourge Invasion has begun.")
+  end
+
+  defp invasion_command(state, ["off"]) do
+    :ok = ScourgeInvasionSystem.disable()
+    system_message(state, "The Scourge Invasion has been called off.")
+  end
+
+  defp invasion_command(state, [action, name]) when action in ["attack", "fell"] do
+    case Enum.find(ScourgeInvasion.zones(), &(Atom.to_string(&1.name) == name)) do
+      nil ->
+        zones = Enum.map_join(ScourgeInvasion.zones(), ", ", &Atom.to_string(&1.name))
+        system_message(state, "Unknown zone. Zones: #{zones}")
+
+      zone ->
+        invasion_action(state, action, zone)
+    end
+  end
+
+  defp invasion_command(state, _params),
+    do: system_message(state, "Usage: .invasion [on|off|attack <zone>|fell <zone>]")
+
+  defp invasion_action(state, "attack", zone) do
+    case ScourgeInvasionSystem.attack(zone.name) do
+      :ok -> system_message(state, "The Scourge descend on #{zone.name}.")
+      {:error, reason} -> system_message(state, "Cannot attack #{zone.name}: #{reason}")
+    end
+  end
+
+  defp invasion_action(state, "fell", zone) do
+    ScourgeInvasionSystem.necropolis_fell(zone.zone_id)
+    system_message(state, "A necropolis over #{zone.name} falls.")
+  end
 
   defp world_events_command(state, []) do
     %{active: active, next: next} = GameEvent.status()
