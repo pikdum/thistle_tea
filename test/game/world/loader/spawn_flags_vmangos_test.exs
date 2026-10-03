@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.Loader.SpawnFlagsVmangosTest do
 
   @lord_valthalak 301_240
   @henze_faulk 81_163
+  @zaetars_spirit 55_352
   @disabled_game_object 9496
 
   describe "Mangos.Creature.query_bounds/3" do
@@ -22,6 +23,11 @@ defmodule ThistleTea.Game.World.Loader.SpawnFlagsVmangosTest do
 
       assert Mangos.Creature.dead?(henze)
       refute Mangos.Creature.held_back?(henze)
+    end
+
+    test "loads spawns that are not visible so a script can reveal them" do
+      assert [spirit] = 349 |> creature_rows(28.1887, 62.3964) |> Enum.filter(&(&1.guid == @zaetars_spirit))
+      assert Mangos.Creature.concealed?(spirit)
     end
   end
 

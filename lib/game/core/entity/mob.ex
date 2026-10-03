@@ -82,7 +82,7 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
         %__MODULE__{
           object: object,
           unit: %Unit{} = unit,
-          internal: %Internal{creature: %Creature{} = creature, loot: loot, name: name}
+          internal: %Internal{creature: %Creature{} = creature, loot: loot, name: name, concealed?: concealed?}
         } = mob
       ) do
     %{
@@ -103,7 +103,8 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
       pickpocket_id: if(loot, do: loot.pickpocket_id),
       skinning_id: if(loot, do: loot.skinning_id),
       skinned?: loot && loot.skinned?,
-      body_loot?: loot && not is_nil(loot.session)
+      body_loot?: loot && not is_nil(loot.session),
+      concealed?: concealed? == true
     }
   end
 

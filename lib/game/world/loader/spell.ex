@@ -727,6 +727,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(39), do: :language
   defp effect_type(40), do: :dual_wield
   defp effect_type(45), do: :honor
+  defp effect_type(46), do: :spawn
   defp effect_type(60), do: :proficiency
   defp effect_type(61), do: :send_event
   defp effect_type(50), do: :trans_door

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
   alias ThistleTea.Game.Core.Class.Warlock
   alias ThistleTea.Game.Core.Class.Warrior
   alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
@@ -111,6 +112,9 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.Script do
       true -> {state, database_script_events(state, context, spell.script_steps)}
     end
   end
+
+  def apply(%Mob{internal: %{concealed?: true} = internal} = state, _context, _spell, %Effect{type: :spawn}, _now),
+    do: {Entity.mark_broadcast_update(%{state | internal: %{internal | concealed?: false}}), []}
 
   def apply(state, _context, _spell, _effect, _now), do: {state, []}
 

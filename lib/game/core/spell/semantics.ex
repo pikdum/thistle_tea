@@ -193,7 +193,8 @@ defmodule ThistleTea.Game.Core.Spell.Semantics do
     :dual_wield,
     :proficiency,
     :quest_complete,
-    :send_event
+    :send_event,
+    :spawn
   ]
   @reputation [:reputation]
 

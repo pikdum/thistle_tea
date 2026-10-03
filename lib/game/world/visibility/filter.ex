@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.Visibility.Filter do
 
   def can_see?(viewer_ghost?, type, meta, corpse_distance \\ nil)
 
+  def can_see?(_viewer_ghost?, :mob, %{concealed?: true}, _corpse_distance), do: false
   def can_see?(false, :player, meta, _corpse_distance), do: not ghost?(meta)
   def can_see?(false, :mob, meta, _corpse_distance), do: not spirit_service?(meta)
   def can_see?(false, _type, _meta, _corpse_distance), do: true

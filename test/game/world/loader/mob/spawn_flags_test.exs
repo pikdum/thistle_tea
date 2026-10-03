@@ -7,10 +7,19 @@ defmodule ThistleTea.Game.World.Loader.Mob.SpawnFlagsTest do
   alias ThistleTea.Test.Unique
 
   describe "Mangos.Creature.held_back?/1" do
-    test "holds back disabled and invisible spawns" do
-      for {flags, held_back?} <- [{0, false}, {0x01, false}, {0x02, true}, {0x40, true}, {0x80, false}, {0x42, true}] do
+    test "holds back only disabled spawns" do
+      cases = [{0, false}, {0x01, false}, {0x02, true}, {0x40, false}, {0x80, false}, {0x42, true}]
+
+      for {flags, held_back?} <- cases do
         assert Mangos.Creature.held_back?(%Mangos.Creature{spawn_flags: flags}) == held_back?
       end
+    end
+  end
+
+  describe "Mangos.Creature.concealed?/1" do
+    test "conceals spawns flagged not visible" do
+      assert Mangos.Creature.concealed?(%Mangos.Creature{spawn_flags: 0x40})
+      refute Mangos.Creature.concealed?(%Mangos.Creature{spawn_flags: 0x02})
     end
   end
 
@@ -32,6 +41,14 @@ defmodule ThistleTea.Game.World.Loader.Mob.SpawnFlagsTest do
       living = build(0)
       assert living.unit.health == living.unit.max_health
       refute living.internal.death_finalized?
+    end
+
+    test "a spawn flagged not visible builds concealed and stays so through respawn" do
+      concealed = build(0x40)
+      assert concealed.internal.concealed?
+      assert %{concealed?: true} = Mob.visibility_metadata(concealed)
+      assert Mob.respawn(concealed).internal.concealed?
+      refute build(0).internal.concealed?
     end
   end
 

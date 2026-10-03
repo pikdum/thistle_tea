@@ -365,6 +365,18 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffectTest do
       assert {_living, []} = SpellEffect.receive(faulk, context, spell, 1_000)
     end
 
+    test "a spawn effect reveals a concealed creature" do
+      spell = %Spell{id: 21_896, effects: [%Effect{index: 0, type: :spawn, implicit_target_a: :caster}]}
+      context = %CastContext{caster_guid: 1, caster_level: 50}
+      spirit = %{target_fixture() | object: %Object{guid: 1, entry: 12_238}}
+      concealed = %{spirit | internal: %{spirit.internal | concealed?: true}}
+
+      assert {%{internal: %{concealed?: false, broadcast_update?: true}}, []} =
+               SpellEffect.receive(concealed, context, spell, 1_000)
+
+      assert {^spirit, []} = SpellEffect.receive(spirit, context, spell, 1_000)
+    end
+
     test "capturing a worg pup takes the pup away at once" do
       spell = %Spell{id: 15_998, effects: [%Effect{index: 0, type: :dummy, implicit_target_a: :creature_near_caster}]}
       context = %CastContext{caster_guid: 99, caster_level: 10}

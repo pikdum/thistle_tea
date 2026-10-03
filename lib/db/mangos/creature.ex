@@ -10,7 +10,6 @@ defmodule ThistleTea.DB.Mangos.Creature do
   @spawn_flag_disabled 0x02
   @spawn_flag_not_visible 0x40
   @spawn_flag_dead 0x80
-  @held_back @spawn_flag_disabled ||| @spawn_flag_not_visible
 
   schema "creature" do
     field(:id, :integer, default: 0)
@@ -63,7 +62,9 @@ defmodule ThistleTea.DB.Mangos.Creature do
     )
   end
 
-  def held_back?(%__MODULE__{spawn_flags: flags}), do: band(flags || 0, @held_back) != 0
+  def held_back?(%__MODULE__{spawn_flags: flags}), do: band(flags || 0, @spawn_flag_disabled) != 0
+
+  def concealed?(%__MODULE__{spawn_flags: flags}), do: band(flags || 0, @spawn_flag_not_visible) != 0
 
   def dead?(%__MODULE__{spawn_flags: flags, health_percent: health_percent}),
     do: band(flags || 0, @spawn_flag_dead) != 0 or health_percent == 0.0
@@ -73,7 +74,7 @@ defmodule ThistleTea.DB.Mangos.Creature do
       where:
         c.map == ^map and c.position_x >= ^x1 and c.position_x < ^x2 and c.position_y >= ^y1 and
           c.position_y < ^y2,
-      where: fragment("(? & ?) = 0", c.spawn_flags, ^@held_back),
+      where: fragment("(? & ?) = 0", c.spawn_flags, ^@spawn_flag_disabled),
       left_join: ce in assoc(c, :game_event_creature),
       where: ce.event in ^events or is_nil(ce.event),
       preload: [game_event_creature: ce],

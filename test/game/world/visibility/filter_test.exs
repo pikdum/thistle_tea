@@ -13,6 +13,11 @@ defmodule ThistleTea.Game.World.Visibility.FilterTest do
       refute Filter.can_see?(false, :mob, %{alive?: true, spirit_service?: true})
     end
 
+    test "nobody sees a concealed creature, ghost or not" do
+      refute Filter.can_see?(false, :mob, %{alive?: true, concealed?: true})
+      refute Filter.can_see?(true, :mob, %{alive?: true, concealed?: true, spirit_service?: true}, 1.0)
+    end
+
     test "sees living and dead-unreleased players" do
       assert Filter.can_see?(false, :player, %{alive?: true})
       assert Filter.can_see?(false, :player, %{alive?: false, ghost?: false})

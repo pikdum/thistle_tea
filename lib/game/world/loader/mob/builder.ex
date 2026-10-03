@@ -158,6 +158,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Builder do
       internal: %Internal{
         world: WorldRef.open(c.map),
         name: ct.name,
+        concealed?: Mangos.Creature.concealed?(c),
         invincibility_health_threshold: CreatureFlags.invincibility_threshold(ct.creature_type_flags),
         creature: %Creature{
           db_guid: c.guid,

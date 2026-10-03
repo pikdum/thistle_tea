@@ -135,6 +135,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal do
     navigation_intents: [],
     broadcast_update?: false,
     death_finalized?: false,
+    concealed?: false,
     rooted?: false,
     spline_id: 0,
     godmode: false,
