@@ -137,6 +137,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.System.Honor, as: HonorSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Instance.InstanceData
+  alias ThistleTea.Game.World.System.LocalDefense, as: LocalDefenseSystem
   alias ThistleTea.Game.World.System.OutdoorPvp, as: OutdoorPvpSystem
   alias ThistleTea.Game.World.System.OutdoorPvp.CaptureEnvironment
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -201,6 +202,7 @@ defmodule ThistleTea.Application do
         ScriptedEventSystem,
         CreatureGroups,
         CombatLeashes,
+        LocalDefenseSystem,
         InstanceSystem,
         DuelSystem,
         EntityRegistry,

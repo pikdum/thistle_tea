@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver do
   alias ThistleTea.Game.World.Entity.EffectResolver.DeathItem
   alias ThistleTea.Game.World.Entity.EffectResolver.Durability
   alias ThistleTea.Game.World.Entity.EffectResolver.Honor
+  alias ThistleTea.Game.World.Entity.EffectResolver.LocalDefense
   alias ThistleTea.Game.World.Entity.EffectResolver.Movement
   alias ThistleTea.Game.World.Entity.EffectResolver.PetLearning
   alias ThistleTea.Game.World.Entity.EffectResolver.Pvp
@@ -79,7 +80,10 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver do
   end
 
   def resolve(entity, %Effects.PlayerDefeated{} = effect), do: Battleground.resolve(entity, effect)
-  def resolve(entity, %Effects.CreatureDefeated{} = effect), do: Battleground.resolve(entity, effect)
+
+  def resolve(entity, %Effects.CreatureDefeated{} = effect),
+    do: Battleground.resolve(entity, effect) ++ LocalDefense.resolve(entity, effect)
+
   def resolve(_entity, %Effects.HonorDamage{} = effect), do: Honor.resolve(effect)
   def resolve(entity, %Effects.HonorCreatureKill{} = effect), do: Honor.creature_kill(entity, effect)
   def resolve(entity, %Effects.PetAbilityUsed{} = effect), do: PetLearning.resolve(entity, effect)

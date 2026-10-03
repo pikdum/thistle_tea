@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Core.Effects.CombatTypes do
     {:EnterEvade, [:target_guid], []},
     {:PlayerDefeated, [:source_guid, :count_death?], []},
     {:CreatureDefeated, [:source_guid], []},
+    {:LocalDefenseAlert, [:world, :area_id, :attacking_team], []},
     {:BattlegroundDeath, [:world, :defeat], []},
     {:BattlegroundFlagRemoved, [:world, :guid, :team, :position], []},
     {:BattlegroundCreatureDeath, [:world, :defeat], []},

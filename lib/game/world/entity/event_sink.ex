@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink do
   alias ThistleTea.Game.World.Entity.EventSink.Spells
   alias ThistleTea.Game.World.Entity.EventSink.Summons
   alias ThistleTea.Game.World.System.Battleground
+  alias ThistleTea.Game.World.System.LocalDefense, as: LocalDefenseSystem
 
   @client_effects [
     Effects.StartMirrorTimer,
@@ -259,6 +260,11 @@ defmodule ThistleTea.Game.World.Entity.EventSink do
 
   defp emit_resolved(entity, %Effects.BattlegroundCreatureDeath{world: world, defeat: defeat}, _context) do
     Battleground.creature_died(world, defeat)
+    entity
+  end
+
+  defp emit_resolved(entity, %Effects.LocalDefenseAlert{} = alert, _context) do
+    LocalDefenseSystem.alert(alert.world, alert.area_id, alert.attacking_team)
     entity
   end
 
