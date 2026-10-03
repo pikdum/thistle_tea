@@ -10,6 +10,14 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
 
   @immune_to_npc 0x200
 
+  @defias_raider_positions [
+    {-11_450.836, 1_569.755, 54.267, 4.230},
+    {-11_449.697, 1_569.124, 54.421, 4.206},
+    {-11_448.237, 1_568.307, 54.620, 4.206},
+    {-11_448.037, 1_570.213, 54.961, 4.283},
+    {-11_449.018, 1_570.738, 54.828, 4.220}
+  ]
+
   def all do
     [
       %QuestEscort{
@@ -403,6 +411,20 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
         start_delay_ms: 750,
         accept: [{:invincible, 20}, {:add_aura, 6634}],
         points: %{3 => [:run, {:faction, 189}], 9 => [:fail]}
+      },
+      %QuestEscort{
+        quest_id: 1651,
+        entry: 6182,
+        credit_point: 17,
+        instant_respawn?: true,
+        accept: [{:say, 2360}, :run],
+        points: %{
+          7 => [{:event_phase, 1} | defias_raiders(3)],
+          8 => [{:event_phase, 2} | defias_raiders(4)],
+          9 => [{:event_phase, 3} | defias_raiders(5)],
+          10 => [:walk],
+          11 => [{:say, 3090}]
+        }
       }
     ]
   end
@@ -445,6 +467,12 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
         24 => [{:say, 1618}]
       }
     }
+  end
+
+  defp defias_raiders(count) do
+    @defias_raider_positions
+    |> Enum.take(count)
+    |> Enum.map(&{:summon, 6180, &1, attack: :escort, despawn: {:timed_out_of_combat, 30_000}})
   end
 
   defp bandits(positions) do

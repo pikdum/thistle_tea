@@ -10,10 +10,12 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   `{:remove_aura, spell_id}`, `{:remove_unit_flags, mask}` (until
   respawn), `{:invincible, health_pct}` (never falls below that share of its
   health), `:fail` (fails the quest for the player and their group),
-  `{:summon, entry, position, opts}`, and `{:after, delay_ms, action}`. A
-  summon despawns per `despawn: {type, delay_ms}` (vmangos `TempSummonType`
-  names), attacks the escortee, the player, or nothing per `attack:`, and runs
-  the actions in `script:`.
+  `{:event_phase, phase}` (the escortee's EventAI phase, for a script port
+  that reacts to it), `{:summon, entry, position, opts}`, and
+  `{:after, delay_ms, action}`. A summon despawns per
+  `despawn: {type, delay_ms}` (vmangos `TempSummonType` names), attacks the
+  escortee, the player, or nothing per `attack:`, and runs the actions in
+  `script:`.
 
   The phase says where the steps run: `:accept` and `:arrival` steps are
   given the player as their target, `:point` steps reach the player through
@@ -77,6 +79,9 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   def steps({:faction, faction_id}, _quest_id, _phase) do
     [%ScriptStep{command: :set_faction, datalong: faction_id, datalong2: @restore_on_respawn}]
   end
+
+  def steps({:event_phase, event_phase}, _quest_id, _phase),
+    do: [%ScriptStep{command: :set_phase, datalong: event_phase}]
 
   def steps(:run, _quest_id, _phase), do: [%ScriptStep{command: :set_run, datalong: 1}]
   def steps(:walk, _quest_id, _phase), do: [%ScriptStep{command: :set_run, datalong: 0}]
