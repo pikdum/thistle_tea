@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Context.Waypoints do
   (`Core.Quest.QuestEscort`) by the quest id in `dataint3`, so one escortee
   can walk a different path for each of its quests. Source 5 selects the
   path a `Core.AI.CreatureScript` port walks, by the creature entry in
-  `dataint2` or the creature's own.
+  `dataint2` or the creature's own and the path variant in `dataint3`.
   """
 
   alias ThistleTea.Game.Core.AI.ScriptStep
@@ -42,7 +42,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Context.Waypoints do
   defp route(routes, 2, _guid_key, entry_key, _quest_id), do: Map.get(routes, {:entry, entry_key})
   defp route(routes, 3, _guid_key, entry_key, _quest_id), do: Map.get(routes, {:special, entry_key})
   defp route(routes, 4, _guid_key, _entry_key, quest_id), do: Map.get(routes, {:escort, quest_id})
-  defp route(routes, 5, _guid_key, entry_key, _quest_id), do: Map.get(routes, {:script, entry_key})
+  defp route(routes, 5, _guid_key, entry_key, variant), do: Map.get(routes, {:script, entry_key, variant})
   defp route(_routes, _source, _guid_key, _entry_key, _quest_id), do: nil
 
   defp positive_or(value, _fallback) when is_integer(value) and value > 0, do: value

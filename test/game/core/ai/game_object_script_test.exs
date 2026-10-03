@@ -111,6 +111,23 @@ defmodule ThistleTea.Game.Core.AI.GameObjectScriptTest do
       assert [] = effects(@panther_cage, character(), context)
     end
 
+    test "the sprite darter cage frees the pen for a player on Freedom for All Creatures" do
+      steps = GameObjectScript.steps(143_979, @cask_position)
+
+      for {quests, freed} <- [{[{2969, :incomplete}], 1}, {[{2969, :complete}], 0}, {[], 0}] do
+        player = character(quests: quests)
+        {player, _blackboard} = Script.run(player, Blackboard.new(), steps, player.object.guid, Context.new(0))
+        commands = Enum.filter(player.internal.events, &match?(%Effects.ScriptedEventCommand{}, &1))
+        assert length(commands) == freed
+      end
+
+      assert [%ScriptStep{command: :start_script_for_all, datalong2: 2, datalong3: 7_997} = free] = steps
+      assert %{1 => escape} = free.sub_scripts
+
+      assert [%ScriptStep{command: :set_faction, datalong: 10}, %ScriptStep{command: :set_run, datalong: 1} | _pick] =
+               escape
+    end
+
     test "the Inconspicuous Landmark brings five treasure hunters down on the player" do
       player = character()
       guid = player.object.guid

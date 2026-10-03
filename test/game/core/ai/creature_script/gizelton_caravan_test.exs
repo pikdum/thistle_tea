@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.GizeltonCaravanTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Core.AI.CreatureScript
+  alias ThistleTea.Game.Core.AI.CreatureScript.Route
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Condition
 
@@ -154,5 +155,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.GizeltonCaravanTest do
     end
   end
 
-  defp point(point), do: CreatureScript.routes() |> Map.fetch!(@cork) |> Map.fetch!(point)
+  defp point(point) do
+    %Route{points: points} = Enum.find(CreatureScript.routes(), &(&1.entry == @cork))
+    Map.fetch!(points, point)
+  end
 end

@@ -18,9 +18,11 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   being turned in, as `QuestRewarded` hooks do, returns the steps to append
   to its completion script from `quest_end_steps/0`. A script that only
   reacts to quests claims no entries, so its creature keeps its EventAI.
-  A creature that walks its `script_waypoint` path, as `npc_escortAI`
-  creatures do, gets the steps to run at each point of it from `routes/0`,
-  keyed by its entry and then by point; `start_waypoints` source 5 starts it.
+  A creature that walks a path, as `npc_escortAI` creatures walk their
+  `script_waypoint` rows, gets it and the steps to run at each of its points
+  from `routes/0` (`CreatureScript.Route`); `start_waypoints` source 5
+  starts it. `pick/1` runs one of several step lists at random, as C++
+  scripts roll `urand`, nesting `start_script` choices four at a time.
   """
 
   alias ThistleTea.Game.Core.AI.AIEvent
@@ -33,10 +35,12 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.Faulk
   alias ThistleTea.Game.Core.AI.CreatureScript.FelwoodOoze
   alias ThistleTea.Game.Core.AI.CreatureScript.GizeltonCaravan
+  alias ThistleTea.Game.Core.AI.CreatureScript.KindalMoonweaver
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
   alias ThistleTea.Game.Core.AI.CreatureScript.Murkdeep
   alias ThistleTea.Game.Core.AI.CreatureScript.Piznik
   alias ThistleTea.Game.Core.AI.CreatureScript.RabidThistleBear
+  alias ThistleTea.Game.Core.AI.CreatureScript.Route
   alias ThistleTea.Game.Core.AI.CreatureScript.ShakesOBreen
   alias ThistleTea.Game.Core.AI.CreatureScript.SicklyCritter
   alias ThistleTea.Game.Core.AI.CreatureScript.TapokeSlimJahn
@@ -51,7 +55,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   @callback quest_start_steps() :: %{pos_integer() => [%ScriptStep{}]}
   @callback quest_end_steps() :: %{pos_integer() => [%ScriptStep{}]}
 
-  @callback routes() :: %{pos_integer() => %{non_neg_integer() => [%ScriptStep{}]}}
+  @callback routes() :: [%Route{}]
 
   @optional_callbacks quest_start_steps: 0, quest_end_steps: 0, routes: 0
 
@@ -71,6 +75,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     RabidThistleBear,
     ShakesOBreen,
     SicklyCritter,
+    KindalMoonweaver,
     TapokeSlimJahn,
     Triage,
     TwiggyFlathead,
@@ -78,6 +83,12 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   ]
   @timed_script 1
   @restore_on_respawn 0x01
+  @start_script_options [
+    {:datalong, :dataint},
+    {:datalong2, :dataint2},
+    {:datalong3, :dataint3},
+    {:datalong4, :dataint4}
+  ]
 
   def ported?(entry), do: not is_nil(script(entry))
 
@@ -101,7 +112,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
 
   def quest_end_steps, do: quest_steps(:quest_end_steps)
 
-  def routes, do: Enum.reduce(implementations(:routes), %{}, &Map.merge(&2, &1))
+  def routes, do: Enum.concat(implementations(:routes))
 
   defp quest_steps(callback) do
     callback
@@ -116,7 +127,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   end
 
   defp steps do
-    route_steps = routes() |> Map.values() |> Enum.flat_map(&Map.values/1) |> List.flatten()
+    route_steps = routes() |> Enum.flat_map(&Map.values(&1.points)) |> List.flatten()
     (entries() |> Enum.flat_map(&events/1) |> Enum.flat_map(&List.flatten(&1.actions))) ++ route_steps
   end
 
@@ -130,6 +141,34 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   def timed(steps) when is_list(steps) do
     %ScriptStep{command: :start_script, datalong: @timed_script, dataint: 100, sub_scripts: %{@timed_script => steps}}
   end
+
+  def pick([_ | _] = choices), do: choices |> Enum.map(&{1, &1}) |> choose()
+
+  defp choose([{_weight, steps}]), do: steps
+
+  defp choose(options) when length(options) > length(@start_script_options) do
+    options
+    |> Enum.chunk_every(ceil(length(options) / length(@start_script_options)))
+    |> Enum.map(fn group -> {group |> Enum.map(&elem(&1, 0)) |> Enum.sum(), choose(group)} end)
+    |> choose()
+  end
+
+  defp choose(options) do
+    total = options |> Enum.map(&elem(&1, 0)) |> Enum.sum()
+    chances = Enum.map(options, fn {weight, _steps} -> div(weight * 100, total) end)
+    chances = List.update_at(chances, -1, &(&1 + 100 - Enum.sum(chances)))
+    scripts = options |> Enum.with_index(1) |> Map.new(fn {{_weight, steps}, id} -> {id, steps} end)
+
+    step =
+      [@start_script_options, Enum.to_list(1..length(options)), chances]
+      |> Enum.zip()
+      |> Enum.reduce(%ScriptStep{command: :start_script, sub_scripts: scripts}, &put_option/2)
+
+    [step]
+  end
+
+  defp put_option({{id_field, chance_field}, id, chance}, step),
+    do: struct!(step, [{id_field, id}, {chance_field, chance}])
 
   def faction(faction_id) when is_integer(faction_id),
     do: %ScriptStep{command: :set_faction, datalong: faction_id, datalong2: @restore_on_respawn}

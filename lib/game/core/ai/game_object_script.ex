@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Core.AI.GameObjectScript do
   alias ThistleTea.Game.Core.AI.GameObjectScript.LardsPicnicBasket
   alias ThistleTea.Game.Core.AI.GameObjectScript.PantherCage
   alias ThistleTea.Game.Core.AI.GameObjectScript.ResoniteCask
+  alias ThistleTea.Game.Core.AI.GameObjectScript.SpriteDarterCage
   alias ThistleTea.Game.Core.AI.GameObjectScript.WindStone
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
@@ -43,6 +44,7 @@ defmodule ThistleTea.Game.Core.AI.GameObjectScript do
     LardsPicnicBasket,
     PantherCage,
     ResoniteCask,
+    SpriteDarterCage,
     WindStone
   ]
   @origin {0.0, 0.0, 0.0, 0.0}

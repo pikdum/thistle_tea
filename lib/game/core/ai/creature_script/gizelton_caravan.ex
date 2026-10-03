@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.GizeltonCaravan do
   @behaviour ThistleTea.Game.Core.AI.CreatureScript
 
   alias ThistleTea.Game.Core.AI.CreatureScript
+  alias ThistleTea.Game.Core.AI.CreatureScript.Route
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Condition
 
@@ -230,7 +231,12 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.GizeltonCaravan do
 
     camps = Enum.map(@camps, fn {point, {vendor, speaker, text}} -> {point, camp(vendor, speaker, text)} end)
 
-    %{@cork => Map.new(legs ++ camps ++ [{@last_point, [on_caravan([%ScriptStep{command: :despawn}])]}])}
+    [
+      %Route{
+        entry: @cork,
+        points: Map.new(legs ++ camps ++ [{@last_point, [on_caravan([%ScriptStep{command: :despawn}])]}])
+      }
+    ]
   end
 
   defp setup do
