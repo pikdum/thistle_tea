@@ -22,7 +22,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   `script_waypoint` rows, gets it and the steps to run at each of its points
   from `routes/0` (`CreatureScript.Route`); `start_waypoints` source 5
   starts it. `pick/1` runs one of several step lists at random, as C++
-  scripts roll `urand`, nesting `start_script` choices four at a time.
+  scripts roll `urand`, nesting `start_script` choices four at a time, and
+  `pick_weighted/1` does the same over `{weight, steps}` pairs.
   """
 
   alias ThistleTea.Game.Core.AI.AIEvent
@@ -41,6 +42,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
   alias ThistleTea.Game.Core.AI.CreatureScript.Murkdeep
   alias ThistleTea.Game.Core.AI.CreatureScript.Omen
+  alias ThistleTea.Game.Core.AI.CreatureScript.Onyxia
   alias ThistleTea.Game.Core.AI.CreatureScript.Piznik
   alias ThistleTea.Game.Core.AI.CreatureScript.RabidThistleBear
   alias ThistleTea.Game.Core.AI.CreatureScript.Route
@@ -77,6 +79,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     LazyPeon,
     Murkdeep,
     Omen,
+    Onyxia,
     Piznik,
     RabidThistleBear,
     ShakesOBreen,
@@ -149,6 +152,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   end
 
   def pick([_ | _] = choices), do: choices |> Enum.map(&{1, &1}) |> choose()
+
+  def pick_weighted([{weight, _steps} | _] = choices) when is_integer(weight), do: choose(choices)
 
   defp choose([{_weight, steps}]), do: steps
 
