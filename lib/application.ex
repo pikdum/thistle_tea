@@ -341,9 +341,7 @@ defmodule ThistleTea.Application do
 
     with {:ok, pid} <- Supervisor.start_link(children, opts) do
       if !test do
-        PassiveSpellLoader.load_all()
-        SpellAreaLoader.load_all()
-        SpellChainLoader.load_abilities()
+        load_spell_data()
         CreatureGroupLoader.load_all()
         Logger.info("Loading waypoints...")
         WaypointLoader.load_all()
@@ -407,22 +405,10 @@ defmodule ThistleTea.Application do
         ModelGeometryLoader.load_all()
         ModelGeometryLoader.load_all_addons()
         TransportLoader.load_all()
-        SpellEffectOverrideLoader.load_all()
-        SpellElixirLoader.load_all()
-        SpellGroupLoader.load_all()
-        SpellLoader.load_target_positions()
-        SpellPetAuraLoader.load_all()
-        SpellObjectTargetLoader.load_all()
-        SpellUnitTargetLoader.load_all()
         GameObjectScriptLoader.load_all()
         EventScriptLoader.load_all()
         PageTextLoader.load_all()
-        SpellProcEventLoader.load_all()
-        SpellScriptLoader.load_all()
-        SpellScriptNameLoader.load_all()
         TotemLoader.preload()
-        SpellThreatLoader.load_all()
-        TalentLoader.load_all()
         PetTrainingLoader.load_all()
         PetSpellsLoader.load_all()
         TaxiLoader.load_all()
@@ -443,6 +429,24 @@ defmodule ThistleTea.Application do
 
       {:ok, pid}
     end
+  end
+
+  defp load_spell_data do
+    PassiveSpellLoader.load_all()
+    SpellAreaLoader.load_all()
+    SpellChainLoader.load_abilities()
+    SpellEffectOverrideLoader.load_all()
+    SpellElixirLoader.load_all()
+    SpellGroupLoader.load_all()
+    SpellLoader.load_target_positions()
+    SpellPetAuraLoader.load_all()
+    SpellObjectTargetLoader.load_all()
+    SpellUnitTargetLoader.load_all()
+    SpellProcEventLoader.load_all()
+    SpellScriptLoader.load_all()
+    SpellScriptNameLoader.load_all()
+    SpellThreatLoader.load_all()
+    TalentLoader.load_all()
   end
 
   @impl true
