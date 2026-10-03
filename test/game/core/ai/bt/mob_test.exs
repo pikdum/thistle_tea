@@ -408,6 +408,29 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.AttackStop))
     end
 
+    test "leaves combat when it entered with nobody left to fight" do
+      mob = fixture_mob()
+
+      mob =
+        %{
+          mob
+          | unit: %{mob.unit | health: 100, max_health: 100, auras: []},
+            internal: %{
+              mob.internal
+              | in_combat: true,
+                threat: %{},
+                blackboard: Blackboard.new(),
+                spawn: %Spawn{position: {5.0, 0.0, 0.0}}
+            }
+        }
+        |> BT.init(MobBT.tree())
+
+      {_status, mob} = BehaviorRunner.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, 1_000))
+
+      refute mob.internal.in_combat
+      assert mob.internal.blackboard.navigation.returning_home?
+    end
+
     test "interrupts a wander spline when combat begins" do
       now = Time.now()
 

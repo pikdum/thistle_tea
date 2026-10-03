@@ -36,7 +36,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   alias ThistleTea.Game.Core.Combat.Aggro
   alias ThistleTea.Game.Core.Combat.Engagement
   alias ThistleTea.Game.Core.Combat.Hostility
-  alias ThistleTea.Game.Core.Combat.Threat
   alias ThistleTea.Game.Core.Combat.UnreachableTarget
   alias ThistleTea.Game.Core.Creature.CreatureFlags
   alias ThistleTea.Game.Core.Creature.CreatureMovement
@@ -281,7 +280,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   end
 
   defp in_combat?(%Mob{} = state, %Blackboard{} = blackboard) do
-    CombatBT.in_combat?(state, blackboard) or (state.internal.in_combat == true and Threat.targets(state) != [])
+    CombatBT.in_combat?(state, blackboard) or state.internal.in_combat == true
   end
 
   defp not_in_combat?(%Mob{} = state, %Blackboard{} = blackboard) do
