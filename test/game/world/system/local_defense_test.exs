@@ -16,19 +16,20 @@ defmodule ThistleTea.Game.World.System.LocalDefenseTest do
     setup [:server, :players]
 
     test "warns the defending team on the map once per cooldown", %{server: server, world: world} = context do
-      %{defender: defender, attacker: attacker, elsewhere: elsewhere} = context
+      %{defender: defender, attacker: attacker, elsewhere: elsewhere, relays: relays} = context
       area = Unique.integer()
+      other_area = Unique.integer()
 
       LocalDefense.alert(world, area, :horde, server)
       LocalDefense.alert(world, area, :horde, server)
-      LocalDefense.alert(world, area + 1, :alliance, server)
-
-      assert_receive {^defender, %SmsgZoneUnderAttack{area_id: ^area}}
-      assert_receive {^attacker, %SmsgZoneUnderAttack{area_id: alliance_area}}
-      assert alliance_area == area + 1
+      LocalDefense.alert(world, other_area, :alliance, server)
       :sys.get_state(server)
+      Enum.each(relays, &sync/1)
+
+      assert_received {^defender, %SmsgZoneUnderAttack{area_id: ^area}}
+      assert_received {^attacker, %SmsgZoneUnderAttack{area_id: ^other_area}}
       refute_received {^defender, %SmsgZoneUnderAttack{}}
-      refute_received {^attacker, %SmsgZoneUnderAttack{area_id: ^area}}
+      refute_received {^attacker, %SmsgZoneUnderAttack{}}
       refute_received {^elsewhere, %SmsgZoneUnderAttack{}}
     end
   end
@@ -43,15 +44,16 @@ defmodule ThistleTea.Game.World.System.LocalDefenseTest do
     map_id = Unique.integer()
     [defender, attacker, elsewhere] = guids = Enum.map(1..3, fn _ -> Unique.integer() end)
 
-    for {guid, race, map} <- [
-          {defender, @human, map_id},
-          {attacker, @orc, map_id},
-          {elsewhere, @human, Unique.integer()}
-        ] do
-      relay(guid)
-      Metadata.put(guid, %{race: race})
-      SpatialHash.update(:players, guid, map, 1.0, 2.0, 3.0)
-    end
+    relays =
+      for {guid, race, map} <- [
+            {defender, @human, map_id},
+            {attacker, @orc, map_id},
+            {elsewhere, @human, Unique.integer()}
+          ] do
+        Metadata.put(guid, %{race: race})
+        SpatialHash.update(:players, guid, map, 1.0, 2.0, 3.0)
+        relay(guid)
+      end
 
     on_exit(fn ->
       for guid <- guids do
@@ -60,7 +62,7 @@ defmodule ThistleTea.Game.World.System.LocalDefenseTest do
       end
     end)
 
-    %{world: WorldRef.open(map_id), defender: defender, attacker: attacker, elsewhere: elsewhere}
+    %{world: WorldRef.open(map_id), defender: defender, attacker: attacker, elsewhere: elsewhere, relays: relays}
   end
 
   defp relay(guid) do
@@ -80,8 +82,14 @@ defmodule ThistleTea.Game.World.System.LocalDefenseTest do
   defp forward(test, guid) do
     receive do
       {:"$gen_cast", {:send_packet, packet}} -> send(test, {guid, packet})
+      {:sync, from} -> send(from, {:synced, self()})
     end
 
     forward(test, guid)
+  end
+
+  defp sync(relay) do
+    send(relay, {:sync, self()})
+    assert_receive {:synced, ^relay}, 1_000
   end
 end
