@@ -42,6 +42,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.KindalMoonweaver
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
   alias ThistleTea.Game.Core.AI.CreatureScript.Murkdeep
+  alias ThistleTea.Game.Core.AI.CreatureScript.Obsidion
   alias ThistleTea.Game.Core.AI.CreatureScript.Omen
   alias ThistleTea.Game.Core.AI.CreatureScript.Onyxia
   alias ThistleTea.Game.Core.AI.CreatureScript.Piznik
@@ -57,6 +58,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.TwiggyFlathead
   alias ThistleTea.Game.Core.AI.CreatureScript.TwilightCorrupter
   alias ThistleTea.Game.Core.AI.CreatureScript.WesternPlaguelands
+  alias ThistleTea.Game.Core.AI.CreatureScript.WitchDoctorUnbagwa
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
 
@@ -84,6 +86,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     GizeltonCaravan,
     LazyPeon,
     Murkdeep,
+    Obsidion,
     Omen,
     Onyxia,
     Piznik,
@@ -98,7 +101,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     Triage,
     TwiggyFlathead,
     TwilightCorrupter,
-    WesternPlaguelands
+    WesternPlaguelands,
+    WitchDoctorUnbagwa
   ]
   @timed_script 1
   @restore_on_respawn 0x01
@@ -120,12 +124,11 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
 
   def entries, do: Enum.flat_map(@scripts, & &1.entries())
 
-  def creature_entries, do: Script.creature_entries(steps())
+  def creature_entries, do: Script.creature_entries(steps() ++ all_quest_steps())
 
-  def summon_entries do
-    quest_steps = Enum.flat_map(Map.values(quest_start_steps()) ++ Map.values(quest_end_steps()), & &1)
-    Script.summon_entries(steps() ++ quest_steps)
-  end
+  def summon_entries, do: Script.summon_entries(steps() ++ all_quest_steps())
+
+  defp all_quest_steps, do: Enum.flat_map(Map.values(quest_start_steps()) ++ Map.values(quest_end_steps()), & &1)
 
   def quest_start_steps, do: quest_steps(:quest_start_steps)
 
