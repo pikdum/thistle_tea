@@ -22,7 +22,8 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
   An idle creature ticks only for its out-of-combat timers and friendly
   missing-buff polls; out-of-combat line-of-sight events wait for a unit to
   announce itself within `ooc_los_radius/3`, as vmangos evaluates them from
-  MoveInLineOfSight.
+  MoveInLineOfSight, and gate each unit in sight on the event's condition
+  with that unit as the target, so the nearest unit that passes fires it.
   """
   alias ThistleTea.Game.Core.AI.AIEvent
   alias ThistleTea.Game.Core.AI.BT.Blackboard
@@ -457,7 +458,7 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
          true <- due?(blackboard, index, now),
          true <- AIEvent.phase_allows?(event, blackboard.event_ai.phase),
          true <- casting_allows?(state, event),
-         true <- condition_met?(state, event.condition, invoker_guid, context),
+         true <- event.event_type == :ooc_los or condition_met?(state, event.condition, invoker_guid, context),
          {:ok, invoker_guid} <- satisfy(state, event, invoker_guid, context) do
       blackboard =
         blackboard
@@ -720,14 +721,16 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
   defp normalize_radius(radius) when is_number(radius) and radius > 0, do: radius
   defp normalize_radius(_radius), do: @friendly_hp_default_radius
 
-  defp find_ooc_los_unit(state, %AIEvent{param1: reaction, param2: radius}, %Context{perception: perception}) do
+  defp find_ooc_los_unit(state, %AIEvent{param1: reaction, param2: radius} = event, %Context{} = context) do
+    perception = context.perception
     source = Perception.actor(perception, state.object.guid)
 
     perception
     |> nearby_units(normalize_radius(radius))
     |> Enum.filter(fn {guid, _distance} ->
       Perception.line_of_sight?(perception, guid) and
-        reaction_allows?(reaction, source, Perception.actor(perception, guid))
+        reaction_allows?(reaction, source, Perception.actor(perception, guid)) and
+        condition_met?(state, event.condition, guid, context)
     end)
     |> Enum.min_by(&elem(&1, 1), fn -> nil end)
     |> case do

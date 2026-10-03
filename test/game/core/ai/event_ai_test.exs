@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Core.AI.EventAITest do
   alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Condition
+  alias ThistleTea.Game.Core.Condition.Subject
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
@@ -20,6 +21,7 @@ defmodule ThistleTea.Game.Core.AI.EventAITest do
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Pet.SummonEvent
+  alias ThistleTea.Game.Core.Quest.QuestLog
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Test.Unique
@@ -411,6 +413,27 @@ defmodule ThistleTea.Game.Core.AI.EventAITest do
       assert [%Effects.MonsterTalk{target_guid: ^player}] = mob.internal.events
     end
 
+    test "checks out-of-combat line-of-sight conditions against each unit in sight" do
+      questing = Guid.from_low_guid(:player, Unique.integer())
+      passing = Guid.from_low_guid(:player, Unique.integer())
+      condition = %Condition{type: :quest_taken, value1: 5_216, value2: 1}
+      mob = mob(events: [event(:ooc_los, param1: 0, param2: 40, param3: 5_000, param4: 5_000, condition: condition)])
+      quest_log = %{0 => %QuestLog.Entry{quest_id: 5_216, status: :incomplete}}
+
+      players = [
+        {passing, 5.0, %Subject{guid: passing, kind: :player, quest_log: %{}}},
+        {questing, 30.0, %Subject{guid: questing, kind: :player, quest_log: quest_log}}
+      ]
+
+      {fired, _blackboard} = EventAI.tick(mob, Blackboard.new(), 1_000, sighting_context(mob, players))
+      assert [%Effects.MonsterTalk{target_guid: ^questing}] = fired.internal.events
+
+      {unchanged, _blackboard} =
+        EventAI.tick(mob, Blackboard.new(), 1_000, sighting_context(mob, Enum.take(players, 1)))
+
+      assert unchanged.internal.events == []
+    end
+
     test "finds friendly crowd control and missing buffs" do
       crowd_control = event(:friendly_is_cc, param2: 30)
       missing_buff = event(:friendly_missing_buff, param1: 27_995, param2: 30)
@@ -713,5 +736,18 @@ defmodule ThistleTea.Game.Core.AI.EventAITest do
     nearby = Keyword.get(opts, :nearby, %{mobs: [], players: [], game_objects: []})
     perception = Perception.new(1_000, nil, observations, nearby)
     Context.new(1_000, perception: perception)
+  end
+
+  defp sighting_context(mob, players) do
+    source = mob.object.guid
+
+    observations =
+      Map.new(players, fn {guid, distance, subject} ->
+        {guid, %Observation{guid: guid, metadata: %{condition_subject: subject}, distance: distance}}
+      end)
+
+    nearby = %{mobs: [], players: Enum.map(players, fn {guid, distance, _subject} -> {guid, distance} end)}
+    observations = Map.put(observations, source, %Observation{guid: source, metadata: %{}})
+    Context.new(1_000, perception: Perception.new(1_000, nil, observations, Map.put(nearby, :game_objects, [])))
   end
 end

@@ -2,7 +2,10 @@ defmodule ThistleTea.Game.Core.Condition.EntityContext do
   @moduledoc """
   Pure projection of an entity and its behavior-tree environment into a
   condition context. `static/1` projects only the facts a creature spawn can
-  never change, for specializing its conditions when it is built.
+  never change, for specializing its conditions when it is built. A perceived
+  player target carries the quest, skill, reputation, and item facts its own
+  process publishes as `condition_subject`, so creatures can gate on them the
+  way vmangos reads the player directly.
   """
 
   alias ThistleTea.Game.Core.AI.BT.Context, as: AIContext
@@ -143,14 +146,38 @@ defmodule ThistleTea.Game.Core.Condition.EntityContext do
   defp target_subject(_source, %Perception{} = perception, guid) when is_integer(guid) and guid > 0 do
     metadata = Perception.metadata(perception, guid) || %{}
 
-    metadata_subject(guid, metadata,
+    guid
+    |> metadata_subject(metadata,
       entry: Perception.entry(perception, guid),
       position: Perception.position(perception, guid),
       moving?: Perception.moving?(perception, guid)
     )
+    |> put_player_facts(Map.get(metadata, :condition_subject))
   end
 
   defp target_subject(_source, %Perception{}, _guid), do: nil
+
+  defp put_player_facts(%Subject{kind: :player, guid: guid} = subject, %Subject{kind: :player, guid: guid} = published) do
+    %{
+      subject
+      | team: published.team,
+        skills: published.skills,
+        skill_bonuses: published.skill_bonuses,
+        spell_ids: published.spell_ids,
+        quest_log: published.quest_log,
+        rewarded_quests: published.rewarded_quests,
+        reputation: published.reputation,
+        reputation_ranks: published.reputation_ranks,
+        explored_areas: published.explored_areas,
+        item_counts: published.item_counts,
+        item_counts_with_bank: published.item_counts_with_bank,
+        equipped_item_ids: published.equipped_item_ids,
+        argent_dawn_commission?: published.argent_dawn_commission?,
+        mini_pet_entry: published.mini_pet_entry
+    }
+  end
+
+  defp put_player_facts(subject, _published), do: subject
 
   def metadata_subject(guid, metadata, opts \\ []) do
     %Subject{
