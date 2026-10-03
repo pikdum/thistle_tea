@@ -2,6 +2,11 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect do
   @moduledoc """
   Applies a cast spell's effects (damage, healing, auras, item creation, …) to
   a target entity, returning the updated entity and the events to emit.
+
+  A dead target takes only resurrection, durability loss, corpse scripts, and,
+  as vmangos `AddSpellAuraHolder` allows, auras that persist through death or
+  may target the dead. A corpse may still raise an object at its own feet, so
+  the Putrid Mushroom grows where an Emeriss-touched player fell.
   """
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.EffectImmunity
@@ -442,7 +447,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect do
   defp apply_effects(target, context, effects, events, applied, now) do
     effects =
       if Entity.dead?(target) do
-        Enum.filter(effects, &dead_target_effect?(&1, context.spell, target))
+        Enum.filter(effects, &dead_target_effect?(&1, context, target))
       else
         effects
       end
@@ -450,7 +455,13 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect do
     do_apply_effects(target, context, effects, events, applied, now)
   end
 
-  defp dead_target_effect?(%Effect{type: type} = effect, spell, target) do
+  defp dead_target_effect?(%Effect{type: :apply_aura}, %CastContext{spell: spell}, _target),
+    do: Spell.attribute?(spell, :death_persistent) or Spell.attribute?(spell, :allow_dead_target)
+
+  defp dead_target_effect?(%Effect{type: :summon_object_wild}, %CastContext{caster_guid: guid}, %{object: %{guid: guid}}),
+       do: true
+
+  defp dead_target_effect?(%Effect{type: type} = effect, %CastContext{spell: spell}, target) do
     type in @dead_target_effects or
       (type in @corpse_script_effects and
          (Spell.attribute?(spell, :allow_dead_target) or UnitTargets.corpse_effect?(spell, effect, target)))

@@ -50,6 +50,13 @@ defmodule ThistleTea.Game.Core.Spell.WildObjectTest do
       assert Enum.all?(events, &(&1.duration_ms == 0))
     end
 
+    test "a corpse still raises its own object but not another's", %{caster: caster, context: context} do
+      corpse = %{caster | unit: %{caster.unit | health: 0}}
+      other = %{corpse | object: %Object{guid: 2}}
+      assert {_, [%Effects.SummonGameObject{entry: 161_513}]} = SpellEffect.receive(corpse, context, spell(), 1_000)
+      assert {_, []} = SpellEffect.receive(other, %{context | target_role: :other}, spell(), 1_000)
+    end
+
     test "uses the effect radius for forward placement", %{caster: caster, context: context} do
       effect = %{hd(spell().effects) | implicit_target_a: :caster_front, radius_yards: 3.0}
       spell = %{spell() | effects: [effect]}
