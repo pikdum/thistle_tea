@@ -216,9 +216,58 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScriptTest do
     end
   end
 
+  describe "the Greymist camp" do
+    test "calls a hidden Murkdeep out for a player on WANTED: Murkdeep!" do
+      player = character(quests: [{4740, :incomplete}])
+      guid = player.object.guid
+
+      assert [%Effects.SummonCreature{summon: summon, steps: event, target_guid: ^guid}] = effects(1966, player)
+
+      assert %{
+               entry: 10_323,
+               despawn_type: 1,
+               despawn_delay_ms: 1_800_000,
+               unique?: true,
+               unique_limit: 1,
+               unique_distance: 100,
+               attack_guid: nil
+             } = summon
+
+      assert [
+               %ScriptStep{command: :morph, datalong: 11_686, datalong2: 1, delay_ms: 0},
+               %ScriptStep{command: :modify_flags, datalong: 46, datalong3: 1},
+               %ScriptStep{command: :set_react_state, datalong: 0} | waves
+             ] = event
+
+      summons = Enum.filter(waves, &(&1.command == :summon_creature))
+
+      assert Enum.map(summons, &{&1.delay_ms, &1.datalong}) == [
+               {1_000, 2_202},
+               {1_000, 2_202},
+               {1_000, 2_202},
+               {31_000, 2_205},
+               {31_000, 2_205},
+               {61_000, 2_206}
+             ]
+
+      assert Enum.all?(summons, &match?(%ScriptStep{dataint3: 0, dataint4: 1, datalong2: 600_000}, &1))
+
+      assert [%ScriptStep{delay_ms: 61_000}] = Enum.filter(waves, &(&1.command == :attack_start))
+
+      assert waves |> Enum.filter(&(&1.command == :despawn)) |> Enum.map(&{&1.delay_ms, &1.condition.reverse?}) ==
+               [{1_000, true}, {31_000, true}, {61_000, true}]
+    end
+
+    test "leaves the camp quiet for everyone else" do
+      assert [] = effects(1966, character())
+      assert [] = effects(1966, character(quests: [{4740, :complete}]))
+    end
+  end
+
   describe "summon_entries/0" do
     test "lists every creature a trigger can call" do
-      assert Enum.sort(AreaTriggerScript.summon_entries()) == [1981, 4967, 9683 | @ancients] ++ [15_625]
+      assert Enum.sort(AreaTriggerScript.summon_entries()) ==
+               Enum.sort([1981, 2202, 2205, 2206, 4967, 9683, 10_323, 15_625 | @ancients])
     end
   end
 

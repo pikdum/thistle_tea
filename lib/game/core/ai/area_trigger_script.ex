@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScript do
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.ChildrensWeek
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.HuldarMiran
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.IrontreeWood
+  alias ThistleTea.Game.Core.AI.AreaTriggerScript.MurlocCamp
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.Ravenholdt
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.ScentOfLarkorwi
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.SentryPoint
@@ -29,6 +30,7 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScript do
     ChildrensWeek,
     HuldarMiran,
     IrontreeWood,
+    MurlocCamp,
     Ravenholdt,
     ScentOfLarkorwi,
     SentryPoint,
