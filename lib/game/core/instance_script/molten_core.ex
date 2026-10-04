@@ -22,7 +22,8 @@ defmodule ThistleTea.Game.Core.InstanceScript.MoltenCore do
   come back once the boss is dead: Lucifron's protectors, Magmadar's core
   hounds, Gehennas's flamewakers, Garr with his firesworn and lava surgers,
   Golemagg's core ragers, and Sulfuron's priests despawn whenever they
-  respawn.
+  respawn. Golemagg's ragers also vanish the moment he dies, since they
+  cannot fall below half health while he lives.
   """
 
   alias ThistleTea.Game.Core.AI.ScriptStep
@@ -77,6 +78,8 @@ defmodule ThistleTea.Game.Core.InstanceScript.MoltenCore do
     11_662 => @sulfuron
   }
 
+  @golemagg_entry 11_988
+  @core_rager 11_672
   @majordomo_entry 12_018
   @majordomo_hall {758.089, -1_176.71, -118.640, 3.12414}
   @corpse_timed 6
@@ -144,7 +147,7 @@ defmodule ThistleTea.Game.Core.InstanceScript.MoltenCore do
 
   def creature_event(data, script_state, %{creature_entry: entry, event: :death}) when is_map_key(@bosses, entry) do
     {:ok, _stored, data, effects} = set_data(data, Map.fetch!(@bosses, entry), @done)
-    {:ok, data, script_state, effects}
+    {:ok, data, script_state, effects ++ fallen_guard(entry)}
   end
 
   def creature_event(data, script_state, %{creature_entry: entry, event: :spawned, creature_guid: guid})
@@ -210,6 +213,12 @@ defmodule ThistleTea.Game.Core.InstanceScript.MoltenCore do
       {data, []}
     end
   end
+
+  defp fallen_guard(@golemagg_entry) do
+    [%Effects.RunCreatureScript{creature_entry: @core_rager, steps: [%ScriptStep{command: :despawn}]}]
+  end
+
+  defp fallen_guard(_boss_entry), do: []
 
   defp firelord_cache, do: %Effects.RespawnGameObject{db_guid: @firelord_cache, duration_ms: @hour_ms}
 end

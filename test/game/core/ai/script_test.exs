@@ -412,6 +412,25 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
       assert [%Effects.SetFacing{facing: {:target, ^friendly}}] = mob.internal.events
     end
 
+    test "creature entry selectors pass over corpses", %{mob: mob} do
+      corpse = Guid.from_low_guid(:mob, 1_000, Unique.integer())
+      living = Guid.from_low_guid(:mob, 1_000, Unique.integer())
+
+      observations = %{
+        corpse => %Observation{guid: corpse, distance: 4.0, metadata: %{entry: 1_000, alive?: false}},
+        living => %Observation{guid: living, distance: 8.0, metadata: %{entry: 1_000, alive?: true}}
+      }
+
+      nearby = %{mobs: [{corpse, 4.0}, {living, 8.0}], players: [], game_objects: []}
+      context = Context.new(0, perception: Perception.new(0, nil, observations, nearby))
+
+      for target_type <- [:nearest_creature_with_entry, :random_creature_with_entry] do
+        step = %ScriptStep{command: :turn_to, target_type: target_type, target_param1: 1_000, target_param2: 20}
+        {turned, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, context)
+        assert [%Effects.SetFacing{facing: {:target, ^living}}] = turned.internal.events
+      end
+    end
+
     test "nearest hostile player passes over dead players", %{mob: mob} do
       dead = Guid.from_low_guid(:player, 1)
       living = Guid.from_low_guid(:player, 2)
@@ -1316,6 +1335,23 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
       assert mob.internal.movement_start_position == {20.0, 0.0, 0.0}
     end
 
+    test "teleport_to at its target lands at the target's feet", %{mob: mob} do
+      world = WorldRef.instance(409, Unique.integer())
+      player = Guid.from_low_guid(:player, Unique.integer())
+      mob = %{mob | internal: %{mob.internal | world: world, visibility_cell: {world, 0, 0}}}
+      step = %ScriptStep{command: :teleport_to, at_target?: true}
+
+      {teleported, _blackboard} =
+        Script.run(mob, Blackboard.new(), [step], player, standing(player, {world, 3.0, 4.0, -5.0}))
+
+      assert teleported.movement_block.position == {3.0, 4.0, -5.0, 0.0}
+      assert [%Effects.CreatureTeleported{position: position}] = teleported.internal.events
+      assert position == {3.0, 4.0, -5.0, 0.0}
+
+      elsewhere = standing(player, {WorldRef.instance(409, Unique.integer()), 3.0, 4.0, -5.0})
+      assert {^mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], player, elsewhere)
+    end
+
     test "teleport_to fails closed for ineligible sources", %{mob: mob} do
       step = %ScriptStep{command: :teleport_to, datalong: 0, datalong2: 9, position: {1.0, 2.0, 3.0, 4.0}}
       player_controlled = %{mob | unit: %{mob.unit | flags: 0x00000008}}
@@ -1908,6 +1944,11 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
       assert updated == mob
       assert blackboard == Blackboard.new()
     end
+  end
+
+  defp standing(guid, position) do
+    observations = %{guid => %Observation{guid: guid, position: position}}
+    Context.new(5_000, perception: Perception.new(5_000, nil, observations, %{mobs: [], players: [], game_objects: []}))
   end
 
   defp mob(_context) do

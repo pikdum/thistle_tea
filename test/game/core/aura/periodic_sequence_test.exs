@@ -78,6 +78,31 @@ defmodule ThistleTea.Game.Core.Aura.PeriodicSequenceTest do
     end
   end
 
+  describe "tick/2 for Inferno" do
+    test "pulses fire damage that grows over the eight ticks", %{entity: entity} do
+      effect = %Effect{
+        index: 0,
+        type: :apply_aura,
+        aura: :periodic_trigger_spell,
+        implicit_target_a: :caster,
+        amplitude_ms: 1_000,
+        trigger_spell_id: 18_947
+      }
+
+      inferno = %Spell{id: 19_695, duration_ms: 8_000, effects: [effect]}
+      {entity, _events} = entity |> Aura.remove_spells([24_834], 0) |> elem(0) |> Aura.apply_spell(1, 62, inferno, 0)
+
+      {_entity, pulses} =
+        Enum.reduce(1..8, {entity, []}, fn tick, {current, pulses} ->
+          {next, events} = Aura.tick(current, tick * 1_000)
+          {next, pulses ++ triggers(events)}
+        end)
+
+      assert Enum.map(pulses, &{&1.spell_id, &1.effect_base_points}) ==
+               Enum.map([500, 500, 1_000, 1_000, 2_000, 2_000, 3_000, 5_000], &{19_698, %{0 => &1}})
+    end
+  end
+
   defp triggers(events), do: Enum.filter(events, &is_struct(&1, Effects.TriggerSpell))
 
   defp whirl(_context) do

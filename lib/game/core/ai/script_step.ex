@@ -14,7 +14,9 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   A summon with a `scatter` radius lands on a random walkable point that far
   around its position, as C++ scripts place adds with `GetRandomPoint`. A
   `concealed?` summon arrives hidden from players until a script reveals it,
-  as C++ scripts summon a creature with its visibility turned off.
+  as C++ scripts summon a creature with its visibility turned off. A
+  code-built teleport with `at_target?` lands at its target's feet, as C++
+  scripts `NearTeleportTo` a player.
   """
   import Bitwise, only: [&&&: 2]
 

@@ -62,6 +62,14 @@ defmodule ThistleTea.Game.Core.InstanceScript.MoltenCoreTest do
                Instance.creature_event(instances, context.world, guard)
     end
 
+    test "Golemagg's core ragers fall with him", context do
+      assert {:ok, [despawn], _instances} =
+               Instance.creature_event(context.instances, context.world, creature(11_988, :death))
+
+      assert %Effects.RunCreatureScript{creature_entry: 11_672, steps: [%ScriptStep{command: :despawn}]} = despawn
+      assert {:ok, [], _instances} = Instance.creature_event(context.instances, context.world, creature(12_057, :death))
+    end
+
     test "Ragnaros roars seven seconds after Majordomo burns, then turns on the raid", context do
       assert {:ok, [%Effects.Schedule{key: :ragnaros_roars, delay_ms: 7_000}], instances} =
                Instance.creature_event(context.instances, context.world, creature(12_018, :death))

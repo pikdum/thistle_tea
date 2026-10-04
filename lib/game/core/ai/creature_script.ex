@@ -55,6 +55,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
   alias ThistleTea.Game.Core.AI.CreatureScript.MagramiSpectre
   alias ThistleTea.Game.Core.AI.CreatureScript.MajordomoExecutus
+  alias ThistleTea.Game.Core.AI.CreatureScript.MoltenCore
   alias ThistleTea.Game.Core.AI.CreatureScript.Murkdeep
   alias ThistleTea.Game.Core.AI.CreatureScript.Obsidion
   alias ThistleTea.Game.Core.AI.CreatureScript.Omen
@@ -122,6 +123,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     LazyPeon,
     MagramiSpectre,
     MajordomoExecutus,
+    MoltenCore,
     Murkdeep,
     Obsidion,
     Omen,

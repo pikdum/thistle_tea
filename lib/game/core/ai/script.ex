@@ -542,6 +542,32 @@ defmodule ThistleTea.Game.Core.AI.Script do
     {updated, blackboard}
   end
 
+  defp execute(
+         %Mob{internal: %{world: world}} = state,
+         blackboard,
+         %ScriptStep{command: :teleport_to, at_target?: true} = step,
+         target_guid,
+         now,
+         %Context{perception: perception} = context
+       ) do
+    {_x, _y, _z, orientation} = state.movement_block.position
+
+    case Perception.position(perception, target_guid) do
+      {^world, x, y, z} ->
+        execute(
+          state,
+          blackboard,
+          %{step | at_target?: false, position: {x, y, z, orientation}},
+          target_guid,
+          now,
+          context
+        )
+
+      _missing ->
+        {state, blackboard}
+    end
+  end
+
   defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :teleport_to} = step, _target_guid, now, %Context{}) do
     with true <- server_controlled_teleport_source?(state),
          {:ok, teleport} <- ScriptStep.teleport_to(step) do
@@ -2219,7 +2245,9 @@ defmodule ThistleTea.Game.Core.AI.Script do
     candidates =
       perception
       |> Perception.nearby(:mobs, range)
-      |> Enum.filter(fn {guid, _distance} -> guid != self_guid and Perception.entry(perception, guid) == entry end)
+      |> Enum.filter(fn {guid, _distance} ->
+        guid != self_guid and Perception.entry(perception, guid) == entry and alive_observation?(perception, guid)
+      end)
 
     case {target_type, candidates} do
       {_target_type, []} -> nil

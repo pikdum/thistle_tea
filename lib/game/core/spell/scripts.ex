@@ -11,7 +11,9 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
   `extra_effects/1` adds what a script grants beyond the data, such as
   Stoneform's disease immunity, and `chosen_effects/3` keeps one of the
   effects a script runs only one of per cast, such as Collecting Fallout's
-  phial or radiation.
+  phial or radiation. `periodic_trigger_spell_id/3` and
+  `periodic_trigger_points/2` stand in for C++ boss loops that pulse a
+  spell with growing damage, such as Baron Geddon's Inferno.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -74,6 +76,9 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
   @preserved_periodic_timers @immediate_periodic_spells ++ [13_797, 14_298, 14_299, 14_300, 14_301, 23_184, 25_041]
   @one_of_effects %{"spell_gnomeregan_collecting_fallout" => [0, 1]}
   @shadow_bolt_whirl [24_820, 24_821, 24_822, 24_823, 24_835, 24_836, 24_837, 24_838]
+  @inferno 19_695
+  @inferno_pulse 19_698
+  @inferno_pulse_damage [500, 500, 1_000, 1_000, 2_000, 2_000, 3_000, 5_000]
 
   def cone(spell_id, _degrees) when spell_id in @shadow_bolt_whirl do
     step = Enum.find_index(@shadow_bolt_whirl, &(&1 == spell_id))
@@ -86,7 +91,15 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
     Enum.at(@shadow_bolt_whirl, rem(tick_count, length(@shadow_bolt_whirl)))
   end
 
+  def periodic_trigger_spell_id(%Spell{id: @inferno}, _trigger_id, _tick_count), do: @inferno_pulse
   def periodic_trigger_spell_id(_spell, trigger_id, _tick_count), do: trigger_id
+
+  def periodic_trigger_points(%Spell{id: @inferno}, tick_count) do
+    pulse = tick_count |> max(1) |> min(length(@inferno_pulse_damage))
+    %{0 => Enum.at(@inferno_pulse_damage, pulse - 1)}
+  end
+
+  def periodic_trigger_points(_spell, _tick_count), do: %{}
 
   def initial_periodic_delay(%Spell{id: id}, _interval) when id in @immediate_periodic_spells, do: 0
   def initial_periodic_delay(%Spell{}, interval), do: interval
