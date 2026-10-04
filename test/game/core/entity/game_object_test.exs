@@ -185,6 +185,15 @@ defmodule ThistleTea.Game.Core.Entity.GameObjectTest do
       assert go.internal.event == 12
       assert go.internal.world.map_id == 0
     end
+
+    test "a placed ritual altar is a ritual with no owner and no participants yet" do
+      template = %GameObjectTemplate{entry: 133_234, type: 18, size: 1.0, data: data([3, 10_340, 11_206, 1, 0, 0, 1])}
+      altar = GameObject.build(template, %GameObjectSpawn{guid: 1, entry: 133_234, map_id: 70})
+
+      assert %{owner_guid: nil, required_participants: 3, completion_spell_id: 10_340} = altar.internal.ritual
+      assert altar.internal.ritual.persistent?
+      assert altar.internal.ritual.users == MapSet.new()
+    end
   end
 
   describe "build/2 chests" do

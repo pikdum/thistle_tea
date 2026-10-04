@@ -2,10 +2,15 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.Ritual do
   @moduledoc """
   Runtime state decoded from a summoning-ritual game-object template, plus its
   owner, selected target, unique participants, and completion state.
+
+  A placed ritual, such as an altar in a dungeon, has no owner. Its first
+  participant stands in for one: helpers group with them, and they cast the
+  completion spell.
   """
 
   defstruct [
     :owner_guid,
+    :first_user_guid,
     :target_guid,
     :required_participants,
     :completion_spell_id,

@@ -113,7 +113,7 @@ defmodule ThistleTea.Game.Core.Entity.GameObject do
       caster_target_spell_targets: Enum.at(data, 5) || 0,
       casters_grouped?: enabled?(Enum.at(data, 6)),
       no_target_check?: enabled?(Enum.at(data, 7)),
-      users: MapSet.new([owner_guid])
+      users: if(is_integer(owner_guid), do: MapSet.new([owner_guid]), else: MapSet.new())
     }
   end
 
@@ -228,6 +228,7 @@ defmodule ThistleTea.Game.Core.Entity.GameObject do
         loot: chest_loot(template),
         gathering: gathering(template),
         trap: trap(template, nil),
+        ritual: ritual(template, nil, nil, nil),
         spawn: object_spawn(template, spawn)
       }
     }

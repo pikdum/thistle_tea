@@ -183,20 +183,14 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
           movement_block: %{position: position}
         } = state
       ) do
-    {ritual, result} = RitualServer.use(ritual, user_guid, same_group?(ritual.owner_guid, user_guid))
+    {ritual, result} = RitualServer.use(ritual, user_guid, same_group?(RitualServer.anchor(ritual), user_guid))
     state = %{state | internal: %{internal | ritual: ritual}}
 
     if result in [:waiting, :complete] do
       start_ritual_channel(state, ritual, user_guid)
     end
 
-    if result == :complete do
-      cast_ritual_completion(state, ritual, world, position)
-      cast_ritual_participant_spell(state, ritual)
-      release_cooldown(state)
-      Entity.finish_game_object_channel(ritual.owner_guid, state.object.guid)
-      if not ritual.persistent?, do: send(self(), :despawn)
-    end
+    state = if result == :complete, do: complete_ritual(state, ritual, world, position), else: state
 
     {:noreply, state}
   end
@@ -809,6 +803,29 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
 
   defp use_object(%GameObject{} = state, _user_guid), do: {:noreply, state}
 
+  defp complete_ritual(state, %Ritual{owner_guid: nil} = ritual, _world, _position) do
+    trigger_ritual_completion(state, ritual)
+    cast_ritual_participant_spell(state, ritual)
+    finish_ritual_channels(state)
+    if not ritual.persistent?, do: send(self(), :despawn)
+    %{state | internal: %{state.internal | ritual: RitualServer.reset(ritual)}}
+  end
+
+  defp complete_ritual(state, %Ritual{} = ritual, world, position) do
+    cast_ritual_completion(state, ritual, world, position)
+    cast_ritual_participant_spell(state, ritual)
+    release_cooldown(state)
+    Entity.finish_game_object_channel(ritual.owner_guid, state.object.guid)
+    if not ritual.persistent?, do: send(self(), :despawn)
+    state
+  end
+
+  defp trigger_ritual_completion(state, %Ritual{completion_spell_id: spell_id, first_user_guid: caster_guid})
+       when is_integer(spell_id) and is_integer(caster_guid),
+       do: Entity.trigger_spell(caster_guid, spell_id, state.object.guid, triggered: true)
+
+  defp trigger_ritual_completion(_state, _ritual), do: :ok
+
   defp cast_ritual_completion(state, %Ritual{} = ritual, world, {x, y, z, orientation}) do
     with spell_id when is_integer(spell_id) <- ritual.completion_spell_id,
          %Spell{} = spell <- SpellLoader.load(spell_id) do
@@ -846,10 +863,13 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   defp start_ritual_channel(state, %Ritual{} = ritual, user_guid) do
     with spell_id when is_integer(spell_id) <- ritual.animation_spell_id,
          %Spell{} = spell <- SpellLoader.load(spell_id) do
-      duration_ms = state.internal.summon.despawn_in_ms || spell.duration_ms || 0
+      duration_ms = ritual_channel_ms(state.internal.summon) || spell.duration_ms || 0
       Entity.start_game_object_channel(user_guid, state.object.guid, spell, duration_ms)
     end
   end
+
+  defp ritual_channel_ms(%Summon{despawn_in_ms: duration_ms}), do: duration_ms
+  defp ritual_channel_ms(_summon), do: nil
 
   defp finish_ritual_channels(%GameObject{object: %{guid: guid}, internal: %Internal{ritual: %Ritual{} = ritual}}) do
     Enum.each(ritual.users, &Entity.finish_game_object_channel(&1, guid))
@@ -1016,6 +1036,8 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   end
 
   defp allowed_user?(_summon, _user_guid), do: true
+
+  defp same_group?(nil, _user_guid), do: false
 
   defp same_group?(owner_guid, user_guid) do
     case {PartySystem.group_of(owner_guid), PartySystem.group_of(user_guid)} do
