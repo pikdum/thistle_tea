@@ -3,7 +3,8 @@ defmodule ThistleTea.Game.World.Loader.Script do
   Loads generic script-command rows (`creature_ai_scripts`,
   `creature_movement_scripts`, `generic_scripts`, …) into `ScriptStep`
   structs grouped by script id, resolving the broadcast texts referenced by
-  talk steps, mount-by-entry steps into display ids, and recursively the
+  talk steps (a code-built talk step naming no text keeps the literal texts it
+  carries), mount-by-entry steps into display ids, and recursively the
   `generic_scripts` referenced by start-script and summon steps
   (cycle-guarded), so the runtime interpreter never touches the database.
   """
@@ -113,24 +114,34 @@ defmodule ThistleTea.Game.World.Loader.Script do
     end)
   end
 
+  def resolve_code_steps(steps), do: steps |> resolve_equipment() |> resolve_texts()
+
   defp resolve_equipment(steps) do
     templates =
       steps
+      |> Enum.flat_map(&with_sub_steps/1)
       |> Enum.filter(&(&1.command == :set_equipment and &1.datalong == 0))
       |> Enum.flat_map(&[&1.dataint, &1.dataint2, &1.dataint3])
       |> Enum.filter(&(is_integer(&1) and &1 > 0))
       |> Enum.uniq()
       |> load_equipment_templates()
 
-    Enum.map(steps, fn
-      %ScriptStep{command: :set_equipment, datalong: 0} = step ->
-        items = Enum.map([step.dataint, step.dataint2, step.dataint3], &equipment_item(&1, templates))
-        %{step | equipment_items: items}
+    attach_equipment(steps, templates)
+  end
 
-      %ScriptStep{} = step ->
-        step
+  defp attach_equipment(steps, templates) do
+    Enum.map(steps, fn %ScriptStep{} = step ->
+      sub_scripts = Map.new(step.sub_scripts, fn {id, sub_steps} -> {id, attach_equipment(sub_steps, templates)} end)
+      attach_step_equipment(%{step | sub_scripts: sub_scripts}, templates)
     end)
   end
+
+  defp attach_step_equipment(%ScriptStep{command: :set_equipment, datalong: 0} = step, templates) do
+    items = Enum.map([step.dataint, step.dataint2, step.dataint3], &equipment_item(&1, templates))
+    %{step | equipment_items: items}
+  end
+
+  defp attach_step_equipment(%ScriptStep{} = step, _templates), do: step
 
   defp equipment_item(entry, _templates) when entry < 0, do: :unchanged
   defp equipment_item(0, _templates), do: nil
@@ -199,13 +210,18 @@ defmodule ThistleTea.Game.World.Loader.Script do
   end
 
   defp attach_step_texts(%ScriptStep{command: :talk} = step, texts_by_id) do
-    texts =
-      step
-      |> ScriptStep.talk_text_ids()
-      |> Enum.flat_map(&List.wrap(Map.get(texts_by_id, &1)))
-      |> Enum.map(&override_chat_type(&1, step.datalong))
+    case ScriptStep.talk_text_ids(step) do
+      [] ->
+        step
 
-    %{step | texts: texts}
+      text_ids ->
+        texts =
+          text_ids
+          |> Enum.flat_map(&List.wrap(Map.get(texts_by_id, &1)))
+          |> Enum.map(&override_chat_type(&1, step.datalong))
+
+        %{step | texts: texts}
+    end
   end
 
   defp attach_step_texts(%ScriptStep{} = step, _texts_by_id), do: step

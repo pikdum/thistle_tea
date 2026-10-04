@@ -102,6 +102,13 @@ defmodule ThistleTea.Game.Core.Profession.SkinningTest do
     end
   end
 
+  describe "corpse_spell/1" do
+    test "skinning The Beast frees Finkle Einhorn" do
+      assert Skinning.corpse_spell(10_430) == 16_710
+      assert Skinning.corpse_spell(10_429) == nil
+    end
+  end
+
   describe "skill_up/4" do
     test "gains one point, respects caps, and gives nothing for gray corpses", %{caster: caster} do
       assert {:gained, skills} = Skinning.skill_up(caster.player.skills, 5, 0, 0)

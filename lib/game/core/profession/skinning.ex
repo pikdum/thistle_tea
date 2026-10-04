@@ -2,6 +2,8 @@ defmodule ThistleTea.Game.Core.Profession.Skinning do
   @moduledoc """
   Skinning admission, corpse flags, attempt difficulty, and profession gains.
   The corpse owner claims each skin once; this module only evaluates data.
+  Skinning The Beast of Blackrock Spire makes the skinner cast Finkle is
+  Einhorn, freeing the hunter it swallowed (vmangos `boss_the_beast`).
   """
   import Bitwise
 
@@ -17,8 +19,13 @@ defmodule ThistleTea.Game.Core.Profession.Skinning do
 
   @skill 393
   @skinnable 0x04000000
+  @the_beast 10_430
+  @finkle_is_einhorn 16_710
 
   def skill_id, do: @skill
+
+  def corpse_spell(@the_beast), do: @finkle_is_einhorn
+  def corpse_spell(_entry), do: nil
   def spell?(%Spell{effects: effects}), do: Enum.any?(effects, &(&1.type == :skinning))
 
   def skill(%Character{} = character) do

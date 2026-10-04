@@ -1,16 +1,19 @@
 defmodule ThistleTea.Game.World.Entity.Player.Skinning do
   @moduledoc """
-  Completes skinning casts through the corpse owner and projects private loot
-  and profession gains to the player.
+  Completes skinning casts through the corpse owner and projects private loot,
+  profession gains, and any spell the corpse makes its skinner cast.
   """
+  alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity, as: EntityCore
   alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Inventory
   alias ThistleTea.Game.Core.Profession.Skinning, as: SkinningCore
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Player.Looting
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -30,7 +33,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Skinning do
 
       case Entity.call(guid, {:skin_corpse, Looting.actor(state, guid), SkinningCore.skill(character)}) do
         {:ok, loot, level, rank} ->
-          character = advance_skill(character, level, rank)
+          character = character |> advance_skill(level, rank) |> cast_corpse_spell(guid)
           Outbound.send_packet(%Message.SmsgLootResponse{guid: guid, loot: loot, loot_type: 2})
           %{state | character: character, loot_guid: guid, loot_type: :skinning}
 
@@ -56,6 +59,13 @@ defmodule ThistleTea.Game.World.Entity.Player.Skinning do
 
       :unchanged ->
         character
+    end
+  end
+
+  defp cast_corpse_spell(%Character{object: %{guid: player_guid}} = character, guid) do
+    case SkinningCore.corpse_spell(Guid.entry(guid)) do
+      nil -> character
+      spell_id -> EventSink.emit(character, Effects.trigger_spell_request(player_guid, spell_id, player_guid, []))
     end
   end
 

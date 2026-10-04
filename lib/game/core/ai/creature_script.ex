@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.ArchmageTervosh
   alias ThistleTea.Game.Core.AI.CreatureScript.Bartleby
   alias ThistleTea.Game.Core.AI.CreatureScript.Belnistrasz
+  alias ThistleTea.Game.Core.AI.CreatureScript.BlackrockSpire
   alias ThistleTea.Game.Core.AI.CreatureScript.CapturedFelwoodOoze
   alias ThistleTea.Game.Core.AI.CreatureScript.ChickenCluck
   alias ThistleTea.Game.Core.AI.CreatureScript.CombatGadgets
@@ -99,6 +100,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     ArchmageTervosh,
     Bartleby,
     Belnistrasz,
+    BlackrockSpire,
     CapturedFelwoodOoze,
     ChickenCluck,
     CombatGadgets,

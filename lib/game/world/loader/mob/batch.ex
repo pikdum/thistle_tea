@@ -252,7 +252,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
       events =
         entry
         |> CreatureScript.events()
-        |> Enum.map(fn event -> %{event | actions: Enum.map(event.actions, &ScriptLoader.resolve_texts/1)} end)
+        |> Enum.map(fn event -> %{event | actions: Enum.map(event.actions, &ScriptLoader.resolve_code_steps/1)} end)
 
       {entry, events}
     end)
