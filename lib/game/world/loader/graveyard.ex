@@ -1,5 +1,9 @@
 defmodule ThistleTea.Game.World.Loader.Graveyard do
-  @moduledoc "Cached graveyard links with area, faction, and dungeon-entrance selection."
+  @moduledoc """
+  Cached graveyard links with area, faction, and dungeon-entrance selection.
+  Each graveyard keeps the facing vmangos turns a returning spirit to, toward
+  its spirit healer.
+  """
 
   import Ecto.Query
 
@@ -33,16 +37,17 @@ defmodule ThistleTea.Game.World.Loader.Graveyard do
 
     ids = links |> Enum.map(& &1.id) |> Enum.uniq()
     locations = DBC.all(from(l in DBC.WorldSafeLocs, where: l.id in ^ids))
-    load(links, locations)
+    facings = Mangos.Repo.all(from(f in Mangos.WorldSafeLocsFacing, select: {f.id, f.orientation})) |> Map.new()
+    load(links, locations, __MODULE__, facings)
   end
 
-  def load(links, locations, table \\ __MODULE__) do
+  def load(links, locations, table \\ __MODULE__, facings \\ %{}) do
     locations = Map.new(locations, &{&1.id, &1})
 
     links
     |> Enum.group_by(& &1.ghost_zone)
     |> Enum.each(fn {area, links} ->
-      graveyards = Enum.flat_map(links, &graveyard(&1, locations)) |> Enum.sort_by(& &1.id)
+      graveyards = Enum.flat_map(links, &graveyard(&1, locations, facings)) |> Enum.sort_by(& &1.id)
       :ets.insert(table, {area, graveyards})
     end)
   end
@@ -93,13 +98,21 @@ defmodule ThistleTea.Game.World.Loader.Graveyard do
 
   defp rank(%{id: id}, _map, _position, _entrance), do: {2, 0, id}
 
-  defp graveyard(link, locations) do
+  defp graveyard(link, locations, facings) do
     case Map.get(locations, link.id) do
       nil ->
         []
 
       loc ->
-        [%{id: loc.id, map: loc.map, position: {loc.location_x, loc.location_y, loc.location_z}, faction: link.faction}]
+        [
+          %{
+            id: loc.id,
+            map: loc.map,
+            position: {loc.location_x, loc.location_y, loc.location_z},
+            facing: Map.get(facings, loc.id),
+            faction: link.faction
+          }
+        ]
     end
   end
 end

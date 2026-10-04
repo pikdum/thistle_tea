@@ -113,5 +113,14 @@ defmodule ThistleTea.Game.World.Entity.Player.MovementControlTest do
       assert state.pending_movement_acks == %{}
       assert_receive {:"$gen_cast", {:start_teleport, 10.0, 20.0, 30.0, 1}}
     end
+
+    test "turns the spirit to the graveyard's facing" do
+      state = MovementControl.defer_repop(%State{guid: 1}, {10.0, 20.0, 30.0, 1}, 3.84)
+      token = state.pending_repop.token
+      assert_receive {:"$gen_cast", {:finish_repop, ^token}}
+
+      MovementControl.finish_repop(state, token)
+      assert_receive {:"$gen_cast", {:start_teleport, 10.0, 20.0, 30.0, 3.84, 1}}
+    end
   end
 end

@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.World.Loader.GraveyardTest do
   @horde 67
 
   defp graveyard(id, map, position, faction \\ 0) do
-    %{id: id, map: map, position: position, faction: faction}
+    %{id: id, map: map, position: position, facing: nil, faction: faction}
   end
 
   describe "team_for_race/1" do
@@ -83,6 +83,14 @@ defmodule ThistleTea.Game.World.Loader.GraveyardTest do
       Graveyard.load(links, locations, table)
       assert Graveyard.for_area(100, table) == [graveyard(1, 0, {1.0, 2.0, 3.0}, 469)]
       assert Graveyard.for_area(999, table) == []
+    end
+
+    test "keeps the facing a returning spirit is turned to" do
+      table = :ets.new(:graveyard_cache, [:set])
+      links = [%{id: 3, ghost_zone: 100, faction: 0}]
+      locations = [%{id: 3, map: 0, location_x: 1.0, location_y: 2.0, location_z: 3.0}]
+      Graveyard.load(links, locations, table, %{3 => 3.83972})
+      assert [%{id: 3, facing: 3.83972}] = Graveyard.for_area(100, table)
     end
   end
 end

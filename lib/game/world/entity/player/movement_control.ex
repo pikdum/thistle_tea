@@ -249,9 +249,9 @@ defmodule ThistleTea.Game.World.Entity.Player.MovementControl do
     end
   end
 
-  def defer_repop(%State{} = state, {x, y, z, map}) do
+  def defer_repop(%State{} = state, {x, y, z, map}, facing \\ nil) do
     token = make_ref()
-    repop = %{token: token, position: {x, y, z}, map: map}
+    repop = %{token: token, position: {x, y, z}, map: map, facing: facing}
     GenServer.cast(self(), {:finish_repop, token})
     Process.send_after(self(), {:finish_repop_timeout, token}, @ack_timeout_ms)
     %{state | pending_repop: repop}
@@ -262,7 +262,7 @@ defmodule ThistleTea.Game.World.Entity.Player.MovementControl do
   def finish_repop(%State{pending_repop: %{token: token} = repop} = state, token, force?) do
     if force? or map_size(state.pending_movement_acks) == 0 do
       {x, y, z} = repop.position
-      GenServer.cast(self(), {:start_teleport, x, y, z, repop.map})
+      GenServer.cast(self(), teleport(x, y, z, repop))
       pending = if force?, do: %{}, else: state.pending_movement_acks
       %{state | pending_repop: nil, pending_movement_acks: pending}
     else
@@ -271,6 +271,11 @@ defmodule ThistleTea.Game.World.Entity.Player.MovementControl do
   end
 
   def finish_repop(%State{} = state, _token, _force?), do: state
+
+  defp teleport(x, y, z, %{facing: facing, map: map}) when is_number(facing),
+    do: {:start_teleport, x, y, z, facing, map}
+
+  defp teleport(x, y, z, %{map: map}), do: {:start_teleport, x, y, z, map}
 
   def maybe_finish_repop(%State{pending_repop: %{token: token}} = state) do
     finish_repop(state, token)

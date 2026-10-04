@@ -184,15 +184,15 @@ defmodule ThistleTea.Game.World.Entity.Player.Corpses do
     team = Graveyard.team_for_race(character.unit.race)
 
     case Battleground.graveyard(world, character.object.guid) do
-      {gx, gy, gz, _orientation} -> MovementControl.defer_repop(state, {gx, gy, gz, world})
+      {gx, gy, gz, orientation} -> MovementControl.defer_repop(state, {gx, gy, gz, world}, orientation)
       nil -> defer_open_world_graveyard(state, world.map_id, {x, y, z}, team)
     end
   end
 
   defp defer_open_world_graveyard(state, map_id, position, team) do
     case Graveyards.closest(map_id, position, team) do
-      %{map: graveyard_map, position: {gx, gy, gz}} ->
-        MovementControl.defer_repop(state, {gx, gy, gz, graveyard_map})
+      %{map: graveyard_map, position: {gx, gy, gz}} = graveyard ->
+        MovementControl.defer_repop(state, {gx, gy, gz, graveyard_map}, Map.get(graveyard, :facing))
 
       _missing ->
         state
