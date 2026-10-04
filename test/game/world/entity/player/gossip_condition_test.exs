@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipConditionTest do
   alias ThistleTea.Game.Core.Entity.Component.Player
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.ItemTemplate
+  alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Reputation
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Entity
@@ -22,6 +23,8 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipConditionTest do
   alias ThistleTea.Game.World.Loader.Gossip.Menu
   alias ThistleTea.Game.World.Loader.Gossip.Option
   alias ThistleTea.Game.World.Loader.Gossip.Text
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Test.Unique
 
   describe "allows?/3" do
@@ -101,23 +104,35 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipConditionTest do
         taxi_path_steps: [%ScriptStep{command: :send_taxi_path, datalong: 315}]
       }
 
+      speaker = Guid.from_low_guid(:mob, Unique.integer(), Unique.integer())
+      beside(speaker)
       menu = %Menu{text_id: 68, options: [option]}
       deposited = bank_character(player_guid, item.object.guid)
-      deposited_state = Gossip.send_menu(2, menu, [], %{character: deposited, gossip_menu_options: []})
+      deposited_state = Gossip.send_menu(speaker, menu, [], %{character: deposited, gossip_menu_options: []})
       assert [%Option{id: 0}] = deposited_state.gossip_menu_options
-      assert %{gossip_menu_options: []} = Gossip.select(deposited_state, 2, 0)
+      assert %{gossip_menu_options: []} = Gossip.select(deposited_state, speaker, 0)
       assert_receive %SendTaxiPath{path_id: 315}
 
       withdrawn = %{deposited | player: %{deposited.player | bank1: 0, inv1: item.object.guid}}
-      withdrawn_state = %{character: withdrawn, gossip_menu_options: [option], gossip_menu_guid: 2}
-      assert %{gossip_menu_options: []} = Gossip.select(withdrawn_state, 2, 0)
+      withdrawn_state = %{character: withdrawn, gossip_menu_options: [option], gossip_menu_guid: speaker}
+      assert %{gossip_menu_options: []} = Gossip.select(withdrawn_state, speaker, 0)
       assert_receive %SendTaxiPath{path_id: 315}
 
       absent = %{withdrawn | player: %{withdrawn.player | inv1: 0}}
-      absent_state = %{character: absent, gossip_menu_options: [option], gossip_menu_guid: 2}
-      assert Gossip.select(absent_state, 2, 0) == absent_state
+      absent_state = %{character: absent, gossip_menu_options: [option], gossip_menu_guid: speaker}
+      assert Gossip.select(absent_state, speaker, 0) == absent_state
       refute_receive %SendTaxiPath{path_id: 315}
     end
+  end
+
+  defp beside(guid) do
+    Metadata.put(guid, %{alive?: true})
+    SpatialHash.update(:mobs, guid, WorldRef.open(0), 2.0, 0.0, 0.0)
+
+    on_exit(fn ->
+      Metadata.delete(guid)
+      SpatialHash.remove(:mobs, guid)
+    end)
   end
 
   defp context(team, race, class) do

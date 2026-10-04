@@ -54,8 +54,11 @@ defmodule ThistleTea.Game.Inbound.CmsgGossipSelectOptionTest do
         internal: %Internal{world: WorldRef.open(0), spellbook: %{}}
       }
 
-      state = %{character: character, gossip_menu_options: [option], gossip_menu_guid: 1}
-      message = %CmsgGossipSelectOption{guid: 1, gossip_list_id: 0}
+      speaker = Guid.from_low_guid(:mob, Unique.integer(), Unique.integer())
+      beside(speaker)
+
+      state = %{character: character, gossip_menu_options: [option], gossip_menu_guid: speaker}
+      message = %CmsgGossipSelectOption{guid: speaker, gossip_list_id: 0}
 
       assert %{gossip_menu_options: []} = Inbound.handle(message, state)
       assert_receive %SendTaxiPath{path_id: 315}
@@ -67,6 +70,7 @@ defmodule ThistleTea.Game.Inbound.CmsgGossipSelectOptionTest do
       creature_guid = Guid.from_low_guid(:mob, 3701, Unique.integer())
       {:ok, _player_owner} = Entity.register(player_guid)
       {:ok, _creature_owner} = Entity.register(creature_guid)
+      beside(creature_guid)
 
       steps = [%ScriptStep{command: :create_item, datalong: 7586, datalong2: 1}]
 
@@ -198,6 +202,7 @@ defmodule ThistleTea.Game.Inbound.CmsgGossipSelectOptionTest do
       option = %Option{id: 0, option_id: 1, action_menu_id: 0, poi: poi}
       character = talker(Guid.from_low_guid(:player, Unique.integer()), %{})
       guard_guid = Guid.from_low_guid(:mob, 68, Unique.integer())
+      beside(guard_guid)
       state = %{character: character, gossip_menu_options: [option], gossip_menu_guid: guard_guid}
 
       assert Inbound.handle(%CmsgGossipSelectOption{guid: guard_guid, gossip_list_id: 0}, state) == state
@@ -214,6 +219,7 @@ defmodule ThistleTea.Game.Inbound.CmsgGossipSelectOptionTest do
       {:ok, log} = QuestLog.add(%{}, quest.id)
       player_guid = Guid.from_low_guid(:player, Unique.integer())
       npc_guid = Guid.from_low_guid(:mob, entry, Unique.integer())
+      beside(npc_guid)
       option = %Option{id: 0, option_id: 1, action_menu_id: -1}
 
       state = %State{
@@ -269,6 +275,16 @@ defmodule ThistleTea.Game.Inbound.CmsgGossipSelectOptionTest do
       refute_receive %SendTaxiPath{path_id: 315}
       refute_receive {:"$gen_cast", {:send_packet, _packet}}
     end
+  end
+
+  defp beside(guid) do
+    Metadata.put(guid, %{alive?: true})
+    SpatialHash.update(:mobs, guid, WorldRef.open(0), 2.0, 0.0, 0.0)
+
+    on_exit(fn ->
+      Metadata.delete(guid)
+      SpatialHash.remove(:mobs, guid)
+    end)
   end
 
   defp talker(guid, quest_log) do

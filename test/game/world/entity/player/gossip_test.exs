@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipTest do
   alias ThistleTea.Game.World.Loader.Gossip.Text
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Test.Unique
 
   describe "creature_menu/1" do
@@ -50,6 +51,33 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipTest do
 
       Metadata.update(creature_guid, %{gossip_menu_id: scripted_id})
       assert %Menu{menu_id: ^scripted_id} = Gossip.creature_menu(creature_guid)
+    end
+  end
+
+  describe "hello/2" do
+    test "answers only a living creature within interaction reach" do
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      entry = Unique.integer()
+      menu_id = Unique.integer()
+      creature_guid = Guid.from_low_guid(:mob, entry, Unique.integer())
+      :ets.insert(GossipLoader, {{:menu, menu_id}, %Menu{menu_id: menu_id, text_id: 738}})
+      on_exit(fn -> :ets.delete(GossipLoader, {:menu, menu_id}) end)
+
+      beside(creature_guid)
+      Metadata.update(creature_guid, %{gossip_menu_id: menu_id})
+      state = %{character: character(player_guid), gossip_menu_options: []}
+
+      SpatialHash.update(:mobs, creature_guid, WorldRef.open(0), 20.0, 0.0, 0.0)
+      assert Gossip.hello(state, creature_guid) == state
+
+      SpatialHash.update(:mobs, creature_guid, WorldRef.open(0), 2.0, 0.0, 0.0)
+      Metadata.update(creature_guid, %{alive?: false})
+      assert Gossip.hello(state, creature_guid) == state
+      refute_receive {:"$gen_cast", {:send_packet, %SmsgGossipMessage{}}}
+
+      Metadata.update(creature_guid, %{alive?: true})
+      Gossip.hello(state, creature_guid)
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgGossipMessage{title_text_id: 738}}}
     end
   end
 
@@ -107,6 +135,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipTest do
       player_guid = Guid.from_low_guid(:player, id)
       creature_guid = Guid.from_low_guid(:mob, 6669, Unique.integer())
       {:ok, _owner} = Entity.register(creature_guid)
+      beside(creature_guid)
       quest = %Quest{id: 900_000 + Unique.integer(), required_kills: [{0, 6669, 1}]}
       :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
       {:ok, log} = QuestLog.add(%{}, quest.id)
@@ -136,6 +165,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipTest do
       entry = Unique.integer()
       creature_guid = Guid.from_low_guid(:mob, entry, Unique.integer())
       {:ok, _owner} = Entity.register(creature_guid)
+      beside(creature_guid)
       reply_id = {:creature_reply, entry, 0}
       :ets.insert(GossipLoader, {{:menu, reply_id}, %Menu{menu_id: reply_id, text_id: 738}})
       on_exit(fn -> :ets.delete(GossipLoader, {:menu, reply_id}) end)
@@ -150,6 +180,16 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipTest do
       assert_receive {:"$gen_cast", {:start_script, ^steps, ^player_guid}}
       assert replied.gossip_menu_options == []
     end
+  end
+
+  defp beside(guid) do
+    Metadata.put(guid, %{alive?: true})
+    SpatialHash.update(:mobs, guid, WorldRef.open(0), 2.0, 0.0, 0.0)
+
+    on_exit(fn ->
+      Metadata.delete(guid)
+      SpatialHash.remove(:mobs, guid)
+    end)
   end
 
   defp character(guid) do

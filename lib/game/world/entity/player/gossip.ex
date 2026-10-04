@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   @moduledoc """
-  Player boundary for conditioned gossip menus and actions.
+  Player boundary for conditioned gossip menus and actions. A player talks to
+  a creature only while it lives, is not hostile, and stands within vmangos
+  interaction reach, both to open its menu and to pick an option.
   """
 
   alias ThistleTea.Game.Core.AI.BT.Blackboard
@@ -29,6 +31,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   alias ThistleTea.Game.World.Entity.Player.GossipCondition
   alias ThistleTea.Game.World.Entity.Player.Guilds
   alias ThistleTea.Game.World.Entity.Player.HomeBind
+  alias ThistleTea.Game.World.Entity.Player.NpcReach
   alias ThistleTea.Game.World.Entity.Player.Petitions
   alias ThistleTea.Game.World.Entity.Player.PetStable
   alias ThistleTea.Game.World.Entity.Player.PetUntraining
@@ -55,7 +58,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   def default_text_id, do: @default_gossip_text_id
 
   def hello(%{character: %Character{} = character} = state, guid) do
-    if Reputation.can_interact?(character, guid) do
+    if creature_interactable?(character, guid) do
       Entity.pause_for_talk(guid)
       quests = quest_items(guid, character)
 
@@ -181,13 +184,18 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
 
   defp start_text_script(%Text{}, _npc_guid, _character), do: :ok
 
+  defp creature_interactable?(character, guid) do
+    match?(%{alive?: true}, Metadata.query(guid, [:alive?])) and Reputation.can_interact?(character, guid) and
+      NpcReach.within?(character, guid)
+  end
+
   defp put_menu(%State{} = state, guid, options), do: %{state | gossip_menu_guid: guid, gossip_menu_options: options}
   defp put_menu(state, guid, options), do: Map.merge(state, %{gossip_menu_guid: guid, gossip_menu_options: options})
 
   defp source_allowed?(character, guid) do
     cond do
       Guid.type_id(guid) != :game_object ->
-        true
+        creature_interactable?(character, guid)
 
       match?(%GameObjectTemplate{type: 10}, GameObjectTemplateLoader.cached(World.entry(guid))) ->
         GameObjects.interactable?(character, guid)
