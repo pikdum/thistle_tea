@@ -23,5 +23,12 @@ defmodule ThistleTea.Game.World.Loader.VendorVmangosTest do
       assert length(entries) == length(Enum.uniq(entries))
       assert Enum.map(items, & &1.index) == Enum.to_list(1..length(items))
     end
+
+    test "keeps items removed by the supported patch off the shelves" do
+      assert :ok = Vendor.load_all()
+      entries = Enum.map(Vendor.items(989), & &1.template.entry)
+      assert 7005 in entries
+      refute 3777 in entries
+    end
   end
 end

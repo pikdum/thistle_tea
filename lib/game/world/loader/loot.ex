@@ -1,7 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.Loot do
   @moduledoc """
   Generates a loot instance for a loot id by feeding Mangos loot-template rows
-  through the pure loot roller.
+  through the pure loot roller. Items `forbidden_items` removes from the
+  supported patch never drop.
   """
   import Ecto.Query
 
@@ -12,6 +13,7 @@ defmodule ThistleTea.Game.World.Loader.Loot do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.ItemProperty, as: ItemPropertyLoader
 
+  @supported_patch 10
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
   def init(table \\ __MODULE__) do
@@ -22,14 +24,14 @@ defmodule ThistleTea.Game.World.Loader.Loot do
   end
 
   def load_all do
-    creature = Mangos.Repo.all(Mangos.CreatureLootTemplate)
-    gameobject = Mangos.Repo.all(Mangos.GameObjectLootTemplate)
-    fishing = Mangos.Repo.all(Mangos.FishingLootTemplate)
-    pickpocket = Mangos.Repo.all(Mangos.PickpocketingLootTemplate)
-    skinning = Mangos.Repo.all(Mangos.SkinningLootTemplate)
-    disenchant = Mangos.Repo.all(Mangos.DisenchantLootTemplate)
-    item = Mangos.Repo.all(Mangos.ItemLootTemplate)
-    references = Mangos.Repo.all(Mangos.ReferenceLootTemplate)
+    creature = Mangos.Repo.all(permitted(Mangos.CreatureLootTemplate))
+    gameobject = Mangos.Repo.all(permitted(Mangos.GameObjectLootTemplate))
+    fishing = Mangos.Repo.all(permitted(Mangos.FishingLootTemplate))
+    pickpocket = Mangos.Repo.all(permitted(Mangos.PickpocketingLootTemplate))
+    skinning = Mangos.Repo.all(permitted(Mangos.SkinningLootTemplate))
+    disenchant = Mangos.Repo.all(permitted(Mangos.DisenchantLootTemplate))
+    item = Mangos.Repo.all(permitted(Mangos.ItemLootTemplate))
+    references = Mangos.Repo.all(permitted(Mangos.ReferenceLootTemplate))
 
     cache_rows(:creature, creature)
     cache_rows(:gameobject, gameobject)
@@ -47,7 +49,7 @@ defmodule ThistleTea.Game.World.Loader.Loot do
   end
 
   def load_fishing do
-    fishing = Mangos.Repo.all(Mangos.FishingLootTemplate)
+    fishing = Mangos.Repo.all(permitted(Mangos.FishingLootTemplate))
     cache_rows(:fishing, fishing)
     references = preload_references(fishing, MapSet.new())
     preload_items([fishing, references])
@@ -65,7 +67,7 @@ defmodule ThistleTea.Game.World.Loader.Loot do
       []
     else
       ids = MapSet.to_list(entries)
-      references = Mangos.Repo.all(from(r in Mangos.ReferenceLootTemplate, where: r.entry in ^ids))
+      references = Mangos.Repo.all(permitted(from(r in Mangos.ReferenceLootTemplate, where: r.entry in ^ids)))
       grouped = references |> rows() |> Enum.group_by(& &1.entry)
       Enum.each(entries, &cache({:reference, &1}, Map.get(grouped, &1, [])))
       references ++ preload_references(references, MapSet.union(seen, entries))
@@ -256,9 +258,20 @@ defmodule ThistleTea.Game.World.Loader.Loot do
 
   defp load_missing(kind, entry, schema) do
     case :ets.lookup(__MODULE__, :loaded) do
-      [{:loaded, true}] -> []
-      _not_preloaded -> entry |> schema.query() |> Mangos.Repo.all() |> rows() |> then(&cache({kind, entry}, &1))
+      [{:loaded, true}] ->
+        []
+
+      _not_preloaded ->
+        entry |> schema.query() |> permitted() |> Mangos.Repo.all() |> rows() |> then(&cache({kind, entry}, &1))
     end
+  end
+
+  defp permitted(query) do
+    from(row in query,
+      where:
+        row.mincount_or_ref < 0 or
+          row.item not in subquery(Mangos.ForbiddenItem.entries(@supported_patch))
+    )
   end
 
   defp rows(template_rows) do

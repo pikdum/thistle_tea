@@ -37,6 +37,17 @@ defmodule ThistleTea.Game.World.Loader.ItemLootVmangosTest do
     end
   end
 
+  describe "load_all/0" do
+    test "keeps items removed by the supported patch out of loot tables" do
+      assert :ok = LootLoader.load_all()
+      [{{:creature, 504}, rows}] = :ets.lookup(LootLoader, {:creature, 504})
+      items = Enum.map(rows, & &1.item)
+      assert 829 in items
+      refute 835 in items
+      assert -30_018 in Enum.map(rows, & &1.mincount_or_ref)
+    end
+  end
+
   def query(_event, _measurements, _metadata, pid) do
     if self() == pid, do: send(pid, :gameplay_query)
   end

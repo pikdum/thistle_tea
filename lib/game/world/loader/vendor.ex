@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.Vendor do
   @moduledoc """
   ETS cache of direct and template vendor inventories, including stock terms.
+  Items `forbidden_items` removes from the supported patch are not sold.
   """
   import Ecto.Query
 
@@ -10,6 +11,7 @@ defmodule ThistleTea.Game.World.Loader.Vendor do
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
+  @supported_patch 10
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
   def init(table \\ __MODULE__) do
@@ -20,8 +22,8 @@ defmodule ThistleTea.Game.World.Loader.Vendor do
   end
 
   def load_all do
-    direct = Mangos.Repo.all(from(row in Mangos.NpcVendor, order_by: [row.slot, row.item]))
-    shared = Mangos.Repo.all(from(row in Mangos.NpcVendorTemplate, order_by: [row.slot, row.item]))
+    direct = Mangos.Repo.all(sold(from(row in Mangos.NpcVendor, order_by: [row.slot, row.item])))
+    shared = Mangos.Repo.all(sold(from(row in Mangos.NpcVendorTemplate, order_by: [row.slot, row.item])))
     conditions = (direct ++ shared) |> Enum.map(& &1.condition_id) |> ConditionLoader.load_by_ids()
     templates = Enum.group_by(shared, & &1.entry)
 
@@ -66,17 +68,22 @@ defmodule ThistleTea.Game.World.Loader.Vendor do
     end
   end
 
-  defp direct_rows(entry), do: entry |> Mangos.NpcVendor.query() |> Mangos.Repo.all()
+  defp direct_rows(entry), do: entry |> Mangos.NpcVendor.query() |> sold() |> Mangos.Repo.all()
 
   defp template_rows(entry) do
     case Mangos.Repo.get(Mangos.CreatureTemplate, entry) do
       %Mangos.CreatureTemplate{vendor_template_id: id} when id > 0 ->
-        Mangos.Repo.all(from(row in Mangos.NpcVendorTemplate, where: row.entry == ^id, order_by: [row.slot, row.item]))
+        Mangos.Repo.all(
+          sold(from(row in Mangos.NpcVendorTemplate, where: row.entry == ^id, order_by: [row.slot, row.item]))
+        )
 
       _ ->
         []
     end
   end
+
+  defp sold(query),
+    do: from(row in query, where: row.item not in subquery(Mangos.ForbiddenItem.entries(@supported_patch)))
 
   defp load_rows(rows, entry) do
     conditions =
