@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.CombatGadgets
   alias ThistleTea.Game.Core.AI.CreatureScript.DaphneStilwell
   alias ThistleTea.Game.Core.AI.CreatureScript.DashelStonefist
+  alias ThistleTea.Game.Core.AI.CreatureScript.DireMaul
   alias ThistleTea.Game.Core.AI.CreatureScript.DragonsOfNightmare
   alias ThistleTea.Game.Core.AI.CreatureScript.ElementalInvaders
   alias ThistleTea.Game.Core.AI.CreatureScript.Emberstrife
@@ -99,6 +100,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     CombatGadgets,
     DaphneStilwell,
     DashelStonefist,
+    DireMaul,
     DragonsOfNightmare,
     ElementalInvaders,
     Emberstrife,
