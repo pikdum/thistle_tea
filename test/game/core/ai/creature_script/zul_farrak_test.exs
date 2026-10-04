@@ -62,6 +62,14 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.ZulFarrakTest do
     test "Bly bashes and takes revenge" do
       assert spells(@bly) == [11_972, 12_170]
     end
+
+    test "a Ward of Zum'rah raises a skeleton every five seconds, fighting or not" do
+      events = CreatureScript.events(7_785)
+
+      assert Enum.map(events, & &1.event_type) == [:timer_ooc, :timer_in_combat]
+      assert Enum.all?(events, &({&1.param1, &1.param2, &1.param3, &1.param4} == {5_000, 5_000, 5_000, 5_000}))
+      assert spells(7_785) == [11_088, 11_088]
+    end
   end
 
   describe "gossip/0" do

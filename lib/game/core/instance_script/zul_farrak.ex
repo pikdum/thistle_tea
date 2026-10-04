@@ -19,7 +19,9 @@ defmodule ThistleTea.Game.Core.InstanceScript.ZulFarrak do
   A wave counts as cleared only once every troll summoned for it has reported
   in and died.
 
-  Zum'rah, Antu'sul, and Gahz'rilla are not part of this port.
+  Gahz'rilla answers the gong once per copy. A Gahz'rilla summoned after the
+  first vanishes, as vmangos makes it disappear and die. Zum'rah and
+  Antu'sul wake through their area triggers (`AreaTriggerScript.ZulFarrak`).
   """
 
   alias ThistleTea.Game.Core.AI.CreatureScript
@@ -44,6 +46,7 @@ defmodule ThistleTea.Game.Core.InstanceScript.ZulFarrak do
   @wave_3 7
   @killed_all_trolls 8
   @done 3
+  @in_progress 1
 
   @bly 7_604
   @raven 7_605
@@ -51,6 +54,7 @@ defmodule ThistleTea.Game.Core.InstanceScript.ZulFarrak do
   @weegli 7_607
   @murta 7_608
   @ukorz 7_267
+  @gahzrilla_entry 7_273
   @cages [141_070, 141_071, 141_072, 141_073, 141_074]
   @end_door_entry 146_084
   @ukorz_yell 6_067
@@ -190,6 +194,20 @@ defmodule ThistleTea.Game.Core.InstanceScript.ZulFarrak do
   def game_object_used(data, script_state, _entry), do: {:ok, data, script_state, []}
 
   def game_object_spawned(data, _script_state, entry), do: {:ok, Doors.spawned(doors(), data, %{}, entry)}
+
+  def creature_event(data, script_state, %{creature_entry: @gahzrilla_entry, event: :spawned} = event) do
+    if Encounter.value(data, @gahzrilla) == @not_started do
+      {:ok, Map.put(data, @gahzrilla, @in_progress), script_state, []}
+    else
+      vanish = %Effects.RunCreatureScript{
+        creature_entry: @gahzrilla_entry,
+        creature_guid: event.creature_guid,
+        steps: [%ScriptStep{command: :despawn}]
+      }
+
+      {:ok, data, script_state, [vanish]}
+    end
+  end
 
   def creature_event(data, script_state, %{creature_entry: entry, event: :spawned, db_guid: nil} = event)
       when entry in @wave_entries do

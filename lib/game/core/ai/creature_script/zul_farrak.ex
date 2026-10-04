@@ -23,6 +23,9 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.ZulFarrak do
   other.
 
   In a fight, Bly bashes and takes revenge and Weegli throws bombs.
+
+  vmangos `ward_zumrah`: a Ward of Zum'rah raises a Skeleton of Zum'rah every
+  five seconds for as long as it stands, in a fight or out.
   """
 
   @behaviour ThistleTea.Game.Core.AI.CreatureScript
@@ -37,6 +40,10 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.ZulFarrak do
   @oro 7_606
   @weegli 7_607
   @murta 7_608
+  @ward_of_zumrah 7_785
+  @summon_skeleton 11_088
+  @triggered 0x02
+  @skeleton_ms 5_000
 
   @pyramid 1
   @end_door 3
@@ -85,7 +92,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.ZulFarrak do
   @weegli_door "Will you blow up that door now?"
 
   @impl CreatureScript
-  def entries, do: [@bly, @weegli]
+  def entries, do: [@bly, @weegli, @ward_of_zumrah]
 
   @impl CreatureScript
   def events(@bly = entry) do
@@ -102,6 +109,19 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.ZulFarrak do
         param3: 10_000,
         param4: 10_000
       )
+    ]
+  end
+
+  def events(@ward_of_zumrah = entry) do
+    raise_skeleton = [
+      %ScriptStep{command: :cast_spell, datalong: @summon_skeleton, datalong2: @triggered, target_self?: true}
+    ]
+
+    timer = [param1: @skeleton_ms, param2: @skeleton_ms, param3: @skeleton_ms, param4: @skeleton_ms]
+
+    [
+      CreatureScript.event(entry, 1, :timer_ooc, raise_skeleton, timer),
+      CreatureScript.event(entry, 2, :timer_in_combat, raise_skeleton, timer)
     ]
   end
 

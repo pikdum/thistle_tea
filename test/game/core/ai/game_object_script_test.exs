@@ -128,6 +128,17 @@ defmodule ThistleTea.Game.Core.AI.GameObjectScriptTest do
                escape
     end
 
+    test "the Tablet of Theka teaches the spider god's name on The Spider God" do
+      for {quests, credited} <- [{[{2936, :incomplete}], 1}, {[{2936, :complete}], 0}, {[], 0}] do
+        player = character(quests: quests)
+        tablet = Guid.from_low_guid(:game_object, 142_715, Unique.integer())
+        steps = GameObjectScript.steps(142_715, @cask_position)
+        {player, _blackboard} = Script.run(player, Blackboard.new(), steps, tablet, Context.new(0))
+        credits = Enum.filter(player.internal.events, &match?(%Effects.QuestEventCredit{quest_id: 2_936}, &1))
+        assert length(credits) == credited
+      end
+    end
+
     test "the Inconspicuous Landmark brings five treasure hunters down on the player" do
       player = character()
       guid = player.object.guid

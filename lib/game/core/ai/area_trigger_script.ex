@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScript do
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.SentryPoint
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.TwiggyFlathead
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.TwilightGrove
+  alias ThistleTea.Game.Core.AI.AreaTriggerScript.ZulFarrak
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
 
@@ -35,7 +36,8 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScript do
     ScentOfLarkorwi,
     SentryPoint,
     TwiggyFlathead,
-    TwilightGrove
+    TwilightGrove,
+    ZulFarrak
   ]
   @origin {0.0, 0.0, 0.0}
 

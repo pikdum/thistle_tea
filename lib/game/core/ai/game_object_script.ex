@@ -3,9 +3,10 @@ defmodule ThistleTea.Game.Core.AI.GameObjectScript do
   Ports of vmangos C++ game object scripts, the hooks behind a
   `gameobject_template` `script_name`, written as generic script steps.
 
-  `steps/2` ports `GOHello`: the steps run when a player uses the object, on
-  that player, with the object as their target, so their conditions read
-  around the object and their summons can attack the player who used it.
+  `steps/2` ports `GOHello`: the steps run when a player uses the object, or
+  opens a quest giver object's window, on that player, with the object as
+  their target, so their conditions read around the object and their summons
+  can attack the player who used it.
   vmangos runs the hook before the object's own use, and a hook that claims
   the use stops it there. A port only adds steps, and the object still opens,
   locks out, and runs its database script as usual, so a claimed use that
@@ -26,6 +27,7 @@ defmodule ThistleTea.Game.Core.AI.GameObjectScript do
   alias ThistleTea.Game.Core.AI.GameObjectScript.PantherCage
   alias ThistleTea.Game.Core.AI.GameObjectScript.ResoniteCask
   alias ThistleTea.Game.Core.AI.GameObjectScript.SpriteDarterCage
+  alias ThistleTea.Game.Core.AI.GameObjectScript.TabletOfTheka
   alias ThistleTea.Game.Core.AI.GameObjectScript.WindStone
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
@@ -45,6 +47,7 @@ defmodule ThistleTea.Game.Core.AI.GameObjectScript do
     PantherCage,
     ResoniteCask,
     SpriteDarterCage,
+    TabletOfTheka,
     WindStone
   ]
   @origin {0.0, 0.0, 0.0, 0.0}

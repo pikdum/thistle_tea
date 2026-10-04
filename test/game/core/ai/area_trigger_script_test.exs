@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScriptTest do
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -264,10 +265,53 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScriptTest do
     end
   end
 
+  describe "Zul'Farrak" do
+    test "Zum'rah turns on intruders once per copy while he is near" do
+      [%ScriptStep{command: :start_script, condition: condition, sub_scripts: %{1 => [mark, wake]}}] =
+        AreaTriggerScript.steps(962, @position)
+
+      assert %Condition{
+               type: :and,
+               children: [
+                 %Condition{type: :instance_data, value1: 4, value2: 0, value3: 0},
+                 %Condition{type: :nearby_creature, value1: 7_271, value2: 30}
+               ]
+             } = condition
+
+      assert %ScriptStep{command: :set_instance_data, datalong: 4, datalong2: 1} = mark
+
+      assert %ScriptStep{command: :start_script, target_param1: 7_271, swap_final?: true, sub_scripts: %{1 => zumrah}} =
+               wake
+
+      assert [
+               %ScriptStep{command: :modify_flags, datalong: 46, datalong2: 0x100, datalong3: 2},
+               %ScriptStep{command: :set_faction, datalong: 37},
+               %ScriptStep{command: :talk, dataint: 3_622}
+             ] = zumrah
+    end
+
+    test "Antu'sul hatches four broodlings on the dungeon and comes down to the basin" do
+      [%ScriptStep{sub_scripts: %{1 => [mark, wake]}}] = AreaTriggerScript.steps(1447, @position)
+      assert %ScriptStep{command: :set_instance_data, datalong: 5, datalong2: 1} = mark
+      assert %ScriptStep{target_param1: 8_127, target_param2: 100, sub_scripts: %{1 => [lunch | rest]}} = wake
+      {broodlings, [descend]} = Enum.split(rest, -1)
+
+      assert %ScriptStep{command: :talk, dataint: 4_166} = lunch
+      assert length(broodlings) == 4
+
+      for broodling <- broodlings do
+        assert %ScriptStep{command: :summon_creature, datalong: 8_138, datalong2: 25_000, dataint4: 1} = broodling
+        assert %{1 => [%ScriptStep{command: :zone_combat_pulse, datalong: 1}]} = broodling.sub_scripts
+      end
+
+      assert %ScriptStep{command: :move_to, datalong3: 5, position: {1_805.133667, 740.349304, _, _}} = descend
+    end
+  end
+
   describe "summon_entries/0" do
     test "lists every creature a trigger can call" do
       assert Enum.sort(AreaTriggerScript.summon_entries()) ==
-               Enum.sort([1981, 2202, 2205, 2206, 4967, 9683, 10_323, 15_625 | @ancients])
+               Enum.sort([1981, 2202, 2205, 2206, 4967, 8138, 9683, 10_323, 15_625 | @ancients])
     end
   end
 

@@ -322,6 +322,27 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectQuestsTest do
       assert Gossip.hello_game_object(state, context.object_guid).character.unit.mount_display_id == 2404
     end
 
+    test "runs a ported object's hello script on the player", context do
+      {:ok, _} = Entity.register(context.state.guid)
+      tablet_guid = Guid.from_low_guid(:game_object, 142_715, Unique.integer())
+      tablet = %{context.object | object: %Object{guid: tablet_guid}}
+      :ets.insert(GameObjectTemplateLoader, {142_715, %{context.template | entry: 142_715}})
+      {:ok, _} = Entity.register(tablet_guid)
+      World.update_position(tablet, :game_objects)
+      Metadata.put(tablet_guid, %{go_type: 2, go_spawned?: true, go_rotation: {0.0, 0.0, 0.0, 1.0}, go_scale: 1.0})
+
+      on_exit(fn ->
+        :ets.delete(GameObjectTemplateLoader, 142_715)
+        Metadata.delete(tablet_guid)
+        World.remove_position(tablet, :game_objects)
+      end)
+
+      Gossip.hello_game_object(context.state, tablet_guid)
+
+      assert_received {:"$gen_cast",
+                       {:start_script, [%ScriptStep{command: :quest_explored, datalong: 2_936}], ^tablet_guid}}
+    end
+
     test "rejects disabled objects without granting use credit or opening a dialog", context do
       Metadata.update(context.object_guid, %{go_flags: 0x10})
       assert Gossip.hello_game_object(context.state, context.object_guid) == context.state

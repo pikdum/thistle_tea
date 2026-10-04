@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   alias ThistleTea.Game.World.Entity.Player.Taxi
   alias ThistleTea.Game.World.Entity.Player.Training
   alias ThistleTea.Game.World.Entity.Player.Vendor
+  alias ThistleTea.Game.World.Loader.GameObjectScript, as: GameObjectScriptLoader
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Gossip.Menu
@@ -76,6 +77,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
          {:ok, character} <-
            GameObjectInteraction.prepare_questgiver_use(character, template, Metadata.get(guid)[:go_flags], Time.now()) do
       state = put_object_user(state, character)
+      start_hello_script(guid, state.character)
       menu_id = Enum.at(template.data, 3, 0)
 
       case GossipLoader.get_menu(menu_id) do
@@ -88,6 +90,13 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
       end
     else
       _invalid -> state
+    end
+  end
+
+  defp start_hello_script(guid, %Character{} = character) do
+    with {_world, x, y, z} <- World.position(guid),
+         [_ | _] = steps <- GameObjectScriptLoader.ported(World.entry(guid), {x, y, z, 0.0}) do
+      Entity.start_script(character.object.guid, steps, guid)
     end
   end
 

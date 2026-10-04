@@ -130,6 +130,18 @@ defmodule ThistleTea.Game.Core.InstanceScript.ZulFarrakTest do
       assert {:ok, [], instances} = Instance.creature_event(instances, context.world, event)
       assert {:ok, [], _} = Instance.creature_event(instances, context.world, %{event | event: :death})
     end
+
+    test "Gahz'rilla rises once per copy", context do
+      first = Unique.integer()
+      again = Unique.integer()
+
+      assert {:ok, [], instances} = spawned(context.instances, context, 7_273, first)
+      assert Instance.read(instances, context.world, 2) == {:ok, 1}
+
+      assert {:ok, [vanish], _} = spawned(instances, context, 7_273, again)
+
+      assert %Effects.RunCreatureScript{creature_guid: ^again, steps: [%ScriptStep{command: :despawn}]} = vanish
+    end
   end
 
   defp moved(effects) do
