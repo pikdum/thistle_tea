@@ -62,6 +62,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
   alias ThistleTea.Game.World.Entity.Player.Weather
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ClassSpell
+  alias ThistleTea.Game.World.Loader.GameTele, as: GameTeleLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
@@ -204,6 +205,7 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
       ".weather [fine|auto|step] or <rain|snow|storm> <0..1> [permanent] - zone weather",
       ".invasion [on|off|attack <zone>|fell <zone>] - drive the Scourge Invasion",
       ".go xyz <x> <y> <z> [map|here] [facing] - teleport, optionally facing an angle in radians",
+      ".tele <name> - teleport to a named location (lists matches when several fit)",
       ".guid - show target guid",
       ".help - show help",
       ".instance info - show instance ownership and membership",
@@ -632,6 +634,22 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
       {:ok, x, y, z, map} -> teleport_player(state, x, y, z, map)
       {:ok, x, y, z} -> teleport_player(state, x, y, z, state.character.internal.world)
       :error -> system_message(state, "Invalid command. Use: .go xyz <x> <y> <z> [map|here] [facing]")
+    end
+    |> handled()
+  end
+
+  def run(state, ".tele " <> name) do
+    case GameTeleLoader.search(name) do
+      [%{position: position, map: map}] ->
+        teleport_player(state, position, map)
+
+      [] ->
+        system_message(state, "No teleport location matches #{String.trim(name)}.")
+
+      found ->
+        names = found |> Enum.take(15) |> Enum.map_join(", ", & &1.name)
+        more = if length(found) > 15, do: " (#{length(found) - 15} more)", else: ""
+        system_message(state, "Locations: #{names}#{more}")
     end
     |> handled()
   end

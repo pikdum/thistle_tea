@@ -75,6 +75,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.GameObjectRequirement, as: GameObjectRequirementLoader
   alias ThistleTea.Game.World.Loader.GameObjectScript, as: GameObjectScriptLoader
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
+  alias ThistleTea.Game.World.Loader.GameTele, as: GameTeleLoader
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Graveyard, as: GraveyardLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -358,6 +359,7 @@ defmodule ThistleTea.Application do
         CreatureGroupLoader.load_all()
         CreatureLinkLoader.load_all()
         GameObjectRequirementLoader.load_all()
+        GameTeleLoader.load_all()
         Logger.info("Loading waypoints...")
         WaypointLoader.load_all()
         Logger.info("Loading quests...")
