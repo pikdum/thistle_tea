@@ -238,6 +238,22 @@ defmodule ThistleTea.Game.Core.Aura.EffectImmunityTest do
       end
     end
 
+    test "a mechanic mask purges and blocks every mechanic it names", %{entity: entity} do
+      bleed = %{stun() | mechanic: 15}
+      {bleeding, _} = Aura.apply_spell(entity, 2, 10, bleed, 0)
+      stoneform = protection(:mechanic_immunity_mask, 0x4000, [:immunity_purges_effect])
+      {protected, _} = Aura.apply_spell(bleeding, 1, 10, stoneform, 100)
+      refute Aura.has_spell?(protected, bleed.id)
+
+      {protected, _} = Aura.apply_spell(protected, 2, 10, bleed, 200)
+      refute Aura.has_spell?(protected, bleed.id)
+      {stunned, _} = Aura.apply_spell(protected, 2, 10, %{stun() | mechanic: 12}, 200)
+      assert Aura.has_aura?(stunned, :mod_stun)
+
+      {cursed, _} = Aura.apply_spell(entity, 1, 10, %{stoneform | attributes: MapSet.new([:negative])}, 0)
+      assert EffectImmunity.friendly_mechanics(cursed) == MapSet.new([15])
+    end
+
     test "mechanic purges require the attribute and preserve immunity-bypassing controls", %{entity: entity} do
       for {control_attributes, immunity_attributes} <- [
             {[], []},

@@ -278,6 +278,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> struct!(equipped_item_fields(row))
     |> struct!(power_fields(row))
     |> append_shapeshift_passives(radius_lookup)
+    |> append_script_effects()
     |> load_linked_auras(MapSet.put(ancestors, row.id))
     |> load_boost_auras(MapSet.put(ancestors, row.id))
     |> load_script_spells(MapSet.put(ancestors, row.id))
@@ -402,6 +403,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp unsigned32(value) when is_integer(value) and value < 0, do: value + 4_294_967_296
   defp unsigned32(value) when is_integer(value), do: value
   defp unsigned32(_value), do: 0
+
+  defp append_script_effects(%SpellCore{} = spell),
+    do: %{spell | effects: spell.effects ++ Scripts.extra_effects(spell)}
 
   defp append_shapeshift_passives(%SpellCore{effects: effects} = spell, radius_lookup) do
     case shapeshift_form_value(effects) do
@@ -929,6 +933,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(142), do: :mod_base_resistance_percent
   defp aura_type(143), do: :mod_resistance_exclusive
   defp aura_type(144), do: :safe_fall
+  defp aura_type(147), do: :mechanic_immunity_mask
   defp aura_type(148), do: :retain_combo_points
   defp aura_type(149), do: :reduce_pushback
   defp aura_type(150), do: :mod_shield_block_value_pct

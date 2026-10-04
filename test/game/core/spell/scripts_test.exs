@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Core.Spell.ScriptsTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.Spell.Scripts
 
   test "finishers are derived from DBC spell attributes" do
@@ -40,6 +41,26 @@ defmodule ThistleTea.Game.Core.Spell.ScriptsTest do
     test "Wolfshead Helm's cat form trigger grants its energy" do
       assert Scripts.successful_finish_trigger(%Spell{id: 17_770, script_name: "spell_wolfshead_helm"}) == 29_940
       assert Scripts.successful_finish_trigger(%Spell{id: 20_577, script_name: "spell_cannibalize"}) == 20_578
+    end
+  end
+
+  describe "extra_effects/1" do
+    test "Stoneform adds disease immunity beside the poison immunity its data grants" do
+      armor = %Effect{index: 0, type: :apply_aura, aura: :mod_resistance_percent, misc_value: 1}
+      poison = %Effect{index: 1, type: :apply_aura, aura: :dispel_immunity, misc_value: 4}
+      stoneform = %Spell{id: 20_594, script_name: "spell_stoneform", effects: [armor, poison]}
+
+      assert [%Effect{index: 2, type: :apply_aura, aura: :dispel_immunity, misc_value: 3}] =
+               Scripts.extra_effects(stoneform)
+
+      assert Scripts.extra_effects(%{stoneform | script_name: nil}) == []
+    end
+  end
+
+  describe "boost_aura_ids/1" do
+    test "Shadowmeld raises stealth level through its passive companion" do
+      assert Scripts.boost_aura_ids(%Spell{id: 20_580, script_name: "spell_shadowmeld"}) == [21_009]
+      assert Scripts.boost_aura_ids(%Spell{id: 20_580}) == []
     end
   end
 

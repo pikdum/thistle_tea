@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Core.Spell.Immunity do
   @moduledoc "Immunity grants that purge existing effects, derived from a spell or an active aura holder."
 
-  import Bitwise, only: [band: 2, bor: 2]
+  import Bitwise, only: [band: 2, bor: 2, <<<: 2]
 
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
@@ -31,6 +31,13 @@ defmodule ThistleTea.Game.Core.Spell.Immunity do
     build(spell, grants)
   end
 
+  def granted_mechanics(:mechanic_immunity, mechanic) when is_integer(mechanic) and mechanic > 0, do: [mechanic]
+
+  def granted_mechanics(:mechanic_immunity_mask, mask) when is_integer(mask),
+    do: for(mechanic <- 1..32, band(mask, 1 <<< (mechanic - 1)) != 0, do: mechanic)
+
+  def granted_mechanics(_type, _misc_value), do: []
+
   def empty?(%__MODULE__{} = immunity), do: immunity == %__MODULE__{}
 
   def school?(%__MODULE__{schools: schools}, %Spell{} = spell), do: band(schools, Spell.school_mask(spell)) != 0
@@ -48,8 +55,8 @@ defmodule ThistleTea.Game.Core.Spell.Immunity do
   defp add({:school_immunity, mask}, immunity) when is_integer(mask) and mask > 0,
     do: %{immunity | schools: bor(immunity.schools, mask)}
 
-  defp add({:mechanic_immunity, mechanic}, immunity) when is_integer(mechanic) and mechanic > 0,
-    do: %{immunity | mechanics: MapSet.put(immunity.mechanics, mechanic)}
+  defp add({type, misc_value}, immunity) when type in [:mechanic_immunity, :mechanic_immunity_mask],
+    do: %{immunity | mechanics: MapSet.union(immunity.mechanics, MapSet.new(granted_mechanics(type, misc_value)))}
 
   defp add({:dispel_immunity, dispel}, immunity) when is_integer(dispel) and dispel > 0,
     do: %{immunity | dispels: MapSet.put(immunity.dispels, dispel)}

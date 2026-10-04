@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
   and the shield is mechanic 19, so generic immunity handling covers it.)
   `exclusive_category/1` classifies raw DBC rows whose mutual exclusivity the
   data likewise never states.
+  `extra_effects/1` adds what a script grants beyond the data, such as
+  Stoneform's disease immunity.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -59,6 +61,8 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
   @shaman_lightning_shield_family_mask 0x00000400
   @shaman_item_set_lightning_shield 23_552
   @dispel_curse 2
+  @dispel_disease 3
+  @shadowmeld_passive 21_009
   @tracking_aura_types [44, 45, 151]
   @allow_while_mounted 0x01000000
   @no_autocast_ai 0x00020000
@@ -99,7 +103,20 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
   def shapeshift_passives(form), do: Map.get(@shapeshift_passives, form, [])
 
   def boost_aura_ids(%Spell{id: 19_574, spell_family: @spell_family_hunter}), do: [24_395, 24_396, 24_397, 26_592]
+
+  def boost_aura_ids(%Spell{} = spell),
+    do: if(Spell.vmangos_script?(spell, "spell_shadowmeld"), do: [@shadowmeld_passive], else: [])
+
   def boost_aura_ids(_spell), do: []
+
+  def extra_effects(%Spell{effects: effects} = spell) do
+    with true <- Spell.vmangos_script?(spell, "spell_stoneform"),
+         %Effect{} = immunity <- Enum.find(effects, &match?(%Effect{aura: :dispel_immunity}, &1)) do
+      [%{immunity | index: length(effects), misc_value: @dispel_disease}]
+    else
+      _unscripted -> []
+    end
+  end
 
   defdelegate form_aura_ids(spell), to: Druid
   defdelegate script_spell_ids(spell), to: Shaman

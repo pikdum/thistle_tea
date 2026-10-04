@@ -43,7 +43,7 @@ defmodule ThistleTea.Game.Core.Aura.EffectImmunity do
     not Spell.attribute?(spell, :no_immunities) and
       not Spell.attribute?(spell, :ignore_caster_and_target_restrictions) and
       applies_to_polarity?(holder, Enum.any?(spell.effects, &harmful_effect?(spell, &1))) and
-      Enum.any?(holder.auras, &match?(%Aura{type: :mechanic_immunity, misc_value: ^mechanic}, &1))
+      Enum.any?(holder.auras, &(mechanic in Immunity.granted_mechanics(&1.type, &1.misc_value)))
   end
 
   def mechanic?(_holder, _spell), do: false
@@ -51,8 +51,8 @@ defmodule ThistleTea.Game.Core.Aura.EffectImmunity do
   def friendly_mechanics(%{unit: %Unit{auras: holders}}) when is_list(holders) do
     for holder <- holders,
         applies_to_polarity?(holder, false),
-        %Aura{type: :mechanic_immunity, misc_value: mechanic} <- holder.auras,
-        is_integer(mechanic) and mechanic > 0,
+        %Aura{} = aura <- holder.auras,
+        mechanic <- Immunity.granted_mechanics(aura.type, aura.misc_value),
         into: MapSet.new(),
         do: mechanic
   end
@@ -129,8 +129,8 @@ defmodule ThistleTea.Game.Core.Aura.EffectImmunity do
 
   defp matches?(%Aura{type: :state_immunity, misc_value: type}, %Effect{aura: type}) when not is_nil(type), do: true
 
-  defp matches?(%Aura{type: :mechanic_immunity, misc_value: mechanic}, %Effect{mechanic: mechanic})
-       when is_integer(mechanic) and mechanic > 0, do: true
+  defp matches?(%Aura{type: type, misc_value: misc_value}, %Effect{mechanic: mechanic})
+       when is_integer(mechanic) and mechanic > 0, do: mechanic in Immunity.granted_mechanics(type, misc_value)
 
   defp matches?(_aura, _effect), do: false
 end
