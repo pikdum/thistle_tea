@@ -1,9 +1,13 @@
 defmodule ThistleTea.Game.World.Entity.Mob.RespawnTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.AI.AIEvent
+  alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Combat.CombatLeash
   alias ThistleTea.Game.Core.Combat.Engagement
+  alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
   alias ThistleTea.Game.Core.Entity.Component.Internal.Loot
   alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
   alias ThistleTea.Game.Core.Entity.Component.Internal.Spawn
@@ -13,6 +17,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.RespawnTest do
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.WorldRef
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Mob.Respawn
@@ -131,6 +136,32 @@ defmodule ThistleTea.Game.World.Entity.Mob.RespawnTest do
       assert mob.internal.loot.corpse_removed?
       assert CombatLeashes.last_extended_at(ref) == nil
       Process.cancel_timer(mob.internal.spawn.respawn_ref)
+    end
+  end
+
+  describe "force/2" do
+    test "publishes the respawn position before spawn events read their surroundings" do
+      guid = Guid.from_low_guid(:mob, 1, Unique.integer())
+      {:ok, _} = Entity.register(guid)
+      alone = %Condition{type: :nearby_creature, value1: Unique.integer(), value2: 30, reverse?: true}
+      phase = %ScriptStep{command: :set_phase, datalong: 2, condition: alone}
+      event = %AIEvent{id: 1, event_type: :spawned, chance: 100, actions: [[phase]]}
+      mob = fixture_mob(health: 10)
+      creature = %Creature{ai_events: [event]}
+      mob = %{mob | object: %{mob.object | guid: guid}, internal: %{mob.internal | creature: creature}}
+
+      on_exit(fn ->
+        World.remove_position(mob)
+        Entity.unregister(guid)
+      end)
+
+      mob = Respawn.despawn(mob, 60_000)
+      Process.cancel_timer(mob.internal.spawn.respawn_ref)
+      assert World.position(guid) == nil
+
+      mob = Respawn.force(mob, false)
+
+      assert mob.internal.blackboard.event_ai.phase == 2
     end
   end
 

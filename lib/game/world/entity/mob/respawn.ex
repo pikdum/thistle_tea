@@ -209,6 +209,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
       |> Mob.apply_addon_auras(now)
       |> BT.init(MobBT.tree())
       |> register_group_respawn()
+      |> publish_position()
       |> EventAI.with_blackboard(&EventAI.on_spawned(&1, &2, now, AIEnvironment.context(&1, now)))
       |> NavigationResolver.resolve(now)
       |> put_spawn_position()
@@ -233,6 +234,11 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
       :pooled -> state
       :unpooled -> respawn(state)
     end
+  end
+
+  defp publish_position(%Mob{} = state) do
+    World.update_position(state)
+    state
   end
 
   defp put_spawn_position(%Mob{} = state) do
