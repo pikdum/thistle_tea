@@ -40,7 +40,13 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.BlackrockSpireTest do
       assert %ScriptStep{command: :set_equipment, dataint: 0, dataint2: 0} = empty
       assert %ScriptStep{command: :cast_spell, datalong: 16_076, target_self?: true} = unarmed
 
-      assert [%{actions: [[%ScriptStep{command: :set_equipment, datalong: 1}]]}] =
+      assert [
+               %{
+                 actions: [
+                   [%ScriptStep{command: :set_equipment, datalong: 1}, %ScriptStep{command: :set_phase, datalong: 0}]
+                 ]
+               }
+             ] =
                Enum.filter(CreatureScript.events(@voone), &(&1.event_type == :evade))
     end
 

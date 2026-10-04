@@ -84,7 +84,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.BlackrockSpire do
         8_000,
         in_phase(1)
       ),
-      CreatureScript.event(entry, 8, :evade, [%ScriptStep{command: :set_equipment, datalong: 1}])
+      CreatureScript.event(entry, 8, :evade, [%ScriptStep{command: :set_equipment, datalong: 1}, set_phase(0)])
     ]
   end
 
@@ -141,8 +141,10 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.BlackrockSpire do
   end
 
   defp throw_axe(next_phase, swap) do
-    [Combat.cast(16_075) | swap] ++ [%ScriptStep{command: :set_phase, datalong: next_phase}]
+    [Combat.cast(16_075) | swap] ++ [set_phase(next_phase)]
   end
+
+  defp set_phase(phase), do: %ScriptStep{command: :set_phase, datalong: phase}
 
   defp equipment(main_hand), do: %ScriptStep{command: :set_equipment, dataint: main_hand, dataint3: -1}
 
