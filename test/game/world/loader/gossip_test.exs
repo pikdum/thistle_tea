@@ -75,6 +75,24 @@ defmodule ThistleTea.Game.World.Loader.GossipTest do
 
       assert option.action_steps == [:resolved | steps]
     end
+
+    test "an option with a reply text leads to a menu showing just that text" do
+      entry = Unique.integer()
+      reply_id = {:creature_reply, entry, 1}
+      on_exit(fn -> cleanup(entry, [reply_id]) end)
+
+      gossip = %ScriptedGossip{
+        texts: [%ScriptedGossip.Text{text_id: 720}],
+        options: [%ScriptedGossip.Option{text: "Bye"}, %ScriptedGossip.Option{text: "Phrase", reply_text_id: 738}]
+      }
+
+      :ok = Gossip.put_scripted_menu(entry, gossip, & &1)
+
+      assert %Menu{options: [%Option{action_menu_id: -1}, %Option{action_menu_id: ^reply_id}]} =
+               Gossip.menu_for_creature(entry)
+
+      assert %Menu{menu_id: ^reply_id, text_id: 738, texts: [], options: []} = Gossip.get_menu(reply_id)
+    end
   end
 
   defp cleanup(entry, menu_ids) do

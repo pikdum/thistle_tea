@@ -5,8 +5,10 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.Gossip do
 
   The greeting is the last of `texts` whose condition holds, or the first
   text with no condition when none does. Each option shows while its condition
-  holds. Picking one closes the window and runs the option's steps on the
-  creature with the player as their target, as a `GossipSelect` handler does.
+  holds. Picking one runs the option's steps on the creature with the player
+  as their target, as a `GossipSelect` handler does, and closes the window,
+  or, for an option with a `reply_text_id`, shows that text with nothing to
+  pick, as a handler that sends a second menu does.
   """
 
   defstruct texts: [], options: []
@@ -20,6 +22,6 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.Gossip do
   defmodule Option do
     @moduledoc false
     @enforce_keys [:text]
-    defstruct [:text, :condition, icon: 0, steps: []]
+    defstruct [:text, :condition, :reply_text_id, icon: 0, steps: []]
   end
 end

@@ -293,7 +293,15 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
     end
   end
 
-  defp dispatch_gossip_menu(state, character, guid, %Option{action_menu_id: action_menu_id}) when action_menu_id > 0 do
+  defp dispatch_gossip_menu(state, _character, guid, %Option{action_menu_id: {:creature_reply, _entry, _id} = menu_id}) do
+    case GossipLoader.get_menu(menu_id) do
+      %Menu{} = menu -> send_menu(guid, menu, [], state)
+      nil -> state
+    end
+  end
+
+  defp dispatch_gossip_menu(state, character, guid, %Option{action_menu_id: action_menu_id})
+       when is_integer(action_menu_id) and action_menu_id > 0 do
     case GossipLoader.get_menu(action_menu_id) do
       %Menu{} = menu -> send_menu(guid, menu, quest_items(guid, character), state)
       nil -> state

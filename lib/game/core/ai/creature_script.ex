@@ -53,6 +53,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.Omen
   alias ThistleTea.Game.Core.AI.CreatureScript.Onyxia
   alias ThistleTea.Game.Core.AI.CreatureScript.Piznik
+  alias ThistleTea.Game.Core.AI.CreatureScript.PluckyJohnson
   alias ThistleTea.Game.Core.AI.CreatureScript.RabidThistleBear
   alias ThistleTea.Game.Core.AI.CreatureScript.Ragnaros
   alias ThistleTea.Game.Core.AI.CreatureScript.RiggleBassbait
@@ -110,6 +111,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     Omen,
     Onyxia,
     Piznik,
+    PluckyJohnson,
     RabidThistleBear,
     Ragnaros,
     RiggleBassbait,

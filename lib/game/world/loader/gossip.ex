@@ -9,6 +9,8 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   with `add_creature_option/2` once the menus are loaded. Closing the window
   from a database option credits the creature as talked to; a scripted option
   sets `talk_credit?` false, since its C++ handler closes the window itself.
+  A scripted option with a reply text leads to a menu of its own, keyed
+  `{:creature_reply, entry, option_id}`, that shows the text and nothing else.
   """
   import Ecto.Query
 
@@ -255,6 +257,15 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
         %Text{text_id: text_id, condition_id: if(condition, do: index, else: 0), condition: condition}
       end)
 
+    replies =
+      gossip.options
+      |> Enum.with_index()
+      |> Enum.filter(fn {%Gossip.Option{reply_text_id: text_id}, _id} -> is_integer(text_id) end)
+      |> Map.new(fn {%Gossip.Option{reply_text_id: text_id}, id} ->
+        menu_id = {:creature_reply, creature_entry, id}
+        {id, %Menu{menu_id: menu_id, text_id: text_id}}
+      end)
+
     options =
       gossip.options
       |> Enum.with_index()
@@ -265,7 +276,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
           text: option.text,
           option_id: @option_gossip,
           npc_flag: 0,
-          action_menu_id: @close_gossip,
+          action_menu_id: reply_menu_id(replies, id),
           condition: option.condition,
           action_steps: resolve_texts.(option.steps),
           talk_credit?: false
@@ -280,8 +291,16 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
 
     menu_id = {:creature, creature_entry}
     menu = %Menu{menu_id: menu_id, text_id: text_id, texts: texts, options: options}
-    :ets.insert(__MODULE__, [{{:menu, menu_id}, menu}, {{:creature_menu, creature_entry}, menu_id}])
+    reply_rows = Enum.map(replies, fn {_id, %Menu{menu_id: reply_id} = reply} -> {{:menu, reply_id}, reply} end)
+    :ets.insert(__MODULE__, [{{:menu, menu_id}, menu}, {{:creature_menu, creature_entry}, menu_id} | reply_rows])
     :ok
+  end
+
+  defp reply_menu_id(replies, id) do
+    case replies do
+      %{^id => %Menu{menu_id: menu_id}} -> menu_id
+      _none -> @close_gossip
+    end
   end
 
   def npc_flags(creature_entry) do

@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.Player.Gossip
   alias ThistleTea.Game.World.Entity.Player.State
+  alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Gossip.Menu
   alias ThistleTea.Game.World.Loader.Gossip.Option
   alias ThistleTea.Game.World.Loader.Gossip.Text
@@ -102,6 +103,26 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipTest do
 
       talked = Gossip.select(state, creature_guid, 1)
       assert QuestLog.get(talked.character.player.quest_log, quest.id).counts == %{0 => 1}
+    end
+
+    test "a scripted reply shows its text and runs the option's steps on the speaker" do
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      entry = Unique.integer()
+      creature_guid = Guid.from_low_guid(:mob, entry, Unique.integer())
+      {:ok, _owner} = Entity.register(creature_guid)
+      reply_id = {:creature_reply, entry, 0}
+      :ets.insert(GossipLoader, {{:menu, reply_id}, %Menu{menu_id: reply_id, text_id: 738}})
+      on_exit(fn -> :ets.delete(GossipLoader, {:menu, reply_id}) end)
+
+      steps = [%ScriptStep{command: :quest_explored, datalong: 1_950}]
+      option = %Option{id: 0, option_id: 1, action_menu_id: reply_id, action_steps: steps, talk_credit?: false}
+      state = %State{guid: player_guid, character: character(player_guid), gossip_menu_guid: creature_guid}
+
+      replied = Gossip.select(%{state | gossip_menu_options: [option]}, creature_guid, 0)
+
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgGossipMessage{title_text_id: 738, gossips: [], quests: []}}}
+      assert_receive {:"$gen_cast", {:start_script, ^steps, ^player_guid}}
+      assert replied.gossip_menu_options == []
     end
   end
 
