@@ -96,6 +96,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
         BT.condition(&dead?/2),
         BT.action(&idle_dead/3)
       ]),
+      BT.action(&EventAIBT.tick/3),
       BT.sequence([
         BT.condition(&stunned?/2),
         BT.action(&idle_stunned/3)
@@ -107,7 +108,6 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
         BT.condition(&not_in_combat?/2),
         SpellBT.casting_sequence()
       ]),
-      BT.action(&EventAIBT.tick/3),
       BT.action(&SeekAssistance.tick/3),
       BT.action(&Flee.tick/3),
       BT.action(&Distancing.tick/3),

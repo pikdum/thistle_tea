@@ -470,6 +470,32 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       assert Enum.any?(state.internal.events, &match?(%Effects.MovementStopped{}, &1))
     end
 
+    test "a stunned creature keeps running its combat timers" do
+      victim = player_guid()
+      talk = %ScriptStep{command: :talk, texts: [%{text: "Help!", chat_type: :say, language: 0, emote_id: 0}]}
+      event = %AIEvent{id: 1, event_type: :timer_in_combat, chance: 100, actions: [[talk]]}
+      stun = %Holder{spell: %Spell{id: 12}, auras: [%Aura{type: :mod_stun}]}
+      mob = fixture_mob()
+
+      mob =
+        %{
+          mob
+          | unit: %{mob.unit | target: victim, health: 100, max_health: 100, auras: [stun]},
+            internal: %{
+              mob.internal
+              | in_combat: true,
+                threat: %{victim => 100.0},
+                creature: %Creature{ai_events: [event]}
+            }
+        }
+        |> BT.init(MobBT.tree())
+
+      assert {{:running, _delay, :stunned}, mob} =
+               BehaviorRunner.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, 1_000))
+
+      assert [%Effects.MonsterTalk{}] = Enum.filter(mob.internal.events, &is_struct(&1, Effects.MonsterTalk))
+    end
+
     test "an idle creature with nothing scheduled sleeps until a message arrives" do
       mob = fixture_mob()
       mob = %{mob | unit: %{mob.unit | health: 100, max_health: 100, auras: []}} |> BT.init(MobBT.tree())
