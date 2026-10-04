@@ -729,7 +729,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       assert NavigationResolver.resolve(requested, 1_000, no_path).movement_block.spline_nodes == []
     end
 
-    test "arrival reports the original point once and failed paths cannot advance it" do
+    test "arrival reports the original point once, walking straight there when no path is found" do
       route = %WaypointRoute{
         first_point: 37,
         destination_point: 37,
@@ -740,12 +740,12 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       blackboard = %Blackboard{navigation: %Blackboard.Navigation{scripted_waypoint_route: route}}
       state = fixture_mob(spline_nodes: []) |> BT.init(MobBT.tree(), blackboard)
       {_, requested} = BehaviorRunner.tick(MobBT.tree(), state, Context.new(1_000))
-      failed = NavigationResolver.resolve(requested, 1_000, fn _, _, _, _ -> nil end)
-      {{:running, _, :blocked}, failed} = BehaviorRunner.tick(MobBT.tree(), failed, Context.new(1_001))
-      assert failed.internal.blackboard.navigation.scripted_waypoint_route.destination_point == 37
-      refute Enum.any?(failed.internal.events, &is_struct(&1, Effects.MovementInform))
+      moving = NavigationResolver.resolve(requested, 1_000, fn _, _, _, _ -> nil end)
+      assert moving.movement_block.spline_nodes == [{10.0, 0.0, 0.0}]
+      {{:running, _, :movement}, moving} = BehaviorRunner.tick(MobBT.tree(), moving, Context.new(1_001))
+      assert moving.internal.blackboard.navigation.scripted_waypoint_route.destination_point == 37
+      refute Enum.any?(moving.internal.events, &is_struct(&1, Effects.MovementInform))
 
-      moving = NavigationResolver.resolve(requested, 1_000, fn _, _, to, _ -> [to] end)
       arrived = Movement.sync_position(moving, 5_000)
       {_, finished} = BehaviorRunner.tick(MobBT.tree(), arrived, Context.new(5_000))
       assert %Effects.MovementInform{motion_type: 2, point_id: 37} in finished.internal.events

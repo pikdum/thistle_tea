@@ -1270,6 +1270,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   defp navigation_options(state, %Blackboard{} = blackboard) do
     case {waypoint_route(state, blackboard), waypoint_destination(state, blackboard), blackboard.navigation.target} do
       {%WaypointRoute{pathfind?: false}, %Waypoint{position: {x, y, z, _}}, {x, y, z}} -> [pathfind?: false]
+      {%WaypointRoute{}, %Waypoint{position: {x, y, z, _}}, {x, y, z}} -> [shortcut?: true]
       _route -> []
     end
   end
