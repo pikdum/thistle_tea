@@ -18,6 +18,19 @@ defmodule ThistleTea.Game.Core.Quest.QuestRequirementsTest do
     })
   end
 
+  describe "delivered?/3" do
+    test "needs every required item and the money a turn-in costs" do
+      quest = %Quest{id: 50, required_items: [{0, 19_807, 40}, {1, 6_948, 1}], reward_money: -100}
+      carried = %{19_807 => 40, 6_948 => 1}
+      count = &Map.get(carried, &1, 0)
+
+      assert QuestRequirements.delivered?(quest, count, 100)
+      refute QuestRequirements.delivered?(quest, count, 99)
+      refute QuestRequirements.delivered?(quest, &Map.get(%{carried | 19_807 => 39}, &1, 0), 100)
+      assert QuestRequirements.delivered?(%Quest{id: 51, reward_money: 50}, count, 0)
+    end
+  end
+
   describe "can_auto_reward?/2" do
     test "uses flag-quest requirements without requiring a free log slot or reputation" do
       quest = %Quest{

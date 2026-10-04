@@ -2,6 +2,11 @@ defmodule ThistleTea.Game.Core.Quest.QuestDialogStatus do
   @moduledoc """
   Computes the questgiver status icon and the gossip quest-menu entries for an
   NPC from its given/ended quest lists and the player's quest context.
+
+  An auto-complete quest (method 0) needs no accepting: like
+  vmangos, its giver lists it as ready to turn in to anyone who could take it,
+  under a yellow question mark, or a blue one when it repeats, and selecting
+  it opens the request-items step instead of the quest details.
   """
   alias ThistleTea.Game.Core.Quest
   alias ThistleTea.Game.Core.Quest.QuestLog
@@ -47,13 +52,17 @@ defmodule ThistleTea.Game.Core.Quest.QuestDialogStatus do
       Enum.flat_map(giver_quests, fn quest ->
         if not MapSet.member?(ender_ids, quest.id) and
              QuestRequirements.can_take?(quest, ctx, Map.get(condition_results, quest.id)) do
-          [{quest, @available}]
+          [{quest, giver_icon(quest)}]
         else
           []
         end
       end)
 
     ender_entries ++ giver_entries
+  end
+
+  defp giver_icon(%Quest{} = quest) do
+    if Quest.auto_complete?(quest), do: @reward_rep, else: @available
   end
 
   defp ender_status(%Quest{} = quest, ctx) do
@@ -70,9 +79,17 @@ defmodule ThistleTea.Game.Core.Quest.QuestDialogStatus do
 
   defp giver_status(%Quest{} = quest, ctx, condition_results) do
     case QuestRequirements.can_take(quest, ctx, Map.get(condition_results, quest.id)) do
-      :ok -> @available
+      :ok -> takeable_status(quest)
       {:error, :low_level} -> @unavailable
       {:error, _reason} -> @none
+    end
+  end
+
+  defp takeable_status(%Quest{} = quest) do
+    cond do
+      not Quest.auto_complete?(quest) -> @available
+      Quest.repeatable?(quest) -> @reward_rep
+      true -> @reward
     end
   end
 end

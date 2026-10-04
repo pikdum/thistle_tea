@@ -65,6 +65,18 @@ defmodule ThistleTea.Game.Core.Quest.QuestDialogStatusTest do
       context = ctx(quest_log: quest_log)
       assert QuestDialogStatus.for_npc([], quests, context) == QuestDialogStatus.reward()
     end
+
+    test "reward for an auto-complete quest anyone could take" do
+      once = %Quest{id: 1, method: 0}
+      repeatable = %Quest{id: 2, method: 0, special_flags: 0x1}
+
+      assert QuestDialogStatus.for_npc([once], [once], ctx()) == QuestDialogStatus.reward()
+      assert QuestDialogStatus.for_npc([repeatable], [repeatable], ctx()) == QuestDialogStatus.reward_rep()
+
+      rewarded = ctx(rewarded_quests: MapSet.new([1, 2]))
+      assert QuestDialogStatus.for_npc([once], [once], rewarded) == QuestDialogStatus.none()
+      assert QuestDialogStatus.for_npc([repeatable], [repeatable], rewarded) == QuestDialogStatus.reward_rep()
+    end
   end
 
   describe "menu/3" do
@@ -109,6 +121,14 @@ defmodule ThistleTea.Game.Core.Quest.QuestDialogStatusTest do
 
       assert [{%Quest{id: 1}, icon}] = QuestDialogStatus.menu([], [quest], context)
       assert icon == QuestDialogStatus.incomplete()
+    end
+
+    test "lists auto-complete quests as ready to turn in" do
+      quest = %Quest{id: 1, method: 0}
+
+      assert [{^quest, icon}] = QuestDialogStatus.menu([quest], [quest], ctx())
+      assert icon == QuestDialogStatus.reward_rep()
+      assert QuestDialogStatus.menu([quest], [quest], ctx(rewarded_quests: MapSet.new([1]))) == []
     end
 
     test "conditioned giver entries require an explicit met result" do

@@ -2,6 +2,8 @@ defmodule ThistleTea.Game.Core.Quest.QuestRequirements do
   @moduledoc """
   Validates whether a player can accept a quest: not already active or
   rewarded, race/class masks, skills, reputation, and compiled quest dependencies.
+  `delivered?/3` checks what a turn-in takes from the player, its required
+  items and any money it costs.
   """
   import Bitwise
 
@@ -39,6 +41,11 @@ defmodule ThistleTea.Game.Core.Quest.QuestRequirements do
       ctx.level >= quest.min_level and race_allowed?(quest, ctx.race) and
       class_allowed?(quest, ctx.class) and skill_met?(quest, ctx) and
       prerequisites_met?(dependencies(quest).prerequisites, ctx)
+  end
+
+  def delivered?(%Quest{} = quest, count_item, coinage) when is_function(count_item, 1) and is_integer(coinage) do
+    Enum.all?(quest.required_items, fn {_index, item_id, count} -> count_item.(item_id) >= count end) and
+      coinage >= -min(quest.reward_money, 0)
   end
 
   def base_can_take(%Quest{} = quest, ctx) do

@@ -19,6 +19,8 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestTurnInTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage
   alias ThistleTea.Game.Network.Message.SmsgItemPushResult
+  alias ThistleTea.Game.Network.Message.SmsgQuestgiverOfferReward
+  alias ThistleTea.Game.Network.Message.SmsgQuestgiverRequestItems
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Entity
@@ -241,6 +243,55 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestTurnInTest do
       assert BattlegroundSystem.match_for_world(world) == match_pid
       assert Match.snapshot(match_pid).armor.alliance.scraps == 20
     end
+  end
+
+  describe "auto-complete quests" do
+    setup context do
+      quest = %{QuestLoader.get(context.quest_id) | method: 0, request_items_text: "Have you brought them?"}
+      :ets.insert(QuestLoader, {{:quest, quest.id}, quest})
+      :ok
+    end
+
+    test "turn in without being accepted once the items are carried", context do
+      %{npc_guid: npc_guid, quest_id: quest_id} = context
+      empty = state(context, carrying([]))
+
+      assert Quests.complete_quest(empty, npc_guid, quest_id) == empty
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %SmsgQuestgiverRequestItems{npc_guid: ^npc_guid, completable: false}}}
+
+      assert Quests.request_reward(empty, npc_guid, quest_id) == empty
+      assert Quests.choose_reward(empty, npc_guid, quest_id, 0) == empty
+      refute_receive {:"$gen_cast", {:send_packet, %SmsgQuestgiverOfferReward{}}}
+
+      required = Enum.map(1..2, fn _ -> ItemStore.create(@required_entry, owner: context.player_guid) end)
+      ready = state(context, carrying(required))
+
+      Quests.complete_quest(ready, npc_guid, quest_id)
+
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgQuestgiverRequestItems{npc_guid: ^npc_guid, completable: true}}}
+
+      Quests.request_reward(ready, npc_guid, quest_id)
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgQuestgiverOfferReward{npc_guid: ^npc_guid}}}
+
+      rewarded = Quests.choose_reward(ready, npc_guid, quest_id, 0)
+      assert MapSet.member?(rewarded.character.player.rewarded_quests, quest_id)
+      assert rewarded.character.player.quest_log == %{}
+      assert Inventory.count_entry(rewarded.character.player, @required_entry, &ItemStore.get/1) == 0
+      assert Inventory.count_entry(rewarded.character.player, @reward1_entry, &ItemStore.get/1) == 1
+
+      assert Quests.complete_quest(rewarded, npc_guid, quest_id) == rewarded
+      refute_receive {:"$gen_cast", {:send_packet, %SmsgQuestgiverRequestItems{}}}
+    end
+  end
+
+  defp carrying(items) do
+    items
+    |> Enum.with_index(1)
+    |> Enum.reduce(%Player{quest_log: %{}, coinage: 0}, fn {item, index}, player ->
+      struct!(player, [{:"inv#{index}", item.object.guid}])
+    end)
   end
 
   defp enter_alterac(guid) do

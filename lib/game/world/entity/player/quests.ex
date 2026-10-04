@@ -2,6 +2,11 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   @moduledoc """
   Player-session quest flows: questgiver hello/details/accept/complete/reward
   exchanges, quest-log changes, and the packets each step sends.
+
+  A quest turns in from the log once its entry is complete. An auto-complete
+  quest also turns in without one: anyone who could take it goes straight to
+  its request-items and reward steps, and it is ready once they carry its
+  required items.
   """
   alias ThistleTea.Game.Core.Condition, as: ConditionEvaluator
   alias ThistleTea.Game.Core.Death
@@ -113,7 +118,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
             send_details(npc_guid, quest)
 
           icon in [QuestDialogStatus.reward_rep(), QuestDialogStatus.incomplete()] ->
-            send_turn_in_dialog(npc_guid, quest, icon == QuestDialogStatus.reward_rep())
+            send_turn_in_dialog(npc_guid, quest, turn_in_status(state.character, quest) == :complete)
 
           true ->
             send_quest_list(npc_guid, [{quest, icon}], state.character)
@@ -366,8 +371,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   def complete_quest(%{character: %Character{} = character} = state, npc_guid, quest_id) do
     with true <- QuestGiver.rewardable?(character, npc_guid),
          %Quest{} = quest <- ender_quest(npc_guid, quest_id),
-         %Entry{} = entry <- QuestLog.get(character.player.quest_log, quest_id) do
-      send_turn_in_dialog(npc_guid, quest, entry.status == :complete)
+         status when status != :none <- turn_in_status(character, quest) do
+      send_turn_in_dialog(npc_guid, quest, status == :complete)
     end
 
     state
@@ -376,7 +381,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   def request_reward(%{character: %Character{} = character} = state, npc_guid, quest_id) do
     with true <- QuestGiver.rewardable?(character, npc_guid),
          %Quest{} = quest <- ender_quest(npc_guid, quest_id),
-         %Entry{status: :complete} <- QuestLog.get(character.player.quest_log, quest_id) do
+         :complete <- turn_in_status(character, quest) do
       send_offer_reward(npc_guid, quest)
     end
 
@@ -386,7 +391,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
   def choose_reward(%{character: %Character{} = character} = state, npc_guid, quest_id, reward_index) do
     with true <- QuestGiver.rewardable?(character, npc_guid),
          %Quest{} = quest <- ender_quest(npc_guid, quest_id),
-         %Entry{status: :complete} <- QuestLog.get(character.player.quest_log, quest_id),
+         :complete <- turn_in_status(character, quest),
          {:ok, choice} <- validate_reward_choice(quest, reward_index),
          :ok <- validate_required_money(quest, character),
          {:ok, change_set, rewards} <- plan_turn_in_inventory(character, quest, choice) do
@@ -398,6 +403,22 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
 
       _other ->
         state
+    end
+  end
+
+  defp turn_in_status(%Character{} = character, %Quest{} = quest) do
+    case QuestLog.get(character.player.quest_log, quest.id) do
+      %Entry{status: :complete} -> :complete
+      %Entry{} -> :incomplete
+      nil -> auto_complete_status(character, quest)
+    end
+  end
+
+  defp auto_complete_status(%Character{player: player} = character, %Quest{} = quest) do
+    cond do
+      not Quest.auto_complete?(quest) or takeability(character, quest) != :ok -> :none
+      QuestRequirements.delivered?(quest, item_counter(player), player.coinage) -> :complete
+      true -> :incomplete
     end
   end
 
