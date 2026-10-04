@@ -45,6 +45,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.GizeltonCaravan
   alias ThistleTea.Game.Core.AI.CreatureScript.Gossip
   alias ThistleTea.Game.Core.AI.CreatureScript.KindalMoonweaver
+  alias ThistleTea.Game.Core.AI.CreatureScript.LadyJainaProudmoore
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
   alias ThistleTea.Game.Core.AI.CreatureScript.MagramiSpectre
   alias ThistleTea.Game.Core.AI.CreatureScript.MajordomoExecutus
@@ -123,6 +124,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     StaveOfTheAncients,
     StormwindRendezvous,
     KindalMoonweaver,
+    LadyJainaProudmoore,
     TapokeSlimJahn,
     Terenthis,
     TestOfEndurance,
