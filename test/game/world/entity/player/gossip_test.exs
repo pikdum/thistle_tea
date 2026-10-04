@@ -27,6 +27,32 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Test.Unique
 
+  describe "creature_menu/1" do
+    test "follows the menu a script gave the creature over its template's" do
+      entry = Unique.integer()
+      [template_id, scripted_id] = for _ <- 1..2, do: Unique.integer()
+      creature_guid = Guid.from_low_guid(:mob, entry, Unique.integer())
+
+      :ets.insert(GossipLoader, [
+        {{:menu, template_id}, %Menu{menu_id: template_id}},
+        {{:menu, scripted_id}, %Menu{menu_id: scripted_id}},
+        {{:creature_menu, entry}, template_id}
+      ])
+
+      Metadata.put(creature_guid, %{entry: entry, gossip_menu_id: nil})
+
+      on_exit(fn ->
+        Metadata.delete(creature_guid)
+        Enum.each([{:menu, template_id}, {:menu, scripted_id}, {:creature_menu, entry}], &:ets.delete(GossipLoader, &1))
+      end)
+
+      assert %Menu{menu_id: ^template_id} = Gossip.creature_menu(creature_guid)
+
+      Metadata.update(creature_guid, %{gossip_menu_id: scripted_id})
+      assert %Menu{menu_id: ^scripted_id} = Gossip.creature_menu(creature_guid)
+    end
+  end
+
   describe "send_menu/4" do
     test "starts the shown greeting's script on its speaker" do
       player_guid = Guid.from_low_guid(:player, Unique.integer())

@@ -1589,6 +1589,16 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
       assert blackboard.navigation.waypoint_hold.earlier_summons == MapSet.new([companion])
     end
 
+    test "set_gossip_menu swaps the creature's menu until it respawns", %{mob: mob} do
+      {talked, _blackboard} =
+        Script.run(mob, Blackboard.new(), [%ScriptStep{command: :set_gossip_menu, datalong: 5_711}], nil, 1)
+
+      assert talked.internal.creature.gossip_menu_id == 5_711
+      assert talked.internal.broadcast_update?
+      assert %{gossip_menu_id: 5_711} = Mob.visibility_metadata(talked)
+      assert Mob.respawn(talked).internal.creature.gossip_menu_id == nil
+    end
+
     test "set_concealed hides and reveals the creature", %{mob: mob} do
       {hidden, _blackboard} =
         Script.run(mob, Blackboard.new(), [%ScriptStep{command: :set_concealed, datalong: 1}], nil, 1)

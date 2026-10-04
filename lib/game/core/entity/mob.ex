@@ -120,6 +120,7 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
       detection_range: creature.detection_range,
       db_guid: creature.db_guid,
       npc_flags: unit.npc_flags || 0,
+      gossip_menu_id: creature.gossip_menu_id,
       spirit_service?: ((unit.npc_flags || 0) &&& @npc_flag_spirit_service) != 0,
       ghost_visible?: ((creature.type_flags || 0) &&& @creature_type_flag_ghost_visible) != 0,
       creature_type: creature.creature_type,
@@ -161,7 +162,7 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
         movement_options: nil,
         behavior_tree: nil,
         broadcast_update?: false,
-        creature: grounded(internal.creature),
+        creature: internal.creature |> grounded() |> default_gossip(),
         spawn: %{spawn_state | respawn_ref: nil, respawn_pending?: false, event_data: nil},
         loot: %{loot | session: nil, pockets: nil, skinned?: false, corpse_removed?: false, corpse_token: nil}
     }
@@ -188,6 +189,9 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
 
   defp grounded(%Creature{} = creature), do: %{creature | script_flight: nil}
   defp grounded(creature), do: creature
+
+  defp default_gossip(%Creature{} = creature), do: %{creature | gossip_menu_id: nil}
+  defp default_gossip(creature), do: creature
 
   defp respawn_unit(%Spawn{unit: %Unit{} = unit}, _current_unit), do: unit
 

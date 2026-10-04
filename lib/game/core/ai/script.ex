@@ -1411,6 +1411,18 @@ defmodule ThistleTea.Game.Core.AI.Script do
     {Effects.enqueue(state, effect), blackboard}
   end
 
+  defp execute(
+         %Mob{internal: internal} = state,
+         blackboard,
+         %ScriptStep{command: :set_gossip_menu} = step,
+         _target,
+         _now
+       )
+       when is_integer(step.datalong) and step.datalong >= 0 do
+    creature = %{internal.creature | gossip_menu_id: step.datalong}
+    {Entity.mark_broadcast_update(%{state | internal: %{internal | creature: creature}}), blackboard}
+  end
+
   defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :respawn_creature} = step, _target, _now) do
     {Effects.enqueue(state, Effects.respawn_self(step.datalong != 0)), blackboard}
   end

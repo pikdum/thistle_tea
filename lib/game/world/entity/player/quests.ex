@@ -683,8 +683,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Quests do
     QuestGreetingLoader.get(source, entry) || gossip_greeting(source, entry, npc_guid, character) || %Greeting{}
   end
 
-  defp gossip_greeting(:unit, entry, npc_guid, character) do
-    with %GossipLoader.Menu{} = menu <- GossipLoader.menu_for_creature(entry),
+  defp gossip_greeting(:unit, _entry, npc_guid, character) do
+    with %GossipLoader.Menu{} = menu <- Gossip.creature_menu(npc_guid),
          text_id = Gossip.title_text_id(menu, character, npc_guid),
          false <- text_id == Gossip.default_text_id(),
          [%{text_0: male, text_1: female, em_0: emote, em_0_delay: delay} | _groups] <- NpcTextLoader.get(text_id),

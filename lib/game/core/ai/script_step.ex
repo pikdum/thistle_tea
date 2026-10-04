@@ -306,6 +306,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   defp command(81), do: :despawn_game_object
   defp command(82), do: :load_game_object_spawn
   defp command(83), do: :quest_credit
+  defp command(84), do: :set_gossip_menu
   defp command(85), do: :send_script_event
   defp command(87), do: :reset_door_or_button
   defp command(88), do: :set_command_state

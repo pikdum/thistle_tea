@@ -59,7 +59,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
       Entity.pause_for_talk(guid)
       quests = quest_items(guid, character)
 
-      case Battlegrounds.gossip_menu(character, guid) || GossipLoader.menu_for_creature(World.entry(guid)) do
+      case Battlegrounds.gossip_menu(character, guid) || creature_menu(guid) do
         %Menu{} = menu -> send_menu(guid, menu, quests, state)
         nil when quests != [] -> send_menu(guid, %Menu{text_id: @default_gossip_text_id, options: []}, quests, state)
         nil -> Vendor.list(state, guid)
@@ -70,6 +70,13 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   end
 
   def hello(state, _guid), do: state
+
+  def creature_menu(guid) do
+    case Metadata.query(guid, [:gossip_menu_id]) do
+      %{gossip_menu_id: menu_id} when is_integer(menu_id) -> GossipLoader.get_menu(menu_id)
+      _template -> GossipLoader.menu_for_creature(World.entry(guid))
+    end
+  end
 
   def hello_game_object(%{character: %Character{} = character} = state, guid) do
     with true <- QuestGiver.interactable?(character, guid),

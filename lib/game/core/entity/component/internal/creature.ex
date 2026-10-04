@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.Creature do
     :reaction_state,
     :guard_call,
     :script_flight,
+    :gossip_menu_id,
     stationary?: false,
     critter?: false,
     civilian?: false,

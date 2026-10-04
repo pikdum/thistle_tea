@@ -141,6 +141,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptStepTest do
       assert ScriptStep.build(row(81)).command == :despawn_game_object
       assert ScriptStep.build(row(82)).command == :load_game_object_spawn
       assert ScriptStep.build(row(83)).command == :quest_credit
+      assert ScriptStep.build(row(84)).command == :set_gossip_menu
       assert ScriptStep.build(row(85)).command == :send_script_event
       assert ScriptStep.build(row(87)).command == :reset_door_or_button
       assert ScriptStep.build(row(89)).command == :play_custom_animation
