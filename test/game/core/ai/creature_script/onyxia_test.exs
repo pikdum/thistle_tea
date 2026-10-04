@@ -127,13 +127,16 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.OnyxiaTest do
       assert mask == CreatureScript.only_in_phases([5])
     end
 
-    test "an evade puts her back on the ground in her first phase", %{player: player} do
+    test "an evade puts her back on the ground in her first phase and ends her broods", %{player: player} do
       onyxia = %{onyxia(player, 50) | internal: %{onyxia(player, 50).internal | creature: flying_creature()}}
 
       {onyxia, blackboard} = EventAI.on_evade(onyxia, in_phase(13), 1_000, context(onyxia, player))
 
       assert blackboard.event_ai.phase == 0
       refute CreatureMovement.flying?(onyxia)
+
+      assert [%{actions: [[%ScriptStep{command: :stop_scripts} | _]]}] =
+               Enum.filter(CreatureScript.events(@onyxia), &(&1.event_type == :evade))
     end
 
     test "whelps call the whole lair into the fight" do

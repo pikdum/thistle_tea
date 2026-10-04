@@ -147,7 +147,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
       Combat.every(entry, 1, Combat.cast(20_228, :hostile_random), 7_000, 7_000),
       Combat.every(entry, 2, Combat.cast(20_553, :self), 10_000, 2_000),
       Combat.below_health(entry, 3, [Combat.cast(20_544, :self), quake_in(5_000)], 10),
-      CreatureScript.event(entry, 4, :script_event, [Combat.cast(19_798), quake_in(5_000)], param1: @earthquake)
+      CreatureScript.event(entry, 4, :script_event, [Combat.cast(19_798), quake_in(5_000)], param1: @earthquake),
+      CreatureScript.event(entry, 5, :evade, [%ScriptStep{command: :stop_scripts}])
     ]
   end
 

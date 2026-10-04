@@ -37,6 +37,13 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.DragonsOfNightmareTest do
       end
     end
 
+    test "an evade ends every dragon's pending scripts" do
+      for entry <- [@ysondre, @lethon, 14_889, @taerar] do
+        assert %{actions: [[%ScriptStep{command: :stop_scripts} | _rest]]} =
+                 Enum.find(CreatureScript.events(entry), &(&1.event_type == :evade))
+      end
+    end
+
     test "Ysondre summons druid spirits for every few players on her threat list" do
       for {players, druids} <- [{2, 3}, {8, 6}, {25, 15}] do
         guids = Enum.map(1..players, fn _ -> Guid.from_low_guid(:player, Unique.integer()) end)

@@ -116,7 +116,18 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.StratholmeTest do
                {17_284, :victim, 18_000, 15_000}
              ]
 
-      assert [%{actions: [[_phase, %ScriptStep{command: :update_entry, datalong: @dathrohan}, _clear]]}] =
+      assert [
+               %{
+                 actions: [
+                   [
+                     %ScriptStep{command: :stop_scripts},
+                     _phase,
+                     %ScriptStep{command: :update_entry, datalong: @dathrohan},
+                     _clear
+                   ]
+                 ]
+               }
+             ] =
                by_type(events, :evade)
     end
 

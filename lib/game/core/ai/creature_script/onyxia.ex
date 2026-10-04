@@ -120,6 +120,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.Onyxia do
       event(1, :aggro, [talk(@say_aggro), zone_pulse()]),
       event(2, :kill, [talk(@say_kill)], chance: 50),
       event(3, :evade, [
+        %ScriptStep{command: :stop_scripts},
         %ScriptStep{command: :set_phase, datalong: @ground},
         set_fly(false),
         remove_aura(@hover),

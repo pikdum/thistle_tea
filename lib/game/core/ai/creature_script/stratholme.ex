@@ -232,6 +232,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.Stratholme do
       ),
       CreatureScript.event(entry, 11, :death, [Combat.talk(6_442) | Enum.flat_map(@skeleton_spots, &skeleton/1)]),
       CreatureScript.event(entry, 12, :evade, [
+        %ScriptStep{command: :stop_scripts},
         set_phase(0),
         %ScriptStep{command: :update_entry, datalong: @dathrohan},
         clear_spell_list()

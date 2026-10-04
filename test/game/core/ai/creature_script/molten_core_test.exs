@@ -103,7 +103,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTest do
       assert %ScriptStep{datalong: 19_779, target_self?: true} = self_cast
     end
 
-    test "Golemagg calls his ragers below a tenth of his health and quakes every five seconds" do
+    test "Golemagg calls his ragers below a tenth of his health and quakes every five seconds until he evades" do
       events = CreatureScript.events(@golemagg)
 
       assert [%{param1: 10, repeatable?: false, actions: [[attract, later]]}] = by_type(events, :hp)
@@ -112,6 +112,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTest do
 
       assert [%{param1: 1, actions: [[%ScriptStep{datalong: 19_798}, again]]}] = by_type(events, :script_event)
       assert only_sub_script(again) == only_sub_script(later)
+      assert [%{actions: [[%ScriptStep{command: :stop_scripts}]]}] = by_type(events, :evade)
     end
 
     test "a Core Rager will not drop below half health while Golemagg lives" do

@@ -253,6 +253,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.DragonsOfNightmare do
 
   defp evade(entry) do
     [
+      %ScriptStep{command: :stop_scripts},
       %ScriptStep{command: :remove_guardians},
       remove_aura(@mark_of_nature),
       %ScriptStep{command: :set_phase, datalong: 0}
