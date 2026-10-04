@@ -143,8 +143,9 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
     Enum.filter([step.dataint2, step.dataint4], &(is_integer(&1) and &1 > 0))
   end
 
-  def nested_script_ids(%__MODULE__{command: :start_script_for_all, datalong: script_id})
-      when is_integer(script_id) and script_id > 0, do: [script_id]
+  def nested_script_ids(%__MODULE__{command: command, datalong: script_id})
+      when command in [:start_script_for_all, :start_script_on_zone] and is_integer(script_id) and script_id > 0,
+      do: [script_id]
 
   def nested_script_ids(%__MODULE__{}), do: []
 
@@ -311,6 +312,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   defp command(89), do: :play_custom_animation
   defp command(90), do: :start_script_on_group
   defp command(91), do: :load_creature_spawn
+  defp command(92), do: :start_script_on_zone
   defp command(other), do: {:unsupported, other}
 
   defp instance_data_mode(0), do: {:ok, :raw}

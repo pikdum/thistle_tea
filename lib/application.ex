@@ -58,6 +58,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Loader.BroadcastText, as: BroadcastTextLoader
   alias ThistleTea.Game.World.Loader.ClassSpell, as: ClassSpellLoader
+  alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.CreatureArchetype, as: CreatureArchetypeLoader
   alias ThistleTea.Game.World.Loader.CreatureEvent, as: CreatureEventLoader
   alias ThistleTea.Game.World.Loader.CreatureGroup, as: CreatureGroupLoader
@@ -402,7 +403,9 @@ defmodule ThistleTea.Application do
             FireworkGuy.entries()
         )
 
-        GameObjectLoader.preload_blueprints(InstanceScript.game_object_db_guids())
+        GameObjectLoader.preload_blueprints(
+          InstanceScript.game_object_db_guids() ++ ConditionLoader.object_fit_game_object_guids()
+        )
 
         Logger.info("Loading templates...")
         CreatureTemplateLoader.load_all()

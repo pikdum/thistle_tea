@@ -96,6 +96,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
     :set_map_event_data,
     :send_map_event,
     :start_script_for_all,
+    :start_script_on_zone,
     :edit_map_event
   ]
   @game_object_owner_commands [

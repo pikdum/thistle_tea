@@ -7,10 +7,13 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
   alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Condition.Reason
   alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Loader.GameObject, as: GameObjectLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.SpatialHash
@@ -295,6 +298,32 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
              %{7 => :unmet}
   end
 
+  test "object-fit conditions see a known spawn that is not up as despawned", context do
+    db_guid = Unique.integer()
+    :ets.insert(GameObjectLoader, {db_guid, %GameObject{internal: %Internal{world: WorldRef.open(0)}}})
+    on_exit(fn -> :ets.delete(GameObjectLoader, db_guid) end)
+
+    condition = %Condition{
+      entry: 7,
+      type: :object_fit_condition,
+      value1: db_guid,
+      children: [%Condition{type: :object_spawned, reverse?: true}]
+    }
+
+    assert ScriptedEventSystem.condition_results(context.world, context.source_guid, context.target_guid, [condition]) ==
+             %{7 => :met}
+
+    spawned = %{condition | children: [%Condition{type: :object_spawned}]}
+
+    assert ScriptedEventSystem.condition_results(context.world, context.source_guid, context.target_guid, [spawned]) ==
+             %{7 => :unmet}
+
+    elsewhere = WorldRef.open(1)
+
+    assert ScriptedEventSystem.condition_results(elsewhere, context.source_guid, context.target_guid, [condition]) ==
+             %{7 => :unmet}
+  end
+
   test "condition results preserve unavailable world facts as unknown", context do
     condition = %Condition{entry: 8, type: :nearby_creature, value1: 4_236, value2: 30}
 
@@ -462,6 +491,27 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
     refute_receive {:"$gen_cast", {:start_script, [^sub_step], _target_guid}}
   end
 
+  describe "start script on zone" do
+    setup [:zone_players]
+
+    test "starts the script for every player standing in the zone", context do
+      buff = %ScriptStep{command: :add_aura, datalong: 22_888}
+      command(context, zone_step(context.zone_id, 0, buff))
+
+      assert_receive {:"$gen_cast", {:start_script, [^buff], target_guid}}
+      assert target_guid == context.target_guid
+      refute_receive {:"$gen_cast", {:start_script, [^buff], _target_guid}}
+    end
+
+    test "hands the script on to the players' pets when asked", context do
+      buff = %ScriptStep{command: :add_aura, datalong: 16_609}
+      command(context, zone_step(context.zone_id, 1, buff))
+
+      assert_receive {:"$gen_cast", {:start_script_with_pet, [^buff], _target_guid}}
+      refute_receive {:"$gen_cast", {:start_script, [^buff], _target_guid}}
+    end
+  end
+
   describe "command_result/1" do
     test "global writes need no map event and expired requests cannot overwrite them", context do
       index = Unique.integer()
@@ -538,6 +588,33 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
 
     :sys.get_state(ScriptedEventSystem)
     :ok
+  end
+
+  defp zone_players(context) do
+    zone_id = Unique.integer()
+    elsewhere_guid = Guid.from_low_guid(:player, Unique.integer())
+    {:ok, _} = Entity.register(elsewhere_guid)
+    Metadata.update(context.target_guid, %{area: zone_id})
+    Metadata.put(elsewhere_guid, %{alive?: true, area: Unique.integer()})
+    SpatialHash.update(:players, elsewhere_guid, context.world, 20.0, 0.0, 0.0)
+
+    on_exit(fn ->
+      Entity.unregister(elsewhere_guid)
+      Metadata.delete(elsewhere_guid)
+      SpatialHash.remove(:players, elsewhere_guid)
+    end)
+
+    %{zone_id: zone_id}
+  end
+
+  defp zone_step(zone_id, with_pets, step) do
+    %ScriptStep{
+      command: :start_script_on_zone,
+      datalong: 21_002,
+      datalong2: zone_id,
+      datalong3: with_pets,
+      sub_scripts: %{21_002 => [step]}
+    }
   end
 
   defp evaluate_event do

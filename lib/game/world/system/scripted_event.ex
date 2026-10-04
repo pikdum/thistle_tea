@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   alias ThistleTea.Game.Core.Condition.Result
   alias ThistleTea.Game.Core.Condition.Subject
   alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.InstanceScript
   alias ThistleTea.Game.Core.Math
@@ -25,6 +26,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Loader.GameObject, as: GameObjectLoader
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
@@ -150,8 +152,8 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
       {:noreply, events}
   end
 
-  defp command_allowed?(_events, %Effects.ScriptedEventCommand{step: %ScriptStep{command: :start_script_for_all}}),
-    do: true
+  defp command_allowed?(_events, %Effects.ScriptedEventCommand{step: %ScriptStep{command: command}})
+       when command in [:start_script_for_all, :start_script_on_zone], do: true
 
   defp command_allowed?(_events, %Effects.ScriptedEventCommand{
          step: %ScriptStep{command: :set_server_variable, datalong: index, datalong2: value}
@@ -286,6 +288,11 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
 
   defp apply_command(events, %Effects.ScriptedEventCommand{step: %ScriptStep{command: :start_script_for_all}} = effect) do
     start_script_for_all(effect)
+    events
+  end
+
+  defp apply_command(events, %Effects.ScriptedEventCommand{step: %ScriptStep{command: :start_script_on_zone}} = effect) do
+    start_script_on_zone(effect)
     events
   end
 
@@ -562,6 +569,9 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
     end
   end
 
+  defp evaluate_condition(%Condition{type: :object_spawned}, _events, _world, _source, {:despawned_game_object, _}),
+    do: :unmet
+
   defp evaluate_condition(%Condition{type: :object_spawned} = condition, _events, _world, _source, target) do
     metadata_result(condition, target, :go_spawned?)
   end
@@ -593,11 +603,14 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
          source,
          _target
        ) do
-    case World.spawn_guid(world, :game_object, db_guid) do
-      guid when is_integer(guid) ->
+    cond do
+      guid = World.spawn_guid(world, :game_object, db_guid) ->
         condition_result(child, events, world, source, guid)
 
-      _missing ->
+      despawned_spawn?(world, db_guid) ->
+        condition_result(child, events, world, source, {:despawned_game_object, db_guid})
+
+      true ->
         :unmet
     end
   end
@@ -747,6 +760,13 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
       match?(%{faction_template: %{}}, Metadata.query(target, [:faction_template]))
   end
 
+  defp despawned_spawn?(%WorldRef{map_id: map_id}, db_guid) do
+    match?(
+      %GameObject{internal: %{world: %WorldRef{map_id: ^map_id}}},
+      GameObjectLoader.cached_blueprint(db_guid)
+    )
+  end
+
   defp metadata_result(condition, guid, key) do
     case Metadata.query(guid, [key]) do
       %{^key => value} when is_boolean(value) -> Result.truth(value)
@@ -814,6 +834,19 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
       |> Enum.each(&run_steps(&1, sub_steps(effect.step, effect.step.datalong), effect.target_guid))
     end
   end
+
+  defp start_script_on_zone(%Effects.ScriptedEventCommand{world: world, step: step} = effect) do
+    steps = sub_steps(step, step.datalong)
+    with_pets? = step.datalong3 == 1
+
+    world
+    |> World.players_in_zone(step.datalong2)
+    |> Enum.each(&run_zone_steps(&1, steps, effect.target_guid || 0, with_pets?))
+  end
+
+  defp run_zone_steps(_guid, [], _target_guid, _with_pets?), do: :ok
+  defp run_zone_steps(guid, steps, target_guid, true), do: Entity.start_script_with_pet(guid, steps, target_guid)
+  defp run_zone_steps(guid, steps, target_guid, false), do: Entity.start_script(guid, steps, target_guid)
 
   defp nearby_targets(0, world, x, y, z, radius),
     do: World.nearby_units_exact(:game_objects, world, {x, y, z}, radius) |> Enum.map(&elem(&1, 0))

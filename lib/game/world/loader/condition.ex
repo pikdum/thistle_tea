@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.World.Loader.Condition do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.Condition
 
+  def object_fit_game_object_guids, do: Mangos.Repo.all(Mangos.Condition.object_fit_game_object_guids())
+
   def load_by_ids([]), do: %{}
 
   def load_by_ids(entries) when is_list(entries) do

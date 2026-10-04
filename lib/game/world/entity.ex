@@ -259,6 +259,10 @@ defmodule ThistleTea.Game.World.Entity do
     dispatch_cast(entity, {:start_script, steps, target_guid, world})
   end
 
+  def start_script_with_pet(player, steps, target_guid) when is_list(steps) and is_integer(target_guid) do
+    dispatch_cast(player, {:start_script_with_pet, steps, target_guid})
+  end
+
   def script_event(entity, event_id, data, invoker_guid \\ nil)
       when is_integer(event_id) and is_integer(data) and (is_integer(invoker_guid) or is_nil(invoker_guid)) do
     dispatch_cast(entity, {:script_event, event_id, data, invoker_guid})

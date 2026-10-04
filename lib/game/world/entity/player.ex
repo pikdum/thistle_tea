@@ -272,6 +272,15 @@ defmodule ThistleTea.Game.World.Entity.Player do
       {:noreply, state}
   end
 
+  def handle_cast({:start_script_with_pet, steps, target_guid}, %State{character: %Character{} = character} = state) do
+    case Companion.summon_guid(character) do
+      pet_guid when is_integer(pet_guid) -> Entity.start_script(pet_guid, steps, target_guid)
+      nil -> :ok
+    end
+
+    handle_cast({:start_script, steps, target_guid}, state)
+  end
+
   @impl GenServer
   def handle_cast({:mail_delivery, token, mail}, state) do
     state = Mail.receive_delivery(state, token, mail)

@@ -17,4 +17,8 @@ defmodule ThistleTea.DB.Mangos.Condition do
   def query(entries) when is_list(entries) do
     from(c in __MODULE__, where: c.condition_entry in ^entries)
   end
+
+  def object_fit_game_object_guids do
+    from(c in __MODULE__, where: c.type == 50 and c.value1 > 0, distinct: true, select: c.value1)
+  end
 end
