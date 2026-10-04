@@ -1487,7 +1487,13 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
         character
 
       effects ->
-        effects = Enum.reject(effects, &Spell.channel_ticked_effect?(spell, &1))
+        rolls = (casting.trigger_context || %CastContext{}).rolls
+
+        effects =
+          effects
+          |> Enum.reject(&Spell.channel_ticked_effect?(spell, &1))
+          |> Scripts.chosen_effects(spell, rolls)
+
         apply_impacts(character, %{casting | spell: %{spell | effects: effects}}, casting.resolution.impacts, now)
     end
   end

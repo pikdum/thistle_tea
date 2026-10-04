@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.Spell.ScriptsTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.Rolls
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.Spell.Scripts
@@ -54,6 +55,22 @@ defmodule ThistleTea.Game.Core.Spell.ScriptsTest do
                Scripts.extra_effects(stoneform)
 
       assert Scripts.extra_effects(%{stoneform | script_name: nil}) == []
+    end
+  end
+
+  describe "chosen_effects/3" do
+    test "Collecting Fallout fills the phial or irradiates the collector, never both" do
+      phial = %Effect{index: 0, type: :trigger_spell, trigger_spell_id: 11_637}
+      radiation = %Effect{index: 1, type: :trigger_spell, trigger_spell_id: 11_638}
+      fallout = %Spell{id: 12_709, script_name: "spell_gnomeregan_collecting_fallout", effects: [phial, radiation]}
+
+      assert Scripts.chosen_effects([phial, radiation], fallout, Rolls.fixed(script_effect: 0)) == [phial]
+      assert Scripts.chosen_effects([phial, radiation], fallout, Rolls.fixed(script_effect: 1)) == [radiation]
+
+      assert Scripts.chosen_effects([phial, radiation], %{fallout | script_name: nil}, Rolls.system()) == [
+               phial,
+               radiation
+             ]
     end
   end
 

@@ -9,7 +9,9 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
   `exclusive_category/1` classifies raw DBC rows whose mutual exclusivity the
   data likewise never states.
   `extra_effects/1` adds what a script grants beyond the data, such as
-  Stoneform's disease immunity.
+  Stoneform's disease immunity, and `chosen_effects/3` keeps one of the
+  effects a script runs only one of per cast, such as Collecting Fallout's
+  phial or radiation.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -19,6 +21,7 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
   alias ThistleTea.Game.Core.Class.Shaman
   alias ThistleTea.Game.Core.Class.Warlock
   alias ThistleTea.Game.Core.Profession.Engineering.DeathRay
+  alias ThistleTea.Game.Core.Rolls
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Cone
   alias ThistleTea.Game.Core.Spell.Consumable
@@ -69,6 +72,7 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
 
   @immediate_periodic_spells [8145, 6474, 8179, 8172, 8167, 8515, 10_609, 10_612]
   @preserved_periodic_timers @immediate_periodic_spells ++ [13_797, 14_298, 14_299, 14_300, 14_301, 23_184, 25_041]
+  @one_of_effects %{"spell_gnomeregan_collecting_fallout" => [0, 1]}
   @shadow_bolt_whirl [24_820, 24_821, 24_822, 24_823, 24_835, 24_836, 24_837, 24_838]
 
   def cone(spell_id, _degrees) when spell_id in @shadow_bolt_whirl do
@@ -117,6 +121,14 @@ defmodule ThistleTea.Game.Core.Spell.Scripts do
       _unscripted -> []
     end
   end
+
+  def chosen_effects(effects, %Spell{script_name: script_name}, rolls) when is_map_key(@one_of_effects, script_name) do
+    indices = Map.fetch!(@one_of_effects, script_name)
+    chosen = Enum.at(indices, Rolls.integer(rolls, :script_effect, 0, length(indices) - 1))
+    Enum.reject(effects, &(&1.index in indices and &1.index != chosen))
+  end
+
+  def chosen_effects(effects, _spell, _rolls), do: effects
 
   defdelegate form_aura_ids(spell), to: Druid
   defdelegate script_spell_ids(spell), to: Shaman
