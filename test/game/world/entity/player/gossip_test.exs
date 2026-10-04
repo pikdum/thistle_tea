@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipTest do
   alias ThistleTea.Game.World.Loader.Gossip.Option
   alias ThistleTea.Game.World.Loader.Gossip.Text
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Test.Unique
 
   describe "send_menu/4" do
@@ -38,6 +39,25 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipTest do
 
       assert_receive {:"$gen_cast", {:send_packet, %SmsgGossipMessage{title_text_id: 4449}}}
       assert_receive {:"$gen_cast", {:start_script, ^steps, ^player_guid}}
+    end
+
+    test "offers an option once a script grants the creature the flag it needs" do
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      creature_guid = Guid.from_low_guid(:mob, 12_018, Unique.integer())
+      {:ok, _owner} = Entity.register(creature_guid)
+      on_exit(fn -> Metadata.delete(creature_guid) end)
+
+      option = %Option{id: 0, option_id: 1, npc_flag: 1, action_menu_id: 4109, text: "Tell me more."}
+      menu = %Menu{menu_id: 4093, texts: [%Text{text_id: 4995, condition_id: 0}], options: [option]}
+      state = %{character: character(player_guid)}
+
+      Metadata.put(creature_guid, %{alive?: true, npc_flags: 0})
+      Gossip.send_menu(creature_guid, menu, [], state)
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgGossipMessage{gossips: []}}}
+
+      Metadata.update(creature_guid, %{npc_flags: 1})
+      Gossip.send_menu(creature_guid, menu, [], state)
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgGossipMessage{gossips: [%{message: "Tell me more."}]}}}
     end
 
     test "starts nothing for a greeting without a script" do

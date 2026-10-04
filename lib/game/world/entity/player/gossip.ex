@@ -376,9 +376,17 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   defp creature_flag_allowed?(%Option{npc_flag: npc_flag}, _npc_guid) when npc_flag in [nil, 0], do: true
 
   defp creature_flag_allowed?(%Option{npc_flag: npc_flag}, npc_guid) do
-    GossipLoader.npc_flags(World.entry(npc_guid))
+    npc_guid
+    |> live_npc_flags()
     |> Bitwise.band(npc_flag)
     |> Kernel.!=(0)
+  end
+
+  defp live_npc_flags(npc_guid) do
+    case Metadata.get(npc_guid) do
+      %{npc_flags: flags} when is_integer(flags) -> flags
+      _ -> GossipLoader.npc_flags(World.entry(npc_guid))
+    end
   end
 
   defp option_allowed?(_context, nil, _policy), do: false
