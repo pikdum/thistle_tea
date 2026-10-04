@@ -1,6 +1,21 @@
 defmodule ThistleTea.Game.Core.InstanceScript.Stratholme do
-  @moduledoc false
+  @moduledoc """
+  vmangos `instance_stratholme`, with the pieces of `stratholme.cpp` and the
+  boss scripts that act on the whole instance.
 
+  On the undead side, the Baron's timed run starts from the gauntlet gate,
+  the acolytes' deaths shatter their ziggurat crystals and open the way to
+  the Slaughter Square, where the abominations' deaths bring Ramstein and
+  his death the Black Guard. On the live side, the fall of one Crimson
+  Guardsman calls Timmy the Cruel into the Market Row, Cannon Master Willey
+  shuts his courtyard gate while he fights, and every postbox opened with
+  its key calls three Undead Postmen, the third bringing Postmaster Malown.
+
+  vmangos summons the postmen and Malown around the player who opened the
+  box; they appear around the box itself here.
+  """
+
+  alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.InstanceScript.Effects
 
   @baron_run 0
@@ -31,6 +46,11 @@ defmodule ThistleTea.Game.Core.InstanceScript.Stratholme do
   @black_guard_entry 10_394
   @mindless_undead_entry 11_030
   @ysida_entry 16_031
+  @crimson_guardsman_entry 10_418
+  @timmy_entry 10_808
+  @willey_entry 10_997
+  @postman_entry 11_142
+  @malown_entry 11_143
 
   @ziggurat_doors %{@baroness => 175_380, @nerub => 175_379, @pallid => 175_381}
   @ziggurat_four 175_405
@@ -41,6 +61,24 @@ defmodule ThistleTea.Game.Core.InstanceScript.Stratholme do
   @baron_gate_entries [175_405, 175_796, 175_374]
   @gauntlet_gate_entry 175_357
   @ysida_cage_entry 181_071
+  @willey_gate 175_969
+
+  @timmy_spawner_db_guid 54_070
+  @timmy_spawn {3_614.7, -3_187.64, 131.406, 0.0}
+  @say_timmy 6_150
+
+  @postboxes %{
+    176_346 => {3_690.03, -3_405.43, 132.838, -1.74533},
+    176_349 => {3_651.28, -3_165.66, 128.177, 2.02458},
+    176_350 => {3_659.79, -3_476.73, 138.381, 1.02974},
+    176_351 => {3_639.65, -3_641.33, 138.541, -1.23918},
+    176_352 => {3_564.92, -3_353.24, 130.67, -0.855212},
+    176_353 => {3_473.59, -3_294.16, 132.052, 2.19912}
+  }
+  @postmaster_summoning_use 3
+  @postmaster_lifetime_ms 180_000
+  @timed_or_dead_despawn 1
+  @dead_despawn 7
 
   @baron_run_schedules [
     :baron_run_10_minutes,
@@ -75,9 +113,19 @@ defmodule ThistleTea.Game.Core.InstanceScript.Stratholme do
   @baron_locked_flags 0x02000002
 
   def broadcast_text_ids,
-    do: [6_289, 6_398, 6_401, 6_415, 6_425, 6_527, 11_812, 11_813, 11_814, 11_815, 11_816, 11_817, 11_931]
+    do: [6_289, 6_398, 6_401, 6_415, 6_425, 6_527, 11_812, 11_813, 11_814, 11_815, 11_816, 11_817, 11_931, @say_timmy]
 
-  def summon_entries, do: [@black_guard_entry, @ramstein_entry, @mindless_undead_entry, @ysida_entry]
+  def summon_entries,
+    do: [
+      @black_guard_entry,
+      @ramstein_entry,
+      @mindless_undead_entry,
+      @ysida_entry,
+      @timmy_entry,
+      @postman_entry,
+      @malown_entry
+    ]
+
   def game_object_db_guids, do: []
   def door_entries, do: []
   def data64(_index), do: nil
@@ -124,6 +172,19 @@ defmodule ThistleTea.Game.Core.InstanceScript.Stratholme do
 
       _started ->
         {:ok, data, script_state, []}
+    end
+  end
+
+  def game_object_used(data, script_state, entry) when is_map_key(@postboxes, entry) do
+    script_state = ensure_script_state(script_state)
+    uses = script_state.postboxes_used + 1
+
+    if uses > @postmaster_summoning_use do
+      {:ok, data, script_state, []}
+    else
+      spot = Map.fetch!(@postboxes, entry)
+      postmaster = if uses == @postmaster_summoning_use, do: [postmaster(spot)], else: []
+      {:ok, data, %{script_state | postboxes_used: uses}, postmen(spot) ++ postmaster}
     end
   end
 
@@ -283,6 +344,28 @@ defmodule ThistleTea.Game.Core.InstanceScript.Stratholme do
 
     {:ok, data, script_state, effects}
   end
+
+  defp handle_creature_event(data, %{timmy_summoned?: false} = script_state, %{
+         creature_entry: @crimson_guardsman_entry,
+         event: :death,
+         db_guid: @timmy_spawner_db_guid
+       }) do
+    timmy = %Effects.SummonCreature{
+      entry: @timmy_entry,
+      position: @timmy_spawn,
+      despawn_delay_ms: 0,
+      despawn_type: @dead_despawn,
+      steps: [%ScriptStep{command: :talk, dataint: @say_timmy}]
+    }
+
+    {:ok, data, %{script_state | timmy_summoned?: true}, [timmy]}
+  end
+
+  defp handle_creature_event(data, script_state, %{creature_entry: @willey_entry, event: :aggro}),
+    do: {:ok, data, script_state, [operate(@willey_gate, :close)]}
+
+  defp handle_creature_event(data, script_state, %{creature_entry: @willey_entry, event: event})
+       when event in [:evade, :death], do: {:ok, data, script_state, [operate(@willey_gate, :open)]}
 
   defp handle_creature_event(data, script_state, _event), do: {:ok, data, script_state, []}
 
@@ -484,7 +567,9 @@ defmodule ThistleTea.Game.Core.InstanceScript.Stratholme do
         ramstein_dead?: false,
         slaughter_gate_open?: false,
         black_guards_announced?: false,
-        dead_black_guards: MapSet.new()
+        dead_black_guards: MapSet.new(),
+        timmy_summoned?: false,
+        postboxes_used: 0
       },
       script_state
     )
@@ -532,6 +617,31 @@ defmodule ThistleTea.Game.Core.InstanceScript.Stratholme do
       move_to: move_to,
       despawn_delay_ms: despawn_delay_ms
     }
+  end
+
+  defp postmen(spot) do
+    Enum.map([0.0, 2.0, -2.0], fn turn ->
+      %Effects.SummonCreature{
+        entry: @postman_entry,
+        position: beside(spot, turn),
+        despawn_delay_ms: 0,
+        despawn_type: @dead_despawn
+      }
+    end)
+  end
+
+  defp postmaster(spot) do
+    %Effects.SummonCreature{
+      entry: @malown_entry,
+      position: spot,
+      despawn_delay_ms: @postmaster_lifetime_ms,
+      despawn_type: @timed_or_dead_despawn
+    }
+  end
+
+  defp beside({x, y, z, facing}, turn) do
+    angle = facing + turn
+    {x + 1.5 * :math.cos(angle), y + 1.5 * :math.sin(angle), z, angle + :math.pi()}
   end
 
   defp mindless_undead_summons do

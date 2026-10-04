@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.InstanceScriptTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Instance
   alias ThistleTea.Game.Core.InstanceScript.Effects
 
@@ -274,6 +275,51 @@ defmodule ThistleTea.Game.Core.InstanceScriptTest do
 
       assert {:ok, [], _instances} =
                Instance.creature_event(instances, context.world, creature_event(10_394, :death, guid: 205))
+    end
+  end
+
+  describe "live-side encounters" do
+    test "Timmy answers the fall of his guardsman once", context do
+      spawner = creature_event(10_418, :death, db_guid: 54_070)
+
+      assert {:ok, [], instances} =
+               Instance.creature_event(
+                 context.instances,
+                 context.world,
+                 creature_event(10_418, :death, db_guid: 54_069)
+               )
+
+      assert {:ok, [timmy], instances} = Instance.creature_event(instances, context.world, spawner)
+
+      assert %Effects.SummonCreature{entry: 10_808, position: {3_614.7, -3_187.64, 131.406, _}, despawn_type: 7} = timmy
+      assert [%ScriptStep{command: :talk, dataint: 6_150}] = timmy.steps
+      assert {:ok, [], _instances} = Instance.creature_event(instances, context.world, spawner)
+    end
+
+    test "Willey shuts his courtyard gate for the fight", context do
+      for {event, action} <- [aggro: :close, evade: :open, death: :open] do
+        assert {:ok, [%Effects.OperateGameObject{entry: 175_969, action: ^action}], _instances} =
+                 Instance.creature_event(context.instances, context.world, creature_event(10_997, event))
+      end
+    end
+
+    test "every postbox opened calls three postmen, and the third brings the postmaster", context do
+      {effects, instances} =
+        Enum.map_reduce([176_346, 176_352, 176_353, 176_349], context.instances, fn postbox, instances ->
+          assert {:ok, effects, instances} = Instance.game_object_used(instances, context.world, postbox)
+          {effects, instances}
+        end)
+
+      assert [first, second, third, []] = effects
+
+      for summons <- [first, second] do
+        assert Enum.map(summons, & &1.entry) == [11_142, 11_142, 11_142]
+        assert Enum.all?(summons, &match?(%Effects.SummonCreature{despawn_type: 7}, &1))
+      end
+
+      assert [_, _, _, %Effects.SummonCreature{entry: 11_143} = malown] = third
+      assert %{position: {3_473.59, -3_294.16, 132.052, _}, despawn_delay_ms: 180_000, despawn_type: 1} = malown
+      assert {:ok, [], _instances} = Instance.game_object_used(instances, context.world, 176_350)
     end
   end
 
