@@ -62,6 +62,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.CreatureArchetype, as: CreatureArchetypeLoader
   alias ThistleTea.Game.World.Loader.CreatureEvent, as: CreatureEventLoader
   alias ThistleTea.Game.World.Loader.CreatureGroup, as: CreatureGroupLoader
+  alias ThistleTea.Game.World.Loader.CreatureLink, as: CreatureLinkLoader
   alias ThistleTea.Game.World.Loader.CreatureScriptRoute, as: CreatureScriptRouteLoader
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
@@ -354,6 +355,7 @@ defmodule ThistleTea.Application do
       if !test do
         load_spell_data()
         CreatureGroupLoader.load_all()
+        CreatureLinkLoader.load_all()
         Logger.info("Loading waypoints...")
         WaypointLoader.load_all()
         Logger.info("Loading quests...")

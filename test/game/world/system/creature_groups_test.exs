@@ -1,8 +1,11 @@
 defmodule ThistleTea.Game.World.System.CreatureGroupsTest do
   use ExUnit.Case, async: true
 
+  import Bitwise
+
   alias ThistleTea.Game.Core.Creature.CreatureGroup
   alias ThistleTea.Game.Core.Creature.CreatureGroup.Member
+  alias ThistleTea.Game.Core.Creature.CreatureLink
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
   alias ThistleTea.Game.Core.Entity.Component.Internal.Spawn
@@ -13,6 +16,7 @@ defmodule ThistleTea.Game.World.System.CreatureGroupsTest do
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.System.CreatureGroups
+  alias ThistleTea.Test.Unique
 
   setup [:groups]
 
@@ -217,6 +221,81 @@ defmodule ThistleTea.Game.World.System.CreatureGroupsTest do
       assert CreatureGroups.formation(world, 101, server) == nil
       assert CreatureGroups.formation(world, 103, server) == nil
     end
+  end
+
+  describe "creature links" do
+    test "a master's aggro pulls in its slave, and a slave's pulls in its master", %{world: world} do
+      server = linked_server(0x1 ||| 0x2)
+      [master, slave] = register_pair(server, world)
+
+      CreatureGroups.event(master, {:attack, 99}, self(), server)
+      assert_receive {:creature_group, token, {:attack, 99}}
+      assert CreatureGroups.valid_command?(world, slave.object.guid, token, self(), server)
+
+      [master, slave] = register_pair(server, world)
+      CreatureGroups.event(slave, {:attack, 98}, self(), server)
+      assert_receive {:creature_group, token, {:attack, 98}}
+      assert CreatureGroups.valid_command?(world, master.object.guid, token, self(), server)
+      refute_receive {:creature_group, _, _}
+    end
+
+    test "a master's despawn takes its slave along and its evade raises a fallen one", %{world: world} do
+      server = linked_server(0x2000 ||| 0x4)
+      [master, slave] = register_pair(server, world)
+
+      CreatureGroups.event(master, :despawn, self(), server)
+      assert_receive {:creature_group, _token, :despawn}
+
+      CreatureGroups.event(slave, :death, self(), server)
+      CreatureGroups.respawn(master, self(), server)
+      CreatureGroups.event(master, {:attack, 99}, self(), server)
+      CreatureGroups.event(master, :evade, self(), server)
+      assert_receive {:creature_group, token, :respawn}
+      assert CreatureGroups.valid_command?(world, slave.object.guid, token, self(), server)
+    end
+
+    test "holds a slave while its master lies dead and lets it in once the master respawns", %{world: world} do
+      server = linked_server(0x400)
+      master = mob(world, 10, 1_010)
+      slave = mob(world, 11, 1_011)
+
+      assert :ok = CreatureGroups.register(master, self(), server)
+      CreatureGroups.event(master, :death, self(), server)
+      assert :held = CreatureGroups.register(slave, self(), server)
+
+      CreatureGroups.respawn(master, self(), server)
+      assert_receive {:creature_group, token, :respawn}
+      assert CreatureGroups.valid_command?(world, slave.object.guid, token, self(), server)
+      assert :ok = CreatureGroups.respawn(slave, self(), server)
+
+      CreatureGroups.event(slave, :death, self(), server)
+      assert CreatureGroups.spawn_allowed?(slave, self(), server)
+      CreatureGroups.event(master, :death, self(), server)
+      refute CreatureGroups.spawn_allowed?(slave, self(), server)
+      CreatureGroups.respawn(master, self(), server)
+      assert_receive {:creature_group, _token, :respawn}
+      refute_receive {:creature_group, _, _}
+    end
+  end
+
+  defp linked_server(flags) do
+    link = %CreatureLink{slave: 11, master: 10, flags: flags}
+
+    links = fn
+      _map, 10 -> {nil, [link]}
+      _map, 11 -> {link, []}
+      _map, _id -> {nil, []}
+    end
+
+    start_supervised!(
+      Supervisor.child_spec({CreatureGroups, name: nil, catalog: fn _map, _id -> nil end, links: links}, id: :linked)
+    )
+  end
+
+  defp register_pair(server, world) do
+    pair = [mob(world, 10, Unique.integer()), mob(world, 11, Unique.integer())]
+    Enum.each(pair, &CreatureGroups.register(&1, self(), server))
+    pair
   end
 
   defp groups(context) do

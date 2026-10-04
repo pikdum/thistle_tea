@@ -7,7 +7,9 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
   despawn timer and `SummonDespawn` rules, and stops once its corpse is gone.
   Script-driven despawns hide the mob immediately and ride the same respawn
   timer back in. Reviving a corpse respawns it alive in place; a spawn that is
-  dead by default lies back down once its life runs out.
+  dead by default lies back down once its life runs out. A linked spawn whose
+  master forbids it to spawn is held out of the world, with no timer, until
+  `CreatureGroups` lets it back in.
   """
   alias ThistleTea.Game.Core.AI.BT
   alias ThistleTea.Game.Core.AI.BT.Mob, as: MobBT
@@ -104,9 +106,19 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
       temporary?(state) ->
         remove_and_stop(state)
 
+      not CreatureGroups.spawn_allowed?(state, self()) ->
+        state |> clear_ref() |> hold()
+
       true ->
         recycle_or_respawn(state)
     end
+  end
+
+  def hold(%Mob{} = state) do
+    Metadata.update(state.object.guid, %{alive?: false, health_pct: 0.0})
+
+    %{state | unit: %{state.unit | health: 0}, internal: %{state.internal | death_finalized?: true}}
+    |> Corpse.remove()
   end
 
   def force(%Mob{} = state, even_if_alive?) when is_boolean(even_if_alive?) do

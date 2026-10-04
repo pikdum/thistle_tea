@@ -191,8 +191,11 @@ defmodule ThistleTea.Game.World.Entity.Mob do
     state = sync_perception_metadata(state)
     World.update_position(state)
     state = Visibility.join_entity(state)
-    CreatureGroups.register(state, self())
-    {:ok, state, {:continue, {:spawned, now}}}
+
+    case CreatureGroups.register(state, self()) do
+      :held -> {:ok, state, {:continue, :hold}}
+      _registered -> {:ok, state, {:continue, {:spawned, now}}}
+    end
   end
 
   @impl GenServer
@@ -1784,6 +1787,8 @@ defmodule ThistleTea.Game.World.Entity.Mob do
     {:noreply, state}
   end
 
+  def handle_continue(:hold, %Mob{} = state), do: {:noreply, Respawn.hold(state)}
+
   def handle_continue(:maybe_broadcast, %Mob{} = state) do
     state =
       state
@@ -2198,6 +2203,10 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   end
 
   defp apply_creature_group_command(%Mob{} = state, :respawn), do: Respawn.force_group_member(state)
+
+  defp apply_creature_group_command(%Mob{} = state, :despawn) do
+    if EntityCore.dead?(state), do: state, else: Respawn.despawn(state, nil)
+  end
 
   defp apply_creature_group_command(%Mob{} = state, {:member_died, guid, entry, leader?}) do
     if EntityCore.dead?(state) do

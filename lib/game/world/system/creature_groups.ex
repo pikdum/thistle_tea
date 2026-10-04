@@ -1,18 +1,22 @@
 defmodule ThistleTea.Game.World.System.CreatureGroups do
   @moduledoc """
-  Owns creature-group membership separately for each world copy. Entity owners
-  report lifecycle transitions; group commands are delivered without calling back
-  into those owners. Membership survives cell unloading and spawn reincarnation.
+  Owns creature-group membership and creature links separately for each world
+  copy. Entity owners report lifecycle transitions; group and link commands are
+  delivered without calling back into those owners. Membership survives cell
+  unloading and spawn reincarnation. A linked slave whose master forbids it to
+  spawn is held dead until the master's death, respawn, or despawn lets it in.
   """
   use GenServer
 
   alias ThistleTea.Game.Core.Creature.CreatureGroup
   alias ThistleTea.Game.Core.Creature.CreatureGroup.Member
+  alias ThistleTea.Game.Core.Creature.CreatureLink
   alias ThistleTea.Game.Core.Creature.Formation
   alias ThistleTea.Game.Core.Entity.Component.Internal.WaypointRoute
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Loader.CreatureGroup, as: CreatureGroupLoader
+  alias ThistleTea.Game.World.Loader.CreatureLink, as: CreatureLinkLoader
 
   require Logger
 
@@ -45,6 +49,10 @@ defmodule ThistleTea.Game.World.System.CreatureGroups do
     }
 
     GenServer.call(server, {:register, key, actor, respawn?})
+  end
+
+  def spawn_allowed?(%Mob{} = entity, owner, server \\ __MODULE__) when is_pid(owner) do
+    GenServer.call(server, {:spawn_allowed, entity.internal.world, entity.object.guid, owner})
   end
 
   def event(%Mob{} = entity, event, owner, server \\ __MODULE__) when is_pid(owner) do
@@ -93,8 +101,10 @@ defmodule ThistleTea.Game.World.System.CreatureGroups do
        actors: %{},
        guids: %{},
        monitors: %{},
+       held: MapSet.new(),
        formation_table: create_formation_table(opts),
-       catalog: Keyword.get(opts, :catalog, &CreatureGroupLoader.get/2)
+       catalog: Keyword.get(opts, :catalog, &CreatureGroupLoader.get/2),
+       links: Keyword.get(opts, :links, &CreatureLinkLoader.links/2)
      }}
   end
 
@@ -120,12 +130,33 @@ defmodule ThistleTea.Game.World.System.CreatureGroups do
         monitors: Map.put(state.monitors, ref, key)
     }
 
+    held? = not respawn? and actor.alive? and not gate_open?(state, key)
+    state = if held?, do: hold(state, key, actor), else: %{state | held: MapSet.delete(state.held, key)}
+    actor = Map.fetch!(state.actors, key)
+
     state = ensure_group(state, world, id)
     state = %{state | tokens: Map.put(state.tokens, key, make_ref())}
     state = update_group_lifecycle(state, key, :respawn)
     state = publish_group(state, Map.get(state.memberships, key))
-    if (respawn? or match?(%{alive?: false}, previous)) and actor.alive?, do: dispatch(state, key, :respawn)
-    {:reply, :ok, state}
+
+    state =
+      if (respawn? or match?(%{alive?: false}, previous)) and actor.alive?,
+        do: dispatch(state, key, :respawn),
+        else: state
+
+    {:reply, if(held?, do: :held, else: :ok), state}
+  end
+
+  defp handle_request({:spawn_allowed, world, guid, owner}, state) do
+    case owned_actor(state, world, guid, owner) do
+      {:ok, key, actor} ->
+        if gate_open?(state, key),
+          do: {:reply, true, %{state | held: MapSet.delete(state.held, key)}},
+          else: {:reply, false, hold(state, key, actor)}
+
+      _stale ->
+        {:reply, true, state}
+    end
   end
 
   defp handle_request({:join, world, guid, target, member, owner}, state) do
@@ -192,7 +223,7 @@ defmodule ThistleTea.Game.World.System.CreatureGroups do
     valid? =
       with {:ok, key, _actor} <- owned_actor(state, world, guid, owner),
            ^token <- Map.get(state.tokens, key) do
-        not is_nil(Map.get(state.memberships, key))
+        not is_nil(Map.get(state.memberships, key)) or linked?(state, key)
       else
         _stale -> false
       end
@@ -215,7 +246,8 @@ defmodule ThistleTea.Game.World.System.CreatureGroups do
        | groups: reject_world(state.groups, world),
          memberships: reject_world(state.memberships, world),
          tokens: reject_world(state.tokens, world),
-         actors: reject_world(state.actors, world)
+         actors: reject_world(state.actors, world),
+         held: MapSet.reject(state.held, &(elem(&1, 0) == world))
      }}
   end
 
@@ -243,8 +275,7 @@ defmodule ThistleTea.Game.World.System.CreatureGroups do
       state = %{state | actors: Map.put(state.actors, key, updated)}
       state = update_group_lifecycle(state, key, event)
       state = publish_group(state, Map.get(state.memberships, key))
-      dispatch(state, key, event)
-      {:noreply, state}
+      {:noreply, dispatch(state, key, event)}
     else
       _unchanged -> {:noreply, state}
     end
@@ -271,6 +302,8 @@ defmodule ThistleTea.Game.World.System.CreatureGroups do
   end
 
   defp forget_ungrouped_actor(state, key) do
+    state = %{state | held: MapSet.delete(state.held, key)}
+
     if is_nil(Map.get(state.memberships, key)) do
       %{state | actors: Map.delete(state.actors, key), tokens: Map.delete(state.tokens, key)}
     else
@@ -380,10 +413,77 @@ defmodule ThistleTea.Game.World.System.CreatureGroups do
          %CreatureGroup{} = group <- Map.get(state.groups, group_key) do
       group
       |> CreatureGroup.actions(id, event, actors(state, world, group))
-      |> Enum.each(fn {target, action} ->
-        member_key = {world, target}
-        send(state.actors[member_key].pid, {:creature_group, state.tokens[member_key], command(action, state, world)})
-      end)
+      |> Enum.each(&deliver(state, world, &1))
+    end
+
+    dispatch_links(state, key, event)
+  end
+
+  defp deliver(state, world, {target, action}) do
+    member_key = {world, target}
+    send(state.actors[member_key].pid, {:creature_group, state.tokens[member_key], command(action, state, world)})
+  end
+
+  defp dispatch_links(state, {world, id} = key, event) do
+    {master_link, slave_links} = state.links.(world.map_id, id)
+    source = Map.get(state.actors, key)
+
+    slave_commands =
+      for %CreatureLink{slave: slave} = link <- slave_links,
+          %{present?: true} = actor <- [Map.get(state.actors, {world, slave})],
+          command = slave_command(state, world, link, event, actor, source),
+          not is_nil(command),
+          do: {slave, command}
+
+    commands = slave_commands ++ master_commands(state, world, master_link, event)
+    Enum.each(commands, &deliver(state, world, &1))
+
+    released = for {slave, :respawn} <- slave_commands, do: {world, slave}
+    %{state | held: Enum.reduce(released, state.held, &MapSet.delete(&2, &1))}
+  end
+
+  defp slave_command(state, world, %CreatureLink{slave: slave} = link, event, actor, source) do
+    CreatureLink.slave_command(link, event, actor) ||
+      if(
+        event in [:death, :despawn, :respawn] and MapSet.member?(state.held, {world, slave}) and
+          CreatureLink.spawn_allowed?(link, source),
+        do: :respawn
+      )
+  end
+
+  defp master_commands(state, world, %CreatureLink{master: master} = link, event) do
+    with %{present?: true} = actor <- Map.get(state.actors, {world, master}),
+         command when not is_nil(command) <- CreatureLink.master_command(link, event, actor) do
+      [{master, command}]
+    else
+      _none -> []
+    end
+  end
+
+  defp master_commands(_state, _world, nil, _event), do: []
+
+  defp gate_open?(state, {world, id}) do
+    case state.links.(world.map_id, id) do
+      {%CreatureLink{master: master} = link, _slaves} ->
+        CreatureLink.spawn_allowed?(link, Map.get(state.actors, {world, master}))
+
+      _unlinked ->
+        true
+    end
+  end
+
+  defp hold(state, key, actor) do
+    %{
+      state
+      | held: MapSet.put(state.held, key),
+        actors: Map.put(state.actors, key, %{actor | alive?: false, combat?: false})
+    }
+  end
+
+  defp linked?(state, {world, id}) do
+    case state.links.(world.map_id, id) do
+      {nil, []} -> false
+      _linked -> true
     end
   end
 
