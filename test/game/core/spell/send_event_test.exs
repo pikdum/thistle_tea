@@ -22,11 +22,10 @@ defmodule ThistleTea.Game.Core.Spell.SendEventTest do
   setup [:caster]
 
   describe "Casting.start/4" do
-    test "runs a target-less event once from the caster", %{caster: caster} do
+    test "runs a target-less event once from the caster, aimed at nothing", %{caster: caster} do
       caster = caster |> Casting.start(spell(nil), Target.none(), 1_000) |> Casting.complete(1_000)
-      guid = caster.object.guid
 
-      assert [%Effects.ScriptSteps{steps: steps, target_guid: ^guid}] = script_events(caster)
+      assert [%Effects.ScriptSteps{steps: steps, target_guid: 0}] = script_events(caster)
       assert steps == @steps
     end
 
@@ -74,7 +73,11 @@ defmodule ThistleTea.Game.Core.Spell.SendEventTest do
       assert SendEvent.target(10, [20], 30, 1) == 10
       assert SendEvent.target(nil, [20], 30, 1) == 20
       assert SendEvent.target(nil, [nil], 30, 1) == 30
-      assert SendEvent.target(nil, [], nil, 1) == 1
+    end
+
+    test "has no target when only the caster could be one" do
+      assert SendEvent.target(nil, [], nil, 1) == 0
+      assert SendEvent.target(nil, [], 1, 1) == 0
     end
   end
 

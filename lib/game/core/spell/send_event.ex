@@ -4,7 +4,9 @@ defmodule ThistleTea.Game.Core.Spell.SendEvent do
 
   An event effect without implicit targets runs once per cast, from the
   caster, aimed at the spell focus, the targeted object, or the selected unit
-  in that order (VMangos `EffectSendEvent` in the immediate phase). A targeted
+  in that order (VMangos `EffectSendEvent` in the immediate phase). With none
+  of those, or only the caster itself selected, it runs with no target, as
+  vmangos does, so steps placed relative to a target are skipped. A targeted
   event effect runs per recipient instead, through the spell-effect script
   dispatcher.
   """
@@ -12,6 +14,8 @@ defmodule ThistleTea.Game.Core.Spell.SendEvent do
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Effect
+
+  @no_target 0
 
   def cast_events(%Spell{effects: effects}, owner_guid, caster_guid, target_guid)
       when is_integer(caster_guid) and is_integer(target_guid) do
@@ -29,6 +33,10 @@ defmodule ThistleTea.Game.Core.Spell.SendEvent do
     do: Enum.any?(effects, &match?(%Effect{type: :send_event, implicit_target_a: nil, implicit_target_b: nil}, &1))
 
   def target(focus_guid, object_guids, selected_guid, caster_guid) do
-    Enum.find([focus_guid, List.first(object_guids || []), selected_guid], caster_guid, &(is_integer(&1) and &1 > 0))
+    Enum.find(
+      [focus_guid, List.first(object_guids || []), selected_guid],
+      @no_target,
+      &(is_integer(&1) and &1 > 0 and &1 != caster_guid)
+    )
   end
 end
