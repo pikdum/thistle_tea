@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSpellCastTest do
   alias ThistleTea.Game.Core.Entity.GameObjectTemplate
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Rolls
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Effect
   alias ThistleTea.Game.Core.Spell.ObjectTargets
@@ -114,6 +115,45 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSpellCastTest do
       assert context.caster_owner_guid == owner.object.guid
       assert context.caster_level == 42
       assert context.caster_position == {object.internal.world, 0.0, 0.0, 0.0}
+    end
+
+    test "an object casts at its own level, else the level cap", %{object: object, spell: spell} do
+      mob(object, 100, 2.0)
+      object = %{object | game_object: %{object.game_object | level: 0}}
+
+      assert [%Effects.DeliverSpell{cast_context: %{caster_level: 60}}] =
+               deliveries(SpellCast.launch(object, spell, nil))
+
+      object = %{object | game_object: %{object.game_object | level: 30}}
+
+      assert [%Effects.DeliverSpell{cast_context: %{caster_level: 30}}] =
+               deliveries(SpellCast.launch(object, spell, nil))
+    end
+
+    test "harmful magic rolls the spell hit table against each target", %{object: object, spell: spell} do
+      owner = player(object, 100.0)
+      target = mob(object, 100, 2.0)
+      Metadata.update(owner.object.guid, %{faction_template: friendly()})
+      Metadata.update(target.object.guid, %{faction_template: enemy(), unit_flags: 0})
+      object = %{object | game_object: %{object.game_object | created_by: owner.object.guid}}
+
+      spell = %{
+        spell
+        | dmg_class: 1,
+          school: :frost,
+          effects: [%{hd(spell.effects) | type: :school_damage}]
+      }
+
+      outcomes =
+        for roll <- [0, 9_999] do
+          cast =
+            SpellCast.launch(object, spell, nil, caster_guid: owner.object.guid, rolls: Rolls.fixed(spell_hit: roll))
+
+          assert [%Effects.DeliverSpell{cast_context: context}] = deliveries(cast)
+          context.hit_outcome
+        end
+
+      assert outcomes == [:hit, :resist]
     end
 
     test "owned object hostility follows the owner instead of the template", %{object: object} do
@@ -290,6 +330,9 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSpellCastTest do
 
     entity
   end
+
+  defp friendly, do: %FactionTemplate{id: 1, faction: 1, faction_group: 1, friend_group: 1, enemy_group: 2}
+  defp enemy, do: %FactionTemplate{id: 2, faction: 2, faction_group: 2, friend_group: 2, enemy_group: 1}
 
   defp deliveries(object), do: Enum.filter(object.internal.events, &is_struct(&1, Effects.DeliverSpell))
 end
