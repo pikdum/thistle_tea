@@ -1031,15 +1031,15 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
     end
   end
 
-  defp channel_target_guid(%{object: %{guid: guid}, unit: %{target: target}} = character, %Cast{
-         spell: %Spell{effects: effects},
-         targets: %Target{} = targets
-       }) do
+  defp channel_target_guid(
+         %{object: %{guid: guid}, unit: %{target: target}} = character,
+         %Cast{spell: %Spell{effects: effects}, targets: %Target{} = targets} = casting
+       ) do
     unit_guid = Target.unit_guid(targets)
     pet_guid = if is_struct(character, Character), do: Companion.summon_guid(character)
 
     case pet_channel_target(pet_guid, effects) do
-      nil -> preferred_channel_target(guid, unit_guid, target)
+      nil -> preferred_channel_target(guid, unit_guid, aura_hit(casting, guid), target)
       pet_guid -> pet_guid
     end
   end
@@ -1052,13 +1052,20 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
 
   defp pet_channel_target(_pet_guid, _effects), do: nil
 
-  defp preferred_channel_target(self_guid, unit_guid, target) do
+  defp preferred_channel_target(self_guid, unit_guid, aura_hit, target) do
     cond do
       is_integer(unit_guid) and unit_guid > 0 and unit_guid != self_guid -> unit_guid
+      is_integer(aura_hit) -> aura_hit
       is_integer(target) and target > 0 and target != self_guid -> target
       true -> 0
     end
   end
+
+  defp aura_hit(%Cast{spell: %Spell{} = spell, resolution: %CastResolution{hits: hits}}, self_guid) do
+    if Spell.target_dependent_channel?(spell), do: Enum.find(hits, &(is_integer(&1) and &1 != self_guid))
+  end
+
+  defp aura_hit(%Cast{}, _self_guid), do: nil
 
   defp stop_channel(
          %{object: %{guid: user_guid}, internal: %Internal{} = internal} = character,
@@ -1315,15 +1322,15 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
     end
   end
 
-  defp valid_channel_target?(character, %Cast{
+  defp valid_channel_target?(%{object: %{guid: self_guid}} = character, %Cast{
          spell: %Spell{} = spell,
          targets: %Target{} = targets,
          resolution: %CastResolution{hits: hits}
        }) do
     if Spell.target_dependent_channel?(spell) do
       case pet_channel_target(character.unit.channel_object, spell.effects) || Target.unit_guid(targets) do
-        guid when is_integer(guid) and guid > 0 -> guid in hits
-        _none -> hits != []
+        guid when is_integer(guid) and guid > 0 and guid != self_guid -> guid in hits
+        _self_or_none -> hits != []
       end
     else
       true

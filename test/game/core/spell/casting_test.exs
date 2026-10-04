@@ -816,6 +816,39 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
       assert [%Effects.ChannelStart{spell_id: 5143, channel_time_ms: 5_000}] = mob.internal.events
     end
 
+    test "aims a channel cast on oneself at the scripted creature its aura lands on" do
+      now = 1_000
+      idol_target = 8
+
+      spell = %Spell{
+        id: 12_774,
+        duration_ms: -1,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{type: :apply_aura, aura: :dummy, implicit_target_a: :creature_near_caster}]
+      }
+
+      resolution = %{
+        channel_resolution()
+        | hits: [idol_target],
+          impacts: [],
+          followups: %{channel_resolution().followups | packet_hits: [idol_target]}
+      }
+
+      casting =
+        spell
+        |> Cast.new(Target.unit(1), now)
+        |> Cast.transition(:launch)
+        |> Cast.put_resolution(resolution)
+        |> Cast.transition(:impact)
+
+      mob =
+        Casting.complete(%Mob{object: %Object{guid: 1}, unit: %Unit{target: 0}, internal: %Internal{}}, casting, now)
+
+      assert %Cast{phase: :channel_tick} = mob.internal.casting
+      assert mob.unit.channel_spell == 12_774
+      assert mob.unit.channel_object == idol_target
+    end
+
     test "queues quest cast credit for successful unit and gameobject targets" do
       unit_guid = Guid.from_low_guid(:mob, 10_978, 1)
       object_guid = Guid.from_low_guid(:game_object, 176_158, 2)
