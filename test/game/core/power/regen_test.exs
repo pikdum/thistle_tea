@@ -492,6 +492,15 @@ defmodule ThistleTea.Game.Core.Power.RegenTest do
       assert Regen.tick(entity, 10_000).unit.health == 150
     end
 
+    test "a creature a player controls heals from its spirit, not a third of its health" do
+      entity = mob(health: 3_000, max_health: 31_440, charmed_by: 1, class: @warrior, spirit: 100)
+
+      assert Regen.tick(entity, 10_000).unit.health == 3_000 + trunc(100 * 1.26 - 22.6) * 4
+
+      dull = mob(health: 3_000, max_health: 31_440, summoned_by: 1, class: @warrior, spirit: 10)
+      assert Regen.tick(dull, 10_000).unit.health == 3_000
+    end
+
     test "regenerates a third of max mana out of combat" do
       entity = mob(health: 300, power1: 0, max_power1: 90)
 

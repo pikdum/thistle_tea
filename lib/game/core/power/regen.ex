@@ -3,8 +3,12 @@ defmodule ThistleTea.Game.Core.Power.Regen do
   Blizzlike resource regeneration and decay ticks for players and creatures:
   health/mana/rage regen with the five-second rule, regen-modifying auras, and
   per-entity-type tick intervals. Player reserves regenerate independently of
-  the displayed power type, including mana in feral forms. `needs_regen?/1`
-  gates whether ticking continues at all.
+  the displayed power type, including mana in feral forms. A creature out of
+  combat heals a third of its health a tick, unless a player controls it:
+  then it heals from its spirit like a player of its class, four seconds'
+  worth a tick, as vmangos `Creature::RegenerateHealth` does, so a charmed
+  or possessed creature keeps its wounds. `needs_regen?/1` gates whether
+  ticking continues at all.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -22,6 +26,7 @@ defmodule ThistleTea.Game.Core.Power.Regen do
   @tick_ms 2_000
   @creature_tick_ms 5_000
   @focus_tick_ms 4_000
+  @controlled_regen_ticks 4
   @regen_flag_health 0x1
   @regen_flag_power 0x2
   @five_second_rule_ms 5_000
@@ -113,12 +118,15 @@ defmodule ThistleTea.Game.Core.Power.Regen do
   defp creature_regen_health(entity), do: entity
 
   defp creature_health_per_tick(%{unit: %Unit{} = unit}) do
-    if Appearance.polymorphed?(unit) and player_controlled?(unit) do
-      div(unit.max_health, 10)
-    else
-      max(div(unit.max_health, 3), 1)
+    cond do
+      not player_controlled?(unit) -> max(div(unit.max_health, 3), 1)
+      Appearance.polymorphed?(unit) -> div(unit.max_health, 10)
+      true -> controlled_health_per_tick(unit)
     end
   end
+
+  defp controlled_health_per_tick(%Unit{class: class, spirit: spirit}),
+    do: trunc(max(health_per_tick(class, spirit || 0), 0)) * @controlled_regen_ticks
 
   defp player_controlled?(%Unit{charmed_by: charmer, summoned_by: owner}) do
     controller = if charmer in [nil, 0], do: owner, else: charmer
