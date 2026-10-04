@@ -85,6 +85,12 @@ defmodule ThistleTea.Game.Core.InstanceScript.Effects do
     defstruct [:db_guid, :duration_ms]
   end
 
+  defmodule SuspendGameObject do
+    @moduledoc false
+    @enforce_keys [:db_guid]
+    defstruct [:db_guid]
+  end
+
   defmodule LoadCreatureSpawns do
     @moduledoc false
     @enforce_keys [:db_guids]

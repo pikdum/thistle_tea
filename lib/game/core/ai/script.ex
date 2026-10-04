@@ -12,7 +12,9 @@ defmodule ThistleTea.Game.Core.AI.Script do
   `release_waypoints` lets it go) — steps with a failing condition are skipped,
   and unsupported commands are logged and skipped. The code-built
   `clear_auras` sheds the auras an evade would, for a script that ends a fight
-  without one. Initial target swaps move execution to the supplied owner
+  without one, and `stop_scripts` ends every script the creature is still
+  running, as a C++ boss script's reset clears its timers; started scripts
+  otherwise outlive an evade, as vmangos map scripts do. Initial target swaps move execution to the supplied owner
   before selection; final swaps move it to the selected owner. Conditions and
   commands then use the final source and target. Triggered casts use the
   trigger-spell pipeline; normal casts use the caster's
@@ -1290,6 +1292,10 @@ defmodule ThistleTea.Game.Core.AI.Script do
   defp execute(state, blackboard, %ScriptStep{command: :clear_auras}, _target_guid, now) do
     {state, events} = AuraCore.remove_on_evade(state, now)
     {Effects.enqueue(state, events), blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :stop_scripts}, _target_guid, _now) do
+    {Run.clear(state), blackboard}
   end
 
   defp execute(%Mob{internal: internal} = state, blackboard, %ScriptStep{command: :set_concealed} = step, _target, _now) do

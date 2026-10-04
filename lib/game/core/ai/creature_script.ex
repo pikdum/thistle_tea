@@ -47,12 +47,14 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.KindalMoonweaver
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
   alias ThistleTea.Game.Core.AI.CreatureScript.MagramiSpectre
+  alias ThistleTea.Game.Core.AI.CreatureScript.MajordomoExecutus
   alias ThistleTea.Game.Core.AI.CreatureScript.Murkdeep
   alias ThistleTea.Game.Core.AI.CreatureScript.Obsidion
   alias ThistleTea.Game.Core.AI.CreatureScript.Omen
   alias ThistleTea.Game.Core.AI.CreatureScript.Onyxia
   alias ThistleTea.Game.Core.AI.CreatureScript.Piznik
   alias ThistleTea.Game.Core.AI.CreatureScript.RabidThistleBear
+  alias ThistleTea.Game.Core.AI.CreatureScript.Ragnaros
   alias ThistleTea.Game.Core.AI.CreatureScript.RiggleBassbait
   alias ThistleTea.Game.Core.AI.CreatureScript.Route
   alias ThistleTea.Game.Core.AI.CreatureScript.ScarletMonastery
@@ -100,12 +102,14 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     GizeltonCaravan,
     LazyPeon,
     MagramiSpectre,
+    MajordomoExecutus,
     Murkdeep,
     Obsidion,
     Omen,
     Onyxia,
     Piznik,
     RabidThistleBear,
+    Ragnaros,
     RiggleBassbait,
     ScarletMonastery,
     Scholomance,

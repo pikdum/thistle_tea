@@ -29,6 +29,12 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSink do
     :ok
   end
 
+  def emit(%WorldRef{} = world, %Effects.SuspendGameObject{db_guid: db_guid}, options) do
+    suspend = Keyword.get(options, :suspend_game_object, &SpawnPool.suspend_game_object/3)
+    suspend.(world, db_guid, nil)
+    :ok
+  end
+
   def emit(%WorldRef{} = world, %Effects.LoadCreatureSpawns{db_guids: db_guids}, options) do
     blueprints = Keyword.get(options, :creature_blueprints, &MobLoader.blueprints/1)
     load = Keyword.get(options, :load_creature, &SpawnPool.load_creature/2)

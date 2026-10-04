@@ -1153,6 +1153,15 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
       assert Enum.map(mob.unit.auras, & &1.spell.id) == [12]
     end
 
+    test "stop_scripts ends the creature's waiting scripts", %{mob: mob} do
+      later = [%ScriptStep{command: :set_phase, datalong: 3, delay_ms: 180_000}]
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), later, nil, 1_000)
+      assert map_size(mob.internal.scripts.runs) == 1
+
+      {mob, _blackboard} = Script.run(mob, blackboard, [%ScriptStep{command: :stop_scripts}], nil, 2_000)
+      assert mob.internal.scripts.runs == %{}
+    end
+
     test "respawn_creature enqueues an owner lifecycle request", %{mob: mob} do
       step = %ScriptStep{command: :respawn_creature, datalong: 1}
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)

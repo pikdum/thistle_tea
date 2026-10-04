@@ -122,6 +122,19 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSinkTest do
       refute_receive {:respawn, _, _, _}
     end
 
+    test "holds a game object spawn out of the exact copy", context do
+      owner = self()
+
+      options =
+        Keyword.put(context.options, :suspend_game_object, fn world, db_guid, respawn_delay_ms ->
+          send(owner, {:suspend, world, db_guid, respawn_delay_ms})
+        end)
+
+      assert :ok = InstanceEffectSink.emit(context.world, %Effects.SuspendGameObject{db_guid: 43_157}, options)
+      assert_receive {:suspend, world, 43_157, nil}
+      assert world == context.world
+    end
+
     test "loads held-back creature spawns into the exact copy", context do
       owner = self()
 
