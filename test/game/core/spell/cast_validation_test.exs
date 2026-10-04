@@ -117,6 +117,17 @@ defmodule ThistleTea.Game.Core.Spell.CastValidationTest do
       assert {:error, :caster_aurastate} = CastValidation.validate(npc, spell, Target.none(), nil, @now)
     end
 
+    test "creatures shoot without a ranged weapon or ammunition" do
+      shoot = harmful_spell(mana_cost: 0, dmg_class: 3, equipped_item_class: 2, equipped_item_subclass_mask: 0x4000)
+      target = Target.unit(200)
+      info = %{guid: 200, position: {5.0, 0.0, 0.0}, alive?: true, hostile?: true}
+      assert :ok = CastValidation.validate(caster(), shoot, target, info, @now)
+
+      npc = caster()
+      player = %Character{object: npc.object, unit: npc.unit, internal: npc.internal}
+      assert {:error, _missing} = CastValidation.validate(player, shoot, target, info, @now)
+    end
+
     test "weapon item restrictions apply to player inventories" do
       npc = caster()
       player = %Character{object: npc.object, unit: npc.unit, internal: npc.internal}

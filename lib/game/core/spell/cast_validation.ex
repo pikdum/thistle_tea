@@ -185,6 +185,8 @@ defmodule ThistleTea.Game.Core.Spell.CastValidation do
     end
   end
 
+  defp check_ammo(%Mob{}, _spell, _opts), do: :ok
+
   defp check_ammo(caster, spell, opts) do
     if godmode?(caster) do
       :ok
