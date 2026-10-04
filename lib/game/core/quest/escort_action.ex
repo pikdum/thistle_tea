@@ -21,8 +21,17 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   player, given a hostile faction first), `:fail` (fails the quest for the
   player and their group), `:die` (ends the quest's map event, then kills
   the escortee), `{:event_phase, phase}` (the escortee's EventAI phase, for
-  a script port that reacts to it), `{:summon, entry, position, opts}`, and
-  `{:after, delay_ms, action}`. `{:hold, actions}` stops the escort at its
+  a script port that reacts to it), `:abort` (ends the quest's map event as
+  a failure, which fails the quest and respawns the escortee, vmangos
+  `ResetEscort`), `{:summon, entry, position, opts}`,
+  `{:summon_object, entry, position, duration_ms}` (unattached, so players
+  can open it),
+  `{:object_state, entry, state}` (sets the state of the nearest game object
+  of that entry), and `{:after, delay_ms, action}`.
+  `{:await, timeout_ms, actions, expired_actions}` stops the escort at its
+  point until a script releases it (`release_waypoints`), then runs
+  `actions`, or runs `expired_actions` if nothing does within `timeout_ms`.
+  `{:hold, actions}` stops the escort at its
   point until every creature the escortee summoned from then on is gone, for
   at most 400 s, then runs `actions`. It must not be delayed, and it must
   come before the summons it waits for and before any action another
@@ -55,8 +64,12 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   @attack_event_target 23
   @hold_ms 400_000
   @event_success 1
+  @event_failure 0
   @hold_release_script 1
+  @hold_expired_script 2
   @signal_hold 1
+  @object_radius 40
+  @unattached_object 1
   @triggered 0x02
 
   @despawn_types %{
@@ -75,6 +88,9 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
 
   defp summon_entry({:after, _delay_ms, action}), do: summon_entry(action)
   defp summon_entry({:hold, actions}), do: Enum.flat_map(actions, &summon_entry/1)
+
+  defp summon_entry({:await, _timeout_ms, actions, expired}), do: Enum.flat_map(actions ++ expired, &summon_entry/1)
+
   defp summon_entry({:summon, entry, _position, _opts}), do: [entry]
   defp summon_entry(_action), do: []
 
@@ -182,6 +198,49 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
         command: :hold_waypoints,
         datalong: @hold_ms,
         sub_scripts: %{@hold_release_script => release}
+      }
+    ]
+  end
+
+  def steps({:await, timeout_ms, actions, expired_actions}, quest_id, phase)
+      when is_integer(timeout_ms) and is_list(actions) and is_list(expired_actions) do
+    [
+      %ScriptStep{
+        command: :hold_waypoints,
+        datalong: timeout_ms,
+        datalong2: @signal_hold,
+        sub_scripts: %{
+          @hold_release_script => Enum.flat_map(actions, &steps(&1, quest_id, phase)),
+          @hold_expired_script => Enum.flat_map(expired_actions, &steps(&1, quest_id, phase))
+        }
+      }
+    ]
+  end
+
+  def steps(:abort, quest_id, _phase),
+    do: [%ScriptStep{command: :end_map_event, datalong: quest_id, datalong2: @event_failure}]
+
+  def steps({:summon_object, entry, {_x, _y, _z, _o} = position, duration_ms}, _quest_id, _phase)
+      when is_integer(duration_ms) do
+    [
+      %ScriptStep{
+        command: :summon_object,
+        datalong: entry,
+        datalong2: div(duration_ms, 1_000),
+        datalong3: @unattached_object,
+        position: position
+      }
+    ]
+  end
+
+  def steps({:object_state, entry, state}, _quest_id, _phase) do
+    [
+      %ScriptStep{
+        command: :set_game_object_state,
+        datalong: state,
+        target_type: :nearest_game_object_with_entry,
+        target_param1: entry,
+        target_param2: @object_radius
       }
     ]
   end

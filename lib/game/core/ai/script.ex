@@ -14,7 +14,10 @@ defmodule ThistleTea.Game.Core.AI.Script do
   `clear_auras` sheds the auras an evade would, for a script that ends a fight
   without one, and `stop_scripts` ends every script the creature is still
   running, as a C++ boss script's reset clears its timers; started scripts
-  otherwise outlive an evade, as vmangos map scripts do. Initial target swaps move execution to the supplied owner
+  otherwise outlive an evade, as vmangos map scripts do. A `summon_object`
+  step with `datalong3` 1 leaves the object unattached, as a C++ script's
+  `SummonGameObject(..., false)` does, so players can open its lock.
+  Initial target swaps move execution to the supplied owner
   before selection; final swaps move it to the selected owner. Conditions and
   commands then use the final source and target. Triggered casts use the
   trigger-spell pipeline; normal casts use the caster's
@@ -79,6 +82,8 @@ defmodule ThistleTea.Game.Core.AI.Script do
 
   @max_phase 31
   @hold_release_script 1
+  @hold_expired_script 2
+  @unattached_object 1
   @signal_hold 1
   @unit_flag_player_controlled 0x00000008
   @mana_power 0
@@ -561,7 +566,13 @@ defmodule ThistleTea.Game.Core.AI.Script do
   defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :hold_waypoints} = step, _target_guid, now, %Context{}) do
     steps = Map.get(step.sub_scripts, @hold_release_script, [])
     mode = if step.datalong2 == @signal_hold, do: :signal, else: :summons
-    opts = [mode: mode, earlier_summons: state.internal.live_summons]
+
+    opts = [
+      mode: mode,
+      earlier_summons: state.internal.live_summons,
+      expired_steps: Map.get(step.sub_scripts, @hold_expired_script)
+    ]
+
     {state, WaypointHold.start(blackboard, now, step.datalong, steps, opts)}
   end
 
@@ -1357,7 +1368,8 @@ defmodule ThistleTea.Game.Core.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :summon_object} = step, _target_guid, _now) do
     position = step.position |> Tuple.to_list() |> Enum.map(&unspecified_coordinate/1) |> List.to_tuple()
-    effect = Effects.summon_game_object(step.datalong, step.datalong2 * 1_000, position: position)
+    owned? = step.datalong3 != @unattached_object
+    effect = Effects.summon_game_object(step.datalong, step.datalong2 * 1_000, position: position, owned?: owned?)
     {Effects.enqueue(state, effect), blackboard}
   end
 

@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Core.AI.GameObjectScript do
   """
 
   alias ThistleTea.Game.Core.AI.GameObjectScript.HandOfIruxosCrystal
+  alias ThistleTea.Game.Core.AI.GameObjectScript.IncantationOfCelebras
   alias ThistleTea.Game.Core.AI.GameObjectScript.InconspicuousLandmark
   alias ThistleTea.Game.Core.AI.GameObjectScript.LardsPicnicBasket
   alias ThistleTea.Game.Core.AI.GameObjectScript.PantherCage
@@ -42,6 +43,7 @@ defmodule ThistleTea.Game.Core.AI.GameObjectScript do
 
   @scripts [
     HandOfIruxosCrystal,
+    IncantationOfCelebras,
     InconspicuousLandmark,
     LardsPicnicBasket,
     PantherCage,

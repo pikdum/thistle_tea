@@ -11,7 +11,9 @@ defmodule ThistleTea.Game.Core.AI.BT.WaypointHold do
   the summons spawned beside it are counted first. A `:signal` hold waits
   until a script releases it, which also makes a timed pause when nothing
   does. Either hold releases once it runs out at `until`, and then runs its
-  release steps.
+  release steps. A signal hold given `expired_steps` runs those instead when
+  it runs out before any script released it, as an escort gives up on a
+  player who never did their part.
   """
 
   alias ThistleTea.Game.Core.AI.BT.Blackboard
@@ -20,7 +22,15 @@ defmodule ThistleTea.Game.Core.AI.BT.WaypointHold do
   alias ThistleTea.Game.Core.Pet.SummonEvent
 
   @enforce_keys [:until, :ready_at]
-  defstruct [:until, :ready_at, steps: [], mode: :summons, earlier_summons: MapSet.new()]
+  defstruct [
+    :until,
+    :ready_at,
+    steps: [],
+    expired_steps: nil,
+    signaled?: false,
+    mode: :summons,
+    earlier_summons: MapSet.new()
+  ]
 
   @summon_endings [:summoned_just_died, :summoned_just_despawn]
 
@@ -42,6 +52,7 @@ defmodule ThistleTea.Game.Core.AI.BT.WaypointHold do
       until: now + max(duration_ms, 0),
       ready_at: now + 1,
       steps: steps,
+      expired_steps: Keyword.get(opts, :expired_steps),
       mode: Keyword.get(opts, :mode, :summons),
       earlier_summons: Keyword.get(opts, :earlier_summons, MapSet.new())
     }
@@ -51,7 +62,8 @@ defmodule ThistleTea.Game.Core.AI.BT.WaypointHold do
 
   def release(%Blackboard{navigation: %{waypoint_hold: %__MODULE__{} = hold} = navigation} = blackboard, now)
       when is_integer(now) do
-    %{blackboard | navigation: %{navigation | waypoint_hold: %{hold | until: min(hold.until, now)}}}
+    released = %{hold | until: min(hold.until, now), signaled?: hold.signaled? or now < hold.until}
+    %{blackboard | navigation: %{navigation | waypoint_hold: released}}
   end
 
   def release(%Blackboard{} = blackboard, _now), do: blackboard
@@ -63,7 +75,7 @@ defmodule ThistleTea.Game.Core.AI.BT.WaypointHold do
     case blackboard.navigation.waypoint_hold do
       %__MODULE__{} = hold ->
         cond do
-          now >= hold.until -> {:release, hold.steps}
+          now >= hold.until -> {:release, release_steps(hold)}
           hold.mode == :signal -> {:hold, hold.until - now}
           now < hold.ready_at -> {:hold, hold.ready_at - now}
           MapSet.subset?(summons, hold.earlier_summons) -> {:release, hold.steps}
@@ -76,4 +88,7 @@ defmodule ThistleTea.Game.Core.AI.BT.WaypointHold do
   end
 
   def status(_entity, _blackboard, _now), do: :none
+
+  defp release_steps(%__MODULE__{signaled?: false, expired_steps: expired}) when is_list(expired), do: expired
+  defp release_steps(%__MODULE__{steps: steps}), do: steps
 end

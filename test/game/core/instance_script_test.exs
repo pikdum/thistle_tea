@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Core.InstanceScriptTest do
   @script_names ~w(
     instance_blackrock_depths
     instance_deadmines
+    instance_maraudon
     instance_razorfen_kraul
     instance_ruins_of_ahnqiraj
     instance_scarlet_monastery

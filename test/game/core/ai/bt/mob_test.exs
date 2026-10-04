@@ -606,6 +606,24 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
       assert released.navigation.run_mode
     end
 
+    test "runs a signal hold's expired steps only when nothing released it" do
+      release = [%ScriptStep{command: :set_run, datalong: 1}]
+      expired = [%ScriptStep{command: :set_run, datalong: 0}]
+      state = fixture_mob()
+      run_mode = fn blackboard -> blackboard.navigation.run_mode end
+
+      held =
+        %Blackboard{navigation: %{%Blackboard{}.navigation | run_mode: true}}
+        |> WaypointHold.start(1_000, 5_000, release, mode: :signal, expired_steps: expired)
+
+      assert {:success, _state, timed_out} = MobBT.wait_until_waypoint_ready(state, held, Context.new(6_000))
+      refute run_mode.(timed_out)
+
+      signaled = WaypointHold.release(held, 3_000)
+      assert {:success, _state, released} = MobBT.wait_until_waypoint_ready(state, signaled, Context.new(6_000))
+      assert run_mode.(released)
+    end
+
     test "gives up holding once the hold runs out" do
       state = WaypointHold.track(fixture_mob(), Guid.from_low_guid(:mob, 9522, Unique.integer()))
       blackboard = WaypointHold.start(%Blackboard{}, 1_000, 5_000, [])

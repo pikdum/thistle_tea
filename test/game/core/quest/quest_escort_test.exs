@@ -155,6 +155,40 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscortTest do
       assert %ScriptStep{command: :modify_flags, datalong: 147, datalong2: 0x2, datalong3: 1} = flags
     end
 
+    test "await a signal, giving up on the player once it runs out", %{escort: escort} do
+      escort = %{escort | points: %{4 => [{:await, 36_000, [{:say, 104}], [:abort]}]}}
+
+      assert [%ScriptStep{command: :hold_waypoints, datalong: 36_000, datalong2: 1, sub_scripts: subs}] =
+               escort |> QuestEscort.point_steps(9, 0) |> Map.fetch!(4)
+
+      assert %{1 => [%ScriptStep{command: :talk, dataint: 104}], 2 => [abort]} = subs
+      assert %ScriptStep{command: :end_map_event, datalong: 4_242, datalong2: 0} = abort
+    end
+
+    test "summon an object and set the state of one nearby", %{escort: escort} do
+      escort = %{
+        escort
+        | points: %{4 => [{:summon_object, 178_965, {1.0, 2.0, 3.0, 0.5}, 40_000}, {:object_state, 178_560, 0}]}
+      }
+
+      assert [summon, state] = escort |> QuestEscort.point_steps(9, 0) |> Map.fetch!(4)
+
+      assert %ScriptStep{
+               command: :summon_object,
+               datalong: 178_965,
+               datalong2: 40,
+               datalong3: 1,
+               position: {1.0, 2.0, 3.0, 0.5}
+             } = summon
+
+      assert %ScriptStep{
+               command: :set_game_object_state,
+               datalong: 0,
+               target_type: :nearest_game_object_with_entry,
+               target_param1: 178_560
+             } = state
+    end
+
     test "cast a triggered spell on the escortee", %{escort: escort} do
       escort = %{escort | points: %{4 => [{:after, 11_000, {:cast, 25_004}}]}}
 

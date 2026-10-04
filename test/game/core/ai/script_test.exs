@@ -949,9 +949,23 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
                %Effects.SummonGameObject{
                  entry: 21_145,
                  duration_ms: 300_000,
-                 position: {-9084.64, 830.321, 109.609, 0.541051}
+                 position: {-9084.64, 830.321, 109.609, 0.541051},
+                 owned?: true
                }
              ] = mob.internal.events
+    end
+
+    test "summon_object can leave the object unattached for players to open", %{mob: mob} do
+      step = %ScriptStep{
+        command: :summon_object,
+        datalong: 178_965,
+        datalong2: 40,
+        datalong3: 1,
+        position: {1.0, 2.0, 3.0, 0.0}
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+      assert [%Effects.SummonGameObject{entry: 178_965, owned?: false}] = mob.internal.events
     end
 
     test "summon_object translates script zero coordinates into unspecified positions", %{mob: mob} do

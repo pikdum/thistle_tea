@@ -13,6 +13,10 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
   aggro chatter and dead-summon reactions are left out. Grark Lorkrub holds at each ambush
   until every summon is gone rather than counting kills, and his Searscale
   drakes appear where they strike instead of waiting there two points early.
+  Celebras the Redeemed waits at his altar in Maraudon for the player to read
+  the tome he sets out (`Core.AI.GameObjectScript.IncantationOfCelebras`),
+  and gives up after half a minute; the aura he raises is summoned for the
+  stretch of the walk it lasts rather than refreshing the spawned one.
   """
 
   alias ThistleTea.Game.Core.AI.CreatureScript.Eranikus
@@ -20,6 +24,15 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
 
   @immune_to_npc 0x200
   @questgiver 0x2
+  @gossip 0x1
+  @celebras_rest_ms 600_000
+  @celebras_tome_wait_ms 36_000
+  @incantation_of_celebras 178_965
+  @incantation_spot {652.431, 74.7087, -85.3355, 6.16101}
+  @celebras_blue_aura 178_964
+  @celebras_blue_aura_spot {652.463013, 74.085098, -85.335297, 3.054616}
+  @staff_creator 178_560
+  @object_active 0
   @willix_rest_ms 600_000
   @malfurion 15_362
   @malfurion_arrival {7734.575684, -2312.118652, 452.679504, 0.068726}
@@ -561,6 +574,22 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
             {:after, 23_500, :die}
           ]
         }
+      },
+      %QuestEscort{
+        quest_id: 7046,
+        entry: 13_716,
+        credit_point: 13,
+        credit_delay_ms: 3_000,
+        start_delay_ms: 5_000,
+        accept: [{:say, 8952}, :run],
+        points: %{
+          1 => [{:say, 8953}, :walk],
+          3 => [{:say, 8954}],
+          4 => scepter_ritual(),
+          5 => [{:say, 8949}, {:summon_object, @celebras_blue_aura, @celebras_blue_aura_spot, 12_000}],
+          6 => [{:say, 8955}, {:object_state, @staff_creator, @object_active}],
+          13 => [{:pause, @celebras_rest_ms}, {:after, 3_000, {:npc_flags, Bitwise.bor(@questgiver, @gossip)}}]
+        }
       }
     ]
   end
@@ -656,6 +685,15 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
   defp phantasms(position, count, scatter, despawn_ms) do
     {:summon, @nightmare_phantasm, position, attack: :escort, despawn: {:timed_out_of_combat, despawn_ms}, count: count,
      scatter: scatter}
+  end
+
+  defp scepter_ritual do
+    [
+      {:await, @celebras_tome_wait_ms, [{:say, 8948}, {:pause, 1_000}], [:abort]},
+      {:after, 4_000, {:say, 8950}},
+      {:after, 5_000, {:summon_object, @incantation_of_celebras, @incantation_spot, 40_000}},
+      {:after, 6_000, {:say, 8951}}
+    ]
   end
 
   defp agamar, do: [attack: :escort, despawn: {:timed_out_of_combat, 25_000}]

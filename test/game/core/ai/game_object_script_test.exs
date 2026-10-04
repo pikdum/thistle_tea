@@ -128,6 +128,21 @@ defmodule ThistleTea.Game.Core.AI.GameObjectScriptTest do
                escape
     end
 
+    test "reading the Incantation of Celebras lets Celebras go on with the ritual" do
+      player = character(quests: [{7046, :incomplete}])
+      celebras = Guid.from_low_guid(:mob, 13_716, Unique.integer())
+      perception = Perception.new(0, nil, %{}, %{mobs: [{celebras, 6.0}], players: [], game_objects: []})
+      context = Context.new(0, perception: perception)
+
+      assert [%Effects.ForwardScriptSteps{target_guid: ^celebras, steps: [%ScriptStep{command: :release_waypoints}]}] =
+               effects(178_965, player, context)
+
+      assert [%ScriptStep{sub_scripts: %{1 => [_release, vanish]}}] = GameObjectScript.steps(178_965, @cask_position)
+      assert %ScriptStep{command: :remove_object, swap_final?: true, target_type: :provided} = vanish
+      assert [] = effects(178_965, character(quests: [{7046, :complete}]), context)
+      assert [] = effects(178_965, character(), context)
+    end
+
     test "the Tablet of Theka teaches the spider god's name on The Spider God" do
       for {quests, credited} <- [{[{2936, :incomplete}], 1}, {[{2936, :complete}], 0}, {[], 0}] do
         player = character(quests: quests)
