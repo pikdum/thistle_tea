@@ -60,6 +60,12 @@ defmodule ThistleTea.Game.Core.Battleground.Effects do
     defstruct [:team, :tier]
   end
 
+  defmodule RunCreatureScript do
+    @moduledoc false
+    @enforce_keys [:creature_entry, :steps]
+    defstruct [:creature_entry, :steps]
+  end
+
   defmodule OperateGates do
     @moduledoc false
     @enforce_keys [:action]

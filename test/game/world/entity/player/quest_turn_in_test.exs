@@ -149,37 +149,44 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestTurnInTest do
   end
 
   describe "hello/2" do
-    test "questgiver-only blacksmiths expose match gossip through the quest hello path", context do
-      {world, _pid} = enter_alterac(context.player_guid)
-      npc_guid = Guid.from_low_guid(:mob, 13_257, context.id)
-      {:ok, _} = Entity.register(npc_guid)
+    for {entry, option_text, greeting, action} <- [
+          {13_257, 9_130, 6_073, :armor_status},
+          {13_442, 8_757, 6_174, :offering_status}
+        ] do
+      test "questgiver #{entry} exposes match gossip through the quest hello path", context do
+        {world, _pid} = enter_alterac(context.player_guid)
+        npc_guid = Guid.from_low_guid(:mob, unquote(entry), context.id)
+        {:ok, _} = Entity.register(npc_guid)
 
-      npc = %{
-        object: %Object{guid: npc_guid},
-        internal: %Internal{world: world},
-        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
-      }
+        npc = %{
+          object: %Object{guid: npc_guid},
+          internal: %Internal{world: world},
+          movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+        }
 
-      World.update_position(npc, :mobs)
-      Metadata.put(npc_guid, %{alive?: true, npc_flags: 2})
-      previous = :ets.lookup(BroadcastText, 9_130)
-      :ets.insert(BroadcastText, {9_130, %{text: "How many more supplies are needed?"}})
+        World.update_position(npc, :mobs)
+        Metadata.put(npc_guid, %{alive?: true, npc_flags: 2})
+        text_id = unquote(option_text)
+        previous = :ets.lookup(BroadcastText, text_id)
+        :ets.insert(BroadcastText, {text_id, %{text: "How many more supplies are needed?"}})
 
-      on_exit(fn ->
-        World.remove_position(npc, :mobs)
-        Metadata.delete(npc_guid)
-        :ets.delete(BroadcastText, 9_130)
-        :ets.insert(BroadcastText, previous)
-      end)
+        on_exit(fn ->
+          World.remove_position(npc, :mobs)
+          Metadata.delete(npc_guid)
+          :ets.delete(BroadcastText, text_id)
+          :ets.insert(BroadcastText, previous)
+        end)
 
-      state = state(context, %Player{})
-      state = put_in(state.character.internal.world, world)
-      result = Quests.hello(state, npc_guid)
-      assert result.gossip_menu_guid == npc_guid
-      assert [%{action: {:battleground, :armor_status}}] = result.gossip_menu_options
+        state = state(context, %Player{})
+        state = put_in(state.character.internal.world, world)
+        result = Quests.hello(state, npc_guid)
+        assert result.gossip_menu_guid == npc_guid
+        assert [%{action: {:battleground, unquote(action)}}] = result.gossip_menu_options
 
-      assert_receive {:"$gen_cast",
-                      {:send_packet, %SmsgGossipMessage{guid: ^npc_guid, title_text_id: 6_073, gossips: [_]}}}
+        assert_receive {:"$gen_cast",
+                        {:send_packet,
+                         %SmsgGossipMessage{guid: ^npc_guid, title_text_id: unquote(greeting), gossips: [_]}}}
+      end
     end
   end
 
@@ -206,42 +213,55 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestTurnInTest do
       refute_receive {:"$gen_cast", {:trigger_spell, _, _, _}}
     end
 
-    test "credits the match only after a successful inventory commit and ignores duplicate reward requests", context do
-      quest_id = 6_781
-      quest = %{QuestLoader.get(context.quest_id) | id: quest_id}
-      previous = :ets.lookup(QuestLoader, {:quest, quest_id})
-      :ets.insert(QuestLoader, {{:quest, quest_id}, quest})
-      :ets.insert(QuestLoader, {{:ender, Guid.entry(context.npc_guid)}, [quest_id]})
-      context = %{context | quest_id: quest_id}
-      {world, match_pid} = enter_alterac(context.player_guid)
+    for {quest_id, stockpile, field, amount} <- [
+          {6_781, :armor, :scraps, 20},
+          {6_881, :offerings, :count, 1},
+          {7_386, :offerings, :count, 5}
+        ] do
+      test "quest #{quest_id} credits the match after inventory commit and ignores duplicate rewards", context do
+        quest_id = unquote(quest_id)
+        quest = %{QuestLoader.get(context.quest_id) | id: quest_id}
+        previous = :ets.lookup(QuestLoader, {:quest, quest_id})
+        :ets.insert(QuestLoader, {{:quest, quest_id}, quest})
+        :ets.insert(QuestLoader, {{:ender, Guid.entry(context.npc_guid)}, [quest_id]})
+        context = %{context | quest_id: quest_id}
+        {world, match_pid} = enter_alterac(context.player_guid)
 
-      on_exit(fn ->
-        :ets.delete(QuestLoader, {:quest, quest_id})
-        :ets.insert(QuestLoader, previous)
-      end)
+        on_exit(fn ->
+          :ets.delete(QuestLoader, {:quest, quest_id})
+          :ets.insert(QuestLoader, previous)
+        end)
 
-      npc = %{
-        object: %Object{guid: context.npc_guid},
-        internal: %Internal{world: world},
-        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
-      }
+        npc = %{
+          object: %Object{guid: context.npc_guid},
+          internal: %Internal{world: world},
+          movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+        }
 
-      World.update_position(npc, :mobs)
-      incomplete = state(context, completed_player(quest_id, []))
-      incomplete = put_in(incomplete.character.internal.world, world)
-      assert Quests.choose_reward(incomplete, context.npc_guid, quest_id, 0) == incomplete
-      assert Match.snapshot(match_pid).armor.alliance.scraps == 0
+        World.update_position(npc, :mobs)
+        incomplete = state(context, completed_player(quest_id, []))
+        incomplete = put_in(incomplete.character.internal.world, world)
+        assert Quests.choose_reward(incomplete, context.npc_guid, quest_id, 0) == incomplete
 
-      required = Enum.map(1..2, fn _ -> ItemStore.create(@required_entry, owner: context.player_guid) end)
-      ready = %{incomplete | character: %{incomplete.character | player: completed_player(quest_id, required)}}
-      rewarded = Quests.choose_reward(ready, context.npc_guid, quest_id, 0)
-      refute QuestLog.active?(rewarded.character.player.quest_log, quest_id)
-      assert Inventory.count_entry(rewarded.character.player, @required_entry, &ItemStore.get/1) == 0
-      assert BattlegroundSystem.match_for_world(world) == match_pid
-      assert Match.snapshot(match_pid).armor.alliance.scraps == 20
-      assert Quests.choose_reward(rewarded, context.npc_guid, quest_id, 0) == rewarded
-      assert BattlegroundSystem.match_for_world(world) == match_pid
-      assert Match.snapshot(match_pid).armor.alliance.scraps == 20
+        assert get_in(Match.snapshot(match_pid), [Access.key(unquote(stockpile)), :alliance, Access.key(unquote(field))]) ==
+                 0
+
+        required = Enum.map(1..2, fn _ -> ItemStore.create(@required_entry, owner: context.player_guid) end)
+        ready = %{incomplete | character: %{incomplete.character | player: completed_player(quest_id, required)}}
+        rewarded = Quests.choose_reward(ready, context.npc_guid, quest_id, 0)
+        refute QuestLog.active?(rewarded.character.player.quest_log, quest_id)
+        assert Inventory.count_entry(rewarded.character.player, @required_entry, &ItemStore.get/1) == 0
+        assert BattlegroundSystem.match_for_world(world) == match_pid
+
+        assert get_in(Match.snapshot(match_pid), [Access.key(unquote(stockpile)), :alliance, Access.key(unquote(field))]) ==
+                 unquote(amount)
+
+        assert Quests.choose_reward(rewarded, context.npc_guid, quest_id, 0) == rewarded
+        assert BattlegroundSystem.match_for_world(world) == match_pid
+
+        assert get_in(Match.snapshot(match_pid), [Access.key(unquote(stockpile)), :alliance, Access.key(unquote(field))]) ==
+                 unquote(amount)
+      end
     end
   end
 

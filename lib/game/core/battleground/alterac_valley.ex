@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley do
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Creatures
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Mine
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Node
+  alias ThistleTea.Game.Core.Battleground.AlteracValley.Offering
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Rewards
   alias ThistleTea.Game.Core.Battleground.Defeat
   alias ThistleTea.Game.Core.Battleground.Effects
@@ -31,6 +32,7 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley do
     defeated_events: MapSet.new(),
     defeated_incarnations: MapSet.new(),
     armor: %{},
+    offerings: %{},
     team_scores: %{alliance: 0, horde: 0},
     resurrection_queue: MapSet.new(),
     weekend?: false
@@ -52,6 +54,7 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley do
       nodes: Node.all(),
       mines: Mine.all(),
       armor: Armor.all(),
+      offerings: Offering.all(),
       weekend?: Keyword.get(opts, :weekend?, false)
     }
 
@@ -77,9 +80,24 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley do
   defdelegate auto_leave_ms(match, now), to: Lifecycle
   defdelegate next_resurrection_ms(match, now), to: Lifecycle
   defdelegate creature_died(match, defeat, now), to: Creatures, as: :defeated
-  defdelegate quest_rewarded(match, guid, quest_id), to: Armor, as: :contribute
-  defdelegate gossip(match, guid, entry, standing), to: Armor
-  defdelegate interact(match, guid, entry, action, standing), to: Armor
+
+  def quest_rewarded(match, guid, quest_id) do
+    armor = Armor.contribute(match, guid, quest_id)
+    offering = Offering.contribute(armor.match, guid, quest_id)
+    %{offering | effects: armor.effects ++ offering.effects}
+  end
+
+  def gossip(match, guid, entry, standing),
+    do: Armor.gossip(match, guid, entry, standing) || Offering.gossip(match, guid, entry)
+
+  def interact(match, guid, entry, action, standing) do
+    case Armor.interact(match, guid, entry, action, standing) do
+      {:unhandled, _result} -> Offering.interact(match, guid, entry, action)
+      handled -> handled
+    end
+  end
+
+  def gossip_entry?(entry), do: not is_nil(Armor.smith_team(entry) || Offering.summoner_team(entry))
 
   def disconnect(%__MODULE__{} = match, guid, _position, _dropped_guid), do: Roster.disconnect(match, guid)
   def leave(%__MODULE__{} = match, guid, _position, _dropped_guid), do: Roster.leave(match, guid)

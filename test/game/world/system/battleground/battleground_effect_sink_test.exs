@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.System.Battleground.BattlegroundEffectSinkTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Battleground.Effects
   alias ThistleTea.Game.Core.Battleground.Player
   alias ThistleTea.Game.Core.Battleground.Template
@@ -11,11 +12,41 @@ defmodule ThistleTea.Game.World.System.Battleground.BattlegroundEffectSinkTest d
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Loader.BroadcastText
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Battleground.EffectSink
   alias ThistleTea.Game.World.System.Honor
   alias ThistleTea.Test.Unique
 
   describe "emit/2" do
+    test "runs voiced creature scripts only in the match's copy" do
+      world = WorldRef.instance(30, Unique.integer())
+      other_world = WorldRef.instance(30, Unique.integer())
+      summoner = Guid.from_low_guid(:mob, 13_442, Unique.integer())
+      other_summoner = Guid.from_low_guid(:mob, 13_442, Unique.integer())
+      wrong_entry = Guid.from_low_guid(:mob, 13_236, Unique.integer())
+      text_id = Unique.integer()
+      line = %{text: "Aid and protect us!", chat_type: :yell, language: 0, emote_id: 0}
+      :ets.insert(BroadcastText, {text_id, line})
+
+      for {guid, copy} <- [{summoner, world}, {other_summoner, other_world}, {wrong_entry, world}] do
+        {:ok, _} = Entity.register(guid)
+        SpatialHash.insert(:mobs, guid, copy, 0.0, 0.0, 0.0)
+      end
+
+      on_exit(fn ->
+        for guid <- [summoner, other_summoner, wrong_entry], do: SpatialHash.remove(:mobs, guid)
+        :ets.delete(BroadcastText, text_id)
+      end)
+
+      match = %{world: world, players: %{}}
+      steps = [%ScriptStep{command: :talk, dataint: text_id}, %ScriptStep{command: :start_waypoints, datalong: 5}]
+      assert :ok = EffectSink.emit(match, [%Effects.RunCreatureScript{creature_entry: 13_442, steps: steps}])
+      assert_receive {:"$gen_cast", {:start_script, [talk, route], ^summoner, ^world}}
+      assert talk.texts == [line]
+      assert route == List.last(steps)
+      refute_received {:"$gen_cast", {:start_script, _, _, _}}
+    end
+
     test "keeps the offline carrier's name after live metadata disappears" do
       observer = Unique.integer()
       carrier = Unique.integer()

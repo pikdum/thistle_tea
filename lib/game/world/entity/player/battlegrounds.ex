@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
 
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Battleground
-  alias ThistleTea.Game.Core.Battleground.AlteracValley.Armor
+  alias ThistleTea.Game.Core.Battleground.AlteracValley
   alias ThistleTea.Game.Core.Battleground.Deserter
   alias ThistleTea.Game.Core.Battleground.Entrance
   alias ThistleTea.Game.Core.Battleground.Flags
@@ -58,7 +58,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
 
   def gossip_menu(%Character{internal: %{world: %WorldRef{map_id: 30, instance_id: id} = world}} = character, guid)
       when is_integer(id) do
-    if Armor.smith_team(World.entry(guid)) && QuestGiver.interactable?(character, guid) do
+    if AlteracValley.gossip_entry?(World.entry(guid)) && QuestGiver.interactable?(character, guid) do
       case BattlegroundSystem.gossip(world, character.object.guid, World.entry(guid), upgrade_standing(character)) do
         nil -> nil
         menu -> build_gossip_menu(menu)

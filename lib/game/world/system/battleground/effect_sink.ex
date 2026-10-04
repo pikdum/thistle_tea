@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.World.System.Battleground.EffectSink do
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Loader.BroadcastText, as: BroadcastTextLoader
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
+  alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.Battleground.Buffs
@@ -64,6 +65,15 @@ defmodule ThistleTea.Game.World.System.Battleground.EffectSink do
 
   defp emit_effect(match, %Effects.StopEventRespawns{event: event}) do
     Spawns.stop_respawns(match.world, event)
+  end
+
+  defp emit_effect(match, %Effects.RunCreatureScript{creature_entry: entry, steps: steps}) do
+    steps = ScriptLoader.attach_cached_texts(steps, &BroadcastTextLoader.get/1)
+
+    match.world
+    |> World.guids()
+    |> Enum.filter(&(Guid.entity_type(&1) == :mob and Guid.entry(&1) == entry))
+    |> Enum.each(&Entity.start_script(&1, steps, &1, match.world))
   end
 
   defp emit_effect(match, %Effects.NodeAnnouncement{} = effect) do
