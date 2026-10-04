@@ -224,6 +224,26 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSinkTest do
     assert world == context.world
   end
 
+  test "gives the talk steps it hands creatures their declared lines", context do
+    line = %{text: "Intruders!", chat_type: :zone_yell}
+    talk = %ScriptStep{command: :talk, dataint: 11_812}
+
+    summon = %Effects.SummonCreature{
+      entry: 16_031,
+      position: {1.0, 2.0, 3.0, 4.0},
+      despawn_delay_ms: 5_000,
+      steps: [%ScriptStep{command: :start_script, sub_scripts: %{1 => [talk]}}]
+    }
+
+    assert :ok = InstanceEffectSink.emit(context.world, summon, context.options)
+    assert_receive {:summon, _world, %Effects.SummonCreature{steps: [%ScriptStep{sub_scripts: %{1 => [said]}}]}}
+    assert said.texts == [line]
+
+    script = %Effects.RunCreatureScript{creature_entry: 10_440, steps: [talk]}
+    assert :ok = InstanceEffectSink.emit(context.world, script, context.options)
+    assert_receive {:run_creature_script, _guid, [%ScriptStep{texts: [^line]}], _world}
+  end
+
   test "resolves one exact database spawn for a script spell", context do
     effect = %Effects.TriggerCreatureSpell{
       creature_entry: 10_415,

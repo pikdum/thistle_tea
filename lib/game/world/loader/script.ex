@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.World.Loader.Script do
   carries), mount-by-entry steps into display ids, and recursively the
   `generic_scripts` referenced by start-script and summon steps
   (cycle-guarded), so the runtime interpreter never touches the database.
+  Steps built at runtime, such as an instance script's, take their texts from
+  an already-loaded cache through `attach_cached_texts/2`.
   """
   import Ecto.Query, only: [from: 2]
 
@@ -192,14 +194,27 @@ defmodule ThistleTea.Game.World.Loader.Script do
     end
   end
 
-  def resolve_texts(steps) do
+  def resolve_texts(steps), do: steps |> talk_text_ids() |> load_broadcast_texts() |> then(&attach_texts(steps, &1))
+
+  def attach_cached_texts(steps, lookup) when is_function(lookup, 1) do
     texts_by_id =
       steps
-      |> Enum.flat_map(&with_sub_steps/1)
-      |> Enum.flat_map(&ScriptStep.talk_text_ids/1)
-      |> load_broadcast_texts()
+      |> talk_text_ids()
+      |> Enum.reduce(%{}, fn id, texts ->
+        case lookup.(id) do
+          nil -> texts
+          text -> Map.put(texts, id, text)
+        end
+      end)
 
     attach_texts(steps, texts_by_id)
+  end
+
+  defp talk_text_ids(steps) do
+    steps
+    |> Enum.flat_map(&with_sub_steps/1)
+    |> Enum.flat_map(&ScriptStep.talk_text_ids/1)
+    |> Enum.uniq()
   end
 
   defp attach_texts(steps, texts_by_id) do

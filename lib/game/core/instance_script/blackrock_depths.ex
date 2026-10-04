@@ -91,7 +91,7 @@ defmodule ThistleTea.Game.Core.InstanceScript.BlackrockDepths do
   @crowd_stands {{595.78, -188.65, -35.5}, 69}
   @arena_neutral 15
 
-  def broadcast_text_ids, do: [@yell_magmus]
+  def broadcast_text_ids, do: [@yell_magmus, @say_sentence]
   def summon_entries, do: [@grimstone]
   def game_object_db_guids, do: [@chest_of_seven]
   def registered_fields, do: [@ring_of_law, @tomb_of_seven, @lyceum, @iron_hall, @flamelash, @arena_stage]

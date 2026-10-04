@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSink do
   @moduledoc """
   Projects typed instance-script effects into owners in one exact world copy.
+  Talk steps handed to creatures take their lines from the broadcast texts
+  the instance scripts declared, which are loaded at boot.
   """
 
   alias ThistleTea.Game.Core.Entity.Mob
@@ -12,6 +14,7 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSink do
   alias ThistleTea.Game.World.Loader.BroadcastText
   alias ThistleTea.Game.World.Loader.GameObject, as: GameObjectLoader
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
+  alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
   alias ThistleTea.Game.World.System.SpawnPool
 
@@ -70,8 +73,13 @@ defmodule ThistleTea.Game.World.System.Instance.InstanceEffectSink do
     spawn_guid = Keyword.get(options, :spawn_guid, &World.spawn_guid/3)
     broadcast_text = Keyword.get(options, :broadcast_text, &BroadcastText.get/1)
 
-    project(world, effect, guids, dispatch, summon, spawn_guid, broadcast_text)
+    project(world, with_texts(effect, broadcast_text), guids, dispatch, summon, spawn_guid, broadcast_text)
   end
+
+  defp with_texts(%{steps: [_ | _] = steps} = effect, broadcast_text),
+    do: %{effect | steps: ScriptLoader.attach_cached_texts(steps, broadcast_text)}
+
+  defp with_texts(effect, _broadcast_text), do: effect
 
   defp project(world, %Effects.OperateGameObject{} = effect, guids, dispatch, _summon, _spawn_guid, _text) do
     world

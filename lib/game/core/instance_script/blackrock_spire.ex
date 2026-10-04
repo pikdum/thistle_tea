@@ -79,7 +79,7 @@ defmodule ThistleTea.Game.Core.InstanceScript.BlackrockSpire do
   @summon_lifetime_ms 3_600_000
   @dead_despawn 7
 
-  def broadcast_text_ids, do: []
+  def broadcast_text_ids, do: [@say_rookery_start]
   def summon_entries, do: [@rookery_hatcher, @rookery_guardian, @solakar]
   def game_object_db_guids, do: []
 
