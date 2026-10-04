@@ -35,17 +35,21 @@ defmodule ThistleTea.Game.World.Loader.VMangosBoundaryTest do
   end
 
   describe "npc_text" do
-    test "loads VMangos broadcast text groups" do
+    test "loads VMangos broadcast text groups with both gender slots filled" do
       NpcTextLoader.init()
       :ets.delete_all_objects(NpcTextLoader)
 
       [group | groups] = NpcTextLoader.get(68)
 
       assert group.text_0 == "Greetings, $n."
-      assert group.text_1 == ""
+      assert group.text_1 == "Greetings, $n."
       assert group.lang == 0
       assert group.em_0 == 0
       assert Enum.all?(groups, &(&1.text_0 == ""))
+
+      [spirit_healer | _] = NpcTextLoader.get(580)
+      assert spirit_healer.text_0 != ""
+      assert spirit_healer.text_0 == spirit_healer.text_1
     end
   end
 

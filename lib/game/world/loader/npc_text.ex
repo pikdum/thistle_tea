@@ -2,6 +2,11 @@ defmodule ThistleTea.Game.World.Loader.NpcText do
   @moduledoc """
   ETS cache of npc_text rows from Mangos, translated into the text-group
   shape the npc-text-update packet needs.
+
+  The client reads each option's text from the slot matching the speaker's
+  gender and refuses to open the gossip window when that slot is empty, so a
+  broadcast text written for one gender fills both slots, as vmangos
+  `HandleNpcTextQueryOpcode` does.
   """
   alias ThistleTea.DB.Mangos
 
@@ -57,10 +62,11 @@ defmodule ThistleTea.Game.World.Loader.NpcText do
     Enum.map(0..7, fn i ->
       broadcast_text_id = Map.get(npc_text, String.to_atom("broadcast_text_id#{i}")) || 0
       broadcast_text = Map.get(broadcast_texts, broadcast_text_id)
+      {male, female} = gendered_texts(text(broadcast_text, :male_text), text(broadcast_text, :female_text))
 
       %{
-        text_0: text(broadcast_text, :male_text),
-        text_1: text(broadcast_text, :female_text),
+        text_0: male,
+        text_1: female,
         lang: integer(broadcast_text, :language_id),
         prob: Map.get(npc_text, String.to_atom("prob#{i}")),
         em_0_delay: integer(broadcast_text, :emote_delay1),
@@ -72,6 +78,10 @@ defmodule ThistleTea.Game.World.Loader.NpcText do
       }
     end)
   end
+
+  defp gendered_texts("", female), do: {female, female}
+  defp gendered_texts(male, ""), do: {male, male}
+  defp gendered_texts(male, female), do: {male, female}
 
   defp text(nil, _field), do: ""
   defp text(row, field), do: Map.get(row, field) || ""
