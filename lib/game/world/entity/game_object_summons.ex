@@ -1,8 +1,9 @@
 defmodule ThistleTea.Game.World.Entity.GameObjectSummons do
   @moduledoc """
-  Creates spell-owned and independent world objects. The unit owner retains
-  monitor records for slot replacement and world departure; each owned
-  object also monitors that exact owner process.
+  Creates spell-owned and independent world objects. The owning unit or
+  object retains monitor records for slot replacement and world departure;
+  each owned object also monitors that exact owner process, so a script's
+  objects go when the object that raised them does.
   """
 
   alias ThistleTea.Game.Core.Effects
@@ -163,6 +164,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSummons do
   defp owner_pid(_context), do: nil
 
   defp owner_level(%{unit: %{level: level}}) when is_integer(level), do: level
+  defp owner_level(%GameObject{game_object: %{level: level}}) when is_integer(level) and level > 0, do: level
   defp owner_level(_entity), do: 1
 
   defp zone_id(%{map_id: map_id}, {x, y, z, _orientation}) do

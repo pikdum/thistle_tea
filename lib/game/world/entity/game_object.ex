@@ -56,6 +56,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   alias ThistleTea.Game.World.Entity.GameObject.Ritual, as: RitualServer
   alias ThistleTea.Game.World.Entity.GameObject.SpellCast
   alias ThistleTea.Game.World.Entity.GameObject.Trap, as: TrapServer
+  alias ThistleTea.Game.World.Entity.GameObjectSummons
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.World.Entity.ScriptDelivery
   alias ThistleTea.Game.World.Entity.ScriptExecution
@@ -430,6 +431,20 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
 
   def handle_info({:DOWN, token, :process, _pid, _reason}, %GameObject{} = state) when is_reference(token) do
     {:noreply, Chest.reservation_lost(state, token)}
+  end
+
+  def handle_info(%Effects.SummonGameObject{} = effect, %GameObject{} = state) do
+    monitors = GameObjectSummons.summon(state, state.internal.game_object_monitors, effect, Context.new(self()))
+    {:noreply, %{state | internal: %{state.internal | game_object_monitors: monitors}}}
+  rescue
+    error ->
+      Logger.error("Game object summon failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:game_object_down, token, :process, _pid, _reason}, %GameObject{} = state) do
+    monitors = Map.delete(state.internal.game_object_monitors, token)
+    {:noreply, %{state | internal: %{state.internal | game_object_monitors: monitors}}}
   end
 
   def handle_info({:owner_reaction_changed, _owner_guid}, %GameObject{} = state) do

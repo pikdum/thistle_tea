@@ -211,6 +211,21 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSummonsTest do
       assert :sys.get_state(player_object.pid).game_object.created_by == 42
       assert :sys.get_state(mob_object.pid).game_object.created_by == 43
     end
+
+    test "an object keeps the objects its scripts raise and takes them when it goes", %{caster: caster} do
+      {:ok, owner, owner_pid} =
+        GameObjectSummons.start(caster, %{request(caster, nil) | owned?: false}, Context.new(self()))
+
+      raise_post = Effects.summon_game_object(950_101, 60_000, position: {12.0, 22.0, 30.0, 0.0})
+      send(owner_pid, GameObjectSummons.prepare(owner, raise_post))
+
+      assert [%{pid: post_pid}] = Map.values(:sys.get_state(owner_pid).internal.game_object_monitors)
+      assert :sys.get_state(post_pid).game_object.created_by == owner.object.guid
+
+      ref = Process.monitor(post_pid)
+      World.stop_entity(owner_pid)
+      assert_receive {:DOWN, ^ref, :process, ^post_pid, _reason}, 1_000
+    end
   end
 
   describe "player world departure" do
