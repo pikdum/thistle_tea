@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gathering do
   alias ThistleTea.Game.World.Entity.Player.GameObjects
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.Looting
+  alias ThistleTea.Game.World.Entity.Player.ObjectRequirement
   alias ThistleTea.Game.World.Entity.Player.ObjectTarget
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.ItemStore
@@ -231,7 +232,9 @@ defmodule ThistleTea.Game.World.Entity.Player.Gathering do
         _ -> {:error, :item_gone}
       end
     else
-      with {:ok, template} <- target(state, guid), do: {:ok, GameObjectTemplate.lock_id(template)}
+      with {:ok, template} <- target(state, guid),
+           true <- ObjectRequirement.met?(state.character.internal.world, guid) || {:error, :try_again},
+           do: {:ok, GameObjectTemplate.lock_id(template)}
     end
   end
 

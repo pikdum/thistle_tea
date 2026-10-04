@@ -72,6 +72,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Fishing, as: FishingLoader
   alias ThistleTea.Game.World.Loader.GameObject, as: GameObjectLoader
+  alias ThistleTea.Game.World.Loader.GameObjectRequirement, as: GameObjectRequirementLoader
   alias ThistleTea.Game.World.Loader.GameObjectScript, as: GameObjectScriptLoader
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
@@ -356,6 +357,7 @@ defmodule ThistleTea.Application do
         load_spell_data()
         CreatureGroupLoader.load_all()
         CreatureLinkLoader.load_all()
+        GameObjectRequirementLoader.load_all()
         Logger.info("Loading waypoints...")
         WaypointLoader.load_all()
         Logger.info("Loading quests...")

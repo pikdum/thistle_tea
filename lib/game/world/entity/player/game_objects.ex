@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjects do
   alias ThistleTea.Game.World.Entity.Player.Gathering
   alias ThistleTea.Game.World.Entity.Player.Gossip
   alias ThistleTea.Game.World.Entity.Player.Looting
+  alias ThistleTea.Game.World.Entity.Player.ObjectRequirement
   alias ThistleTea.Game.World.Entity.Player.ObjectTarget
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
@@ -60,7 +61,8 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjects do
     enabled? = ((Map.get(metadata, :go_flags) || 0) &&& 0x10) == 0
 
     enabled? and not scripted_door?(character, guid) and
-      interactable_template?(character, guid, GameObjectTemplateLoader.cached(Guid.entry(guid)), metadata)
+      interactable_template?(character, guid, GameObjectTemplateLoader.cached(Guid.entry(guid)), metadata) and
+      ObjectRequirement.met?(character.internal.world, guid)
   end
 
   defp scripted_door?(%Character{internal: %{world: %{map_id: map_id, instance_id: id}}}, guid) when is_integer(id),
