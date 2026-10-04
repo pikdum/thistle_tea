@@ -14,13 +14,14 @@ defmodule ThistleTea.Game.Core.AI.EventScript do
 
   alias ThistleTea.Game.Core.AI.CreatureScript.TestOfEndurance
   alias ThistleTea.Game.Core.AI.EventScript.PrincipalSource
+  alias ThistleTea.Game.Core.AI.EventScript.Uldaman
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
 
   @callback event_ids() :: [pos_integer()]
   @callback event_steps(pos_integer()) :: [%ScriptStep{}]
 
-  @scripts [PrincipalSource, TestOfEndurance]
+  @scripts [PrincipalSource, TestOfEndurance, Uldaman]
 
   def steps_by_event do
     for script <- @scripts, event_id <- script.event_ids(), into: %{}, do: {event_id, script.event_steps(event_id)}

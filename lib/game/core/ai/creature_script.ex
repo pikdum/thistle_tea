@@ -73,6 +73,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.Triage
   alias ThistleTea.Game.Core.AI.CreatureScript.TwiggyFlathead
   alias ThistleTea.Game.Core.AI.CreatureScript.TwilightCorrupter
+  alias ThistleTea.Game.Core.AI.CreatureScript.Uldaman
   alias ThistleTea.Game.Core.AI.CreatureScript.WesternPlaguelands
   alias ThistleTea.Game.Core.AI.CreatureScript.WitchDoctorUnbagwa
   alias ThistleTea.Game.Core.AI.CreatureScript.Yenniku
@@ -133,6 +134,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     Triage,
     TwiggyFlathead,
     TwilightCorrupter,
+    Uldaman,
     WesternPlaguelands,
     WitchDoctorUnbagwa,
     Yenniku,
