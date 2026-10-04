@@ -14,14 +14,18 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   escort does), `{:pause, duration_ms}` (stops the escort at its point for
   that long, vmangos `SetEscortPaused`), `{:cast, spell_id}` (cast on itself,
   triggered; `{:cast, spell_id, triggered?: false}` casts it with its cast
-  time), `{:face, entry}` (turns to the nearest creature of that entry),
+  time), `{:interrupt, spell_id}` (ends its cast or channel of that spell),
+  `{:face, entry}` (turns to the nearest creature of that entry),
   `{:signal, entry, event_id}` (sends that creature a script event, for a
   script port that reacts to it), `{:invincible, health_pct}` (never falls
   below that share of its health), `{:attack, :player}` (turns on the
   player, given a hostile faction first), `:fail` (fails the quest for the
   player and their group), `:die` (ends the quest's map event, then kills
   the escortee), `{:event_phase, phase}` (the escortee's EventAI phase, for
-  a script port that reacts to it), `:abort` (ends the quest's map event as
+  a script port that reacts to it), `{:react, reaction}` (`:passive`,
+  `:defensive`, or `:aggressive`, as an escort that chants through a scene
+  ignores its attackers), `{:instance_data, field, value}` (sets a field of
+  the dungeon copy's instance data), `:abort` (ends the quest's map event as
   a failure, which fails the quest and respawns the escortee, vmangos
   `ResetEscort`), `{:summon, entry, position, opts}`,
   `{:summon_object, entry, position, duration_ms}` (unattached, so players
@@ -71,6 +75,7 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
   @object_radius 40
   @unattached_object 1
   @triggered 0x02
+  @reactions %{passive: 0, defensive: 1, aggressive: 2}
 
   @despawn_types %{
     timed_or_dead: 1,
@@ -137,6 +142,15 @@ defmodule ThistleTea.Game.Core.Quest.EscortAction do
 
   def steps({:event_phase, event_phase}, _quest_id, _phase),
     do: [%ScriptStep{command: :set_phase, datalong: event_phase}]
+
+  def steps({:react, reaction}, _quest_id, _phase),
+    do: [%ScriptStep{command: :set_react_state, datalong: Map.fetch!(@reactions, reaction)}]
+
+  def steps({:interrupt, spell_id}, _quest_id, _phase),
+    do: [%ScriptStep{command: :interrupt_casts, datalong2: spell_id}]
+
+  def steps({:instance_data, field, value}, _quest_id, _phase),
+    do: [%ScriptStep{command: :set_instance_data, datalong: field, datalong2: value}]
 
   def steps(:run, _quest_id, _phase), do: [%ScriptStep{command: :set_run, datalong: 1}]
   def steps(:walk, _quest_id, _phase), do: [%ScriptStep{command: :set_run, datalong: 0}]

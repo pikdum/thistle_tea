@@ -204,6 +204,20 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscortTest do
                escort |> QuestEscort.point_steps(9, 0) |> Map.fetch!(4)
     end
 
+    test "ignore attackers through a scene, end its channel, and report to the dungeon", %{escort: escort} do
+      escort = %{
+        escort
+        | points: %{4 => [{:react, :passive}, {:interrupt, 12_774}, {:instance_data, 2, 1}, {:react, :aggressive}]}
+      }
+
+      assert [
+               %ScriptStep{command: :set_react_state, datalong: 0},
+               %ScriptStep{command: :interrupt_casts, datalong2: 12_774},
+               %ScriptStep{command: :set_instance_data, datalong: 2, datalong2: 1},
+               %ScriptStep{command: :set_react_state, datalong: 2}
+             ] = escort |> QuestEscort.point_steps(9, 0) |> Map.fetch!(4)
+    end
+
     test "cast a spell with its cast time, flag the escortee, and turn to and signal another creature",
          %{escort: escort} do
       escort = %{
@@ -301,6 +315,25 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscortTest do
       descend = Enum.find(points[30], &(&1.command == :send_script_event))
       assert %ScriptStep{datalong: 2, delay_ms: 207_000} = descend
       assert Enum.all?(waves, &(&1.delay_ms <= descend.delay_ms))
+    end
+
+    test "Belnistrasz chants the idol quiet through five quilboar waves and Plaguemaw" do
+      escort = Catalog.get(3525)
+      assert %QuestEscort{entry: 8_516, credit_point: 24, credit_delay_ms: 244_000} = escort
+      ritual = escort |> QuestEscort.point_steps(32, 0) |> Map.fetch!(24)
+
+      summons = for %ScriptStep{command: :summon_creature} = step <- ritual, do: {step.delay_ms, step.datalong}
+      assert summons |> Enum.map(&elem(&1, 0)) |> Enum.uniq() == [2_000, 41_000, 81_000, 121_000, 161_000, 221_000]
+      assert Enum.filter(summons, &match?({221_000, _}, &1)) == [{221_000, 7_356}]
+      assert Enum.count(summons, &match?({_, 7_333}, &1)) == 5
+
+      assert %ScriptStep{datalong: 12_774, delay_ms: 1_000} = Enum.find(ritual, &(&1.command == :cast_spell))
+      assert %ScriptStep{datalong2: 12_774, delay_ms: 244_000} = Enum.find(ritual, &(&1.command == :interrupt_casts))
+
+      assert %ScriptStep{datalong: 152_097, delay_ms: 244_000} =
+               Enum.find(ritual, &(&1.command == :summon_object))
+
+      assert %ScriptStep{datalong: 2, datalong2: 1} = Enum.find(ritual, &(&1.command == :set_instance_data))
     end
   end
 

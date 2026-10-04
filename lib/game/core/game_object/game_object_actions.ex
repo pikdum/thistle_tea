@@ -9,6 +9,8 @@ defmodule ThistleTea.Game.Core.GameObject.GameObjectActions do
   alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Entity.GameObjectTemplate
 
+  @no_interact 0x10
+
   def configuration(%GameObjectTemplate{type: type, data: data}, state) do
     delay = if type in [0, 1], do: div(Enum.at(data, 2, 0), 65_536) * 1_000, else: 0
     %ObjectAction{default_state: state, auto_close_ms: delay}
@@ -29,12 +31,12 @@ defmodule ThistleTea.Game.Core.GameObject.GameObjectActions do
   def apply(%GameObject{} = entity, 15, _user_guid),
     do: Effects.enqueue(entity, %Effects.RemoveSelf{respawn_delay_ms: nil})
 
-  def apply(%GameObject{} = entity, 16, _user_guid), do: flag(entity, 0x10, true)
-  def apply(%GameObject{} = entity, 17, _user_guid), do: flag(entity, 0x10, false)
+  def apply(%GameObject{} = entity, 16, _user_guid), do: flag(entity, @no_interact, true)
+  def apply(%GameObject{} = entity, 17, _user_guid), do: flag(entity, @no_interact, false)
   def apply(%GameObject{} = entity, 18, _user_guid), do: entity |> reset() |> lock(true)
   def apply(%GameObject{} = entity, _action, _user_guid), do: entity
 
-  def usable?(%GameObject{game_object: object}), do: ((object.flags || 0) &&& 0x10) == 0
+  def usable?(%GameObject{game_object: object}), do: ((object.flags || 0) &&& @no_interact) == 0
 
   def set_state(%GameObject{} = entity, state) do
     action = %{entity.internal.object_action | revision: entity.internal.object_action.revision + 1}
@@ -57,6 +59,9 @@ defmodule ThistleTea.Game.Core.GameObject.GameObjectActions do
 
   def reset(%GameObject{internal: %{object_action: action}} = entity),
     do: transition(entity, action.default_state, %{action | active?: false}, 0, action.default_state)
+
+  def operate(%GameObject{} = entity, :inert, _delay_ms), do: flag(entity, @no_interact, true)
+  def operate(%GameObject{} = entity, :active, _delay_ms), do: flag(entity, @no_interact, false)
 
   def operate(%GameObject{} = entity, operation, delay_ms) do
     action = entity.internal.object_action

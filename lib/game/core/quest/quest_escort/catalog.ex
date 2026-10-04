@@ -17,6 +17,11 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
   the tome he sets out (`Core.AI.GameObjectScript.IncantationOfCelebras`),
   and gives up after half a minute; the aura he raises is summoned for the
   stretch of the walk it lasts rather than refreshing the spawned one.
+  Belnistrasz chants the idol of Razorfen Downs quiet for four minutes,
+  ignoring the blows of the quilboar that rise around him, and sets out the
+  brazier the quest ends at; the quilboar take turns at the room's three
+  spawning spots instead of rolling one, and appear directly rather than from
+  an invisible spawner.
   """
 
   alias ThistleTea.Game.Core.AI.CreatureScript.Eranikus
@@ -33,6 +38,18 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
   @celebras_blue_aura_spot {652.463013, 74.085098, -85.335297, 3.054616}
   @staff_creator 178_560
   @object_active 0
+  @idol_ritual_ms 244_000
+  @idol_shutdown 12_774
+  @idol_waves [2_000, 41_000, 81_000, 121_000, 161_000, 221_000]
+  @plaguemaw_wave_ms 221_000
+  @idol_spawners [
+    {2582.79, 954.392, 52.4821, 3.78736},
+    {2569.42, 956.380, 52.2732, 5.42797},
+    {2570.62, 942.393, 53.7433, 0.71558}
+  ]
+  @belnistrasz_brazier 152_097
+  @belnistrasz_brazier_spot {2577.196, 947.0781, 53.16757, 2.356195}
+  @extinguish_fires 2
   @willix_rest_ms 600_000
   @malfurion 15_362
   @malfurion_arrival {7734.575684, -2312.118652, 452.679504, 0.068726}
@@ -590,6 +607,14 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
           6 => [{:say, 8955}, {:object_state, @staff_creator, @object_active}],
           13 => [{:pause, @celebras_rest_ms}, {:after, 3_000, {:npc_flags, Bitwise.bor(@questgiver, @gossip)}}]
         }
+      },
+      %QuestEscort{
+        quest_id: 3525,
+        entry: 8_516,
+        credit_point: 24,
+        credit_delay_ms: @idol_ritual_ms,
+        accept: [{:say, 4493}, {:faction, 250}],
+        points: %{24 => idol_ritual()}
       }
     ]
   end
@@ -599,6 +624,46 @@ defmodule ThistleTea.Game.Core.Quest.QuestEscort.Catalog do
   def summon_entries, do: all() |> Enum.flat_map(&QuestEscort.summon_entries/1) |> Enum.uniq()
 
   defp gravelflint, do: [attack: :player, despawn: {:timed_out_of_combat, 30_000}]
+
+  defp idol_ritual do
+    waves =
+      @idol_waves
+      |> Enum.zip(Stream.cycle(@idol_spawners))
+      |> Enum.flat_map(fn {delay_ms, spawner} -> Enum.map(idol_wave(delay_ms, spawner), &{:after, delay_ms, &1}) end)
+
+    [
+      {:say, 4501},
+      {:pause, @idol_ritual_ms + 1_000},
+      {:event_phase, 1},
+      {:react, :passive},
+      {:after, 1_000, {:cast, @idol_shutdown}}
+    ] ++
+      waves ++
+      [
+        {:after, 61_000, {:say, 4504}},
+        {:after, 121_000, {:say, 4505}},
+        {:after, 181_000, {:say, 4506}},
+        {:after, 241_000, {:say, 4507}},
+        {:after, @idol_ritual_ms, {:interrupt, @idol_shutdown}},
+        {:after, @idol_ritual_ms, {:summon_object, @belnistrasz_brazier, @belnistrasz_brazier_spot, 3_600_000}},
+        {:after, @idol_ritual_ms, {:instance_data, @extinguish_fires, 1}},
+        {:after, @idol_ritual_ms, {:react, :aggressive}},
+        {:after, @idol_ritual_ms, {:event_phase, 0}}
+      ]
+  end
+
+  defp idol_wave(delay_ms, {x, y, z, o}) when delay_ms >= @plaguemaw_wave_ms,
+    do: [{:summon, 7_356, {x, y, z, o}, attack: :escort, despawn: {:timed_or_dead, 60_000}}]
+
+  defp idol_wave(_delay_ms, spawner) do
+    defenders = [attack: :escort, scatter: 2.0, despawn: {:timed_or_dead, 60_000}]
+
+    [
+      {:summon, 7_333, spawner, [count: 2] ++ defenders},
+      {:summon, 7_329, spawner, defenders},
+      {:summon, 7_335, spawner, defenders}
+    ]
+  end
 
   defp blackrock_ambush(summons) do
     Enum.map(summons, fn {entry, position} ->

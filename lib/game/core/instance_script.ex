@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Core.InstanceScript do
   alias ThistleTea.Game.Core.InstanceScript.DireMaul
   alias ThistleTea.Game.Core.InstanceScript.Maraudon
   alias ThistleTea.Game.Core.InstanceScript.MoltenCore
+  alias ThistleTea.Game.Core.InstanceScript.RazorfenDowns
   alias ThistleTea.Game.Core.InstanceScript.RazorfenKraul
   alias ThistleTea.Game.Core.InstanceScript.RuinsOfAhnQiraj
   alias ThistleTea.Game.Core.InstanceScript.ScarletMonastery
@@ -26,6 +27,7 @@ defmodule ThistleTea.Game.Core.InstanceScript do
     Deadmines,
     DireMaul,
     MoltenCore,
+    RazorfenDowns,
     RazorfenKraul,
     RuinsOfAhnQiraj,
     ScarletMonastery,
@@ -125,6 +127,7 @@ defmodule ThistleTea.Game.Core.InstanceScript do
   defp adapter("instance_dire_maul"), do: DireMaul
   defp adapter("instance_maraudon"), do: Maraudon
   defp adapter("instance_molten_core"), do: MoltenCore
+  defp adapter("instance_razorfen_downs"), do: RazorfenDowns
   defp adapter("instance_razorfen_kraul"), do: RazorfenKraul
   defp adapter("instance_ruins_of_ahnqiraj"), do: RuinsOfAhnQiraj
   defp adapter("instance_scarlet_monastery"), do: ScarletMonastery

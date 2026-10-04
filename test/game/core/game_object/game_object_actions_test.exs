@@ -89,6 +89,19 @@ defmodule ThistleTea.Game.Core.GameObject.GameObjectActionsTest do
     end
   end
 
+  describe "operate/3" do
+    test "makes an object inert and usable again without touching its state", %{door: door} do
+      inert = Actions.operate(door, :inert, 0)
+      assert inert.game_object.flags == 0x30
+      assert inert.game_object.state == door.game_object.state
+      refute Actions.usable?(inert)
+
+      active = Actions.operate(inert, :active, 0)
+      assert active.game_object.flags == 0x20
+      assert Actions.usable?(active)
+    end
+  end
+
   defp door(_context) do
     %{
       door: %GameObject{

@@ -257,7 +257,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   end
 
   def handle_cast({:operate_game_object, action, reset_delay_ms}, %GameObject{} = state)
-      when action in [:open, :close, :reset, :destroy] and is_integer(reset_delay_ms) do
+      when action in [:open, :close, :reset, :destroy, :inert, :active] and is_integer(reset_delay_ms) do
     {:noreply, operate_game_object(state, action, reset_delay_ms)}
   end
 
