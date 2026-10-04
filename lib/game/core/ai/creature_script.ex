@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   """
 
   alias ThistleTea.Game.Core.AI.AIEvent
+  alias ThistleTea.Game.Core.AI.CreatureScript.AlteracValley
   alias ThistleTea.Game.Core.AI.CreatureScript.ArchmageTervosh
   alias ThistleTea.Game.Core.AI.CreatureScript.Bartleby
   alias ThistleTea.Game.Core.AI.CreatureScript.Belnistrasz
@@ -100,6 +101,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   @optional_callbacks quest_start_steps: 0, quest_end_steps: 0, routes: 0, gossip: 0
 
   @scripts [
+    AlteracValley,
     ArchmageTervosh,
     Bartleby,
     Belnistrasz,
