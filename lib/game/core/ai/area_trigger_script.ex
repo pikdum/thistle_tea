@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScript do
   triggers and act where the player stands.
   """
 
+  alias ThistleTea.Game.Core.AI.AreaTriggerScript.BlackrockSpire
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.ChildrensWeek
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.HuldarMiran
   alias ThistleTea.Game.Core.AI.AreaTriggerScript.IrontreeWood
@@ -28,6 +29,7 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScript do
   @callback steps(pos_integer(), {number(), number(), number()}) :: [%ScriptStep{}]
 
   @scripts [
+    BlackrockSpire,
     ChildrensWeek,
     HuldarMiran,
     IrontreeWood,

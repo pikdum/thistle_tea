@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScriptTest do
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Context
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
+  alias ThistleTea.Game.Core.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Condition
@@ -305,6 +306,37 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScriptTest do
       end
 
       assert %ScriptStep{command: :move_to, datalong3: 5, position: {1_805.133667, 740.349304, _, _}} = descend
+    end
+  end
+
+  describe "Blackrock Spire" do
+    test "the Dragonspine Door opens for a player carrying the Seal of Ascension" do
+      player = %{character() | internal: %{character().internal | world: WorldRef.instance(229, 1)}}
+      guid = player.object.guid
+      steps = AreaTriggerScript.steps(2046, @position)
+
+      sealed = %Condition.Subject{guid: guid, kind: :player, item_counts: %{12_344 => 1}}
+      empty = %{sealed | item_counts: %{12_344 => 0}}
+
+      for {published, fields} <- [{sealed, [5]}, {empty, []}] do
+        observation = %Observation{guid: guid, metadata: %{condition_subject: published}}
+        context = Context.new(0, perception: Perception.new(0, nil, %{guid => observation}, %{}))
+        {player, _blackboard} = Script.run(player, Blackboard.new(), steps, guid, context)
+
+        commands = for %Effects.InstanceDataCommand{field: field, value: 3} <- player.internal.events, do: field
+        assert commands == fields
+      end
+    end
+
+    test "The Beast leaves its furnace for anyone stepping in while it is idle" do
+      assert [
+               %ScriptStep{
+                 command: :attack_start,
+                 target_param1: 10_430,
+                 swap_final?: true,
+                 condition: %Condition{type: :in_combat, reverse?: true, swap_targets?: true}
+               }
+             ] = AreaTriggerScript.steps(2066, @position)
     end
   end
 

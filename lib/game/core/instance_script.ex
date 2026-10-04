@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Core.InstanceScript do
 
   alias ThistleTea.Game.Core.InstanceScript.BlackfathomDeeps
   alias ThistleTea.Game.Core.InstanceScript.BlackrockDepths
+  alias ThistleTea.Game.Core.InstanceScript.BlackrockSpire
   alias ThistleTea.Game.Core.InstanceScript.Deadmines
   alias ThistleTea.Game.Core.InstanceScript.DireMaul
   alias ThistleTea.Game.Core.InstanceScript.Gnomeregan
@@ -25,6 +26,7 @@ defmodule ThistleTea.Game.Core.InstanceScript do
   @adapters [
     BlackfathomDeeps,
     BlackrockDepths,
+    BlackrockSpire,
     Deadmines,
     DireMaul,
     Gnomeregan,
@@ -126,6 +128,7 @@ defmodule ThistleTea.Game.Core.InstanceScript do
 
   defp adapter("instance_blackfathom_deeps"), do: BlackfathomDeeps
   defp adapter("instance_blackrock_depths"), do: BlackrockDepths
+  defp adapter("instance_blackrock_spire"), do: BlackrockSpire
   defp adapter("instance_deadmines"), do: Deadmines
   defp adapter("instance_dire_maul"), do: DireMaul
   defp adapter("instance_gnomeregan"), do: Gnomeregan
