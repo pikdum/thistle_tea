@@ -53,6 +53,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.Onyxia
   alias ThistleTea.Game.Core.AI.CreatureScript.Piznik
   alias ThistleTea.Game.Core.AI.CreatureScript.RabidThistleBear
+  alias ThistleTea.Game.Core.AI.CreatureScript.RiggleBassbait
   alias ThistleTea.Game.Core.AI.CreatureScript.Route
   alias ThistleTea.Game.Core.AI.CreatureScript.ScarletMonastery
   alias ThistleTea.Game.Core.AI.CreatureScript.Scholomance
@@ -105,6 +106,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     Onyxia,
     Piznik,
     RabidThistleBear,
+    RiggleBassbait,
     ScarletMonastery,
     Scholomance,
     ScourgeInvasion,
