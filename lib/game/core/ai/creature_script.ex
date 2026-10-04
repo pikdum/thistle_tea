@@ -59,6 +59,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.ScourgeInvasion
   alias ThistleTea.Game.Core.AI.CreatureScript.ShakesOBreen
   alias ThistleTea.Game.Core.AI.CreatureScript.SicklyCritter
+  alias ThistleTea.Game.Core.AI.CreatureScript.StaveOfTheAncients
   alias ThistleTea.Game.Core.AI.CreatureScript.StormwindRendezvous
   alias ThistleTea.Game.Core.AI.CreatureScript.TapokeSlimJahn
   alias ThistleTea.Game.Core.AI.CreatureScript.TestOfEndurance
@@ -109,6 +110,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     ScourgeInvasion,
     ShakesOBreen,
     SicklyCritter,
+    StaveOfTheAncients,
     StormwindRendezvous,
     KindalMoonweaver,
     TapokeSlimJahn,
