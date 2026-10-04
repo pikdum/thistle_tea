@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.Core.InstanceScript.Effects do
   defmodule Schedule do
     @moduledoc false
     @enforce_keys [:key, :delay_ms]
-    defstruct [:key, :delay_ms]
+    defstruct [:key, :delay_ms, :max_delay_ms]
   end
 
   defmodule CancelSchedules do

@@ -592,7 +592,7 @@ defmodule ThistleTea.Game.World.System.Instance do
   defp dispatch_effect(world, %Effects.Schedule{} = effect, state) do
     state = cancel_script_timer(state, world, effect.key)
     token = make_ref()
-    timer_ref = Process.send_after(self(), {:instance_script_timer, world, effect.key, token}, effect.delay_ms)
+    timer_ref = Process.send_after(self(), {:instance_script_timer, world, effect.key, token}, schedule_delay(effect))
     refs = Map.put(state.script_timer_refs, {world, effect.key}, {timer_ref, token})
     %{state | script_timer_refs: refs}
   end
@@ -609,6 +609,11 @@ defmodule ThistleTea.Game.World.System.Instance do
       Logger.warning("Instance effect failed: #{Exception.message(error)}")
       state
   end
+
+  defp schedule_delay(%Effects.Schedule{delay_ms: delay_ms, max_delay_ms: max_delay_ms})
+       when is_integer(max_delay_ms) and max_delay_ms > delay_ms, do: Enum.random(delay_ms..max_delay_ms)
+
+  defp schedule_delay(%Effects.Schedule{delay_ms: delay_ms}), do: delay_ms
 
   defp cancel_script_timer(state, world, key) do
     case Map.pop(state.script_timer_refs, {world, key}) do

@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.Faulk
   alias ThistleTea.Game.Core.AI.CreatureScript.FelwoodOoze
   alias ThistleTea.Game.Core.AI.CreatureScript.GizeltonCaravan
+  alias ThistleTea.Game.Core.AI.CreatureScript.Gnomeregan
   alias ThistleTea.Game.Core.AI.CreatureScript.Gossip
   alias ThistleTea.Game.Core.AI.CreatureScript.KindalMoonweaver
   alias ThistleTea.Game.Core.AI.CreatureScript.LadyJainaProudmoore
@@ -112,6 +113,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     Faulk,
     FelwoodOoze,
     GizeltonCaravan,
+    Gnomeregan,
     LazyPeon,
     MagramiSpectre,
     MajordomoExecutus,

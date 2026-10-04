@@ -100,6 +100,18 @@ defmodule ThistleTea.Game.Core.GameObject.GameObjectActionsTest do
       assert active.game_object.flags == 0x20
       assert Actions.usable?(active)
     end
+
+    test "locks a door shut and unlocks it open", %{door: door} do
+      locked = door |> Actions.activate() |> Actions.operate(:lock, 0)
+      assert locked.game_object.state == 1
+      assert locked.game_object.flags == 0x22
+      assert locked.internal.object_action.lock_override
+
+      unlocked = Actions.operate(locked, :unlock, 0)
+      assert unlocked.game_object.state == 0
+      assert unlocked.game_object.flags == 0x21
+      refute unlocked.internal.object_action.lock_override
+    end
   end
 
   defp door(_context) do

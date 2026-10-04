@@ -62,6 +62,8 @@ defmodule ThistleTea.Game.Core.GameObject.GameObjectActions do
 
   def operate(%GameObject{} = entity, :inert, _delay_ms), do: flag(entity, @no_interact, true)
   def operate(%GameObject{} = entity, :active, _delay_ms), do: flag(entity, @no_interact, false)
+  def operate(%GameObject{} = entity, :lock, _delay_ms), do: entity |> reset() |> lock(true)
+  def operate(%GameObject{} = entity, :unlock, _delay_ms), do: entity |> activate() |> lock(false)
 
   def operate(%GameObject{} = entity, operation, delay_ms) do
     action = entity.internal.object_action

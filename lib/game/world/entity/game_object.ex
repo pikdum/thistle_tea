@@ -78,6 +78,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
 
   @summoning_ritual 18
   @active 0
+  @operate_actions [:open, :close, :reset, :destroy, :inert, :active, :lock, :unlock]
 
   def start_link(%GameObject{} = state) do
     GenServer.start_link(__MODULE__, state, name: EntityRegistry.via(state.object.guid))
@@ -257,7 +258,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   end
 
   def handle_cast({:operate_game_object, action, reset_delay_ms}, %GameObject{} = state)
-      when action in [:open, :close, :reset, :destroy, :inert, :active] and is_integer(reset_delay_ms) do
+      when action in @operate_actions and is_integer(reset_delay_ms) do
     {:noreply, operate_game_object(state, action, reset_delay_ms)}
   end
 

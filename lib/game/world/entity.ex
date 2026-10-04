@@ -10,6 +10,8 @@ defmodule ThistleTea.Game.World.Entity do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Entity.Registry, as: EntityRegistry
 
+  @operate_actions [:open, :close, :reset, :destroy, :inert, :active, :lock, :unlock]
+
   def register(guid), do: EntityRegistry.register(guid)
   def unregister(guid), do: EntityRegistry.unregister(guid)
   def online?(guid), do: EntityRegistry.registered?(guid)
@@ -105,7 +107,7 @@ defmodule ThistleTea.Game.World.Entity do
   end
 
   def operate_game_object(entity, action, reset_delay_ms \\ 0)
-      when action in [:open, :close, :reset, :destroy, :inert, :active] and is_integer(reset_delay_ms) do
+      when action in @operate_actions and is_integer(reset_delay_ms) do
     dispatch_cast(entity, {:operate_game_object, action, reset_delay_ms})
   end
 
