@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard.Combat do
   @moduledoc false
 
   defstruct extra_attacks: 0,
+            held_extra_attacks: 0,
             next_attack_at: 0,
             next_offhand_attack_at: 0,
             aggro_check?: true,

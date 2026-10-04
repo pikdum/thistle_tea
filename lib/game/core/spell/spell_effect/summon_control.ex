@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.SummonControl do
   @moduledoc false
 
   alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Class.Paladin
   alias ThistleTea.Game.Core.Class.Rogue
   alias ThistleTea.Game.Core.Class.Warlock
   alias ThistleTea.Game.Core.Combat.ExtraAttacks
@@ -364,24 +365,9 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.SummonControl do
   end
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :add_extra_attacks} = effect, _now) do
-    count = max(Amount.roll(spell, effect, context), 1)
-    updated = ExtraAttacks.grant(state, count, context.extra_attack?)
-
-    events =
-      if updated == state do
-        []
-      else
-        [
-          %Effects.SpellExtraAttacks{
-            source_guid: context.caster_guid,
-            target_guid: state.object.guid,
-            spell_id: spell.id,
-            count: count
-          }
-        ]
-      end
-
-    {updated, events}
+    if Paladin.reckoning?(spell),
+      do: {ExtraAttacks.hold(state), []},
+      else: grant_extra_attacks(state, context, spell, effect)
   end
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :modify_threat} = effect, _now) do
@@ -478,4 +464,25 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffect.SummonControl do
   end
 
   defp resurrectable?(_state), do: false
+
+  defp grant_extra_attacks(state, context, spell, effect) do
+    count = max(Amount.roll(spell, effect, context), 1)
+    updated = ExtraAttacks.grant(state, count, context.extra_attack?)
+
+    events =
+      if updated == state do
+        []
+      else
+        [
+          %Effects.SpellExtraAttacks{
+            source_guid: context.caster_guid,
+            target_guid: state.object.guid,
+            spell_id: spell.id,
+            count: count
+          }
+        ]
+      end
+
+    {updated, events}
+  end
 end

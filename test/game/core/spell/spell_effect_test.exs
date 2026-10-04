@@ -904,6 +904,16 @@ defmodule ThistleTea.Game.Core.Spell.SpellEffectTest do
       {unchanged, events} = SpellEffect.receive(target, context, spell, 1_001)
       assert unchanged.internal.blackboard.combat.extra_attacks == 1
       assert events == []
+
+      reckoning = %{spell | script_name: "spell_paladin_reckoning"}
+      fresh = %{target | internal: %{target.internal | blackboard: nil}}
+      {banked, events} = SpellEffect.receive(fresh, context, reckoning, 1_002)
+      {banked, _events} = SpellEffect.receive(banked, context, reckoning, 1_003)
+
+      assert {banked.internal.blackboard.combat.held_extra_attacks, banked.internal.blackboard.combat.extra_attacks} ==
+               {2, 0}
+
+      assert events == []
     end
 
     test "heal effects restore health and emit heal threat for the effective gain" do

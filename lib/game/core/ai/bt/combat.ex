@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
   alias ThistleTea.Game.Core.Combat.CombatControl
   alias ThistleTea.Game.Core.Combat.CombatSkills
   alias ThistleTea.Game.Core.Combat.Disarm
+  alias ThistleTea.Game.Core.Combat.ExtraAttacks
   alias ThistleTea.Game.Core.Death
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
@@ -116,7 +117,8 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
     state = Effects.enqueue(state, events)
     blackboard = clear_swing_error(blackboard)
     {state, blackboard} = perform_main_hand(state, target, blackboard, main_ready?, now)
-    perform_offhand(state, target, blackboard, offhand_ready?(state, blackboard, now), now)
+    {state, blackboard} = perform_offhand(state, target, blackboard, offhand_ready?(state, blackboard, now), now)
+    {state, ExtraAttacks.arm(blackboard)}
   end
 
   defp perform_main_hand(state, target, blackboard, true, now) do

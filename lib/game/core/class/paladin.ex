@@ -63,6 +63,8 @@ defmodule ThistleTea.Game.Core.Class.Paladin do
 
   def illumination_energize_id, do: @illumination_energize
 
+  def reckoning?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_paladin_reckoning")
+
   def holy_shock_ids(spell_id), do: Map.get(@holy_shock, spell_id)
 
   def judgement_proc_aura?(%Spell{} = spell), do: Spell.family_flag?(spell, @spell_family, @judgement_aura_family_mask)

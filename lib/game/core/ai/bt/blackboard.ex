@@ -237,6 +237,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard do
       combat
       | next_attack_at: 0,
         extra_attacks: 0,
+        held_extra_attacks: 0,
         attack_started: false,
         auto_attacking: false,
         auto_attack_target: nil,
@@ -313,6 +314,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Blackboard do
             auto_attacking: false,
             auto_attack_target: nil,
             extra_attacks: 0,
+            held_extra_attacks: 0,
             last_swing_error: nil
         }
     }

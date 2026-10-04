@@ -41,6 +41,31 @@ defmodule ThistleTea.Game.Core.Combat.ExtraAttacksTest do
     end
   end
 
+  describe "hold/1" do
+    test "banks up to four Reckoning attacks that block other grants until a swing arms them", %{entity: entity} do
+      held = Enum.reduce(1..6, entity, fn _crit, banked -> ExtraAttacks.hold(banked) end)
+      assert held.internal.blackboard.combat.held_extra_attacks == 4
+      refute ExtraAttacks.pending?(held)
+      assert ExtraAttacks.grant(held, 1) == held
+
+      armed = ExtraAttacks.arm(held.internal.blackboard)
+      assert {armed.combat.extra_attacks, armed.combat.held_extra_attacks} == {4, 0}
+      assert ExtraAttacks.arm(armed) == armed
+      refute ExtraAttacks.clear(held).internal.blackboard.combat.held_extra_attacks > 0
+    end
+
+    test "a regular swing arms the banked attacks for the next tick", %{entity: entity} do
+      entity = entity |> ExtraAttacks.hold() |> ExtraAttacks.hold()
+      blackboard = entity.internal.blackboard
+      blackboard = %{blackboard | combat: %{blackboard.combat | next_attack_at: 0, attack_started: true}}
+
+      {:success, swung, armed} = Combat.melee_attack_with_context(entity, blackboard, context())
+
+      assert Enum.count(swung.internal.events, &is_struct(&1, Effects.DeliverAttack)) == 1
+      assert {armed.combat.extra_attacks, armed.combat.held_extra_attacks} == {2, 0}
+    end
+  end
+
   describe "consume_extra_attacks/3" do
     test "uses main-hand white attacks, preserves casting and queued abilities, and resets its timer", %{entity: entity} do
       queued = %Spell{id: 78}
