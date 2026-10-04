@@ -11,6 +11,13 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.Combat do
   keeps repeating there, as the `GetHealthPercent() < X` blocks do. Each
   timing is milliseconds or a `{min, max}` range rolled every time, as `urand`
   timers are.
+
+  A vmangos timer only starts over once its cast succeeds, so one that comes
+  due while its boss is still casting, or finds nobody to hit, tries again a
+  moment later. These timers do the same: an unconditional cast among their
+  steps that fails stops the rest of them, and the event fires again on the
+  next tick instead of waiting out its repeat. `check_result?: false` opts
+  out, for the timers vmangos restarts whether or not the cast lands.
   """
 
   alias ThistleTea.Game.Core.AI.CreatureScript
@@ -22,20 +29,18 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.Combat do
   def every_out_of_combat(entry, index, steps, first, repeat, opts \\ []),
     do: timer(entry, index, :timer_ooc, steps, first, repeat, opts)
 
-  def below_health(entry, index, steps, percent, repeat \\ nil) do
-    case repeat do
-      nil ->
-        CreatureScript.event(entry, index, :hp, List.wrap(steps), param1: percent, repeatable?: false)
+  def below_health(entry, index, steps, percent, repeat \\ nil, opts \\ []) do
+    timing =
+      case repeat do
+        nil ->
+          [repeatable?: false]
 
-      repeat ->
-        {repeat_min, repeat_max} = range(repeat)
+        repeat ->
+          {repeat_min, repeat_max} = range(repeat)
+          [param3: repeat_min, param4: repeat_max]
+      end
 
-        CreatureScript.event(entry, index, :hp, List.wrap(steps),
-          param1: percent,
-          param3: repeat_min,
-          param4: repeat_max
-        )
-    end
+    CreatureScript.event(entry, index, :hp, retried(steps), [param1: percent, check_result?: true] ++ timing ++ opts)
   end
 
   def cast(spell_id, target \\ :victim, flags \\ 0)
@@ -59,9 +64,18 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.Combat do
       entry,
       index,
       event_type,
-      List.wrap(steps),
-      [param1: first_min, param2: first_max, param3: repeat_min, param4: repeat_max] ++ opts
+      retried(steps),
+      [param1: first_min, param2: first_max, param3: repeat_min, param4: repeat_max, check_result?: true] ++ opts
     )
+  end
+
+  defp retried(steps) do
+    steps
+    |> List.wrap()
+    |> Enum.map(fn
+      %ScriptStep{command: :cast_spell, condition: nil} = step -> %{step | abort_on_failure?: true}
+      step -> step
+    end)
   end
 
   defp range({min_ms, max_ms}), do: {min_ms, max_ms}
