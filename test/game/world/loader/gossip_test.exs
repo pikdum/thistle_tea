@@ -1,6 +1,9 @@
 defmodule ThistleTea.Game.World.Loader.GossipTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Core.AI.CreatureScript.Gossip, as: ScriptedGossip
+  alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.World.Loader.Gossip
   alias ThistleTea.Game.World.Loader.Gossip.Menu
   alias ThistleTea.Game.World.Loader.Gossip.Option
@@ -41,6 +44,36 @@ defmodule ThistleTea.Game.World.Loader.GossipTest do
                Gossip.menu_for_creature(entry)
 
       assert Gossip.get_menu(menu_id) == shared
+    end
+  end
+
+  describe "put_scripted_menu/3" do
+    test "replaces the creature's menu with greetings ranked by order and options that close the window" do
+      entry = Unique.integer()
+      menu_id = Unique.integer()
+      :ets.insert(Gossip, [{{:menu, menu_id}, %Menu{menu_id: menu_id, text_id: 7}}, {{:creature_menu, entry}, menu_id}])
+      on_exit(fn -> cleanup(entry, [menu_id]) end)
+      ready = %Condition{type: :instance_data, value1: 1, value2: 8}
+      steps = [%ScriptStep{command: :talk, dataint: 3_882}]
+
+      gossip = %ScriptedGossip{
+        texts: [
+          %ScriptedGossip.Text{text_id: 1_516},
+          %ScriptedGossip.Text{text_id: 1_515, condition: %Condition{type: :instance_data, value1: 1}},
+          %ScriptedGossip.Text{text_id: 1_517, condition: ready}
+        ],
+        options: [%ScriptedGossip.Option{text: "Fight", condition: ready, steps: steps}]
+      }
+
+      assert :ok = Gossip.put_scripted_menu(entry, gossip, &[:resolved | &1])
+
+      assert %Menu{text_id: 1_516, texts: texts, options: [option]} = Gossip.menu_for_creature(entry)
+      assert Enum.map(texts, &{&1.text_id, &1.condition_id}) == [{1_516, 0}, {1_515, 2}, {1_517, 3}]
+
+      assert %Option{id: 0, text: "Fight", option_id: 1, action_menu_id: -1, condition: ^ready, talk_credit?: false} =
+               option
+
+      assert option.action_steps == [:resolved | steps]
     end
   end
 

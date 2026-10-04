@@ -1,8 +1,10 @@
 defmodule ThistleTea.Game.World.Loader.Gossip do
   @moduledoc """
   Loads gossip menus and options from Mangos into ETS, filtered to the option
-  types the server supports, with creature-to-menu and trainer lookups. Each
-  greeting text keeps the gossip script vmangos starts whenever it is shown.
+  types the server supports, with creature-to-menu and trainer lookups. A menu
+  that a C++ gossip script builds in code (`CreatureScript.Gossip`) replaces its
+  creature's database menu through `put_scripted_menus/1`. Each greeting text
+  keeps the gossip script vmangos starts whenever it is shown.
   Options that vmangos adds in C++ gossip scripts are appended per creature
   with `add_creature_option/2` once the menus are loaded. Closing the window
   from a database option credits the creature as talked to; a scripted option
@@ -11,6 +13,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Core.AI.CreatureScript.Gossip
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.Script
@@ -49,6 +52,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   ]
 
   @npc_flag_trainer 0x10
+  @close_gossip -1
 
   defmodule Menu do
     @moduledoc false
@@ -235,6 +239,47 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
     id = menu.options |> Enum.map(& &1.id) |> Enum.max(fn -> -1 end)
     menu_id = {:creature, creature_entry}
     menu = %{menu | menu_id: menu_id, options: menu.options ++ [%{option | id: id + 1}]}
+    :ets.insert(__MODULE__, [{{:menu, menu_id}, menu}, {{:creature_menu, creature_entry}, menu_id}])
+    :ok
+  end
+
+  def put_scripted_menus(menus) when is_map(menus) do
+    Enum.each(menus, fn {creature_entry, gossip} -> put_scripted_menu(creature_entry, gossip) end)
+  end
+
+  def put_scripted_menu(creature_entry, %Gossip{} = gossip, resolve_texts \\ &Script.resolve_texts/1) do
+    texts =
+      gossip.texts
+      |> Enum.with_index(1)
+      |> Enum.map(fn {%Gossip.Text{text_id: text_id, condition: condition}, index} ->
+        %Text{text_id: text_id, condition_id: if(condition, do: index, else: 0), condition: condition}
+      end)
+
+    options =
+      gossip.options
+      |> Enum.with_index()
+      |> Enum.map(fn {%Gossip.Option{} = option, id} ->
+        %Option{
+          id: id,
+          icon: option.icon,
+          text: option.text,
+          option_id: @option_gossip,
+          npc_flag: 0,
+          action_menu_id: @close_gossip,
+          condition: option.condition,
+          action_steps: resolve_texts.(option.steps),
+          talk_credit?: false
+        }
+      end)
+
+    text_id =
+      Enum.find_value(texts, fn
+        %Text{condition_id: 0, text_id: text_id} -> text_id
+        %Text{} -> nil
+      end)
+
+    menu_id = {:creature, creature_entry}
+    menu = %Menu{menu_id: menu_id, text_id: text_id, texts: texts, options: options}
     :ets.insert(__MODULE__, [{{:menu, menu_id}, menu}, {{:creature_menu, creature_entry}, menu_id}])
     :ok
   end

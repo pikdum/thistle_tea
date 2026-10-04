@@ -23,7 +23,9 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   from `routes/0` (`CreatureScript.Route`); `start_waypoints` source 5
   starts it. `pick/1` runs one of several step lists at random, as C++
   scripts roll `urand`, nesting `start_script` choices four at a time, and
-  `pick_weighted/1` does the same over `{weight, steps}` pairs.
+  `pick_weighted/1` does the same over `{weight, steps}` pairs. A creature
+  whose C++ script builds its gossip menu in code gets it from `gossip/0`
+  (`CreatureScript.Gossip`), and it replaces the database menu.
   """
 
   alias ThistleTea.Game.Core.AI.AIEvent
@@ -40,6 +42,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.Faulk
   alias ThistleTea.Game.Core.AI.CreatureScript.FelwoodOoze
   alias ThistleTea.Game.Core.AI.CreatureScript.GizeltonCaravan
+  alias ThistleTea.Game.Core.AI.CreatureScript.Gossip
   alias ThistleTea.Game.Core.AI.CreatureScript.KindalMoonweaver
   alias ThistleTea.Game.Core.AI.CreatureScript.LazyPeon
   alias ThistleTea.Game.Core.AI.CreatureScript.MagramiSpectre
@@ -62,6 +65,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.TwilightCorrupter
   alias ThistleTea.Game.Core.AI.CreatureScript.WesternPlaguelands
   alias ThistleTea.Game.Core.AI.CreatureScript.WitchDoctorUnbagwa
+  alias ThistleTea.Game.Core.AI.CreatureScript.ZulFarrak
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
 
@@ -71,8 +75,9 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   @callback quest_end_steps() :: %{pos_integer() => [%ScriptStep{}]}
 
   @callback routes() :: [%Route{}]
+  @callback gossip() :: %{pos_integer() => %Gossip{}}
 
-  @optional_callbacks quest_start_steps: 0, quest_end_steps: 0, routes: 0
+  @optional_callbacks quest_start_steps: 0, quest_end_steps: 0, routes: 0, gossip: 0
 
   @scripts [
     ArchmageTervosh,
@@ -108,7 +113,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     TwiggyFlathead,
     TwilightCorrupter,
     WesternPlaguelands,
-    WitchDoctorUnbagwa
+    WitchDoctorUnbagwa,
+    ZulFarrak
   ]
   @timed_script 1
   @restore_on_respawn 0x01
@@ -142,6 +148,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
 
   def routes, do: Enum.concat(implementations(:routes))
 
+  def gossip, do: :gossip |> implementations() |> Enum.reduce(%{}, &Map.merge(&2, &1))
+
   defp quest_steps(callback) do
     callback
     |> implementations()
@@ -156,7 +164,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
 
   defp steps do
     route_steps = routes() |> Enum.flat_map(&Map.values(&1.points)) |> List.flatten()
-    (entries() |> Enum.flat_map(&events/1) |> Enum.flat_map(&List.flatten(&1.actions))) ++ route_steps
+    gossip_steps = gossip() |> Map.values() |> Enum.flat_map(& &1.options) |> Enum.flat_map(& &1.steps)
+    (entries() |> Enum.flat_map(&events/1) |> Enum.flat_map(&List.flatten(&1.actions))) ++ route_steps ++ gossip_steps
   end
 
   def event(entry, index, event_type, steps, opts \\ []) when is_integer(entry) and is_list(steps) do

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Core.InstanceScript do
   alias ThistleTea.Game.Core.InstanceScript.ShadowfangKeep
   alias ThistleTea.Game.Core.InstanceScript.Stratholme
   alias ThistleTea.Game.Core.InstanceScript.SunkenTemple
+  alias ThistleTea.Game.Core.InstanceScript.ZulFarrak
 
   @adapters [
     BlackfathomDeeps,
@@ -24,7 +25,8 @@ defmodule ThistleTea.Game.Core.InstanceScript do
     Scholomance,
     ShadowfangKeep,
     Stratholme,
-    SunkenTemple
+    SunkenTemple,
+    ZulFarrak
   ]
 
   def broadcast_text_ids do
@@ -118,5 +120,6 @@ defmodule ThistleTea.Game.Core.InstanceScript do
   defp adapter("instance_shadowfang_keep"), do: ShadowfangKeep
   defp adapter("instance_stratholme"), do: Stratholme
   defp adapter("instance_sunken_temple"), do: SunkenTemple
+  defp adapter("instance_zulfarrak"), do: ZulFarrak
   defp adapter(_script_name), do: nil
 end

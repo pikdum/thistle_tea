@@ -366,6 +366,7 @@ defmodule ThistleTea.Application do
         ReputationLoader.load_all()
         Logger.info("Loading gossip menus...")
         GossipLoader.load_all()
+        GossipLoader.put_scripted_menus(CreatureScript.gossip())
         QuestFollowerLoader.load_all()
         VendorLoader.load_all()
         AreaTriggerLoader.load_all()
