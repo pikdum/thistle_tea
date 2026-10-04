@@ -67,6 +67,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
   alias ThistleTea.Game.World.Spell.SpellAreas
   alias ThistleTea.Game.World.Spell.SpellReception
   alias ThistleTea.Game.World.System.CombatLeashes
+  alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Instance.InstanceData
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.System.ScriptedEvent
@@ -116,6 +117,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
       body_height: PlayerMovement.body_height(entity),
       instance_data: instance_data(entity, requirements, options),
       saved_variables: saved_variables(requirements, options),
+      active_game_events: active_game_events(requirements, options),
       formation: FormationEnvironment.snapshot(entity, now),
       shared_leash_time: CombatLeashes.last_extended_at(entity),
       combat_zone: combat_zone,
@@ -539,6 +541,13 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
     if Enum.any?(requirements, &match?({:saved_variable, _index}, &1)) do
       lookup = Keyword.get(options, :saved_variables, &ServerVariables.snapshot/0)
       lookup.()
+    end
+  end
+
+  defp active_game_events(requirements, options) do
+    if Enum.any?(requirements, &match?({:active_game_event, _id}, &1)) do
+      lookup = Keyword.get(options, :game_events, &GameEvent.active_events/0)
+      MapSet.new(lookup.())
     end
   end
 

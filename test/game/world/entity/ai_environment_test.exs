@@ -595,6 +595,18 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironmentTest do
       refute_received {:instance_data, _, _}
     end
 
+    test "lends active game events to the conditions that name one" do
+      condition = %Condition{type: :active_game_event, value1: 15}
+      request = Request.new([], 0.0, script_conditions: [condition])
+      context = AIEnvironment.context(mob(WorldRef.open(0)), 1_000, request, game_events: fn -> [15, 40] end)
+
+      assert context.active_game_events == MapSet.new([15, 40])
+
+      assert AIEnvironment.context(mob(WorldRef.open(0)), 1_000, %Request{},
+               game_events: fn -> flunk("game event lookup was not planned") end
+             ).active_game_events == nil
+    end
+
     test "skips instance lookup when no condition requests it" do
       AIEnvironment.context(mob(WorldRef.open(0)), 1_000, %Request{},
         instance_data: fn _world, _fields -> flunk("instance lookup was not planned") end

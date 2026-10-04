@@ -40,7 +40,8 @@ defmodule ThistleTea.Game.Core.Condition.EntityContext do
       world: %{
         map_id: map_id(entity),
         instance_data: ai_context.instance_data,
-        saved_variables: ai_context.saved_variables
+        saved_variables: ai_context.saved_variables,
+        active_game_events: ai_context.active_game_events
       },
       now: ai_context.condition_now,
       content_patch: @content_patch,
