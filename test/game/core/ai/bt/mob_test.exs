@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
   alias ThistleTea.Game.Core.Movement
   alias ThistleTea.Game.Core.Pet.SummonEvent
   alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Combat.ThreatSelection
@@ -175,6 +176,43 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
   end
 
   describe "drop_threat/2" do
+    test "runs evade events once combat is over, so a spell they cast is not cut short" do
+      target = player_guid()
+
+      chant = %Spell{
+        id: 12_774,
+        name: "Chant",
+        school: :physical,
+        cast_time_ms: 2_000,
+        range_yards: 0.0,
+        mana_cost: 0,
+        power_type: 0,
+        attributes: MapSet.new(),
+        effects: []
+      }
+
+      cast = %ScriptStep{command: :cast_spell, datalong: 12_774, target_self?: true}
+      event = %AIEvent{id: 1, event_type: :evade, chance: 100, repeatable?: true, actions: [[cast]]}
+      mob = fixture_mob(position: {0.0, 0.0, 0.0, 0.0}, spline_nodes: [])
+
+      mob = %{
+        mob
+        | unit: %{mob.unit | target: target},
+          internal: %{
+            mob.internal
+            | in_combat: true,
+              threat: %{target => 100.0},
+              creature: %Creature{ai_events: [event]},
+              spellbook: %{12_774 => chant}
+          }
+      }
+
+      mob = drop_threat(BT.init(mob, MobBT.tree()), target, Context.new(1_000))
+
+      refute mob.internal.in_combat
+      assert %Cast{spell: %Spell{id: 12_774}} = mob.internal.casting
+    end
+
     test "pets keep their auras and health when the final opponent leaves combat" do
       target = player_guid()
       mob = fixture_mob(position: {20.0, 0.0, 0.0, 0.0}, spline_nodes: [])

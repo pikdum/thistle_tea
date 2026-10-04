@@ -132,9 +132,10 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
           ]),
           BT.sequence([
             BT.condition(&should_tether?/3),
-            BT.action(&eventai_evade/3),
+            BT.action(&eventai_leave_combat/3),
             BT.action(&set_tether_target/3),
             BT.action(&clear_combat/3),
+            BT.action(&eventai_evade/3),
             BT.action(&heal_to_full/2),
             BT.action(&move_to_target_with_context/3)
           ]),
@@ -281,8 +282,12 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
     {:success, state, blackboard}
   end
 
-  defp eventai_evade(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
+  defp eventai_leave_combat(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
     {state, blackboard} = EventAI.on_leave_combat(state, blackboard, now, context)
+    {:success, state, blackboard}
+  end
+
+  defp eventai_evade(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
     {state, blackboard} = EventAI.on_evade(state, blackboard, now, context)
     {:success, state, blackboard}
   end
@@ -601,17 +606,18 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
 
   defp reset_living_after_combat(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
     {state, blackboard} = EventAI.on_leave_combat(state, blackboard, now, context)
-    {state, blackboard} = EventAI.on_evade(state, blackboard, now, context)
 
     case set_tether_target(state, blackboard, context) do
       {:success, state, blackboard} ->
         {:success, state, blackboard} = clear_combat(state, blackboard, context)
+        {state, blackboard} = EventAI.on_evade(state, blackboard, now, context)
         {:success, state, blackboard} = heal_to_full(state, blackboard)
         {_status, state, blackboard} = move_to_target(state, blackboard, context)
         %{state | internal: %{state.internal | blackboard: blackboard}}
 
       {:failure, state, blackboard} ->
         {:success, state, blackboard} = clear_combat(state, blackboard, context)
+        {state, blackboard} = EventAI.on_evade(state, blackboard, now, context)
         %{state | internal: %{state.internal | blackboard: blackboard}}
     end
   end
