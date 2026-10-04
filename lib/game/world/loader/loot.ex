@@ -88,10 +88,10 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     }
   end
 
-  def generate_gameobject(loot_id, min_gold, max_gold) do
+  def generate_gameobject(loot_id, min_gold, max_gold, condition_met? \\ &unmet/1) do
     %Loot{
       gold: roll_gold(min_gold, max_gold),
-      items: roll_items(loot_id, &gameobject_rows/1)
+      items: roll_items(loot_id, &gameobject_rows/1, &always_wanted/1, &ItemLoader.get_template/1, condition_met?)
     }
   end
 
@@ -168,12 +168,19 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     %Loot{gold: gold, items: items}
   end
 
-  defp roll_items(loot_id, rows_fn, wanted_quest_item? \\ &always_wanted/1, get_template \\ &ItemLoader.get_template/1)
+  defp roll_items(
+         loot_id,
+         rows_fn,
+         wanted_quest_item? \\ &always_wanted/1,
+         get_template \\ &ItemLoader.get_template/1,
+         condition_met? \\ &unmet/1
+       )
 
-  defp roll_items(loot_id, rows_fn, wanted_quest_item?, get_template) when is_integer(loot_id) and loot_id > 0 do
+  defp roll_items(loot_id, rows_fn, wanted_quest_item?, get_template, condition_met?)
+       when is_integer(loot_id) and loot_id > 0 do
     loot_id
     |> rows_fn.()
-    |> Loot.roll(&reference_rows/1)
+    |> Loot.roll(&reference_rows/1, &:rand.uniform/0, &reference_allowed?(&1, condition_met?))
     |> Enum.filter(fn {item_id, _count, quest_item, _condition} -> not quest_item or wanted_quest_item?.(item_id) end)
     |> Enum.map(fn {item_id, count, quest_item, condition} ->
       {get_template.(item_id), count, quest_item, condition}
@@ -194,9 +201,18 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     end)
   end
 
-  defp roll_items(_loot_id, _rows_fn, _wanted_quest_item?, _get_template), do: []
+  defp roll_items(_loot_id, _rows_fn, _wanted_quest_item?, _get_template, _condition_met?), do: []
+
+  defp reference_allowed?(row, condition_met?) do
+    case Map.get(row, :condition) do
+      nil -> true
+      condition -> condition_met?.(condition)
+    end
+  end
 
   defp always_wanted(_item_id), do: true
+
+  defp unmet(_condition), do: false
 
   defp creature_rows(loot_id) do
     case :ets.lookup(__MODULE__, {:creature, loot_id}) do

@@ -13,7 +13,6 @@ defmodule ThistleTea.Game.Core.Loot.LootSession do
   round-robin assignment, quest-item visibility, interaction distance, and
   master-loot recipient eligibility.
   """
-  alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Item.ItemEligibility
   alias ThistleTea.Game.Core.Item.ItemProperty
   alias ThistleTea.Game.Core.Loot
@@ -338,14 +337,8 @@ defmodule ThistleTea.Game.Core.Loot.LootSession do
     end)
   end
 
-  defp condition_allowed?(_actor, %Loot.Item{condition: nil}), do: true
-
-  defp condition_allowed?(%Actor{condition_context: context}, %Loot.Item{condition: condition})
-       when not is_nil(context) do
-    Condition.evaluate(context, condition) == :met
-  end
-
-  defp condition_allowed?(%Actor{}, %Loot.Item{}), do: false
+  defp condition_allowed?(%Actor{} = actor, %Loot.Item{condition: condition}),
+    do: Actor.condition_met?(actor, condition)
 
   defp item_allowed?(%Actor{} = actor, %Loot.Item{} = item) do
     item.owner_guid in [nil, actor.guid] and condition_allowed?(actor, item)

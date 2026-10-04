@@ -1,9 +1,13 @@
 defmodule ThistleTea.Game.World.Entity.GameObject.ChestTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Core.Condition
+  alias ThistleTea.Game.Core.Condition.Context
+  alias ThistleTea.Game.Core.Condition.InstanceDataSnapshot
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Loot, as: InternalLoot
   alias ThistleTea.Game.Core.Entity.GameObject
+  alias ThistleTea.Game.Core.Entity.ItemTemplate
   alias ThistleTea.Game.Core.Loot
   alias ThistleTea.Game.Core.Loot.Actor
   alias ThistleTea.Game.Core.Loot.Commit
@@ -11,6 +15,9 @@ defmodule ThistleTea.Game.World.Entity.GameObject.ChestTest do
   alias ThistleTea.Game.Core.Loot.Release
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Entity.GameObject.Chest
+  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
+  alias ThistleTea.Test.Unique
 
   @actor %Actor{guid: 42, group_id: nil, needed_items: MapSet.new([11_119]), distance: 0.0}
 
@@ -85,5 +92,72 @@ defmodule ThistleTea.Game.World.Entity.GameObject.ChestTest do
       refute state.internal.loot.corpse_removed?
       assert %LootSession{} = state.internal.loot.session
     end
+  end
+
+  describe "view/2 on a fresh chest" do
+    setup [:conditioned_reference]
+
+    test "expands a conditioned reference when the opener's copy meets it", context do
+      {result, _state} = Chest.view(fresh_chest(context.loot_id), opener(context.guards_alive))
+
+      assert {:ok, %Loot{items: [%Loot.Item{item_id: item_id}]}} = result
+      assert item_id == context.item_id
+    end
+
+    test "leaves a conditioned reference out when the opener's copy misses it", context do
+      {result, _state} = Chest.view(fresh_chest(context.loot_id), opener(context.guards_alive - 1))
+
+      assert {:error, :nothing_to_take} = result
+    end
+  end
+
+  defp conditioned_reference(_context) do
+    ItemLoader.init()
+    LootLoader.init()
+    loot_id = Unique.integer()
+    reference_id = Unique.integer()
+    item_id = Unique.integer()
+    guards_alive = 6
+
+    condition = %Condition{entry: 1_600, type: :instance_data, value1: 15, value2: guards_alive, value3: 1}
+    :ets.insert(ItemLoader, {item_id, %ItemTemplate{entry: item_id, name: "Tribute", quality: 2}})
+
+    :ets.insert(
+      LootLoader,
+      {{:gameobject, loot_id},
+       [%{item: 0, chance: 100.0, groupid: 0, mincount_or_ref: -reference_id, maxcount: 1, condition: condition}]}
+    )
+
+    :ets.insert(
+      LootLoader,
+      {{:reference, reference_id}, [%{item: item_id, chance: 100.0, groupid: 0, mincount_or_ref: 1, maxcount: 1}]}
+    )
+
+    on_exit(fn ->
+      :ets.delete(LootLoader, {:gameobject, loot_id})
+      :ets.delete(LootLoader, {:reference, reference_id})
+      :ets.delete(ItemLoader, item_id)
+    end)
+
+    %{loot_id: loot_id, item_id: item_id, guards_alive: guards_alive}
+  end
+
+  defp fresh_chest(loot_id) do
+    %GameObject{
+      internal: %Internal{
+        world: %WorldRef{map_id: 429, instance_id: 1},
+        loot: %InternalLoot{id: loot_id, min_gold: 0, max_gold: 0}
+      }
+    }
+  end
+
+  defp opener(guards_alive) do
+    snapshot = %InstanceDataSnapshot{
+      world: %WorldRef{map_id: 429, instance_id: 1},
+      status: :available,
+      fields: %{15 => {:ok, guards_alive}}
+    }
+
+    %{@actor | condition_context: Context.new(world: %{instance_data: snapshot})}
   end
 end

@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Loot.ActorFactory do
   alias ThistleTea.Game.World.ServerVariables
   alias ThistleTea.Game.World.System.Battleground
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.World.System.Instance.InstanceData
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   def for_character(%Character{object: %{guid: guid}} = character, target_guid) do
@@ -91,12 +92,22 @@ defmodule ThistleTea.Game.World.Loot.ActorFactory do
     %{context | source: loot_subject(target_guid)}
   end
 
+  defp with_instance_data(%Context{world: facts} = context, target_guid) do
+    case World.position(target_guid) do
+      {%WorldRef{instance_id: id} = world, _x, _y, _z} when is_integer(id) ->
+        %{context | world: Map.put(facts || %{}, :instance_data, InstanceData.read_all(world))}
+
+      _outside ->
+        context
+    end
+  end
+
   defp character_condition_context(
          %Character{unit: %Unit{}, player: %Player{}, internal: %Internal{world: world}} = character,
          target_guid
        )
        when not is_nil(world) do
-    character |> ConditionContext.snapshot() |> with_source(target_guid)
+    character |> ConditionContext.snapshot() |> with_source(target_guid) |> with_instance_data(target_guid)
   end
 
   defp character_condition_context(%Character{}, _target_guid), do: nil
@@ -111,6 +122,7 @@ defmodule ThistleTea.Game.World.Loot.ActorFactory do
       world: %{active_game_events: MapSet.new(GameEvent.get_events()), saved_variables: ServerVariables.snapshot()},
       content_patch: 10
     )
+    |> with_instance_data(target_guid)
   end
 
   defp remote_subject(guid, metadata) do

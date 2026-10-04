@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject.Chest do
   defp authorized?(_state, _actor), do: true
 
   defp view_authorized(%GameObject{} = state, %Actor{} = actor) do
-    case ensure_session(state) do
+    case ensure_session(state, actor) do
       {%LootSession{} = session, state} ->
         case LootSession.view(session, actor) do
           {:ok, %Loot{} = loot} ->
@@ -239,18 +239,23 @@ defmodule ThistleTea.Game.World.Entity.GameObject.Chest do
 
   defp respawn_ms(%GameObject{}), do: @default_respawn_ms
 
-  defp ensure_session(%GameObject{internal: %Internal{loot: %InternalLoot{corpse_removed?: true}}}), do: :no_loot
+  defp ensure_session(%GameObject{internal: %Internal{loot: %InternalLoot{corpse_removed?: true}}}, _actor),
+    do: :no_loot
 
-  defp ensure_session(%GameObject{internal: %Internal{loot: %InternalLoot{session: %LootSession{} = session}}} = state) do
+  defp ensure_session(
+         %GameObject{internal: %Internal{loot: %InternalLoot{session: %LootSession{} = session}}} = state,
+         _actor
+       ) do
     {session, state}
   end
 
-  defp ensure_session(%GameObject{internal: %Internal{loot: %InternalLoot{} = loot}} = state) do
-    session = LootSession.new(LootLoader.generate_gameobject(loot.id, loot.min_gold, loot.max_gold), nil)
+  defp ensure_session(%GameObject{internal: %Internal{loot: %InternalLoot{} = loot}} = state, actor) do
+    generated = LootLoader.generate_gameobject(loot.id, loot.min_gold, loot.max_gold, &Actor.condition_met?(actor, &1))
+    session = LootSession.new(generated, nil)
     {session, put_session(state, session)}
   end
 
-  defp ensure_session(%GameObject{}), do: :no_loot
+  defp ensure_session(%GameObject{}, _actor), do: :no_loot
 
   defp session(%GameObject{internal: %Internal{loot: %InternalLoot{session: session}}}), do: session
   defp session(%GameObject{}), do: nil

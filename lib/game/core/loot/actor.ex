@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Core.Loot.Actor do
   @moduledoc false
 
+  alias ThistleTea.Game.Core.Condition
+
   @enforce_keys [:guid, :group_id, :needed_items, :distance]
   defstruct [:guid, :group_id, :needed_items, :distance, :condition_context, :item_eligibility, access_allowed?: true]
 
@@ -25,4 +27,11 @@ defmodule ThistleTea.Game.Core.Loot.Actor do
   end
 
   def within?(%__MODULE__{}, _maximum), do: false
+
+  def condition_met?(%__MODULE__{}, nil), do: true
+
+  def condition_met?(%__MODULE__{condition_context: context}, condition) when not is_nil(context),
+    do: Condition.evaluate(context, condition) == :met
+
+  def condition_met?(%__MODULE__{}, _condition), do: false
 end
