@@ -4,6 +4,10 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
   A spawn's `creature_addon` row overrides its template's model, equipment,
   and auras, as vmangos `ChooseDisplayId`, `LoadEquipment`, and
   `LoadCreatureAddon` do; its posture and mount reach the builder with it.
+  Charm spell cooldowns are seconds, except a value of a thousand or more,
+  which is a row written in milliseconds: Emberstrife's Flames of the Black
+  Flight says 10000, and read as seconds it would lock the Seal of Ascension's
+  only spell on that dragon for nearly three hours after one cast.
   """
   import Ecto.Query
 
@@ -22,6 +26,7 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @supported_patch 10
+  @millisecond_charm_cooldown 1_000
 
   def load([]), do: []
 
@@ -439,10 +444,13 @@ defmodule ThistleTea.Game.World.Loader.Mob.Batch do
       slot: row.slot,
       spell: Map.fetch!(spellbook, row.spell_id),
       availability: row.availability,
-      cooldown_min_ms: low * 1000,
-      cooldown_max_ms: high * 1000
+      cooldown_min_ms: charm_cooldown_ms(low),
+      cooldown_max_ms: charm_cooldown_ms(high)
     }
   end
+
+  defp charm_cooldown_ms(value) when value >= @millisecond_charm_cooldown, do: value
+  defp charm_cooldown_ms(seconds), do: seconds * 1000
 
   defp base_spell_ids(creature, list) do
     template = creature.creature_template

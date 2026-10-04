@@ -48,6 +48,10 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
       assert mob.internal.spellbook[12_544].recovery_time_ms in 9_000..12_000
     end
 
+    test "reads Emberstrife's Flames of the Black Flight cooldown as the ten seconds it means" do
+      assert mob(10_321).internal.spellbook[16_054].recovery_time_ms == 10_000
+    end
+
     test "loads Defias Pillager EventAI events with resolved scripts" do
       mob = mob(589)
       events = mob.internal.creature.ai_events
