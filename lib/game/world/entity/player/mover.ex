@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Mover do
   alias ThistleTea.Game.Core.Pet.Companion
   alias ThistleTea.Game.Core.Pet.PlayerPossession
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Player.Cinematic, as: PlayerCinematic
   alias ThistleTea.Game.World.Entity.Player.CompanionVisibility
   alias ThistleTea.Game.World.Entity.Player.Exploration
   alias ThistleTea.Game.World.Entity.Player.Instances
@@ -62,5 +63,6 @@ defmodule ThistleTea.Game.World.Entity.Player.Mover do
     |> CompanionVisibility.defer_restoration()
     |> Exploration.check_current()
     |> ItemLoot.open()
+    |> PlayerCinematic.begin()
   end
 end

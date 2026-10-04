@@ -99,6 +99,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   alias ThistleTea.Game.World.Entity.Player.Attacking
   alias ThistleTea.Game.World.Entity.Player.Auction.ClientProjection, as: AuctionProjection
   alias ThistleTea.Game.World.Entity.Player.Battlegrounds
+  alias ThistleTea.Game.World.Entity.Player.Cinematic, as: PlayerCinematic
   alias ThistleTea.Game.World.Entity.Player.CompanionOwner
   alias ThistleTea.Game.World.Entity.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.World.Entity.Player.CompanionOwner.Monitor, as: CompanionMonitor
@@ -1149,6 +1150,14 @@ defmodule ThistleTea.Game.World.Entity.Player do
     else
       {:noreply, state}
     end
+  end
+
+  def handle_info(:cinematic_camera, state) do
+    {:noreply, PlayerCinematic.update(state)}
+  rescue
+    error ->
+      Logger.error("cinematic camera crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
   end
 
   def handle_info(:restore_companion, state) do

@@ -60,6 +60,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   alias ThistleTea.Game.World.Entity.Player.AccountCaches
   alias ThistleTea.Game.World.Entity.Player.Auction
   alias ThistleTea.Game.World.Entity.Player.Buyback
+  alias ThistleTea.Game.World.Entity.Player.Cinematic, as: PlayerCinematic
   alias ThistleTea.Game.World.Entity.Player.ConditionContext
   alias ThistleTea.Game.World.Entity.Player.Corpses
   alias ThistleTea.Game.World.Entity.Player.Enchantments
@@ -142,7 +143,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
 
   def enter_world(state, character_guid) do
     {:ok, c} = CharacterStore.fetch(state.account.id, character_guid)
-    first_login? = PlayedTime.first_login?(c)
+    intro = if PlayedTime.first_login?(c), do: intro_sequence(c)
     c = c |> Trade.recover() |> Auction.recover() |> VendorPurchase.recover()
     old_item_counts = Quests.quest_item_counts(c)
 
@@ -233,7 +234,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
       orientation: o
     })
 
-    send_init_packets(c, first_login?: first_login?)
+    send_init_packets(c, intro_cinematic: intro)
     Social.send_lists(c)
     Enchantments.send_active_timers(c)
     Guilds.signed_on(c)
@@ -262,6 +263,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
     |> TickScheduler.ensure_scheduled()
     |> Mail.schedule_delivery()
     |> Quests.restore_timers()
+    |> PlayerCinematic.prepare(intro)
   end
 
   def restore_companion(%{character: %Character{internal: %Internal{taxi_flight: %Flight{}}}} = state), do: state
@@ -412,7 +414,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
       timescale: 0.01666667
     })
 
-    if Keyword.get(opts, :first_login?, false), do: send_intro_cinematic(c)
+    if sequence = Keyword.get(opts, :intro_cinematic),
+      do: Outbound.send_packet(%Message.SmsgTriggerCinematic{cinematic_sequence_id: sequence})
 
     item_updates = owned_item_updates(c)
 
@@ -561,13 +564,10 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
 
   defp normalize_faction_template(character), do: character
 
-  defp send_intro_cinematic(%Character{unit: %Unit{race: race}}) do
+  defp intro_sequence(%Character{unit: %Unit{race: race}}) do
     case DBC.get_by(DBC.ChrRaces, id: race) do
-      %DBC.ChrRaces{cinematic_sequence: sequence} when is_integer(sequence) and sequence > 0 ->
-        Outbound.send_packet(%Message.SmsgTriggerCinematic{cinematic_sequence_id: sequence})
-
-      _ ->
-        :ok
+      %DBC.ChrRaces{cinematic_sequence: sequence} when is_integer(sequence) and sequence > 0 -> sequence
+      _ -> nil
     end
   end
 

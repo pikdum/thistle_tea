@@ -9,6 +9,9 @@ defmodule ThistleTea.Game.World.Visibility do
   or turns re-checks the hidden members listed near it, a viewer whose
   reaction facts change re-checks every hidden member in view, and a hidden
   announcer is re-checked by every viewer that hears it.
+
+  While a first login's intro cinematic runs, its camera (`set_camera/2`)
+  stands in for the player's own position, as a Far Sight viewpoint does.
   """
 
   alias ThistleTea.Game.Core.Aura.StealthDetection
@@ -104,6 +107,31 @@ defmodule ThistleTea.Game.World.Visibility do
   end
 
   def refresh_viewpoint(state, _guid), do: state
+
+  def set_camera(
+        %{guid: viewer_guid, character: %{internal: %{world: world}}, visibility_cells: %MapSet{} = old_cells} = state,
+        {x, y, z} = position
+      ) do
+    state
+    |> put_camera(position)
+    |> sync_visibility_cells(viewer_guid, old_cells, visible_cells_at(world, x, y, z))
+  end
+
+  def set_camera(state, _position), do: state
+
+  def reset_camera(
+        %{
+          camera: {_x, _y, _z},
+          guid: viewer_guid,
+          character: %Character{} = character,
+          visibility_cells: %MapSet{} = old_cells
+        } = state
+      ) do
+    state = put_camera(state, nil)
+    sync_visibility_cells(state, viewer_guid, old_cells, viewpoint_cells(state) || visible_cells(character))
+  end
+
+  def reset_camera(state), do: state
 
   def reset_viewpoint(
         %{guid: viewer_guid, character: %Character{} = character, visibility_cells: %MapSet{} = old_cells} = state
@@ -420,6 +448,9 @@ defmodule ThistleTea.Game.World.Visibility do
     |> sync_visible_entities(viewer_guid, new_cells)
   end
 
+  defp viewpoint_cells(%{camera: {x, y, z}, character: %{internal: %{world: world}}}),
+    do: visible_cells_at(world, x, y, z)
+
   defp viewpoint_cells(%{viewpoint_guid: guid, character: %{internal: %{world: world}}})
        when is_integer(guid) and guid > 0 do
     case viewpoint_location(guid) do
@@ -432,6 +463,9 @@ defmodule ThistleTea.Game.World.Visibility do
 
   defp put_viewpoint(%State{} = state, guid), do: %{state | viewpoint_guid: guid}
   defp put_viewpoint(state, guid), do: Map.put(state, :viewpoint_guid, guid)
+
+  defp put_camera(%State{} = state, position), do: %{state | camera: position}
+  defp put_camera(state, position), do: Map.put(state, :camera, position)
 
   defp viewpoint_location(guid) do
     World.position(guid)

@@ -67,6 +67,8 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
     :spell_environment_position,
     :visibility_cells,
     :viewpoint_guid,
+    :camera,
+    :cinematic,
     :player_tick_ref,
     :logout_timer,
     :target,

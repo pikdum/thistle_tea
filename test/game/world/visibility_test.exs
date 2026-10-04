@@ -384,6 +384,30 @@ defmodule ThistleTea.Game.World.VisibilityTest do
 
       SpatialHash.remove(:mobs, viewpoint_guid)
     end
+
+    test "an intro cinematic camera holds the view through refreshes until it resets" do
+      self_guid = Guid.from_low_guid(:player, unique_low())
+      character = character(self_guid, ghost?: false)
+      local_cells = Visibility.visible_cells(character)
+
+      state = %{
+        guid: self_guid,
+        character: character,
+        visibility_cells: local_cells,
+        tracked_entities: MapSet.new(),
+        cell_activator: nil
+      }
+
+      remote = Visibility.set_camera(state, {1_000.0, 1_000.0, 0.0})
+      assert MapSet.member?(remote.visibility_cells, SpatialHash.cell(WorldRef.open(0), 1_000.0, 1_000.0, 0.0))
+      refute remote.visibility_cells == local_cells
+      assert Visibility.refresh_player(remote).visibility_cells == remote.visibility_cells
+
+      restored = Visibility.reset_camera(remote)
+      assert restored.camera == nil
+      assert restored.visibility_cells == local_cells
+      assert Visibility.reset_camera(restored) == restored
+    end
   end
 
   describe "ghost visibility" do

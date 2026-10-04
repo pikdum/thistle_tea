@@ -57,6 +57,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.BankBagSlotPrice, as: BankBagSlotPriceLoader
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Loader.BroadcastText, as: BroadcastTextLoader
+  alias ThistleTea.Game.World.Loader.CinematicWaypoint, as: CinematicWaypointLoader
   alias ThistleTea.Game.World.Loader.ClassSpell, as: ClassSpellLoader
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.CreatureArchetype, as: CreatureArchetypeLoader
@@ -360,6 +361,7 @@ defmodule ThistleTea.Application do
         CreatureLinkLoader.load_all()
         GameObjectRequirementLoader.load_all()
         GameTeleLoader.load_all()
+        CinematicWaypointLoader.load_all()
         Logger.info("Loading waypoints...")
         WaypointLoader.load_all()
         Logger.info("Loading quests...")
