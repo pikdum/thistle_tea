@@ -75,6 +75,62 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.BlackrockDepthsTest do
     end
   end
 
+  describe "routes/0" do
+    test "Grimstone opens the beast gate and calls two packs of one random kind each" do
+      [%{1 => [_line, %ScriptStep{sub_scripts: %{1 => timed}}]}] = grimstone_points()
+
+      assert [%ScriptStep{command: :set_instance_data, datalong: 46, datalong2: 1, delay_ms: 7_000} | _rest] = timed
+      [first_pack, second_pack] = Enum.filter(timed, &(&1.command == :start_script))
+      assert first_pack.delay_ms == 10_000
+      assert second_pack.delay_ms == 29_000
+
+      for pack <- [first_pack, second_pack] do
+        kinds = chosen(pack)
+
+        assert Enum.sort(Enum.map(kinds, fn summons -> hd(summons).datalong end)) == [
+                 8_925,
+                 8_926,
+                 8_927,
+                 8_928,
+                 8_932,
+                 8_933
+               ]
+
+        for summons <- kinds do
+          assert Enum.map(summons, & &1.delay_ms) == [0, 3_000, 3_000, 7_000]
+          assert summons |> Enum.map(& &1.datalong) |> Enum.uniq() |> length() == 1
+
+          for summon <- summons do
+            assert %ScriptStep{dataint4: 7, position: {608.96, -235.322, _, _}} = summon
+
+            assert %{1 => [%ScriptStep{command: :set_home_position}, %ScriptStep{command: :zone_combat_pulse}]} =
+                     summon.sub_scripts
+          end
+        end
+      end
+    end
+
+    test "Grimstone calls one of the six champions and closes the ring once it falls" do
+      [%{4 => [%ScriptStep{dataint: 5_446}, %ScriptStep{sub_scripts: %{1 => timed}}], 5 => [done]}] = grimstone_points()
+
+      assert [%ScriptStep{datalong: 46, datalong2: 2, delay_ms: 5_000}, _teleport, champion] = timed
+      champions = champion |> chosen() |> Enum.map(fn [summon] -> summon.datalong end)
+      assert Enum.sort(champions) == [9_027, 9_028, 9_029, 9_030, 9_031, 9_032]
+      assert %ScriptStep{command: :set_instance_data, datalong: 0, datalong2: 3} = done
+    end
+  end
+
+  defp grimstone_points, do: for(%{entry: 10_096, points: points} <- CreatureScript.routes(), do: points)
+
+  defp chosen(%ScriptStep{sub_scripts: sub_scripts}) do
+    Enum.flat_map(Map.values(sub_scripts), fn steps ->
+      case Enum.filter(steps, &(&1.command == :summon_creature)) do
+        [] -> Enum.flat_map(steps, &chosen/1)
+        summons -> [summons]
+      end
+    end)
+  end
+
   defp timer(%{actions: [[%ScriptStep{datalong: spell} = step]], param1: first, param3: repeat}) do
     {spell, if(step.target_self?, do: :self, else: step.target_type), first, repeat}
   end

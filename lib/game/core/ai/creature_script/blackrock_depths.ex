@@ -15,6 +15,11 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.BlackrockDepths do
   and no longer hostile. Plugger keeps his demon armor up and grumbles about
   his customers between fights.
 
+  High Justice Grimstone (`npc_grimstone`) runs the Ring of Law for
+  `InstanceScript.BlackrockDepths`: he sentences the challengers, calls two
+  packs of a random kind of beast through the beast gate, and once they are
+  dead walks to the far gate and calls a random champion.
+
   Moira mends any injured ally rather than only the Emperor, and the Hand of
   Thaurissan strikes the Emperor's victim even when no other player stands
   with it.
@@ -24,6 +29,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.BlackrockDepths do
 
   alias ThistleTea.Game.Core.AI.CreatureScript
   alias ThistleTea.Game.Core.AI.CreatureScript.Combat
+  alias ThistleTea.Game.Core.AI.CreatureScript.Route
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Condition
 
@@ -39,6 +45,30 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.BlackrockDepths do
   @emperor 9_019
   @moira 8_929
   @high_priestess 10_076
+  @grimstone 10_096
+
+  @ring_path [
+    {604.803, -191.082, -54.0586},
+    {604.073, -222.107, -52.7438},
+    {621.4, -214.499, -52.8145},
+    {601.301, -198.557, -53.9503},
+    {631.818, -180.548, -52.6548},
+    {627.39, -201.076, -52.6929}
+  ]
+  @ring_holds [0, 1, 2, 4, 5]
+  @hold_ms 1_800_000
+  @ring_mobs [8_925, 8_926, 8_927, 8_928, 8_933, 8_932]
+  @ring_champions [9_027, 9_028, 9_029, 9_030, 9_031, 9_032]
+  @beast_gate {608.96, -235.322, -53.907, 1.857}
+  @champion_gate {644.3, -175.989, -53.739, 3.418}
+  @ring_center {596.285156, -188.698944, -54.132176, 0.0}
+  @arena_stage 46
+  @ring_of_law 0
+  @done 3
+  @teleport 6_422
+  @script_route 5
+  @dead_despawn 7
+  @charge_in 1
 
   @anvilrage_reservist 8_901
   @anvilrage_medic 8_894
@@ -78,7 +108,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.BlackrockDepths do
       @phalanx,
       @emperor,
       @moira,
-      @high_priestess
+      @high_priestess,
+      @grimstone
     ]
 
   @impl CreatureScript
@@ -180,6 +211,92 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.BlackrockDepths do
       Combat.every(entry, 4, %{Combat.cast(15_586, :friendly_injured) | target_param1: 40}, 12_000, 10_000)
     ]
   end
+
+  def events(@grimstone), do: []
+
+  @impl CreatureScript
+  def routes do
+    path =
+      @ring_path
+      |> Enum.with_index()
+      |> Enum.map(fn {{x, y, z}, index} -> {x, y, z, if(index in @ring_holds, do: @hold_ms, else: 0)} end)
+
+    [%Route{entry: @grimstone, path: path, points: ring_points()}]
+  end
+
+  defp ring_points do
+    %{
+      0 => [Combat.talk(5_442), CreatureScript.timed([at(5_000, resume(1))])],
+      1 => [
+        Combat.talk(5_443),
+        CreatureScript.timed([
+          at(7_000, stage(1)),
+          at(7_000, Combat.cast(@teleport, :self)),
+          at(10_000, resume(2)),
+          at(10_000, beasts(fn _index -> [] end)),
+          at(29_000, beasts(&second_pack_words/1))
+        ])
+      ],
+      4 => [
+        Combat.talk(5_446),
+        CreatureScript.timed([
+          at(5_000, stage(2)),
+          at(8_000, Combat.cast(@teleport, :self)),
+          at(10_000, champion())
+        ])
+      ],
+      5 => [%ScriptStep{command: :set_instance_data, datalong: @ring_of_law, datalong2: @done}]
+    }
+  end
+
+  defp beasts(words) do
+    @ring_mobs
+    |> Enum.map(fn entry ->
+      pack =
+        [{0, 0}, {1, 3_000}, {2, 3_000}, {3, 7_000}]
+        |> Enum.flat_map(fn {index, at_ms} ->
+          Enum.map([arena_summon(entry, @beast_gate) | words.(index)], &at(at_ms, &1))
+        end)
+
+      [CreatureScript.timed(pack)]
+    end)
+    |> CreatureScript.pick()
+    |> hd()
+  end
+
+  defp second_pack_words(2), do: [Combat.talk(5_444)]
+  defp second_pack_words(3), do: [Combat.talk(5_445)]
+  defp second_pack_words(_index), do: []
+
+  defp champion do
+    @ring_champions
+    |> Enum.map(&[arena_summon(&1, @champion_gate)])
+    |> CreatureScript.pick()
+    |> hd()
+  end
+
+  defp arena_summon(entry, position) do
+    %ScriptStep{
+      command: :summon_creature,
+      datalong: entry,
+      dataint2: @charge_in,
+      dataint3: -1,
+      dataint4: @dead_despawn,
+      position: position,
+      sub_scripts: %{
+        @charge_in => [
+          %ScriptStep{command: :set_home_position, position: @ring_center},
+          %ScriptStep{command: :zone_combat_pulse, datalong: 1}
+        ]
+      }
+    }
+  end
+
+  defp stage(value), do: %ScriptStep{command: :set_instance_data, datalong: @arena_stage, datalong2: value}
+
+  defp resume(point), do: %ScriptStep{command: :start_waypoints, datalong: @script_route, datalong2: point}
+
+  defp at(delay_ms, %ScriptStep{} = step), do: %{step | delay_ms: delay_ms}
 
   defp reserve({entry, position}) do
     %ScriptStep{

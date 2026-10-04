@@ -309,6 +309,13 @@ defmodule ThistleTea.Game.Core.AI.AreaTriggerScriptTest do
     end
   end
 
+  describe "Blackrock Depths" do
+    test "stepping into the Ring of Law asks the instance to start the fight" do
+      assert [%ScriptStep{command: :set_instance_data, datalong: 0, datalong2: 1, condition: nil}] =
+               AreaTriggerScript.steps(1526, @position)
+    end
+  end
+
   describe "Blackrock Spire" do
     test "the Dragonspine Door opens for a player carrying the Seal of Ascension" do
       player = %{character() | internal: %{character().internal | world: WorldRef.instance(229, 1)}}
