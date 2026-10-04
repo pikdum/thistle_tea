@@ -3,9 +3,11 @@ defmodule ThistleTea.Game.World.Pathfinding do
   Navigation-mesh queries over the namigator NIF: pathfinding, random points,
   terrain and liquid heights, interiors, and zone/area lookup. A map without a
   loaded navigation mesh paths in a straight line, as vmangos does without
-  mmaps.
+  mmaps. A spot with no area data, such as inside an instance's buildings,
+  falls back to the map's zone when the map has only one.
   """
   alias ThistleTea.Game.Core.Math
+  alias ThistleTea.Game.World.Loader.Exploration
   alias ThistleTea.Game.World.Pathfinding.Aquatic
   alias ThistleTea.Native.Namigator
 
@@ -16,7 +18,14 @@ defmodule ThistleTea.Game.World.Pathfinding do
 
     case Namigator.get_zone_and_area(map_id, x, y, z) do
       {zone, area} = result when zone in 1..0xFFFFFFFE and area in 1..0xFFFFFFFE -> result
-      _unknown -> surface_zone_and_area(map_id, {x, y, z})
+      _unknown -> surface_zone_and_area(map_id, {x, y, z}) || sole_zone(map_id)
+    end
+  end
+
+  defp sole_zone(map_id) do
+    case Exploration.sole_zone(map_id) do
+      zone when is_integer(zone) -> {zone, zone}
+      nil -> nil
     end
   end
 

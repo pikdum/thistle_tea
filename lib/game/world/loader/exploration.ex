@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.Exploration do
   @moduledoc """
-  Cached AreaTable exploration metadata and VMangos exploration base XP.
+  Cached AreaTable exploration metadata and VMangos exploration base XP. A
+  map with a single zone, like most instances, names that zone for places
+  the navigation data has no area for.
   """
   alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos.ExplorationBaseXp
@@ -21,11 +23,23 @@ defmodule ThistleTea.Game.World.Loader.Exploration do
   end
 
   def load_areas do
-    DBC.AreaTable
-    |> DBC.all()
-    |> Enum.each(fn area ->
+    areas = DBC.all(DBC.AreaTable)
+
+    Enum.each(areas, fn area ->
       :ets.insert(__MODULE__, [{{:area, area.id}, area}, {{:area_bit, area.map, area.area_bit}, area.id}])
     end)
+
+    areas
+    |> Enum.filter(&(&1.parent_area_table == 0))
+    |> Enum.group_by(& &1.map, & &1.id)
+    |> Enum.each(fn {map_id, zones} -> :ets.insert(__MODULE__, {{:map_zones, map_id}, zones}) end)
+  end
+
+  def sole_zone(map_id) do
+    case :ets.lookup(__MODULE__, {:map_zones, map_id}) do
+      [{_key, [zone]}] -> zone
+      _none_or_many -> nil
+    end
   end
 
   def area_by_bit(map_id, bit) do
