@@ -135,11 +135,15 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   def select(state, _guid, _gossip_list_id), do: state
 
   def quest_items(npc_guid, character) do
-    npc_guid
-    |> Quests.quest_menu(character)
-    |> Enum.map(fn {%Quest{} = quest, icon} ->
-      %QuestItem{quest_id: quest.id, quest_icon: icon, level: quest.level, title: quest.title}
-    end)
+    if QuestGiver.offers_quests?(npc_guid) do
+      npc_guid
+      |> Quests.quest_menu(character)
+      |> Enum.map(fn {%Quest{} = quest, icon} ->
+        %QuestItem{quest_id: quest.id, quest_icon: icon, level: quest.level, title: quest.title}
+      end)
+    else
+      []
+    end
   end
 
   def send_menu(npc_guid, %Menu{} = menu, quests, %{character: %Character{} = character} = state) do

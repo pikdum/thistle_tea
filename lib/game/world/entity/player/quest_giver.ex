@@ -2,6 +2,8 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestGiver do
   @moduledoc """
   Live world-object resolution and interaction checks for quest exchanges.
   Creature and game-object identities remain separate even when entries match.
+  A creature offers quests only while it carries the questgiver npc flag, so a
+  script that clears the flag closes its quests the way vmangos does.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -20,6 +22,8 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestGiver do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Reaction
 
+  @questgiver 0x2
+
   def present?(%Character{internal: %{world: world}} = character, guid) do
     Guid.type_id(guid) in [:unit, :game_object] and Entity.online?(guid) and
       match?({^world, _, _, _}, World.position(guid)) and source_allowed?(character, guid)
@@ -32,6 +36,13 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestGiver do
 
   def rewardable?(%Character{} = character, guid) do
     present?(character, guid) and rewardable_life?(character, guid)
+  end
+
+  def offers_quests?(guid) do
+    case Guid.type_id(guid) do
+      :unit -> match?(%{npc_flags: flags} when is_integer(flags) and (flags &&& @questgiver) != 0, Metadata.get(guid))
+      _source -> true
+    end
   end
 
   defp reactive?(%Character{internal: internal} = character) do
@@ -60,7 +71,7 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestGiver do
 
   defp creature_interactable?(character, guid) do
     with %{alive?: true, npc_flags: flags} = metadata <- Metadata.get(guid),
-         true <- (flags &&& 0x2) != 0,
+         true <- (flags &&& @questgiver) != 0,
          false <- Map.get(metadata, :in_combat, false),
          true <- ((Map.get(metadata, :unit_flags) || 0) &&& 0x03000000) == 0,
          true <- NpcReach.within?(character, guid) do

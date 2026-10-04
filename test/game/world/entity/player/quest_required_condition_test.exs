@@ -178,6 +178,17 @@ defmodule ThistleTea.Game.World.Entity.Player.QuestRequiredConditionTest do
     assert_received {:"$gen_cast", {:send_packet, %Message.SmsgGossipMessage{quests: [_quest]}}}
   end
 
+  test "gossip lists no quests once the creature stops being a questgiver", context do
+    quest = %Quest{id: context.quest_id, level: 1, title: "Flagged"}
+    put_quest(context, quest, giver: true)
+
+    assert [%QuestItem{}] = Gossip.quest_items(context.npc_guid, context.character)
+
+    Metadata.update(context.npc_guid, %{npc_flags: 1})
+
+    assert Gossip.quest_items(context.npc_guid, context.character) == []
+  end
+
   test "acceptance re-evaluates a stale bank-backed menu before mutation", context do
     source_item_id = context.source_item_id
     :ets.insert(ItemLoader, {source_item_id, %ItemTemplate{entry: source_item_id, name: "Source"}})
