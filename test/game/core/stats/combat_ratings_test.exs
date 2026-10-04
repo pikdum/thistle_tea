@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.Core.Stats.CombatRatingsTest do
   @rogue 4
   @mage 8
 
-  describe "melee_crit_chance/3" do
+  describe "melee_crit_chance/4" do
     test "warriors get one percent crit per 3.9 agility at level 1" do
       assert_in_delta CombatRatings.melee_crit_chance(@warrior, 1, 39), 10.0, 0.001
     end
@@ -24,6 +24,12 @@ defmodule ThistleTea.Game.Core.Stats.CombatRatingsTest do
 
     test "mages add their class base crit" do
       assert_in_delta CombatRatings.melee_crit_chance(@mage, 60, 20), 3.2 + 1.0, 0.001
+    end
+
+    test "prefers the per-level rate a player's level stats carry" do
+      assert_in_delta CombatRatings.melee_crit_chance(@warrior, 30, 60, 10.395), 60 / 10.395, 0.001
+      assert_in_delta CombatRatings.melee_crit_chance(@mage, 1, 20, 11.1111), 3.2 + 20 / 11.1111, 0.001
+      assert_in_delta CombatRatings.melee_crit_chance(@warrior, 60, 100, nil), 5.0, 0.001
     end
   end
 

@@ -243,6 +243,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Player do
     keyring15: {0x02A4, 2, :guid, :private},
     keyring16: {0x02A6, 2, :guid, :private},
     keyring_slots: {:virtual, 0},
+    crit_per_agility: :virtual,
     farsight: {0x02C8, 2, :guid, :private},
     field_combo_target: {0x02CA, 2, :guid, :private},
     xp: {0x02CC, 1, :int, :private},

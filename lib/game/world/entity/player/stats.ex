@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Stats do
   @moduledoc false
 
   alias ThistleTea.DB.Mangos.PlayerClassLevelStats
+  alias ThistleTea.DB.Mangos.PlayerCritPerAgility
   alias ThistleTea.DB.Mangos.PlayerLevelStats
   alias ThistleTea.DB.Mangos.PlayerXpForLevel
   alias ThistleTea.Game.Core.Entity.Character
@@ -33,7 +34,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Stats do
     :base_mana,
     :max_health,
     :max_mana,
-    :next_level_xp
+    :next_level_xp,
+    :crit_per_agility
   ]
 
   def get(race, class, level) do
@@ -107,7 +109,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Stats do
       player
       | next_level_xp: stats.next_level_xp,
         skills: Skills.on_level_up(player.skills, stats.level),
-        keyring_slots: Keyring.size(stats.level)
+        keyring_slots: Keyring.size(stats.level),
+        crit_per_agility: stats.crit_per_agility
     }
 
     %{character | unit: unit, player: player}
@@ -150,7 +153,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Stats do
       spirit: unit.base_spirit || unit.spirit,
       base_health: unit.base_health,
       base_mana: unit.base_mana,
-      next_level_xp: player.next_level_xp
+      next_level_xp: player.next_level_xp,
+      crit_per_agility: player.crit_per_agility
     }
 
     %{stats | max_health: max_health(stats), max_mana: max_mana(stats)}
@@ -174,7 +178,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Stats do
       stats
       | max_health: max_health(stats),
         max_mana: max_mana(stats),
-        next_level_xp: next_level_xp(stats.level)
+        next_level_xp: next_level_xp(stats.level),
+        crit_per_agility: PlayerCritPerAgility.rate(stats.class, stats.level)
     }
   end
 

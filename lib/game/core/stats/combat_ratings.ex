@@ -1,7 +1,9 @@
 defmodule ThistleTea.Game.Core.Stats.CombatRatings do
   @moduledoc """
   Player melee avoidance and crit chances from canonical stats, defense skill,
-  learned combat capabilities, equipment, and auras. The same defensive chances
+  learned combat capabilities, equipment, and auras. Crit from agility uses the
+  vmangos per-class, per-level rate a player's level stats carry, and a
+  linear approximation without one. The same defensive chances
   feed attack resolution and the player fields shown on the character sheet.
   """
   alias ThistleTea.Game.Core.Aura
@@ -69,16 +71,20 @@ defmodule ThistleTea.Game.Core.Stats.CombatRatings do
 
   @base_avoidance_chance 5.0
 
-  def melee_crit_chance(class, level, agility) do
-    class_base_bonus(class) + agility_chance(@crit_agility_rates, class, level, agility)
-  end
+  def melee_crit_chance(class, level, agility, crit_per_agility \\ nil)
+
+  def melee_crit_chance(class, _level, agility, rate) when is_number(rate) and rate > 0,
+    do: class_base_bonus(class) + agility / rate
+
+  def melee_crit_chance(class, level, agility, _rate),
+    do: class_base_bonus(class) + agility_chance(@crit_agility_rates, class, level, agility)
 
   def crit_chance(entity, :offhand), do: crit_chance(entity, :mainhand)
 
-  def crit_chance(%{unit: %Unit{} = unit, player: %Player{}} = character, hand) do
+  def crit_chance(%{unit: %Unit{} = unit, player: %Player{} = player} = character, hand) do
     level = unit.level || 1
     skill = CombatWeapon.skill_snapshot(character, hand).caster_attack_skill
-    base = melee_crit_chance(unit.class, level, unit.agility || 0)
+    base = melee_crit_chance(unit.class, level, unit.agility || 0, player.crit_per_agility)
     bonus = weapon_bonus(character, :mod_crit_percent, hand)
     max(base + bonus + (skill - Skills.max_for_level(level)) * 0.04, 0.0)
   end
