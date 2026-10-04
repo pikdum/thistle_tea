@@ -1,7 +1,10 @@
 defmodule ThistleTea.Game.Core.Aura.ControlSync do
   @moduledoc """
   Derives mob charm ownership from active control auras and emits ownership
-  transition events for the controlling player's boundary.
+  transition events for the controlling player's boundary. A creature freed
+  alive from someone else's control turns on its former controller with
+  threat equal to its maximum health, as vmangos does when a charm or
+  possession ends, so it never gets a breather to regenerate in.
   """
 
   alias ThistleTea.Game.Core.Aura.Holder
@@ -121,7 +124,7 @@ defmodule ThistleTea.Game.Core.Aura.ControlSync do
     }
 
     {mob |> Combat.sync_combat_flag() |> Entity.mark_broadcast_update(),
-     [Effects.control_released(pet.owner_guid, mob.object.guid)]}
+     [Effects.control_released(pet.owner_guid, mob.object.guid) | turn_on_controller(mob, pet.owner_guid)]}
   end
 
   defp sync_possession(
@@ -224,7 +227,7 @@ defmodule ThistleTea.Game.Core.Aura.ControlSync do
     mob =
       mob |> Casting.interrupt(now) |> restore_controlled_unit(pet, nil) |> MovementHandoff.offer(pet.owner_guid, now)
 
-    {mob, [Effects.control_released(pet.owner_guid, mob.object.guid)]}
+    {mob, [Effects.control_released(pet.owner_guid, mob.object.guid) | turn_on_controller(mob, pet.owner_guid)]}
   end
 
   defp release_possession(%Mob{} = mob, %Pet{} = pet, now) do
@@ -268,6 +271,13 @@ defmodule ThistleTea.Game.Core.Aura.ControlSync do
 
     Entity.mark_broadcast_update(mob)
   end
+
+  defp turn_on_controller(%Mob{unit: %Unit{max_health: max_health}} = mob, controller_guid)
+       when is_integer(controller_guid) and controller_guid > 0 do
+    if Entity.dead?(mob), do: [], else: [Effects.turn_on_controller(controller_guid, max_health || 0)]
+  end
+
+  defp turn_on_controller(_mob, _controller_guid), do: []
 
   defp possession_holder(holders) when is_list(holders) do
     Enum.find(holders, &Holder.has_any_type?(&1, [:mod_possess, :mod_possess_pet]))

@@ -324,6 +324,11 @@ defmodule ThistleTea.Game.World.Entity.EventSink.Combat do
     entity
   end
 
+  def emit(%Mob{} = entity, %Effects.TurnOnController{controller_guid: controller, threat: threat}, context) do
+    Context.send(context, {:turn_on_controller, controller, threat})
+    entity
+  end
+
   def emit(%Mob{} = entity, %Effects.CallAssistance{target_guid: target_guid}, context)
       when is_integer(target_guid) and target_guid > 0 do
     helpers = CallForHelp.capture(entity, target_guid)

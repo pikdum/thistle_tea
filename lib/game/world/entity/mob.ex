@@ -1480,6 +1480,24 @@ defmodule ThistleTea.Game.World.Entity.Mob do
     end
   end
 
+  def handle_info({:turn_on_controller, controller, threat}, %Mob{} = state) do
+    if EntityCore.dead?(state) or not Reaction.attackable?(controller, state) do
+      {:noreply, state}
+    else
+      state =
+        state
+        |> engage_combat(controller, contact?: true, selection: :target)
+        |> Threat.add(controller, threat)
+        |> wake_ai_tick()
+
+      {:noreply, state, {:continue, :maybe_broadcast}}
+    end
+  rescue
+    error ->
+      Logger.error("Creature turning on its controller failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_info({:guard_call_answered, answer}, %Mob{} = state) do
     {:noreply, GuardCall.answered(state, answer), {:continue, :maybe_broadcast}}
   end

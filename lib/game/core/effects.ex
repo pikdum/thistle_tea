@@ -697,6 +697,10 @@ defmodule ThistleTea.Game.Core.Effects do
     %Effects.ControlReleased{source_guid: owner_guid, target_guid: controlled_guid}
   end
 
+  def turn_on_controller(controller_guid, threat) when is_integer(controller_guid) and is_number(threat) do
+    %Effects.TurnOnController{controller_guid: controller_guid, threat: threat}
+  end
+
   def release_controlled(owner_guid, controlled_guid, spell_id \\ nil)
       when is_integer(owner_guid) and is_integer(controlled_guid) and (is_integer(spell_id) or is_nil(spell_id)) do
     %Effects.ReleaseControlled{source_guid: owner_guid, target_guid: controlled_guid, spell_id: spell_id}

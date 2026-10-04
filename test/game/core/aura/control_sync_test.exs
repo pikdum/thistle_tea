@@ -115,12 +115,12 @@ defmodule ThistleTea.Game.Core.Aura.ControlSyncTest do
     test "possessing an ordinary mob creates and removes a temporary control component" do
       mob = %Mob{
         object: %Object{guid: 20},
-        unit: %Unit{auras: [holder(:mod_possess)], faction_template: 14, npc_flags: 3},
+        unit: %Unit{auras: [holder(:mod_possess)], faction_template: 14, npc_flags: 3, health: 300, max_health: 900},
         internal: %Internal{}
       }
 
       {possessed, [_grant]} = ControlSync.sync(mob)
-      {restored, [_release]} = ControlSync.sync(%{possessed | unit: %{possessed.unit | auras: []}})
+      {restored, [_release, turn]} = ControlSync.sync(%{possessed | unit: %{possessed.unit | auras: []}})
 
       assert possessed.internal.pet.kind == :possessed
       assert possessed.internal.pet.possessed?
@@ -130,12 +130,20 @@ defmodule ThistleTea.Game.Core.Aura.ControlSyncTest do
       assert restored.unit.faction_template == 14
       assert restored.unit.npc_flags == 3
       assert restored.unit.flags == 0
+      assert turn == %Effects.TurnOnController{controller_guid: 10, threat: 900}
     end
 
     test "charming a mob flags it player-controlled and strips the flag on release" do
       mob = %Mob{
         object: %Object{guid: 20},
-        unit: %Unit{auras: [holder(:mod_charm)], faction_template: 14, npc_flags: 3, flags: 0x1000},
+        unit: %Unit{
+          auras: [holder(:mod_charm)],
+          faction_template: 14,
+          npc_flags: 3,
+          flags: 0x1000,
+          health: 500,
+          max_health: 1_200
+        },
         internal: %Internal{}
       }
 
@@ -150,7 +158,7 @@ defmodule ThistleTea.Game.Core.Aura.ControlSyncTest do
       assert is_struct(grant, Effects.ControlGranted)
 
       unflagged = %{charmed | unit: %{charmed.unit | flags: 8, auras: []}}
-      {released, [release]} = ControlSync.sync(unflagged)
+      {released, [release, turn]} = ControlSync.sync(unflagged)
 
       assert released.internal.pet == nil
       assert released.unit.charmed_by == 0
@@ -158,6 +166,22 @@ defmodule ThistleTea.Game.Core.Aura.ControlSyncTest do
       assert (released.unit.flags &&& 0x00000008) == 0
       assert (released.unit.flags &&& 0x1000) != 0
       assert is_struct(release, Effects.ControlReleased)
+      assert turn == %Effects.TurnOnController{controller_guid: 10, threat: 1_200}
+    end
+
+    test "a creature that dies under control turns on no one" do
+      for aura_type <- [:mod_charm, :mod_possess] do
+        mob = %Mob{
+          object: %Object{guid: 20},
+          unit: %Unit{auras: [holder(aura_type)], faction_template: 14, health: 500, max_health: 1_200},
+          internal: %Internal{}
+        }
+
+        {controlled, _events} = ControlSync.sync(mob)
+        {_released, events} = ControlSync.sync(%{controlled | unit: %{controlled.unit | health: 0, auras: []}})
+
+        assert [%Effects.ControlReleased{}] = events
+      end
     end
 
     test "new control stops the mob's current movement path" do
