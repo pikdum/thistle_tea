@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Core.Aura.Transition do
   alias ThistleTea.Game.Core.Aura.Change
   alias ThistleTea.Game.Core.Aura.ControlSync
   alias ThistleTea.Game.Core.Aura.DiminishingReturns
+  alias ThistleTea.Game.Core.Aura.DummyFlags
   alias ThistleTea.Game.Core.Aura.EffectImmunity
   alias ThistleTea.Game.Core.Aura.HealthSync
   alias ThistleTea.Game.Core.Aura.Holder
@@ -112,6 +113,7 @@ defmodule ThistleTea.Game.Core.Aura.Transition do
       |> HealthSync.sync(entity.unit)
       |> Appearance.reconcile_equipment(previous, holders)
       |> TauntSync.sync(previous, holders)
+      |> DummyFlags.sync(previous, holders)
       |> ComboPoints.expire(removed, cause)
       |> MountSync.sync(previous, holders)
       |> DiminishingReturns.reconcile(previous, holders, now)
