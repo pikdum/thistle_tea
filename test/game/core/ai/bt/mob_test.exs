@@ -672,6 +672,36 @@ defmodule ThistleTea.Game.Core.AI.BT.MobTest do
   end
 
   describe "scripted waypoint routes" do
+    test "a clipped mesh path still reaches the authored waypoint and runs its script" do
+      destination = {10.0, 0.0, 7.0}
+
+      route = %WaypointRoute{
+        first_point: 1,
+        destination_point: 1,
+        points: %{
+          1 => %Waypoint{
+            position: {10.0, 0.0, 7.0, nil},
+            script_steps: [%ScriptStep{command: :set_phase, datalong: 3}]
+          }
+        },
+        repeat?: false
+      }
+
+      blackboard = %Blackboard{navigation: %Blackboard.Navigation{scripted_waypoint_route: route}}
+      state = fixture_mob(spline_nodes: []) |> BT.init(MobBT.tree(), blackboard)
+      {_, requested} = BehaviorRunner.tick(MobBT.tree(), state, Context.new(1_000))
+
+      for path <- [nil, [], [{8.0, 0.0, 14.0}]] do
+        moved = NavigationResolver.resolve(requested, 1_000, fn _, _, _, _ -> path end)
+        assert List.last(moved.movement_block.spline_nodes) == destination
+        arrived = Movement.sync_position(moved, 100_000)
+        {_, finished} = BehaviorRunner.tick(MobBT.tree(), arrived, Context.new(100_000))
+        assert finished.internal.blackboard.event_ai.phase == 3
+        assert %Effects.MovementInform{motion_type: 2, point_id: 1} in finished.internal.events
+        assert finished.internal.blackboard.navigation.scripted_waypoint_route.destination_point == nil
+      end
+    end
+
     test "special paths retain authored heights without ground pathfinding" do
       destination = {10.0, 0.0, 40.0}
 

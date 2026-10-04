@@ -154,7 +154,11 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSummons do
   defp coordinate(value, _fallback) when is_number(value), do: value
   defp coordinate(_value, fallback), do: fallback
 
-  defp track_channel(%GameObject{object: %{guid: guid}, internal: %Internal{ritual: %Ritual{}}}, context) do
+  defp track_channel(
+         %GameObject{object: %{guid: guid}, internal: %Internal{ritual: %Ritual{owner_guid: owner_guid}}},
+         context
+       )
+       when is_integer(owner_guid) do
     Context.send(context, %Commands.ChannelGameObjectStarted{guid: guid})
   end
 

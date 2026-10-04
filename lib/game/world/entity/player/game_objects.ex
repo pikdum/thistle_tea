@@ -76,8 +76,9 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjects do
          GameObjectInteraction.battleground_allowed?(character) and
            object_in_range?(character, guid, template, metadata)
 
-  defp interactable_template?(character, guid, %GameObjectTemplate{type: 22} = template, metadata),
-    do: object_in_range?(character, guid, template, metadata) and not Reaction.hostile?(guid, character)
+  defp interactable_template?(character, guid, %GameObjectTemplate{type: type} = template, metadata)
+       when type in [18, 22],
+       do: object_in_range?(character, guid, template, metadata) and not Reaction.hostile?(guid, character)
 
   defp interactable_template?(character, guid, %GameObjectTemplate{type: type} = template, metadata)
        when type in [0, 1, 9, 10, 23], do: object_in_range?(character, guid, template, metadata)

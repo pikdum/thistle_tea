@@ -863,13 +863,15 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
 
   defp start_ritual_channel(state, %Ritual{} = ritual, user_guid) do
     with spell_id when is_integer(spell_id) <- ritual.animation_spell_id,
-         %Spell{} = spell <- SpellLoader.load(spell_id) do
+         %Spell{} = spell <- SpellLoader.cached(spell_id) do
       duration_ms = ritual_channel_ms(state.internal.summon) || spell.duration_ms || 0
       Entity.start_game_object_channel(user_guid, state.object.guid, spell, duration_ms)
     end
   end
 
-  defp ritual_channel_ms(%Summon{despawn_in_ms: duration_ms}), do: duration_ms
+  defp ritual_channel_ms(%Summon{despawn_in_ms: duration_ms}) when is_integer(duration_ms) and duration_ms > 0,
+    do: duration_ms
+
   defp ritual_channel_ms(_summon), do: nil
 
   defp finish_ritual_channels(%GameObject{object: %{guid: guid}, internal: %Internal{ritual: %Ritual{} = ritual}}) do

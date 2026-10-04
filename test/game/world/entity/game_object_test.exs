@@ -4,6 +4,8 @@ defmodule ThistleTea.Game.World.Entity.GameObjectTest do
   alias ThistleTea.Game.Core.Entity.Component.GameObject, as: GameObjectComponent
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Fishing
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Ritual
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Summon
   alias ThistleTea.Game.Core.Entity.Component.Internal.Trap
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Object
@@ -12,6 +14,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectTest do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Profession.Lock
   alias ThistleTea.Game.Core.Profession.Lock.Requirement
+  alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message.SmsgGameobjectDespawnAnim
   alias ThistleTea.Game.Network.Message.SmsgGameobjectResetState
@@ -20,6 +23,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectTest do
   alias ThistleTea.Game.World.Entity.GameObject, as: GameObjectServer
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Lock, as: LockLoader
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Test.Unique
@@ -56,6 +60,36 @@ defmodule ThistleTea.Game.World.Entity.GameObjectTest do
   end
 
   describe "handle_cast/2" do
+    test "an altar without a despawn timer uses its spell's channel duration" do
+      user_guid = Guid.from_low_guid(:player, Unique.integer())
+      object_guid = Guid.from_low_guid(:game_object, Unique.integer(), Unique.integer())
+      spell_id = Unique.integer()
+      spell = %Spell{id: spell_id, duration_ms: 600_000}
+      :ets.insert(SpellLoader, {{:spell, spell_id}, spell})
+      {:ok, _} = Entity.register(user_guid)
+
+      on_exit(fn ->
+        :ets.delete(SpellLoader, {:spell, spell_id})
+        Entity.unregister(user_guid)
+      end)
+
+      for {despawn_ms, expected_ms} <- [{0, 600_000}, {nil, 600_000}, {25_000, 25_000}] do
+        state = %GameObject{
+          object: %Object{guid: object_guid},
+          movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+          internal: %Internal{
+            world: WorldRef.instance(30, Unique.integer()),
+            ritual: %Ritual{required_participants: 10, animation_spell_id: spell_id},
+            summon: %Summon{despawn_in_ms: despawn_ms}
+          }
+        }
+
+        assert {:noreply, joined} = GameObjectServer.handle_cast({:gameobject_use, user_guid, 60}, state)
+        assert MapSet.member?(joined.internal.ritual.users, user_guid)
+        assert_receive {:"$gen_cast", {:start_game_object_channel, ^object_guid, ^spell, ^expected_ms}}
+      end
+    end
+
     test "creates slow-opening banners before resetting the recipient's interaction cache" do
       lock_id = Unique.integer()
       :ets.insert(LockLoader, {lock_id, %Lock{id: lock_id, requirements: [%Requirement{type: :skill, index: 17}]}})

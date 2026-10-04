@@ -11,6 +11,40 @@ defmodule ThistleTea.Game.World.Loader.AlteracValleyVMangosTest do
   @moduletag :vmangos_db
 
   describe "Alterac event catalog" do
+    test "the altar spell overrides supply one boss summon apiece" do
+      for {spell_id, entry} <- [{21_249, 13_256}, {21_648, 13_419}] do
+        assert [override] = Mangos.Repo.all(from(mod in Mangos.SpellEffectMod, where: mod.id == ^spell_id))
+
+        assert {override.effect_index, override.effect, override.effect_misc_value, override.effect_implicit_target_a,
+                override.effect_radius_index} == {1, 41, entry, 32, 12}
+      end
+    end
+
+    test "offering quests and summoner routes match the two ten-player altars" do
+      for {id, item, amount} <- [{7_385, 17_306, 5}, {6_801, 17_306, 1}, {7_386, 17_423, 5}, {6_881, 17_423, 1}] do
+        quest = Mangos.Repo.get!(Mangos.QuestTemplate, id)
+        assert {quest.req_item_id1, quest.req_item_count1} == {item, amount}
+      end
+
+      for {entry, last} <- [{13_236, 44}, {13_442, 50}, {13_256, 38}, {13_419, 39}] do
+        points =
+          Mangos.Repo.all(
+            from(point in Mangos.ScriptWaypoint,
+              where: point.entry == ^entry,
+              select: point.point,
+              order_by: point.point
+            )
+          )
+
+        assert points == Enum.to_list(0..last)
+      end
+
+      for {entry, spell} <- [{178_465, 21_249}, {178_670, 21_648}] do
+        [altar | _] = Mangos.Repo.all(from(altar in Mangos.GameObjectTemplate, where: altar.entry == ^entry))
+        assert {altar.type, altar.data0, altar.data1} == {18, 10, spell}
+      end
+    end
+
     test "armor donations consume twenty scraps and every graveyard and tower guard tier has spawns" do
       quests = Mangos.Repo.all(from(quest in Mangos.QuestTemplate, where: quest.entry in [6_741, 6_781, 7_223, 7_224]))
       assert length(quests) == 4

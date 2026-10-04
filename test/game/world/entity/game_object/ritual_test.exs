@@ -3,8 +3,27 @@ defmodule ThistleTea.Game.World.Entity.GameObject.RitualTest do
 
   alias ThistleTea.Game.Core.Entity.Component.Internal.Ritual
   alias ThistleTea.Game.World.Entity.GameObject.Ritual, as: RitualServer
+  alias ThistleTea.Test.Unique
 
   describe "use/3" do
+    test "ten-player altars wait for ten distinct participants" do
+      users = for _ <- 1..10, do: Unique.integer()
+      ritual = %Ritual{required_participants: 10}
+
+      ritual =
+        Enum.reduce(Enum.take(users, 9), ritual, fn user, ritual ->
+          {joined, :waiting} = RitualServer.use(ritual, user, false)
+          assert {^joined, :ignored} = RitualServer.use(joined, user, false)
+          refute joined.completed?
+          joined
+        end)
+
+      assert {%Ritual{completed?: true, users: participants}, :complete} =
+               RitualServer.use(ritual, List.last(users), false)
+
+      assert MapSet.size(participants) == 10
+    end
+
     test "completes after the required unique grouped participants" do
       ritual = %Ritual{
         owner_guid: 1,

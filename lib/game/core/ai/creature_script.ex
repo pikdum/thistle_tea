@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
 
   alias ThistleTea.Game.Core.AI.AIEvent
   alias ThistleTea.Game.Core.AI.CreatureScript.AlteracValley
+  alias ThistleTea.Game.Core.AI.CreatureScript.AlteracValleyAssault
   alias ThistleTea.Game.Core.AI.CreatureScript.ArchmageTervosh
   alias ThistleTea.Game.Core.AI.CreatureScript.Bartleby
   alias ThistleTea.Game.Core.AI.CreatureScript.Belnistrasz
@@ -102,6 +103,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
 
   @scripts [
     AlteracValley,
+    AlteracValleyAssault,
     ArchmageTervosh,
     Bartleby,
     Belnistrasz,

@@ -128,58 +128,60 @@ defmodule ThistleTea.Game.World.Entity.Player.GameObjectsTest do
       end
     end
 
-    test "spellcasting objects require a living nearby player and a nonhostile faction" do
-      entry = Unique.integer()
-      template = %GameObjectTemplate{entry: entry, type: 22, size: 1.0, flags: 0, data: [30_238]}
-      GameObjectTemplateLoader.put(template)
-      object = GameObject.build_summoned(template, WorldRef.open(0), {0.0, 0.0, 0.0, 0.0})
-      guid = object.object.guid
-      World.update_position(object)
-      alliance = %FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
-      horde = %FactionTemplate{id: 2, faction: 2, faction_group: 5, friend_group: 4, enemy_group: 10}
+    for type <- [18, 22] do
+      test "object type #{type} requires a living nearby player and a nonhostile faction" do
+        entry = Unique.integer()
+        template = %GameObjectTemplate{entry: entry, type: unquote(type), size: 1.0, flags: 0, data: [30_238]}
+        GameObjectTemplateLoader.put(template)
+        object = GameObject.build_summoned(template, WorldRef.open(0), {0.0, 0.0, 0.0, 0.0})
+        guid = object.object.guid
+        World.update_position(object)
+        alliance = %FactionTemplate{id: 1, faction: 1, faction_group: 3, friend_group: 2, enemy_group: 12}
+        horde = %FactionTemplate{id: 2, faction: 2, faction_group: 5, friend_group: 4, enemy_group: 10}
 
-      :ets.insert(
-        FactionLoader,
-        {entry, %{faction_template: alliance, faction_template_id: entry, faction_can_have_reputation?: false}}
-      )
+        :ets.insert(
+          FactionLoader,
+          {entry, %{faction_template: alliance, faction_template_id: entry, faction_can_have_reputation?: false}}
+        )
 
-      Metadata.put(guid, %{
-        go_spawned?: true,
-        go_rotation: {0.0, 0.0, 0.0, 1.0},
-        go_scale: 1.0,
-        go_flags: 0,
-        faction_template: alliance
-      })
+        Metadata.put(guid, %{
+          go_spawned?: true,
+          go_rotation: {0.0, 0.0, 0.0, 1.0},
+          go_scale: 1.0,
+          go_flags: 0,
+          faction_template: alliance
+        })
 
-      character = %Character{
-        object: %Object{guid: Unique.integer()},
-        player: %Player{},
-        unit: %Unit{health: 100, max_health: 100, faction_template: entry},
-        internal: %Internal{world: WorldRef.open(0)},
-        movement_block: %MovementBlock{position: {1.0, 0.0, 0.0, 0.0}}
-      }
+        character = %Character{
+          object: %Object{guid: Unique.integer()},
+          player: %Player{},
+          unit: %Unit{health: 100, max_health: 100, faction_template: entry},
+          internal: %Internal{world: WorldRef.open(0)},
+          movement_block: %MovementBlock{position: {1.0, 0.0, 0.0, 0.0}}
+        }
 
-      Presence.enter(character, %{faction_template: alliance})
+        Presence.enter(character, %{faction_template: alliance})
 
-      on_exit(fn ->
-        Presence.leave(character)
-        World.remove_position(object)
-        Metadata.delete(guid)
-        :ets.delete(GameObjectTemplateLoader, entry)
-        :ets.delete(FactionLoader, entry)
-      end)
+        on_exit(fn ->
+          Presence.leave(character)
+          World.remove_position(object)
+          Metadata.delete(guid)
+          :ets.delete(GameObjectTemplateLoader, entry)
+          :ets.delete(FactionLoader, entry)
+        end)
 
-      assert GameObjects.interactable?(character, guid)
-      refute GameObjects.interactable?(%{character | unit: %{character.unit | health: 0}}, guid)
+        assert GameObjects.interactable?(character, guid)
+        refute GameObjects.interactable?(%{character | unit: %{character.unit | health: 0}}, guid)
 
-      refute GameObjects.interactable?(
-               %{character | movement_block: %{character.movement_block | position: {20.0, 0.0, 0.0, 0.0}}},
-               guid
-             )
+        refute GameObjects.interactable?(
+                 %{character | movement_block: %{character.movement_block | position: {20.0, 0.0, 0.0, 0.0}}},
+                 guid
+               )
 
-      refute GameObjects.interactable?(%{character | internal: %{character.internal | world: WorldRef.open(1)}}, guid)
-      Metadata.update(guid, %{faction_template: horde})
-      refute GameObjects.interactable?(character, guid)
+        refute GameObjects.interactable?(%{character | internal: %{character.internal | world: WorldRef.open(1)}}, guid)
+        Metadata.update(guid, %{faction_template: horde})
+        refute GameObjects.interactable?(character, guid)
+      end
     end
   end
 

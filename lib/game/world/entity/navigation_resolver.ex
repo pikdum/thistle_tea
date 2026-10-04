@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Entity.NavigationResolver do
   @moduledoc """
   Resolves navigation intents at the entity-owner boundary. A creature headed
-  home that has no path there, such as one left in the air or knocked off the
-  mesh, takes the straight line, as the vmangos path finder's shortcut does.
+  home or following an authored waypoint finishes at the requested point,
+  even when the mesh path stops short, as the vmangos shortcut does.
   """
 
   alias ThistleTea.Game.Core.AI.NavigationIntent
@@ -91,6 +91,12 @@ defmodule ThistleTea.Game.World.Entity.NavigationResolver do
   end
 
   defp shortcut(nil, true, destination), do: [destination]
+  defp shortcut([], true, destination), do: [destination]
+
+  defp shortcut(path, true, destination) do
+    if NavigationIntent.reached?(List.last(path), destination), do: path, else: path ++ [destination]
+  end
+
   defp shortcut(path, _shortcut?, _destination), do: path
 
   defp replace_point_movement(entity, opts, now) do

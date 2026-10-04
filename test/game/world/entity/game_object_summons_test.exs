@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSummonsTest do
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity, as: EntityCore
   alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Commands
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Object
@@ -58,6 +59,18 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSummonsTest do
   end
 
   describe "summon/4" do
+    test "only an owned ritual attaches to its creator's channel", %{caster: caster} do
+      for owned? <- [true, false] do
+        effect = %{request(caster, nil) | entry: 950_104, owned?: owned?}
+        {:ok, object, _pid} = GameObjectSummons.start(caster, effect, Context.new(self()))
+        guid = object.object.guid
+
+        if owned?,
+          do: assert_receive(%Commands.ChannelGameObjectStarted{guid: ^guid}),
+          else: refute_receive(%Commands.ChannelGameObjectStarted{})
+      end
+    end
+
     test "replaces only the same owner's same slot and ignores stale removal", %{caster: caster} do
       monitors = summon(caster, %{}, 1)
       [{old_token, old}] = Map.to_list(monitors)
