@@ -267,6 +267,17 @@ defmodule ThistleTea.Game.World.Entity.EventSink do
     entity
   end
 
+  defp emit_resolved(entity, %Effects.BattlegroundCreatureEvent{} = effect, context) do
+    server =
+      case context do
+        %Context{battleground_system: server} when not is_nil(server) -> server
+        _default -> Battleground
+      end
+
+    Battleground.creature_event(effect.world, effect, server)
+    entity
+  end
+
   defp emit_resolved(entity, %Effects.LocalDefenseAlert{} = alert, _context) do
     LocalDefenseSystem.alert(alert.world, alert.area_id, alert.attacking_team)
     entity

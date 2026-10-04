@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Core.Battleground.AlteracValley do
   @moduledoc "Pure Alterac Valley match lifecycle, contested objectives, creature victories, and resurrection geography."
 
+  alias ThistleTea.Game.Core.Battleground.AlteracValley.Air
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Armor
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Creatures
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Mine
@@ -33,6 +34,7 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley do
     defeated_incarnations: MapSet.new(),
     armor: %{},
     offerings: %{},
+    air: %{},
     team_scores: %{alliance: 0, horde: 0},
     resurrection_queue: MapSet.new(),
     weekend?: false
@@ -55,6 +57,7 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley do
       mines: Mine.all(),
       armor: Armor.all(),
       offerings: Offering.all(),
+      air: Air.all(),
       weekend?: Keyword.get(opts, :weekend?, false)
     }
 
@@ -84,11 +87,14 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley do
   def quest_rewarded(match, guid, quest_id) do
     armor = Armor.contribute(match, guid, quest_id)
     offering = Offering.contribute(armor.match, guid, quest_id)
-    %{offering | effects: armor.effects ++ offering.effects}
+    air = Air.contribute(offering.match, guid, quest_id)
+    %{air | effects: armor.effects ++ offering.effects ++ air.effects}
   end
 
   def gossip(match, guid, entry, standing),
     do: Armor.gossip(match, guid, entry, standing) || Offering.gossip(match, guid, entry)
+
+  def interact(match, guid, entry, :rescue_commander, _standing), do: Air.begin_rescue(match, guid, entry)
 
   def interact(match, guid, entry, action, standing) do
     case Armor.interact(match, guid, entry, action, standing) do
@@ -96,6 +102,8 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley do
       handled -> handled
     end
   end
+
+  def creature_event(match, entry, event), do: Air.creature_event(match, entry, event)
 
   def gossip_entry?(entry), do: not is_nil(Armor.smith_team(entry) || Offering.summoner_team(entry))
 

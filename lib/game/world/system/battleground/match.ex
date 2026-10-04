@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.System.Battleground.Match do
   alias ThistleTea.Game.Core.Battleground.Result
   alias ThistleTea.Game.Core.Battleground.Rules
   alias ThistleTea.Game.Core.Battleground.WarsongGulch
+  alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World
@@ -48,6 +49,7 @@ defmodule ThistleTea.Game.World.System.Battleground.Match do
 
   def creature_died(server, defeat), do: GenServer.cast(server, {:creature_died, defeat})
   def quest_rewarded(server, guid, quest_id), do: GenServer.cast(server, {:quest_rewarded, guid, quest_id})
+  def creature_event(server, effect), do: GenServer.cast(server, {:creature_event, effect})
   def gossip(server, guid, entry, standing), do: GenServer.call(server, {:gossip, guid, entry, standing})
 
   def interact(server, guid, entry, action, standing),
@@ -225,6 +227,20 @@ defmodule ThistleTea.Game.World.System.Battleground.Match do
       Logger.error("Battleground quest reward failed: #{Exception.message(error)}")
       {:noreply, state}
   end
+
+  def handle_cast(
+        {:creature_event, %Effects.BattlegroundCreatureEvent{world: world} = effect},
+        %{match: %{world: world}} = state
+      ) do
+    result = Rules.creature_event(state.match, effect.creature_entry, effect.event)
+    {:noreply, apply_result(state, result)}
+  rescue
+    error ->
+      Logger.error("Battleground creature event failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:creature_event, %Effects.BattlegroundCreatureEvent{}}, state), do: {:noreply, state}
 
   def handle_cast({:disconnect, guid, position, dropped_guid}, state) do
     dropped_guid = dropped_flag_guid(state, guid, dropped_guid)

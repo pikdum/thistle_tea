@@ -7,11 +7,15 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
   alias ThistleTea.Game.Core.Battleground.Effects.Scoreboard
   alias ThistleTea.Game.Core.Battleground.Effects.UpdateStatus
   alias ThistleTea.Game.Core.Battleground.Template
+  alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.EventSink
+  alias ThistleTea.Game.World.Entity.EventSink.Context
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.Battleground.Match
+  alias ThistleTea.Test.Unique
 
   defmodule Catalog do
     @moduledoc false
@@ -59,6 +63,45 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
       )
 
     %{server: server, supervisor: supervisor}
+  end
+
+  describe "creature_event/3" do
+    test "commander arrival is emitted by the owner and routed only to its match", %{server: server} do
+      alliance = Unique.integer()
+      horde = Unique.integer()
+      creature_guid = Guid.from_low_guid(:mob, 13_438, Unique.integer())
+      assert :ok = BattlegroundSystem.join(alliance(alliance), 30, server)
+      assert :ok = BattlegroundSystem.join(horde(horde), 30, server)
+      assert {:ok, world, _} = BattlegroundSystem.port(alliance, 1, nil, server)
+      assert :ok = BattlegroundSystem.debug_start_now(world, server)
+      pid = BattlegroundSystem.match_for_world(world, server)
+      assert :close = BattlegroundSystem.interact(world, alliance, 13_438, :rescue_commander, 0, server)
+      assert Match.snapshot(pid).air[13_438].phase == :returning
+      assert :close = BattlegroundSystem.interact(world, alliance, 13_438, :rescue_commander, 0, server)
+
+      effect = %Effects.BattlegroundCreatureEvent{
+        world: WorldRef.instance(30, Unique.integer()),
+        creature_guid: creature_guid,
+        creature_entry: 13_438,
+        event: 1
+      }
+
+      Match.creature_event(pid, effect)
+      assert Match.snapshot(pid).air[13_438].phase == :returning
+
+      EventSink.emit(
+        %{object: %{guid: creature_guid}},
+        %{effect | world: world},
+        Context.new(self(), battleground_system: server)
+      )
+
+      BattlegroundSystem.world_states(world, server)
+      assert Match.snapshot(pid).air[13_438].phase == :ready
+      BattlegroundSystem.quest_rewarded(world, alliance, 6_942, server)
+      BattlegroundSystem.world_states(world, server)
+      assert Match.snapshot(pid).air[13_438].count == 1
+      assert Match.snapshot(pid).air[13_179].count == 0
+    end
   end
 
   describe "join_group/3" do

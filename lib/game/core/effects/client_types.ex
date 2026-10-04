@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Core.Effects.ClientTypes do
     {:ScriptReply, [:request, :status], []},
     {:InstanceDataCommand, [:world, :field, :value, :mode], [script_id: nil]},
     {:InstanceCreatureEvent, [:world, :creature_guid, :creature_entry, :event], [db_guid: nil, bind_player: nil]},
+    {:BattlegroundCreatureEvent, [:world, :creature_guid, :creature_entry, :event], []},
     {:SendScriptEvent, [:owner_guid, :invoker_guid, :event_id, :data], []},
     {:ForwardScriptSteps, [:target_guid, :steps, :source_guid], [reply: nil]},
     {:StartGroupScript, [:steps, :target_guid], []},

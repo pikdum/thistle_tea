@@ -85,6 +85,9 @@ defmodule ThistleTea.Game.World.System.Battleground do
   def quest_rewarded(%WorldRef{} = world, guid, quest_id, server \\ __MODULE__),
     do: GenServer.cast(server, {:quest_rewarded, world, guid, quest_id})
 
+  def creature_event(%WorldRef{} = world, effect, server \\ __MODULE__),
+    do: GenServer.cast(server, {:creature_event, world, effect})
+
   def gossip(%WorldRef{} = world, guid, entry, standing, server \\ __MODULE__),
     do: GenServer.call(server, {:gossip, world, guid, entry, standing})
 
@@ -424,6 +427,15 @@ defmodule ThistleTea.Game.World.System.Battleground do
   rescue
     error ->
       Logger.error("Battleground quest reward routing failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:creature_event, world, effect}, state) do
+    if pid = Map.get(state.worlds, world), do: Match.creature_event(pid, effect)
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("Battleground creature event routing failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 

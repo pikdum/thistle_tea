@@ -25,8 +25,8 @@ defmodule ThistleTea.Game.World.Entity.ScriptDeliveryTest do
     test "caller death stops delivery and invalidates a queued request" do
       {_receiver, guid} = receiver()
 
-      owner =
-        spawn(fn ->
+      {owner, owner_monitor} =
+        spawn_monitor(fn ->
           receive do
             :stop -> :ok
           end
@@ -37,7 +37,9 @@ defmodule ThistleTea.Game.World.Entity.ScriptDeliveryTest do
       assert_receive {:request, request}
       monitor = Process.monitor(request.reply_to)
       send(owner, :stop)
-      assert_receive {:DOWN, ^monitor, :process, _, :normal}
+      assert_receive {:DOWN, ^owner_monitor, :process, ^owner, :normal}
+      assert_receive {:DOWN, ^monitor, :process, _, reason}
+      assert reason in [:normal, :noproc]
       refute Process.alive?(request.reply_to)
     end
 

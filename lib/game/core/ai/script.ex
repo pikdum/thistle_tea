@@ -1344,6 +1344,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
     state =
       case step.datalong do
         46 -> %{state | unit: %{state.unit | flags: modify_flags(state.unit.flags, step)}}
+        143 -> %{state | unit: %{state.unit | dynamic_flags: modify_flags(state.unit.dynamic_flags, step)}}
         147 -> %{state | unit: %{state.unit | npc_flags: modify_flags(state.unit.npc_flags, step)}}
         _field -> state
       end
@@ -1507,6 +1508,17 @@ defmodule ThistleTea.Game.Core.AI.Script do
     run? = datalong != 0
     state = %{state | internal: %{state.internal | running: run?}}
     {state, Blackboard.set_run_mode(blackboard, run?)}
+  end
+
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :battleground_event, datalong: event}, _target, _now) do
+    effect = %Effects.BattlegroundCreatureEvent{
+      world: state.internal.world,
+      creature_guid: state.object.guid,
+      creature_entry: state.object.entry,
+      event: event
+    }
+
+    {Effects.enqueue(state, effect), blackboard}
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :despawn} = step, _target_guid, _now) do

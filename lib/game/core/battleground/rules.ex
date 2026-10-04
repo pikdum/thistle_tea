@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Core.Battleground.Rules do
 
   alias ThistleTea.Game.Core.Battleground.AlteracValley
   alias ThistleTea.Game.Core.Battleground.ArathiBasin
+  alias ThistleTea.Game.Core.Battleground.Result
   alias ThistleTea.Game.Core.Battleground.WarsongGulch
 
   def for_map(30), do: AlteracValley
@@ -25,4 +26,7 @@ defmodule ThistleTea.Game.Core.Battleground.Rules do
   def weekend_event(30), do: 18
   def weekend_event(489), do: 19
   def weekend_event(529), do: 20
+
+  def creature_event(%AlteracValley{} = match, entry, event), do: AlteracValley.creature_event(match, entry, event)
+  def creature_event(match, _entry, _event), do: %Result{match: match}
 end

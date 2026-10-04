@@ -64,6 +64,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
       quests = quest_items(guid, character)
 
       case Battlegrounds.gossip_menu(character, guid) || creature_menu(guid) || greeting_menu(guid) do
+        :handled -> state
         %Menu{} = menu -> send_menu(guid, menu, quests, state)
         nil when quests != [] -> send_menu(guid, %Menu{text_id: @default_gossip_text_id, options: []}, quests, state)
         nil -> Vendor.list(state, guid)

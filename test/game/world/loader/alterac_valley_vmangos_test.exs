@@ -11,6 +11,31 @@ defmodule ThistleTea.Game.World.Loader.AlteracValleyVMangosTest do
   @moduletag :vmangos_db
 
   describe "Alterac event catalog" do
+    test "each wing commander has her supply quest and a route home" do
+      for {entry, quest_id, item_id, final_point} <- [
+            {13_179, 6_825, 17_326, 74},
+            {13_180, 6_826, 17_327, 84},
+            {13_181, 6_827, 17_328, 97},
+            {13_438, 6_942, 17_502, 66},
+            {13_439, 6_941, 17_503, 76},
+            {13_437, 6_943, 17_504, 92}
+          ] do
+        quest = Mangos.Repo.get!(Mangos.QuestTemplate, quest_id)
+        assert {quest.req_item_id1, quest.req_item_count1, quest.method} == {item_id, 1, 0}
+
+        points =
+          Mangos.Repo.all(from(point in Mangos.ScriptWaypoint, where: point.entry == ^entry, select: point.point))
+
+        assert 0 in points and final_point in points
+
+        assert Mangos.Repo.exists?(
+                 from(relation in Mangos.CreatureQuestRelation,
+                   where: relation.id == ^entry and relation.quest == ^quest_id
+                 )
+               )
+      end
+    end
+
     test "the altar spell overrides supply one boss summon apiece" do
       for {spell_id, entry} <- [{21_249, 13_256}, {21_648, 13_419}] do
         assert [override] = Mangos.Repo.all(from(mod in Mangos.SpellEffectMod, where: mod.id == ^spell_id))

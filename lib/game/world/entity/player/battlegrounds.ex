@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Battleground
   alias ThistleTea.Game.Core.Battleground.AlteracValley
+  alias ThistleTea.Game.Core.Battleground.AlteracValley.Air
   alias ThistleTea.Game.Core.Battleground.Deserter
   alias ThistleTea.Game.Core.Battleground.Entrance
   alias ThistleTea.Game.Core.Battleground.Flags
@@ -56,17 +57,42 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
 
   def quest_rewarded(state, _quest_id), do: state
 
-  def gossip_menu(%Character{internal: %{world: %WorldRef{map_id: 30, instance_id: id} = world}} = character, guid)
+  def gossip_menu(%Character{internal: %{world: %WorldRef{map_id: 30, instance_id: id}}} = character, guid)
       when is_integer(id) do
-    if AlteracValley.gossip_entry?(World.entry(guid)) && QuestGiver.interactable?(character, guid) do
-      case BattlegroundSystem.gossip(world, character.object.guid, World.entry(guid), upgrade_standing(character)) do
-        nil -> nil
-        menu -> build_gossip_menu(menu)
-      end
+    if QuestGiver.interactable?(character, guid) do
+      alterac_menu(character, World.entry(guid))
     end
   end
 
   def gossip_menu(%Character{}, _guid), do: nil
+
+  defp alterac_menu(character, entry) do
+    cond do
+      Air.commander?(entry) ->
+        rescue_commander(character, entry)
+
+      AlteracValley.gossip_entry?(entry) ->
+        case BattlegroundSystem.gossip(
+               character.internal.world,
+               character.object.guid,
+               entry,
+               upgrade_standing(character)
+             ) do
+          nil -> nil
+          menu -> build_gossip_menu(menu)
+        end
+
+      true ->
+        nil
+    end
+  end
+
+  defp rescue_commander(character, entry) do
+    case BattlegroundSystem.interact(character.internal.world, character.object.guid, entry, :rescue_commander, 0) do
+      :close -> :handled
+      :unhandled -> nil
+    end
+  end
 
   def select_gossip(%{character: %Character{} = character} = state, guid, action) do
     if QuestGiver.interactable?(character, guid) do
