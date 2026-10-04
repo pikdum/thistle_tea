@@ -2279,7 +2279,9 @@ defmodule ThistleTea.Game.Core.AI.Script do
   defp flag?(flags, mask) when is_integer(flags), do: (flags &&& mask) != 0
   defp flag?(_flags, _mask), do: false
 
-  defp player_reaction_allows?(:nearest_hostile_player, source, target), do: Hostility.hostile?(source, target)
+  defp player_reaction_allows?(:nearest_hostile_player, source, target),
+    do: Hostility.valid_hostile_target?(source, target)
+
   defp player_reaction_allows?(:nearest_friendly_player, source, target), do: Hostility.friendly?(source, target)
 
   defp distance_extreme(candidates, perception, direction) do

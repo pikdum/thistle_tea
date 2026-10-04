@@ -412,6 +412,28 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
       assert [%Effects.SetFacing{facing: {:target, ^friendly}}] = mob.internal.events
     end
 
+    test "nearest hostile player passes over dead players", %{mob: mob} do
+      dead = Guid.from_low_guid(:player, 1)
+      living = Guid.from_low_guid(:player, 2)
+      mob_faction = %FactionTemplate{faction: 15, faction_group: 8, friend_group: 8, enemy_group: 1}
+      player_faction = %FactionTemplate{faction: 1, faction_group: 1, friend_group: 1, enemy_group: 8}
+      mob = %{mob | unit: %{mob.unit | faction_template: mob_faction}}
+
+      observations = %{
+        mob.object.guid => %Observation{guid: mob.object.guid, metadata: %{faction_template: mob_faction}},
+        dead => %Observation{guid: dead, distance: 4.0, metadata: %{faction_template: player_faction, alive?: false}},
+        living => %Observation{guid: living, distance: 8.0, metadata: %{faction_template: player_faction, alive?: true}}
+      }
+
+      nearby = %{mobs: [], players: [{dead, 4.0}, {living, 8.0}], game_objects: []}
+      context = Context.new(0, perception: Perception.new(0, nil, observations, nearby))
+      step = %ScriptStep{command: :turn_to, target_type: :nearest_hostile_player, target_param1: 20}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, context)
+
+      assert [%Effects.SetFacing{facing: {:target, ^living}}] = mob.internal.events
+    end
+
     test "flee marks the blackboard and emotes when a victim exists", %{mob: mob} do
       victim = Guid.from_low_guid(:player, 7)
       mob = %{mob | unit: %{mob.unit | target: victim}}
