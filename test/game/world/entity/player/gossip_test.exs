@@ -79,6 +79,20 @@ defmodule ThistleTea.Game.World.Entity.Player.GossipTest do
       Gossip.hello(state, creature_guid)
       assert_receive {:"$gen_cast", {:send_packet, %SmsgGossipMessage{title_text_id: 738}}}
     end
+
+    test "greets with the spawn's own text when the creature has no menu" do
+      player_guid = Guid.from_low_guid(:player, Unique.integer())
+      db_guid = Unique.integer()
+      creature_guid = Guid.from_low_guid(:mob, Unique.integer(), Unique.integer())
+      :ets.insert(GossipLoader, {{:npc_text, db_guid}, 1_693})
+      on_exit(fn -> :ets.delete(GossipLoader, {:npc_text, db_guid}) end)
+
+      beside(creature_guid)
+      Metadata.update(creature_guid, %{db_guid: db_guid})
+
+      Gossip.hello(%{character: character(player_guid), gossip_menu_options: []}, creature_guid)
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgGossipMessage{title_text_id: 1_693, gossips: []}}}
+    end
   end
 
   describe "send_menu/4" do

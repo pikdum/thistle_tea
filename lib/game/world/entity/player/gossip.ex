@@ -2,7 +2,8 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
   @moduledoc """
   Player boundary for conditioned gossip menus and actions. A player talks to
   a creature only while it lives, is not hostile, and stands within vmangos
-  interaction reach, both to open its menu and to pick an option.
+  interaction reach, both to open its menu and to pick an option. A creature
+  without a menu greets with its spawn's `npc_gossip` text, as in vmangos.
   """
 
   alias ThistleTea.Game.Core.AI.BT.Blackboard
@@ -62,7 +63,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
       Entity.pause_for_talk(guid)
       quests = quest_items(guid, character)
 
-      case Battlegrounds.gossip_menu(character, guid) || creature_menu(guid) do
+      case Battlegrounds.gossip_menu(character, guid) || creature_menu(guid) || greeting_menu(guid) do
         %Menu{} = menu -> send_menu(guid, menu, quests, state)
         nil when quests != [] -> send_menu(guid, %Menu{text_id: @default_gossip_text_id, options: []}, quests, state)
         nil -> Vendor.list(state, guid)
@@ -78,6 +79,15 @@ defmodule ThistleTea.Game.World.Entity.Player.Gossip do
     case Metadata.query(guid, [:gossip_menu_id]) do
       %{gossip_menu_id: menu_id} when is_integer(menu_id) -> GossipLoader.get_menu(menu_id)
       _template -> GossipLoader.menu_for_creature(World.entry(guid))
+    end
+  end
+
+  defp greeting_menu(guid) do
+    with %{db_guid: db_guid} when is_integer(db_guid) <- Metadata.query(guid, [:db_guid]),
+         text_id when is_integer(text_id) <- GossipLoader.npc_text(db_guid) do
+      %Menu{text_id: text_id, options: []}
+    else
+      _none -> nil
     end
   end
 

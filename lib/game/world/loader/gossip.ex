@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   sets `talk_credit?` false, since its C++ handler closes the window itself.
   A scripted option with a reply text leads to a menu of its own, keyed
   `{:creature_reply, entry, option_id}`, that shows the text and nothing else.
+  `npc_gossip` gives a spawn without a menu the greeting text it opens with.
   """
   import Ecto.Query
 
@@ -190,6 +191,10 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
       :ets.insert(__MODULE__, {{:creature_npc_flags, creature_entry}, npc_flags})
     end)
 
+    Mangos.NpcGossip
+    |> Mangos.Repo.all()
+    |> Enum.each(&:ets.insert(__MODULE__, {{:npc_text, &1.npc_guid}, &1.text_id}))
+
     from(ct in Mangos.CreatureTemplate,
       where: fragment("? & ?", ct.npc_flags, ^@npc_flag_trainer) != 0,
       select: {ct.entry, ct.trainer_type, ct.trainer_class, ct.trainer_race}
@@ -225,6 +230,13 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   def get_menu(menu_id) do
     case :ets.lookup(__MODULE__, {:menu, menu_id}) do
       [{_key, %Menu{} = menu}] -> menu
+      _ -> nil
+    end
+  end
+
+  def npc_text(db_guid) do
+    case :ets.lookup(__MODULE__, {:npc_text, db_guid}) do
+      [{_key, text_id}] -> text_id
       _ -> nil
     end
   end
