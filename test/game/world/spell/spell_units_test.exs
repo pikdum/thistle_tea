@@ -287,6 +287,18 @@ defmodule ThistleTea.Game.World.Spell.SpellUnitsTest do
       assert [%Effects.SpellCastFailed{}] = EffectResolver.resolve(caster, trigger)
     end
 
+    test "item casts check their requirements against the resolved creature", %{caster: caster, spell: spell} do
+      mob = spawn_mob(caster, 100, {1.0, 0.0, 0.0})
+      self_target = Target.self(caster.object.guid)
+
+      item_cast = SpellRequirements.resolve(caster, spell, self_target, cast_item_guid: 123)
+      assert Target.unit_guid(item_cast.cast_target.targets) == mob.object.guid
+      assert item_cast.cast_target.info.guid == mob.object.guid
+
+      plain_cast = SpellRequirements.resolve(caster, spell, self_target)
+      assert plain_cast.cast_target.targets == self_target
+    end
+
     test "item casts report the resolved creature as their selected target", %{caster: caster, spell: spell} do
       mob = spawn_mob(caster, 100, {1.0, 0.0, 0.0})
       casting = caster |> Casting.start(spell, Target.self(caster.object.guid), 1_000, 123) |> Casting.complete(1_000)

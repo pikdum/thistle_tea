@@ -388,7 +388,10 @@ defmodule ThistleTea.Game.World.Entity.Player.Spellcasting do
          :ok <- check_party_unit_target(character, spell, targets),
          :ok <- check_object_target(state, spell, targets),
          :ok <- LocationTargets.validate(spell, locations),
-         :ok <- UnitTargets.validate(spell, SpellUnits.resolve(character, spell, targets)) do
+         units = SpellUnits.resolve(character, spell, targets),
+         :ok <- UnitTargets.validate(spell, units) do
+      targets = UnitTargets.item_selection(targets, units, cast_item_guid)
+
       CastValidation.validate(
         character,
         spell,

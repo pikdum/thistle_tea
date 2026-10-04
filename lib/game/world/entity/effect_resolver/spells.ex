@@ -87,7 +87,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
       %Effects.CastRequirementsResolved{
         cast: cast,
         now: now,
-        requirements: SpellRequirements.resolve(entity, cast.spell, cast.targets)
+        requirements: SpellRequirements.resolve(entity, cast.spell, cast.targets, cast_item_guid: cast.cast_item_guid)
       }
     ]
   end

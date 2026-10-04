@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.Spell.SpellRequirements do
   alias ThistleTea.Game.Core.Spell.LocationTargets
   alias ThistleTea.Game.Core.Spell.Requirements
   alias ThistleTea.Game.Core.Spell.Target
+  alias ThistleTea.Game.Core.Spell.UnitTargets
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Reaction
@@ -22,9 +23,13 @@ defmodule ThistleTea.Game.World.Spell.SpellRequirements do
   alias ThistleTea.Game.World.Spell.SpellUnits
   alias ThistleTea.Game.World.Visibility
 
-  def resolve(caster, %Spell{} = spell, targets \\ Target.none()) do
+  def resolve(caster, %Spell{} = spell, targets \\ Target.none(), opts \\ []) do
     requirements = resolve_targets(caster, spell, targets)
-    targets = LocationTargets.apply(targets, requirements.locations)
+
+    targets =
+      targets
+      |> LocationTargets.apply(requirements.locations)
+      |> UnitTargets.item_selection(requirements.units, Keyword.get(opts, :cast_item_guid))
 
     %{
       requirements
