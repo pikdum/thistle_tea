@@ -214,6 +214,19 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSpellCastTest do
     end
   end
 
+  describe "scripted activation" do
+    test "a creature uses a quest object in place, with no player quest checks", %{object: object} do
+      user = mob(object, 100, 1.0)
+      {:ok, pid} = World.start_entity(object)
+      on_exit(fn -> World.stop_entity(object.object.guid) end)
+
+      send(pid, {:script_activate_object, user.object.guid})
+
+      assert :sys.get_state(pid).internal.object_action.active?
+      refute_received {:"$gen_cast", {:use_quest_object, _, _}}
+    end
+  end
+
   describe "finish_spell/3" do
     test "quest objects resolve nearby creatures instead of the user", %{object: object, spell: spell} do
       user = player(object, 1.0)

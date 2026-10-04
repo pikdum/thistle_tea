@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   alias ThistleTea.Game.Core.GameObject.GameObjectActions
   alias ThistleTea.Game.Core.GameObject.GameObjectInteraction
   alias ThistleTea.Game.Core.GameObject.Goober
+  alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Loot.Actor
   alias ThistleTea.Game.Core.Loot.Commit
   alias ThistleTea.Game.Core.Loot.LootSession
@@ -296,17 +297,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
         _from,
         %GameObject{internal: %{goober: %Internal.Goober{}}} = state
       ) do
-    {result, updated} = GooberServer.use(state, user_guid, world, quest_allowed?, Time.now())
-
-    updated =
-      if result == :activated do
-        trigger_linked_objects(updated, user_guid)
-        GooberServer.start_script(updated, user_guid)
-        GooberServer.start_spell(updated, user_guid)
-      else
-        updated
-      end
-
+    {result, updated} = use_goober(state, user_guid, world, quest_allowed?)
     {:reply, result, flush_actions(updated)}
   rescue
     error ->
@@ -459,8 +450,17 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
       when type in [0, 1], do: use_object(state, user_guid)
 
   def handle_info({:script_activate_object, user_guid}, %GameObject{internal: %{goober: %Internal.Goober{}}} = state) do
-    Entity.use_quest_object(user_guid, state.object.guid, state.internal.world)
-    {:noreply, state}
+    if Guid.entity_type(user_guid) == :player do
+      Entity.use_quest_object(user_guid, state.object.guid, state.internal.world)
+      {:noreply, state}
+    else
+      {_result, state} = use_goober(state, user_guid, state.internal.world, true)
+      {:noreply, flush_actions(state)}
+    end
+  rescue
+    error ->
+      Logger.error("Scripted goober use failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
   end
 
   def handle_info({:script_activate_object, _user_guid}, %GameObject{} = state) do
@@ -701,6 +701,18 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   end
 
   defp stop_linked_objects(%GameObject{}), do: :ok
+
+  defp use_goober(%GameObject{} = state, user_guid, world, quest_allowed?) do
+    {result, updated} = GooberServer.use(state, user_guid, world, quest_allowed?, Time.now())
+
+    if result == :activated do
+      trigger_linked_objects(updated, user_guid)
+      GooberServer.start_script(updated, user_guid)
+      {result, GooberServer.start_spell(updated, user_guid)}
+    else
+      {result, updated}
+    end
+  end
 
   defp trigger_linked_objects(%GameObject{internal: %{summon: %Summon{linked_guids: [_ | _] = guids}}}, user_guid) do
     Enum.each(guids, fn guid ->
