@@ -34,7 +34,7 @@ defmodule ThistleTea.Game.Core.AI.EventScriptTest do
 
   describe "summon_entries/0" do
     test "lists every creature a ported event or its summons call" do
-      assert Enum.sort(EventScript.summon_entries()) == [4_100, 4_490, @toxicologist]
+      assert Enum.sort(EventScript.summon_entries()) == [4_100, 4_490, @toxicologist, 14_500]
     end
   end
 end
