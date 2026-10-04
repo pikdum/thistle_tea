@@ -71,6 +71,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.TwilightCorrupter
   alias ThistleTea.Game.Core.AI.CreatureScript.WesternPlaguelands
   alias ThistleTea.Game.Core.AI.CreatureScript.WitchDoctorUnbagwa
+  alias ThistleTea.Game.Core.AI.CreatureScript.Yenniku
   alias ThistleTea.Game.Core.AI.CreatureScript.ZulFarrak
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.ScriptStep
@@ -126,6 +127,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     TwilightCorrupter,
     WesternPlaguelands,
     WitchDoctorUnbagwa,
+    Yenniku,
     ZulFarrak
   ]
   @timed_script 1
