@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.DashelStonefist
   alias ThistleTea.Game.Core.AI.CreatureScript.DragonsOfNightmare
   alias ThistleTea.Game.Core.AI.CreatureScript.ElementalInvaders
+  alias ThistleTea.Game.Core.AI.CreatureScript.Emberstrife
   alias ThistleTea.Game.Core.AI.CreatureScript.Eranikus
   alias ThistleTea.Game.Core.AI.CreatureScript.ErisHavenfire
   alias ThistleTea.Game.Core.AI.CreatureScript.Faulk
@@ -99,6 +100,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     DashelStonefist,
     DragonsOfNightmare,
     ElementalInvaders,
+    Emberstrife,
     Eranikus,
     ErisHavenfire,
     Faulk,
