@@ -4,10 +4,22 @@ defmodule ThistleTea.Game.World.Loader.BattlegroundVMangosTest do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Core.Battleground.Entrance
   alias ThistleTea.Game.Core.Battleground.Template
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
 
   @moduletag :vmangos_db
+
+  test "catalogs each battleground's portals for both teams" do
+    table = :ets.new(:battleground_entrance_vmangos_test, [:set, :public])
+    BattlegroundLoader.load_entrances(Mangos.Repo.all(Mangos.AreaTriggerBgEntrance), table)
+
+    assert %Entrance{team: :alliance, type_id: 2, exit_map: 1} = BattlegroundLoader.entrance(3650, table)
+    assert %Entrance{team: :horde, type_id: 1, exit_map: 0} = BattlegroundLoader.entrance(2413, table)
+
+    assert Enum.frequencies_by([2412, 2413, 3650, 3654, 3953, 3954], &BattlegroundLoader.entrance(&1, table).type_id) ==
+             %{1 => 2, 2 => 2, 3 => 2}
+  end
 
   test "pins the WSG template, battlemasters, and event-controlled spawns" do
     table = :ets.new(:battleground_vmangos_test, [:set, :public])

@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.Battleground do
   @moduledoc """
-  ETS catalog of VMangos battleground admission and event-spawn data.
+  ETS catalog of VMangos battleground admission and event-spawn data, and
+  the portals in the world that lead to each battleground.
   """
 
   import Ecto.Query
@@ -8,6 +9,7 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
   alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.Battleground
+  alias ThistleTea.Game.Core.Battleground.Entrance
   alias ThistleTea.Game.Core.Battleground.Template
 
   @supported_patch 10
@@ -43,6 +45,7 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
     battlemasters = Mangos.Repo.all(Mangos.BattlemasterEntry)
     safe_locs = load_safe_locs(templates)
     event_members = Enum.flat_map([30, 489, 529], &load_event_members/1)
+    load_entrances(Mangos.Repo.all(Mangos.AreaTriggerBgEntrance))
     load(templates, safe_locs, battlemasters, event_members)
   end
 
@@ -83,6 +86,12 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
 
     :ok
   end
+
+  def load_entrances(rows, table \\ __MODULE__) do
+    Enum.each(rows, &:ets.insert(table, {{:entrance, &1.id}, Entrance.from_row(&1)}))
+  end
+
+  def entrance(trigger_id, table \\ __MODULE__) when is_integer(trigger_id), do: lookup(table, {:entrance, trigger_id})
 
   def template_for_map(map_id, table \\ __MODULE__) when is_integer(map_id) do
     lookup(table, {:map, map_id})

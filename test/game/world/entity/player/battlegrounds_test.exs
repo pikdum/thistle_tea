@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.Entity.Player.BattlegroundsTest do
 
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Battleground.Entrance
   alias ThistleTea.Game.Core.Battleground.Template
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
@@ -93,6 +94,20 @@ defmodule ThistleTea.Game.World.Entity.Player.BattlegroundsTest do
     end
   end
 
+  describe "enter_portal/2" do
+    test "shows its own team the battleground list and turns the other away", %{leader: leader} do
+      alliance = portal(:alliance)
+      state = leader |> state() |> Map.put(:battleground_portal, nil)
+
+      assert %{battleground_portal: ^alliance} = Battlegrounds.enter_portal(state, alliance)
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgBattlefieldList{guid: 0, map: 489}}}
+
+      assert Battlegrounds.enter_portal(state, %{alliance | team: :horde}) == state
+      message = "You must be in the Horde and at least 10th level to enter."
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgAreaTriggerMessage{message: ^message}}}
+    end
+  end
+
   describe "port/2" do
     test "rechecks Deserter and cancels an earlier invitation", %{leader: leader} do
       state = state(leader)
@@ -103,6 +118,25 @@ defmodule ThistleTea.Game.World.Entity.Player.BattlegroundsTest do
       assert BattlegroundSystem.status(state.guid).status == :none
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgBattlefieldStatus{status: :none}}}
       refute_received {:"$gen_cast", {:start_teleport, _, _, _, _, _}}
+    end
+
+    test "returns a player who accepts beside the portal to its exit", %{leader: leader} do
+      state = leader |> state() |> Map.put(:battleground_portal, portal(:alliance))
+      assert {:ok, ^state} = Battlegrounds.debug_join_solo(state, 489)
+      Battlegrounds.port(state, 1)
+
+      assert BattlegroundSystem.leave(state.guid, {1.0, 2.0, 3.0, 4.0}) ==
+               {:ok, {WorldRef.open(0), {30.0, 0.0, 0.0, 1.5}}}
+    end
+
+    test "returns a player who accepts far from the portal to where they stood", %{leader: leader} do
+      far = %{portal(:alliance) | exit_position: {300.0, 0.0, 0.0, 1.5}}
+      state = leader |> state() |> Map.put(:battleground_portal, far)
+      assert {:ok, ^state} = Battlegrounds.debug_join_solo(state, 489)
+      Battlegrounds.port(state, 1)
+
+      assert BattlegroundSystem.leave(state.guid, {1.0, 2.0, 3.0, 4.0}) ==
+               {:ok, {WorldRef.open(0), {0.0, 0.0, 0.0, 0.0}}}
     end
   end
 
@@ -122,9 +156,12 @@ defmodule ThistleTea.Game.World.Entity.Player.BattlegroundsTest do
     assert {:ok, _group} = PartySystem.accept(member.object.guid, member.internal.name)
   end
 
+  defp portal(team),
+    do: %Entrance{trigger_id: 3650, team: team, type_id: 2, exit_map: 0, exit_position: {30.0, 0.0, 0.0, 1.5}}
+
   defp catalog(_context) do
-    key = {:map, 489}
-    previous = :ets.lookup(BattlegroundLoader, key)
+    keys = [{:map, 489}, {:type, 2}]
+    previous = Enum.flat_map(keys, &:ets.lookup(BattlegroundLoader, &1))
 
     template = %Template{
       type_id: 2,
@@ -137,10 +174,10 @@ defmodule ThistleTea.Game.World.Entity.Player.BattlegroundsTest do
       horde_start: {5.0, 6.0, 7.0, 8.0}
     }
 
-    :ets.insert(BattlegroundLoader, {key, template})
+    Enum.each(keys, &:ets.insert(BattlegroundLoader, {&1, template}))
 
     on_exit(fn ->
-      :ets.delete(BattlegroundLoader, key)
+      Enum.each(keys, &:ets.delete(BattlegroundLoader, &1))
       :ets.insert(BattlegroundLoader, previous)
     end)
 

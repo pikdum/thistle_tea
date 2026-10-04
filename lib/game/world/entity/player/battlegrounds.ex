@@ -1,12 +1,15 @@
 defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
   @moduledoc """
   Player boundary for battleground admission, status, travel, and queries.
+  Walking into a battleground's portal shows its list to an eligible player,
+  who later returns to the portal's exit if they accept the invitation near it.
   """
 
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Battleground
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Armor
   alias ThistleTea.Game.Core.Battleground.Deserter
+  alias ThistleTea.Game.Core.Battleground.Entrance
   alias ThistleTea.Game.Core.Battleground.Flags
   alias ThistleTea.Game.Core.Battleground.Resurrection, as: BattlegroundResurrection
   alias ThistleTea.Game.Core.Battleground.Rules
@@ -36,6 +39,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   @interaction_range 10.0
+  @portal_range 50.0
 
   def remove_flags(%{character: %Character{} = character} = state) do
     {character, events} = Flags.remove(character, Time.now())
@@ -115,6 +119,24 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
 
     state
   end
+
+  def enter_portal(%{ready: true, character: %Character{} = character} = state, %Entrance{} = entrance) do
+    team = Battleground.team_for_race(character.unit.race)
+
+    with %{} = template <- BattlegroundLoader.template_for_type(entrance.type_id),
+         :ok <- Entrance.admit(entrance, template, team, character.unit.level) do
+      send_list(%{state | battleground_portal: entrance}, template.map_id, 0)
+    else
+      {:error, message} ->
+        Outbound.send_packet(%Message.SmsgAreaTriggerMessage{message: message})
+        state
+
+      nil ->
+        state
+    end
+  end
+
+  def enter_portal(state, _entrance), do: state
 
   def list(%{ready: true} = state, map_id), do: send_list(state, map_id, 0)
   def list(state, _map_id), do: state
@@ -212,7 +234,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
   def port(state, _action), do: state
 
   defp enter_or_decline(state, action) do
-    case BattlegroundSystem.port(state.guid, action, return_destination(state.character)) do
+    case BattlegroundSystem.port(state.guid, action, return_destination(state)) do
       {:ok, world, {x, y, z, orientation}} ->
         GenServer.cast(self(), {:start_teleport, x, y, z, orientation, world})
 
@@ -429,7 +451,17 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
     }
   end
 
-  defp return_destination(character) do
+  defp return_destination(%{battleground_portal: %Entrance{} = entrance, character: character} = state) do
+    {x, y, z, _orientation} = character.movement_block.position
+    {exit_x, exit_y, exit_z, _exit_orientation} = entrance.exit_position
+
+    if character.internal.world.map_id == entrance.exit_map and
+         Math.distance({x, y, z}, {exit_x, exit_y, exit_z}) <= @portal_range,
+       do: {WorldRef.open(entrance.exit_map), entrance.exit_position},
+       else: return_destination(%{state | battleground_portal: nil})
+  end
+
+  defp return_destination(%{character: character}) do
     {x, y, z, orientation} = character.movement_block.position
     {character.internal.world, {x, y, z, orientation}}
   end

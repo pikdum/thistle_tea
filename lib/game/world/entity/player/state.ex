@@ -77,6 +77,7 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
     :mail_session_token,
     :mail_delivery_ref,
     :pending_last_instance_map,
+    :battleground_portal,
     :transport_refresh_pending,
     :taxi_arrival_ref,
     :server_movement,

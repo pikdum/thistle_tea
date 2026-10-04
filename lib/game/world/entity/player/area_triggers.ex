@@ -1,7 +1,8 @@
 defmodule ThistleTea.Game.World.Entity.Player.AreaTriggers do
   @moduledoc """
   Validates area-trigger proximity and applies quest, script, rest, and
-  cached portal behavior for a player. A living player who enters a scripted
+  cached portal behavior for a player. A battleground's entrance offers its
+  list instead of a teleport. A living player who enters a scripted
   trigger runs its script on themselves, unless the trigger is still resting
   from its cooldown in their world.
   """
@@ -13,6 +14,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AreaTriggers do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.AreaTriggerCooldown
   alias ThistleTea.Game.World.Entity
+  alias ThistleTea.Game.World.Entity.Player.Battlegrounds
   alias ThistleTea.Game.World.Entity.Player.ConditionContext
   alias ThistleTea.Game.World.Entity.Player.Corpses
   alias ThistleTea.Game.World.Entity.Player.Instances
@@ -20,6 +22,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AreaTriggers do
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.Entity.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
+  alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Outbound
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
@@ -82,10 +85,10 @@ defmodule ThistleTea.Game.World.Entity.Player.AreaTriggers do
   end
 
   defp enter_tavern_or_teleport(state, trigger_id) do
-    if AreaTriggerLoader.tavern?(trigger_id) do
-      PlayerRest.enter_tavern(state, trigger_id)
-    else
-      maybe_teleport(state, AreaTriggerLoader.teleport(trigger_id))
+    cond do
+      AreaTriggerLoader.tavern?(trigger_id) -> PlayerRest.enter_tavern(state, trigger_id)
+      entrance = BattlegroundLoader.entrance(trigger_id) -> Battlegrounds.enter_portal(state, entrance)
+      true -> maybe_teleport(state, AreaTriggerLoader.teleport(trigger_id))
     end
   end
 
