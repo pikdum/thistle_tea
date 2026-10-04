@@ -26,7 +26,8 @@ defmodule ThistleTea.Game.Core.Spell.SendEventTest do
       caster = caster |> Casting.start(spell(nil), Target.none(), 1_000) |> Casting.complete(1_000)
       guid = caster.object.guid
 
-      assert [%Effects.ScriptSteps{steps: @steps, target_guid: ^guid}] = script_events(caster)
+      assert [%Effects.ScriptSteps{steps: steps, target_guid: ^guid}] = script_events(caster)
+      assert steps == @steps
     end
 
     test "leaves an event without script steps silent", %{caster: caster} do
