@@ -5,7 +5,9 @@ defmodule ThistleTea.Game.Core.Condition.EntityContext do
   never change, for specializing its conditions when it is built. A perceived
   player target carries the quest, skill, reputation, and item facts its own
   process publishes as `condition_subject`, so creatures can gate on them the
-  way vmangos reads the player directly.
+  way vmangos reads the player directly. A player's own scripts read the
+  inventory, exploration, and reputation facts it published the same way,
+  since its struct alone cannot count the items it carries.
   """
 
   alias ThistleTea.Game.Core.AI.BT.Context, as: AIContext
@@ -31,7 +33,12 @@ defmodule ThistleTea.Game.Core.Condition.EntityContext do
   @game_object_flags 9
 
   def build(entity, %AIContext{} = ai_context, target_guid \\ nil) do
-    source = entity |> subject(ai_context.now) |> put_condition_area(ai_context.condition_area)
+    source =
+      entity
+      |> subject(ai_context.now)
+      |> put_condition_area(ai_context.condition_area)
+      |> put_own_facts(ai_context.perception)
+
     target = target_subject(source, ai_context.perception, target_guid)
 
     Context.new(
@@ -179,6 +186,27 @@ defmodule ThistleTea.Game.Core.Condition.EntityContext do
   end
 
   defp put_player_facts(subject, _published), do: subject
+
+  defp put_own_facts(%Subject{kind: :player, guid: guid} = subject, %Perception{} = perception) do
+    case Perception.metadata(perception, guid) do
+      %{condition_subject: %Subject{kind: :player, guid: ^guid} = published} ->
+        %{
+          subject
+          | team: published.team,
+            reputation: published.reputation,
+            explored_areas: published.explored_areas,
+            item_counts: published.item_counts,
+            item_counts_with_bank: published.item_counts_with_bank,
+            equipped_item_ids: published.equipped_item_ids,
+            argent_dawn_commission?: published.argent_dawn_commission?
+        }
+
+      _unpublished ->
+        subject
+    end
+  end
+
+  defp put_own_facts(subject, _perception), do: subject
 
   def metadata_subject(guid, metadata, opts \\ []) do
     %Subject{
