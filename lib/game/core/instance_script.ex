@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Core.InstanceScript do
   alias ThistleTea.Game.Core.InstanceScript.Stratholme
   alias ThistleTea.Game.Core.InstanceScript.SunkenTemple
   alias ThistleTea.Game.Core.InstanceScript.Uldaman
+  alias ThistleTea.Game.Core.InstanceScript.WailingCaverns
   alias ThistleTea.Game.Core.InstanceScript.ZulFarrak
 
   @adapters [
@@ -33,6 +34,7 @@ defmodule ThistleTea.Game.Core.InstanceScript do
     Stratholme,
     SunkenTemple,
     Uldaman,
+    WailingCaverns,
     ZulFarrak
   ]
 
@@ -131,6 +133,7 @@ defmodule ThistleTea.Game.Core.InstanceScript do
   defp adapter("instance_stratholme"), do: Stratholme
   defp adapter("instance_sunken_temple"), do: SunkenTemple
   defp adapter("instance_uldaman"), do: Uldaman
+  defp adapter("instance_wailing_caverns"), do: WailingCaverns
   defp adapter("instance_zulfarrak"), do: ZulFarrak
   defp adapter(_script_name), do: nil
 end
