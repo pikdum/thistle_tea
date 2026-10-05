@@ -11,6 +11,28 @@ defmodule ThistleTea.Game.Core.Spell.BattlegroundTest do
   alias ThistleTea.Game.Core.Spell.Target
 
   describe "validate/2" do
+    test "beacon planting requires an active match and the item's team" do
+      for {ids, team, opponent} <- [
+            {[21_355, 21_370, 21_371], :horde, :alliance},
+            {[21_728, 21_729, 21_730], :alliance, :horde}
+          ],
+          id <- ids do
+        spell = %Spell{id: id}
+        assert Battleground.restricted?(spell)
+        assert Battleground.validate(spell, %{map_id: 30, phase: :active, team: team}) == :ok
+
+        for context <- [
+              nil,
+              %{map_id: 30, phase: :active, team: opponent},
+              %{map_id: 529, phase: :active, team: team},
+              %{map_id: 30, phase: :countdown, team: team},
+              %{map_id: 30, phase: {:ended, team}, team: team}
+            ] do
+          assert Battleground.validate(spell, context) == {:error, :requires_area}
+        end
+      end
+    end
+
     test "requires actual membership for battleground-only spells" do
       spell = %Spell{id: 23_034, attributes: MapSet.new([:only_battlegrounds])}
       assert Battleground.restricted?(spell)

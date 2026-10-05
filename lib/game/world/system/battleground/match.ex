@@ -4,6 +4,8 @@ defmodule ThistleTea.Game.World.System.Battleground.Match do
   """
   use GenServer
 
+  alias ThistleTea.Game.Core.Battleground.AlteracValley
+  alias ThistleTea.Game.Core.Battleground.AlteracValley.Air
   alias ThistleTea.Game.Core.Battleground.Effects.ExitPlayers
   alias ThistleTea.Game.Core.Battleground.Result
   alias ThistleTea.Game.Core.Battleground.Rules
@@ -51,6 +53,7 @@ defmodule ThistleTea.Game.World.System.Battleground.Match do
   def quest_rewarded(server, guid, quest_id), do: GenServer.cast(server, {:quest_rewarded, guid, quest_id})
   def creature_event(server, effect), do: GenServer.cast(server, {:creature_event, effect})
   def gossip(server, guid, entry, standing), do: GenServer.call(server, {:gossip, guid, entry, standing})
+  def take_beacon(server, guid, entry, standing), do: GenServer.call(server, {:take_beacon, guid, entry, standing})
 
   def interact(server, guid, entry, action, standing),
     do: GenServer.call(server, {:interact, guid, entry, action, standing})
@@ -169,6 +172,19 @@ defmodule ThistleTea.Game.World.System.Battleground.Match do
       Logger.error("Battleground gossip failed: #{Exception.message(error)}")
       {:reply, nil, state}
   end
+
+  def handle_call({:take_beacon, guid, entry, standing}, _from, %{match: %AlteracValley{}} = state) do
+    case Air.take_beacon(state.match, guid, entry, standing) do
+      {:ok, item, result} -> {:reply, {:ok, item}, apply_result(state, result)}
+      {:error, reason, result} -> {:reply, {:error, reason}, apply_result(state, result)}
+    end
+  rescue
+    error ->
+      Logger.error("Battleground beacon issue failed: #{Exception.message(error)}")
+      {:reply, {:error, :unavailable}, state}
+  end
+
+  def handle_call({:take_beacon, _guid, _entry, _standing}, _from, state), do: {:reply, {:error, :unavailable}, state}
 
   def handle_call({:interact, guid, entry, action, standing}, _from, state) do
     {reply, result} = state.rules.interact(state.match, guid, entry, action, standing)

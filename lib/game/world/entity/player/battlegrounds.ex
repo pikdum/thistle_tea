@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
+  alias ThistleTea.Game.World.Entity.Player.AirBeacons
   alias ThistleTea.Game.World.Entity.Player.Gossip
   alias ThistleTea.Game.World.Entity.Player.QuestGiver
   alias ThistleTea.Game.World.Entity.Player.Reputation
@@ -99,6 +100,12 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
       nil -> nil
       menu -> build_gossip_menu(menu)
     end
+  end
+
+  def select_gossip(%{character: %Character{} = character} = state, guid, :take_air_beacon) do
+    if QuestGiver.interactable?(character, guid),
+      do: AirBeacons.take(state, World.entry(guid), upgrade_standing(character)),
+      else: state
   end
 
   def select_gossip(%{character: %Character{} = character} = state, guid, action) do

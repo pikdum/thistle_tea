@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
   alias ThistleTea.Game.Core.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Battleground.AlteracValley.Beacon
   alias ThistleTea.Game.Core.Combat.FactionTemplate
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
@@ -39,6 +40,55 @@ defmodule ThistleTea.Game.Core.Spell.CastingTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Test.Unique
+
+  describe "complete/3 beacon planting" do
+    test "beacons have an independent lifetime while ordinary summoned objects retain their owner" do
+      guid = Unique.integer()
+
+      character = %Character{
+        object: %Object{guid: guid},
+        unit: %Unit{health: 100, auras: []},
+        player: %Player{},
+        movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}},
+        internal: %Internal{world: WorldRef.instance(30, Unique.integer())}
+      }
+
+      for entry <- [178_545, 178_547, 178_549, 178_724, 178_725, 178_726, Unique.integer()] do
+        spell = %Spell{
+          id: Unique.integer(),
+          duration_ms: 0,
+          effects: [%Effect{type: :trans_door, misc_value: entry, implicit_target_a: :caster_destination}]
+        }
+
+        resolution = %{
+          channel_resolution()
+          | hits: [],
+            impacts: [],
+            followups: %{channel_resolution().followups | packet_hits: []}
+        }
+
+        cast =
+          spell
+          |> Cast.new(Target.self(guid), 1_000)
+          |> Cast.transition(:launch)
+          |> Cast.put_resolution(resolution)
+          |> Cast.transition(:impact)
+
+        result = Casting.complete(character, cast, 1_000)
+
+        assert %Effects.SummonGameObject{} =
+                 effect = Enum.find(result.internal.events, &is_struct(&1, Effects.SummonGameObject))
+
+        if Beacon.entry?(entry) do
+          assert effect.duration_ms == 0
+          refute effect.owned?
+        else
+          assert effect.duration_ms == 8_000
+          assert effect.owned?
+        end
+      end
+    end
+  end
 
   describe "cancel/2" do
     test "removes a channel aura from its recorded target after pet possession changes ownership" do

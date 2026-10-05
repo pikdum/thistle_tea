@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.Script.Request, as: ScriptRequest
+  alias ThistleTea.Game.Core.Battleground.AlteracValley.Beacon
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Ritual
@@ -44,6 +45,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   alias ThistleTea.Game.World.Entity.AIEnvironment
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.EventSink.Context
+  alias ThistleTea.Game.World.Entity.GameObject.AlteracBeacon
   alias ThistleTea.Game.World.Entity.GameObject.Chair
   alias ThistleTea.Game.World.Entity.GameObject.CheerSpeaker
   alias ThistleTea.Game.World.Entity.GameObject.Chest
@@ -88,7 +90,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   def init(%GameObject{} = state) do
     GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
-    state = monitor_owner(state)
+    state = state |> Beacon.prepare(Time.now()) |> monitor_owner()
     publish_condition_metadata(state)
     World.update_position(state)
     state = Visibility.join_entity(state)
@@ -107,6 +109,7 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
       |> ElementalRift.start()
       |> GhostMagnet.start()
       |> NecroticCamp.start()
+      |> AlteracBeacon.start()
       |> EventSink.emit_pending(Context.new(self()))
 
     {:noreply, state}
@@ -313,6 +316,19 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
   def handle_call({:loot_view, %Actor{} = actor}, _from, %GameObject{} = state) do
     {result, state} = Chest.view(state, actor)
     {:reply, result, state}
+  end
+
+  def handle_call(
+        {:open_lock, %Actor{} = actor, opened, _gain?},
+        _from,
+        %GameObject{internal: %{beacon: %Beacon{}}} = state
+      ) do
+    {result, state} = AlteracBeacon.open(state, actor, opened)
+    {:reply, result, state}
+  rescue
+    error ->
+      Logger.error("Beacon disarm failed: #{Exception.message(error)}")
+      {:reply, {:error, :bad_targets}, state}
   end
 
   def handle_call({:open_lock, %Actor{} = actor, opened, gain?}, {owner_pid, _tag}, %GameObject{} = state) do
@@ -604,6 +620,14 @@ defmodule ThistleTea.Game.World.Entity.GameObject do
 
   def handle_info(:rift_upkeep, %GameObject{} = state) do
     {:noreply, state |> ElementalRift.upkeep() |> EventSink.emit_pending(Context.new(self()))}
+  end
+
+  def handle_info(:alterac_beacon_summon, %GameObject{} = state) do
+    {:noreply, AlteracBeacon.summon(state)}
+  rescue
+    error ->
+      Logger.error("Beacon summon failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_info(:ghost_magnet_call, %GameObject{} = state) do

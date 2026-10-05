@@ -101,7 +101,10 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley.AirTest do
         home = Air.creature_event(departure.match, entry, 1).match
         assert Air.gossip(home, guid, entry, 0) == nil
         supplied = put_in(home.air[entry].count, goal)
-        assert %{options: [%{action: :launch_air_attack}]} = Air.gossip(supplied, guid, entry, 0)
+
+        assert %{options: [%{action: :take_air_beacon}, %{action: :launch_air_attack}]} =
+                 Air.gossip(supplied, guid, entry, 0)
+
         assert Air.gossip(supplied, guid, entry, -1) == nil
         assert Air.gossip(supplied, context.invited, entry, 0) == nil
         opponent = context[if(team == :alliance, do: :horde, else: :alliance)]
@@ -130,6 +133,57 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley.AirTest do
       home = Air.creature_event(rescue_again.match, 13_438, 1).match
       assert home.air[13_438] == %Air{phase: :ready, count: 90, launched?: true}
       assert {:close, %{effects: []}} = Air.interact(home, context.alliance, 13_438, :launch_air_attack, 0)
+    end
+  end
+
+  describe "take_beacon/4" do
+    test "each fleet resets supplies once and can grant another beacon after resupplying", context do
+      items = %{
+        13_179 => 17_324,
+        13_180 => 17_325,
+        13_181 => 17_323,
+        13_438 => 17_506,
+        13_439 => 17_507,
+        13_437 => 17_505
+      }
+
+      for {team, entry, _quest, goal, _rep} <- commanders() do
+        guid = context[team]
+        match = context.match
+        match = put_in(match.air[entry], %Air{phase: :ready, count: goal + 10})
+        item = Map.fetch!(items, entry)
+        assert {:ok, ^item, result} = Air.take_beacon(match, guid, entry, 0)
+        assert result.effects == []
+        assert result.match.air[entry].count == 0
+        assert {:error, :unavailable, %{match: retained}} = Air.take_beacon(result.match, guid, entry, 0)
+        assert retained == result.match
+        restocked = put_in(retained.air[entry].count, goal)
+
+        assert %{options: [%{action: :take_air_beacon}, %{action: :launch_air_attack}]} =
+                 Air.gossip(restocked, guid, entry, 0)
+
+        assert {:ok, ^item, again} = Air.take_beacon(restocked, guid, entry, 0)
+        assert again.match.air[entry].count == 0
+        assert Map.delete(again.match.air, entry) == Map.delete(context.match.air, entry)
+      end
+    end
+
+    test "unfunded, enemy, offline and low reputation requests preserve stockpiles", context do
+      match = context.match
+      match = put_in(match.air[13_179], %Air{phase: :ready, count: 90})
+
+      for {candidate, guid, standing} <- [
+            {match, context.alliance, 0},
+            {match, context.invited, 0},
+            {match, context.horde, -1},
+            {%{match | phase: :countdown}, context.horde, 0},
+            {put_in(match.air[13_179].phase, :returning), context.horde, 0},
+            {put_in(match.air[13_179].count, 89), context.horde, 0},
+            {put_in(match.air[13_179].launched?, true), context.horde, 0}
+          ] do
+        assert {:error, :unavailable, %{match: ^candidate, effects: []}} =
+                 Air.take_beacon(candidate, guid, 13_179, standing)
+      end
     end
   end
 

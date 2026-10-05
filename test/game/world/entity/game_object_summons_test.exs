@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSummonsTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.Unique
 
   setup [:templates]
 
@@ -59,6 +60,47 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSummonsTest do
   end
 
   describe "summon/4" do
+    test "an Alterac beacon retains its match lifetime after its caster exits", %{caster: caster} do
+      entry = 178_545
+      previous = GameObjectTemplateLoader.cached(entry)
+
+      GameObjectTemplateLoader.put(%GameObjectTemplate{
+        entry: entry,
+        type: 10,
+        size: 1.0,
+        flags: 0,
+        faction: 0,
+        data: [99]
+      })
+
+      world = WorldRef.instance(30, Unique.integer())
+      caster = %{caster | internal: %{caster.internal | world: world}}
+      owner = idle_owner()
+      effect = GameObjectSummons.prepare(caster, Effects.summon_game_object(entry, 0, owned?: false))
+      {:ok, object, pid} = GameObjectSummons.start(caster, effect, Context.new(owner))
+
+      on_exit(fn ->
+        World.stop_entity(object.object.guid)
+        if previous, do: GameObjectTemplateLoader.put(previous), else: :ets.delete(GameObjectTemplateLoader, entry)
+      end)
+
+      state = :sys.get_state(pid)
+      assert state.game_object.level == 0
+      assert state.game_object.faction == 84
+      assert state.game_object.created_by == nil
+      assert state.internal.summon.owner_pid == nil
+      assert state.internal.summon.owner_monitor == nil
+      assert state.internal.summon.despawn_in_ms == nil
+      assert state.internal.beacon.status == :waiting
+      assert Metadata.get(object.object.guid).go_spawned?
+      Process.exit(owner, :kill)
+      send(pid, :alterac_beacon_summon)
+      assert :sys.get_state(pid).internal.beacon.status == :waiting
+      assert World.position(object.object.guid) != nil
+      assert {^caster, %{}} = GameObjectSummons.dismiss(caster, %{})
+      assert Process.alive?(pid)
+    end
+
     test "only an owned ritual attaches to its creator's channel", %{caster: caster} do
       for owned? <- [true, false] do
         effect = %{request(caster, nil) | entry: 950_104, owned?: owned?}

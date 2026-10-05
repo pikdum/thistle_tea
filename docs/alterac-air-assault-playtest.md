@@ -1,7 +1,8 @@
 # Alterac Valley named air assaults
 
 This milestone adds the six supplied wing commanders' named air attacks.
-Planted beacons and their generic attackers remain a following milestone.
+Planted beacons and their generic attackers are covered by
+[the beacon acceptance notes](alterac-beacon-playtest.md).
 Reference behavior comes from
 `refs/vmangos/src/scripts/battlegrounds/battleground_alterac.cpp` and
 `refs/vmangos/src/game/Battlegrounds/BattleGroundAV.cpp`.

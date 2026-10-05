@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Entity.GameObject.Goober do
   @moduledoc "Object-owner boundary for quest-object admission, scripts, and spell delivery."
 
+  alias ThistleTea.Game.Core.Battleground.AlteracValley.Beacon
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.GameObject.Goober
@@ -12,6 +13,9 @@ defmodule ThistleTea.Game.World.Entity.GameObject.Goober do
   alias ThistleTea.Game.World.Loader.EventScript, as: EventScriptLoader
   alias ThistleTea.Game.World.Loader.GameObjectScript, as: GameObjectScriptLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+
+  def use(%GameObject{internal: %{beacon: %Beacon{}}} = object, _user_guid, _world, _quest_allowed?, _now),
+    do: {:unavailable, object}
 
   def use(%GameObject{internal: %{world: world}} = object, user_guid, world, quest_allowed?, now) do
     if match?({^world, _, _, _}, World.position(user_guid)) do

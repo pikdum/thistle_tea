@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Air
   alias ThistleTea.Game.Core.Battleground.Entrance
   alias ThistleTea.Game.Core.Battleground.Template
+  alias ThistleTea.Game.World.Loader.Item
 
   @supported_patch 10
   @table_options [:named_table, :public, read_concurrency: true]
@@ -42,6 +43,7 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
   end
 
   def load_all do
+    Enum.each(Air.entries(), &Item.get_template(Air.beacon_item(&1)))
     templates = Mangos.Repo.all(from(row in Mangos.BattlegroundTemplate, where: row.patch <= @supported_patch))
     battlemasters = Mangos.Repo.all(Mangos.BattlemasterEntry)
     safe_locs = load_safe_locs(templates)

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
   alias ThistleTea.Game.Core.Aura, as: AuraCore
   alias ThistleTea.Game.Core.Aura.Heartbeat
   alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Battleground.AlteracValley.Beacon
   alias ThistleTea.Game.Core.Battleground.Insignia
   alias ThistleTea.Game.Core.Class.Hunter
   alias ThistleTea.Game.Core.Class.Paladin
@@ -1238,7 +1239,10 @@ defmodule ThistleTea.Game.Core.Spell.Casting do
       for %Spell.Effect{type: :trans_door, misc_value: entry, implicit_target_a: target} <- spell.effects,
           target != :caster_fishing_spot,
           is_integer(entry) and entry > 0 do
-        Effects.summon_game_object(entry, area_duration(casting, spell),
+        beacon? = Beacon.entry?(entry)
+
+        Effects.summon_game_object(entry, if(beacon?, do: 0, else: area_duration(casting, spell)),
+          owned?: not beacon?,
           ritual_target_guid: target_guid,
           spell_id: spell.id,
           position: summoned_object_position(character, casting.targets)

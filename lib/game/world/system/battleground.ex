@@ -370,8 +370,8 @@ defmodule ThistleTea.Game.World.System.Battleground do
   def handle_call({:spell_context, world, guid}, _from, state) do
     context =
       with pid when is_pid(pid) <- Map.get(state.worlds, world),
-           {:inside, ^pid, _team} <- Map.get(state.players, guid) do
-        %{map_id: world.map_id, phase: Match.snapshot(pid).phase}
+           {:inside, ^pid, team} <- Map.get(state.players, guid) do
+        %{map_id: world.map_id, phase: Match.snapshot(pid).phase, team: team}
       else
         _outside -> nil
       end

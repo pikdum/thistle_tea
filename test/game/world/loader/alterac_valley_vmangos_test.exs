@@ -12,6 +12,34 @@ defmodule ThistleTea.Game.World.Loader.AlteracValleyVMangosTest do
   @moduletag :vmangos_db
 
   describe "Alterac event catalog" do
+    test "beacon items, objects and generic attackers exist with the expected locks and spells" do
+      for {item_id, spell_id, object_id, text_id} <- [
+            {17_323, 21_371, 178_549, 8_671},
+            {17_324, 21_355, 178_545, 8_667},
+            {17_325, 21_370, 178_547, 8_669},
+            {17_505, 21_728, 178_726, 8_793},
+            {17_506, 21_730, 178_724, 8_796},
+            {17_507, 21_729, 178_725, 8_799}
+          ] do
+        item = Mangos.Repo.get!(Mangos.ItemTemplate, item_id)
+        assert {item.spellid_1, item.spellcharges_1, item.max_count} == {spell_id, -1, 1}
+        assert {item.spellcategory_1, item.spellcategorycooldown_1} == {951, 1_800_000}
+        object = Mangos.Repo.get!(Mangos.GameObjectTemplate, object_id)
+        assert {object.type, object.data0} == {10, 99}
+        assert text_id in BattlegroundLoader.broadcast_text_ids()
+        assert Mangos.Repo.get!(Mangos.BroadcastText, text_id)
+
+        assert [override] =
+                 Mangos.Repo.all(
+                   from(mod in Mangos.SpellEffectMod, where: mod.id == ^spell_id and mod.effect_index == 0)
+                 )
+
+        assert {override.effect, override.effect_misc_value} == {50, object_id}
+      end
+
+      for id <- [13_161, 13_178], do: assert(Mangos.Repo.get!(Mangos.CreatureTemplate, id).inhabit_type == 4)
+    end
+
     test "named air attackers and their launch dialogue exist in the seed catalog" do
       for {entry, text} <- [
             {14_943, 10_341},

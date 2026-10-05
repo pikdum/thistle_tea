@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal do
     :loot,
     :item_loot,
     :summon,
+    :beacon,
     :pet,
     :possession,
     :movement_handoff,
