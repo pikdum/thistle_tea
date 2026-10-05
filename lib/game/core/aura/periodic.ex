@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Core.Aura.Periodic do
   alias ThistleTea.Game.Core.Power.PowerBurn
   alias ThistleTea.Game.Core.Power.PowerLeech
   alias ThistleTea.Game.Core.Power.Resources
+  alias ThistleTea.Game.Core.Quest.CapturedFollower
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.Core.Spell.PersistentArea
@@ -56,12 +57,13 @@ defmodule ThistleTea.Game.Core.Aura.Periodic do
   def tick(%{unit: %Unit{auras: holders}} = entity, now, contexts) when is_list(holders) and holders != [] do
     {entity, area_events} = remove_unavailable_areas(entity, now, contexts)
     {entity, heartbeat_events} = Heartbeat.tick(entity, now, contexts)
+    {entity, follower_events} = CapturedFollower.reconcile(entity, now, contexts)
 
     entity
     |> tick_periodics(now, contexts)
     |> then(fn {entity, events} ->
       {entity, expire_events} = Lifecycle.expire_due(entity, now)
-      {entity, area_events ++ heartbeat_events ++ events ++ expire_events}
+      {entity, area_events ++ heartbeat_events ++ follower_events ++ events ++ expire_events}
     end)
   end
 
@@ -444,6 +446,12 @@ defmodule ThistleTea.Game.Core.Aura.Periodic do
   defp tick_aura(entity, _holder, %Aura{type: :periodic_emote, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, Consumable.party_emotes(entity)}
+  end
+
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :dummy, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)},
+     CapturedFollower.tick_events(entity, holder)}
   end
 
   defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}

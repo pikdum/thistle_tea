@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver do
   alias ThistleTea.Game.Core.Effects.RandomChoice
   alias ThistleTea.Game.Core.Effects.WhenGrouped
   alias ThistleTea.Game.World.Entity.EffectResolver.Battleground
+  alias ThistleTea.Game.World.Entity.EffectResolver.CapturedFollower
   alias ThistleTea.Game.World.Entity.EffectResolver.Combat
   alias ThistleTea.Game.World.Entity.EffectResolver.DeathItem
   alias ThistleTea.Game.World.Entity.EffectResolver.Durability
@@ -87,6 +88,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver do
   def resolve(_entity, %Effects.HonorDamage{} = effect), do: Honor.resolve(effect)
   def resolve(entity, %Effects.HonorCreatureKill{} = effect), do: Honor.creature_kill(entity, effect)
   def resolve(entity, %Effects.PetAbilityUsed{} = effect), do: PetLearning.resolve(entity, effect)
+  def resolve(entity, %Effects.EnsureCapturedFollower{} = effect), do: CapturedFollower.resolve(entity, effect)
 
   def resolve(entity, %Effects.DeliverAttack{} = effect) do
     Pvp.contacts(entity, entity.object.guid, effect.target_guid, :attack) ++ [effect]

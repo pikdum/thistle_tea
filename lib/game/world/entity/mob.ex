@@ -1870,6 +1870,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
     Metadata.update(guid, %{
       orientation: orientation,
       evading?: evading?(state.internal.blackboard),
+      follow_guid: follow_guid(state.internal.blackboard),
       lateral_speed: MovementBlock.lateral_speed(state.movement_block),
       assistance_available?: Assistance.available?(state),
       flee_from_help_available?: Assistance.flee_available?(state)
@@ -1879,6 +1880,13 @@ defmodule ThistleTea.Game.World.Entity.Mob do
   end
 
   defp sync_perception_metadata(%Mob{} = state), do: state
+
+  defp follow_guid(blackboard) do
+    case Blackboard.following(Blackboard.ensure(blackboard)) do
+      %{guid: guid} -> guid
+      _not_following -> nil
+    end
+  end
 
   @impl GenServer
   def terminate(_reason, state) do

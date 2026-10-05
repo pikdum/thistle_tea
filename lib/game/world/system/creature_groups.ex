@@ -165,10 +165,11 @@ defmodule ThistleTea.Game.World.System.CreatureGroups do
          {^world, _target_id} = target_key <- Map.get(state.guids, target) do
       group_key = Map.get(state.memberships, target_key) || target_key
       {_world, leader} = group_key
-      group = Map.get(state.groups, group_key, CreatureGroup.new(leader))
+      group = Map.get(state.groups, group_key) || runtime_group(state.actors[target_key], leader)
       {_world, id} = key
       group = CreatureGroup.add(group, id, member)
       state = put_group(state, world, group)
+      state = catch_up_death(state, target_key, id)
       state = publish_group(state, group_key)
       {:reply, :ok, state}
     else
@@ -253,15 +254,13 @@ defmodule ThistleTea.Game.World.System.CreatureGroups do
 
   @impl GenServer
   def handle_cast({:event, world, guid, owner, {:waypoint, %WaypointRoute{} = route}}, state) do
-    with {:ok, {^world, id} = key, actor} <- owned_actor(state, world, guid, owner),
-         group_key when not is_nil(group_key) <- Map.get(state.memberships, key),
-         %CreatureGroup{} = group <- Map.get(state.groups, group_key) do
-      group = CreatureGroup.reached_waypoint(group, id, route.destination_point)
-      actor = if is_struct(actor.route, WaypointRoute), do: %{actor | route: route}, else: actor
-      state = %{state | groups: Map.put(state.groups, group_key, group), actors: Map.put(state.actors, key, actor)}
-      {:noreply, publish_group(state, group_key)}
-    else
-      _ungrouped -> {:noreply, state}
+    case owned_actor(state, world, guid, owner) do
+      {:ok, {^world, _id} = key, actor} ->
+        state = %{state | actors: Map.put(state.actors, key, %{actor | route: route})}
+        {:noreply, reached_waypoint(state, key, route.destination_point)}
+
+      _ungrouped ->
+        {:noreply, state}
     end
   rescue
     error ->
@@ -317,6 +316,43 @@ defmodule ThistleTea.Game.World.System.CreatureGroups do
 
   defp default_route(%Mob{internal: %{spawn: %{movement_type: 2, waypoint_route: %WaypointRoute{} = route}}}), do: route
   defp default_route(%Mob{}), do: nil
+
+  defp runtime_group(%{route: %WaypointRoute{destination_point: point}}, leader),
+    do: CreatureGroup.reached_waypoint(CreatureGroup.new(leader), leader, point)
+
+  defp runtime_group(_actor, leader), do: CreatureGroup.new(leader)
+
+  defp catch_up_death(state, {world, source} = key, joined) do
+    case Map.get(state.actors, key) do
+      %{alive?: false} ->
+        state = update_group_lifecycle(state, key, :death)
+        group = state.groups[state.memberships[key]]
+
+        group
+        |> CreatureGroup.actions(source, :death, actors(state, world, group))
+        |> Enum.filter(&(elem(&1, 0) == joined))
+        |> Enum.each(&deliver(state, world, &1))
+
+        state
+
+      _alive ->
+        state
+    end
+  end
+
+  defp reached_waypoint(state, {world, id} = key, point) do
+    group_key = Map.get(state.memberships, key)
+
+    case Map.get(state.groups, group_key) do
+      %CreatureGroup{} = group ->
+        group = CreatureGroup.reached_waypoint(group, id, point)
+        state = %{state | groups: Map.put(state.groups, group_key, group)}
+        publish_group(state, {world, group.leader})
+
+      nil ->
+        state
+    end
+  end
 
   defp spawn_position(%Mob{internal: %{spawn: %{position: position}}}), do: position
   defp spawn_position(%Mob{}), do: nil

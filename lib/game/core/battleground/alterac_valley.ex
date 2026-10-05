@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley do
 
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Air
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Armor
+  alias ThistleTea.Game.Core.Battleground.AlteracValley.Cavalry
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Creatures
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Mine
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Node
@@ -35,6 +36,7 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley do
     armor: %{},
     offerings: %{},
     air: %{},
+    cavalry: %{},
     team_scores: %{alliance: 0, horde: 0},
     resurrection_queue: MapSet.new(),
     weekend?: false
@@ -58,6 +60,7 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley do
       armor: Armor.all(),
       offerings: Offering.all(),
       air: Air.all(),
+      cavalry: Cavalry.all(),
       weekend?: Keyword.get(opts, :weekend?, false)
     }
 
@@ -88,18 +91,22 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley do
     armor = Armor.contribute(match, guid, quest_id)
     offering = Offering.contribute(armor.match, guid, quest_id)
     air = Air.contribute(offering.match, guid, quest_id)
-    %{air | effects: armor.effects ++ offering.effects ++ air.effects}
+    cavalry = Cavalry.contribute(air.match, guid, quest_id)
+    %{cavalry | effects: armor.effects ++ offering.effects ++ air.effects ++ cavalry.effects}
   end
 
   def gossip(match, guid, entry, standing),
     do:
       Armor.gossip(match, guid, entry, standing) || Offering.gossip(match, guid, entry) ||
-        Air.gossip(match, guid, entry, standing)
+        Air.gossip(match, guid, entry, standing) || Cavalry.gossip(match, guid, entry, standing)
 
   def interact(match, guid, entry, :rescue_commander, _standing), do: Air.begin_rescue(match, guid, entry)
 
   def interact(match, guid, entry, :launch_air_attack, standing),
     do: Air.interact(match, guid, entry, :launch_air_attack, standing)
+
+  def interact(match, guid, entry, :launch_cavalry_attack, standing),
+    do: Cavalry.interact(match, guid, entry, :launch_cavalry_attack, standing)
 
   def interact(match, guid, entry, action, standing) do
     case Armor.interact(match, guid, entry, action, standing) do
@@ -108,9 +115,14 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley do
     end
   end
 
-  def creature_event(match, entry, event), do: Air.creature_event(match, entry, event)
+  def creature_event(match, entry, event) do
+    air = Air.creature_event(match, entry, event)
+    cavalry = Cavalry.creature_event(air.match, entry, event)
+    %{cavalry | effects: air.effects ++ cavalry.effects}
+  end
 
-  def gossip_entry?(entry), do: not is_nil(Armor.smith_team(entry) || Offering.summoner_team(entry))
+  def gossip_entry?(entry),
+    do: not is_nil(Armor.smith_team(entry) || Offering.summoner_team(entry) || Cavalry.commander_team(entry))
 
   def disconnect(%__MODULE__{} = match, guid, _position, _dropped_guid), do: Roster.disconnect(match, guid)
   def leave(%__MODULE__{} = match, guid, _position, _dropped_guid), do: Roster.leave(match, guid)

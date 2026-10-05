@@ -282,7 +282,7 @@ defmodule ThistleTea.Game.World.Entity.EventSink.ClientProjection do
   end
 
   def emit(entity, %Effects.ForwardScriptSteps{reply: nil} = effect, _context) do
-    Entity.start_script(effect.target_guid, effect.steps, effect.source_guid, entity.internal.world)
+    Entity.start_script(effect.target_guid, effect.steps, effect.source_guid, effect.world || entity.internal.world)
     entity
   end
 

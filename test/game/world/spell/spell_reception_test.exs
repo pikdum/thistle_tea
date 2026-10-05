@@ -5,11 +5,13 @@ defmodule ThistleTea.Game.World.Spell.SpellReceptionTest do
   alias ThistleTea.Game.Core.Aura.Heartbeat
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Effects
+  alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.CastContext
   alias ThistleTea.Game.Core.Spell.Effect
@@ -140,6 +142,38 @@ defmodule ThistleTea.Game.World.Spell.SpellReceptionTest do
   end
 
   describe "aura_contexts/2" do
+    test "capture checks refresh the animal's live position and remove a dead or missing source" do
+      caster = Guid.from_low_guid(:mob, 10_990, Unique.integer())
+      world = WorldRef.instance(30, Unique.integer())
+      spell = %Spell{id: 21_863, duration_ms: -1, effects: [%Effect{index: 0, type: :apply_aura, aura: :dummy}]}
+
+      character = %Character{
+        object: %Object{guid: Unique.integer()},
+        unit: %Unit{health: 100, auras: []},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: world}
+      }
+
+      context = %CastContext{spell: spell, caster_guid: caster, caster_position: {world, 1.0, 0.0, 0.0}}
+      {character, _events} = Aura.apply_spell(character, context, spell, 0)
+      Metadata.put(caster, %{alive?: true})
+      SpatialHash.update(:mobs, caster, world, 49.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        Metadata.delete(caster)
+        SpatialHash.remove(:mobs, caster)
+      end)
+
+      [context] = character |> SpellReception.aura_contexts(2_000) |> Map.values()
+      assert context.caster_position == {world, 49.0, 0.0, 0.0}
+      assert context.caster_available?
+      assert {%{unit: %{auras: [_]}}, _events} = projected_tick(character, 2_000)
+      Metadata.update(caster, %{alive?: false})
+      assert {%{unit: %{auras: []}}, _events} = projected_tick(character, 2_000)
+      Metadata.delete(caster)
+      assert {%{unit: %{auras: []}}, _events} = projected_tick(character, 2_000)
+    end
+
     test "mana drains stop when their caster dies, leaves the world, or disappears", ctx do
       spell = %Spell{
         id: 5138,

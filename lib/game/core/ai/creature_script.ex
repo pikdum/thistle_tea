@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.AlteracValley
   alias ThistleTea.Game.Core.AI.CreatureScript.AlteracValleyAir
   alias ThistleTea.Game.Core.AI.CreatureScript.AlteracValleyAssault
+  alias ThistleTea.Game.Core.AI.CreatureScript.AlteracValleyCavalry
   alias ThistleTea.Game.Core.AI.CreatureScript.AlteracValleyWarRider
   alias ThistleTea.Game.Core.AI.CreatureScript.ArchmageTervosh
   alias ThistleTea.Game.Core.AI.CreatureScript.Bartleby
@@ -107,6 +108,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
     AlteracValley,
     AlteracValleyAir,
     AlteracValleyAssault,
+    AlteracValleyCavalry,
     AlteracValleyWarRider,
     ArchmageTervosh,
     Bartleby,

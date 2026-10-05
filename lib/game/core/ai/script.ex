@@ -1297,6 +1297,26 @@ defmodule ThistleTea.Game.Core.AI.Script do
     Flee.start(state, blackboard, context, seek != 0)
   end
 
+  defp execute(
+         %Mob{movement_block: %{position: {x, y, z, _orientation}}, internal: %{world: world}} = state,
+         blackboard,
+         %ScriptStep{command: :join_creature_group, formation_from_position?: true} = step,
+         target,
+         now,
+         %Context{perception: perception}
+       ) do
+    case Perception.position(perception, target) do
+      {^world, tx, ty, tz} ->
+        orientation = (Perception.metadata(perception, target) || %{})[:orientation] || 0.0
+        distance = Math.distance({x, y, z}, {tx, ty, tz})
+        angle = :math.atan2(y - ty, x - tx) - orientation
+        execute(state, blackboard, %{step | position: {distance, 0.0, 0.0, angle}}, target, now)
+
+      _unavailable ->
+        {state, blackboard}
+    end
+  end
+
   defp execute(state, blackboard, %ScriptStep{} = step, target_guid, now, %Context{}) do
     execute(state, blackboard, step, target_guid, now)
   end

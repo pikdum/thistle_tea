@@ -17,6 +17,8 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   as C++ scripts summon a creature with its visibility turned off. A
   code-built teleport with `at_target?` lands at its target's feet, as C++
   scripts `NearTeleportTo` a player.
+  A group join with `formation_from_position?` retains the creature's current
+  distance and bearing from its observed leader as its formation offset.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -49,6 +51,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
             scatter: 0.0,
             count: 1,
             concealed?: false,
+            formation_from_position?: false,
             condition_id: 0,
             condition: nil,
             success_condition: nil,

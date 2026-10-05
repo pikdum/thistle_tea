@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Core.Aura.Application do
   alias ThistleTea.Game.Core.Entity.Component.Internal.Totem
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Profession.Engineering.DeathRay
+  alias ThistleTea.Game.Core.Quest.CapturedFollower
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.AbsorbBonus
   alias ThistleTea.Game.Core.Spell.CastContext
@@ -598,8 +599,9 @@ defmodule ThistleTea.Game.Core.Aura.Application do
   defp holder_expiry(spell, context, now), do: expires_at(now, effective_duration(spell, context))
 
   defp retained_context(context, auras) do
-    if context.persistent_area || Enum.any?(auras, &(&1.type in @context_auras)),
-      do: %{context | persistent_area: nil}
+    if context.persistent_area || CapturedFollower.spell?(context.spell) ||
+         Enum.any?(auras, &(&1.type in @context_auras)),
+       do: %{context | persistent_area: nil}
   end
 
   defp effective_duration(%Spell{} = spell, %CastContext{} = context) do
@@ -672,7 +674,8 @@ defmodule ThistleTea.Game.Core.Aura.Application do
        ), do: %Aura{index: index, type: :none, amount: 0}
 
   defp build_aura(entity, %Spell{} = spell, %Effect{} = effect, amount_override, %CastContext{} = context, now) do
-    amplitude_ms = Modifiers.periodic_interval(context.spell_modifiers, effect)
+    amplitude_ms =
+      CapturedFollower.interval(spell, effect) || Modifiers.periodic_interval(context.spell_modifiers, effect)
 
     %Aura{
       index: effect.index,
@@ -772,13 +775,16 @@ defmodule ThistleTea.Game.Core.Aura.Application do
 
   defp transfer_multiplier(%Effect{multiple_value: value}, _context), do: value
 
-  defp next_tick(_spell, %Effect{} = effect, amplitude_ms, %CastContext{persistent_area: %PersistentArea{} = area}, now) do
-    if Effect.periodic?(effect) and is_integer(amplitude_ms) and amplitude_ms > 0,
-      do: PersistentArea.next_tick(area, amplitude_ms, now)
+  defp next_tick(spell, %Effect{} = effect, amplitude_ms, %CastContext{persistent_area: %PersistentArea{} = area}, now) do
+    if ticking?(spell, effect, amplitude_ms), do: PersistentArea.next_tick(area, amplitude_ms, now)
   end
 
   defp next_tick(spell, %Effect{} = effect, amplitude_ms, _context, now) do
-    if Effect.periodic?(effect) and is_integer(amplitude_ms) and amplitude_ms > 0,
-      do: now + Scripts.initial_periodic_delay(spell, amplitude_ms)
+    if ticking?(spell, effect, amplitude_ms), do: now + Scripts.initial_periodic_delay(spell, amplitude_ms)
+  end
+
+  defp ticking?(spell, effect, amplitude_ms) do
+    is_integer(amplitude_ms) and amplitude_ms > 0 and
+      (Effect.periodic?(effect) or not is_nil(CapturedFollower.interval(spell, effect)))
   end
 end

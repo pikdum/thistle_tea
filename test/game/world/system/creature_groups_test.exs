@@ -160,6 +160,34 @@ defmodule ThistleTea.Game.World.System.CreatureGroupsTest do
   end
 
   describe "join/6" do
+    test "joining a dead leader receives its death and inherits its route", %{server: server, world: world} do
+      for flags <- [0x80, 0x87] do
+        leader = mob(world, nil, Unique.integer())
+        member = mob(world, nil, Unique.integer())
+        guid = leader.object.guid
+
+        route = %WaypointRoute{
+          first_point: 0,
+          destination_point: 1,
+          points: %{0 => %Waypoint{position: {0.0, 0.0, 0.0, nil}}, 1 => %Waypoint{position: {10.0, 0.0, 0.0, nil}}}
+        }
+
+        Enum.each([leader, member], &CreatureGroups.register(&1, self(), server))
+        CreatureGroups.event(leader, {:waypoint, route}, self(), server)
+        CreatureGroups.event(leader, :death, self(), server)
+        assert :ok = CreatureGroups.join(world, member.object.guid, guid, %Member{flags: flags}, self(), server)
+        assert_receive {:creature_group, token, {:member_died, ^guid, _entry, true}}
+        assert CreatureGroups.valid_command?(world, member.object.guid, token, self(), server)
+
+        if flags == 0x87 do
+          assert %{role: :leader, route: ^route, last_waypoint: 1} =
+                   CreatureGroups.formation(world, member.object.guid, server)
+        else
+          assert CreatureGroups.formation(world, member.object.guid, server) == nil
+        end
+      end
+    end
+
     test "supports runtime summons and rejects cross-instance joins", %{server: server, world: world} do
       leader = mob(world, nil, 301)
       member = mob(world, nil, 302)
@@ -173,6 +201,57 @@ defmodule ThistleTea.Game.World.System.CreatureGroupsTest do
   end
 
   describe "formation/3" do
+    test "runtime formations inherit a route and cursor that preceded membership", %{server: server, world: world} do
+      leader = mob(world, nil, Unique.integer())
+      follower = mob(world, nil, Unique.integer())
+      Enum.each([leader, follower], &CreatureGroups.register(&1, self(), server))
+
+      route = %WaypointRoute{
+        first_point: 0,
+        destination_point: 1,
+        points: %{0 => %Waypoint{position: {0.0, 0.0, 0.0, nil}}, 1 => %Waypoint{position: {10.0, 0.0, 0.0, nil}}}
+      }
+
+      CreatureGroups.event(leader, {:waypoint, route}, self(), server)
+      CreatureGroups.join(world, follower.object.guid, leader.object.guid, %Member{flags: 0x80}, self(), server)
+      assert CreatureGroups.formation(world, follower.object.guid, server) == nil
+      assert :ok = CreatureGroups.leave(world, follower.object.guid, self(), server)
+
+      assert :ok =
+               CreatureGroups.join(
+                 world,
+                 follower.object.guid,
+                 leader.object.guid,
+                 %Member{flags: 0x87},
+                 self(),
+                 server
+               )
+
+      CreatureGroups.event(leader, :death, self(), server)
+
+      assert %{role: :leader, route: ^route, last_waypoint: 1} =
+               CreatureGroups.formation(world, follower.object.guid, server)
+    end
+
+    test "runtime formations inherit routes that began after the leader spawned", %{server: server, world: world} do
+      leader = mob(world, nil, Unique.integer())
+      follower = mob(world, nil, Unique.integer())
+      Enum.each([leader, follower], &CreatureGroups.register(&1, self(), server))
+      CreatureGroups.join(world, follower.object.guid, leader.object.guid, %Member{flags: 1}, self(), server)
+
+      route = %WaypointRoute{
+        first_point: 0,
+        destination_point: 1,
+        points: %{0 => %Waypoint{position: {0.0, 0.0, 0.0, nil}}, 1 => %Waypoint{position: {10.0, 0.0, 0.0, nil}}}
+      }
+
+      CreatureGroups.event(leader, {:waypoint, route}, self(), server)
+      CreatureGroups.event(leader, :death, self(), server)
+
+      assert %{role: :leader, route: ^route, last_waypoint: 1} =
+               CreatureGroups.formation(world, follower.object.guid, server)
+    end
+
     @tag formation?: true
     test "promotes survivors on the original route and restores the original leader on respawn", %{
       server: server,

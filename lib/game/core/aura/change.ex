@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Core.Aura.Change do
     :delayed,
     :interrupted,
     :removed,
+    :source_unavailable,
     :ticked
   ]
 
@@ -33,6 +34,7 @@ defmodule ThistleTea.Game.Core.Aura.Change do
           | :delayed
           | :interrupted
           | :removed
+          | :source_unavailable
           | :ticked
 
   @type t :: %__MODULE__{

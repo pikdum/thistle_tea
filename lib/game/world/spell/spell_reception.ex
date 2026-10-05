@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.Spell.SpellReception do
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Math
+  alias ThistleTea.Game.Core.Quest.CapturedFollower
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.AuraRank
   alias ThistleTea.Game.Core.Spell.CastContext
@@ -180,11 +181,17 @@ defmodule ThistleTea.Game.World.Spell.SpellReception do
           else: context
 
       context =
-        if Holder.has_any_type?(holder, [:periodic_leech, :periodic_health_funnel, :periodic_mana_leech]) do
+        if Holder.has_any_type?(holder, [:periodic_leech, :periodic_health_funnel, :periodic_mana_leech]) or
+             CapturedFollower.spell?(holder.spell) do
           %{context | caster_available?: caster_available?(target, holder.caster_guid, now)}
         else
           context
         end
+
+      context =
+        if CapturedFollower.spell?(holder.spell),
+          do: %{context | caster_position: World.position(holder.caster_guid, now)},
+          else: context
 
       {{holder.spell.id, holder.caster_guid, holder.item_source}, context}
     end

@@ -336,8 +336,8 @@ login_debug() {
 
   display="$(session_value "$session_dir" display)"
   window_id="$(focus_window "$session_dir")"
-  DISPLAY="$display" xdotool mousemove --window "$window_id" 650 378 click 1 key ctrl+a type --clearmodifiers --delay 50 debug
-  DISPLAY="$display" xdotool mousemove --window "$window_id" 650 448 click 1 key ctrl+a type --clearmodifiers --delay 50 debug
+  DISPLAY="$display" xdotool mousemove --window "$window_id" 650 378 sleep 0.1 click 1 key Home shift+End BackSpace type --clearmodifiers --delay 50 debug
+  DISPLAY="$display" xdotool mousemove --window "$window_id" 650 448 sleep 0.1 click 1 key Home shift+End BackSpace type --clearmodifiers --delay 50 debug
   DISPLAY="$display" xdotool key Return
   sleep 6
   DISPLAY="$display" xdotool key Return
@@ -393,7 +393,7 @@ click_at() {
   button="$(button_number "$2")"
   display="$(session_value "$session_dir" display)"
   window_id="$(focus_window "$session_dir")"
-  DISPLAY="$display" xdotool mousemove --window "$window_id" "$x" "$y" click "$button"
+  DISPLAY="$display" xdotool mousemove --window "$window_id" "$x" "$y" sleep 0.1 click "$button"
 }
 
 drag_to() {

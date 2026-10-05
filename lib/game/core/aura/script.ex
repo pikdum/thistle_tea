@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Core.Aura.Script do
   alias ThistleTea.Game.Core.Power.Resources
   alias ThistleTea.Game.Core.Profession.Engineering
   alias ThistleTea.Game.Core.Profession.Engineering.DeathRay
+  alias ThistleTea.Game.Core.Quest.CapturedFollower
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Proc
 
@@ -45,6 +46,7 @@ defmodule ThistleTea.Game.Core.Aura.Script do
   def after_remove(entity, holders, cause) when is_list(holders) do
     Enum.flat_map(holders, fn holder ->
       after_remove_holder(entity, holder, cause) ++
+        CapturedFollower.after_remove(entity, holder, cause) ++
         DeathRay.after_remove(entity, holder, cause) ++
         Silithyst.after_remove(entity, holder, cause) ++
         Flags.after_remove(entity, holder) ++ BattlegroundResurrection.after_remove(entity, holder)

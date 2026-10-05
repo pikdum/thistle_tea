@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
   alias ThistleTea.Game.Core.Party.Group
   alias ThistleTea.Game.Core.Pet.Totems
   alias ThistleTea.Game.Core.Player.PlayedTime
+  alias ThistleTea.Game.Core.Quest.CapturedFollower
   alias ThistleTea.Game.Core.Spell.Casting
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
@@ -186,6 +187,7 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
     state = Buyback.logout(state)
     state = ItemDurations.logout(state)
     state = Battlegrounds.remove_flags(state)
+    state = release_captured_followers(state)
 
     if state.guid && state.character do
       BattlegroundSystem.disconnect(state.guid, state.character.movement_block.position)
@@ -209,6 +211,13 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
   end
 
   defp disengage(%__MODULE__{} = state), do: state
+
+  defp release_captured_followers(%__MODULE__{character: %Character{} = character} = state) do
+    {character, effects} = CapturedFollower.release(character, Time.now())
+    %{state | character: EventSink.emit(character, effects)}
+  end
+
+  defp release_captured_followers(state), do: state
 
   defp clear_scripts(%__MODULE__{character: %Character{} = character} = state),
     do: %{state | character: ScriptRun.clear(character)}

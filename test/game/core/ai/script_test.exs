@@ -40,6 +40,33 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
 
   setup [:mob]
 
+  describe "join_creature_group" do
+    test "preserves the observed formation offset and rejects another world", %{mob: mob} do
+      leader = Guid.from_low_guid(:mob, Unique.integer(), Unique.integer())
+      mob = %{mob | movement_block: %{mob.movement_block | position: {3.0, 4.0, 0.0, 0.0}}}
+      step = %ScriptStep{command: :join_creature_group, datalong: 0x87, formation_from_position?: true}
+
+      observation = %Observation{
+        guid: leader,
+        position: {mob.internal.world, 0.0, 0.0, 0.0},
+        metadata: %{orientation: 1.0}
+      }
+
+      perception = Perception.new(0, nil, %{leader => observation}, %{mobs: [], players: [], game_objects: []})
+      context = Context.new(0, perception: perception)
+      {joined, _board} = Script.execute_steps(mob, Blackboard.new(), [step], leader, context)
+      assert [%Effects.CreatureGroupCommand{command: {:join, ^leader, member}}] = joined.internal.events
+      assert member.distance == 5.0
+      assert_in_delta member.angle, :math.atan2(4.0, 3.0) - 1.0, 0.00001
+      assert member.flags == 0x87
+
+      observation = %{observation | position: {WorldRef.instance(30, Unique.integer()), 0.0, 0.0, 0.0}}
+      perception = %{perception | entities: %{leader => observation}}
+      context = %{context | perception: perception}
+      assert Script.execute_steps(mob, Blackboard.new(), [step], leader, context) == {mob, Blackboard.new()}
+    end
+  end
+
   describe "MOVE_TO completion" do
     test "random-point moves use the observed destination without treating radius as facing", %{mob: mob} do
       mob = %{mob | movement_block: %{mob.movement_block | position: {0.0, 0.0, 0.0, 0.0}, run_speed: 7.0}}
