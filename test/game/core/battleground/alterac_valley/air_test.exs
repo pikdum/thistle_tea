@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley.AirTest do
 
   setup [:active_match]
 
-  describe "interact/5" do
+  describe "begin_rescue/3" do
     test "a friendly rescue departs once and donations wait for arrival", context do
       for {team, entry, quest, _goal, _reputation} <- commanders() do
         guid = context[team]
@@ -90,6 +90,46 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley.AirTest do
       assert AlteracValley.creature_event(reset, 0, 1).match == reset
       {:close, returning} = AlteracValley.interact(reset, context.alliance, 13_438, :rescue_commander, 0)
       assert returning.match.air[13_438].phase == :returning
+    end
+  end
+
+  describe "gossip/4" do
+    test "each supplied fleet offers its own launch at neutral reputation", context do
+      for {team, entry, quest, goal, _rep} <- commanders() do
+        guid = context[team]
+        {:close, departure} = Air.begin_rescue(context.match, guid, entry)
+        home = Air.creature_event(departure.match, entry, 1).match
+        assert Air.gossip(home, guid, entry, 0) == nil
+        supplied = put_in(home.air[entry].count, goal)
+        assert %{options: [%{action: :launch_air_attack}]} = Air.gossip(supplied, guid, entry, 0)
+        assert Air.gossip(supplied, guid, entry, -1) == nil
+        assert Air.gossip(supplied, context.invited, entry, 0) == nil
+        opponent = context[if(team == :alliance, do: :horde, else: :alliance)]
+        assert Air.gossip(supplied, opponent, entry, 0) == nil
+        assert Air.gossip(%{supplied | phase: :countdown}, guid, entry, 0) == nil
+
+        assert {:close, launch} = AlteracValley.interact(supplied, guid, entry, :launch_air_attack, 0)
+        assert launch.match.air[entry].launched?
+        assert launch.match.air[entry].count == goal
+        assert [%Effects.RunCreatureScript{creature_entry: ^entry, steps: [%{datalong: 2}]}] = launch.effects
+        assert Air.gossip(launch.match, guid, entry, 0) == nil
+        assert {:close, %{effects: []}} = Air.interact(launch.match, guid, entry, :launch_air_attack, 0)
+        assert AlteracValley.quest_rewarded(launch.match, guid, quest).match.air[entry].count == goal + 1
+        assert Enum.all?(Map.delete(launch.match.air, entry), fn {_entry, fleet} -> not fleet.launched? end)
+      end
+    end
+  end
+
+  describe "interact/5" do
+    test "rescuing a respawned commander cannot launch the same named attacker again", context do
+      match = context.match
+      match = put_in(match.air[13_438], %Air{phase: :ready, count: 90})
+      {:close, launched} = Air.interact(match, context.alliance, 13_438, :launch_air_attack, 0)
+      reset = Air.creature_event(launched.match, 13_438, 0).match
+      {:close, rescue_again} = Air.begin_rescue(reset, context.alliance, 13_438)
+      home = Air.creature_event(rescue_again.match, 13_438, 1).match
+      assert home.air[13_438] == %Air{phase: :ready, count: 90, launched?: true}
+      assert {:close, %{effects: []}} = Air.interact(home, context.alliance, 13_438, :launch_air_attack, 0)
     end
   end
 

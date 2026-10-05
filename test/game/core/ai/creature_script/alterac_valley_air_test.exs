@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.AlteracValleyAirTest do
   alias ThistleTea.Game.Core.AI.CreatureScript.AlteracValleyAir
   alias ThistleTea.Game.Core.AI.EventAI
   alias ThistleTea.Game.Core.AI.Script
+  alias ThistleTea.Game.Core.AI.Script.Run
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
@@ -85,6 +86,47 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.AlteracValleyAirTest do
         assert prisoner.unit.stand_state == if(route.entry in [13_439, 13_437], do: 1, else: 0)
         assert board.event_ai.phase == 0
         assert notification(mob, 0) in prisoner.internal.events
+      end
+    end
+  end
+
+  describe "resume/7" do
+    test "a ready commander transforms then summons exactly one named attacker at flight altitude" do
+      for {entry, rider, display} <- [
+            {13_179, 14_943, 11_012},
+            {13_180, 14_944, 11_012},
+            {13_181, 14_945, 11_012},
+            {13_438, 14_946, 1_148},
+            {13_439, 14_948, 1_148},
+            {13_437, 14_947, 1_148}
+          ] do
+        mob = creature(entry)
+        board = Blackboard.new()
+        board = %{board | event_ai: %{board.event_ai | phase: 2}}
+        {waiting, board} = EventAI.on_script_event(mob, board, 2, 0, 0, Context.new(0))
+        assert board.event_ai.phase == 3
+        assert waiting.unit.npc_flags == 2
+        assert map_size(waiting.internal.scripts.runs) == 1
+        [run] = Map.values(waiting.internal.scripts.runs)
+        {flying, board} = Run.resume(waiting, board, run.id, run.receipt, run.world, :continue, Context.new(5_000))
+        assert flying.unit.npc_flags == 0
+        assert flying.unit.display_id == display
+        assert flying.internal.creature.script_flight
+        assert [%{destination: {1.0, 2.0, 33.0}}] = flying.internal.navigation_intents
+        refute Enum.any?(flying.internal.events, &is_struct(&1, Effects.SummonCreature))
+        flying = %{flying | movement_block: %{flying.movement_block | position: {1.0, 2.0, 33.0, 0.0}}}
+        [run] = Map.values(flying.internal.scripts.runs)
+        {airborne, board} = Run.resume(flying, board, run.id, run.receipt, run.world, :continue, Context.new(10_000))
+
+        assert [%Effects.SummonCreature{summon: %{entry: ^rider, position: position, despawn_type: 5}}] =
+                 Enum.filter(airborne.internal.events, &is_struct(&1, Effects.SummonCreature))
+
+        assert position == {1.0, 2.0, 33.0, 0.0}
+
+        assert Enum.any?(airborne.internal.events, &match?(%Effects.TriggerSpell{spell_id: 24_699}, &1))
+        {again, board_again} = EventAI.on_script_event(airborne, board, 2, 0, 11_000, Context.new(11_000))
+        assert again == airborne
+        assert board_again.event_ai.phase == 3
       end
     end
   end

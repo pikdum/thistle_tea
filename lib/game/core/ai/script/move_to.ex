@@ -41,7 +41,7 @@ defmodule ThistleTea.Game.Core.AI.Script.MoveTo do
          %Context{perception: perception} = context
        )
        when mode in [1, 2] do
-    case Perception.position(perception, target) do
+    case source_position(mob, target, perception) do
       {^world, x, y, z} -> {:ok, relative_position(mob, step, {x, y, z}, target, context)}
       _ -> :error
     end
@@ -59,6 +59,14 @@ defmodule ThistleTea.Game.Core.AI.Script.MoveTo do
   end
 
   defp destination(_mob, _step, _target, _context), do: :error
+
+  defp source_position(
+         %Mob{object: %{guid: guid}, internal: %{world: world}, movement_block: %{position: {x, y, z, _}}},
+         guid,
+         _perception
+       ), do: {world, x, y, z}
+
+  defp source_position(%Mob{}, target, perception), do: Perception.position(perception, target)
 
   defp relative_position(_mob, %ScriptStep{datalong: 1, position: {dx, dy, dz, o}}, {x, y, z}, _target, _context) do
     {x + dx, y + dy, z + dz, o}

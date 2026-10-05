@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Entity.ScriptExecution do
   alias ThistleTea.Game.Core.AI.Script.Run
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Mob
+  alias ThistleTea.Game.Core.Movement
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World.Entity.AIEnvironment
   alias ThistleTea.Game.World.Entity.Mob.Corpse
@@ -93,6 +94,7 @@ defmodule ThistleTea.Game.World.Entity.ScriptExecution do
   defp execute(entity, steps, target_guid, apply) do
     entity = prepare(entity, steps)
     now = Time.now()
+    entity = Movement.sync_position(entity, now)
 
     request = ObservationRequest.for_script(steps, [target_guid])
 

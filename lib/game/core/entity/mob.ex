@@ -187,7 +187,7 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
   defp rest(%Unit{} = unit, true), do: %{unit | health: 0}
   defp rest(%Unit{} = unit, false), do: unit
 
-  defp grounded(%Creature{} = creature), do: %{creature | script_flight: nil}
+  defp grounded(%Creature{} = creature), do: %{creature | script_flight: nil, caster_chase_distance: nil}
   defp grounded(creature), do: creature
 
   defp default_gossip(%Creature{} = creature), do: %{creature | gossip_menu_id: nil}

@@ -1,13 +1,15 @@
 defmodule ThistleTea.Game.Core.AI.CreatureScript.AlteracValleyAir do
-  @moduledoc "Alterac Valley's six imprisoned wing commanders and their return to the faction base."
+  @moduledoc "Alterac Valley's six wing commanders, their rescue journeys, and the launch of named air attacks."
 
   @behaviour ThistleTea.Game.Core.AI.CreatureScript
 
   alias ThistleTea.Game.Core.AI.CreatureScript
+  alias ThistleTea.Game.Core.AI.CreatureScript.Combat
   alias ThistleTea.Game.Core.AI.CreatureScript.Route
   alias ThistleTea.Game.Core.AI.ScriptStep
 
   @destinations %{13_179 => 74, 13_180 => 84, 13_181 => 97, 13_438 => 66, 13_439 => 76, 13_437 => 92}
+  @riders %{13_179 => 14_943, 13_180 => 14_944, 13_181 => 14_945, 13_438 => 14_946, 13_439 => 14_948, 13_437 => 14_947}
 
   @impl true
   def entries, do: Map.keys(@destinations)
@@ -20,6 +22,10 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.AlteracValleyAir do
       CreatureScript.event(entry, 3, :script_event, depart(entry),
         param1: 1,
         inverse_phase_mask: CreatureScript.only_in_phases([0])
+      ),
+      CreatureScript.event(entry, 4, :script_event, launch(entry),
+        param1: 2,
+        inverse_phase_mask: CreatureScript.only_in_phases([2])
       )
     ]
   end
@@ -63,6 +69,39 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.AlteracValleyAir do
       %ScriptStep{command: :movement, datalong: 0},
       notify(1)
     ]
+  end
+
+  defp launch(entry) do
+    display = if entry in [13_179, 13_180, 13_181], do: 11_012, else: 1_148
+
+    steps = [
+      %{flags(147, 2, 2) | delay_ms: 5_000},
+      %ScriptStep{command: :morph, datalong: display, datalong2: 1, delay_ms: 5_000},
+      %ScriptStep{command: :set_fly, datalong: 1, delay_ms: 5_000},
+      %ScriptStep{command: :set_run, datalong: 1, delay_ms: 5_000},
+      %ScriptStep{command: :set_combat_movement, datalong: 0, delay_ms: 5_000},
+      %{Combat.cast(24_085, :self) | delay_ms: 5_000},
+      %ScriptStep{
+        command: :move_to,
+        datalong: 1,
+        datalong3: 12,
+        position: {0.0, 0.0, 30.0, -10.0},
+        target_self?: true,
+        delay_ms: 5_000
+      },
+      %ScriptStep{command: :add_aura, datalong: 24_699, datalong2: 8, delay_ms: 10_000},
+      %ScriptStep{
+        command: :summon_creature,
+        datalong: Map.fetch!(@riders, entry),
+        datalong2: 10_000,
+        dataint: 1,
+        dataint4: 5,
+        dataint3: -1,
+        delay_ms: 10_000
+      }
+    ]
+
+    [%ScriptStep{command: :set_phase, datalong: 3}, CreatureScript.timed(steps)]
   end
 
   defp flags(field, value, mode),

@@ -41,16 +41,18 @@ defmodule ThistleTea.TelemetryTest do
     test "keeps histogram storage bounded under concurrent writers" do
       tick(1)
       before = Telemetry.checkpoint()
-      size = :ets.info(Telemetry, :size)
+      key = {:duration, :mob_tick, :success}
+      size = tuple_size(Map.fetch!(before.rows, key))
 
       1..8
       |> Task.async_stream(fn _ -> Enum.each(1..1_000, fn _ -> tick(10) end) end, ordered: false)
       |> Enum.each(fn result -> assert result == {:ok, :ok} end)
 
-      metric = Enum.find(Telemetry.report(before).durations, &(&1.name == :mob_tick and &1.label == :success))
+      current = Telemetry.checkpoint()
+      metric = Enum.find(Telemetry.report(before, current).durations, &(&1.name == :mob_tick and &1.label == :success))
       assert metric.count == 8_000
       assert metric.mean_us == 10
-      assert :ets.info(Telemetry, :size) == size
+      assert tuple_size(Map.fetch!(current.rows, key)) == size
     end
 
     test "coalesces arbitrary behavior statuses into one histogram" do

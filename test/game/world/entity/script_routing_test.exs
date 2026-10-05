@@ -2,7 +2,10 @@ defmodule ThistleTea.Game.World.Entity.ScriptRoutingTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Core.AI.BT.Blackboard
+  alias ThistleTea.Game.Core.AI.BT.Context, as: BTContext
   alias ThistleTea.Game.Core.AI.Script.Request
+  alias ThistleTea.Game.Core.AI.Script.Run
   alias ThistleTea.Game.Core.AI.ScriptStep
   alias ThistleTea.Game.Core.Condition
   alias ThistleTea.Game.Core.Effects
@@ -15,6 +18,7 @@ defmodule ThistleTea.Game.World.Entity.ScriptRoutingTest do
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.GameObject
   alias ThistleTea.Game.Core.Guid
+  alias ThistleTea.Game.Core.Movement
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Network.Message.SmsgEmote
@@ -285,6 +289,28 @@ defmodule ThistleTea.Game.World.Entity.ScriptRoutingTest do
         assert [%Effects.ScriptReply{request: ^request, status: :failed}] = failed.internal.events
         assert %{failed | internal: %{failed.internal | events: []}} == actor
       end
+    end
+  end
+
+  describe "resume/5" do
+    test "a delayed summon uses the owner's current spline position", %{world: world} do
+      now = Time.now()
+      actor = mob(world, 0.0, 0.0)
+      step = %ScriptStep{command: :summon_creature, datalong: 14_943, dataint3: -1, delay_ms: 5_000}
+
+      {actor, board, {:pending, id}} =
+        Run.start(actor, Blackboard.new(), [step], 0, BTContext.new(now - 10_000), :timed)
+
+      receipt = Run.pending(actor, id).receipt
+      actor = %{actor | internal: %{actor.internal | blackboard: board}}
+      actor = Movement.move_along_path(actor, [{0.0, 0.0, 30.0}], [velocity: 10.0], now - 10_000)
+      assert elem(actor.movement_block.position, 2) == 0.0
+
+      resumed = ScriptExecution.resume(actor, id, receipt, world, :continue)
+      summon = Enum.find(resumed.internal.events, &is_struct(&1, Effects.SummonCreature))
+      assert summon.summon.position == {0.0, 0.0, 30.0, 0.0}
+      assert elem(resumed.movement_block.position, 2) == 30.0
+      assert resumed.internal.scripts.runs == %{}
     end
   end
 

@@ -92,9 +92,14 @@ defmodule ThistleTea.Game.Core.Battleground.AlteracValley do
   end
 
   def gossip(match, guid, entry, standing),
-    do: Armor.gossip(match, guid, entry, standing) || Offering.gossip(match, guid, entry)
+    do:
+      Armor.gossip(match, guid, entry, standing) || Offering.gossip(match, guid, entry) ||
+        Air.gossip(match, guid, entry, standing)
 
   def interact(match, guid, entry, :rescue_commander, _standing), do: Air.begin_rescue(match, guid, entry)
+
+  def interact(match, guid, entry, :launch_air_attack, standing),
+    do: Air.interact(match, guid, entry, :launch_air_attack, standing)
 
   def interact(match, guid, entry, action, standing) do
     case Armor.interact(match, guid, entry, action, standing) do

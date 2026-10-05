@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Blackboard.Formation, as: FormationMemory
   alias ThistleTea.Game.Core.AI.BT.Blackboard.Navigation, as: NavigationMemory
+  alias ThistleTea.Game.Core.AI.BT.CasterChase
   alias ThistleTea.Game.Core.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Core.AI.BT.Confusion
   alias ThistleTea.Game.Core.AI.BT.Context
@@ -145,6 +146,10 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
           BT.sequence([
             BT.condition(&target_valid_same_map?/3),
             MobSpells.hold_ranged_step()
+          ]),
+          BT.sequence([
+            BT.condition(&target_valid_same_map?/3),
+            BT.action(&hold_caster_distance/3)
           ]),
           BT.sequence([
             BT.condition(&target_valid_same_map?/3),
@@ -688,6 +693,22 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
     end
   end
 
+  def hold_caster_distance(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
+    if CasterChase.in_range?(state, context) do
+      {_, tx, ty, _} = Perception.position(context.perception, state.unit.target)
+      state = state |> maybe_halt(context.now) |> face_target(state.unit.target, {tx, ty})
+
+      {_status, state, blackboard} =
+        if CombatBT.in_combat_range?(state, blackboard, context),
+          do: melee_attack(state, blackboard, context),
+          else: {:success, state, blackboard}
+
+      combat_wait(state, blackboard, context)
+    else
+      {:failure, state, blackboard}
+    end
+  end
+
   def halt_at_contact(%Mob{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, %Context{
         now: now,
         perception: perception
@@ -995,6 +1016,14 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
          target_guid,
          %Context{now: now, perception: perception, random: random}
        ) do
+    if CasterChase.distance(state) && Perception.line_of_sight?(perception, target_guid) do
+      CasterChase.destination(state, {tx, ty, tz})
+    else
+      melee_destination(state, {mx, my}, {tx, ty, tz}, target_guid, now, perception, random)
+    end
+  end
+
+  defp melee_destination(state, {mx, my}, {tx, ty, tz}, target_guid, now, perception, random) do
     base_angle = base_chase_angle({mx, my}, {tx, ty}, random)
     chase_distance = CombatCore.chase_target_distance(melee_reach_to(state, target_guid, perception))
     angle = base_angle + approach_angle_offset(state, target_guid, now, perception, random)

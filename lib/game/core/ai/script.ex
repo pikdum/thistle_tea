@@ -1380,6 +1380,18 @@ defmodule ThistleTea.Game.Core.AI.Script do
   end
 
   defp execute(
+         %Mob{internal: %{creature: creature} = internal} = state,
+         blackboard,
+         %ScriptStep{command: :set_caster_chase_distance, datalong: distance},
+         _target,
+         _now
+       )
+       when is_number(distance) and distance >= 0 do
+    creature = %{creature | caster_chase_distance: if(distance > 0, do: distance)}
+    {%{state | internal: %{internal | creature: creature}}, blackboard}
+  end
+
+  defp execute(
          %{unit: %Unit{target: target}} = state,
          blackboard,
          %ScriptStep{command: :call_for_help, position: {radius, _y, _z, _o}},
@@ -1429,12 +1441,13 @@ defmodule ThistleTea.Game.Core.AI.Script do
   defp execute(
          %{object: %{guid: guid}, unit: %Unit{level: level}} = state,
          blackboard,
-         %ScriptStep{command: :add_aura, datalong: spell_id},
+         %ScriptStep{command: :add_aura, datalong: spell_id, datalong2: flags},
          _target_guid,
          _now
        )
        when is_integer(spell_id) and spell_id > 0 do
-    effect = Effects.trigger_spell(guid, level || 1, guid, spell_id)
+    opts = if (flags &&& 8) == 0, do: [], else: [duration_ms: -1]
+    effect = Effects.trigger_spell(guid, level || 1, guid, spell_id, opts)
     {Effects.enqueue(state, effect), blackboard}
   end
 

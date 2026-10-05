@@ -90,7 +90,14 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
   defp rescue_commander(character, entry) do
     case BattlegroundSystem.interact(character.internal.world, character.object.guid, entry, :rescue_commander, 0) do
       :close -> :handled
-      :unhandled -> nil
+      :unhandled -> commander_menu(character, entry)
+    end
+  end
+
+  defp commander_menu(character, entry) do
+    case BattlegroundSystem.gossip(character.internal.world, character.object.guid, entry, upgrade_standing(character)) do
+      nil -> nil
+      menu -> build_gossip_menu(menu)
     end
   end
 

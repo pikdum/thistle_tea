@@ -1196,6 +1196,12 @@ defmodule ThistleTea.Game.Core.AI.ScriptTest do
       assert [%Effects.TriggerSpell{source_guid: ^guid, target_guid: ^guid, spell_id: 11_048}] = mob.internal.events
     end
 
+    test "add_aura retains the permanent flag", %{mob: mob} do
+      step = %ScriptStep{command: :add_aura, datalong: 24_699, datalong2: 8}
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+      assert [%Effects.TriggerSpell{spell_id: 24_699, duration_ms: -1}] = mob.internal.events
+    end
+
     test "clear_auras sheds what an evade would, keeping players' timed buffs", %{mob: mob} do
       player = Guid.from_low_guid(:player, 9)
       own = %Holder{spell: %Spell{id: 10}, caster_guid: mob.object.guid, expires_at: -1, negative?: false}

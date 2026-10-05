@@ -538,7 +538,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
   defp custom_effect_points(%Effects.TriggerSpell{effect_base_points: points}), do: points
 
   defp apply_trigger_duration_override(%Spell{} = spell, %Effects.TriggerSpell{duration_ms: duration_ms})
-       when is_integer(duration_ms) and duration_ms > 0 do
+       when is_integer(duration_ms) and (duration_ms > 0 or duration_ms == -1) do
     %{spell | duration_ms: duration_ms, max_duration_ms: duration_ms}
   end
 

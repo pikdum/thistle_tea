@@ -58,6 +58,14 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.CustomSpellTest do
       assert Enum.map(delivery.spell.effects, & &1.base_points) == [30, 25, 10]
       assert delivery.spell.duration_ms == 5000
     end
+
+    test "a permanent duration override does not change the cached spell", %{caster: caster, spell: spell} do
+      trigger = Effects.trigger_spell(caster.object.guid, 60, caster.object.guid, spell.id, duration_ms: -1)
+      delivery = caster |> Spells.resolve(trigger) |> Enum.find(&is_struct(&1, Effects.DeliverSpell))
+      assert delivery.spell.duration_ms == -1
+      assert delivery.spell.max_duration_ms == -1
+      assert caster.internal.spellbook[spell.id].duration_ms == 10_000
+    end
   end
 
   defp caster(_context) do

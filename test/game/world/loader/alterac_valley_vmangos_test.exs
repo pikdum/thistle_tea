@@ -7,10 +7,28 @@ defmodule ThistleTea.Game.World.Loader.AlteracValleyVMangosTest do
   alias ThistleTea.Game.Core.Battleground.AlteracValley
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Mine
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Node
+  alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
 
   @moduletag :vmangos_db
 
   describe "Alterac event catalog" do
+    test "named air attackers and their launch dialogue exist in the seed catalog" do
+      for {entry, text} <- [
+            {14_943, 10_341},
+            {14_944, 10_343},
+            {14_945, 10_346},
+            {14_946, 10_351},
+            {14_947, 10_349},
+            {14_948, 10_353}
+          ] do
+        creature = Mangos.Repo.get!(Mangos.CreatureTemplate, entry)
+        assert creature.model_id1 > 0
+        assert creature.faction_alliance > 0
+        assert Mangos.Repo.get!(Mangos.BroadcastText, text)
+        assert text in BattlegroundLoader.broadcast_text_ids()
+      end
+    end
+
     test "each wing commander has her supply quest and a route home" do
       for {entry, quest_id, item_id, final_point} <- [
             {13_179, 6_825, 17_326, 74},

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
   alias ThistleTea.DB.DBC
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Core.Battleground
+  alias ThistleTea.Game.Core.Battleground.AlteracValley.Air
   alias ThistleTea.Game.Core.Battleground.Entrance
   alias ThistleTea.Game.Core.Battleground.Template
 
@@ -154,6 +155,7 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
   def broadcast_text_ids,
     do:
       @warsong_broadcast_text_ids ++
+        Air.broadcast_text_ids() ++
         [
           7_335,
           7_336,
