@@ -201,6 +201,55 @@ defmodule ThistleTea.Game.World.System.CreatureGroupsTest do
   end
 
   describe "formation/3" do
+    test "promotes again after the temporary commander's owner exits", %{server: server, world: world} do
+      leader = mob(world, nil, Unique.integer())
+      first = mob(world, nil, Unique.integer())
+      second = mob(world, nil, Unique.integer())
+
+      owner = spawn(fn -> receive do: (:stop -> :ok) end)
+      on_exit(fn -> send(owner, :stop) end)
+      CreatureGroups.register(leader, owner, server)
+      Enum.each([first, second], &CreatureGroups.register(&1, self(), server))
+
+      route = %WaypointRoute{
+        first_point: 0,
+        destination_point: 1,
+        points: %{0 => %Waypoint{position: {0.0, 0.0, 0.0, nil}}, 1 => %Waypoint{position: {10.0, 0.0, 0.0, nil}}}
+      }
+
+      CreatureGroups.event(leader, {:waypoint, route}, owner, server)
+
+      Enum.each([first, second], fn member ->
+        assert :ok =
+                 CreatureGroups.join(
+                   world,
+                   member.object.guid,
+                   leader.object.guid,
+                   %Member{flags: 0x87},
+                   self(),
+                   server
+                 )
+      end)
+
+      CreatureGroups.event(leader, :death, owner, server)
+      assert %{role: :leader, route: ^route} = CreatureGroups.formation(world, first.object.guid, server)
+      ref = Process.monitor(owner)
+      send(owner, :stop)
+      assert_receive {:DOWN, ^ref, :process, ^owner, :normal}
+      await_absent(server, world, leader.object.guid, 100)
+      assert CreatureGroups.members(world, first.object.guid, server) == [first.object.guid, second.object.guid]
+
+      CreatureGroups.event(first, :death, self(), server)
+
+      assert %{role: :leader, leader_guid: guid, route: ^route, last_waypoint: 1} =
+               CreatureGroups.formation(world, second.object.guid, server)
+
+      assert guid == second.object.guid
+      CreatureGroups.stop_world(world, server)
+      assert CreatureGroups.formation(world, second.object.guid, server) == nil
+      assert CreatureGroups.members(world, second.object.guid, server) == []
+    end
+
     test "runtime formations inherit a route and cursor that preceded membership", %{server: server, world: world} do
       leader = mob(world, nil, Unique.integer())
       follower = mob(world, nil, Unique.integer())

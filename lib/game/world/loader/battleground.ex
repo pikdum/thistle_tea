@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
   alias ThistleTea.Game.Core.Battleground
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Air
   alias ThistleTea.Game.Core.Battleground.AlteracValley.Cavalry
+  alias ThistleTea.Game.Core.Battleground.AlteracValley.Ground
   alias ThistleTea.Game.Core.Battleground.Entrance
   alias ThistleTea.Game.Core.Battleground.Template
   alias ThistleTea.Game.World.Loader.Item
@@ -45,6 +46,7 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
 
   def load_all do
     Enum.each(Air.entries(), &Item.get_template(Air.beacon_item(&1)))
+    Enum.each([12_096, 12_097], &Item.get_template(Ground.order_item(&1)))
     templates = Mangos.Repo.all(from(row in Mangos.BattlegroundTemplate, where: row.patch <= @supported_patch))
     battlemasters = Mangos.Repo.all(Mangos.BattlemasterEntry)
     safe_locs = load_safe_locs(templates)
@@ -160,6 +162,7 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
       @warsong_broadcast_text_ids ++
         Air.broadcast_text_ids() ++
         Cavalry.broadcast_text_ids() ++
+        Ground.broadcast_text_ids() ++
         [
           7_335,
           7_336,

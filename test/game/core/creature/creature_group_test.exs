@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.Core.Creature.CreatureGroupTest do
 
   alias ThistleTea.Game.Core.Creature.CreatureGroup
   alias ThistleTea.Game.Core.Creature.CreatureGroup.Member
+  alias ThistleTea.Game.Core.Entity.Component.Internal.WaypointRoute
+  alias ThistleTea.Test.Unique
 
   setup [:actors]
 
@@ -50,6 +52,29 @@ defmodule ThistleTea.Game.Core.Creature.CreatureGroupTest do
       actors = actors |> put_in([2, :alive?], false) |> put_in([3, :present?], false)
       assert CreatureGroup.dead?(group(0), 1, actors)
       refute CreatureGroup.dead?(group(0), 2, actors)
+    end
+  end
+
+  describe "on_death/3" do
+    test "promotes another survivor after the original leader despawns" do
+      [leader, first, second] = Enum.map(1..3, fn _ -> Unique.integer() end)
+
+      group =
+        CreatureGroup.new(leader)
+        |> CreatureGroup.add(first, %Member{flags: 1})
+        |> CreatureGroup.add(second, %Member{})
+
+      actors = %{
+        leader => %{guid: leader, present?: true, alive?: false, route: %WaypointRoute{}},
+        first => %{guid: first, present?: true, alive?: true},
+        second => %{guid: second, present?: true, alive?: true}
+      }
+
+      group = CreatureGroup.on_death(group, leader, actors)
+      assert group.active_leader == first
+      actors = actors |> put_in([leader, :present?], false) |> put_in([first, :alive?], false)
+      assert CreatureGroup.on_death(group, first, actors).active_leader == second
+      assert CreatureGroup.on_death(group, first, put_in(actors[second].present?, false)).active_leader == leader
     end
   end
 

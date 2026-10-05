@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Player, as: PlayerServer
-  alias ThistleTea.Game.World.Entity.Player.AirBeacons
+  alias ThistleTea.Game.World.Entity.Player.BattlegroundSupplies
   alias ThistleTea.Game.World.Entity.Player.Gossip
   alias ThistleTea.Game.World.Entity.Player.QuestGiver
   alias ThistleTea.Game.World.Entity.Player.Reputation
@@ -104,7 +104,13 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
 
   def select_gossip(%{character: %Character{} = character} = state, guid, :take_air_beacon) do
     if QuestGiver.interactable?(character, guid),
-      do: AirBeacons.take(state, World.entry(guid), upgrade_standing(character)),
+      do: BattlegroundSupplies.take_beacon(state, World.entry(guid), upgrade_standing(character)),
+      else: state
+  end
+
+  def select_gossip(%{character: %Character{} = character} = state, guid, :take_ground_orders) do
+    if QuestGiver.interactable?(character, guid),
+      do: BattlegroundSupplies.take_orders(state, World.entry(guid), upgrade_standing(character)),
       else: state
   end
 
@@ -134,7 +140,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
 
   defp upgrade_standing(character), do: max(Reputation.standing(character, 729), Reputation.standing(character, 730))
 
-  defp build_gossip_menu(%{text_id: text_id, options: options}) do
+  defp build_gossip_menu(%{text_id: text_id, options: options} = menu) do
     options =
       Enum.flat_map(options, fn option ->
         case BroadcastText.get(option.text_id) do
@@ -146,8 +152,12 @@ defmodule ThistleTea.Game.World.Entity.Player.Battlegrounds do
         end
       end)
 
+    options = if menu[:vendor?], do: options ++ [vendor_option()], else: options
     %Menu{text_id: text_id, options: options}
   end
+
+  defp vendor_option,
+    do: %Option{id: 2, icon: 1, text: "I wish to browse your goods.", option_id: 3, npc_flag: 4, talk_credit?: false}
 
   def battlemaster_hello(%{ready: true, character: %Character{} = character} = state, guid) do
     entry = World.entry(guid)

@@ -32,7 +32,7 @@ defmodule ThistleTea.Game.Core.Creature.CreatureGroup do
   def formation?(%__MODULE__{} = group), do: flag?(group, 1)
 
   def on_death(%__MODULE__{active_leader: source} = group, source, actors) do
-    if formation?(group) and match?(%{present?: true, route: %WaypointRoute{}}, actors[group.leader]) do
+    if formation?(group) and match?(%{route: %WaypointRoute{}}, actors[group.leader]) do
       leader =
         group.members
         |> Map.keys()

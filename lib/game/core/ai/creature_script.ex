@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   alias ThistleTea.Game.Core.AI.CreatureScript.AlteracValleyAir
   alias ThistleTea.Game.Core.AI.CreatureScript.AlteracValleyAssault
   alias ThistleTea.Game.Core.AI.CreatureScript.AlteracValleyCavalry
+  alias ThistleTea.Game.Core.AI.CreatureScript.AlteracValleyGround
   alias ThistleTea.Game.Core.AI.CreatureScript.AlteracValleyWarRider
   alias ThistleTea.Game.Core.AI.CreatureScript.ArchmageTervosh
   alias ThistleTea.Game.Core.AI.CreatureScript.Bartleby
@@ -100,15 +101,17 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
   @callback quest_end_steps() :: %{pos_integer() => [%ScriptStep{}]}
 
   @callback routes() :: [%Route{}]
+  @callback summon_entries() :: [non_neg_integer()]
   @callback gossip() :: %{pos_integer() => %Gossip{}}
 
-  @optional_callbacks quest_start_steps: 0, quest_end_steps: 0, routes: 0, gossip: 0
+  @optional_callbacks quest_start_steps: 0, quest_end_steps: 0, routes: 0, gossip: 0, summon_entries: 0
 
   @scripts [
     AlteracValley,
     AlteracValleyAir,
     AlteracValleyAssault,
     AlteracValleyCavalry,
+    AlteracValleyGround,
     AlteracValleyWarRider,
     ArchmageTervosh,
     Bartleby,
@@ -188,7 +191,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript do
 
   def creature_entries, do: Script.creature_entries(steps() ++ all_quest_steps())
 
-  def summon_entries, do: Script.summon_entries(steps() ++ all_quest_steps())
+  def summon_entries,
+    do: Enum.concat(implementations(:summon_entries)) ++ Script.summon_entries(steps() ++ all_quest_steps())
 
   defp all_quest_steps, do: Enum.flat_map(Map.values(quest_start_steps()) ++ Map.values(quest_end_steps()), & &1)
 

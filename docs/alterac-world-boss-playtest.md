@@ -8,8 +8,8 @@ quest, waypoint, game-object, and spell catalogs.
 
 This slice implements Storm Crystals and Stormpike Soldier's Blood donations,
 the summoners' escorted journeys, ten-player rituals, and Ivus and Lokholar's
-combat scripts. Air strikes and cavalry were implemented in later slices;
-ground assaults remain future work.
+combat scripts. Air strikes, cavalry, and [ground assaults](alterac-ground-playtest.md)
+were implemented in later slices.
 
 ## Native donations and scripted journeys
 

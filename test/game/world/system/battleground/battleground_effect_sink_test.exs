@@ -18,6 +18,26 @@ defmodule ThistleTea.Game.World.System.Battleground.BattlegroundEffectSinkTest d
   alias ThistleTea.Test.Unique
 
   describe "emit/2" do
+    test "a replacement deployment targets its own commander in the match's copy" do
+      world = WorldRef.instance(30, Unique.integer())
+      other_world = WorldRef.instance(30, Unique.integer())
+      commander = Guid.from_low_guid(:mob, 13_446, Unique.integer())
+      stale = Guid.from_low_guid(:mob, 13_446, Unique.integer())
+      other = Guid.from_low_guid(:mob, 13_446, Unique.integer())
+
+      for {guid, copy} <- [{commander, world}, {stale, world}, {other, other_world}] do
+        {:ok, _} = Entity.register(guid)
+        SpatialHash.insert(:mobs, guid, copy, 0.0, 0.0, 0.0)
+      end
+
+      on_exit(fn -> for guid <- [commander, stale, other], do: SpatialHash.remove(:mobs, guid) end)
+      steps = [%ScriptStep{command: :send_script_event, datalong: 1}]
+      effect = %Effects.RunCreatureScript{creature_entry: 13_446, creature_guid: commander, steps: steps}
+      assert :ok = EffectSink.emit(%{world: world, players: %{}}, [effect])
+      assert_receive {:"$gen_cast", {:start_script, ^steps, ^commander, ^world}}
+      refute_received {:"$gen_cast", {:start_script, _, _, _}}
+    end
+
     test "runs voiced creature scripts only in the match's copy" do
       world = WorldRef.instance(30, Unique.integer())
       other_world = WorldRef.instance(30, Unique.integer())

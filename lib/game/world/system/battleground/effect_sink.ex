@@ -67,12 +67,12 @@ defmodule ThistleTea.Game.World.System.Battleground.EffectSink do
     Spawns.stop_respawns(match.world, event)
   end
 
-  defp emit_effect(match, %Effects.RunCreatureScript{creature_entry: entry, steps: steps}) do
+  defp emit_effect(match, %Effects.RunCreatureScript{creature_entry: entry, creature_guid: guid, steps: steps}) do
     steps = ScriptLoader.attach_cached_texts(steps, &BroadcastTextLoader.get/1)
 
     match.world
     |> World.guids()
-    |> Enum.filter(&(Guid.entity_type(&1) == :mob and Guid.entry(&1) == entry))
+    |> Enum.filter(&(Guid.entity_type(&1) == :mob and Guid.entry(&1) == entry and (is_nil(guid) or &1 == guid)))
     |> Enum.each(&Entity.start_script(&1, steps, &1, match.world))
   end
 

@@ -1,4 +1,4 @@
-defmodule ThistleTea.Game.World.Entity.Player.AirBeaconsTest do
+defmodule ThistleTea.Game.World.Entity.Player.BattlegroundSuppliesTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.Core.Battleground.Template
@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AirBeaconsTest do
   alias ThistleTea.Game.Core.Inventory
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.CharacterStore
-  alias ThistleTea.Game.World.Entity.Player.AirBeacons
+  alias ThistleTea.Game.World.Entity.Player.BattlegroundSupplies
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -43,14 +43,14 @@ defmodule ThistleTea.Game.World.Entity.Player.AirBeaconsTest do
 
   setup [:supplied_match]
 
-  describe "take/4" do
+  describe "take_beacon/4" do
     test "commits one beacon and receipt before a stale selection can take more", context do
-      state = AirBeacons.take(context.state, 13_179, 0, battleground_system: context.server)
+      state = BattlegroundSupplies.take_beacon(context.state, 13_179, 0, battleground_system: context.server)
       assert Inventory.count_entry(state.character.player, 17_324, &ItemStore.get/1) == 1
       assert Match.snapshot(context.match).air[13_179].count == 0
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgItemPushResult{item_id: 17_324, count: 1}}}
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgGossipComplete{}}}
-      assert AirBeacons.take(state, 13_179, 0, battleground_system: context.server) == state
+      assert BattlegroundSupplies.take_beacon(state, 13_179, 0, battleground_system: context.server) == state
       assert Inventory.count_entry(state.character.player, 17_324, &ItemStore.get/1) == 1
     end
 
@@ -59,7 +59,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AirBeaconsTest do
         character = occupied(context.state.character, variant)
         state = %{context.state | character: character}
         before = Match.snapshot(context.match)
-        assert AirBeacons.take(state, 13_179, 0, battleground_system: context.server) == state
+        assert BattlegroundSupplies.take_beacon(state, 13_179, 0, battleground_system: context.server) == state
         assert Match.snapshot(context.match) == before
         assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgInventoryChangeFailure{}}}
       end
@@ -77,12 +77,49 @@ defmodule ThistleTea.Game.World.Entity.Player.AirBeaconsTest do
     end
   end
 
-  defp occupied(character, :bank) do
-    item = item(17_324, character.object.guid)
+  describe "take_orders/4" do
+    test "commits one order and receipt and deploys only once", context do
+      state = BattlegroundSupplies.take_orders(context.state, 12_097, 9_000, battleground_system: context.server)
+      assert Inventory.count_entry(state.character.player, 17_442, &ItemStore.get/1) == 1
+      assert Match.snapshot(context.match).ground.horde.phase == :assembled
+      assert Match.snapshot(context.match).ground.horde.irondeep == 0
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgItemPushResult{item_id: 17_442, count: 1}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgGossipComplete{}}}
+      assert BattlegroundSupplies.take_orders(state, 12_097, 9_000, battleground_system: context.server) == state
+      assert Inventory.count_entry(state.character.player, 17_442, &ItemStore.get/1) == 1
+    end
+
+    test "full bags and an existing bank order leave the shared stockpile ready", context do
+      for variant <- [:full, :bank] do
+        character = occupied(context.state.character, variant, 17_442)
+        state = %{context.state | character: character}
+        before = Match.snapshot(context.match)
+        assert BattlegroundSupplies.take_orders(state, 12_097, 9_000, battleground_system: context.server) == state
+        assert Match.snapshot(context.match) == before
+        assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgInventoryChangeFailure{}}}
+      end
+    end
+
+    test "racing requesters cannot duplicate an infantry deployment", context do
+      replies =
+        1..8
+        |> Task.async_stream(fn _ -> Match.take_orders(context.match, context.state.guid, 12_097, 9_000) end)
+        |> Enum.map(fn {:ok, reply} -> reply end)
+
+      assert Enum.count(replies, &(&1 == {:ok, 17_442})) == 1
+      assert Enum.count(replies, &(&1 == {:error, :unavailable})) == 7
+      assert Match.snapshot(context.match).ground.horde.phase == :assembled
+    end
+  end
+
+  defp occupied(character, variant, entry \\ 17_324)
+
+  defp occupied(character, :bank, entry) do
+    item = item(entry, character.object.guid)
     %{character | player: %{character.player | bank1: item.object.guid}}
   end
 
-  defp occupied(character, :full) do
+  defp occupied(character, :full, _entry) do
     fields =
       Map.new(1..16, fn slot ->
         {String.to_existing_atom("inv#{slot}"), item(Unique.integer(), character.object.guid).object.guid}
@@ -92,7 +129,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AirBeaconsTest do
   end
 
   defp item(entry, owner) do
-    template = %ItemTemplate{entry: entry, max_count: if(entry == 17_324, do: 1, else: 0), stackable: 1}
+    template = %ItemTemplate{entry: entry, max_count: if(entry in [17_324, 17_442], do: 1, else: 0), stackable: 1}
     ItemStore.put(Item.build(template, Guid.from_low_guid(:item, Unique.integer()), owner: owner))
   end
 
@@ -131,9 +168,16 @@ defmodule ThistleTea.Game.World.Entity.Player.AirBeaconsTest do
     })
 
     for _ <- 1..90, do: Match.quest_rewarded(match, guid, 6_825)
+    for _ <- 1..7, do: Match.quest_rewarded(match, guid, 6_985)
     assert Match.snapshot(match).air[13_179].count == 90
     previous = ItemLoader.get_cached_template(17_324)
+    previous_orders = ItemLoader.get_cached_template(17_442)
     :ets.insert(ItemLoader, {17_324, %ItemTemplate{entry: 17_324, name: "Guse's Beacon", max_count: 1, stackable: 1}})
+
+    :ets.insert(
+      ItemLoader,
+      {17_442, %ItemTemplate{entry: 17_442, name: "Frostwolf Assault Orders", max_count: 1, stackable: 1}}
+    )
 
     character = %Character{
       id: guid,
@@ -146,6 +190,7 @@ defmodule ThistleTea.Game.World.Entity.Player.AirBeaconsTest do
 
     on_exit(fn ->
       if previous, do: :ets.insert(ItemLoader, {17_324, previous}), else: :ets.delete(ItemLoader, 17_324)
+      if previous_orders, do: :ets.insert(ItemLoader, {17_442, previous_orders}), else: :ets.delete(ItemLoader, 17_442)
       :ets.delete(CharacterStore, guid)
       for {item_guid, %Item{item: %{owner: ^guid}}} <- :ets.tab2list(ItemStore), do: ItemStore.delete(item_guid)
       Metadata.delete(guid)
