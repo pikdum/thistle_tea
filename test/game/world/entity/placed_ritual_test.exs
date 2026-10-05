@@ -18,14 +18,16 @@ defmodule ThistleTea.Game.World.Entity.PlacedRitualTest do
 
       GenServer.cast(pid, {:gameobject_use, first, 40})
       GenServer.cast(pid, {:gameobject_use, Unique.integer(), 40})
-      refute_receive {:"$gen_cast", {:trigger_spell, _spell_id, _target, _opts}}, 50
+      assert %{users: users, completed?: false, first_user_guid: ^first} = :sys.get_state(pid).internal.ritual
+      assert MapSet.size(users) == 2
+      refute_received {:"$gen_cast", {:trigger_spell, _spell_id, _target, _opts}}
 
       GenServer.cast(pid, {:gameobject_use, Unique.integer(), 40})
 
-      assert_receive {:"$gen_cast", {:trigger_spell, 10_340, ^guid, [triggered: true]}}
-      assert_receive {:"$gen_cast", {:finish_game_object_channel, ^guid}}
       assert %{users: users, completed?: false, first_user_guid: nil} = :sys.get_state(pid).internal.ritual
       assert users == MapSet.new()
+      assert_received {:"$gen_cast", {:trigger_spell, 10_340, ^guid, [triggered: true]}}
+      assert_received {:"$gen_cast", {:finish_game_object_channel, ^guid}}
     end
   end
 
