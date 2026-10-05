@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.World.Loader.AlteracValleyVMangosTest do
         item = Mangos.Repo.get!(Mangos.ItemTemplate, item_id)
         assert {item.spellid_1, item.spellcharges_1, item.max_count} == {spell_id, -1, 1}
         assert {item.spellcategory_1, item.spellcategorycooldown_1} == {951, 1_800_000}
+        assert item.area == 2_597
         object = Mangos.Repo.get!(Mangos.GameObjectTemplate, object_id)
         assert {object.type, object.data0} == {10, 99}
         assert text_id in BattlegroundLoader.broadcast_text_ids()

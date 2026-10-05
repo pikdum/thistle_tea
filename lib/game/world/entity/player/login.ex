@@ -70,6 +70,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
   alias ThistleTea.Game.World.Entity.Player.Honor
   alias ThistleTea.Game.World.Entity.Player.Instances
   alias ThistleTea.Game.World.Entity.Player.ItemDurations
+  alias ThistleTea.Game.World.Entity.Player.ItemLocationLimits
   alias ThistleTea.Game.World.Entity.Player.LiquidSpells
   alias ThistleTea.Game.World.Entity.Player.Mail
   alias ThistleTea.Game.World.Entity.Player.Quests
@@ -157,6 +158,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Login do
       |> PlayedTime.start(Time.now())
       |> Emote.reset()
       |> Instances.restore(character_guid)
+      |> ItemLocationLimits.restore()
       |> normalize_movement_state()
       |> normalize_combat_stats()
       |> normalize_faction_template()

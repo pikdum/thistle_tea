@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Exploration do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Entity.Player.ItemLocationLimits
   alias ThistleTea.Game.World.Entity.Player.OutdoorPvp
   alias ThistleTea.Game.World.Entity.Player.Pvp
   alias ThistleTea.Game.World.Entity.Player.Rest
@@ -47,6 +48,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Exploration do
       ) do
     case Pathfinding.get_zone_and_area(world.map_id, {x, y, z}) do
       {zone_id, area_id} ->
+        state = ItemLocationLimits.reconcile(state, zone_id: zone_id)
         state = Weather.refresh(state, zone_id)
         state = OutdoorPvp.update_zone(state, zone_id)
         state = Pvp.update_territory(state, zone_id, area_id)
@@ -56,6 +58,7 @@ defmodule ThistleTea.Game.World.Entity.Player.Exploration do
         zone = Rest.default_zone(world.map_id)
 
         state
+        |> ItemLocationLimits.reconcile(zone_id: zone)
         |> Weather.refresh(zone)
         |> OutdoorPvp.update_zone(zone)
         |> Pvp.update_territory(zone, state.character.internal.area)

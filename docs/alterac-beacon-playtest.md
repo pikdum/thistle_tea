@@ -95,7 +95,8 @@ is not ready yet. After clearing the item cooldown for the fixture, leaving both
 clients with a waiting beacon removed the match and every entity in its instance,
 more than fifty-seven seconds before that beacon's deadline. A carried spare
 beacon remained outside Alterac; this exposed missing shared zone-bound inventory
-cleanup and is being fixed in the following inventory milestone.
+cleanup. [The inventory follow-up](item-location-limits-playtest.md) fixes carried
+items on departure and revalidates them after resurrection and login.
 
 For reproducible crater positioning, teleport above the terrain with
 `.go xyz -285 -320 35` and allow the client to land before planting. The enemy

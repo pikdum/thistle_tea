@@ -120,6 +120,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
   alias ThistleTea.Game.World.Entity.Player.InventoryUpdate
   alias ThistleTea.Game.World.Entity.Player.ItemCosts
   alias ThistleTea.Game.World.Entity.Player.ItemDurations
+  alias ThistleTea.Game.World.Entity.Player.ItemLocationLimits
   alias ThistleTea.Game.World.Entity.Player.Items
   alias ThistleTea.Game.World.Entity.Player.Login
   alias ThistleTea.Game.World.Entity.Player.Looting
@@ -1920,6 +1921,7 @@ defmodule ThistleTea.Game.World.Entity.Player do
     |> ServerMovement.reconcile()
     |> cancel_cast_if_dead()
     |> finalize_death()
+    |> ItemLocationLimits.reconcile()
     |> OutdoorPvp.reconcile()
     |> SpellAreas.reconcile()
     |> SpellEnvironment.reconcile()

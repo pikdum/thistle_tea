@@ -95,6 +95,7 @@ defmodule ThistleTea.Game.World.Entity.Player.State do
     :quest_share,
     :quest_share_monitor,
     :item_duration_timer,
+    :item_location_snapshot,
     :instance_eviction,
     :weather_key,
     :weather_token,

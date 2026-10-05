@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InventoryUpdate do
   alias ThistleTea.Game.World.Entity.Player.ConditionContext
   alias ThistleTea.Game.World.Entity.Player.Equipment
   alias ThistleTea.Game.World.Entity.Player.ItemDurations
+  alias ThistleTea.Game.World.Entity.Player.ItemLocationLimits
   alias ThistleTea.Game.World.Entity.Player.Quests
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -137,7 +138,7 @@ defmodule ThistleTea.Game.World.Entity.Player.InventoryUpdate do
   end
 
   defp finish_update(state) do
-    state = state |> sync_condition_subject() |> QuestGivers.refresh()
+    state = state |> ItemLocationLimits.invalidate() |> sync_condition_subject() |> QuestGivers.refresh()
     broadcast_player(state)
     character = state.character |> EventSink.emit_pending(Context.new(self())) |> store_character()
     ItemDurations.sync(%{state | character: character})
