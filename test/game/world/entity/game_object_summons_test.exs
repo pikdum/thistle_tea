@@ -28,9 +28,10 @@ defmodule ThistleTea.Game.World.Entity.GameObjectSummonsTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Test.FactionFixtures
   alias ThistleTea.Test.Unique
 
-  setup [:templates]
+  setup [{FactionFixtures, :seed}, :templates]
 
   describe "prepare/2" do
     test "preserves zero coordinates and fills only unspecified values", %{caster: caster} do

@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemLocationLimitsTest do
   alias ThistleTea.Game.World.Entity.Player.State
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
+  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Test.Unique
 
@@ -42,6 +43,8 @@ defmodule ThistleTea.Game.World.Entity.Player.ItemLocationLimitsTest do
 
     test "removing equipped gear recomputes its stats and visible fields", context do
       template = %{Item.template(context.item) | inventory_type: 13, class: 2, stat_type1: 1, stat_value1: 50}
+      :ets.insert(ItemLoader, {template.entry, template})
+      on_exit(fn -> :ets.delete(ItemLoader, template.entry) end)
       item = %{context.item | internal: Map.put(context.item.internal, :template, template)}
       ItemStore.put(item)
       character = context.state.character

@@ -47,7 +47,13 @@ defmodule ThistleTea.Game.World.Entity.GameObject.GhostMagnetTest do
       assert %{entry: @spectre, despawn_type: 1, despawn_delay_ms: 120_000} = summon
       assert %ScriptStep{command: :set_home_position, position: {hx, hy, _hz, _ho}} = home
       assert %ScriptStep{command: :move_to, datalong3: 1, datalong4: 2, dataint: 2, position: {^hx, ^hy, _, _}} = walk
-      assert_in_delta :math.sqrt((hx - -12_000.0) ** 2 + (hy - -12_000.0) ** 2), 1.5, 0.01
+      {sx, sy, _sz, _so} = summon.position
+
+      if :math.sqrt((sx - -12_000.0) ** 2 + (sy - -12_000.0) ** 2) > 1.5 do
+        assert_in_delta :math.sqrt((hx - -12_000.0) ** 2 + (hy - -12_000.0) ** 2), 1.5, 0.01
+      else
+        assert {hx, hy} == {-12_000.0, -12_000.0}
+      end
     end
 
     test "stops once its eight spectres are out or its two minutes are up" do

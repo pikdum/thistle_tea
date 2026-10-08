@@ -13,7 +13,8 @@ defmodule ThistleTea.Test.FactionFixtures do
   @templates [
     %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12},
     %FactionTemplate{id: 14, faction: 14, faction_group: 8, enemy_group: 1},
-    %FactionTemplate{id: 35, faction: 31, friend_group: 1, friends_0: 31}
+    %FactionTemplate{id: 35, faction: 31, friend_group: 1, friends_0: 31},
+    %FactionTemplate{id: 84, faction: 189, flags: 33, faction_group: 2, friend_group: 2, enemy_group: 4}
   ]
 
   def seed(_context) do

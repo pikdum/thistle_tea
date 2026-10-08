@@ -22,7 +22,10 @@ defmodule ThistleTea.Game.World.System.SpawnPoolTest do
   alias ThistleTea.Game.World.System.Battleground.Spawns, as: BattlegroundSpawns
   alias ThistleTea.Game.World.System.SpawnPool
   alias ThistleTea.Game.World.System.SpawnPool.Supervisor, as: SpawnPoolSupervisor
+  alias ThistleTea.Test.FactionFixtures
   alias ThistleTea.Test.Unique
+
+  setup {FactionFixtures, :seed}
 
   describe "singleton lifecycle" do
     test "disarmed and triggered static traps respawn through their pool with fresh state" do
