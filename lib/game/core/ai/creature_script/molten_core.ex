@@ -23,6 +23,11 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
   ten seconds. A fighting hound above one health within a hundred yards in
   the same copy revives them; without one, they die and despawn.
 
+  Firewalkers root themselves for six Fire Blossoms, one each second at a
+  random attacker, and ignite their victim every twenty seconds. Firelords
+  retaliate with Incinerate, burn random players' souls, and summon Lava
+  Spawns that immediately attack one of their summoner's opponents.
+
   vmangos also binds the Firesworn to Garr with Separation Anxiety, has
   Golemagg evade when a rager is dragged a hundred yards from him, and turns
   Geddon to face his Living Bomb's victim, which this port leaves out. Garr
@@ -49,6 +54,9 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
   @golemagg 11_988
   @core_rager 11_672
   @core_hound 11_671
+  @firewalker 11_666
+  @firelord 11_668
+  @lava_spawn 12_265
 
   @triggered 0x02
   @aura_not_present 0x20
@@ -67,8 +75,22 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
   @percent 1
 
   @impl CreatureScript
-  def entries,
-    do: [@lucifron, @gehennas, @shazzrah, @garr, @firesworn, @geddon, @sulfuron, @golemagg, @core_rager, @core_hound]
+  def entries do
+    [
+      @lucifron,
+      @gehennas,
+      @shazzrah,
+      @garr,
+      @firesworn,
+      @geddon,
+      @sulfuron,
+      @golemagg,
+      @core_rager,
+      @core_hound,
+      @firewalker,
+      @firelord
+    ]
+  end
 
   @impl CreatureScript
   def events(@lucifron = entry) do
@@ -187,6 +209,43 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
       ]),
       CreatureScript.event(entry, 2, :aggro, [zone_combat()]),
       Combat.every(entry, 3, Combat.cast(19_771), {4_000, 7_000}, {4_000, 7_000})
+    ]
+  end
+
+  def events(@firewalker = entry) do
+    blossoms =
+      for shot <- 1..6,
+          do: %{Combat.cast(19_637, :hostile_random) | delay_ms: shot * 1_000}
+
+    [
+      CreatureScript.event(entry, 1, :aggro, [zone_combat()]),
+      Combat.every(entry, 2, [Combat.cast(19_636, :self), CreatureScript.timed(blossoms)], 6_000, 12_000),
+      Combat.every(entry, 3, Combat.cast(19_635), 20_000, 20_000),
+      CreatureScript.event(entry, 4, :evade, [%ScriptStep{command: :stop_scripts}]),
+      CreatureScript.event(entry, 5, :death, [%ScriptStep{command: :stop_scripts}])
+    ]
+  end
+
+  def events(@firelord = entry) do
+    [
+      CreatureScript.event(entry, 1, :aggro, [Combat.cast(19_396, :self, @triggered + @aura_not_present)]),
+      Combat.every(entry, 2, Combat.cast(19_569, :self), {7_500, 12_500}, {15_000, 20_000}),
+      Combat.every(
+        entry,
+        3,
+        %{Combat.cast(19_393, :hostile_random, @triggered) | target_param1: @player},
+        {4_000, 6_000},
+        {3_000, 4_000}
+      ),
+      CreatureScript.event(
+        entry,
+        4,
+        :summoned_unit,
+        [
+          %ScriptStep{command: :attack_start, target_type: :owner_hostile_random, swap_initial?: true}
+        ],
+        param1: @lava_spawn
+      )
     ]
   end
 

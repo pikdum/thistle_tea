@@ -1918,10 +1918,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
     owner_guid
   end
 
-  defp resolve_target(%{unit: %Unit{summoned_by: owner_guid}}, %ScriptStep{target_type: :owner}, _provided)
-       when is_integer(owner_guid) and owner_guid > 0 do
-    owner_guid
-  end
+  defp resolve_target(state, %ScriptStep{target_type: :owner}, _provided), do: owner_guid(state)
 
   defp resolve_target(_state, %ScriptStep{target_type: :provided}, provided), do: provided
 
@@ -1971,13 +1968,12 @@ defmodule ThistleTea.Game.Core.AI.Script do
     find_game_object_with_entry(state, step, target_type, perception, random)
   end
 
-  defp resolve_target(
-         %{internal: %{pet: %Pet{owner_guid: owner}}} = state,
-         %ScriptStep{target_type: :owner_hostile_random, target_param1: flags},
-         _provided,
-         %Context{perception: perception, random: random}
-       ) do
+  defp resolve_target(state, %ScriptStep{target_type: :owner_hostile_random, target_param1: flags}, _provided, %Context{
+         perception: perception,
+         random: random
+       }) do
     victim = victim(state)
+    owner = owner_guid(state)
 
     perception
     |> Perception.metadata(owner)
@@ -2378,6 +2374,14 @@ defmodule ThistleTea.Game.Core.AI.Script do
 
   defp flag?(flags, mask) when is_integer(flags), do: (flags &&& mask) != 0
   defp flag?(_flags, _mask), do: false
+
+  defp owner_guid(%{internal: %{pet: %Pet{owner_guid: guid}}}) when is_integer(guid) and guid > 0, do: guid
+
+  defp owner_guid(%{internal: %{spawn: %{summoner_guid: guid}}}) when is_integer(guid) and guid > 0, do: guid
+
+  defp owner_guid(%{unit: %Unit{summoned_by: guid}}) when is_integer(guid) and guid > 0, do: guid
+
+  defp owner_guid(_state), do: nil
 
   defp player_reaction_allows?(:nearest_hostile_player, source, target),
     do: Hostility.valid_hostile_target?(source, target)

@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironmentTest do
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Spawn
   alias ThistleTea.Game.Core.Entity.Component.MovementBlock
   alias ThistleTea.Game.Core.Entity.Component.Object
   alias ThistleTea.Game.Core.Entity.Component.Unit
@@ -35,6 +36,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironmentTest do
   alias ThistleTea.Game.World.System.ScriptedEvent
   alias ThistleTea.Game.World.System.ScriptedEvent.Event
   alias ThistleTea.Native.Namigator
+  alias ThistleTea.Test.Unique
 
   describe "move_to/4" do
     test "scripted point movement can take over a running patrol" do
@@ -58,6 +60,31 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironmentTest do
   end
 
   describe "context/3" do
+    test "wild summons observe their summoner's distant opponents" do
+      world = WorldRef.instance(999, Unique.integer())
+      parent = Guid.from_low_guid(:mob, 11_668, Unique.integer())
+      enemy = Unique.integer()
+      put_actor(:mobs, parent, world, 90.0)
+      put_actor(:players, enemy, world, 130.0)
+      Metadata.update(parent, %{combat_targets: [enemy]})
+
+      on_exit(fn ->
+        remove_actor(:mobs, parent)
+        remove_actor(:players, enemy)
+      end)
+
+      child = %Mob{
+        object: %Object{guid: Guid.from_low_guid(:mob, 12_265, Unique.integer())},
+        unit: %Unit{health: 100, target: 0, auras: []},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: world, spawn: %Spawn{summoner_guid: parent}, threat: %{}}
+      }
+
+      perception = AIEnvironment.context(child, 1_000).perception
+      assert Perception.metadata(perception, parent).combat_targets == [enemy]
+      assert Perception.position(perception, enemy) == {world, 130.0, 0.0, 0.0}
+    end
+
     test "observes the active melee victim after selection is cleared" do
       world = WorldRef.open(999)
       target = Guid.runtime(:mob, 19)

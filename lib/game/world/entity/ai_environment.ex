@@ -344,7 +344,11 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
          internal: %Internal{auto_shot: auto_shot, threat: threat} = internal,
          unit: %Unit{target: target}
        }) do
-    [auto_repeat_target(auto_shot), target, leader_guid(internal.blackboard) | threat_guids(threat)]
+    summoner = internal.spawn && internal.spawn.summoner_guid
+    owner = if is_integer(summoner), do: Metadata.get(summoner) || %{}, else: %{}
+
+    [summoner, auto_repeat_target(auto_shot), target, leader_guid(internal.blackboard) | threat_guids(threat)]
+    |> Enum.concat(owner[:combat_targets] || [])
     |> Enum.filter(&(is_integer(&1) and &1 > 0))
   end
 
