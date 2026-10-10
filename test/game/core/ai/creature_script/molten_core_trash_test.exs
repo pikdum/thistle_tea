@@ -29,7 +29,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
 
   setup [:combatants]
 
-  describe "combat entry" do
+  describe "events/1" do
     test "scripted casts replace the default spell list on each pull", %{players: [first | _] = players} do
       for {entry, spells} <- [{11_666, [19_636, 19_635]}, {11_668, [19_569, 19_393]}] do
         mob = creature(entry, players)
@@ -51,10 +51,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
         refute MobSpells.has_spells?(mob, blackboard)
       end
     end
-  end
 
-  describe "Firewalker" do
-    test "fires six timed blossoms and selects against the current threat list", %{players: [first, second]} do
+    test "Firewalker fires six blossoms against the current threat list", %{players: [first, second]} do
       mob = creature(11_666, [first, second])
       {mob, blackboard} = EventAI.enter_combat(mob, Blackboard.new(), first, 0, context(mob, 0))
       {early, _} = EventAI.tick(clear_effects(mob), blackboard, 5_999, context(mob, 5_999))
@@ -79,7 +77,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
       assert timers(mob) == []
     end
 
-    test "evade and death cancel the remaining burst receipts", %{players: [first | _] = players} do
+    test "Firewalker evade and death cancel remaining burst receipts", %{players: [first | _] = players} do
       for ending <- [:evade, :death] do
         mob = creature(11_666, players)
         {mob, blackboard} = EventAI.enter_combat(mob, Blackboard.new(), first, 0, context(mob, 0))
@@ -97,10 +95,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
         assert spell_starts(mob) == []
       end
     end
-  end
 
-  describe "Firelord" do
-    test "uses Incinerate, player-only Soul Burn and repeating Lava Spawn casts", %{players: [first | _] = players} do
+    test "Firelord uses Incinerate, player-only Soul Burn and repeating summons", %{players: [first | _] = players} do
       mob = creature(11_668, players)
       npc = Guid.from_low_guid(:mob, 11_666, Unique.integer())
       mob = %{mob | internal: %{mob.internal | threat: Map.put(mob.internal.threat, npc, 100)}}
@@ -119,7 +115,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
       assert spell_starts(mob) == [{19_569, mob.object.guid}]
     end
 
-    test "forwards each new spawn to attack its summoner's opponents", %{players: [first | _] = players} do
+    test "Firelord forwards each spawn to attack its summoner's opponents", %{players: [first | _] = players} do
       parent = creature(11_668, players)
       child = creature(12_265, [])
 
