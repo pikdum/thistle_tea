@@ -6,7 +6,9 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
   alias ThistleTea.Game.Core.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Core.AI.BT.Context.Random
+  alias ThistleTea.Game.Core.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Core.AI.CreatureScript
+  alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.AI.EventAI
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.Script.Run
@@ -26,6 +28,30 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
   alias ThistleTea.Test.Unique
 
   setup [:combatants]
+
+  describe "combat entry" do
+    test "scripted casts replace the default spell list on each pull", %{players: [first | _] = players} do
+      for {entry, spells} <- [{11_666, [19_636, 19_635]}, {11_668, [19_569, 19_393]}] do
+        mob = creature(entry, players)
+        defaults = Enum.map(spells, &%CreatureSpell{spell_id: &1, cast_target: :self})
+        mob = %{mob | internal: %{mob.internal | creature: %{mob.internal.creature | spells: defaults}}}
+        assert MobSpells.has_spells?(mob, Blackboard.new())
+
+        {mob, blackboard} = EventAI.enter_combat(mob, Blackboard.new(), first, 0, context(mob, 0))
+        refute MobSpells.has_spells?(mob, blackboard)
+
+        assert {:failure, unchanged, _blackboard} =
+                 MobSpells.try_cast(clear_effects(mob), blackboard, context(mob, 1_000))
+
+        assert spell_starts(unchanged) == []
+        {mob, blackboard} = EventAI.on_evade(mob, blackboard, 2_000, context(mob, 2_000))
+        blackboard = Blackboard.reset_spells(blackboard)
+        assert MobSpells.has_spells?(mob, blackboard)
+        {mob, blackboard} = EventAI.enter_combat(mob, blackboard, first, 3_000, context(mob, 3_000))
+        refute MobSpells.has_spells?(mob, blackboard)
+      end
+    end
+  end
 
   describe "Firewalker" do
     test "fires six timed blossoms and selects against the current threat list", %{players: [first, second]} do
@@ -96,7 +122,15 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
     test "forwards each new spawn to attack its summoner's opponents", %{players: [first | _] = players} do
       parent = creature(11_668, players)
       child = creature(12_265, [])
-      child = %{child | internal: %{child.internal | spawn: %Spawn{summoner_guid: parent.object.guid}}}
+
+      child = %{
+        child
+        | internal: %{
+            child.internal
+            | world: parent.internal.world,
+              spawn: %Spawn{summoner_guid: parent.object.guid}
+          }
+      }
 
       event = %SummonEvent{
         event: :summoned_unit,

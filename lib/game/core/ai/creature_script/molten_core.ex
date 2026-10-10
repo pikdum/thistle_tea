@@ -218,7 +218,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
           do: %{Combat.cast(19_637, :hostile_random) | delay_ms: shot * 1_000}
 
     [
-      CreatureScript.event(entry, 1, :aggro, [zone_combat()]),
+      CreatureScript.event(entry, 1, :aggro, [clear_spell_list(), zone_combat()]),
       Combat.every(entry, 2, [Combat.cast(19_636, :self), CreatureScript.timed(blossoms)], 6_000, 12_000),
       Combat.every(entry, 3, Combat.cast(19_635), 20_000, 20_000),
       CreatureScript.event(entry, 4, :evade, [%ScriptStep{command: :stop_scripts}]),
@@ -228,7 +228,10 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
 
   def events(@firelord = entry) do
     [
-      CreatureScript.event(entry, 1, :aggro, [Combat.cast(19_396, :self, @triggered + @aura_not_present)]),
+      CreatureScript.event(entry, 1, :aggro, [
+        clear_spell_list(),
+        Combat.cast(19_396, :self, @triggered + @aura_not_present)
+      ]),
       Combat.every(entry, 2, Combat.cast(19_569, :self), {7_500, 12_500}, {15_000, 20_000}),
       Combat.every(
         entry,
@@ -250,6 +253,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
   end
 
   def events(_entry), do: []
+
+  defp clear_spell_list, do: %ScriptStep{command: :creature_spells, datalong: 0}
 
   defp blink do
     lone_script(:hostile_random, @player, 0, [
