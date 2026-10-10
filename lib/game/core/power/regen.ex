@@ -88,6 +88,8 @@ defmodule ThistleTea.Game.Core.Power.Regen do
     needs_resource_regen?(entity) or needs_focus_regen?(entity)
   end
 
+  def needs_resource_regen?(%Mob{internal: %{linked_feign_death: %{revive_at: at}}}) when is_integer(at), do: false
+
   def needs_resource_regen?(%Mob{} = entity) do
     Death.alive?(entity) and
       (creature_needs_health_regen?(entity) or creature_needs_mana_regen?(entity))

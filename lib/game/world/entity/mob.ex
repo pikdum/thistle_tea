@@ -1823,6 +1823,7 @@ defmodule ThistleTea.Game.World.Entity.Mob do
           rooted?: state.internal.rooted? == true,
           root_aura?: Aura.has_aura?(state, :mod_root),
           health_pct: EntityCore.health_pct(state),
+          health: state.unit.health,
           health_deficit: EntityCore.health_deficit(state),
           mana_pct: EntityCore.mana_pct(state),
           power_type: state.unit.power_type,

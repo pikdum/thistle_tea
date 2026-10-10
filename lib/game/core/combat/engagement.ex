@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Core.Combat.Engagement do
   alias ThistleTea.Game.Core.Combat.ZoneCombat
   alias ThistleTea.Game.Core.Creature.CreatureReaction
   alias ThistleTea.Game.Core.Creature.GuardCall
+  alias ThistleTea.Game.Core.Creature.LinkedFeignDeath
   alias ThistleTea.Game.Core.Creature.SummonDespawn
   alias ThistleTea.Game.Core.Creature.TemporaryFaction
   alias ThistleTea.Game.Core.Effects
@@ -229,6 +230,7 @@ defmodule ThistleTea.Game.Core.Combat.Engagement do
       |> PetCombat.leave(reason)
       |> clear_combat_timer(reason)
       |> Casting.cancel(now)
+      |> LinkedFeignDeath.reset(now, reason not in [:death, :despawn])
       |> Combat.sync_combat_flag()
       |> ControlMovement.sync_flags()
       |> Effects.enqueue(leave_effects(entity.object.guid, target, clear_tap?))

@@ -108,6 +108,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal do
     :combo_target_guid,
     :undetectable_until,
     :invincibility_health_threshold,
+    :linked_feign_death,
     world: WorldRef.open(0),
     proximity_checks: %{},
     single_target_sequence: 0,

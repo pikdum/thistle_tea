@@ -19,6 +19,10 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
   ragers refuse to drop below half health; the instance script takes them
   with him when he falls.
 
+  Core Hounds collapse at one health and retain their combat engagement for
+  ten seconds. A fighting hound above one health within a hundred yards in
+  the same copy revives them; without one, they die and despawn.
+
   vmangos also binds the Firesworn to Garr with Separation Anxiety, has
   Golemagg evade when a rager is dragged a hundred yards from him, and turns
   Geddon to face his Living Bomb's victim, which this port leaves out. Garr
@@ -44,6 +48,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
   @flamewaker_priest 11_662
   @golemagg 11_988
   @core_rager 11_672
+  @core_hound 11_671
 
   @triggered 0x02
   @aura_not_present 0x20
@@ -62,7 +67,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
   @percent 1
 
   @impl CreatureScript
-  def entries, do: [@lucifron, @gehennas, @shazzrah, @garr, @firesworn, @geddon, @sulfuron, @golemagg, @core_rager]
+  def entries,
+    do: [@lucifron, @gehennas, @shazzrah, @garr, @firesworn, @geddon, @sulfuron, @golemagg, @core_rager, @core_hound]
 
   @impl CreatureScript
   def events(@lucifron = entry) do
@@ -161,6 +167,26 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
       Combat.below_health(entry, 3, [Combat.talk(7_865), Combat.cast(17_683, :self, @triggered)], 50, 1_000,
         condition: master_alive
       )
+    ]
+  end
+
+  def events(@core_hound = entry) do
+    [
+      CreatureScript.event(entry, 1, :spawned, [
+        %ScriptStep{
+          command: :linked_feign_death,
+          datalong: 10_000,
+          datalong2: @core_hound,
+          datalong3: 100,
+          datalong4: 19_951,
+          sub_scripts: %{
+            1 => [Combat.talk(7_866), Combat.cast(19_951, :self, @triggered)],
+            2 => [Combat.cast(17_683, :self, @triggered), Combat.cast(19_823, :self, @triggered), Combat.talk(7_867)]
+          }
+        }
+      ]),
+      CreatureScript.event(entry, 2, :aggro, [zone_combat()]),
+      Combat.every(entry, 3, Combat.cast(19_771), {4_000, 7_000}, {4_000, 7_000})
     ]
   end
 

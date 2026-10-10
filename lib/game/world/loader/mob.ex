@@ -116,6 +116,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         rooted?: mob.internal.rooted? == true,
         root_aura?: Aura.has_aura?(mob, :mod_root),
         health_pct: Entity.health_pct(mob),
+        health: mob.unit.health,
         health_deficit: Entity.health_deficit(mob),
         mana_pct: Entity.mana_pct(mob),
         power_type: mob.unit.power_type,

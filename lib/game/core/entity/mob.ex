@@ -149,6 +149,7 @@ defmodule ThistleTea.Game.Core.Entity.Mob do
     internal = %{
       internal
       | casting: nil,
+        linked_feign_death: nil,
         invincibility_health_threshold:
           CreatureFlags.invincibility_threshold(mob, internal.invincibility_health_threshold),
         rooted?: false,

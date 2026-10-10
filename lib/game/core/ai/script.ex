@@ -59,6 +59,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
   alias ThistleTea.Game.Core.Creature.CreatureGroup.Member
   alias ThistleTea.Game.Core.Creature.CreatureMovement
   alias ThistleTea.Game.Core.Creature.CreatureReaction
+  alias ThistleTea.Game.Core.Creature.LinkedFeignDeath
   alias ThistleTea.Game.Core.Creature.ScriptEquipment
   alias ThistleTea.Game.Core.Creature.TemporaryFaction
   alias ThistleTea.Game.Core.Effects
@@ -1393,6 +1394,19 @@ defmodule ThistleTea.Game.Core.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :set_melee_attack, datalong: enabled}, _target, _now) do
     {state, Blackboard.set_melee_enabled(blackboard, enabled != 0)}
+  end
+
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :linked_feign_death} = step, _target, _now) do
+    link = %LinkedFeignDeath{
+      entry: step.datalong2,
+      radius: step.datalong3,
+      delay_ms: step.datalong,
+      pacify_spell: step.datalong4,
+      fall_steps: Map.get(step.sub_scripts, 1, []),
+      revive_steps: Map.get(step.sub_scripts, 2, [])
+    }
+
+    {%{state | internal: %{state.internal | linked_feign_death: link}}, blackboard}
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :set_combat_movement, datalong: enabled}, _target, _now) do

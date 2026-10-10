@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
   alias ThistleTea.Game.Core.Combat.ZoneCombat
   alias ThistleTea.Game.Core.Condition.Requirements
   alias ThistleTea.Game.Core.Creature.CreatureMovement
+  alias ThistleTea.Game.Core.Creature.LinkedFeignDeath
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
@@ -217,6 +218,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
       base_observation_radius(entity),
       MobSpells.observation_radius(entity),
       EventAI.observation_radius(entity),
+      LinkedFeignDeath.observation_radius(entity),
       waypoint_observation_radius(entity)
     ]
     |> Enum.max()

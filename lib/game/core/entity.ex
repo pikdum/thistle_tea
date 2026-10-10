@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Core.Entity do
   alias ThistleTea.Game.Core.Combat.Reactive
   alias ThistleTea.Game.Core.Combat.Threat
   alias ThistleTea.Game.Core.Creature.Critter
+  alias ThistleTea.Game.Core.Creature.LinkedFeignDeath
   alias ThistleTea.Game.Core.Death.CorpseReclaim
   alias ThistleTea.Game.Core.Death.SelfResurrection
   alias ThistleTea.Game.Core.Duel.Dueling
@@ -108,6 +109,9 @@ defmodule ThistleTea.Game.Core.Entity do
   def take_damage_with_mitigation(%{internal: %Internal{godmode: true}} = entity, _damage, _now, _opts),
     do: {entity, 0, 0}
 
+  def take_damage_with_mitigation(%Mob{internal: %{linked_feign_death: %{revive_at: at}}} = entity, damage, _now, _opts)
+      when is_integer(at) and is_number(damage) and damage > 0, do: {entity, damage, damage}
+
   def take_damage_with_mitigation(entity, damage, now, opts)
       when is_number(damage) and damage > 0 and is_integer(now) do
     if Keyword.get(opts, :shared_damage) != :unmitigated and
@@ -132,10 +136,11 @@ defmodule ThistleTea.Game.Core.Entity do
       {entity, damage, remaining} = mitigate_damage(entity, damage, school, now, opts)
       entity = DamageOrigin.record(entity, health, remaining, opts)
       damage_threat = remaining * Keyword.get(opts, :threat_multiplier, 1.0)
-      %{unit: unit} = entity
       duel_outcome = duel_lethal_outcome(entity, health, remaining, opts)
       remaining = duel_remaining_damage(health, remaining, duel_outcome)
       remaining = invincibility_remaining_damage(entity, health, remaining)
+      {entity, remaining} = LinkedFeignDeath.prevent(entity, health, remaining, now)
+      %{unit: unit} = entity
       absorbed = damage - remaining
       new_health = max(health - remaining, 0)
 
@@ -255,6 +260,8 @@ defmodule ThistleTea.Game.Core.Entity do
   end
 
   defp gain_taken_rage(entity, _damage, _source), do: entity
+
+  def heal(%Mob{internal: %{linked_feign_death: %{revive_at: at}}} = entity, _amount) when is_integer(at), do: entity
 
   def heal(%{unit: %Unit{health: health, max_health: max_health} = unit} = entity, amount)
       when is_number(health) and is_number(amount) and amount > 0 do

@@ -42,6 +42,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
   alias ThistleTea.Game.Core.Creature.CreatureFlags
   alias ThistleTea.Game.Core.Creature.CreatureMovement
   alias ThistleTea.Game.Core.Creature.Critter
+  alias ThistleTea.Game.Core.Creature.LinkedFeignDeath
   alias ThistleTea.Game.Core.Creature.Posture
   alias ThistleTea.Game.Core.Creature.TemporaryFaction
   alias ThistleTea.Game.Core.Effects
@@ -87,6 +88,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob do
 
   def tree do
     BT.selector([
+      BT.action(&LinkedFeignDeath.tick/3),
       BT.action(&Formation.sync/3),
       BT.action(&critter_escape/3),
       BT.sequence([

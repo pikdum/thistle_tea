@@ -115,7 +115,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
   end
 
   def hold(%Mob{} = state) do
-    Metadata.update(state.object.guid, %{alive?: false, health_pct: 0.0})
+    Metadata.update(state.object.guid, %{alive?: false, health_pct: 0.0, health: 0})
 
     %{state | unit: %{state.unit | health: 0}, internal: %{state.internal | death_finalized?: true}}
     |> Corpse.remove()
@@ -161,7 +161,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
         state = EventSink.emit_pending(state)
         state = %{state | unit: %{state.unit | health: 0}}
         CreatureGroups.event(state, :despawn, self())
-        Metadata.update(state.object.guid, %{alive?: false, health_pct: 0.0})
+        Metadata.update(state.object.guid, %{alive?: false, health_pct: 0.0, health: 0})
 
         state
         |> Corpse.remove()
@@ -281,6 +281,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
       victim_guid: state.unit.target,
       detect_range_modifier: Aura.flat_amount(state, :mod_detect_range),
       health_pct: Entity.health_pct(state),
+      health: state.unit.health,
       health_deficit: Entity.health_deficit(state),
       orientation: elem(state.movement_block.position, 3)
     }

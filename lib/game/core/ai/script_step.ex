@@ -19,6 +19,10 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   scripts `NearTeleportTo` a player.
   A group join with `formation_from_position?` retains the creature's current
   distance and bearing from its observed leader as its formation offset.
+  A `linked_feign_death` step configures lethal-damage prevention: `datalong`
+  is the revival delay in milliseconds, `datalong2` the nearby creature entry,
+  `datalong3` the search radius, and `datalong4` the pacify aura to remove on
+  revival. Sub-scripts 1 and 2 supply the fall and revival hooks.
   """
   import Bitwise, only: [&&&: 2]
 
