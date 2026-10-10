@@ -145,12 +145,65 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
       {child, _blackboard} = Script.run(child, Blackboard.new(), [step], parent.object.guid, child_context)
       assert [%Effects.StartAttack{target_guid: ^first}] = child.internal.events
     end
+
+    test "Ancient Core Hounds retain each debuff until reset", %{players: [first | _] = players} do
+      debuffs = [19_364, 19_365, 19_366, 19_367, 19_369, 19_372]
+
+      for phase <- 1..6 do
+        mob = creature(11_673, players)
+        spawn_context = %{context(mob, 0) | random: Random.fixed(0.5, phase)}
+        {mob, blackboard} = EventAI.on_spawned(mob, Blackboard.new(), 0, spawn_context)
+        assert blackboard.event_ai.phase == phase
+        assert mob.internal.creature.melee_spell_id == 19_319
+        assert mob.internal.creature.call_for_help_range == 0
+        {mob, blackboard} = EventAI.enter_combat(mob, blackboard, first, 0, context(mob, 0))
+        expected = Enum.at(debuffs, phase - 1)
+
+        {mob, blackboard} =
+          Enum.reduce([12_000, 26_000, 40_000], {mob, blackboard}, fn now, {mob, blackboard} ->
+            {mob, blackboard} = EventAI.tick(clear_effects(mob), blackboard, now, context(mob, now))
+            casts = Enum.filter(spell_starts(mob), fn {id, _guid} -> id in debuffs end)
+            assert casts == [{expected, mob.object.guid}]
+            assert blackboard.event_ai.phase == phase
+            {mob, blackboard}
+          end)
+
+        next_phase = rem(phase, 6) + 1
+        reset_context = %{context(mob, 41_000) | random: Random.fixed(0.5, next_phase)}
+        {mob, blackboard} = EventAI.on_evade(clear_effects(mob), blackboard, 41_000, reset_context)
+        assert blackboard.event_ai.phase == next_phase
+        {mob, blackboard} = EventAI.enter_combat(mob, blackboard, first, 42_000, context(mob, 42_000))
+        {mob, _blackboard} = EventAI.tick(clear_effects(mob), blackboard, 54_000, context(mob, 54_000))
+        casts = Enum.filter(spell_starts(mob), fn {id, _guid} -> id in debuffs end)
+        assert casts == [{Enum.at(debuffs, next_phase - 1), mob.object.guid}]
+      end
+    end
+
+    test "Ancient Core Hounds keep Serrated Bite due until the victim reaches melee", %{players: [first | _] = players} do
+      mob = creature(11_673, players)
+      {mob, blackboard} = EventAI.on_spawned(mob, Blackboard.new(), 0, context(mob, 0))
+      {mob, blackboard} = EventAI.enter_combat(mob, blackboard, first, 0, context(mob, 0))
+      far = context(mob, 4_000)
+      observation = %{far.perception.entities[first] | position: {mob.internal.world, 20.0, 0.0, 0.0}, distance: 20.0}
+      far = %{far | perception: %{far.perception | entities: Map.put(far.perception.entities, first, observation)}}
+      {mob, blackboard} = EventAI.tick(clear_effects(mob), blackboard, 4_000, far)
+      refute Enum.any?(spell_starts(mob), &match?({19_771, _}, &1))
+      assert Enum.any?(spell_starts(mob), &match?({19_630, _}, &1))
+
+      {mob, blackboard} = EventAI.tick(clear_effects(mob), blackboard, 5_000, context(mob, 5_000))
+      assert spell_starts(mob) == [{19_771, first}]
+      {mob, blackboard} = EventAI.tick(clear_effects(mob), blackboard, 10_999, context(mob, 10_999))
+      refute Enum.any?(spell_starts(mob), &match?({19_771, _}, &1))
+      {mob, _blackboard} = EventAI.tick(clear_effects(mob), blackboard, 11_999, context(mob, 11_999))
+      assert Enum.any?(spell_starts(mob), &match?({19_771, ^first}, &1))
+    end
   end
 
   defp combatants(_context), do: %{players: [Unique.integer(), Unique.integer()]}
 
   defp creature(entry, players) do
-    spells = Map.new([19_635, 19_636, 19_637, 19_569], &{&1, %Spell{id: &1, cast_time_ms: 0, effects: []}})
+    ids = [19_635, 19_636, 19_637, 19_569, 19_630, 19_771, 19_364, 19_365, 19_366, 19_367, 19_369, 19_372]
+    spells = Map.new(ids, &{&1, %Spell{id: &1, cast_time_ms: 0, effects: []}})
 
     %Mob{
       object: %Object{guid: Guid.from_low_guid(:mob, entry, Unique.integer()), entry: entry},
@@ -170,7 +223,13 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
   defp context(mob, now, extra \\ %{}) do
     entities =
       Map.new([mob.object.guid | Map.keys(mob.internal.threat)], fn guid ->
-        {guid, %Observation{guid: guid, position: {mob.internal.world, 0.0, 0.0, 0.0}, metadata: %{alive?: true}}}
+        {guid,
+         %Observation{
+           guid: guid,
+           position: {mob.internal.world, 0.0, 0.0, 0.0},
+           distance: 0.0,
+           metadata: %{alive?: true}
+         }}
       end)
 
     entities =

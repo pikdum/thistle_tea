@@ -28,6 +28,10 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
   retaliate with Incinerate, burn random players' souls, and summon Lava
   Spawns that immediately attack one of their summoner's opponents.
 
+  Ancient Core Hounds replace their swings with Vicious Bite, breathe fire,
+  and use Serrated Bite in melee. Each reset chooses one of six area debuffs,
+  which the hound retains throughout the fight. They never call assistance.
+
   vmangos also binds the Firesworn to Garr with Separation Anxiety, has
   Golemagg evade when a rager is dragged a hundred yards from him, and turns
   Geddon to face his Living Bomb's victim, which this port leaves out. Garr
@@ -54,12 +58,14 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
   @golemagg 11_988
   @core_rager 11_672
   @core_hound 11_671
+  @ancient_core_hound 11_673
   @firewalker 11_666
   @firelord 11_668
   @lava_spawn 12_265
 
   @triggered 0x02
   @aura_not_present 0x20
+  @only_in_melee 0x40
   @player 0x2
   @all_attackers 8
   @unchecked [check_result?: false]
@@ -73,6 +79,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
   @failed 2
   @at_most 2
   @percent 1
+  @ancient_debuffs [19_364, 19_365, 19_366, 19_367, 19_369, 19_372]
 
   @impl CreatureScript
   def entries do
@@ -87,6 +94,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
       @golemagg,
       @core_rager,
       @core_hound,
+      @ancient_core_hound,
       @firewalker,
       @firelord
     ]
@@ -252,9 +260,35 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
     ]
   end
 
+  def events(@ancient_core_hound = entry) do
+    debuffs =
+      @ancient_debuffs
+      |> Enum.with_index(1)
+      |> Enum.map(fn {spell_id, phase} ->
+        Combat.every(entry, phase + 5, Combat.cast(spell_id, :self), {12_000, 15_000}, {14_000, 24_000},
+          inverse_phase_mask: CreatureScript.only_in_phases([phase])
+        )
+      end)
+
+    [
+      CreatureScript.event(entry, 1, :spawned, [
+        %ScriptStep{command: :set_melee_spell, datalong: 19_319},
+        %ScriptStep{command: :set_call_for_help_range, datalong: 0},
+        ancient_hound_debuff()
+      ]),
+      CreatureScript.event(entry, 2, :aggro, [clear_spell_list()]),
+      CreatureScript.event(entry, 3, :evade, [ancient_hound_debuff()]),
+      Combat.every(entry, 4, Combat.cast(19_630, :self), {4_000, 7_000}, {6_000, 8_000}, @unchecked),
+      Combat.every(entry, 5, Combat.cast(19_771, :victim, @only_in_melee), 4_000, 6_000)
+      | debuffs
+    ]
+  end
+
   def events(_entry), do: []
 
   defp clear_spell_list, do: %ScriptStep{command: :creature_spells, datalong: 0}
+
+  defp ancient_hound_debuff, do: %ScriptStep{command: :set_phase_range, datalong: 1, datalong2: 6}
 
   defp blink do
     lone_script(:hostile_random, @player, 0, [
