@@ -65,6 +65,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity
   alias ThistleTea.Game.Core.Entity.Character
+  alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
   alias ThistleTea.Game.Core.Entity.Component.Internal.Pet
   alias ThistleTea.Game.Core.Entity.Component.Unit
@@ -1394,6 +1395,30 @@ defmodule ThistleTea.Game.Core.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :set_melee_attack, datalong: enabled}, _target, _now) do
     {state, Blackboard.set_melee_enabled(blackboard, enabled != 0)}
+  end
+
+  defp execute(
+         %Mob{internal: %Internal{creature: %Creature{} = creature} = internal} = state,
+         blackboard,
+         %ScriptStep{command: :set_melee_spell, datalong: id},
+         _target,
+         _now
+       )
+       when is_integer(id) and id >= 0 do
+    creature = %{creature | melee_spell_id: if(id > 0, do: id)}
+    {%{state | internal: %{internal | creature: creature}}, blackboard}
+  end
+
+  defp execute(
+         %Mob{internal: %Internal{creature: %Creature{} = creature} = internal} = state,
+         blackboard,
+         %ScriptStep{command: :set_call_for_help_range, datalong: range},
+         _target,
+         _now
+       )
+       when is_number(range) and range >= 0 do
+    creature = %{creature | call_for_help_range: range}
+    {%{state | internal: %{internal | creature: creature}}, blackboard}
   end
 
   defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :linked_feign_death} = step, _target, _now) do

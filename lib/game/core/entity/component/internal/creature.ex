@@ -8,7 +8,8 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.Creature do
   ranges, the civilian's outstanding guard call, and whether a script has
   taken it into the air or set it down (`script_flight`, nil while its
   template decides). A scripted caster chase distance keeps it at casting
-  range instead of following the ordinary melee approach.
+  range instead of following the ordinary melee approach. A melee spell
+  replaces ordinary main-hand swings while the creature runs its own AI.
   """
   defstruct [
     :db_guid,
@@ -42,6 +43,7 @@ defmodule ThistleTea.Game.Core.Entity.Component.Internal.Creature do
     :guard_call,
     :script_flight,
     :caster_chase_distance,
+    :melee_spell_id,
     :gossip_menu_id,
     stationary?: false,
     critter?: false,

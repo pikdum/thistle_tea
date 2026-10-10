@@ -23,6 +23,10 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   is the revival delay in milliseconds, `datalong2` the nearby creature entry,
   `datalong3` the search radius, and `datalong4` the pacify aura to remove on
   revival. Sub-scripts 1 and 2 supply the fall and revival hooks.
+  `set_melee_spell` replaces a creature's ordinary main-hand swings with the
+  triggered spell in `datalong`; zero restores ordinary swings.
+  `set_call_for_help_range` changes the automatic assistance radius in yards;
+  zero suppresses automatic assistance calls.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -123,6 +127,8 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   def spell_ids(%__MODULE__{command: :creature_spells, creature_spell_lists: lists}) do
     lists |> Map.values() |> Enum.flat_map(& &1.spells) |> Enum.map(& &1.spell_id) |> Enum.uniq()
   end
+
+  def spell_ids(%__MODULE__{command: :set_melee_spell, datalong: id}) when is_integer(id) and id > 0, do: [id]
 
   def spell_ids(%__MODULE__{} = step), do: List.wrap(cast_spell_id(step))
 

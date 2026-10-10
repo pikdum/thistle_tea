@@ -19,10 +19,12 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
   alias ThistleTea.Game.Core.Combat.CombatSkills
   alias ThistleTea.Game.Core.Combat.Disarm
   alias ThistleTea.Game.Core.Combat.ExtraAttacks
+  alias ThistleTea.Game.Core.Creature.CharmSpells
   alias ThistleTea.Game.Core.Death
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Character
   alias ThistleTea.Game.Core.Entity.Component.Internal
+  alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Entity.Mob
   alias ThistleTea.Game.Core.Entity.TargetRef
@@ -225,9 +227,20 @@ defmodule ThistleTea.Game.Core.AI.BT.Combat do
 
     case queued_spell do
       %Spell{} = spell -> send_queued_spell_swing(state, spell, target, now)
-      _no_queued_spell -> send_white_swing(state, target)
+      _no_queued_spell -> send_default_swing(state, target)
     end
   end
+
+  defp send_default_swing(%Mob{internal: %Internal{creature: %Creature{melee_spell_id: id}}} = state, target)
+       when is_integer(id) and id > 0 do
+    if CharmSpells.controlled?(state) do
+      send_white_swing(state, target)
+    else
+      Effects.enqueue(state, Effects.trigger_spell(state.object.guid, state.unit.level, target, id))
+    end
+  end
+
+  defp send_default_swing(state, target), do: send_white_swing(state, target)
 
   def extra_attacks_step, do: BT.action(&consume_extra_attacks/3)
 
