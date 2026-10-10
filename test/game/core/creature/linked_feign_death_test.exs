@@ -32,6 +32,15 @@ defmodule ThistleTea.Game.Core.Creature.LinkedFeignDeathTest do
   setup [:hound]
 
   describe "prevent/4" do
+    test "intercepts a template's one-health invincibility threshold", %{mob: mob, player: player} do
+      mob = %{mob | internal: %{mob.internal | invincibility_health_threshold: 1}}
+      fallen = Entity.take_damage(mob, 100_000, 1_000, source: player)
+
+      assert fallen.unit.health == 1
+      assert fallen.unit.stand_state == 7
+      assert fallen.internal.linked_feign_death.revive_at == 11_000
+    end
+
     test "intercepts exact lethal hits and overkill without finalizing a death", %{mob: mob, player: player} do
       for damage <- [100, 1_000] do
         fallen = Entity.take_damage(mob, damage, 1_000, source: player)

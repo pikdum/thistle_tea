@@ -138,8 +138,8 @@ defmodule ThistleTea.Game.Core.Entity do
       damage_threat = remaining * Keyword.get(opts, :threat_multiplier, 1.0)
       duel_outcome = duel_lethal_outcome(entity, health, remaining, opts)
       remaining = duel_remaining_damage(health, remaining, duel_outcome)
-      remaining = invincibility_remaining_damage(entity, health, remaining)
       {entity, remaining} = LinkedFeignDeath.prevent(entity, health, remaining, now)
+      remaining = invincibility_remaining_damage(entity, health, remaining)
       %{unit: unit} = entity
       absorbed = damage - remaining
       new_health = max(health - remaining, 0)
