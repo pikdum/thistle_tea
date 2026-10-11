@@ -1,4 +1,4 @@
-# Golemagg's Trust validation and pending acceptance
+# Golemagg's Trust acceptance
 
 Implementation commit: `d71a3c0c`.
 
@@ -32,12 +32,11 @@ triggered cast instead of an empty event list. The focused suite passed all
 - actual DBC pulse/buff data, the VMangos script label, existing periodic
   triggers and Separation Anxiety, Molten Core scripts, and architecture.
 
-`mix compile --warnings-as-errors` passed. The implementation commit's strict
-Credo and formatting hooks passed. Full `mix test.all` has not been run for
-this change. The previous Core Rager leash milestone passed 8,843 tests; that
-result does not validate this implementation.
+Final validation passed on 2026-10-11: `mix test.all` passed all 8,852 tests;
+`mix compile --warnings-as-errors`, `mix credo --strict`, and
+`mix format --check-formatted` passed.
 
-## Pending native acceptance
+## Native acceptance
 
 A fresh native 1.12.1 build-5875 client entered Blackrock Depths through its
 real entrance and then the Molten Core portal, reaching map 409, copy 2.
@@ -47,25 +46,71 @@ Isle. A separate raid admitted Debugpaladin (GUID 2) to copy 3 through normal
 instance destination and worldport acknowledgement; Debugrogue (GUID 3) stayed
 on Programmer Isle.
 
-Preparation observed 20553 with Golemagg as caster on both engaged ragers,
-500 physical damage bonus, and 1,333 ms swing periods. This is an isolated
-state read, not accepted native lifecycle evidence. The attempted continuous
-sampler did not complete, so native packet delivery, distance departure and
-return, post-wipe idle suppression, repeat pull, and copy isolation remain
-unverified. No accepted native trace was produced.
+The accepted repeat used a fresh GPU client session
+`/home/pikdum/.cache/thistle-wow-playtest.qOoOel`, service
+`thistle-wow-playtest.qOoOel.service`, invocation
+`7f6d73adaef84f9da1c39891203aabda`. WoW PID 228089 belonged to that cgroup and
+used amdgpu client 660. Its graphics counter increased from 18,606,350,525 to
+26,433,786,077 ns between retained reads. The client entered both instances
+through their real portals. No screenshots were attached to the agent's
+conversation; retained captures and client Lua text probes supplied UI evidence.
+
+The native player was level 60 with god mode. Existing script commands stopped
+combat movement and moved the selected rager to controlled distances. A
+224.206-second trace retained 1,078 state samples and 925 projected messages
+to the native player owner:
+
+- Golemagg refreshed both fighting ragers at one-second intervals. All 305
+  Trust casts named the same boss as caster and exactly one recipient each.
+  Normal adjacent intervals were 997–1,002 ms.
+- The selected rager moved from inside the radius to 40 yards from the boss's
+  center, outside the 30-yard surface radius but inside its reset leash.
+  Trust expired, damage bonus returned to zero, swing period returned to
+  2,000 ms, and scale returned from 1.8 to 1.5. The other rager stayed buffed.
+- Moving that rager back to 10 yards restored Trust, the 500 damage bonus,
+  1,333 ms swings, and scale 1.8. Refreshes retained the boss's caster GUID.
+- Moving the native player away stopped combat. The existing boundary evade
+  API then reset the boss and ragers. After the ragers' temporary spawn auras
+  expired, the idle encounter produced no boss-sourced Trust casts. The boss's
+  permanent pulse aura was restored and remained idle.
+- The native player returned, selected Golemagg, and used `.damage 10000`.
+  The second pull restored the same buff behavior and left the boss at
+  816,088/826,088 health.
+- Copy 3's three units retained full health, idle combat state, base swing
+  periods, and their original incarnations throughout acceptance. Zero
+  projected messages referenced their GUIDs, and none entered the native
+  player's visible or tracked roster.
+
+The client itself reported `UnitAttackSpeed("target")` through ordinary chat:
+1.333 seconds nearby, 2 seconds outside the radius, 1.333 seconds after returning,
+2 seconds after reset, and 1.333 seconds on the second pull. This verifies that
+the client received and applied the swing-period projection. The retained
+accepted capture includes the final client readout. Runtime memory stayed
+between 1,449,525,984 and 2,980,242,232 bytes during the accepted trace.
+
+| Unit | Seed DB GUID | Runtime GUID in copy 2 |
+| --- | --- | --- |
+| Golemagg | 56684 | 17379391163160597291 |
+| Core Rager | 56685 | 17379391157858997026 |
+| Core Rager | 56699 | 17379391157858997017 |
+
+Acceptance was saved before the separate Firelord overload investigation.
+That investigation deliberately engaged copy 3 after the isolation trace had
+ended; its resulting state is not part of this acceptance.
+
+## Earlier interrupted attempt
 
 The playtest server exited during preparation. The kernel reported a global
 OOM kill of BEAM PID 191327 at 2026-10-10 21:06:11 local time, with anonymous
 RSS 19,183,040 KiB. The last gameplay telemetry reported 17,053,439,584 bytes
-of runtime memory, 3,165 mobs, and run queue 1,574. The cause is unresolved;
-these observations do not establish whether the new pulse, fixture movement,
-another gameplay path, or another component caused the growth. Investigate
-that failure before claiming acceptance.
+of runtime memory, 3,165 mobs, and run queue 1,574. Those original observations
+did not establish an allocation cause. The subsequent acceptance and separate
+Firelord reproduction are recorded above and in `golemagg-playtest-overload.md`.
 
-The client was stopped through its recorded helper-owned service invocation.
-The server was already terminal. Its headless player owners ended with the
-server. The work is paused with native acceptance, the OOM investigation,
-and the full suite outstanding.
+The earlier client was stopped through its helper-owned service invocation.
+The server and its headless owners were already terminal. The accepted repeat
+above replaces that incomplete attempt; the separate overload investigation
+is recorded in `golemagg-playtest-overload.md`.
 
 Evidence directory: `/home/pikdum/.cache/thistle-wow-playtest.EtdcRa`.
 Owned unit: `thistle-wow-playtest.EtdcRa.service`; invocation:
@@ -79,3 +124,10 @@ Owned unit: `thistle-wow-playtest.EtdcRa.service`; invocation:
 
 Preparation screenshots and GPU ownership records are retained there; they
 do not substitute for the missing acceptance trace.
+
+The accepted session retains `thistle-trust-state.jsonl`,
+`thistle-trust-packets.jsonl`, `thistle-trust-isolation.json`,
+`thistle-trust-acceptance-summary.json`, final validation logs, GPU records,
+and the accepted client capture. Its client was stopped through the recorded
+service invocation. The subsequent overload reproduction's server exited,
+ending its headless owners too.
