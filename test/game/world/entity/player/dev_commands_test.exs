@@ -615,7 +615,6 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
             "1 2m 3",
             "1 2 3m",
             "1 2 3 -1",
-            "1 2 3 here",
             "1 2 3 here 1x",
             "1 2 3 0x"
           ] do
@@ -665,6 +664,23 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommandsTest do
 
       assert {:handled, ^state} = DevCommands.run(state, ".go xyz 3680.53 -3643.80 140.03 here 1.5")
       assert_receive {:"$gen_cast", {:start_teleport, 3680.53, -3643.8, 140.03, 1.5, ^world}}
+    end
+
+    test "accepts here without a facing angle in the current instance copy" do
+      guid = Unique.integer()
+      world = WorldRef.instance(329, Unique.integer())
+      character = debug_character()
+
+      character = %{
+        character
+        | object: %{character.object | guid: guid},
+          internal: %{character.internal | world: world}
+      }
+
+      state = %{guid: guid, character: character}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".go xyz 3680.53 -3643.80 140.03 here")
+      assert_receive {:"$gen_cast", {:start_teleport, 3680.53, -3643.8, 140.03, ^world}}
     end
   end
 

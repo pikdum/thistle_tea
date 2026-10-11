@@ -1242,6 +1242,8 @@ defmodule ThistleTea.Game.World.Entity.Player.DevCommands do
     end
   end
 
+  defp parse_coords([x, y, z, "here"]), do: parse_coords([x, y, z])
+
   defp parse_coords([x, y, z, map]) do
     with {:ok, x, y, z} <- parse_coords([x, y, z]),
          {map, ""} when map >= 0 <- Integer.parse(map) do
