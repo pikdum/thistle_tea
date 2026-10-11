@@ -24,6 +24,8 @@ defmodule ThistleTea.Game.Core.InstanceScript.MoltenCore do
   Golemagg's core ragers, and Sulfuron's priests despawn whenever they
   respawn. Golemagg's ragers also vanish the moment he dies, since they
   cannot fall below half health while he lives.
+  Golemagg's spawn and evade resets restore both seeded ragers immediately,
+  and his instance target slot identifies the boss in the current copy.
   """
 
   alias ThistleTea.Game.Core.AI.ScriptStep
@@ -43,6 +45,8 @@ defmodule ThistleTea.Game.Core.InstanceScript.MoltenCore do
   @majordomo_summoned 23
 
   @done 3
+  @not_started 0
+  @in_progress 1
 
   @bosses %{
     12_098 => @sulfuron,
@@ -79,7 +83,10 @@ defmodule ThistleTea.Game.Core.InstanceScript.MoltenCore do
   }
 
   @golemagg_entry 11_988
+  @golemagg_data 12
+  @golemagg_spawn 56_684
   @core_rager 11_672
+  @core_rager_spawns [56_685, 56_699]
   @majordomo_entry 12_018
   @majordomo_hall {758.089, -1_176.71, -118.640, 3.12414}
   @corpse_timed 6
@@ -100,6 +107,7 @@ defmodule ThistleTea.Game.Core.InstanceScript.MoltenCore do
   def summon_entries, do: [@majordomo_entry]
   def game_object_db_guids, do: [@firelord_cache]
   def door_entries, do: []
+  def data64(@golemagg_data), do: @golemagg_spawn
   def data64(_index), do: nil
   def initial_value(_field), do: 0
 
@@ -143,6 +151,21 @@ defmodule ThistleTea.Game.Core.InstanceScript.MoltenCore do
 
   def creature_event(data, script_state, %{creature_entry: @majordomo_entry, event: :death}) do
     {:ok, data, script_state, [%Effects.Schedule{key: :ragnaros_roars, delay_ms: @roar_after_ms}]}
+  end
+
+  def creature_event(data, script_state, %{creature_entry: @golemagg_entry, event: :aggro}) do
+    {:ok, _stored, data, effects} = set_data(data, @golemagg, @in_progress)
+    {:ok, data, script_state, effects}
+  end
+
+  def creature_event(data, script_state, %{creature_entry: @golemagg_entry, event: event})
+      when event in [:spawned, :evade] do
+    if Encounter.done?(data, @golemagg) do
+      {:ok, data, script_state, []}
+    else
+      {:ok, _stored, data, effects} = set_data(data, @golemagg, @not_started)
+      {:ok, data, script_state, effects ++ reset_ragers()}
+    end
   end
 
   def creature_event(data, script_state, %{creature_entry: entry, event: :death}) when is_map_key(@bosses, entry) do
@@ -219,6 +242,16 @@ defmodule ThistleTea.Game.Core.InstanceScript.MoltenCore do
   end
 
   defp fallen_guard(_boss_entry), do: []
+
+  defp reset_ragers do
+    for db_guid <- @core_rager_spawns do
+      %Effects.RunCreatureScript{
+        creature_entry: @core_rager,
+        creature_db_guid: db_guid,
+        steps: [%ScriptStep{command: :respawn_creature, datalong: 1}]
+      }
+    end
+  end
 
   defp firelord_cache, do: %Effects.RespawnGameObject{db_guid: @firelord_cache, duration_ms: @hour_ms}
 end

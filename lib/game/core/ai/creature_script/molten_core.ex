@@ -37,9 +37,10 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
   Stun and Banish pause their surge cooldown instead of letting it expire.
 
   Garr binds his Firesworn with Separation Anxiety, empowering any pulled
-  more than a hundred yards from him. vmangos also has Golemagg evade when
-  a rager is dragged a hundred yards from him, and turns
-  Geddon to face his Living Bomb's victim, which this port leaves out. Garr
+  more than a hundred yards from him. Every three seconds, a fighting Core
+  Rager checks its horizontal surface distance from Golemagg; more than a
+  hundred yards makes Golemagg evade and resets both ragers.
+  vmangos also turns Geddon to face his Living Bomb's victim, which this port leaves out. Garr
   may force a stunned Firesworn to erupt, Geddon keeps meleeing inside his
   Inferno, and Sulfuron inspires any priest rather than one missing the
   buff.
@@ -83,6 +84,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
   @earthquake 1
 
   @golemagg_field 3
+  @golemagg_data 12
   @failed 2
   @at_most 2
   @percent 1
@@ -207,7 +209,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
       Combat.every(entry, 2, Combat.cast(19_820), 7_000, 10_000),
       Combat.below_health(entry, 3, [Combat.talk(7_865), Combat.cast(17_683, :self, @triggered)], 50, 1_000,
         condition: master_alive
-      )
+      ),
+      Combat.every(entry, 4, leash_golemagg(), 3_000, 3_000, @unchecked)
     ]
   end
 
@@ -334,6 +337,15 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
 
   defp inspire_priest do
     lone_script(:random_creature_with_entry, @flamewaker_priest, 45, [Combat.cast(19_779, :provided, @triggered)])
+  end
+
+  defp leash_golemagg do
+    %{
+      lone_script(:creature_from_instance_data, @golemagg_data, 0, [
+        %ScriptStep{command: :enter_evade, swap_initial?: true}
+      ])
+      | minimum_target_distance_2d: 100.0
+    }
   end
 
   defp enrage_garr,

@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Core.InstanceScript.MoltenCoreTest do
   alias ThistleTea.Game.Core.Effects, as: CoreEffects
   alias ThistleTea.Game.Core.Instance
   alias ThistleTea.Game.Core.InstanceScript.Effects
+  alias ThistleTea.Test.Unique
 
   @majordomo 8
   @ragnaros 9
@@ -52,6 +53,48 @@ defmodule ThistleTea.Game.Core.InstanceScript.MoltenCoreTest do
   end
 
   describe "creature_event/3" do
+    test "Golemagg resets his ragers on spawn and evade", context do
+      for event <- [:spawned, :evade] do
+        {:ok, 1, [], instances} = Instance.command(context.instances, context.world, 3, 1, :raw)
+        assert {:ok, effects, instances} = Instance.creature_event(instances, context.world, creature(11_988, event))
+        assert Instance.copy(instances, context.world).data[3] == 0
+        assert Enum.map(effects, & &1.creature_db_guid) == [56_685, 56_699]
+
+        assert Enum.all?(effects, fn effect ->
+                 match?(
+                   %Effects.RunCreatureScript{
+                     creature_entry: 11_672,
+                     steps: [%ScriptStep{command: :respawn_creature, datalong: 1}]
+                   },
+                   effect
+                 )
+               end)
+      end
+    end
+
+    test "Golemagg's combat state belongs to his copy", context do
+      owner = Unique.integer()
+      {other, nil, instances} = Instance.enter(context.instances, 409, {:player, owner}, owner, "instance_molten_core")
+      assert {:ok, [], instances} = Instance.creature_event(instances, context.world, creature(11_988, :aggro))
+      assert Instance.copy(instances, context.world).data[3] == 1
+      assert Map.get(Instance.copy(instances, other).data, 3, 0) == 0
+
+      assert {:ok, [_first, _second], instances} =
+               Instance.creature_event(instances, context.world, creature(11_988, :evade))
+
+      assert Instance.copy(instances, context.world).data[3] == 0
+      assert Map.get(Instance.copy(instances, other).data, 3, 0) == 0
+    end
+
+    test "a completed Golemagg encounter never resets or restores ragers", context do
+      {:ok, 3, [], instances} = Instance.command(context.instances, context.world, 3, 3, :raw)
+
+      for event <- [:spawned, :aggro, :evade] do
+        assert {:ok, [], updated} = Instance.creature_event(instances, context.world, creature(11_988, event))
+        assert Instance.copy(updated, context.world).data[3] == 3
+      end
+    end
+
     test "a dead lieutenant's guard does not come back", context do
       guard = creature(11_672, :spawned)
       assert {:ok, [], instances} = Instance.creature_event(context.instances, context.world, guard)
