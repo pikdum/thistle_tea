@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Core.Aura.Application do
   alias ThistleTea.Game.Core.Aura.Change
   alias ThistleTea.Game.Core.Aura.DiminishingReturns
   alias ThistleTea.Game.Core.Aura.EffectImmunity
+  alias ThistleTea.Game.Core.Aura.GolemaggsTrust
   alias ThistleTea.Game.Core.Aura.Heartbeat
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Aura.Script
@@ -677,6 +678,7 @@ defmodule ThistleTea.Game.Core.Aura.Application do
   defp build_aura(entity, %Spell{} = spell, %Effect{} = effect, amount_override, %CastContext{} = context, now) do
     amplitude_ms =
       CapturedFollower.interval(spell, effect) || SeparationAnxiety.interval(spell, effect) ||
+        GolemaggsTrust.interval(spell, effect) ||
         Modifiers.periodic_interval(context.spell_modifiers, effect)
 
     %Aura{
@@ -788,6 +790,7 @@ defmodule ThistleTea.Game.Core.Aura.Application do
   defp ticking?(spell, effect, amplitude_ms) do
     is_integer(amplitude_ms) and amplitude_ms > 0 and
       (Effect.periodic?(effect) or not is_nil(CapturedFollower.interval(spell, effect)) or
-         not is_nil(SeparationAnxiety.interval(spell, effect)))
+         not is_nil(SeparationAnxiety.interval(spell, effect)) or
+         not is_nil(GolemaggsTrust.interval(spell, effect)))
   end
 end

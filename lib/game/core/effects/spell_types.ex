@@ -75,6 +75,7 @@ defmodule ThistleTea.Game.Core.Effects.SpellTypes do
     {:GrantPower, [:target_guid, :misc_value, :amount], [source_guid: nil, spell: nil]},
     {:AddComboPoints, [:source_guid, :target_guid, :amount], [retention: nil]},
     {:DeliverSpellToQuery, [:source_guid, :source_level, :spell, :query], [exclude_guids: []]},
+    {:TriggerCreatureSpellInRange, [:spell_id, :creature_entry, :radius], [triggering_spell_id: nil]},
     {:TriggerSpell, [:source_guid, :source_level, :target_guid, :spell_id],
      [
        cast_item_guid: nil,

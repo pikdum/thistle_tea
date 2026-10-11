@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Core.Aura.Periodic do
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.AreaSources
   alias ThistleTea.Game.Core.Aura.Change
+  alias ThistleTea.Game.Core.Aura.GolemaggsTrust
   alias ThistleTea.Game.Core.Aura.Heartbeat
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Aura.Lifecycle
@@ -399,28 +400,11 @@ defmodule ThistleTea.Game.Core.Aura.Periodic do
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_trigger_spell, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
-    trigger_id = Scripts.periodic_trigger_spell_id(holder.spell, aura.trigger_spell_id, aura.tick_count)
-
     events =
-      case {Warlock.allow_periodic_trigger?(entity, holder), trigger_id} do
-        {false, _spell_id} ->
-          []
+      if GolemaggsTrust.spell?(holder.spell),
+        do: GolemaggsTrust.tick_events(entity, holder, aura),
+        else: periodic_trigger_events(entity, holder, aura)
 
-        {true, spell_id} when is_integer(spell_id) and spell_id > 0 ->
-          [
-            Effects.trigger_spell(holder.caster_guid, holder.caster_level, entity.object.guid, spell_id,
-              hit_context: holder.cast_context,
-              triggered_by_spell_id: holder.spell.id,
-              pays_reagents?: holder.spell.reagents in [nil, []],
-              effect_base_points: Scripts.periodic_trigger_points(holder.spell, aura.tick_count)
-            )
-          ]
-
-        _ ->
-          []
-      end
-
-    events = Script.periodic_trigger_events(entity, holder) ++ events
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
   end
 
@@ -452,10 +436,37 @@ defmodule ThistleTea.Game.Core.Aura.Periodic do
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :dummy, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)},
-     CapturedFollower.tick_events(entity, holder) ++ SeparationAnxiety.tick_events(entity, holder, aura)}
+     CapturedFollower.tick_events(entity, holder) ++
+       SeparationAnxiety.tick_events(entity, holder, aura) ++
+       GolemaggsTrust.tick_events(entity, holder, aura)}
   end
 
   defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}
+
+  defp periodic_trigger_events(entity, %Holder{} = holder, %Aura{} = aura) do
+    trigger_id = Scripts.periodic_trigger_spell_id(holder.spell, aura.trigger_spell_id, aura.tick_count)
+
+    events =
+      case {Warlock.allow_periodic_trigger?(entity, holder), trigger_id} do
+        {false, _spell_id} ->
+          []
+
+        {true, spell_id} when is_integer(spell_id) and spell_id > 0 ->
+          [
+            Effects.trigger_spell(holder.caster_guid, holder.caster_level, entity.object.guid, spell_id,
+              hit_context: holder.cast_context,
+              triggered_by_spell_id: holder.spell.id,
+              pays_reagents?: holder.spell.reagents in [nil, []],
+              effect_base_points: Scripts.periodic_trigger_points(holder.spell, aura.tick_count)
+            )
+          ]
+
+        _ ->
+          []
+      end
+
+    Script.periodic_trigger_events(entity, holder) ++ events
+  end
 
   @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
 

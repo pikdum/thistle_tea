@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Core.Entity.Component.Unit
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Inventory
+  alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.Core.Movement.Charge
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Area
@@ -31,6 +32,7 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Core.Spell.UnitTargets
   alias ThistleTea.Game.Core.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EffectResolver.Movement
   alias ThistleTea.Game.World.Entity.EffectResolver.Pvp
   alias ThistleTea.Game.World.Entity.EffectResolver.SpellLaunch
@@ -163,6 +165,26 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
 
   def resolve(_entity, %Effects.DeliverSpellToQuery{}), do: []
 
+  def resolve(entity, %Effects.TriggerCreatureSpellInRange{} = effect) do
+    case trigger_spell(entity, effect.spell_id) do
+      %Spell{} = spell ->
+        entity
+        |> creatures_in_range(effect.creature_entry, effect.radius)
+        |> Enum.flat_map(fn guid ->
+          trigger =
+            Effects.trigger_spell(entity.object.guid, entity.unit.level || 1, guid, spell.id,
+              triggered_by_spell_id: effect.triggering_spell_id,
+              requires_living_target?: true
+            )
+
+          triggered_cast(entity, trigger, spell, [guid], Target.unit(guid))
+        end)
+
+      _missing ->
+        []
+    end
+  end
+
   def resolve(entity, %Effects.HealThreat{} = effect) do
     entity
     |> World.nearby_mobs(@heal_threat_radius)
@@ -213,6 +235,26 @@ defmodule ThistleTea.Game.World.Entity.EffectResolver.Spells do
     do: Map.get(spellbook, id) || SpellLoader.cached(id)
 
   defp trigger_spell(_entity, id), do: SpellLoader.cached(id)
+
+  defp creatures_in_range(entity, entry, radius) do
+    world = entity.internal.world
+    {x, y, z, _orientation} = entity.movement_block.position
+    caster_radius = max(entity.unit.bounding_radius || 0.0, 0.0)
+
+    :mobs
+    |> World.nearby_candidates(world, {x, y, z}, radius + caster_radius)
+    |> Enum.filter(fn guid ->
+      case {Metadata.get(guid), World.position(guid)} do
+        {%{entry: ^entry, alive?: true} = metadata, {^world, tx, ty, _tz}} ->
+          maximum = radius + caster_radius + max(Map.get(metadata, :bounding_radius, 0.0) || 0.0, 0.0)
+          Math.distance({x, y, 0.0}, {tx, ty, 0.0}) < maximum and is_pid(Entity.pid(guid))
+
+        _missing ->
+          false
+      end
+    end)
+    |> Enum.sort()
+  end
 
   defp resolve_trigger(entity, effect, spell) do
     if foreign_owner_required?(entity, effect, spell) do
