@@ -553,7 +553,7 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.Spells do
 
   defp movement_allows_cast?(state, entry), do: not Distancing.active?(state) or CreatureSpell.flag?(entry, :force_cast)
 
-  defp target_flags_allow?(%{object: %{guid: guid}} = state, entry, target_guid, context) do
+  defp target_flags_allow?(%{object: %{}} = state, entry, target_guid, context) do
     cond do
       CreatureSpell.flag?(entry, :target_unreachable) ->
         false
@@ -561,8 +561,8 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.Spells do
       CreatureSpell.flag?(entry, :target_casting) ->
         false
 
-      CreatureSpell.flag?(entry, :aura_not_present) and target_guid == guid ->
-        not AuraCore.has_spell?(state, entry.spell_id)
+      CreatureSpell.flag?(entry, :aura_not_present) and target_has_spell?(state, target_guid, entry.spell_id, context) ->
+        false
 
       CreatureSpell.flag?(entry, :only_in_melee) ->
         in_melee_range?(state, target_guid, context)
@@ -572,6 +572,16 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.Spells do
 
       true ->
         true
+    end
+  end
+
+  defp target_has_spell?(%{object: %{guid: guid}} = state, guid, spell_id, _context),
+    do: AuraCore.has_spell?(state, spell_id)
+
+  defp target_has_spell?(_state, target_guid, spell_id, %Context{perception: perception}) do
+    case Perception.metadata(perception, target_guid) do
+      %{aura_stacks: stacks} when is_map(stacks) -> Map.get(stacks, spell_id, 0) > 0
+      _missing -> false
     end
   end
 

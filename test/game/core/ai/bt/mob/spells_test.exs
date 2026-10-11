@@ -2,6 +2,9 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.SpellsTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.Core.AI.BT.Blackboard
+  alias ThistleTea.Game.Core.AI.BT.Context
+  alias ThistleTea.Game.Core.AI.BT.Context.Perception
+  alias ThistleTea.Game.Core.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Core.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.AI.ScriptStep
@@ -28,6 +31,27 @@ defmodule ThistleTea.Game.Core.AI.BT.Mob.SpellsTest do
   alias ThistleTea.Test.Unique
 
   defp context(state), do: AIEnvironment.context(state, 1_000)
+
+  describe "flags_allow?/4" do
+    test "aura_not_present checks another unit's current auras" do
+      state = fixture_mob(spells: [], spellbook: %{})
+      target = Guid.from_low_guid(:mob, 12_099, Unique.integer())
+      spell_id = Unique.integer()
+      entry = entry(spell_id, cast_flags: MapSet.new([:aura_not_present]))
+
+      for {stacks, allowed?} <- [{%{spell_id => 1}, false}, {%{spell_id => 0}, true}, {%{}, true}] do
+        observation = %Observation{guid: target, metadata: %{aura_stacks: stacks}}
+        perception = Perception.new(1_000, nil, %{target => observation}, %{})
+        assert MobSpells.flags_allow?(state, entry, target, Context.new(1_000, perception: perception)) == allowed?
+      end
+    end
+
+    test "a missing self buff still respects the melee-only flag" do
+      state = fixture_mob(spells: [], spellbook: %{})
+      entry = entry(Unique.integer(), cast_flags: MapSet.new([:aura_not_present, :only_in_melee]))
+      refute MobSpells.flags_allow?(state, entry, state.object.guid, Context.new(1_000))
+    end
+  end
 
   describe "try_cast/3" do
     test "pet autocast toggles preserve the indices of delayed spells" do
