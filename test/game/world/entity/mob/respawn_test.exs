@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.Entity.Mob.RespawnTest do
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EventSink
   alias ThistleTea.Game.World.Entity.Mob.Respawn
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.CombatLeashes
   alias ThistleTea.Test.Unique
 
@@ -140,6 +141,41 @@ defmodule ThistleTea.Game.World.Entity.Mob.RespawnTest do
   end
 
   describe "force/2" do
+    test "releases the living creature's attacker before rebuilding it" do
+      guid = Guid.from_low_guid(:mob, Unique.integer(), Unique.integer())
+      target = Guid.from_low_guid(:player, Unique.integer())
+      {:ok, _} = Entity.register(guid)
+      {:ok, _} = Entity.register(target)
+      Metadata.put(target, %{attacker_count: 0})
+      mob = fixture_mob(health: 5)
+      mob = %{mob | object: %{mob.object | guid: guid}}
+
+      on_exit(fn ->
+        World.remove_position(mob)
+        Entity.unregister(guid)
+        Entity.unregister(target)
+      end)
+
+      %{entity: mob} = Engagement.enter(mob, target, 1_000, selection: :target)
+      mob = EventSink.emit_pending(mob)
+      assert Metadata.get(target).attacker_count == 1
+
+      respawned = Respawn.force(mob, true)
+
+      assert respawned.unit.health == respawned.unit.max_health
+      refute respawned.internal.in_combat
+      assert respawned.unit.target == 0
+      assert respawned.internal.threat == %{}
+      assert Metadata.get(target).attacker_count == 0
+
+      %{entity: engaged} = Engagement.enter(respawned, target, 2_000, selection: :target)
+      engaged = EventSink.emit_pending(engaged)
+      assert Metadata.get(target).attacker_count == 1
+      %{entity: released} = Engagement.leave(engaged, :evade, 3_000)
+      EventSink.emit_pending(released)
+      assert Metadata.get(target).attacker_count == 0
+    end
+
     test "publishes the respawn position before spawn events read their surroundings" do
       guid = Guid.from_low_guid(:mob, 1, Unique.integer())
       {:ok, _} = Entity.register(guid)

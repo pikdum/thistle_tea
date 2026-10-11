@@ -17,7 +17,6 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
   alias ThistleTea.Game.Core.Aura
   alias ThistleTea.Game.Core.Aura.SingleTarget
   alias ThistleTea.Game.Core.Aura.StealthDetection
-  alias ThistleTea.Game.Core.Combat.CombatLeash
   alias ThistleTea.Game.Core.Combat.Engagement
   alias ThistleTea.Game.Core.Combat.FeignDeath
   alias ThistleTea.Game.Core.Creature.CreatureFlags
@@ -205,10 +204,10 @@ defmodule ThistleTea.Game.World.Entity.Mob.Respawn do
 
   defp respawn(%Mob{} = state, position \\ nil, opts \\ []) do
     now = Time.now()
+    %Engagement.Result{entity: state} = Engagement.leave(state, :respawn, now)
 
     state =
       state
-      |> CombatLeash.stop()
       |> EventSink.emit_pending()
       |> Corpse.remove()
       |> SingleTarget.detach(now, keep_self?: false)
