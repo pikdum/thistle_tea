@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.Spell.SpellReception do
   alias ThistleTea.Game.Core.Aura.DispelResistance
   alias ThistleTea.Game.Core.Aura.Heartbeat
   alias ThistleTea.Game.Core.Aura.Holder
+  alias ThistleTea.Game.Core.Aura.SeparationAnxiety
   alias ThistleTea.Game.Core.Aura.StealthDetection
   alias ThistleTea.Game.Core.Combat.CombatTimer
   alias ThistleTea.Game.Core.Combat.HealingReceived
@@ -180,24 +181,49 @@ defmodule ThistleTea.Game.World.Spell.SpellReception do
           do: %{context | heartbeat_roll: Math.random_int(0, 10_000)},
           else: context
 
-      context =
-        if Holder.has_any_type?(holder, [:periodic_leech, :periodic_health_funnel, :periodic_mana_leech]) or
-             CapturedFollower.spell?(holder.spell) do
-          %{context | caster_available?: caster_available?(target, holder.caster_guid, now)}
-        else
-          context
-        end
-
-      context =
-        if CapturedFollower.spell?(holder.spell),
-          do: %{context | caster_position: World.position(holder.caster_guid, now)},
-          else: context
+      context = refresh_caster_availability(target, holder, context, now)
+      context = refresh_caster_location(target, holder, context, now)
 
       {{holder.spell.id, holder.caster_guid, holder.item_source}, context}
     end
   end
 
   def aura_contexts(_target, _now), do: %{}
+
+  defp refresh_caster_availability(target, holder, context, now) do
+    if Holder.has_any_type?(holder, [:periodic_leech, :periodic_health_funnel, :periodic_mana_leech]) or
+         CapturedFollower.spell?(holder.spell) or SeparationAnxiety.spell?(holder.spell) do
+      %{context | caster_available?: caster_available?(target, holder.caster_guid, now)}
+    else
+      context
+    end
+  end
+
+  defp refresh_caster_location(target, holder, context, now) do
+    cond do
+      SeparationAnxiety.spell?(holder.spell) ->
+        %{
+          context
+          | caster_position: World.position(holder.caster_guid, now),
+            caster_bounding_radius: caster_bounding_radius(target, holder.caster_guid)
+        }
+
+      CapturedFollower.spell?(holder.spell) ->
+        %{context | caster_position: World.position(holder.caster_guid, now)}
+
+      true ->
+        context
+    end
+  end
+
+  defp caster_bounding_radius(%{object: %{guid: guid}, unit: unit}, guid), do: unit.bounding_radius
+
+  defp caster_bounding_radius(_target, guid) do
+    case Metadata.get(guid) do
+      %{bounding_radius: radius} -> radius
+      _missing -> nil
+    end
+  end
 
   defp periodic_due?(holder, now),
     do: Enum.any?(holder.auras, &(is_integer(&1.next_tick_at) and &1.next_tick_at <= now))

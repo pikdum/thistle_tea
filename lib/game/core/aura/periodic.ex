@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Core.Aura.Periodic do
   alias ThistleTea.Game.Core.Aura.PeriodicDamage
   alias ThistleTea.Game.Core.Aura.Reactions
   alias ThistleTea.Game.Core.Aura.Script
+  alias ThistleTea.Game.Core.Aura.SeparationAnxiety
   alias ThistleTea.Game.Core.Aura.Transition
   alias ThistleTea.Game.Core.Class.Warlock
   alias ThistleTea.Game.Core.Combat.DamageImmunity
@@ -451,7 +452,7 @@ defmodule ThistleTea.Game.Core.Aura.Periodic do
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :dummy, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)},
-     CapturedFollower.tick_events(entity, holder)}
+     CapturedFollower.tick_events(entity, holder) ++ SeparationAnxiety.tick_events(entity, holder, aura)}
   end
 
   defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}

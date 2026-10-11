@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Core.Aura.Application do
   alias ThistleTea.Game.Core.Aura.Heartbeat
   alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Aura.Script
+  alias ThistleTea.Game.Core.Aura.SeparationAnxiety
   alias ThistleTea.Game.Core.Aura.SingleTarget
   alias ThistleTea.Game.Core.Aura.StackingProc
   alias ThistleTea.Game.Core.Aura.Transition
@@ -599,7 +600,7 @@ defmodule ThistleTea.Game.Core.Aura.Application do
   defp holder_expiry(spell, context, now), do: expires_at(now, effective_duration(spell, context))
 
   defp retained_context(context, auras) do
-    if context.persistent_area || CapturedFollower.spell?(context.spell) ||
+    if context.persistent_area || CapturedFollower.spell?(context.spell) || SeparationAnxiety.spell?(context.spell) ||
          Enum.any?(auras, &(&1.type in @context_auras)),
        do: %{context | persistent_area: nil}
   end
@@ -675,7 +676,8 @@ defmodule ThistleTea.Game.Core.Aura.Application do
 
   defp build_aura(entity, %Spell{} = spell, %Effect{} = effect, amount_override, %CastContext{} = context, now) do
     amplitude_ms =
-      CapturedFollower.interval(spell, effect) || Modifiers.periodic_interval(context.spell_modifiers, effect)
+      CapturedFollower.interval(spell, effect) || SeparationAnxiety.interval(spell, effect) ||
+        Modifiers.periodic_interval(context.spell_modifiers, effect)
 
     %Aura{
       index: effect.index,
@@ -785,6 +787,7 @@ defmodule ThistleTea.Game.Core.Aura.Application do
 
   defp ticking?(spell, effect, amplitude_ms) do
     is_integer(amplitude_ms) and amplitude_ms > 0 and
-      (Effect.periodic?(effect) or not is_nil(CapturedFollower.interval(spell, effect)))
+      (Effect.periodic?(effect) or not is_nil(CapturedFollower.interval(spell, effect)) or
+         not is_nil(SeparationAnxiety.interval(spell, effect)))
   end
 end

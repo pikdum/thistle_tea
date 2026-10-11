@@ -142,6 +142,58 @@ defmodule ThistleTea.Game.World.Spell.SpellReceptionTest do
   end
 
   describe "aura_contexts/2" do
+    test "separation checks use the boss's live position, radius and availability", ctx do
+      spell = %Spell{
+        id: 23_487,
+        duration_ms: -1,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :dummy, radius_yards: 100.0}]
+      }
+
+      target = %{ctx.target | unit: %{ctx.target.unit | auras: [], bounding_radius: 1.0}}
+
+      context = %CastContext{
+        spell: spell,
+        caster_guid: ctx.caster,
+        caster_position: {target.internal.world, 0.0, 0.0, 0.0},
+        caster_bounding_radius: 0.0
+      }
+
+      {target, _events} = Aura.apply_spell(target, context, spell, 0)
+      Metadata.put(ctx.caster, %{alive?: true, bounding_radius: 2.0})
+      SpatialHash.update(:mobs, ctx.caster, target.internal.world, 103.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:mobs, ctx.caster) end)
+
+      assert SpellReception.aura_contexts(target, 4_999) == %{}
+      [context] = target |> SpellReception.aura_contexts(5_000) |> Map.values()
+      assert context.caster_position == {target.internal.world, 103.0, 0.0, 0.0}
+      assert context.caster_bounding_radius == 2.0
+      assert context.caster_available?
+      {_target, events} = projected_tick(target, 5_000)
+      assert Enum.any?(events, &match?(%Effects.TriggerSpell{spell_id: 23_492}, &1))
+
+      Metadata.update(ctx.caster, %{bounding_radius: 3.0})
+      {_target, events} = projected_tick(target, 5_000)
+      refute Enum.any?(events, &is_struct(&1, Effects.TriggerSpell))
+
+      Metadata.update(ctx.caster, %{bounding_radius: 2.0, alive?: false})
+      {_target, events} = projected_tick(target, 5_000)
+      refute Enum.any?(events, &is_struct(&1, Effects.TriggerSpell))
+
+      Metadata.update(ctx.caster, %{alive?: true})
+      SpatialHash.update(:mobs, ctx.caster, WorldRef.instance(409, Unique.integer()), 103.0, 0.0, 0.0)
+      {_target, events} = projected_tick(target, 5_000)
+      refute Enum.any?(events, &is_struct(&1, Effects.TriggerSpell))
+
+      SpatialHash.remove(:mobs, ctx.caster)
+      Metadata.delete(ctx.caster)
+      [context] = target |> SpellReception.aura_contexts(5_000) |> Map.values()
+      assert context.caster_position == nil
+      assert context.caster_bounding_radius == nil
+      refute context.caster_available?
+      {_target, events} = projected_tick(target, 5_000)
+      refute Enum.any?(events, &is_struct(&1, Effects.TriggerSpell))
+    end
+
     test "capture checks refresh the animal's live position and remove a dead or missing source" do
       caster = Guid.from_low_guid(:mob, 10_990, Unique.integer())
       world = WorldRef.instance(30, Unique.integer())
