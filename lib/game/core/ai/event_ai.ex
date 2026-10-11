@@ -30,10 +30,12 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
   alias ThistleTea.Game.Core.AI.AIEvent
   alias ThistleTea.Game.Core.AI.BT.Blackboard
   alias ThistleTea.Game.Core.AI.BT.Blackboard.EventAI, as: EventAIMemory
+  alias ThistleTea.Game.Core.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Core.AI.BT.Context
   alias ThistleTea.Game.Core.AI.BT.Context.Perception
   alias ThistleTea.Game.Core.AI.BT.Context.Random
   alias ThistleTea.Game.Core.AI.BT.Mob.Spells, as: MobSpells
+  alias ThistleTea.Game.Core.AI.BT.Navigation
   alias ThistleTea.Game.Core.AI.CreatureSpell
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.Aura, as: AuraCore
@@ -460,6 +462,7 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
          true <- due?(blackboard, index, now),
          true <- AIEvent.phase_allows?(event, blackboard.event_ai.phase),
          true <- casting_allows?(state, event),
+         true <- victim_allows?(state, event, context),
          true <- event.event_type == :ooc_los or condition_met?(state, event.condition, invoker_guid, context),
          {:ok, invoker_guid} <- satisfy(state, event, invoker_guid, context) do
       blackboard =
@@ -868,6 +871,13 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
 
   defp casting_allows?(state, %AIEvent{not_casting?: true}), do: is_nil(state.internal.casting)
   defp casting_allows?(_state, %AIEvent{}), do: true
+
+  defp victim_allows?(state, %AIEvent{victim_in_melee?: true}, %Context{} = context) do
+    target = victim(state)
+    Navigation.target_valid_same_map?(state, target, context) and CombatBT.in_melee_range?(state, target, context)
+  end
+
+  defp victim_allows?(_state, %AIEvent{}, %Context{}), do: true
 
   defp ensure_init(%Blackboard{event_ai: %EventAIMemory{timers: timers}} = blackboard, _events, _now, %Context{})
        when is_map(timers) do

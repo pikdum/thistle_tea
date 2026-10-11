@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.Core.AI.AIEvent do
   Params keep the per-type meanings documented in vmangos `CreatureEventAI.h`;
   actions are the referenced script steps resolved at load time. Unsupported
   event types keep their numeric id as `{:unsupported, id}`.
+  Code-built events can require a victim in melee before consuming their
+  cooldown with `victim_in_melee?`, independently of cast-result checking.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -16,6 +18,7 @@ defmodule ThistleTea.Game.Core.AI.AIEvent do
             random_action?: false,
             not_casting?: false,
             check_result?: false,
+            victim_in_melee?: false,
             inverse_phase_mask: 0,
             condition_id: 0,
             condition: nil,

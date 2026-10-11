@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
   alias ThistleTea.Game.Core.Guid
   alias ThistleTea.Game.Core.Pet.SummonEvent
   alias ThistleTea.Game.Core.Spell
+  alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Test.Unique
@@ -179,7 +180,9 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
       end
     end
 
-    test "Ancient Core Hounds keep Serrated Bite due until the victim reaches melee", %{players: [first | _] = players} do
+    test "Ancient Core Hounds keep Serrated Bite due until the victim reaches melee in the same copy", %{
+      players: [first | _] = players
+    } do
       mob = creature(11_673, players)
       {mob, blackboard} = EventAI.on_spawned(mob, Blackboard.new(), 0, context(mob, 0))
       {mob, blackboard} = EventAI.enter_combat(mob, blackboard, first, 0, context(mob, 0))
@@ -190,11 +193,38 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
       refute Enum.any?(spell_starts(mob), &match?({19_771, _}, &1))
       assert Enum.any?(spell_starts(mob), &match?({19_630, _}, &1))
 
-      {mob, blackboard} = EventAI.tick(clear_effects(mob), blackboard, 5_000, context(mob, 5_000))
-      assert spell_starts(mob) == [{19_771, first}]
-      {mob, blackboard} = EventAI.tick(clear_effects(mob), blackboard, 10_999, context(mob, 10_999))
+      other_copy = context(mob, 5_000)
+      world = WorldRef.instance(409, Unique.integer())
+      observation = %{other_copy.perception.entities[first] | position: {world, 0.0, 0.0, 0.0}}
+
+      other_copy = %{
+        other_copy
+        | perception: %{other_copy.perception | entities: Map.put(other_copy.perception.entities, first, observation)}
+      }
+
+      {mob, blackboard} = EventAI.tick(clear_effects(mob), blackboard, 5_000, other_copy)
       refute Enum.any?(spell_starts(mob), &match?({19_771, _}, &1))
-      {mob, _blackboard} = EventAI.tick(clear_effects(mob), blackboard, 11_999, context(mob, 11_999))
+      {mob, blackboard} = EventAI.tick(clear_effects(mob), blackboard, 6_000, context(mob, 6_000))
+      assert spell_starts(mob) == [{19_771, first}]
+      {mob, blackboard} = EventAI.tick(clear_effects(mob), blackboard, 11_999, context(mob, 11_999))
+      refute Enum.any?(spell_starts(mob), &match?({19_771, _}, &1))
+      {mob, _blackboard} = EventAI.tick(clear_effects(mob), blackboard, 12_999, context(mob, 12_999))
+      assert Enum.any?(spell_starts(mob), &match?({19_771, ^first}, &1))
+    end
+
+    test "Ancient Core Hounds restart Serrated Bite's melee cooldown when a cast fails", %{
+      players: [first | _] = players
+    } do
+      mob = creature(11_673, players)
+      {mob, blackboard} = EventAI.on_spawned(mob, Blackboard.new(), 0, context(mob, 0))
+      {mob, blackboard} = EventAI.enter_combat(mob, blackboard, first, 0, context(mob, 0))
+      mob = %{mob | internal: %{mob.internal | casting: %Cast{spell: mob.internal.spellbook[19_630]}}}
+      {mob, blackboard} = EventAI.tick(clear_effects(mob), blackboard, 4_000, context(mob, 4_000))
+      assert spell_starts(mob) == []
+      mob = %{mob | internal: %{mob.internal | casting: nil}}
+      {mob, blackboard} = EventAI.tick(clear_effects(mob), blackboard, 5_000, context(mob, 5_000))
+      assert spell_starts(mob) == []
+      {mob, _blackboard} = EventAI.tick(clear_effects(mob), blackboard, 10_000, context(mob, 10_000))
       assert Enum.any?(spell_starts(mob), &match?({19_771, ^first}, &1))
     end
   end

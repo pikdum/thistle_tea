@@ -279,7 +279,10 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
       CreatureScript.event(entry, 2, :aggro, [clear_spell_list()]),
       CreatureScript.event(entry, 3, :evade, [ancient_hound_debuff()]),
       Combat.every(entry, 4, Combat.cast(19_630, :self), {4_000, 7_000}, {6_000, 8_000}, @unchecked),
-      Combat.every(entry, 5, Combat.cast(19_771, :victim, @only_in_melee), 4_000, 6_000)
+      Combat.every(entry, 5, Combat.cast(19_771, :victim, @only_in_melee), 4_000, 6_000,
+        check_result?: false,
+        victim_in_melee?: true
+      )
       | debuffs
     ]
   end
