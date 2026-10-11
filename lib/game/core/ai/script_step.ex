@@ -27,6 +27,9 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
   triggered spell in `datalong`; zero restores ordinary swings.
   `set_call_for_help_range` changes the automatic assistance radius in yards;
   zero suppresses automatic assistance calls.
+  `minimum_target_distance_2d` requires the selected target to be strictly
+  farther away than that many yards in the horizontal plane, after subtracting
+  both bounding radii. Hostile cast selectors filter spell range before choosing.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -45,6 +48,7 @@ defmodule ThistleTea.Game.Core.AI.ScriptStep do
             target_type: :provided,
             target_param1: 0,
             target_param2: 0,
+            minimum_target_distance_2d: nil,
             target_self?: false,
             swap_initial?: false,
             swap_final?: false,

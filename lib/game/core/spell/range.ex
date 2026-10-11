@@ -33,6 +33,37 @@ defmodule ThistleTea.Game.Core.Spell.Range do
     end
   end
 
+  def surface_distance_2d(caster, target) do
+    case positions(caster, target) do
+      {:ok, {x, y, _z}, {tx, ty, _tz}} ->
+        distance = :math.sqrt((tx - x) ** 2 + (ty - y) ** 2)
+        bounds = caster_bounding_radius(caster) + bounding_radius(target)
+        {:ok, max(distance - bounds, 0.0)}
+
+      other ->
+        other
+    end
+  end
+
+  def selection_in_range?(caster, %Spell{melee_range?: true} = spell, target),
+    do: validate(caster, spell, target) == :ok
+
+  def selection_in_range?(caster, %Spell{range_yards: maximum, min_range_yards: minimum}, target)
+      when is_number(maximum) and maximum > 0 do
+    case combat_distance(caster, target) do
+      {:ok, distance} -> distance < maximum and (not is_number(minimum) or distance >= minimum)
+      _missing -> false
+    end
+  end
+
+  def selection_in_range?(_caster, %Spell{}, _target), do: true
+
+  defp bounding_radius(%{bounding_radius: radius}) when is_number(radius), do: max(radius, 0.0)
+  defp bounding_radius(_target), do: 0.0
+
+  defp caster_bounding_radius(%{unit: unit}), do: bounding_radius(unit)
+  defp caster_bounding_radius(_caster), do: 0.0
+
   defp validate_distance(caster, %Spell{range_yards: range} = spell, target, opts)
        when is_number(range) and range > 0 do
     case positions(caster, target) do

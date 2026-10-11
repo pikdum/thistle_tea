@@ -76,8 +76,10 @@ defmodule ThistleTea.Game.Core.AI.Script do
   alias ThistleTea.Game.Core.Math
   alias ThistleTea.Game.Core.Movement
   alias ThistleTea.Game.Core.Pet.Guardians
+  alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Cast
   alias ThistleTea.Game.Core.Spell.Casting
+  alias ThistleTea.Game.Core.Spell.Range, as: SpellRange
   alias ThistleTea.Game.Core.WorldRef
 
   require Logger
@@ -206,6 +208,7 @@ defmodule ThistleTea.Game.Core.AI.Script do
     target = if step.target_self?, do: state.object.guid, else: selected
 
     if (step.target_type == :provided or selected not in [nil, 0]) and
+         target_distance_allows?(state, step, target, context) and
          condition_met?(state, step.condition, target, context) do
       case termination(state, step, target, context) do
         {:terminate, state} ->
@@ -218,6 +221,18 @@ defmodule ThistleTea.Game.Core.AI.Script do
       failed(state, blackboard, step)
     end
   end
+
+  defp target_distance_allows?(state, %ScriptStep{minimum_target_distance_2d: minimum}, target, %Context{
+         perception: perception
+       })
+       when is_number(minimum) do
+    case SpellRange.surface_distance_2d(state, perceived_target(perception, target)) do
+      {:ok, distance} -> distance > minimum
+      _missing -> false
+    end
+  end
+
+  defp target_distance_allows?(_state, %ScriptStep{}, _target, %Context{}), do: true
 
   defp dispatch_final(state, blackboard, step, source_guid, target_guid, context) do
     owner = resolve_target(state, %{step | target_self?: false}, target_guid, context)
@@ -2357,37 +2372,78 @@ defmodule ThistleTea.Game.Core.AI.Script do
     end
   end
 
-  defp resolve_hostile_target(state, %ScriptStep{target_type: target_type, target_param1: flags}, %Context{} = context) do
+  defp resolve_hostile_target(
+         state,
+         %ScriptStep{target_type: target_type, target_param1: flags} = step,
+         %Context{} = context
+       ) do
+    spell = selector_spell(state, step)
+
     candidates =
       state
       |> Threat.entries()
       |> Enum.map(&elem(&1, 0))
-      |> Enum.filter(&target_flags_allow?(&1, flags, context.perception))
+      |> skip_top_candidate(target_type)
+      |> Enum.filter(fn guid ->
+        target_flags_allow?(guid, flags, context.perception) and
+          target_spell_allows?(state, spell, guid, context.perception)
+      end)
 
-    select_hostile_target(target_type, candidates, context)
+    select_hostile_target(target_type, candidates, state, context)
   end
 
-  defp select_hostile_target(_target_type, [], %Context{}), do: nil
-  defp select_hostile_target(:hostile_second_aggro, [_top, second | _rest], %Context{}), do: second
-  defp select_hostile_target(:hostile_second_aggro, _candidates, %Context{}), do: nil
-  defp select_hostile_target(:hostile_last_aggro, candidates, %Context{}), do: List.last(candidates)
+  defp skip_top_candidate(candidates, target_type) when target_type in [:hostile_second_aggro, :hostile_random_not_top],
+    do: Enum.drop(candidates, 1)
 
-  defp select_hostile_target(:hostile_random, candidates, %Context{random: random}) do
+  defp skip_top_candidate(candidates, _target_type), do: candidates
+
+  defp selector_spell(%{internal: %Internal{spellbook: spellbook}}, %ScriptStep{command: :cast_spell, datalong: id}),
+    do: Map.get(spellbook, id)
+
+  defp selector_spell(_state, %ScriptStep{}), do: nil
+
+  defp target_spell_allows?(state, %Spell{} = spell, guid, perception) do
+    target = perceived_target(perception, guid)
+    Map.get(target, :alive?) != false and SpellRange.selection_in_range?(state, spell, target)
+  end
+
+  defp target_spell_allows?(_state, _spell, _guid, _perception), do: true
+
+  defp perceived_target(perception, guid) do
+    perception
+    |> Perception.metadata(guid)
+    |> Kernel.||(%{})
+    |> Map.merge(%{guid: guid, position: Perception.position(perception, guid)})
+  end
+
+  defp select_hostile_target(_target_type, [], _state, %Context{}), do: nil
+  defp select_hostile_target(:hostile_second_aggro, [second | _rest], _state, %Context{}), do: second
+  defp select_hostile_target(:hostile_last_aggro, candidates, _state, %Context{}), do: List.last(candidates)
+
+  defp select_hostile_target(:hostile_random, candidates, _state, %Context{random: random}) do
     Random.choice(random, candidates)
   end
 
-  defp select_hostile_target(:hostile_random_not_top, [_top | rest], %Context{random: random}) when rest != [] do
-    Random.choice(random, rest)
-  end
+  defp select_hostile_target(:hostile_random_not_top, candidates, _state, %Context{random: random}),
+    do: Random.choice(random, candidates)
 
-  defp select_hostile_target(:hostile_random_not_top, _candidates, %Context{}), do: nil
-
-  defp select_hostile_target(:hostile_nearest, candidates, %Context{perception: perception}) do
+  defp select_hostile_target(:hostile_nearest, candidates, _state, %Context{perception: perception}) do
     distance_extreme(candidates, perception, :nearest)
   end
 
-  defp select_hostile_target(:hostile_farthest, candidates, %Context{perception: perception}) do
-    distance_extreme(candidates, perception, :farthest)
+  defp select_hostile_target(:hostile_farthest, candidates, state, %Context{perception: perception}) do
+    candidates
+    |> Enum.flat_map(fn guid ->
+      distance =
+        case SpellRange.combat_distance(state, perceived_target(perception, guid)) do
+          {:ok, distance} -> distance
+          _missing -> Perception.distance(perception, guid)
+        end
+
+      if is_number(distance), do: [{guid, distance}], else: []
+    end)
+    |> Enum.max_by(&elem(&1, 1), fn -> {nil, 0} end)
+    |> elem(0)
   end
 
   defp target_flags_allow?(guid, flags, perception) do
