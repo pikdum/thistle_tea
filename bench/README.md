@@ -53,7 +53,7 @@ This harness times the per-tick and per-recipient work that scales with populati
 
 - `update_object`: SMSG_UPDATE_OBJECT encoding for mob and player values/create blocks, for the owner and for another player, plus `Network.Send.compress/1` on the resulting packets;
 - `movement`: `Math.distance/2`, `Math.movement_duration/2`, and `Movement.position_at/4` on active and finished splines;
-- `spatial`: `World.position/2` across every mob and exact 30-yard `World.nearby_units_exact/5` queries over a populated `SpatialHash`.
+- `spatial`: `World.position/2` across every mob, exact 30-yard `World.nearby_units_exact/5` queries over a populated `SpatialHash`, separate motion reads versus one observation snapshot, and unchanged metadata publication.
 
 ```console
 MIX_ENV=bench mix run --no-start bench/hot_paths.exs
@@ -72,6 +72,9 @@ Update fixtures fill every update field a component declares, so they measure th
 | `HOT_PATHS_MEMORY_TIME` | `0.5` | Benchee memory measurement time per scenario |
 
 Compare runs on the same machine and commit range; the dev environment does not consolidate protocols, so profile a running dev server only for relative weight, not absolute Enumerable cost.
+
+The [server optimization experiments](../docs/server-optimization.md) record
+the observation, metadata publication, population, and mailbox comparisons.
 
 # Population workload
 
@@ -128,6 +131,11 @@ All numeric options use the `POPULATION_BENCH_` prefix:
 `POPULATION_BENCH_OUTPUT` selects the JSON report path (default
 `/tmp/thistle-population.json`). Positive counts and intervals are required;
 use `PET_PERCENT=0` to omit pets.
+
+`POPULATION_BENCH_MESSAGE_QUEUE_DATA` selects `on_heap` (default) or `off_heap`
+for the benchmark owners and connection sinks before warmup. It changes only
+the fixture processes and records the choice in the report; it does not change
+the production process defaults.
 
 For diagnostic function timing, set `POPULATION_BENCH_PROFILE` to one scenario.
 This runs eprof on the population owners and prints its table. If the development

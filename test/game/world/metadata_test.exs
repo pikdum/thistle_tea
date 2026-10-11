@@ -44,6 +44,13 @@ defmodule ThistleTea.Game.World.MetadataTest do
   end
 
   describe "update/3" do
+    test "preserves numeric type changes", %{table: table} do
+      guid = Unique.integer()
+      Metadata.put(table, guid, %{orientation: 0})
+      assert :ok = Metadata.update(table, guid, %{orientation: 0.0})
+      assert Metadata.get(table, guid).orientation === 0.0
+    end
+
     test "merges metadata values", %{table: table} do
       guid = 456
       Metadata.put(table, guid, %{name: "foo"})

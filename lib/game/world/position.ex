@@ -45,7 +45,17 @@ defmodule ThistleTea.Game.World.Position do
   end
 
   def get(guid, now) when is_integer(guid) and is_integer(now) do
-    case SpatialHash.get_projection(guid) do
+    projected_position(guid, SpatialHash.get_projection(guid), now)
+  end
+
+  @doc "Captures projected position and motion from the same movement record."
+  def snapshot(guid, now) when is_integer(guid) and is_integer(now) do
+    projection = SpatialHash.get_projection(guid)
+    {projected_position(guid, projection, now), projection_moving?(projection, now)}
+  end
+
+  defp projected_position(guid, projection, now) do
+    case projection do
       %Spline{} = projection ->
         {x, y, z} = spline_position(projection, now)
         {projection.world, x, y, z}
@@ -67,7 +77,11 @@ defmodule ThistleTea.Game.World.Position do
   end
 
   def moving?(guid, now) when is_integer(guid) and is_integer(now) do
-    case SpatialHash.get_projection(guid) do
+    projection_moving?(SpatialHash.get_projection(guid), now)
+  end
+
+  defp projection_moving?(projection, now) do
+    case projection do
       %Spline{started_at: started_at, duration_ms: duration_ms} ->
         now <= started_at + duration_ms
 

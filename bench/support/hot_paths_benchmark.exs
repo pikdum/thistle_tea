@@ -14,6 +14,7 @@ defmodule ThistleTea.Bench.HotPathsBenchmark do
   alias ThistleTea.Game.Network.Send
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position.Spline
   alias ThistleTea.Game.World.SpatialHash
 
@@ -99,6 +100,7 @@ defmodule ThistleTea.Bench.HotPathsBenchmark do
   defp run_group("spatial", config) do
     world = WorldRef.open(0)
     SpatialHash.setup_tables()
+    Metadata.init()
     guids = populate(world, config)
     now = System.monotonic_time(:millisecond)
     origins = guids |> Enum.take_every(max(div(length(guids), 32), 1)) |> Enum.map(&World.position(&1, now))
@@ -112,7 +114,23 @@ defmodule ThistleTea.Bench.HotPathsBenchmark do
         "nearby_units_exact 30yd x#{length(origins)}" => fn ->
           Enum.each(origins, fn {w, x, y, z} -> World.nearby_units_exact(:mobs, w, {x, y, z}, 30, now) end)
         end,
-        "Position.get every mob" => fn -> Enum.each(guids, &World.position(&1, now)) end
+        "Position.get every mob" => fn -> Enum.each(guids, &World.position(&1, now)) end,
+        "observe motion with separate reads" => fn ->
+          Enum.each(guids, fn guid ->
+            metadata = Metadata.get(guid)
+            {metadata, World.position(guid, now), World.grounded_target_position(guid, now), World.moving?(guid, now)}
+          end)
+        end,
+        "observe motion with one snapshot" => fn ->
+          Enum.each(guids, fn guid ->
+            metadata = Metadata.get(guid)
+            {position, grounded_position, moving?} = World.position_snapshot(guid, metadata, now)
+            {metadata, position, grounded_position, moving?}
+          end)
+        end,
+        "unchanged metadata publication" => fn ->
+          Enum.each(guids, &Metadata.update(&1, %{alive?: true, orientation: 0.0}))
+        end
       },
       config
     )
@@ -127,6 +145,7 @@ defmodule ThistleTea.Bench.HotPathsBenchmark do
       x = -9500.0 + rem(index, side) * config.spacing
       y = 20.0 + div(index, side) * config.spacing
       SpatialHash.insert(:mobs, guid, world, x, y, 56.0)
+      Metadata.put(guid, metadata(index))
 
       if rem(index * 100, 100 * 100) < config.moving_percent * 100 do
         SpatialHash.put_projection(guid, %Spline{
@@ -141,6 +160,31 @@ defmodule ThistleTea.Bench.HotPathsBenchmark do
 
       guid
     end
+  end
+
+  defp metadata(index) do
+    %{
+      alive?: true,
+      orientation: 0.0,
+      level: 50,
+      health: 2_000,
+      health_pct: 100.0,
+      health_deficit: 0,
+      bounding_radius: 0.5,
+      combat_reach: 1.5,
+      airborne?: false,
+      attacker_count: 0,
+      aura_sources: %{},
+      aura_stacks: %{},
+      aura_effects: MapSet.new(),
+      dispel_options: [],
+      in_combat: true,
+      name: "Bench#{index}",
+      victim_guid: 0,
+      unit_flags: 0,
+      movement_velocity: {0.0, 0.0, 0.0},
+      moving_until: 0
+    }
   end
 
   defp mob_update(guid) do

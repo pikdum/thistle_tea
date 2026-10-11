@@ -318,26 +318,21 @@ defmodule ThistleTea.Game.World do
   end
 
   def grounded_target_position(guid, now \\ Time.now()) when is_integer(guid) and is_integer(now) do
-    guid |> position(now) |> ground_if_airborne(guid)
+    guid |> position(now) |> ground_if_airborne(Metadata.query(guid, [:airborne?]))
   end
 
-  defp ground_if_airborne({%WorldRef{map_id: map_id} = world, x, y, z} = position, guid) do
-    if airborne?(guid) do
-      {gx, gy, gz} = Pathfinding.snap_to_ground(map_id, {x, y, z})
-      {world, gx, gy, gz}
-    else
-      position
-    end
+  @doc "Captures position, grounded position, and motion using one projection and the caller's current metadata."
+  def position_snapshot(guid, metadata, now) when is_integer(guid) and is_integer(now) do
+    {position, moving?} = Position.snapshot(guid, now)
+    {position, ground_if_airborne(position, metadata), moving? or recently_moved?(metadata, now)}
   end
 
-  defp ground_if_airborne(position, _guid), do: position
-
-  defp airborne?(guid) do
-    case Metadata.query(guid, [:airborne?]) do
-      %{airborne?: true} -> true
-      _ -> false
-    end
+  defp ground_if_airborne({%WorldRef{map_id: map_id} = world, x, y, z}, %{airborne?: true}) do
+    {gx, gy, gz} = Pathfinding.snap_to_ground(map_id, {x, y, z})
+    {world, gx, gy, gz}
   end
+
+  defp ground_if_airborne(position, _metadata), do: position
 
   def moving?(guid, now \\ Time.now()) when is_integer(guid) and is_integer(now) do
     spline_moving?(guid, now) or recently_moved?(guid, now)
@@ -345,12 +340,10 @@ defmodule ThistleTea.Game.World do
 
   defp spline_moving?(guid, now), do: Position.moving?(guid, now)
 
-  defp recently_moved?(guid, now) do
-    case Metadata.query(guid, [:moving_until]) do
-      %{moving_until: moving_until} when is_integer(moving_until) -> now < moving_until
-      _ -> false
-    end
-  end
+  defp recently_moved?(guid, now) when is_integer(guid), do: recently_moved?(Metadata.query(guid, [:moving_until]), now)
+
+  defp recently_moved?(%{moving_until: until}, now) when is_integer(until), do: now < until
+  defp recently_moved?(_metadata, _now), do: false
 
   def position(subject, now \\ Time.now())
 

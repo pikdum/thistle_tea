@@ -32,7 +32,9 @@ defmodule ThistleTea.Game.World.Metadata do
         if :ets.insert_new(table, {guid, metadata}), do: :ok, else: update(table, guid, metadata)
 
       current ->
-        if replace(table, guid, current, Map.merge(current, metadata)),
+        updated = Map.merge(current, metadata)
+
+        if current === updated or replace(table, guid, current, updated),
           do: :ok,
           else: update(table, guid, metadata)
     end

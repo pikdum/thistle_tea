@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironmentTest do
   alias ThistleTea.Game.World.Entity.AIEnvironment
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding.Aquatic
+  alias ThistleTea.Game.World.Position.Spline
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.ScriptedEvent
   alias ThistleTea.Game.World.System.ScriptedEvent.Event
@@ -60,6 +61,38 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironmentTest do
   end
 
   describe "context/3" do
+    test "captures motion freshly without changing previous observations" do
+      world = WorldRef.instance(999, Unique.integer())
+      target = Guid.from_low_guid(:mob, 1, Unique.integer())
+      put_actor(:mobs, target, world, 130.0)
+      on_exit(fn -> remove_actor(:mobs, target) end)
+
+      SpatialHash.put_projection(target, %Spline{
+        world: world,
+        origin: {130.0, 0.0, 0.0},
+        nodes: [{140.0, 0.0, 0.0}],
+        started_at: 1_000,
+        duration_ms: 1_000,
+        falling?: false
+      })
+
+      request = Request.actor(target)
+      first = AIEnvironment.context(mob(world), 1_500, request).perception
+      assert Perception.position(first, target) == {world, 135.0, 0.0, 0.0}
+      assert Perception.grounded_position(first, target) == {world, 135.0, 0.0, 0.0}
+      assert Perception.moving?(first, target)
+
+      SpatialHash.clear_projection(target)
+      SpatialHash.update(:mobs, target, world, 140.0, 0.0, 0.0)
+      Metadata.update(target, %{level: 20, moving_until: 1_501})
+      second = AIEnvironment.context(mob(world), 1_501, request).perception
+      assert Perception.position(second, target) == {world, 140.0, 0.0, 0.0}
+      refute Perception.moving?(second, target)
+      assert Perception.metadata(second, target).level == 20
+      assert Perception.metadata(first, target).level == 10
+      assert Perception.moving?(first, target)
+    end
+
     test "wild summons observe their summoner's distant opponents" do
       world = WorldRef.instance(999, Unique.integer())
       parent = Guid.from_low_guid(:mob, 11_668, Unique.integer())

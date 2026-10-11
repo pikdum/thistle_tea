@@ -46,6 +46,7 @@ defmodule ThistleTea.Bench.PopulationBenchmark do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.Inbound.CmsgAttackswing
   alias ThistleTea.Game.Inbound.CmsgCastSpell
+  alias ThistleTea.Game.Inbound.CmsgCompleteCinematic
   alias ThistleTea.Game.Inbound.CmsgSetActiveMover
   alias ThistleTea.Game.Network.Message.MsgMove
   alias ThistleTea.Game.World.CharacterStore
@@ -69,7 +70,8 @@ defmodule ThistleTea.Bench.PopulationBenchmark do
       duration_ms: integer("DURATION_MS", 5_000),
       interval_ms: integer("INTERVAL_MS", 100),
       warmup_ms: integer("WARMUP_MS", 1_000),
-      pet_percent: integer("PET_PERCENT", 25)
+      pet_percent: integer("PET_PERCENT", 25),
+      message_queue_data: message_queue_data()
     }
 
     scenarios = System.get_env("POPULATION_BENCH_SCENARIOS", "idle,movement,combat,stealth") |> String.split(",")
@@ -101,6 +103,13 @@ defmodule ThistleTea.Bench.PopulationBenchmark do
     population = prepare(name, config)
 
     try do
+      Enum.each(population.pids, fn pid ->
+        :sys.replace_state(pid, fn state ->
+          Process.flag(:message_queue_data, config.message_queue_data)
+          state
+        end)
+      end)
+
       drive(population, name, config, config.warmup_ms)
       initial_owners = Runtime.owners(population.pids)
       initial_timers = timers(population)
@@ -208,6 +217,7 @@ defmodule ThistleTea.Bench.PopulationBenchmark do
     {:ok, connection} = Connection.start_link()
     {:ok, pid} = PlayerServer.start_link({account, connection, character.id})
     :ok = PlayerServer.handle_message(pid, %CmsgSetActiveMover{guid: character.id})
+    :ok = PlayerServer.handle_message(pid, %CmsgCompleteCinematic{})
     world = world(index, config)
 
     :sys.replace_state(pid, fn state ->
@@ -328,6 +338,14 @@ defmodule ThistleTea.Bench.PopulationBenchmark do
 
   defp integer(name, default),
     do: System.get_env("POPULATION_BENCH_#{name}", Integer.to_string(default)) |> String.to_integer()
+
+  defp message_queue_data do
+    case System.get_env("POPULATION_BENCH_MESSAGE_QUEUE_DATA", "on_heap") do
+      "on_heap" -> :on_heap
+      "off_heap" -> :off_heap
+      _ -> raise("POPULATION_BENCH_MESSAGE_QUEUE_DATA must be on_heap or off_heap")
+    end
+  end
 
   defp git_commit, do: System.cmd("git", ["rev-parse", "HEAD"]) |> elem(0) |> String.trim()
 

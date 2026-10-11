@@ -575,19 +575,19 @@ defmodule ThistleTea.Game.World.Entity.AIEnvironment do
   defp instance_data(_entity, _requirements, _options), do: nil
 
   defp observe(entity, guid, now) do
-    position = World.position(guid, now)
     metadata = Metadata.get(guid)
+    {position, grounded_position, moving?} = World.position_snapshot(guid, metadata, now)
     owner = Reaction.owner_projection(guid, metadata)
 
     %Observation{
       guid: guid,
       position: position,
-      grounded_position: World.grounded_target_position(guid, now),
+      grounded_position: grounded_position,
       distance: distance(origin(entity), position),
       metadata: metadata,
       controller_level: controller_level(metadata, owner),
       owner: owner,
-      moving?: World.moving?(guid, now)
+      moving?: moving?
     }
   end
 

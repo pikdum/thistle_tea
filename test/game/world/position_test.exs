@@ -11,10 +11,90 @@ defmodule ThistleTea.Game.World.PositionTest do
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity.EventSink
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.Position.ClientMotion
   alias ThistleTea.Game.World.Position.Spline
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Test.Unique
+
+  describe "snapshot/2" do
+    test "retains legacy spline records" do
+      guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      entity = mob(guid)
+      world = WorldRef.open(0)
+      on_exit(fn -> World.remove_position(entity) end)
+      World.update_position(entity)
+      :ets.insert(:entity_movement, {guid, {world, {0.0, 0.0, 0.0}, [{10.0, 0.0, 0.0}], 1_000, 1_000}})
+
+      assert Position.snapshot(guid, 1_500) == {{world, 5.0, 0.0, 0.0}, true}
+      assert Position.snapshot(guid, 2_001) == {{world, 10.0, 0.0, 0.0}, false}
+    end
+
+    test "captures spline motion through arrival and removal" do
+      guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      moving = mob(guid)
+      world = WorldRef.open(0)
+      on_exit(fn -> World.remove_position(moving) end)
+      World.update_position(moving)
+
+      assert Position.snapshot(guid, 1_500) == {{world, 5.0, 0.0, 0.0}, true}
+      assert Position.snapshot(guid, 2_000) == {{world, 10.0, 0.0, 0.0}, true}
+      assert Position.snapshot(guid, 2_001) == {{world, 10.0, 0.0, 0.0}, false}
+
+      World.update_position(stop_at(moving, {10.0, 0.0, 0.0, 0.0}))
+      assert Position.snapshot(guid, 2_001) == {{world, 10.0, 0.0, 0.0}, false}
+      World.remove_position(moving)
+      assert Position.snapshot(guid, 2_001) == {nil, false}
+    end
+
+    test "captures bounded client motion at its expiry" do
+      guid = Guid.from_low_guid(:player, unique_guid())
+      character = struct(Character, Map.from_struct(stop_at(mob(guid), {0.0, 0.0, 0.0, 0.0})))
+      projection = Position.client_motion(character, {10.0, 0.0, 0.0}, 1_000, 500)
+      on_exit(fn -> World.remove_position(character) end)
+      Position.put(character, :players, projection)
+
+      assert Position.snapshot(guid, 1_250) == {{WorldRef.open(0), 2.5, 0.0, 0.0}, true}
+      assert Position.snapshot(guid, 1_500) == {{WorldRef.open(0), 5.0, 0.0, 0.0}, true}
+      assert Position.snapshot(guid, 1_501) == {{WorldRef.open(0), 5.0, 0.0, 0.0}, false}
+    end
+  end
+
+  describe "World.position_snapshot/3" do
+    @tag :namigator_maps
+    test "grounds an airborne observation without changing its projected height" do
+      guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      world = WorldRef.open(451)
+      SpatialHash.insert(:mobs, guid, world, 16_303.2, 16_318.1, 100.0)
+      on_exit(fn -> SpatialHash.remove(:mobs, guid) end)
+
+      assert {{^world, x, y, 100.0}, {^world, x, y, grounded_z}, false} =
+               World.position_snapshot(guid, %{airborne?: true}, 1_000)
+
+      assert grounded_z < 100.0
+
+      assert World.position_snapshot(guid, %{airborne?: false}, 1_000) ==
+               {{world, x, y, 100.0}, {world, x, y, 100.0}, false}
+    end
+
+    test "uses recent movement from the supplied observation" do
+      guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      entity = stop_at(mob(guid), {5.0, 0.0, 0.0, 0.0})
+      World.update_position(entity)
+      Metadata.put(guid, %{moving_until: 9_000})
+
+      on_exit(fn ->
+        World.remove_position(entity)
+        Metadata.delete(guid)
+      end)
+
+      position = {WorldRef.open(0), 5.0, 0.0, 0.0}
+      assert World.position_snapshot(guid, %{moving_until: 1_500}, 1_499) == {position, position, true}
+      assert World.position_snapshot(guid, %{moving_until: 1_500}, 1_500) == {position, position, false}
+      assert World.position_snapshot(guid, nil, 1_000) == {position, position, false}
+    end
+  end
 
   describe "put/2" do
     test "projects a falling corpse with the owner's acceleration and stops at the floor" do
@@ -25,6 +105,7 @@ defmodule ThistleTea.Game.World.PositionTest do
       assert %Spline{falling?: true} = Position.projection(guid)
       assert {_, +0.0, +0.0, z} = World.position(guid, 1_500)
       assert_in_delta z, elem(Movement.sync_position(corpse, 1_500).movement_block.position, 2), 0.00001
+      assert Position.snapshot(guid, 1_500) == {{WorldRef.open(0), 0.0, 0.0, z}, true}
       assert {_, +0.0, +0.0, 10.0} = World.position(guid, 10_000)
       landed = Movement.sync_position(corpse, 10_000)
       World.update_position(landed)
