@@ -32,6 +32,10 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
   and use Serrated Bite in melee. Each reset chooses one of six area debuffs,
   which the hound retains throughout the fight. They never call assistance.
 
+  Lava Surgers surge at their farthest player in line of sight and spell range,
+  provided the player's horizontal surface distance exceeds seven yards.
+  Stun and Banish pause their surge cooldown instead of letting it expire.
+
   vmangos also binds the Firesworn to Garr with Separation Anxiety, has
   Golemagg evade when a rager is dragged a hundred yards from him, and turns
   Geddon to face his Living Bomb's victim, which this port leaves out. Garr
@@ -62,11 +66,13 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
   @firewalker 11_666
   @firelord 11_668
   @lava_spawn 12_265
+  @lava_surger 12_101
 
   @triggered 0x02
   @aura_not_present 0x20
   @only_in_melee 0x40
   @player 0x2
+  @in_los 0x1
   @all_attackers 8
   @unchecked [check_result?: false]
   @lone_script 1
@@ -96,7 +102,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
       @core_hound,
       @ancient_core_hound,
       @firewalker,
-      @firelord
+      @firelord,
+      @lava_surger
     ]
   end
 
@@ -284,6 +291,19 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
         victim_in_melee?: true
       )
       | debuffs
+    ]
+  end
+
+  def events(@lava_surger = entry) do
+    surge = %{
+      Combat.cast(19_196, :hostile_farthest)
+      | target_param1: @player + @in_los,
+        minimum_target_distance_2d: 7.0
+    }
+
+    [
+      CreatureScript.event(entry, 1, :aggro, [clear_spell_list()]),
+      Combat.every(entry, 2, surge, {1_000, 2_000}, {5_000, 6_000}, pause_while_stunned?: true)
     ]
   end
 

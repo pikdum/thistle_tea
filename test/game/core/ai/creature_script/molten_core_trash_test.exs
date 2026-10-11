@@ -12,6 +12,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
   alias ThistleTea.Game.Core.AI.EventAI
   alias ThistleTea.Game.Core.AI.Script
   alias ThistleTea.Game.Core.AI.Script.Run
+  alias ThistleTea.Game.Core.Aura
+  alias ThistleTea.Game.Core.Aura.Holder
   alias ThistleTea.Game.Core.Effects
   alias ThistleTea.Game.Core.Entity.Component.Internal
   alias ThistleTea.Game.Core.Entity.Component.Internal.Creature
@@ -24,6 +26,8 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
   alias ThistleTea.Game.Core.Pet.SummonEvent
   alias ThistleTea.Game.Core.Spell
   alias ThistleTea.Game.Core.Spell.Cast
+  alias ThistleTea.Game.Core.Spell.Casting
+  alias ThistleTea.Game.Core.Spell.Requirements
   alias ThistleTea.Game.Core.Spell.Target
   alias ThistleTea.Game.Core.WorldRef
   alias ThistleTea.Test.Unique
@@ -227,13 +231,59 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
       {mob, _blackboard} = EventAI.tick(clear_effects(mob), blackboard, 10_000, context(mob, 10_000))
       assert Enum.any?(spell_starts(mob), &match?({19_771, ^first}, &1))
     end
+
+    test "Lava Surgers surge at the farthest eligible player and repeat", %{players: [first, second]} do
+      mob = creature(12_101, [first, second])
+      {mob, blackboard} = EventAI.enter_combat(mob, Blackboard.new(), first, 0, context(mob, 0))
+      {early, _blackboard} = EventAI.tick(clear_effects(mob), blackboard, 999, surger_context(mob, 999, second, 20.0))
+      assert spell_starts(early) == []
+      {mob, blackboard} = EventAI.tick(clear_effects(mob), blackboard, 1_000, surger_context(mob, 1_000, second, 20.0))
+      assert spell_starts(mob) == [{19_196, second}]
+      mob = Casting.resolve_requirements(mob, mob.internal.casting, %Requirements{}, 1_000)
+
+      {early, _blackboard} =
+        EventAI.tick(clear_effects(mob), blackboard, 5_999, surger_context(mob, 5_999, second, 20.0))
+
+      assert spell_starts(early) == []
+      {mob, _blackboard} = EventAI.tick(clear_effects(mob), blackboard, 6_000, surger_context(mob, 6_000, second, 20.0))
+      assert spell_starts(mob) == [{19_196, second}]
+    end
+
+    test "Lava Surgers retain a due surge while nobody is far enough away", %{players: [first | _] = players} do
+      mob = creature(12_101, players)
+      {mob, blackboard} = EventAI.enter_combat(mob, Blackboard.new(), first, 0, context(mob, 0))
+      {mob, blackboard} = EventAI.tick(clear_effects(mob), blackboard, 1_000, surger_context(mob, 1_000, first, 7.0))
+      assert spell_starts(mob) == []
+      {mob, _blackboard} = EventAI.tick(clear_effects(mob), blackboard, 2_000, surger_context(mob, 2_000, first, 12.0))
+      assert spell_starts(mob) == [{19_196, first}]
+    end
+
+    test "Lava Surgers preserve surge's remaining cooldown through Banish", %{players: [first | _] = players} do
+      mob = creature(12_101, players)
+      {mob, blackboard} = EventAI.enter_combat(mob, Blackboard.new(), first, 0, context(mob, 0))
+      {mob, blackboard} = EventAI.tick(clear_effects(mob), blackboard, 1_000, surger_context(mob, 1_000, first, 12.0))
+      assert spell_starts(mob) == [{19_196, first}]
+      mob = Casting.resolve_requirements(mob, mob.internal.casting, %Requirements{}, 1_000)
+      mob = %{mob | unit: %{mob.unit | auras: [%Holder{auras: [%Aura{type: :mod_stun}]}]}}
+      {mob, blackboard} = EventAI.tick(clear_effects(mob), blackboard, 11_000, surger_context(mob, 11_000, first, 12.0))
+      assert spell_starts(mob) == []
+      mob = %{mob | unit: %{mob.unit | auras: []}}
+      {mob, blackboard} = EventAI.tick(clear_effects(mob), blackboard, 15_000, surger_context(mob, 15_000, first, 12.0))
+      assert spell_starts(mob) == []
+
+      {mob, _blackboard} =
+        EventAI.tick(clear_effects(mob), blackboard, 16_000, surger_context(mob, 16_000, first, 12.0))
+
+      assert spell_starts(mob) == [{19_196, first}]
+    end
   end
 
   defp combatants(_context), do: %{players: [Unique.integer(), Unique.integer()]}
 
   defp creature(entry, players) do
-    ids = [19_635, 19_636, 19_637, 19_569, 19_630, 19_771, 19_364, 19_365, 19_366, 19_367, 19_369, 19_372]
+    ids = [19_196, 19_635, 19_636, 19_637, 19_569, 19_630, 19_771, 19_364, 19_365, 19_366, 19_367, 19_369, 19_372]
     spells = Map.new(ids, &{&1, %Spell{id: &1, cast_time_ms: 0, effects: []}})
+    spells = Map.update!(spells, 19_196, &%{&1 | range_yards: 40.0})
 
     %Mob{
       object: %Object{guid: Guid.from_low_guid(:mob, entry, Unique.integer()), entry: entry},
@@ -282,6 +332,18 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTrashTest do
       :continue,
       context(mob, now)
     )
+  end
+
+  defp surger_context(mob, now, player, distance) do
+    context = context(mob, now)
+
+    observation = %{
+      context.perception.entities[player]
+      | position: {mob.internal.world, distance, 0.0, 0.0},
+        distance: distance
+    }
+
+    %{context | perception: %{context.perception | entities: Map.put(context.perception.entities, player, observation)}}
   end
 
   defp clear_effects(mob), do: %{mob | internal: %{mob.internal | events: []}}
