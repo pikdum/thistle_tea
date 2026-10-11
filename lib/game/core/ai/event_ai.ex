@@ -193,16 +193,44 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
   def tick(state, %Blackboard{} = blackboard, now, %Context{} = context) when is_integer(now) do
     events = events(state)
 
-    if events == [] or not Blackboard.ready_for?(blackboard, :next_eventai_at, now) do
+    if events == [] do
       {state, blackboard}
     else
       blackboard =
         blackboard
         |> ensure_init(events, now, context)
-        |> Blackboard.put_next_at(:next_eventai_at, @tick_ms, now)
+        |> advance_timer_clock(state, events, now)
 
-      fire_matching(state, blackboard, events, &AIEvent.timed?/1, nil, now, context)
+      if Blackboard.ready_for?(blackboard, :next_eventai_at, now) do
+        blackboard = Blackboard.put_next_at(blackboard, :next_eventai_at, @tick_ms, now)
+        fire_matching(state, blackboard, events, &AIEvent.timed?/1, nil, now, context)
+      else
+        {state, blackboard}
+      end
     end
+  end
+
+  defp advance_timer_clock(%Blackboard{event_ai: event_ai} = blackboard, state, events, now) do
+    elapsed = max(now - (event_ai.last_timer_update_at || now), 0)
+
+    timers =
+      if AuraCore.has_aura?(state, :mod_stun) do
+        shift_paused_timers(events, event_ai.timers, elapsed)
+      else
+        event_ai.timers
+      end
+
+    %{blackboard | event_ai: %{event_ai | timers: timers, last_timer_update_at: now}}
+  end
+
+  defp shift_paused_timers(events, timers, elapsed) do
+    events
+    |> Enum.with_index()
+    |> Enum.reduce(timers, fn {event, index}, timers ->
+      if event.pause_while_stunned? and is_integer(timers[index]),
+        do: Map.update!(timers, index, &(&1 + elapsed)),
+        else: timers
+    end)
   end
 
   def enter_combat(state, %Blackboard{} = blackboard, enemy_guid, now) when is_integer(now) do
@@ -462,6 +490,7 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
          true <- due?(blackboard, index, now),
          true <- AIEvent.phase_allows?(event, blackboard.event_ai.phase),
          true <- casting_allows?(state, event),
+         true <- control_allows?(state, event),
          true <- victim_allows?(state, event, context),
          true <- event.event_type == :ooc_los or condition_met?(state, event.condition, invoker_guid, context),
          {:ok, invoker_guid} <- satisfy(state, event, invoker_guid, context) do
@@ -872,6 +901,9 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
   defp casting_allows?(state, %AIEvent{not_casting?: true}), do: is_nil(state.internal.casting)
   defp casting_allows?(_state, %AIEvent{}), do: true
 
+  defp control_allows?(state, %AIEvent{pause_while_stunned?: true}), do: not AuraCore.has_aura?(state, :mod_stun)
+  defp control_allows?(_state, %AIEvent{}), do: true
+
   defp victim_allows?(state, %AIEvent{victim_in_melee?: true}, %Context{} = context) do
     target = victim(state)
     Navigation.target_valid_same_map?(state, target, context) and CombatBT.in_melee_range?(state, target, context)
@@ -885,12 +917,12 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
   end
 
   defp ensure_init(%Blackboard{} = blackboard, events, now, %Context{} = context) do
-    event_ai = %{blackboard.event_ai | timers: %{}, disabled: MapSet.new(), pending: %{}}
+    event_ai = %{blackboard.event_ai | timers: %{}, disabled: MapSet.new(), pending: %{}, last_timer_update_at: now}
     reset_ooc(%{blackboard | event_ai: event_ai}, events, now, context)
   end
 
   defp reset_for_combat(%Blackboard{} = blackboard, events, now, %Context{random: random}) do
-    event_ai = %{blackboard.event_ai | timers: %{}, disabled: MapSet.new(), pending: %{}}
+    event_ai = %{blackboard.event_ai | timers: %{}, disabled: MapSet.new(), pending: %{}, last_timer_update_at: now}
     blackboard = %{blackboard | event_ai: event_ai}
 
     events
@@ -908,6 +940,8 @@ defmodule ThistleTea.Game.Core.AI.EventAI do
          random: random
        })
        when is_map(timers) do
+    blackboard = %{blackboard | event_ai: %{blackboard.event_ai | last_timer_update_at: now}}
+
     events
     |> Enum.with_index()
     |> Enum.reduce(blackboard, fn

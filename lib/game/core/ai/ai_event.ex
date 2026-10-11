@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.Core.AI.AIEvent do
   event types keep their numeric id as `{:unsupported, id}`.
   Code-built events can require a victim in melee before consuming their
   cooldown with `victim_in_melee?`, independently of cast-result checking.
+  `pause_while_stunned?` preserves a timed event's remaining cooldown while
+  its owner has a stun aura, as scripted AIs that stop updating under Banish do.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -19,6 +21,7 @@ defmodule ThistleTea.Game.Core.AI.AIEvent do
             not_casting?: false,
             check_result?: false,
             victim_in_melee?: false,
+            pause_while_stunned?: false,
             inverse_phase_mask: 0,
             condition_id: 0,
             condition: nil,
