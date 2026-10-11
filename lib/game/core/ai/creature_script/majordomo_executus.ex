@@ -17,14 +17,15 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MajordomoExecutus do
 
   If the raid wipes, he sends any guard still standing away and calls a
   fresh one. Phases 0 to 7 count the fallen guard; the counting events run
-  highest phase first, so each death moves the count one step. vmangos also
-  binds the guard to him with Separation Anxiety, punishing a guard pulled
-  too far from him, which this port leaves out.
+  highest phase first, so each death moves the count one step. He binds the
+  guard to him with Separation Anxiety, empowering any pulled more than a
+  hundred yards from him.
   """
 
   @behaviour ThistleTea.Game.Core.AI.CreatureScript
 
   alias ThistleTea.Game.Core.AI.CreatureScript
+  alias ThistleTea.Game.Core.AI.CreatureScript.Combat
   alias ThistleTea.Game.Core.AI.ScriptStep
 
   @majordomo 12_018
@@ -93,6 +94,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MajordomoExecutus do
   @add_flags 1
   @remove_flags 2
   @triggered 0x02
+  @aura_not_present 0x20
   @aggro_and_evade_together 0x06
   @no_attack -1
   @dead_despawn 7
@@ -116,7 +118,7 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MajordomoExecutus do
     [
       event(1, :spawned, [talk(@say_runes_destroyed) | call_guard()]),
       hostile(2, :evade, [%ScriptStep{command: :set_phase, datalong: 0} | dismiss_guard() ++ call_guard()]),
-      hostile(3, :aggro, [talk(@say_aggro), cast_self(@aegis, @triggered)]),
+      hostile(3, :aggro, [talk(@say_aggro), cast_self(@aegis, @triggered) | bind_guard()]),
       hostile(4, :kill, [talk(@say_slay)]),
       hostile(5, :hp, [cast_self(@aegis)], param1: 50, param2: 0, param3: 1_000, param4: 1_000),
       hostile(
@@ -148,6 +150,11 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MajordomoExecutus do
   end
 
   def events(_entry), do: []
+
+  defp bind_guard do
+    for entry <- [@elite, @healer],
+        do: Combat.cast_on_creatures(21_094, entry, @guard_radius, @triggered + @aura_not_present)
+  end
 
   defp call_guard do
     for {entry, position} <- @guard do

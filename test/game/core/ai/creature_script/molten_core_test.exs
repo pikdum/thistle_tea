@@ -50,6 +50,10 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCoreTest do
     test "Garr enrages as his Firesworn die and forces one to erupt every twenty seconds after six minutes" do
       events = CreatureScript.events(@garr)
 
+      assert [%{actions: [[_combat, bind]]}] = by_type(events, :aggro)
+      assert %ScriptStep{command: :start_script_for_all, datalong3: @firesworn, target_self?: true} = bind
+      assert [%ScriptStep{datalong: 23_487, datalong2: 0x22, swap_initial?: true}] = only_sub_script(bind)
+
       assert [%{param1: 19_515, actions: [[%ScriptStep{datalong: 19_516, target_self?: true}]]}] =
                by_type(events, :hit_by_spell)
 

@@ -36,8 +36,9 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
   provided the player's horizontal surface distance exceeds seven yards.
   Stun and Banish pause their surge cooldown instead of letting it expire.
 
-  vmangos also binds the Firesworn to Garr with Separation Anxiety, has
-  Golemagg evade when a rager is dragged a hundred yards from him, and turns
+  Garr binds his Firesworn with Separation Anxiety, empowering any pulled
+  more than a hundred yards from him. vmangos also has Golemagg evade when
+  a rager is dragged a hundred yards from him, and turns
   Geddon to face his Living Bomb's victim, which this port leaves out. Garr
   may force a stunned Firesworn to erupt, Geddon keeps meleeing inside his
   Inferno, and Sulfuron inspires any priest rather than one missing the
@@ -139,7 +140,10 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MoltenCore do
 
   def events(@garr = entry) do
     [
-      CreatureScript.event(entry, 1, :aggro, [zone_combat()]),
+      CreatureScript.event(entry, 1, :aggro, [
+        zone_combat(),
+        Combat.cast_on_creatures(23_487, @firesworn, 150, @triggered + @aura_not_present)
+      ]),
       Combat.every(entry, 2, Combat.cast(19_492, :self), 15_000, {15_000, 20_000}),
       Combat.every(entry, 3, Combat.cast(19_496, :self), 10_000, {10_000, 15_000}),
       Combat.every(entry, 4, [erupt_firesworn()], 360_000, 20_000, @unchecked),

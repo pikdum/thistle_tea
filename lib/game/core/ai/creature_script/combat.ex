@@ -18,10 +18,14 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.Combat do
   steps that fails stops the rest of them, and the event fires again on the
   next tick instead of waiting out its repeat. `check_result?: false` opts
   out, for the timers vmangos restarts whether or not the cast lands.
+
+  `cast_on_creatures/4` casts on nearby living creatures of one entry,
+  keeping the boss as the caster when each recipient starts its script.
   """
 
   alias ThistleTea.Game.Core.AI.CreatureScript
   alias ThistleTea.Game.Core.AI.ScriptStep
+  alias ThistleTea.Game.Core.Condition
 
   def every(entry, index, steps, first, repeat, opts \\ []),
     do: timer(entry, index, :timer_in_combat, steps, first, repeat, opts)
@@ -50,6 +54,20 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.Combat do
 
   def cast(spell_id, target, flags) when is_atom(target),
     do: %ScriptStep{command: :cast_spell, datalong: spell_id, datalong2: flags, target_type: target}
+
+  def cast_on_creatures(spell_id, entry, radius, flags) do
+    cast = %{cast(spell_id, :provided, flags) | swap_initial?: true, condition: %Condition{type: :alive}}
+
+    %ScriptStep{
+      command: :start_script_for_all,
+      datalong: 1,
+      datalong2: 2,
+      datalong3: entry,
+      datalong4: radius,
+      target_self?: true,
+      sub_scripts: %{1 => [cast]}
+    }
+  end
 
   def talk(text_id), do: %ScriptStep{command: :talk, dataint: text_id}
 

@@ -45,6 +45,18 @@ defmodule ThistleTea.Game.Core.AI.CreatureScript.MajordomoExecutusTest do
       end
     end
 
+    test "he binds both kinds of guard with Separation Anxiety on aggro" do
+      %{actions: [[_talk, _aegis | bindings]]} =
+        Enum.find(CreatureScript.events(@majordomo), &(&1.event_type == :aggro))
+
+      assert Enum.map(bindings, & &1.datalong3) == [@elite, @healer]
+
+      for binding <- bindings do
+        assert %ScriptStep{command: :start_script_for_all, datalong4: 150, target_self?: true} = binding
+        assert [%ScriptStep{datalong: 21_094, datalong2: 0x22, swap_initial?: true}] = binding.sub_scripts[1]
+      end
+    end
+
     test "each fallen guard moves the count on by one", %{majordomo: majordomo, player: player} do
       context = context(majordomo, player)
 
