@@ -115,39 +115,36 @@ defmodule ThistleTea.Game.Core.Guid do
 
   def transport?(_guid), do: false
 
-  def pack(guid) when is_integer(guid), do: pack(<<guid::size(64)>>)
+  def pack(guid) when is_integer(guid), do: pack_bytes(<<guid::64>>)
+  def pack(<<_::64>> = guid), do: pack_bytes(guid)
 
-  def pack(guid) when is_binary(guid) do
-    {mask, data} =
-      guid
-      |> :binary.bin_to_list()
-      |> Enum.with_index()
-      |> Enum.reduce({0, []}, fn {byte, index}, {mask, data} ->
-        if byte == 0 do
-          {mask, data}
-        else
-          {mask ||| 1 <<< (byte_size(guid) - 1 - index), data ++ [byte]}
-        end
-      end)
-
-    mask_size = byte_size(guid)
-
-    <<mask::size(mask_size)>> <> Binary.reverse(:erlang.list_to_binary(data))
+  defp pack_bytes(<<b7, b6, b5, b4, b3, b2, b1, b0>>) do
+    <<present(b7)::1, present(b6)::1, present(b5)::1, present(b4)::1, present(b3)::1, present(b2)::1, present(b1)::1,
+      present(b0)::1, packed(b0)::binary, packed(b1)::binary, packed(b2)::binary, packed(b3)::binary,
+      packed(b4)::binary, packed(b5)::binary, packed(b6)::binary, packed(b7)::binary>>
   end
 
-  def unpack(<<mask::8, rest::binary>>) do
-    {guid, remaining_data} =
-      Enum.reduce(0..7, {0, rest}, fn i, {guid_acc, data} ->
-        if (mask &&& 1 <<< i) == 0 do
-          {guid_acc, data}
-        else
-          <<byte::8, remaining::binary>> = data
-          {guid_acc ||| byte <<< (i * 8), remaining}
-        end
-      end)
-
-    {:binary.decode_unsigned(<<guid::64>>), remaining_data}
+  def unpack(<<m7::1, m6::1, m5::1, m4::1, m3::1, m2::1, m1::1, m0::1, rest::binary>>) do
+    {b0, rest} = take_byte(m0, rest)
+    {b1, rest} = take_byte(m1, rest)
+    {b2, rest} = take_byte(m2, rest)
+    {b3, rest} = take_byte(m3, rest)
+    {b4, rest} = take_byte(m4, rest)
+    {b5, rest} = take_byte(m5, rest)
+    {b6, rest} = take_byte(m6, rest)
+    {b7, rest} = take_byte(m7, rest)
+    <<guid::64>> = <<b7, b6, b5, b4, b3, b2, b1, b0>>
+    {guid, rest}
   end
+
+  defp present(0), do: 0
+  defp present(_byte), do: 1
+
+  defp packed(0), do: <<>>
+  defp packed(byte), do: <<byte>>
+
+  defp take_byte(0, rest), do: {0, rest}
+  defp take_byte(1, <<byte, rest::binary>>), do: {byte, rest}
 
   defp type_id_from_high(@high_guid_item), do: :item
   defp type_id_from_high(@high_guid_unit), do: :unit

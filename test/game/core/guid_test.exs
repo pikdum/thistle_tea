@@ -54,6 +54,21 @@ defmodule ThistleTea.Game.Core.GuidTest do
     end
   end
 
+  describe "pack/1" do
+    test "writes the presence mask then non-zero bytes least significant first" do
+      assert Guid.pack(0xF130_0000_0000_0042) == <<0xC1, 0x42, 0x30, 0xF1>>
+      assert Guid.pack(<<0xF1, 0x30, 0, 0, 0, 0, 0, 0x42>>) == <<0xC1, 0x42, 0x30, 0xF1>>
+      assert Guid.pack(0) == <<0>>
+    end
+  end
+
+  describe "unpack/1" do
+    test "reads the presence mask and returns the remaining bytes" do
+      assert Guid.unpack(<<0xC1, 0x42, 0x30, 0xF1, 0xAA>>) == {0xF130_0000_0000_0042, <<0xAA>>}
+      assert Guid.unpack(<<0, 0xAA>>) == {0, <<0xAA>>}
+    end
+  end
+
   describe "transport?/1" do
     test "recognizes animated and map-object transport guids" do
       animated = Guid.from_low_guid(:transport, 176_080, 18_802)
