@@ -18,10 +18,12 @@ defmodule ThistleTea.Game.World.Spell.CreatureSpellInRangeTest do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Entity
   alias ThistleTea.Game.World.Entity.EffectResolver
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Loader.SpellChain
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Test.Unique
 
-  setup [:caster]
+  setup [:triggering_spell_misses, :caster]
 
   describe "resolve/2" do
     test "uses a strict horizontal surface radius", ctx do
@@ -71,6 +73,20 @@ defmodule ThistleTea.Game.World.Spell.CreatureSpellInRangeTest do
         assert WeaponDamage.flat_bonus(expired, :physical, nil) == 0
       end
     end
+  end
+
+  defp triggering_spell_misses(_context) do
+    for {table, key} <- [{SpellLoader, {:spell, 20_556}}, {SpellChain, {:chain, 20_556}}] do
+      previous = :ets.lookup(table, key)
+      :ets.insert(table, {key, nil})
+
+      on_exit(fn ->
+        :ets.delete(table, key)
+        :ets.insert(table, previous)
+      end)
+    end
+
+    :ok
   end
 
   defp caster(_context) do
