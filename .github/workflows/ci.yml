@@ -57,13 +57,18 @@ jobs:
           build: "false"
           test: "false"
           use-github-cache: "false"
-      - name: install tailwind (retried, GitHub release downloads flake)
+      - name: install tailwind (curl, since httpc rejects the release CDN's oversized headers on runners)
         run: |
-          for attempt in 1 2 3; do
-            mix tailwind.install && exit 0
-            sleep 10
-          done
-          exit 1
+          read -r bin url < <(mix run --no-compile --no-start -e '
+            version = Tailwind.configured_version()
+            bin = Tailwind.bin_path()
+            target = bin |> Path.basename() |> String.replace_prefix("tailwind-", "") |> String.replace_suffix("-" <> version, "")
+            url = Tailwind.default_base_url() |> String.replace("$version", version) |> String.replace("$target", target)
+            IO.puts("#{bin} #{url}")
+          ' | tail -1)
+          mkdir -p "$(dirname "$bin")"
+          curl -fsSL --retry 3 -o "$bin" "$url"
+          chmod +x "$bin"
       - run: npm ci
         working-directory: assets
       - name: fetch namigator (C++ NIF source, pinned by flake.lock)
