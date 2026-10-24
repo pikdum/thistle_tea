@@ -16,6 +16,7 @@
   packages = [
     pkgs.git
     pkgs.bun
+    pkgs.elan
     pkgs.inotify-tools
     pkgs.just
     pkgs.rsync

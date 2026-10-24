@@ -47,6 +47,16 @@ jobs:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
       - run: mix deps.get
+      - name: check lean-toolchain matches the Lynx dependency
+        run: cmp lean-toolchain deps/lynx/lean-toolchain
+      - name: install Lean (Lynx laws, toolchain pinned by lean-toolchain)
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: deps/lynx/Lean
+          auto-config: "false"
+          build: "false"
+          test: "false"
+          use-github-cache: "false"
       - name: install tailwind (retried, GitHub release downloads flake)
         run: |
           for attempt in 1 2 3; do
