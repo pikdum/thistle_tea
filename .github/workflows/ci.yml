@@ -57,6 +57,7 @@ jobs:
           build: "false"
           test: "false"
           use-github-cache: "false"
+      - run: mix deps.compile
       - name: install tailwind (curl, since httpc rejects the release CDN's oversized headers on runners)
         run: |
           read -r bin url < <(mix run --no-compile --no-start -e '
