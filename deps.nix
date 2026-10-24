@@ -306,7 +306,7 @@ let
 
       decimal =
         let
-          version = "3.1.1";
+          version = "3.2.0";
           drv = buildMix {
             inherit version;
             name = "decimal";
@@ -315,7 +315,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "decimal";
-              sha256 = "c5f25f2ced74a0587d03e6023f595db8e924c9d3922c8c8ffd9edfc4498cf1f6";
+              sha256 = "190bca80580ce61aa69bb0eacadd7677710205c770225c2c2c07e32a5c31b234";
             };
           };
         in
@@ -370,7 +370,7 @@ let
 
       ecto_sqlite3 =
         let
-          version = "0.25.0";
+          version = "0.26.0";
           drv = buildMix {
             inherit version;
             name = "ecto_sqlite3";
@@ -379,7 +379,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "ecto_sqlite3";
-              sha256 = "7da65c7af38dccf228320db32f93ae49650b0afdd850a09fd2fb191554b3faf5";
+              sha256 = "e04d69e185f27a604dd116144a1bad36595666546d753e9341a3f3736ee64772";
             };
 
             beamDeps = [
@@ -432,7 +432,7 @@ let
 
       exqlite =
         let
-          version = "0.41.0";
+          version = "0.43.0";
           drv = buildMix {
             inherit version;
             name = "exqlite";
@@ -441,7 +441,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "exqlite";
-              sha256 = "a7e9b6bed529ab72aa07ed2a925ac109c27e6877a7a8af252361c396a4192855";
+              sha256 = "aa9996f5f582b01f641076632a03bfe139655606b2ba2c86bf528656adf22a5a";
             };
 
             beamDeps = [
