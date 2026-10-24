@@ -40,7 +40,8 @@ defmodule ThistleTea.Game.Network.Connection.Crypto do
 
   defp decrypt_bytes(<<byte, rest::binary>>, session_key, key_size, recv_i, recv_j, acc) do
     key_index = rem(recv_i, key_size)
-    x = Bitwise.bxor(byte - recv_j, :binary.at(session_key, key_index))
+    <<_::binary-size(^key_index), key_byte, _::binary>> = session_key
+    x = Bitwise.bxor(byte - recv_j, key_byte)
     <<truncated_x>> = <<x::little-size(8)>>
     decrypt_bytes(rest, session_key, key_size, key_index + 1, byte, <<acc::binary, truncated_x>>)
   end
@@ -51,7 +52,8 @@ defmodule ThistleTea.Game.Network.Connection.Crypto do
 
   defp encrypt_bytes(<<byte, rest::binary>>, session_key, key_size, send_i, send_j, acc) do
     key_index = rem(send_i, key_size)
-    x = Bitwise.bxor(byte, :binary.at(session_key, key_index)) + send_j
+    <<_::binary-size(^key_index), key_byte, _::binary>> = session_key
+    x = Bitwise.bxor(byte, key_byte) + send_j
     <<truncated_x>> = <<x::little-size(8)>>
     encrypt_bytes(rest, session_key, key_size, key_index + 1, truncated_x, <<acc::binary, truncated_x>>)
   end
