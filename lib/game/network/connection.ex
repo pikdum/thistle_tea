@@ -11,14 +11,16 @@ defmodule ThistleTea.Game.Network.Connection do
   @derive {Inspect, except: [:session_key, :binary_stream, :packet_queue]}
   defstruct [
     :session_key,
+    :seed,
     binary_stream: <<>>,
     packet_queue: [],
     send_i: 0,
     send_j: 0,
     recv_i: 0,
-    recv_j: 0,
-    seed: :crypto.strong_rand_bytes(4)
+    recv_j: 0
   ]
+
+  def new, do: %__MODULE__{seed: :crypto.strong_rand_bytes(4)}
 
   def receive_data(%__MODULE__{} = conn, data) do
     %{conn | binary_stream: conn.binary_stream <> data}

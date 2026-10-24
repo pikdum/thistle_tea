@@ -95,7 +95,7 @@ defmodule ThistleTea.Game.Network.Server do
 
   @impl ThousandIsland.Handler
   def handle_connection(socket, %{session: session}) do
-    conn = %Connection{}
+    conn = Connection.new()
 
     Socket.send(
       socket,

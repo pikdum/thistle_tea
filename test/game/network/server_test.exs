@@ -33,6 +33,20 @@ defmodule ThistleTea.Game.Network.ServerTest do
       assert_receive {:socket_send, challenge}
       assert byte_size(challenge) == 8
     end
+
+    test "draws a fresh authentication seed for every connection" do
+      socket = test_socket()
+
+      assert {:continue, %ConnectionState{conn: %Connection{seed: first}}} =
+               Server.handle_connection(socket, %{session: Session})
+
+      assert {:continue, %ConnectionState{conn: %Connection{seed: second}}} =
+               Server.handle_connection(socket, %{session: Session})
+
+      assert_receive {:socket_send, <<_header::bytes-size(4), ^first::bytes-size(4)>>}
+      assert_receive {:socket_send, <<_header::bytes-size(4), ^second::bytes-size(4)>>}
+      refute first == second
+    end
   end
 
   describe "handle_cast/2" do
