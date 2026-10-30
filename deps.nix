@@ -247,7 +247,7 @@ let
 
       boundary =
         let
-          version = "0.11.0";
+          version = "0.12.0";
           drv = buildMix {
             inherit version;
             name = "boundary";
@@ -256,7 +256,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "boundary";
-              sha256 = "b9297a96ea14c0e63dbd77b8135e0d483f9c6f34ed1c9dee4b3fea82c596f55a";
+              sha256 = "72e60fb369b3c2429e8ddcbd7ececd315bc2e0a0416e11c22679824523c283ba";
             };
           };
         in
@@ -717,7 +717,7 @@ let
 
       tailwind =
         let
-          version = "0.5.1";
+          version = "0.5.2";
           drv = buildMix {
             inherit version;
             name = "tailwind";
@@ -726,7 +726,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "tailwind";
-              sha256 = "c4e26302a59fec72abc5610ecb6ad2116d9aa31f31aab2d4b8eb6e95d25a689c";
+              sha256 = "e0e5fd9799fb9231b97e52ce074d9ff509043d1946713a71fbc608e81eff7e66";
             };
           };
         in
