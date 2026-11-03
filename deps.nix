@@ -455,7 +455,7 @@ let
 
       fine =
         let
-          version = "0.1.6";
+          version = "0.2.0";
           drv = buildMix {
             inherit version;
             name = "fine";
@@ -464,7 +464,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "fine";
-              sha256 = "5638eb4495488e885ebec167fa57973e5c35e1a50c344eb7666c90ec1c4e3b12";
+              sha256 = "6f69a9e8dadbfd017b27f611b000362870683ae65f28aec904f36ec4c5058db5";
             };
           };
         in
@@ -717,7 +717,7 @@ let
 
       tailwind =
         let
-          version = "0.5.1";
+          version = "0.5.2";
           drv = buildMix {
             inherit version;
             name = "tailwind";
@@ -726,7 +726,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "tailwind";
-              sha256 = "c4e26302a59fec72abc5610ecb6ad2116d9aa31f31aab2d4b8eb6e95d25a689c";
+              sha256 = "e0e5fd9799fb9231b97e52ce074d9ff509043d1946713a71fbc608e81eff7e66";
             };
           };
         in

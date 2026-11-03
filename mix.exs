@@ -45,7 +45,7 @@ defmodule ThistleTea.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:quokka, "~> 2.11", only: [:dev, :test], runtime: false},
       {:elixir_make, "~> 0.10", runtime: false},
-      {:fine, "~> 0.1.0", runtime: false},
+      {:fine, "~> 0.2.0", runtime: false},
       {:telemetry, "~> 1.0"},
       {:bitmap, "~> 1.0"},
       {:phoenix, "~> 1.8"},
