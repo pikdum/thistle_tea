@@ -22,7 +22,6 @@ defmodule ThistleTea.Game.Network.Connection.CryptoLawsTest do
     module
     public import Lynx
     public import Lynx.Modules.Erlang.erlang
-    import all Lynx.Term.Compare
 
     @[expose] public section
 
@@ -118,8 +117,7 @@ defmodule ThistleTea.Game.Network.Connection.CryptoLawsTest do
 
     theorem rem_nat (i n : Nat) (hn : n ≠ 0) :
         Erlang.erlang.«rem/2» (.integer i) (.integer n) = .ok (.integer (i % n : Nat)) := by
-      simp only [Erlang.erlang.«rem/2»]
-      rw [if_neg (by omega)]
+      rw [Erlang.erlang.«rem/2_integers» _ _ (by omega)]
       rfl
 
     theorem ixor_nat (a b : Nat) : ixor a b = ((a ^^^ b : Nat) : Int) := rfl
@@ -195,35 +193,28 @@ defmodule ThistleTea.Game.Network.Connection.CryptoLawsTest do
       | [], _, _ => rfl
       | _ :: l, i, _ => by simp [encL, enc_length K l]
 
-    theorem is_binary_bitstring (b : ByteArray) (l : Fin 8) (v : Valid b l) :
-        Erlang.erlang.«is_binary/1» (.bitstring b l v) = .ok (if l = 0 then Term.true else Term.false) := by
-      by_cases h : l = 0
-      · subst h; rfl
-      · simp only [Erlang.erlang.«is_binary/1», h, if_false]
-        split
-        · rename_i heq; cases heq; contradiction
-        · rfl
+    theorem binary_bytes {value : Term} (binary : Erlang.erlang.«is_binary/1» value = .ok Term.true) :
+        ∃ bytes, value = bs bytes := by
+      cases value <;> simp [Erlang.erlang.«is_binary/1»] at binary
+      rename_i bytes last valid
+      split at binary
+      · rename_i same; cases same
+        exact ⟨bytes.data.toList, rfl⟩
+      · simp at binary
 
-    theorem aligned_bs (b : ByteArray) (v : Valid b 0) : Term.bitstring b 0 v = bs b.data.toList := by
-      rcases b with ⟨⟨l⟩⟩; rfl
-
-    theorem bs_compare_atom (l : List UInt8) (a : String) : Term.compare (bs l) (.atom a) = .gt := by
-      rw [Term.compare_eq_step]; rfl
+    theorem integer_value {value : Term} (integer : Erlang.erlang.«is_integer/1» value = .ok Term.true) :
+        ∃ n, value = .integer n := by
+      cases value <;> simp [Erlang.erlang.«is_integer/1»] at integer
+      exact ⟨_, rfl⟩
 
     theorem empty_bs (p) : Term.bitstring ⟨#[]⟩ 0 p = bs [] := rfl
 
     theorem eq_nil (l : List UInt8) : Erlang.erlang.«==/2» (bs l) (.atom "nil") = .ok Term.false := by
-      simp [Erlang.erlang.«==/2», bs_compare_atom]
+      simp [Erlang.erlang.«==/2», bs]
 
     theorem matchBinary_fixed (h r : List UInt8) (n : Int) (hn : (h.length : Int) = n) :
         matchBinary (bs (h ++ r)) (.integer n) 8 = some (bs h, bs r) := by
       subst hn; exact matchBinary_bs h r
-
-    theorem is_binary_bs (l : List UInt8) : Erlang.erlang.«is_binary/1» (bs l) = .ok Term.true := rfl
-
-    theorem gt_integers (a b : Int) :
-        Erlang.erlang.«>/2» (.integer a) (.integer b) = .ok (if b < a then Term.true else Term.false) := by
-      simp [Erlang.erlang.«>/2», Ordering.isGT_iff_eq_gt, Int.compare_eq_gt]
 
     theorem byte_size_bs (l : List UInt8) : Erlang.erlang.«byte_size/1» (bs l) = .ok (.integer l.length) := by
       simp [Erlang.erlang.«byte_size/1», ByteArray.size]
@@ -254,9 +245,6 @@ defmodule ThistleTea.Game.Network.Connection.CryptoLawsTest do
         ∃ v, matchInteger (bs [a, b, c, d]) (.integer 32) 1 false little = some (v, bs []) :=
       matchInteger_split [a, b, c, d] [] little
 
-    set_option hygiene false in
-    macro "refute_requires" : tactic => `(tactic| (simp [Erlang.erlang.«is_binary/1», Erlang.erlang.«is_integer/1», Erlang.erlang.«==/2», CipherWork.byte_size_bs, CipherWork.gt_integers, *] at requires; done))
-
     end CipherWork
     """
 
@@ -268,37 +256,14 @@ defmodule ThistleTea.Game.Network.Connection.CryptoLawsTest do
       expects: roundtrips?(key, header, i, j, body),
       proof: ~LEAN"""
       open Lynx Lynx.Term.Bitstring CipherWork in
-        simp only [«header_roundtrip:requires/5»] at requires
-        cases key <;> try refute_requires
-        rename_i keyBytes kl kv
-        by_cases hkl : kl = 0
-        case neg => rw [is_binary_bitstring] at requires; refute_requires
-        subst hkl; rw [aligned_bs] at requires ⊢; generalize keyBytes.data.toList = K at requires ⊢
-        by_cases hK : 0 < K.length
-        case neg => refute_requires
-        cases header <;> try refute_requires
-        rename_i hb hl hv
-        by_cases hhl : hl = 0
-        case neg => rw [is_binary_bitstring] at requires; refute_requires
-        subst hhl; rw [aligned_bs] at requires ⊢; generalize hb.data.toList = H at requires ⊢
-        by_cases hH : (H.length : Int) = 6
-        case neg => refute_requires
-        cases i <;> try refute_requires
-        rename_i i
-        by_cases hi : 0 ≤ i
-        case neg => refute_requires
-        cases j <;> try refute_requires
-        rename_i j
-        by_cases hj0 : 0 ≤ j
-        case neg => refute_requires
-        by_cases hj1 : j < 256
-        case neg => refute_requires
-        cases body <;> try refute_requires
-        rename_i bb bl bv
-        by_cases hbl : bl = 0
-        case neg => rw [is_binary_bitstring] at requires; refute_requires
-        subst hbl; rw [aligned_bs] at requires ⊢; generalize bb.data.toList = B at requires ⊢
-        simp [Erlang.erlang.«is_binary/1», Erlang.erlang.«is_integer/1», Erlang.erlang.«==/2», byte_size_bs, gt_integers, *] at requires
+        simp only [«header_roundtrip:requires/5», Term.true, Lynx.Except.andAlso_eq_true, and_assoc] at requires
+        obtain ⟨key_bin, hK, header_bin, hH, i_int, hi, j_int, hj0, hj1, body_bin, requires⟩ := requires
+        obtain ⟨K, rfl⟩ := binary_bytes key_bin
+        obtain ⟨H, rfl⟩ := binary_bytes header_bin
+        obtain ⟨B, rfl⟩ := binary_bytes body_bin
+        obtain ⟨i, rfl⟩ := integer_value i_int
+        obtain ⟨j, rfl⟩ := integer_value j_int
+        simp [byte_size_bs] at hK hH hi hj0 hj1
         have h6 : H.length = 6 := by omega
         obtain ⟨h0, h1, h2, h3, h4, h5, rfl⟩ : ∃ a b c d e f, H = [a, b, c, d, e, f] := by
           rcases H with _ | ⟨a, _ | ⟨b, _ | ⟨c, _ | ⟨d, _ | ⟨e, _ | ⟨f, _ | ⟨g, t⟩⟩⟩⟩⟩⟩⟩ <;> simp at h6
@@ -310,7 +275,7 @@ defmodule ThistleTea.Game.Network.Connection.CryptoLawsTest do
           by_cases c : ((h0.toNat * 256 + h1.toNat : Nat) : Int) ≤ B.length + 4
           · exact c
           · simp at requires; omega
-        have hk0 : K.length ≠ 0 := by omega
+        have hk0 : K.length ≠ 0 := by simpa using hK
         have enc_eq : ∀ (l acc : List UInt8) (i : Nat) (j : Int),
             Crypto.«encrypt_bytes/6» (bs l) (bs K) (.integer K.length) (.integer i) (.integer j) (bs acc) =
               .ok (.tuple #[bs (acc ++ (encL K l i j).1), .integer (encL K l i j).2.1, .integer (encL K l i j).2.2]) := by
@@ -355,17 +320,17 @@ defmodule ThistleTea.Game.Network.Connection.CryptoLawsTest do
             rw [ih]
             simp [decL, kb]
         obtain ⟨i, rfl⟩ := Int.eq_ofNat_of_zero_le hi
-        simp only [«header_roundtrip:ensures/5», «roundtrips?/5», Lynx.Except.ok_bind, Crypto.«encrypt_header/2»,
-          Term.getMapKeys, byte_size_bs, enc_eq, Erlang.maps.«update/3»]
-        simp [Term.getMapKeys]
+        simp only [«header_roundtrip:ensures/5», «roundtrips?/5», Crypto.«encrypt_header/2», Term.getMapKeys,
+          Erlang.maps.«update/3»]
+        simp
         rw [byte_size_bs, Lynx.Except.ok_bind, empty_bs, enc_eq]
         simp only [Lynx.Except.ok_bind, List.nil_append, Erlang.erlang.«is_map/1», Lynx.Except.tryWith_ok]
         have rt := model_roundtrip K [h0, h1, h2, h3, h4, h5] i j hj0 hj1
         have hlen := enc_length K [h0, h1, h2, h3, h4, h5] i j
         generalize encL K [h0, h1, h2, h3, h4, h5] i j = E at rt hlen ⊢
         obtain ⟨E, si, sj⟩ := E
-        simp only [List.nil_append] at rt hlen ⊢
-        simp only [Lynx.Except.ok_bind, binarySegment_bs, append_bs, Except.bind]
+        simp only at rt hlen ⊢
+        simp only [binarySegment_bs, Except.bind]
         unfold Crypto.«decrypt_header/1»
         simp [Term.getMapKeys]
         rw [binarySegment_bs]
@@ -380,7 +345,7 @@ defmodule ThistleTea.Game.Network.Connection.CryptoLawsTest do
         simp
         rw [byte_size_bs, Lynx.Except.ok_bind, match16]
         simp only [extract_some, hopc, matchEnd_nil]
-        simp [Erlang.erlang.«is_map/1», Erlang.maps.«update/3», Term.getMapKeys]
+        simp [Erlang.erlang.«is_map/1», Erlang.maps.«update/3»]
         have nlt : ¬ ((B.length : Int) < h0.toNat * 256 + h1.toNat - 4) := by omega
         simp [nlt, Erlang.erlang.«==/2»]
       """

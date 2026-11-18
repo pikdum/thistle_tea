@@ -168,20 +168,13 @@ defmodule ThistleTea.Game.Core.GuidLawsTest do
             match_bit _ (mbit_lt _), extract_some, tail8, len_mod_append, pk_aligned, hS,
             take_byte_eq _ (byte_lt _ _), seg8, append_bits, match64 g hg, matchEnd_bits]
           rfl
-        cases guid <;> simp [«pack_roundtrip:requires/2», Erlang.erlang.«is_integer/1»] at requires
-        rename_i z
-        have h0 : 0 ≤ z := by
-          by_cases h : 0 ≤ z
-          · exact h
-          · simp [h] at requires
-        have h1 : z ≤ 18446744073709551615 := by
-          by_cases h : z ≤ 18446744073709551615
-          · exact h
-          · simp [h0, h] at requires
-        simp only [h0, h1, if_true] at requires
-        cases suffix <;> simp [Erlang.erlang.«is_binary/1»] at requires
+        simp only [«pack_roundtrip:requires/2», Lynx.Term.true, Lynx.Except.andAlso_eq_true, and_assoc] at requires
+        obtain ⟨integer, h0, h1, binary⟩ := requires
+        cases guid <;> simp [Erlang.erlang.«is_integer/1»] at integer
+        simp at h0 h1
+        cases suffix <;> simp [Erlang.erlang.«is_binary/1»] at binary
         rename_i bytes last valid
-        split at requires
+        split at binary
         · rename_i same
           cases same
           obtain ⟨g, rfl⟩ := Int.eq_ofNat_of_zero_le h0
@@ -193,7 +186,7 @@ defmodule ThistleTea.Game.Core.GuidLawsTest do
           simp only [«pack_roundtrip:ensures/2», Lynx.Except.ok_bind, pack_eq, Except.bind,
             bin8 _ (packed_aligned g), bin8 _ hS, append_bits, unpack_eq g hg _ hS]
           simp [Erlang.erlang.«=:=/2»]
-        · simp at requires
+        · simp at binary
       """
   end
 end

@@ -36,7 +36,7 @@ defmodule ThistleTea.MixProject do
       {:deps_nix, "~> 3.0", only: :dev, runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:lynx,
-       git: "https://github.com/josevalim/lynx.git", ref: "f1ca396e7263a53505010a112d662de5bf97e7d6", only: :test},
+       git: "https://github.com/josevalim/lynx.git", ref: "99a6db764c154207cf3b28c35409d9b56c463357", only: :test},
       {:binary, "~> 0.0.5"},
       {:boundary, "~> 0.10", runtime: false},
       {:ecto_sqlite3, "~> 0.25"},
