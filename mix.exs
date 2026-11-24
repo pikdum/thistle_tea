@@ -38,7 +38,7 @@ defmodule ThistleTea.MixProject do
       {:lynx,
        git: "https://github.com/josevalim/lynx.git", ref: "49928b1f94687cc38dee81490d5301008cfc22f9", only: :test},
       {:binary, "~> 0.0.5"},
-      {:boundary, "~> 0.10", runtime: false},
+      {:boundary, "~> 0.12", runtime: false},
       {:ecto_sqlite3, "~> 0.25"},
       {:group, "~> 0.3"},
       {:thousand_island, "~> 1.0"},
