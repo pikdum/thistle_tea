@@ -474,7 +474,7 @@
               cp -r ${thistle-tea-node-modules}/node_modules assets/node_modules
             '';
 
-            NAMIGATOR_SRC = namigator-src;
+            env.NAMIGATOR_SRC = namigator-src.outPath;
 
             preConfigure = ''
               export HOME=$TMPDIR
