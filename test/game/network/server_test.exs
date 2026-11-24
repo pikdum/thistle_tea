@@ -237,6 +237,8 @@ defmodule ThistleTea.Game.Network.ServerTest do
       socket: self(),
       transport_module: TestTransport,
       read_timeout: 0,
+      handshake_timeout: 0,
+      peername: {{127, 0, 0, 1}, 0},
       silent_terminate_on_error: false,
       span: span
     }

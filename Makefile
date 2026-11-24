@@ -13,6 +13,7 @@ TARGET_ABI ?= $(shell uname -s | tr '[:upper:]' '[:lower:]')
 
 CPPFLAGS := -shared -fPIC -fvisibility=hidden -std=c++17 -Wno-multichar -DDT_POLYREF64
 FINE_INCLUDE_DIR ?= deps/fine/c_include
+FINE_HEADERS := $(FINE_INCLUDE_DIR)/fine.hpp $(FINE_INCLUDE_DIR)/fine/sync.hpp
 CPPFLAGS += -I$(ERTS_INCLUDE_DIR) -I$(FINE_INCLUDE_DIR)
 CPPFLAGS += -I$(NAMIGATOR_SRC)
 CPPFLAGS += -I$(NAMIGATOR_SRC)/pathfind
@@ -64,7 +65,7 @@ $(STAMP):
 	@ mkdir -p $(PRIV_DIR)/native
 	@ touch $(STAMP)
 
-$(NIF_PATH): $(SOURCES) $(STAMP)
+$(NIF_PATH): $(SOURCES) $(FINE_HEADERS) $(STAMP)
 	@test -d "$(NAMIGATOR_SRC)/recastnavigation/Detour/Source" || (echo "missing namigator recastnavigation submodule under $(NAMIGATOR_SRC)" >&2; exit 1)
 	@ mkdir -p $(PRIV_DIR)/native
 	$(CXX) $(CPPFLAGS) $(SOURCES) -o $(NIF_PATH) $(LDFLAGS)

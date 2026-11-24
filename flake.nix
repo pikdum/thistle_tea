@@ -127,7 +127,7 @@
             version = "0.1.0";
             src = ./assets;
             # Bump via `prefetch-npm-deps assets/package-lock.json`.
-            npmDepsHash = "sha256-VUg28u7/6NWlpdwQSTucC8XotibqIBZsoHqjqmssYFk=";
+            npmDepsHash = "sha256-OTGUQkDOH4+Sm2JqkuuCYrTldBFXopkWCKSzHNPzdyk=";
             dontNpmBuild = true;
 
             installPhase = ''
@@ -434,9 +434,21 @@
             };
           };
 
-          beam = pkgs.beam_minimal.packages.erlang_29.extend (
-            _: previous: {
-              elixir = previous.elixir_1_20;
+          beam = pkgs.beam_minimal.packages.erlang_29.overrideScope (
+            final: previous: {
+              elixir = final.elixir_1_20;
+              erlang = previous.erlang.overrideAttrs (
+                old:
+                pkgs.lib.optionalAttrs (pkgs.lib.versionOlder old.version "29.1.3") {
+                  version = "29.1.3";
+                  src = pkgs.fetchFromGitHub {
+                    owner = "erlang";
+                    repo = "otp";
+                    tag = "OTP-29.1.3";
+                    hash = "sha256-4iE84PlRkdVoZVNBOmGc+/kNINGipY4TEyGqJ4PiIFc=";
+                  };
+                }
+              );
             }
           );
 

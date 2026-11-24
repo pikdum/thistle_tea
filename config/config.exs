@@ -5,7 +5,7 @@ alias ThistleTea.DB.Mangos.Repo
 alias ThistleTea.Game.World.Spell.SpellTargetResolver
 
 config :esbuild,
-  version: "0.17.11",
+  version: "0.28.2",
   thistle_tea: [
     args:
       ~w(js/app.js --bundle --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/*),
@@ -28,7 +28,7 @@ config :logger, :default_formatter,
 config :phoenix, :json_library, Jason
 
 config :tailwind,
-  version: "4.3.2",
+  version: "4.3.5",
   thistle_tea: [
     args: ~w(
       --input=css/app.css
